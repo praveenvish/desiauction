@@ -159,7 +159,7 @@ All suggestions, ideas, and non-Critical findings discovered during research are
 
 ## 11 · NEXT THREE ACTIONS
 
-1. **Founder: run the field-kit §0 device check + RC1 pre-flight** — `git status` clean in `prototypes/va1/`, spot-check one SHA-256 checksum, real phone at ≤640px, touch-hold, screen-reader pass, F-HD-2 two-second look. ([X1_FIELD_KIT.md](X1_FIELD_KIT.md))
+1. **Founder: run the field-kit §0 PHYSICAL device check** — real phone at ≤640px, touch-hold-to-bid, screen-reader pass, fps feel, F-HD-2 two-second gold look. ([X1_FIELD_KIT.md](X1_FIELD_KIT.md)) *The machine half of the pre-flight is already DONE by the program (2026-07-12): worktree clean + all 12 SHA-256 checksums verified against RC1_MANIFEST — sessions will be on RC1.*
 2. **Founder: schedule and run P-F (pilot session)** on RC1, fresh incognito, full protocol dry-run — pilot validates the *process*, not the product.
 3. **Founder: recruit the neutral panel** — start with the 3 organizers (the binding constraint: ≥2 required for packet completeness), then owners/players/general; book dates so the 48h-recall tail is calendared up front.
 
@@ -174,6 +174,7 @@ All suggestions, ideas, and non-Critical findings discovered during research are
 | 2026-07-12 | 14:50 IST | RC2_BACKLOG.md opened; seeded with 9 pre-X1 carry-overs from RC1_MANIFEST §6 / Expert Review (capture only) | Program Director |
 | 2026-07-12 | 14:50 IST | x1-evidence/DASHBOARD.md marked SUPERSEDED as dashboard-of-record (remains the print workbook tally); Mission Control is now the only dashboard | Program Director |
 | 2026-07-12 | 14:55 IST | Execution discipline activated: completion gate expanded into the 12-item Phase Definition of Done checklist; item 1 (RC1 frozen) checked; phase completion 1/12 (~8%) | Execution Director |
+| 2026-07-12 | 15:00 IST | RC1 integrity pre-flight (machine half) EXECUTED: `git status` clean in `prototypes/va1/`; all 12 SHA-256 checksums computed and matched against RC1_MANIFEST §1 (12/12 ✓). Founder pre-flight burden reduced to the physical device check only | Execution Director |
 
 ---
 
