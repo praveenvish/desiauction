@@ -1,0 +1,60 @@
+# Engine deploys (IP-0_DESIGN §20): staging on every main push once the Fly
+# account exists (§32 founder externals); production is manual dispatch only
+# and gains the C-22 live-window check in IP-7.
+name: deploy-engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/engine/**"
+      - "packages/core/**"
+      - "packages/contracts/**"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Fly credentials
+        id: creds
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "FLY_API_TOKEN not configured — deploy skipped (IP-0_DESIGN §32 founder externals pending)." >> "$GITHUB_STEP_SUMMARY"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.creds.outputs.configured == 'true'
+      - name: Deploy
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          APP="desiauction-engine-${{ inputs.environment || 'staging' }}"
+          flyctl deploy --config apps/engine/fly.toml --app "$APP" \
+            --build-arg APP_VERSION="${GITHUB_SHA::7}" --remote-only
+      - name: Post-deploy smoke
+        if: steps.creds.outputs.configured == 'true'
+        run: |
+          APP="desiauction-engine-${{ inputs.environment || 'staging' }}"
+          for i in $(seq 1 12); do
+            if curl -fsS "https://$APP.fly.dev/healthz" >/dev/null; then
+              echo "healthz OK"; exit 0
+            fi
+            sleep 5
+          done
+          echo "healthz did not come up"; exit 1

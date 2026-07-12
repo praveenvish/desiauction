@@ -2,26 +2,48 @@
 
 **The trusted operating system for community sports auctions.**
 
-This repository is a greenfield enterprise rebuild. It is not a refactor, not a migration, and not a redesign of the previous implementation. The previous repository serves exactly one purpose: behavioural documentation — business rules, workflows, edge cases, and acceptance criteria. Nothing else crosses over. No code, no architecture, no folder structure, no visual language.
+This repository is a greenfield enterprise rebuild. The previous repository serves exactly one purpose: behavioural documentation — business rules, workflows, edge cases, acceptance criteria. Nothing else crosses over.
 
 ## Status
 
-**Phase 1 — Product Operating System (documentation).** No production code exists yet, by design.
+**Phase 2 — Implementation. Active phase: IP-0 (Engineering Foundation).**
+Governed by [docs/00-index.md](docs/00-index.md) (the Canon), [docs/phase-2/IMPLEMENTATION_BLUEPRINT.md](docs/phase-2/IMPLEMENTATION_BLUEPRINT.md) (frozen roadmap, M0-approved) and [docs/phase-2/IP-0_DESIGN.md](docs/phase-2/IP-0_DESIGN.md) (active-phase design).
 
-> Code follows documentation. Never the reverse.
+## Quickstart (target: under 30 minutes, IP-0_DESIGN §33)
 
-## How this repository works
+Prerequisites: git, Docker, Node ≥ 24 (`.node-version`), pnpm 10 (`npm i -g pnpm@10`).
 
-- [`docs/00-index.md`](docs/00-index.md) is the entry point. It holds the **Canon** — the ~two dozen ratified decisions every other document must agree with — and the reading order.
-- Documents `01`–`70` form the complete Product Operating System: product, design, UX patterns, domain, platform, and engineering.
-- [`docs/reviews/`](docs/reviews/) holds the Phase 1 gate reviews (product, UX, architecture, CTO). Phase 2 (implementation planning) begins only after every review passes and the founder approves.
+```sh
+pnpm install
+docker compose up -d                 # Postgres 17 (:5433) + MinIO (:9000)
+cp .env.example .env.local           # local values; never real secrets
+pnpm env:check                       # fail-closed env validation
+pnpm --filter @desiauction/engine db:migrate
+pnpm dev                             # web :3000 + engine :4000
+pnpm verify                          # lint + typecheck + test + format + boundaries
+```
+
+## Layout
+
+| Path                 | What                                                   | Boundary               |
+| -------------------- | ------------------------------------------------------ | ---------------------- |
+| `apps/web`           | Next.js — Console, Stage, Owner Room, registration     | imports packages only  |
+| `apps/engine`        | Fastify+ws — auction runtime (IP-4)                    | imports packages only  |
+| `packages/core`      | pure domain: money, clock, (IP-4) reducer + invariants | imports nothing        |
+| `packages/contracts` | Zod schemas for everything on a wire                   | zod only               |
+| `packages/ui`        | FLOODLIGHT components (empty until IP-1)               | React only, never core |
+| `packages/config`    | shared tsconfig / eslint / prettier                    | leaf                   |
+| `spikes/`            | throwaway experiments; nothing may import them         | quarantined            |
+
+Boundaries are machine-enforced: `pnpm depcruise`. Trunk-based, squash-only PRs with conventional-commit titles, no local git hooks — CI enforces (IP-0_DESIGN §16–§20).
 
 ## Rules of the repository
 
 1. **Docs are the source of truth.** A PR that makes code disagree with a doc must change the doc first, in the same PR, with the reasoning.
 2. **The Canon wins conflicts.** If two documents disagree, the one consistent with `00-index.md` Canon is correct; fix the other.
-3. **The 35 invariants** ([`docs/40-business-rules.md`](docs/40-business-rules.md)) are constitutional. No feature ships that violates one; violating states should be unrepresentable, not merely forbidden.
-4. **The old repository is read-only reference.** Cite it as behaviour ("the reference implementation does X"), never as justification for an architecture or design decision.
+3. **The 35 invariants** ([docs/40-business-rules.md](docs/40-business-rules.md)) are constitutional. Violating states should be unrepresentable, not merely forbidden.
+4. **The old repository is read-only reference.** Cite it as behaviour, never as justification for architecture or design.
+5. **One implementation phase at a time.** Work belonging to a future phase is recorded, never executed (Blueprint §1).
 
 ## The five-second test
 
