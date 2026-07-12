@@ -1,6 +1,8 @@
 # RC2 BACKLOG — capture only
 ## X1 Human Research Program · DesiAuction Next
 
+> **STATUS 2026-07-12: ACTIVE — survives X1 closure.** X1 was closed by executive waiver (X1_EXECUTIVE_WAIVER.md); this backlog carries forward into implementation. Items get evaluated only inside the implementation phase that owns their surface — never retroactively into the frozen `va1-rc1` prototype.
+
 > **Rules:** Every suggestion, idea, or non-Critical finding discovered during X1 lands here — UI, motion, features, copy, accessibility, design. **Do not prioritize. Do not evaluate. Nothing enters RC1.** RC1 is frozen (tag `va1-rc1`); only Critical defects break the freeze, and those go to the Mission Control defect tracker, not here.
 > Append-only. Each entry: ID, date, source, verbatim capture.
 

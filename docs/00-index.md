@@ -33,6 +33,7 @@ Ratified cross-cutting decisions. Every document cites these as `C-n`.
 | **C-22** | **Live-aware operations**: no production deploy, migration, or risky maintenance while any auction is LIVE; the platform knows its own live windows and enforces the freeze. |
 | **C-23** | **Dignity rules**: UNSOLD is a neutral fact, never a public list; rejection reasons are recorded but never public; contact and payment details of people are never public. The five emotional beats (04) are protected requirements, not aspirations. |
 | **C-24** | **India-first**: DPDP Act 2023 compliance, Mumbai-region infrastructure, phone-first identity (OTP + passkeys), bilingual-ready copy (en → hi), Indian number notation. |
+| **C-25** | **Player identity is a first-class product experience.** Every player has a premium visual identity: a real photograph where one exists, a **premium branded placeholder** where it does not — generic silhouettes are banned. Represented consistently across Auction Stage, Owner Room, SOLD Ceremony, Team Roster, Player Profile, and Search. (Founder executive decision 2026-07-12; provenance = informal organizer input recorded in `phase-0b/X1_EXECUTIVE_WAIVER.md` — executive input, not formal research.) |
 
 ## Reading order
 
