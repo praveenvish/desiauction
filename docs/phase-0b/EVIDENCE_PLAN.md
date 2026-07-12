@@ -273,7 +273,8 @@ Phase 0B **ends** when every row below has its evidence artifact recorded in §1
 
 | Date | Activity | Artifact | Verdict vs criteria | Register deltas |
 |---|---|---|---|---|
-| — | — | *(no evidence yet — plan approved date pending)* | — | — |
+| 2026-07-11 | VA-1 build + browser verification | `prototypes/va1/` (baf6278) + README H1–H10 register | Instrument functional (sale loop, ceremonies ×2 directions, conduct, bid mechanics, resync narration, 0 console errors); **no X1 criteria evaluated yet** | A-E-adjacent: doc-41 slab default gains first evidence (flat increments → ~10-min duels); A-V3: machine-level parity frames favor Anek (Direction A) |
+| 2026-07-11 | VA-1 Review Board (independent panel) | `docs/phase-0b/VA1_REVIEW_BOARD.md` | **GO WITH CONDITIONS G1–G4**: 0 hypotheses validated (expected — zero human evidence); H7 inconclusive-partial; 3 instrument gaps named (holds unexercised, mobile render unverified, fps unmeasurable remotely); VA-2 blocked on multi-device ruling (CF-2) + X1 | New protocol requirements: incognito-per-participant (CF-3 contamination observed), A/B counterbalancing, facilitator warm-up |
 
 ## 12 · Risk register — Phase 0B itself
 
