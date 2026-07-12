@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-dir="A">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA-1 · Stage — Sitapur Premier League</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@500;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600;700&family=Tiro+Devanagari+Hindi&family=Mukta:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/stage.css">
+</head>
+<body class="stage">
+  <div class="stage-root">
+    <header class="s-head">
+      <div class="s-title">Sitapur <b>Premier League</b> · Player Auction 2026</div>
+      <div class="s-lot" id="lotNo"></div>
+    </header>
+
+    <main class="s-main">
+      <section class="s-player" aria-live="off">
+        <div class="role"><span class="chip" id="pRole"></span></div>
+        <h1 class="s-name display" id="pName"></h1>
+        <div class="s-sub" id="pSub"></div>
+        <div class="s-base" id="pBase"></div>
+      </section>
+
+      <section class="s-bidbox" id="bidbox">
+        <div class="s-current-label" id="curLabel">Current bid</div>
+        <div class="s-current money roll" id="cur" data-v="0">—</div>
+        <div class="s-leader" id="leader"></div>
+        <div id="ring" role="timer" aria-label="Time remaining"></div>
+      </section>
+    </main>
+
+    <footer class="s-foot">
+      <div class="s-book" id="book" aria-label="Recent sales"></div>
+      <div class="s-purses" id="purses" aria-label="Team purses"></div>
+    </footer>
+  </div>
+
+  <div class="s-rest" id="rest">
+    <div>
+      <div class="r-label" id="restLabel">Next on the block</div>
+      <div class="r-name display" id="restName"></div>
+      <div class="r-pulse"></div>
+    </div>
+  </div>
+
+  <div id="ceremony" aria-live="polite"></div>
+  <script src="js/stage.js"></script>
+</body>
+</html>

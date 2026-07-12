@@ -1,0 +1,52 @@
+/* Owner Room: agency under pressure. Load ceiling low BY FORCE (§3). */
+
+body.owner { background: var(--bg); }
+.phone { min-height: 100vh; display: flex; flex-direction: column; }
+@media (min-width: 640px) { /* desktop judging: show the phone as a phone */
+  body.owner { display: grid; place-items: center; padding: 30px; background: color-mix(in srgb, var(--bg) 60%, black 40%); }
+  .phone { width: 392px; min-height: 780px; max-height: 92vh; border: 1px solid var(--line); border-radius: 42px;
+    overflow: hidden; background: var(--bg); box-shadow: var(--shadow); position: relative; }
+}
+
+.o-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 10px; }
+.o-team { display: flex; align-items: center; gap: 9px; font-weight: 700; }
+.o-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+.o-dot.bad { background: var(--warn); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+
+.o-purse { display: flex; justify-content: space-between; padding: 10px 18px 14px; }
+.o-purse .cell .l { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); }
+.o-purse .cell .v { font-family: var(--font-money); font-weight: 700; font-size: 19px; }
+
+.o-lot { flex: 1; margin: 0 14px; padding: 20px 18px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+.o-lot .ln { font-size: 12px; color: var(--text-faint); font-family: var(--font-money); }
+.o-pname { font-size: 34px; line-height: 1.08; }
+.o-psub { color: var(--text-dim); font-size: 13px; }
+.o-cur { margin-top: auto; display: flex; align-items: end; justify-content: space-between; }
+.o-cur .amt { font-family: var(--font-money); font-weight: 700; font-size: 40px; }
+.o-cur .amt.yours { color: var(--accent); }
+.o-state { margin-top: 6px; min-height: 22px; font-size: 14px; }
+.o-state .lead-you { color: var(--accent); font-weight: 700; }
+.o-state .lead-them { color: var(--text-dim); }
+.o-ring { position: absolute; top: 16px; right: 14px; }
+
+.o-recent { padding: 10px 18px; display: grid; gap: 6px; min-height: 86px; }
+.o-recent .r { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim);
+  animation: rIn var(--t-med) var(--ease); }
+@keyframes rIn { from { opacity: 0; transform: translateY(4px); } }
+.o-recent .r .a { font-family: var(--font-money); color: var(--text); }
+
+.o-bidbar { padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 8px; }
+.o-bid { width: 100%; padding: 18px; font-size: 19px; font-weight: 800; border-radius: 18px; }
+.o-bid .sub { display: block; font-size: 11px; font-weight: 600; opacity: .75; margin-top: 2px; letter-spacing: .05em; }
+.o-hint { text-align: center; font-size: 12px; color: var(--text-faint); min-height: 16px; }
+
+/* Reconnect takeover — the resync narrates itself before accepting input (EP-10) */
+.o-resync { position: absolute; inset: 0; z-index: 50; display: none; place-items: center; text-align: center;
+  background: color-mix(in srgb, var(--bg) 88%, black 12%); padding: 30px; }
+.o-resync.on { display: grid; }
+.o-resync .steps { display: grid; gap: 14px; font-size: 15px; }
+.o-resync .step { opacity: .25; transition: opacity var(--t-med); display: flex; gap: 10px; align-items: center; justify-content: flex-start; text-align: left; }
+.o-resync .step.done { opacity: 1; }
+.o-resync .step .tick { width: 20px; text-align: center; color: var(--ok); }
+.o-resync .step .money { color: var(--text); }

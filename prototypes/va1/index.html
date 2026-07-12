@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" data-dir="A">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA-1 · Experience Prototype — DesiAuction Next</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@500;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 30px; }
+  .wrap { max-width: 680px; }
+  h1 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 42px; line-height: 1.05; }
+  .sub { color: var(--text-dim); margin: 12px 0 26px; }
+  .cards { display: grid; gap: 12px; }
+  a.card { display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: inherit;
+    padding: 18px 20px; }
+  a.card:hover { background: var(--panel-2); }
+  a.card .t { font-weight: 700; }
+  a.card .d { color: var(--text-dim); font-size: 13px; margin-top: 2px; }
+  a.card .go { color: var(--accent); font-family: var(--font-money); }
+  .note { margin-top: 26px; font-size: 13px; color: var(--text-faint); line-height: 1.6; }
+  .note b { color: var(--text-dim); }
+  .dirrow { margin-top: 18px; display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <span class="chip">VA-1 · Evidence instrument · throwaway</span>
+    <h1>Sitapur Premier League<br>Player Auction 2026</h1>
+    <div class="sub">Three experiences. Two visual directions. One question: does VA-0 survive contact with reality?</div>
+
+    <div class="cards">
+      <a class="card panel" href="stage.html"><span><span class="t">Auction Stage</span><div class="d">The hall / projector view. Runs itself if no Cockpit drives it.</div></span><span class="go">→</span></a>
+      <a class="card panel" href="owner.html"><span><span class="t">Owner Room</span><div class="d">Mobile bidding — open on a phone, or judge the framed phone on desktop.</div></span><span class="go">→</span></a>
+      <a class="card panel" href="cockpit.html"><span><span class="t">Cockpit</span><div class="d">The operator's seat. If open, it drives Stage & Owner tabs live.</div></span><span class="go">→</span></a>
+    </div>
+
+    <div class="dirrow">Direction: <button class="btn" id="da">A · Floodlight</button> <button class="btn" id="db">B · Maidan</button></div>
+
+    <div class="note">
+      <b>How to demo:</b> open the Cockpit in one tab and the Stage in another (same browser) — the Cockpit drives both. Press <b>O</b> to open a lot; rival teams bid on their own; hold <b>Space</b> to bring the gavel down, or let the timer decide. Open the Owner Room on this machine (third tab) to bid as Sitapur Strikers. The ⚙ drawer on every page switches direction A/B, reduced motion, and failure simulations (disconnect, stall, unsold).<br><br>
+      <b>What this is:</b> the Phase 0B VA-1 evidence instrument (see <code>README.md</code> for the hypothesis register). Fake data, no backend, no production code. Judged against <code>docs/EXPERIENCE_DIRECTION.md</code> §12.
+    </div>
+  </div>
+<script>
+  document.documentElement.dataset.dir = localStorage.getItem('va1dir') || 'A';
+  const mark = () => {
+    document.getElementById('da').classList.toggle('primary', document.documentElement.dataset.dir === 'A');
+    document.getElementById('db').classList.toggle('primary', document.documentElement.dataset.dir === 'B');
+  };
+  document.getElementById('da').onclick = () => { localStorage.setItem('va1dir', 'A'); document.documentElement.dataset.dir = 'A'; mark(); };
+  document.getElementById('db').onclick = () => { localStorage.setItem('va1dir', 'B'); document.documentElement.dataset.dir = 'B'; mark(); };
+  mark();
+</script>
+</body>
+</html>

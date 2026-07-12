@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-dir="A">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VA-1 · Owner Room — Sitapur Strikers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@500;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600;700&family=Tiro+Devanagari+Hindi&family=Mukta:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/owner.css">
+</head>
+<body class="owner">
+  <div class="phone">
+    <header class="o-head">
+      <div class="o-team"><span class="o-dot" id="dot"></span> Sitapur Strikers</div>
+      <span class="chip">Owner</span>
+    </header>
+
+    <div class="o-purse">
+      <div class="cell"><div class="l">Purse left</div><div class="v money roll" id="purse" data-v="0">—</div></div>
+      <div class="cell"><div class="l">Spent</div><div class="v money" id="spent">—</div></div>
+      <div class="cell"><div class="l">Squad</div><div class="v money" id="squad">0 / 8</div></div>
+    </div>
+
+    <section class="o-lot panel">
+      <div class="ln" id="lotLabel">Lot —</div>
+      <h1 class="o-pname display" id="pname">—</h1>
+      <div class="o-psub" id="psub"></div>
+      <div class="o-ring" id="oring" role="timer" aria-label="Time remaining"></div>
+      <div class="o-cur"><div class="amt money roll" id="cur" data-v="0">—</div></div>
+      <div class="o-state" id="stateLine"></div>
+    </section>
+
+    <div class="o-recent" id="recent" aria-label="Recent bids"></div>
+
+    <div class="o-bidbar">
+      <button class="btn primary o-bid" id="bid">Waiting…</button>
+      <div class="o-hint" id="hint"></div>
+    </div>
+
+    <div class="o-resync" id="resync">
+      <div class="steps">
+        <div class="step"><span class="tick">✓</span><span>Signal lost — <b>your record is safe</b></span></div>
+        <div class="step"><span class="tick">✓</span><span>Rejoining the auction…</span></div>
+        <div class="step"><span class="tick">✓</span><span id="resyncFacts">Caught up</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ceremony" aria-live="off"></div>
+  <div id="a11y" class="sr-only" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></div>
+  <script src="js/owner.js"></script>
+</body>
+</html>

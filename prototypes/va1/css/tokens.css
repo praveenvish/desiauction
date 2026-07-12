@@ -1,0 +1,70 @@
+/* VA-1 prototype tokens — two visual directions, one experience constitution.
+   Direction A = FLOODLIGHT (broadcast night: ink + volt, gold is earned)
+   Direction B = MAIDAN (heritage daylight: field green + ivory, gold is earned)
+   Both obey VA-0: two temperatures, one truth. All three VA-1 surfaces are
+   stadium-temperature, so both directions render their *stadium* register here. */
+
+:root {
+  --font-ui: "Geist", "Inter", "Mukta", system-ui, sans-serif;
+  --font-display: "Anek Devanagari", "Inter", sans-serif;
+  --font-money: "Geist Mono", ui-monospace, "SF Mono", monospace;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+
+  --t-fast: 140ms;
+  --t-med: 240ms;
+  --t-slow: 420ms;
+  --ease: cubic-bezier(.2,.8,.2,1);
+}
+
+/* ---------- DIRECTION A · FLOODLIGHT ---------- */
+html[data-dir="A"] {
+  --bg: #07090F;
+  --bg-raise: #0C111B;
+  --panel: #111827;
+  --panel-2: #18202F;
+  --line: #232D40;
+  --text: #EAEFF7;
+  --text-dim: #8E9BB0;
+  --text-faint: #5A6578;
+  --accent: #C8F135;          /* volt */
+  --accent-ink: #0A0F05;
+  --accent-dim: #93B622;
+  --gold-1: #F4D06F;
+  --gold-2: #C9922E;
+  --ok: #4ADE80;
+  --warn: #FFC24D;
+  --danger: #FF7A7A;
+  --ceremony-bg: #050608;
+  --shadow: 0 10px 40px rgba(0,0,0,.5);
+  --font-display: "Anek Devanagari", "Inter", sans-serif;
+  --display-weight: 700;
+  --display-tracking: -0.01em;
+}
+
+/* ---------- DIRECTION B · MAIDAN ---------- */
+html[data-dir="B"] {
+  --bg: #0B2E24;              /* evening field green */
+  --bg-raise: #10382C;
+  --panel: #143C30;
+  --panel-2: #1A4538;
+  --line: #26523F;
+  --text: #F7F1E3;            /* warm chalk */
+  --text-dim: #B9C4AF;
+  --text-faint: #7E8F7F;
+  --accent: #E8C46A;          /* heritage gold doubles as accent…    */
+  --accent-ink: #21190A;
+  --accent-dim: #B98A2F;
+  --gold-1: #F1D48A;          /* …ceremony gold stays a warmer tier  */
+  --gold-2: #B98A2F;
+  --ok: #7FD8A4;
+  --warn: #F3B95F;
+  --danger: #F08A7E;
+  --ceremony-bg: #071F17;
+  --shadow: 0 10px 40px rgba(4,20,14,.55);
+  --font-display: "Fraunces", "Tiro Devanagari Hindi", serif;
+  --display-weight: 600;
+  --display-tracking: 0;
+}

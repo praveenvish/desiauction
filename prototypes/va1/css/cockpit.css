@@ -1,0 +1,57 @@
+/* Cockpit: level under peak. A pilot's panel, not a firefighter's. */
+
+body.cockpit { overflow: hidden; }
+.k-root { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 18px 22px; gap: 16px; max-width: 1280px; margin: 0 auto; }
+
+.k-head { display: flex; align-items: center; justify-content: space-between; }
+.k-head .t { font-weight: 700; letter-spacing: .02em; }
+.k-head .t span { color: var(--text-faint); font-weight: 500; }
+.k-status { display: flex; gap: 10px; align-items: center; }
+
+.k-main { display: grid; grid-template-columns: 270px 1fr 280px; gap: 16px; min-height: 0; }
+.k-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.k-card { padding: 16px; }
+.k-card h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--text-faint); margin-bottom: 10px; }
+
+/* Left: conduct */
+.k-next-action { text-align: center; padding: 22px 16px; }
+.k-next-action .lbl { font-size: 12px; color: var(--text-faint); margin-bottom: 10px; }
+.k-next-action .btn { width: 100%; padding: 14px; font-size: 15px; }
+.k-gavel { margin-top: 10px; }
+.k-gavel .btn { background: var(--panel-2); }
+.k-gavel .btn.armed { border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
+.k-controls { display: grid; gap: 8px; }
+.k-controls .btn { justify-content: space-between; font-size: 13px; padding: 9px 12px; }
+
+/* Center: the live truth */
+.k-live { flex: 1; display: grid; align-content: center; justify-items: center; gap: 10px; text-align: center; position: relative; }
+.k-live .lot { font-family: var(--font-money); font-size: 12px; color: var(--text-faint); }
+.k-live .nm { font-size: clamp(28px, 3.6vw, 46px); line-height: 1.05; }
+.k-live .cur { font-family: var(--font-money); font-weight: 700; font-size: clamp(30px, 4vw, 52px); }
+.k-live .cur.has { color: var(--accent); }
+.k-live .who { color: var(--text-dim); font-size: 14px; min-height: 20px; }
+.k-live .idle-hint { color: var(--text-faint); font-size: 14px; }
+.k-bids { display: grid; gap: 5px; width: 100%; max-width: 380px; margin-top: 6px; }
+.k-bids .b { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim);
+  padding: 6px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line);
+  animation: rIn var(--t-med) var(--ease); }
+@keyframes rIn { from { opacity: 0; transform: translateY(4px); } }
+.k-bids .b .a { font-family: var(--font-money); color: var(--text); }
+
+/* Right: attention rail — a queue of single decisions, never a wall */
+.k-queue .q { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.k-queue .q:last-child { border-bottom: 0; }
+.k-queue .q .b { font-family: var(--font-money); font-size: 12px; color: var(--text-faint); }
+.k-flags { display: grid; gap: 8px; }
+.k-flags .f { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-dim); }
+.k-flags .f::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+.k-flags .f.warn::before { background: var(--warn); }
+.k-teams { display: grid; gap: 7px; }
+.k-teams .tm { display: flex; justify-content: space-between; font-size: 13px; }
+.k-teams .tm .v { font-family: var(--font-money); color: var(--text-dim); }
+
+.k-foot { display: flex; justify-content: space-between; align-items: center; color: var(--text-faint); font-size: 12px; }
+.k-keys { display: flex; gap: 14px; }
+.k-keys span { display: inline-flex; gap: 6px; align-items: center; }
+
+@media (max-width: 980px) { .k-main { grid-template-columns: 1fr; } .k-root { overflow: auto; height: auto; min-height: 100vh; } body.cockpit { overflow: auto; } }

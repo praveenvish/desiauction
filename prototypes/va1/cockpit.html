@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-dir="A">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VA-1 · Cockpit — Sitapur Premier League</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anek+Devanagari:wght@500;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600;700&family=Tiro+Devanagari+Hindi&family=Mukta:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/cockpit.css">
+</head>
+<body class="cockpit">
+  <div class="k-root">
+    <header class="k-head">
+      <div class="t">Auction Cockpit <span>· Sitapur Premier League 2026</span></div>
+      <div class="k-status">
+        <span class="chip" id="connChip">Feed healthy</span>
+        <span class="chip" id="phase">Ready</span>
+      </div>
+    </header>
+
+    <main class="k-main">
+      <div class="k-col">
+        <div class="panel k-card k-next-action">
+          <div class="lbl" id="nextLbl">Next decision</div>
+          <button class="btn primary" id="open">Open next lot</button>
+          <div class="k-gavel"><button class="btn" id="gavel">Hold to close lot <kbd>Space</kbd></button></div>
+        </div>
+        <div class="panel k-card">
+          <h3>Conduct</h3>
+          <div class="k-controls">
+            <button class="btn" id="pause">Pause auction <kbd>P</kbd></button>
+            <button class="btn" id="auto">Auto-run off</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="k-col">
+        <div class="panel k-card k-live">
+          <div class="lot" id="klot">—</div>
+          <h1 class="nm display" id="knm">No lot on the block</h1>
+          <div class="cur money roll" id="kcur" data-v="0">—</div>
+          <div class="who" id="kwho"></div>
+          <div id="kring" role="timer" aria-label="Time remaining"></div>
+          <div class="k-bids" id="kbids"></div>
+        </div>
+      </div>
+
+      <div class="k-col">
+        <div class="panel k-card k-queue"><h3>Up next</h3><div id="queue"></div></div>
+        <div class="panel k-card"><h3>Attention</h3><div class="k-flags" id="flags"></div></div>
+        <div class="panel k-card"><h3>Purses</h3><div class="k-teams" id="teams"></div></div>
+      </div>
+    </main>
+
+    <footer class="k-foot">
+      <div id="done">0 lots settled</div>
+      <div class="k-keys">
+        <span><kbd>O</kbd> open next</span>
+        <span><kbd>Space</kbd> hold to close</span>
+        <span><kbd>P</kbd> pause</span>
+      </div>
+    </footer>
+  </div>
+  <script src="js/cockpit.js"></script>
+</body>
+</html>
