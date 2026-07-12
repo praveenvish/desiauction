@@ -1,9 +1,11 @@
 # IMPLEMENTATION BLUEPRINT
-## DesiAuction NEXT · Phase 2 · v1.0 DRAFT · 2026-07-12 · CTO
+## DesiAuction NEXT · Phase 2 · **v1.1 FROZEN** · 2026-07-12 · CTO
+
+> 🔒 **FROZEN at M0 (2026-07-12), verdict APPROVE WITH CONDITIONS — all six conditions RC-1..RC-6 applied in this version.** Review record: [M0_BLUEPRINT_REVIEW.md](M0_BLUEPRINT_REVIEW.md). No roadmap redesign, no phase resequencing, no governance redesign hereafter; improvements occur only inside the active implementation phase. **Active phase: IP-0.**
 
 > **Authority.** Governed by the Canon (C-1..C-25, `docs/00-index.md`), the Experience Direction (VA-0: ⟪SOUL⟫, EP-1..14, XC-1..12), the 35 invariants (doc 40), and the six Golden Journeys (doc 70). Business behaviour is immutable; this blueprint decides *sequence and discipline*, never product philosophy.
 > **Provenance.** Phase X1 closed by executive waiver (`docs/phase-0b/X1_EXECUTIVE_WAIVER.md`). Waived uncertainty is carried here as watch items WI-1..WI-10; open 0B activities (VA-3/5/6/8/9) appear below as **hard gates**, not assumptions.
-> **Status: DRAFT — founder approval of this document opens IP-0.** No production code before that approval. Only the active phase ever receives detailed engineering design; this document intentionally stays at phase altitude for all phases.
+> **Status: FROZEN (M0 passed).** Only the active phase ever receives detailed engineering design; this document intentionally stays at phase altitude for all phases. No production code before `IP-0_DESIGN.md`.
 
 ---
 
@@ -15,7 +17,7 @@ Nine sequential phases. One active at a time. Each ends frozen.
 |---|---|---|---|---|---|
 | IP-0 | Foundation & Proven Substrate | Monorepo, CI, environments, observability skeleton — on a substrate proven by the engine tracer bullet | M | Blueprint approval | **VA-5** tracer bullet = exit gate |
 | IP-1 | FLOODLIGHT Design System | `packages/ui`: tokens, type, motion grammar, core components, **player identity system (C-25)** | M | IP-0 | **VA-8** sound + Hindi voice rulings = inputs; **WI-7** Devanagari ruling |
-| IP-2 | Identity, Tenancy & Access | People, orgs, phone-first auth (OTP + passkeys), grants (C-8), RLS, DPDP data map | M | IP-0 (IP-1 partial ok) | Photo-consent design (C-25 × DPDP) |
+| IP-2 | Identity, Tenancy & Access | People, orgs, phone-first auth (OTP + passkeys), grants (C-8), RLS, DPDP data map | M | IP-1 frozen (RC-6); OTP provider procured (RC-1) | Photo-consent design (C-25 × DPDP); independent auth review (RC-4) |
 | IP-3 | Competition Core | Tournaments, seasons, teams, players, registration + photo intake, Console shell | M–L | IP-1, IP-2 | GJ-1, GJ-2 pass |
 | IP-4 | Auction Engine | Event-sourced ledger, single writer, pure reducer, timers, anti-snipe, slabs, replay, projections (C-9, C-16) | **L** | IP-0 proof, IP-3 data | **VA-6** WS-auth ADR + independent money-path review |
 | IP-5 | Auction Experience | The five surfaces (C-3), SOLD ceremony, recovery narration, real-phone multi-device proof | **L** | IP-1, IP-4 | **Mock auction night** on real phones (WI-4/5/6); GJ-3, GJ-4 pass |
@@ -31,10 +33,10 @@ Common structure per phase: objective · scope in/out · deliverables · DoD · 
 
 ### IP-0 — Foundation & Proven Substrate
 - **Objective:** an engineering platform the rest of the project stands on — and *proof* the chosen substrate can host the engine before we commit to it.
-- **Scope in:** pnpm/turborepo monorepo per C-12 (`apps/web`, `apps/engine`, `packages/core|ui|contracts` — skeletons); TS strict + ESLint + Prettier baseline; CI pipeline with all §4 automated gates; environments (local docker PG, Neon Mumbai dev/staging, Fly dev app); Drizzle + first migration (empty schema + migration discipline proven); OTel + Sentry wiring; secrets management; the **VA-5 tracer bullet**: a ≤500-line vertical spike — append event → pure reduce → project → ack over WS on Neon+Fly.
+- **Scope in:** pnpm/turborepo monorepo per C-12 (`apps/web`, `apps/engine`, `packages/core|ui|contracts` — skeletons); TS strict + ESLint + Prettier baseline; CI pipeline with all §4 automated gates; environments (local docker PG, Neon Mumbai dev/staging, Fly dev app); Drizzle + first migration (empty schema + migration discipline proven); OTel + Sentry wiring; secrets management; **object storage + image pipeline provisioned, Mumbai-resident (RC-2 — consumed by IP-3 photo intake)**; the **VA-5 tracer bullet**: a ≤500-line vertical spike — append event → pure reduce → project → ack over WS on Neon+Fly.
 - **Scope out:** any product feature, any UI beyond a health page, any schema beyond the spike's throwaway table.
 - **Deliverables:** running CI on every PR; deployable hello-engine on Fly Mumbai; tracer-bullet report with measured numbers; `docs/phase-2/IP-0_DESIGN.md` (the only detailed design that exists while IP-0 is active).
-- **Definition of Done:** all §4 gates green on an empty-but-real system; **tracer bullet measured: ledger-append→ack p99 ≤ 20ms engine-internal, full replay of 10k events < 10s, on Neon Mumbai + Fly** (pre-registered VA-5 criteria — if it fails, the substrate decision reopens *here*, cheaply, not in IP-4).
+- **Definition of Done:** all §4 gates green on an empty-but-real system; **tracer bullet measured: ledger-append→ack p99 ≤ 20ms engine-internal, full replay of 10k events < 10s, on Neon Mumbai + Fly** (pre-registered VA-5 criteria — if it fails, the substrate decision reopens *here*, cheaply, not in IP-4); **fan-out probe (RC-5): ≥200 concurrent WS subscribers receive a published event p95 < 500ms on the Fly instance** (additive to VA-5 — the write path was measured, the read fan-out was not; IP-5's mock night is the wrong place to discover fan-out limits).
 - **Acceptance:** founder can clone → `pnpm i` → `pnpm dev` → green; CI badge green; tracer numbers in the report.
 - **Risks:** Fly/Neon regional latency surprises (this is the point); CI over-engineering (right-size for solo+AI per 0A).
 - **Exit:** tracer report committed, phase frozen, IP-1 design doc authorized.
@@ -54,14 +56,14 @@ Common structure per phase: objective · scope in/out · deliverables · DoD · 
 - **Scope in:** people/orgs schema (`org_id` everywhere, RLS defense-in-depth, C-13); phone-first OTP + passkeys (C-24); session management; **grants model (C-8)** with named capability sets; audit log substrate (append-only, actor on every row); DPDP data map + retention rules; **photo-consent capture design** (C-25 makes player photos core data — consent at registration, minors handling, revocation path).
 - **Scope out:** payment identity, public profiles.
 - **Deliverables:** auth flows working in `apps/web`; grants enforcement middleware + per-capability tests; DPDP register doc.
-- **DoD:** authz test matrix (every capability × grant/no-grant) green; RLS verified by attempted cross-tenant reads in tests; OTP rate-limited + no-enumeration.
+- **DoD:** authz test matrix (every capability × grant/no-grant) green; RLS verified by attempted cross-tenant reads in tests; OTP rate-limited + no-enumeration; **independent review of the auth surface by the named reviewer (RC-4 — account takeover at auction time is a money-path attack; same reviewer as IP-4, first engagement here).**
 - **Acceptance:** founder registers with a real phone, creates an org, invites a second person with a narrower grant, and the narrower grant demonstrably cannot exceed scope.
 - **Risks:** OTP provider dependency (procured in IP-0 window); passkey UX on low-end Android.
 - **Exit:** security self-review recorded; frozen.
 
 ### IP-3 — Competition Core
 - **Objective:** everything a tournament is before the auction begins.
-- **Scope in:** tournament/season/team/player schema; registration (GJ-1) incl. **photo upload + placeholder fallback wired end-to-end (C-25)**; team & owner setup; player pools; Console shell in FLOODLIGHT (first real surface, Daylight theme default per C-4); imports (CSV) for players.
+- **Scope in:** tournament/season/team/player schema; registration (GJ-1) incl. **photo upload + placeholder fallback wired end-to-end (C-25, on the IP-0 storage pipeline per RC-2)**; **invites are shareable-link based (RC-3): the organizer forwards links through their own WhatsApp — the platform sends nothing; platform messaging arrives in IP-6 and GJ-1 must never depend on it** (kills the 0A defect-#1 shape); team & owner setup; player pools; Console shell in FLOODLIGHT (first real surface, Daylight theme default per C-4); imports (CSV) for players.
 - **Scope out:** fixtures/standings (post-GA unless a pilot demands them); auction anything.
 - **Deliverables:** GJ-1 (registration) and GJ-2 (tournament setup) passing end-to-end in a real browser incl. real phone.
 - **DoD:** journeys green in CI E2E; every list/detail surface shows player identity per C-25's six-surface contract (the three that exist so far: Roster, Profile, Search).
@@ -144,7 +146,7 @@ A phase closes only when all ten pass. Recorded per phase in `docs/phase-2/GATES
 | 7 | Visual review | FLOODLIGHT conformance on real phone + desktop, screenshots attached |
 | 8 | **Founder review** | live demo, sign-off recorded with date |
 | 9 | Documentation | phase design doc final; affected canon docs (40/41/70/09…) reconciled |
-| 10 | Architecture review | hard rules audit; **independent reviewer for IP-4** (VA-6) |
+| 10 | Architecture review | hard rules audit; **independent reviewer for IP-2 (auth surface, RC-4) and IP-4 (money path, VA-6)** — same named reviewer, two engagements |
 
 ## 5 · RISK REGISTER
 
@@ -158,8 +160,9 @@ A phase closes only when all ten pass. Recorded per phase in `docs/phase-2/GATES
 | R-6 | WhatsApp BSP procurement/template approval lead time | Med | Started day 0; SMS fallback designed from the start. |
 | R-7 | V1-transition ruling absent (0A-B5) | Med | Blocks GA, not build; scheduled with founder before IP-8. |
 | R-8 | Venue-grade networks (patchy 4G, shared WiFi) | Med | EP-9/10 degraded modes are IP-5 scope, tested at mock night, not retrofitted. |
-| R-9 | **C-25 × DPDP: player photos = personal data of possibly-minor players** | Med | Consent at registration, storage/retention rules in IP-2 data map, revocation path; legal check before IP-3 photo intake ships. |
+| R-9 | **C-25 × DPDP: player photos = personal data of possibly-minor players** | Med | Consent at registration, storage/retention rules in IP-2 data map, revocation path, **Mumbai-resident object storage (RC-2)**; legal check before IP-3 photo intake ships. |
 | R-10 | Type licensing / Devanagari display gap (WI-7) | Low | Resolved as an IP-1 ruling; Anek Devanagari is the evidenced candidate. |
+| R-11 | **Same-author governance**: blueprint, reviews, and code share an author; self-certification was 0A's finding zero | High | Numeric evidence-based DoDs (measured p99s, journey E2Es — adjectives can be faked, numbers cannot); founder live demo at every gate; independent reviewer at IP-2 + IP-4 (RC-4); pilot evidence labelled and never backfilled. |
 
 ## 6 · MILESTONE PLAN
 
@@ -187,10 +190,10 @@ Per phase: **(1) Kickoff** — AI writes `IP-<N>_DESIGN.md` (detailed engineerin
 
 **Ready:** behaviour fully specified (docs 40/41/70 + Canon 25); design language specified (05–18) with a browser-proven reference (`va1-rc1`); architecture decided and audit-hardened (0A keeps: C-9/C-3/C-8/C-13/C-16); repo/discipline model defined (this document); AI engineering capacity available now.
 
-**Not ready — must land during IP-0 window (all founder-owned, all external):** ① Neon + Fly + Sentry accounts; ② Razorpay KYC start; ③ **WhatsApp BSP application (longest lead — start today)**; ④ Clash Display licence confirmation + Devanagari decision input; ⑤ name the independent money-path reviewer (VA-6/VA-8); ⑥ DPDP/photo-consent legal check (R-9); ⑦ schedule the VA-8 half-day (sound ruling, Hindi voice register, V1-transition ruling — the last may wait until pre-IP-8 but is cheapest decided early).
+**Not ready — must land during IP-0 window (all founder-owned, all external):** ① Neon + Fly + Sentry accounts; ② Razorpay KYC start; ③ **WhatsApp BSP application (longest lead — start today)**; ④ Clash Display licence confirmation + Devanagari decision input; ⑤ name the independent reviewer (scope: IP-2 auth + IP-4 money path, per RC-4); ⑥ DPDP/photo-consent legal check (R-9); ⑦ schedule the VA-8 half-day (sound ruling, Hindi voice register, V1-transition ruling — the last may wait until pre-IP-8 but is cheapest decided early); ⑧ **SMS/OTP provider account (RC-1 — blocks IP-2)**; ⑨ **object-storage provider selection, Mumbai region (RC-2 — provisioned in IP-0, blocks IP-3)**.
 
 **Verdict: READY TO OPEN IP-0 upon founder approval of this blueprint.** Nothing in the not-ready list blocks IP-0 code; everything in it blocks a *later* phase and is therefore started now.
 
 ---
 
-*Blueprint v1.0 DRAFT · CTO · 2026-07-12. Approval of this document is milestone M0 and opens IP-0. The next artifact after approval is `IP-0_DESIGN.md` — no code before it.*
+*Blueprint v1.1 · CTO · 2026-07-12. M0 passed (APPROVE WITH CONDITIONS, all conditions applied — see M0_BLUEPRINT_REVIEW.md). **FROZEN.** Active phase: IP-0. The next artifact is `IP-0_DESIGN.md` — no code before it.*
