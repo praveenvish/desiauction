@@ -1,5 +1,7 @@
 # X1 Research Dashboard — update after EVERY session
 
+> ⚠️ **SUPERSEDED as dashboard-of-record 2026-07-12.** The single operational dashboard for X1 is now [`../MISSION_CONTROL.md`](../MISSION_CONTROL.md). This sheet remains the at-session print/tally aid from the field kit — transcribe its tallies into Mission Control after every session. Do not maintain two sources of truth.
+
 | Measure | Target | Now |
 |---|---|---|
 | Neutral participants completed | 6–10 | 0 |
