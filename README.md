@@ -25,4 +25,4 @@ This repository is a greenfield enterprise rebuild. It is not a refactor, not a 
 
 ## The five-second test
 
-When a user opens this product, their first reaction within five seconds must be: *"This feels like an exceptional premium product."* Every decision in `docs/` is downstream of that sentence and of one organizer saying: *"For the first time, I actually enjoyed running my own auction."*
+When a user opens this product, their first reaction within five seconds must be: _"This feels like an exceptional premium product."_ Every decision in `docs/` is downstream of that sentence and of one organizer saying: _"For the first time, I actually enjoyed running my own auction."_

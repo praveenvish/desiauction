@@ -1,0 +1,35 @@
+{
+  "name": "desiauction-next",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "env:check": "turbo run env:check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "depcruise": "depcruise apps packages",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check && pnpm depcruise"
+  },
+  "devDependencies": {
+    "@desiauction/config": "workspace:*",
+    "dependency-cruiser": "^16.10.0",
+    "eslint": "^9.39.0",
+    "prettier": "^3.6.0",
+    "turbo": "^2.5.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+# Frozen artifacts are never reformatted (va1-rc1 checksums; governance docs).
+prototypes/
+docs/
+
+pnpm-lock.yaml
+.next/
+.turbo/
+dist/
+coverage/
+drizzle/migrations/meta/
+playwright-report/
+test-results/

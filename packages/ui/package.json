@@ -1,0 +1,17 @@
+{
+  "name": "@desiauction/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@desiauction/config": "workspace:*",
+    "typescript": "^5.9.0"
+  }
+}

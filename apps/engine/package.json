@@ -1,0 +1,39 @@
+{
+  "name": "@desiauction/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --packages=external --outfile=dist/index.mjs",
+    "lint": "eslint src drizzle --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude '**/*.integration.test.ts'",
+    "test:integration": "vitest run src/integration",
+    "env:check": "tsx scripts/check-env.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@desiauction/contracts": "workspace:*",
+    "@desiauction/core": "workspace:*",
+    "@sentry/node": "^10.15.0",
+    "drizzle-orm": "^0.44.0",
+    "fastify": "^5.6.0",
+    "pino": "^9.9.0",
+    "postgres": "^3.4.0",
+    "ws": "^8.18.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@desiauction/config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.0",
+    "drizzle-kit": "^0.31.0",
+    "esbuild": "^0.25.0",
+    "pino-pretty": "^13.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
