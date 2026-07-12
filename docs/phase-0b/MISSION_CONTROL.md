@@ -173,6 +173,7 @@ All suggestions, ideas, and non-Critical findings discovered during research are
 | 2026-07-12 | 14:50 IST | MISSION_CONTROL.md created as the single operational dashboard for X1; all trackers initialized at zero (no sessions run, packet EMPTY) | Program Director |
 | 2026-07-12 | 14:50 IST | RC2_BACKLOG.md opened; seeded with 9 pre-X1 carry-overs from RC1_MANIFEST §6 / Expert Review (capture only) | Program Director |
 | 2026-07-12 | 14:50 IST | x1-evidence/DASHBOARD.md marked SUPERSEDED as dashboard-of-record (remains the print workbook tally); Mission Control is now the only dashboard | Program Director |
+| 2026-07-12 | 14:55 IST | Execution discipline activated: completion gate expanded into the 12-item Phase Definition of Done checklist; item 1 (RC1 frozen) checked; phase completion 1/12 (~8%) | Execution Director |
 
 ---
 
@@ -182,7 +183,24 @@ All suggestions, ideas, and non-Critical findings discovered during research are
 
 Each command updates the relevant trackers and appends to the change log.
 
-## COMPLETION GATE
+## COMPLETION GATE — PHASE DEFINITION OF DONE
 
-X1 closes only when ALL hold: minimum participant count (≥6 neutral) ✚ ≥2 organizers ✚ P-F complete ✚ all observation sheets ✚ all recordings ✚ all deviation logs ✚ all 48h recalls (or documented unreachable ×2) ✚ evidence verified ✚ packet complete.
-Then this document displays **✅ X1 READY FOR ANALYSIS** — and waits. Synthesis begins only on the explicit command **BEGIN SYNTHESIS**.
+X1 closes only when ALL twelve items are checked. Completion % = checked ÷ 12.
+
+| # | DoD item | Status |
+|---|---|---|
+| 1 | RC1 frozen | ✅ 2026-07-12 (`1c14372`, tag `va1-rc1`) |
+| 2 | Founder Pilot (P-F) completed | ☐ |
+| 3 | Minimum participant count reached (≥6 neutral) | ☐ 0/6 |
+| 4 | Organizer quota reached (≥2) | ☐ 0/2 |
+| 5 | Observation sheets complete (= sessions) | ☐ 0 |
+| 6 | Recordings complete (= sessions) | ☐ 0 |
+| 7 | Protocol deviations logged (every session, even "none") | ☐ 0 |
+| 8 | Technical defects logged (every session, even "none") | ☐ 0 |
+| 9 | 48-hour recalls completed (or documented unreachable ×2) | ☐ 0 |
+| 10 | Evidence packet verified | ☐ |
+| 11 | PACKET COMPLETE declared | ☐ |
+| 12 | BEGIN SYNTHESIS authorized (explicit founder command) | ☐ |
+
+**Phase completion: 1/12 (~8%).**
+When items 1–11 hold, this document displays **✅ X1 READY FOR ANALYSIS** — and waits. Synthesis begins only on the explicit command **BEGIN SYNTHESIS** (item 12), which also closes the phase → ✅ PHASE COMPLETE + Closure Report, Lessons Learned, Carry Forward, RC2 summary.
