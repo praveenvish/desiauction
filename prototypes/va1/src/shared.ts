@@ -89,8 +89,9 @@ export function holdButton(btn: HTMLElement, ms: number, onCommit: () => void): 
     fill!.style.transform = `scaleX(${k})`;
     if (k >= 1) { cancel(); onCommit(); } else raf = requestAnimationFrame(tick);
   };
+  // F-AX-1: no reduced-motion bypass — the time gate is safety, not motion.
   const start = (e: Event) => { e.preventDefault(); if ((btn as HTMLButtonElement).disabled) return;
-    if (reduced()) { onCommit(); return; } t0 = performance.now(); raf = requestAnimationFrame(tick); };
+    t0 = performance.now(); raf = requestAnimationFrame(tick); };
   const cancel = () => { cancelAnimationFrame(raf); fill!.style.transform = 'scaleX(0)'; };
   btn.addEventListener('pointerdown', start);
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, cancel));

@@ -495,7 +495,7 @@
   var startPress = (e) => {
     if (btn.disabled || !S || S.phase !== "live") return;
     e.preventDefault();
-    const needHold = nextBid(S) >= HOLD_THRESHOLD && !reduced();
+    const needHold = nextBid(S) >= HOLD_THRESHOLD;
     if (!needHold) {
       commit();
       return;

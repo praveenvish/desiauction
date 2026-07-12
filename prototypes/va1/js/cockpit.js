@@ -323,10 +323,6 @@
     const start = (e) => {
       e.preventDefault();
       if (btn.disabled) return;
-      if (reduced()) {
-        onCommit();
-        return;
-      }
       t0 = performance.now();
       raf = requestAnimationFrame(tick);
     };
@@ -436,7 +432,11 @@
     $("#knm").textContent = s.player ? s.player.name : "No lot on the block";
     const cur = $("#kcur");
     cur.className = "cur money roll" + (s.bids.length ? " has" : "");
-    rollMoney(cur, s.bids.length ? s.current : s.player?.base ?? 0);
+    if (s.player) rollMoney(cur, s.bids.length ? s.current : s.player.base);
+    else {
+      cur.textContent = "\u2014";
+      cur.dataset.v = "0";
+    }
     $("#kwho").innerHTML = s.phase !== "live" && !s.bids.length ? "" : s.bids.length === 0 ? '<span class="idle-hint">No bids yet \xB7 opens at base</span>' : `<b>${teamName(s.teams, s.leader)}</b> leads \xB7 ${s.bids.length} bid${s.bids.length > 1 ? "s" : ""}`;
     ring.update(s.endsAt, s.phase === "live" && s.conn === "live");
     $("#kbids").innerHTML = s.bids.slice(-3).reverse().map((b) => `<div class="b"><span>${teamName(s.teams, b.teamId)}</span><span class="a">${short(b.amount)}</span></div>`).join("");

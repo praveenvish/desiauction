@@ -114,7 +114,9 @@ const commit = () => {
 const startPress = (e: Event) => {
   if (btn.disabled || !S || S.phase !== 'live') return;
   e.preventDefault();
-  const needHold = nextBid(S) >= HOLD_THRESHOLD && !reduced();
+  // F-AX-1: the hold is a money-safety time gate, not decoration — it applies
+  // under reduced motion too (the fill bar is essential progress feedback).
+  const needHold = nextBid(S) >= HOLD_THRESHOLD;
   if (!needHold) { commit(); return; }
   holdT0 = performance.now();
   const tick = () => {

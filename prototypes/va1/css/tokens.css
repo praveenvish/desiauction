@@ -28,7 +28,7 @@ html[data-dir="A"] {
   --line: #232D40;
   --text: #EAEFF7;
   --text-dim: #8E9BB0;
-  --text-faint: #5A6578;
+  --text-faint: #76839B; /* F-AX-2: was #5A6578 (3.38:1 on ink) → 5.19:1 */
   --accent: #C8F135;          /* volt */
   --accent-ink: #0A0F05;
   --accent-dim: #93B622;
@@ -53,7 +53,7 @@ html[data-dir="B"] {
   --line: #26523F;
   --text: #F7F1E3;            /* warm chalk */
   --text-dim: #B9C4AF;
-  --text-faint: #7E8F7F;
+  --text-faint: #A6B4A4; /* F-AX-2: was #7E8F7F (4.28:1 on field green) → 6.78:1 bg / 4.57:1 panel */
   --accent: #E8C46A;          /* heritage gold doubles as accent…    */
   --accent-ink: #21190A;
   --accent-dim: #B98A2F;

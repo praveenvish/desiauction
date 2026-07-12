@@ -34,7 +34,8 @@ function render(s: SimState, e: SimEvent) {
   $('#knm').textContent = s.player ? s.player.name : 'No lot on the block';
   const cur = $('#kcur');
   cur.className = 'cur money roll' + (s.bids.length ? ' has' : '');
-  rollMoney(cur, s.bids.length ? s.current : (s.player?.base ?? 0));
+  if (s.player) rollMoney(cur, s.bids.length ? s.current : s.player.base);
+  else { cur.textContent = '—'; cur.dataset.v = '0'; } // F-CPO-1: no money fact → no money value
   $('#kwho').innerHTML = s.phase !== 'live' && !s.bids.length ? '' :
     s.bids.length === 0 ? '<span class="idle-hint">No bids yet · opens at base</span>'
     : `<b>${teamName(s.teams, s.leader)}</b> leads · ${s.bids.length} bid${s.bids.length > 1 ? 's' : ''}`;
