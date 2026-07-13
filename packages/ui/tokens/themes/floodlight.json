@@ -61,6 +61,15 @@
     "gold-deep": { "$value": "{color.gold.700}", "$type": "color" },
     "glow": { "$value": "{color.gold.300}", "$type": "color" }
   },
+  "identity": {
+    "field": { "$value": "{color.ink.850}", "$type": "color" },
+    "field-deep": { "$value": "{color.ink.950}", "$type": "color" },
+    "line": { "$value": "{color.ink.600}", "$type": "color" },
+    "line-soft": { "$value": "{color.ink.700}", "$type": "color" },
+    "glyph": { "$value": "{color.ink.50}", "$type": "color" },
+    "accent": { "$value": "{color.volt.400}", "$type": "color" },
+    "accent-soft": { "$value": "{color.volt.300}", "$type": "color" }
+  },
   "shadow": {
     "1": { "$value": "none", "$type": "shadow" },
     "2": { "$value": "none", "$type": "shadow" },

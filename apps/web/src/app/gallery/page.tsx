@@ -5,6 +5,7 @@ import "./gallery.css";
 import { semanticTokenNames, ToastProvider } from "@desiauction/ui";
 import { useState } from "react";
 
+import { IdentityDemo } from "./identity-demo";
 import { PrimitivesDemo } from "./primitives-demo";
 
 // M-IP1-1 gallery: token sheet + type ramp + theme flip (IP-1_DESIGN §13).
@@ -214,6 +215,7 @@ export default function GalleryPage() {
           </div>
         </section>
 
+        <IdentityDemo />
         <PrimitivesDemo />
       </main>
     </ToastProvider>

@@ -45,6 +45,13 @@
   --ceremony-gold: #F0B429;
   --ceremony-gold-deep: #B57F14;
   --ceremony-glow: #FFD666;
+  --identity-field: #101623;
+  --identity-field-deep: #070A0F;
+  --identity-line: #2C3A52;
+  --identity-line-soft: #1F2A3D;
+  --identity-glyph: #F6F9FF;
+  --identity-accent: #CDF53C;
+  --identity-accent-soft: #E2FF66;
   --shadow-1: 0 1px 2px rgb(23 23 21 / 0.06), 0 1px 3px rgb(23 23 21 / 0.10);
   --shadow-2: 0 2px 4px rgb(23 23 21 / 0.06), 0 4px 12px rgb(23 23 21 / 0.12);
   --shadow-3: 0 4px 8px rgb(23 23 21 / 0.08), 0 12px 32px rgb(23 23 21 / 0.16);

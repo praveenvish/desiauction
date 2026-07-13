@@ -22,3 +22,10 @@ export { Dialog } from "./primitives/dialog";
 export type { DialogProps } from "./primitives/dialog";
 export { ToastProvider, useToast } from "./primitives/toast";
 export type { ToastOptions, ToastTone } from "./primitives/toast";
+
+export { placeholderIdentity, initialsFor } from "./identity/placeholder";
+export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
+export { PlayerImage } from "./identity/player-image";
+export type { PlayerImageProps, PlayerImageSize } from "./identity/player-image";
+export { PlayerCard } from "./identity/player-card";
+export type { PlayerCardProps, PlayerRole, PlayerStatus } from "./identity/player-card";
