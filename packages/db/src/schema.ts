@@ -67,9 +67,14 @@ export const otpCodes = pgTable(
     expiresAt: ts("expires_at").notNull(),
     attempts: integer("attempts").notNull().default(0),
     consumedAt: ts("consumed_at"),
+    // Per-IP throttling (M-IP2-2 hardening); IPs age out with the codes.
+    requestIp: text("request_ip"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (table) => [index("otp_codes_phone_idx").on(table.phone, table.createdAt)],
+  (table) => [
+    index("otp_codes_phone_idx").on(table.phone, table.createdAt),
+    index("otp_codes_ip_idx").on(table.requestIp, table.createdAt),
+  ],
 );
 
 // Development-only delivery target for the DevInboxSender (IP-2_DESIGN D3).
@@ -89,6 +94,8 @@ export const passkeyCredentials = pgTable(
     publicKey: text("public_key").notNull(),
     counter: integer("counter").notNull().default(0),
     transports: text("transports"),
+    // Device naming (M-IP2-2): "Praveen's iPhone" beats a credential hash.
+    name: text("name").notNull().default("Passkey"),
     createdAt: ts("created_at").notNull().defaultNow(),
     lastUsedAt: ts("last_used_at"),
   },

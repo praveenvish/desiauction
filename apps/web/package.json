@@ -18,6 +18,8 @@
     "@desiauction/db": "workspace:*",
     "@desiauction/ui": "workspace:*",
     "@sentry/nextjs": "10.65.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
     "drizzle-orm": "^0.45.2",
     "next": "^15.5.0",
     "react": "^19.1.0",

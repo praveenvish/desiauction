@@ -19,7 +19,7 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   expect(code).toMatch(/^\d{6}$/);
 
   await page.getByLabel(`Code sent to +91${PHONE}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/account/);
   await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
 
@@ -32,7 +32,7 @@ test("a wrong code is rejected with a humane message", async ({ page }) => {
   await page.getByLabel("Mobile number").fill(PHONE.replace(/^98/, "97"));
   await page.getByRole("button", { name: "Send code" }).click();
   await page.getByLabel(/Code sent to/).fill("000000");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("That code didn't work. Try again.")).toBeVisible();
 });
 

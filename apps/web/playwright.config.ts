@@ -7,7 +7,8 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:3050",
+    // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.
+    baseURL: "http://localhost:3050",
   },
   webServer: {
     command:

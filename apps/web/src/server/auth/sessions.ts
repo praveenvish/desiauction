@@ -72,3 +72,29 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
 export async function revokeSession(db: Db, sessionId: string): Promise<void> {
   await db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, sessionId));
 }
+
+export interface SessionSummary {
+  id: string;
+  userAgent: string | null;
+  createdAt: Date;
+  lastSeenAt: Date;
+}
+
+/** Active sessions for the account security surface (M-IP2-2). */
+export async function listSessions(db: Db, personId: string): Promise<SessionSummary[]> {
+  return db
+    .select({
+      id: sessions.id,
+      userAgent: sessions.userAgent,
+      createdAt: sessions.createdAt,
+      lastSeenAt: sessions.lastSeenAt,
+    })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.personId, personId),
+        isNull(sessions.revokedAt),
+        gt(sessions.expiresAt, new Date()),
+      ),
+    );
+}

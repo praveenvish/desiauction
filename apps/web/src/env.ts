@@ -5,6 +5,13 @@ const envSchema = z.object({
   APP_VERSION: z.string().min(1).default("dev"),
   DATABASE_URL: z.string().startsWith("postgres"),
   SENTRY_DSN: z.url().optional(),
+  // WebAuthn relying party (M-IP2-2). Defaults serve local dev + e2e; deployed
+  // environments set real values (rpID must suffix-match the browser host).
+  RP_ID: z.string().min(1).default("localhost"),
+  RP_ORIGINS: z
+    .string()
+    .default("http://localhost:3000,http://localhost:3050")
+    .transform((value) => value.split(",").map((origin) => origin.trim())),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -5,10 +5,12 @@ import { normalizePhone } from "@desiauction/core";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import type { OtpSender } from "./otp-sender";
+import { logSecurityEvent } from "./security-events";
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const MAX_PER_HOUR = 5;
+const MAX_PER_HOUR_PER_IP = 20;
 const MAX_ATTEMPTS = 5;
 
 export function hashCode(code: string): string {
@@ -27,6 +29,7 @@ export async function requestOtp(
   db: Db,
   sender: OtpSender,
   rawPhone: string,
+  requestIp: string | null = null,
 ): Promise<RequestOtpResult> {
   const normalized = normalizePhone(rawPhone);
   if (!normalized.ok) {
@@ -35,10 +38,13 @@ export async function requestOtp(
   const phone = normalized.phone;
   const now = Date.now();
 
+  // Cooldown guards spam on a pending code; a consumed code (successful
+  // login) never blocks an immediate second-device sign-in. Abuse is still
+  // capped by the hourly limits below.
   const [latest] = await db
     .select({ createdAt: otpCodes.createdAt })
     .from(otpCodes)
-    .where(eq(otpCodes.phone, phone))
+    .where(and(eq(otpCodes.phone, phone), isNull(otpCodes.consumedAt)))
     .orderBy(desc(otpCodes.createdAt))
     .limit(1);
   if (latest !== undefined && now - latest.createdAt.getTime() < RESEND_COOLDOWN_MS) {
@@ -55,12 +61,28 @@ export async function requestOtp(
     return { ok: false, reason: "hourly-limit" };
   }
 
+  if (requestIp !== null) {
+    const [{ count: ipCount }] = (await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(otpCodes)
+      .where(
+        and(
+          eq(otpCodes.requestIp, requestIp),
+          gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)),
+        ),
+      )) as [{ count: number }];
+    if (ipCount >= MAX_PER_HOUR_PER_IP) {
+      return { ok: false, reason: "hourly-limit" };
+    }
+  }
+
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await db.insert(otpCodes).values({
     id: newId(),
     phone,
     codeHash: hashCode(code),
     expiresAt: new Date(now + CODE_TTL_MS),
+    requestIp,
   });
   await sender.send(phone, code);
   return { ok: true };
@@ -100,6 +122,12 @@ export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise
       .update(otpCodes)
       .set({ attempts: candidate.attempts + 1 })
       .where(eq(otpCodes.id, candidate.id));
+    if (candidate.attempts + 1 >= MAX_ATTEMPTS) {
+      const [lockedPerson] = await db.select().from(people).where(eq(people.phone, phone)).limit(1);
+      if (lockedPerson !== undefined) {
+        await logSecurityEvent(db, lockedPerson.id, "auth.otp.lockout");
+      }
+    }
     return { ok: false, reason: "invalid" };
   }
 
