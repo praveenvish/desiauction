@@ -93,12 +93,18 @@ importers:
       '@desiauction/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@desiauction/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@desiauction/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@sentry/nextjs':
         specifier: 10.65.0
         version: 10.65.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.20(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(webpack@5.108.4)
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(postgres@3.4.9)
       next:
         specifier: ^15.5.0
         version: 15.5.20(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -136,6 +142,9 @@ importers:
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@24.13.3)(jsdom@29.1.1)(terser@5.49.0)(tsx@4.23.0)
 
   packages/config:
     dependencies:
@@ -176,6 +185,31 @@ importers:
       vitest:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.13.3)(jsdom@29.1.1)(terser@5.49.0)(tsx@4.23.0)
+
+  packages/db:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.0
+        version: 3.4.9
+      ulidx:
+        specifier: ^2.4.0
+        version: 2.4.1
+    devDependencies:
+      '@desiauction/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      drizzle-kit:
+        specifier: ^0.31.0
+        version: 0.31.10
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
 
   packages/ui:
     dependencies:

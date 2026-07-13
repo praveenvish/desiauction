@@ -60,6 +60,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Every CI run proves the committed migrations apply cleanly (§20, §36).
+      - run: pnpm --filter @desiauction/db db:migrate
       - run: pnpm --filter @desiauction/engine db:migrate
       - run: pnpm test:integration
 

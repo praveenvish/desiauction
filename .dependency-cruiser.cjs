@@ -38,6 +38,22 @@ module.exports = {
       to: { path: "^spikes" },
     },
     {
+      name: "db-is-a-leaf",
+      comment: "db imports only drizzle/postgres/ulidx (IP-2_DESIGN D1)",
+      severity: "error",
+      from: { path: "^packages/db/src" },
+      to: {
+        pathNot: "^packages/db/src|node_modules/(drizzle-orm|postgres|ulidx)/",
+      },
+    },
+    {
+      name: "only-apps-touch-db",
+      comment: "packages never depend on the data layer (IP-2_DESIGN D1)",
+      severity: "error",
+      from: { path: "^packages/(core|contracts|ui)" },
+      to: { path: "^packages/db" },
+    },
+    {
       name: "core-is-pure",
       comment: "core runtime depends on nothing but itself (ulid whitelisted) (§8)",
       severity: "error",

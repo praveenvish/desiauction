@@ -1,0 +1,35 @@
+.inbox {
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  padding: var(--space-8);
+}
+
+.inbox h1 {
+  font-family: var(--font-display);
+  color: var(--text-heading);
+  margin: 0 0 var(--space-2);
+}
+
+.inbox p {
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-5);
+}
+
+.inbox table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.inbox th,
+.inbox td {
+  text-align: left;
+  padding: var(--space-2) var(--space-5) var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.inbox th {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
+}

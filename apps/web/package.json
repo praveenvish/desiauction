@@ -4,18 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --port 3000",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3000",
+    "build": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next build",
+    "start": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next start",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "env:check": "tsx scripts/check-env.ts"
+    "env:check": "tsx scripts/check-env.ts",
+    "test:integration": "vitest run src/server"
   },
   "dependencies": {
     "@desiauction/contracts": "workspace:*",
     "@desiauction/core": "workspace:*",
+    "@desiauction/db": "workspace:*",
     "@desiauction/ui": "workspace:*",
     "@sentry/nextjs": "10.65.0",
+    "drizzle-orm": "^0.45.2",
     "next": "^15.5.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -29,6 +32,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "3.2.7"
   }
 }

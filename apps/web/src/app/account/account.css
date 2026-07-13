@@ -1,0 +1,49 @@
+.account {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  padding: var(--space-6);
+}
+
+.account-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.account-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.account-head h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.account dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-4);
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+}
+
+.account dt {
+  color: var(--text-muted);
+}
+
+.account dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

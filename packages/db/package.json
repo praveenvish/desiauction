@@ -1,0 +1,26 @@
+{
+  "name": "@desiauction/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs migrate"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.0",
+    "ulidx": "^2.4.0"
+  },
+  "devDependencies": {
+    "@desiauction/config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5.9.0"
+  }
+}
