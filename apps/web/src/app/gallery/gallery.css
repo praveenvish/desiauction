@@ -198,3 +198,39 @@
   gap: var(--space-3);
   max-width: 560px;
 }
+
+.hold-button {
+  position: relative;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-full);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-8);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hold-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.hold-ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: var(--radius-full);
+  background: conic-gradient(var(--focus-ring) var(--hold-progress, 0deg), transparent 0deg);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  pointer-events: none;
+}
+
+.hold-button[data-holding="true"] {
+  background: var(--accent-pressed);
+  color: var(--text-inverse);
+}

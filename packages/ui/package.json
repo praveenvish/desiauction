@@ -8,7 +8,8 @@
     "./styles/primitives.css": "./src/generated/primitives.css",
     "./styles/floodlight.css": "./src/generated/floodlight.css",
     "./styles/daylight.css": "./src/generated/daylight.css",
-    "./styles/fonts.css": "./src/fonts/fonts.css"
+    "./styles/fonts.css": "./src/fonts/fonts.css",
+    "./styles/motion.css": "./src/motion/motion.css"
   },
   "scripts": {
     "build": "node style-dictionary.config.mjs",

@@ -25,7 +25,7 @@ test("dialog: cancel and confirm paths both close and confirm announces", async 
   await page.getByRole("button", { name: "Remove player…" }).click();
   await page.getByRole("button", { name: "Remove", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Remove player?" })).not.toBeVisible();
-  await expect(page.getByRole("status")).toContainText("Player removed");
+  await expect(page.getByRole("status", { name: "Notifications" })).toContainText("Player removed");
 });
 
 test("tabs: arrow keys drive selection in a real browser", async ({ page }) => {
@@ -40,7 +40,7 @@ test("tabs: arrow keys drive selection in a real browser", async ({ page }) => {
 
 test("toast: fires into the polite live region and can be dismissed", async ({ page }) => {
   await page.getByRole("button", { name: "Fire success toast" }).click();
-  const region = page.getByRole("status");
+  const region = page.getByRole("status", { name: "Notifications" });
   await expect(region).toContainText("Player saved");
   await page.getByRole("button", { name: "Dismiss: Player saved" }).click();
   await expect(region).not.toContainText("Player saved");

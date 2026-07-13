@@ -23,6 +23,12 @@ export type { DialogProps } from "./primitives/dialog";
 export { ToastProvider, useToast } from "./primitives/toast";
 export type { ToastOptions, ToastTone } from "./primitives/toast";
 
+export { useHoldGate } from "./motion/use-hold-gate";
+export type { HoldGate, HoldGateBind, HoldGateOptions } from "./motion/use-hold-gate";
+export { AnnouncerProvider, useAnnouncer } from "./live/announcer";
+export type { Announce, AnnounceChannel } from "./live/announcer";
+export { VisuallyHidden } from "./live/visually-hidden";
+
 export { placeholderIdentity, initialsFor } from "./identity/placeholder";
 export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
 export { PlayerImage } from "./identity/player-image";
