@@ -103,3 +103,4 @@ Owner F = Founder · E = Engineering · Priority P0 = freeze-blocking chain · E
 | Date | Change | Operator |
 |---|---|---|
 | 2026-07-13 | Tracker created; 19 tasks (14 blocking); status 🟡; next-3 issued | Ops Coordinator |
+| 2026-07-13 | ED-1 recorded (ENGINEERING_DIRECTIVE_ED-1.md): account creation uses cost-tier defaults — GitHub Free · Vercel Hobby · Fly shared-cpu-1x · Neon Free · Sentry Free · S3 PAYG; expected burn ≈ $0–10/mo until pilot. No task/sequence changes | Ops Coordinator |
