@@ -13,6 +13,7 @@
     "disabled": { "$value": "{color.chalk.400}", "$type": "color" },
     "inverse": { "$value": "{color.ink.100}", "$type": "color" },
     "on-accent": { "$value": "{color.ink.950}", "$type": "color" },
+    "on-danger": { "$value": "{color.white}", "$type": "color" },
     "accent": { "$value": "{color.volt.900}", "$type": "color" },
     "heading": { "$value": "{color.chalk.800}", "$type": "color" }
   },

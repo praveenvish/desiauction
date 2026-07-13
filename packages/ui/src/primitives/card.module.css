@@ -1,0 +1,18 @@
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.default {
+  padding: var(--space-5);
+}
+
+.dense {
+  padding: var(--space-4);
+}
+
+.none {
+  padding: 0;
+}

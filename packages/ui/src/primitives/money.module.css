@@ -1,0 +1,20 @@
+.money {
+  font-variant-numeric: tabular-nums;
+  color: var(--money-value);
+}
+
+.spent {
+  color: var(--money-spent);
+}
+
+.remaining {
+  color: var(--money-remaining);
+}
+
+.frozen {
+  color: var(--money-frozen);
+}
+
+.exact {
+  font-family: var(--font-mono);
+}

@@ -6,6 +6,7 @@ export const tokens = {
   "text-disabled": "var(--text-disabled)",
   "text-inverse": "var(--text-inverse)",
   "text-on-accent": "var(--text-on-accent)",
+  "text-on-danger": "var(--text-on-danger)",
   "text-accent": "var(--text-accent)",
   "text-heading": "var(--text-heading)",
   "surface": "var(--surface)",
