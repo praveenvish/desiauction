@@ -18,6 +18,7 @@ export const tokens = {
   "border-strong": "var(--border-strong)",
   "border-interactive": "var(--border-interactive)",
   "focus-ring": "var(--focus-ring)",
+  "scrim": "var(--scrim)",
   "accent": "var(--accent)",
   "accent-hover": "var(--accent-hover)",
   "accent-pressed": "var(--accent-pressed)",

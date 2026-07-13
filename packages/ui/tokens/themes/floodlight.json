@@ -23,6 +23,7 @@
     "interactive": { "$value": "{color.volt.500}", "$type": "color" }
   },
   "focus-ring": { "$value": "{color.volt.500}", "$type": "color" },
+  "scrim": { "$value": "#070A0F99", "$type": "color" },
   "accent": {
     "default": { "$value": "{color.volt.400}", "$type": "color" },
     "hover": { "$value": "{color.volt.300}", "$type": "color" },

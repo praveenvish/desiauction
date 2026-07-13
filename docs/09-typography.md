@@ -10,7 +10,7 @@
 | **Text/UI** | Geist Sans | OFL | Everything else: body, labels, controls, tables |
 | **Mono** | Geist Mono | OFL | Ledger, receipts, IDs, seq numbers, API/dev surfaces |
 
-All self-hosted, `font-display: swap`, subsetted (Latin + Devanagari for Geist fallback stack; Clash Display Latin-only — Devanagari display moments fall back to a specified stack `"Clash Display", "Mukta", sans-serif` until a Devanagari display face is commissioned, tracked as a known gap).
+All self-hosted, `font-display: swap`. **WI-7 RULED (IP-1, 2026-07-13): the Devanagari display companion is Anek Devanagari** — display stack `"Clash Display", "Anek Devanagari", sans-serif` (the former Mukta-fallback gap is closed; machine evidence from va1-rc1 H7, implemented and contrast-verified in `@desiauction/ui`). Text stack as implemented: `"Geist Sans", "Noto Sans Devanagari", sans-serif` (Geist ships via fontsource under the family name "Geist Sans"); mono `"Geist Mono", ui-monospace, monospace`.
 
 ## Scale
 

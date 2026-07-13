@@ -10,7 +10,8 @@
 }
 
 .dialog::backdrop {
-  background: rgb(7 10 15 / 0.6);
+  /* ::backdrop custom-property inheritance is not universal — literal fallback sanctioned. */
+  background: var(--scrim, rgb(7 10 15 / 0.6));
 }
 
 .header {
