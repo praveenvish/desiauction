@@ -132,7 +132,10 @@ describe("SECURITY REGRESSION — identity contract", () => {
       .where(eq(otpInbox.phone, PHONE_C))
       .orderBy(desc(otpInbox.createdAt))
       .limit(1);
-    expect(await verifyOtp(db, PHONE_C, live?.code ?? "")).toEqual({ ok: false, reason: "invalid" });
+    expect(await verifyOtp(db, PHONE_C, live?.code ?? "")).toEqual({
+      ok: false,
+      reason: "invalid",
+    });
   });
 
   it("session rotation: every login mints a distinct token; both are independently revocable", async () => {

@@ -14,7 +14,12 @@ export type Capability =
   | "tournament.create"
   | "tournament.manage"
   | "player.verify"
-  | "auction.conduct";
+  | "auction.conduct"
+  // Competition domain (IP-3, additive — the sanctioned closed-union growth path).
+  | "competition.create"
+  | "competition.manage"
+  | "team.manage"
+  | "registration.review";
 
 export type CapabilitySet = "org:owner" | "org:staff" | "viewer";
 
@@ -29,8 +34,12 @@ const SETS: Record<CapabilitySet, readonly Capability[]> = {
     "tournament.manage",
     "player.verify",
     "auction.conduct",
+    "competition.create",
+    "competition.manage",
+    "team.manage",
+    "registration.review",
   ],
-  "org:staff": ["tournament.manage", "player.verify"],
+  "org:staff": ["tournament.manage", "player.verify", "team.manage", "registration.review"],
   viewer: [],
 };
 

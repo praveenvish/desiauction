@@ -1,0 +1,159 @@
+.competitions,
+.competition-home,
+.register {
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  padding: var(--space-10) var(--space-6);
+}
+
+.competitions-stack,
+.competition-stack,
+.register-panel {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.competitions h1,
+.competition-home h1,
+.register h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.competitions h2,
+.competition-home h2 {
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  margin: 0 0 var(--space-3);
+}
+
+.competitions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.competition-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.competition-link strong {
+  display: block;
+  color: var(--text-heading);
+  margin-bottom: var(--space-1);
+}
+
+.competition-org {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  margin-bottom: var(--space-2);
+}
+
+.competitions-hint {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.create-competition,
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 420px;
+}
+
+.date-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.competition-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.competition-meta {
+  color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+}
+
+.registration-url {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-accent);
+  overflow-wrap: anywhere;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.team-list,
+.registration-list {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.team-list li,
+.registration-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.team-swatch {
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.team-name,
+.registration-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  min-width: 140px;
+}
+
+.registration-phone {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.registration-actions,
+.reject-row {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.add-team-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}

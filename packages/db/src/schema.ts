@@ -7,6 +7,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // IP-2_DESIGN §4. ids are ULIDs (char 26, app-generated via newId()).
@@ -145,4 +146,94 @@ export const auditLog = pgTable(
     at: ts("at").notNull().defaultNow(),
   },
   (table) => [index("audit_scope_idx").on(table.scopeType, table.scopeId, table.at)],
+);
+
+// --- Competition domain (IP-3 §4). Every row is org-scoped (C-13, invariant 1);
+// RLS (read USING + write WITH CHECK) is applied in migration 0005 from day one.
+
+export const seasons = pgTable(
+  "seasons",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    name: text("name").notNull(),
+    year: integer("year").notNull(),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("seasons_org_idx").on(table.orgId)],
+);
+
+export const competitions = pgTable(
+  "competitions",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    seasonId: char("season_id", { length: 26 }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    status: text("status", {
+      enum: ["draft", "setup", "registration_open", "registration_closed"],
+    })
+      .notNull()
+      .default("draft"),
+    visibility: text("visibility", { enum: ["private", "public"] })
+      .notNull()
+      .default("private"),
+    location: text("location"),
+    startsOn: text("starts_on"),
+    endsOn: text("ends_on"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("competitions_org_idx").on(table.orgId)],
+);
+
+export const teams = pgTable(
+  "teams",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    name: text("name").notNull(),
+    shortName: text("short_name"),
+    primaryColor: text("primary_color"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // Team name is unique within a competition (doc 43).
+  (table) => [
+    uniqueIndex("teams_competition_name_uq").on(table.competitionId, table.name),
+    index("teams_competition_idx").on(table.competitionId),
+  ],
+);
+
+export const registrations = pgTable(
+  "registrations",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    role: text("role", {
+      enum: ["batter", "bowler", "all_rounder", "wicket_keeper"],
+    }).notNull(),
+    status: text("status", {
+      enum: ["draft", "submitted", "approved", "rejected", "waitlisted", "withdrawn"],
+    })
+      .notNull()
+      .default("submitted"),
+    basePriceBand: text("base_price_band"),
+    rejectionReason: text("rejection_reason"),
+    rejectionNote: text("rejection_note"),
+    reviewedBy: char("reviewed_by", { length: 26 }),
+    reviewedAt: ts("reviewed_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // One registration per person per competition (doc 42 duplicate rule).
+  (table) => [
+    uniqueIndex("registrations_competition_person_uq").on(table.competitionId, table.personId),
+    index("registrations_competition_idx").on(table.competitionId),
+    index("registrations_person_idx").on(table.personId),
+  ],
 );
