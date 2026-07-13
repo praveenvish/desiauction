@@ -9,7 +9,9 @@ COPY packages ./packages
 COPY apps/engine ./apps/engine
 RUN pnpm install --frozen-lockfile --filter @desiauction/engine...
 RUN pnpm --filter @desiauction/engine build
-RUN pnpm --filter @desiauction/engine deploy --prod /deployed
+# --legacy: workspace code is bundled into dist/index.mjs; the deployed
+# node_modules only carries npm runtime deps (pnpm v10 injection not needed).
+RUN pnpm --filter @desiauction/engine deploy --legacy --prod /deployed
 
 FROM gcr.io/distroless/nodejs24-debian12:nonroot
 WORKDIR /app

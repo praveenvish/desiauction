@@ -4,21 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs watch src/index.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.mjs --external:fastify --external:ws --external:pino --external:pino-pretty --external:postgres --external:drizzle-orm --external:zod --external:@sentry/node",
     "lint": "eslint src drizzle --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --exclude '**/*.integration.test.ts'",
     "test:integration": "vitest run src/integration",
-    "env:check": "tsx scripts/check-env.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "env:check": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/check-env.ts",
+    "db:generate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs migrate"
   },
   "dependencies": {
     "@desiauction/contracts": "workspace:*",
     "@desiauction/core": "workspace:*",
     "@sentry/node": "^10.15.0",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^5.6.0",
     "pino": "^9.9.0",
     "postgres": "^3.4.0",
