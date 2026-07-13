@@ -1,7 +1,7 @@
 # IMPLEMENTATION BLUEPRINT
 ## DesiAuction NEXT · Phase 2 · **v1.1 FROZEN** · 2026-07-12 · CTO
 
-> 🔒 **FROZEN at M0 (2026-07-12), verdict APPROVE WITH CONDITIONS — all six conditions RC-1..RC-6 applied in this version.** Review record: [M0_BLUEPRINT_REVIEW.md](M0_BLUEPRINT_REVIEW.md). No roadmap redesign, no phase resequencing, no governance redesign hereafter; improvements occur only inside the active implementation phase. **Active phase: IP-0.**
+> 🔒 **FROZEN at M0 (2026-07-12), verdict APPROVE WITH CONDITIONS — all six conditions RC-1..RC-6 applied in this version.** Review record: [M0_BLUEPRINT_REVIEW.md](M0_BLUEPRINT_REVIEW.md). No roadmap redesign, no phase resequencing, no governance redesign hereafter; improvements occur only inside the active implementation phase. **Active engineering phase: IP-1** (IP-0 = Engineering Complete · Operations Continuing under FR-01 — see FR-01_EXECUTION_RULING.md).
 
 > **Authority.** Governed by the Canon (C-1..C-25, `docs/00-index.md`), the Experience Direction (VA-0: ⟪SOUL⟫, EP-1..14, XC-1..12), the 35 invariants (doc 40), and the six Golden Journeys (doc 70). Business behaviour is immutable; this blueprint decides *sequence and discipline*, never product philosophy.
 > **Provenance.** Phase X1 closed by executive waiver (`docs/phase-0b/X1_EXECUTIVE_WAIVER.md`). Waived uncertainty is carried here as watch items WI-1..WI-10; open 0B activities (VA-3/5/6/8/9) appear below as **hard gates**, not assumptions.
