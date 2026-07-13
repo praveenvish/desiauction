@@ -28,7 +28,8 @@ const sender = new DevInboxSender(db);
 const RUN = String(Date.now()).slice(-7);
 const PHONE_A = `+9196${RUN}0`;
 const PHONE_B = `+9197${RUN}1`;
-const TEST_PHONES = [PHONE_A, PHONE_B];
+const PHONE_C = `+9198${RUN}2`;
+const TEST_PHONES = [PHONE_A, PHONE_B, PHONE_C];
 
 async function loginFresh(phone: string): Promise<string> {
   await requestOtp(db, sender, phone);
@@ -105,6 +106,33 @@ describe("SECURITY REGRESSION — identity contract", () => {
       .from(auditLog)
       .where(eq(auditLog.actor, person?.id ?? ""));
     expect(events.some((event) => event.action === "auth.otp.lockout")).toBe(true);
+  });
+
+  it("attempt cap holds under CONCURRENCY: parallel wrong guesses cannot exceed MAX (RC-4 F3)", async () => {
+    await requestOtp(db, sender, PHONE_C);
+    const [row] = await db
+      .select()
+      .from(otpCodes)
+      .where(eq(otpCodes.phone, PHONE_C))
+      .orderBy(desc(otpCodes.createdAt))
+      .limit(1);
+    if (row === undefined) {
+      throw new Error("no code");
+    }
+    // Fire many more wrong guesses than the cap, all at once. The atomic
+    // guarded increment must ceiling the counter at MAX — a read-modify-write
+    // would let concurrent readers collapse into far fewer increments.
+    await Promise.all(Array.from({ length: 12 }, () => verifyOtp(db, PHONE_C, "000000")));
+    const [after] = await db.select().from(otpCodes).where(eq(otpCodes.id, row.id)).limit(1);
+    expect(after?.attempts).toBe(5);
+    // And the real code is dead — the cap was genuinely reached, not skipped.
+    const [live] = await db
+      .select()
+      .from(otpInbox)
+      .where(eq(otpInbox.phone, PHONE_C))
+      .orderBy(desc(otpInbox.createdAt))
+      .limit(1);
+    expect(await verifyOtp(db, PHONE_C, live?.code ?? "")).toEqual({ ok: false, reason: "invalid" });
   });
 
   it("session rotation: every login mints a distinct token; both are independently revocable", async () => {

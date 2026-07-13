@@ -2,7 +2,7 @@ import { createHash, randomInt } from "node:crypto";
 
 import { newId, otpCodes, people, type Db } from "@desiauction/db";
 import { normalizePhone } from "@desiauction/core";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import type { OtpSender } from "./otp-sender";
 import { logSecurityEvent } from "./security-events";
@@ -118,11 +118,16 @@ export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise
   }
 
   if (candidate.codeHash !== hashCode(code)) {
-    await db
+    // Atomic increment guarded by the cap: concurrent wrong guesses serialize
+    // on the row lock and only rows still under MAX_ATTEMPTS are bumped, so the
+    // 5-attempt ceiling holds under parallelism (RC-4 Finding 3). A no-op
+    // update (empty return) means the cap was already reached.
+    const [bumped] = await db
       .update(otpCodes)
-      .set({ attempts: candidate.attempts + 1 })
-      .where(eq(otpCodes.id, candidate.id));
-    if (candidate.attempts + 1 >= MAX_ATTEMPTS) {
+      .set({ attempts: sql`${otpCodes.attempts} + 1` })
+      .where(and(eq(otpCodes.id, candidate.id), lt(otpCodes.attempts, MAX_ATTEMPTS)))
+      .returning({ attempts: otpCodes.attempts });
+    if (bumped !== undefined && bumped.attempts >= MAX_ATTEMPTS) {
       const [lockedPerson] = await db.select().from(people).where(eq(people.phone, phone)).limit(1);
       if (lockedPerson !== undefined) {
         await logSecurityEvent(db, lockedPerson.id, "auth.otp.lockout");

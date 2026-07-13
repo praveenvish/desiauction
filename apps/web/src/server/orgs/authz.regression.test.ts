@@ -8,6 +8,7 @@ import {
   createDb,
   grants as grantsTable,
   invites as invitesTable,
+  newId,
   organizations,
   orgMembers,
   otpCodes,
@@ -212,6 +213,50 @@ describe("AUTHZ REGRESSION — tenancy + capability contract", () => {
       // No tenant context at all -> policies fail closed: zero rows.
       const noContext = await probe`select * from org_members`;
       expect(noContext.length).toBe(0);
+    } finally {
+      await probe.end();
+      await handle.sql.unsafe(`drop owned by ${role}`);
+      await handle.sql.unsafe(`drop role if exists ${role}`);
+    }
+  });
+
+  it("RLS WRITE PROOF: WITH CHECK blocks a self-escalating cross-tenant write (RC-4 F1)", async () => {
+    // The write-side lock (migration 0004). Under the R-1 role recipe a caller
+    // must not be able to INSERT a grant scoped to an org that is not their
+    // active tenant — the classic self-escalation to org:owner on any org.
+    const role = `rls_wprobe_${RUN}`;
+    await handle.sql.unsafe(`drop role if exists ${role}`);
+    await handle.sql.unsafe(`create role ${role} login password 'probe' nosuperuser nobypassrls`);
+    await handle.sql.unsafe(`grant select, insert on grants to ${role}`);
+    const url = new URL(env.DATABASE_URL);
+    const probeHandle = createDb(
+      `postgres://${role}:probe@${url.hostname}:${url.port}${url.pathname}`,
+    );
+    const probe = probeHandle.sql;
+    try {
+      // Active tenant = org X; attempt a grant scoped to FOREIGN org Y -> denied.
+      const cross = probe.begin(async (tx) => {
+        await tx`select set_config('app.person_id', ${owner}, true)`;
+        await tx`select set_config('app.org_id', ${orgX.id}, true)`;
+        await tx`insert into grants(id, person_id, scope_type, scope_id, capability_set, granted_by)
+                 values (${newId()}, ${owner}, 'org', ${orgY.id}, 'org:owner', ${owner})`;
+      });
+      await expect(cross).rejects.toThrow(/row-level security/);
+
+      // A grant scoped to the ACTIVE tenant is legitimate and succeeds.
+      const legitId = newId();
+      await probe.begin(async (tx) => {
+        await tx`select set_config('app.person_id', ${owner}, true)`;
+        await tx`select set_config('app.org_id', ${orgX.id}, true)`;
+        await tx`insert into grants(id, person_id, scope_type, scope_id, capability_set, granted_by)
+                 values (${legitId}, ${owner}, 'org', ${orgX.id}, 'viewer', ${owner})`;
+      });
+      const [written] = await db
+        .select()
+        .from(grantsTable)
+        .where(eq(grantsTable.id, legitId))
+        .limit(1);
+      expect(written?.scopeId).toBe(orgX.id);
     } finally {
       await probe.end();
       await handle.sql.unsafe(`drop owned by ${role}`);

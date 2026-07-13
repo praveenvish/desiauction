@@ -14,8 +14,8 @@
 Identity → Authentication → Session → Authorization → Tenant Resolution → RLS → Business Capability
 ```
 
-Test-suite shorthand: **SEC** = `auth/security.regression.test.ts` (7) ·
-**AUTHZ** = `orgs/authz.regression.test.ts` (11) · **INT** =
+Test-suite shorthand: **SEC** = `auth/security.regression.test.ts` (8) ·
+**AUTHZ** = `orgs/authz.regression.test.ts` (12) · **INT** =
 `auth/auth.integration.test.ts` (7) · **CORE** = `core/capabilities.test.ts` (8) ·
 **E2E** = `e2e/{login,passkeys,orgs}.spec.ts` (real Chrome).
 
@@ -53,13 +53,16 @@ rotates IPs faster than 20/h — bounded by SMS cost once RC-1 lands.
 for victims' phones (harassment/cost); forged challenges or unknown credential ids in
 passkey finish actions; man-in-the-middle on the ceremony origin.
 **Mitigations:** codes are 6-digit CSPRNG, SHA-256-stored, 5-min TTL, ≤ 5 verify
-attempts (5th kills the code even for the right value, logging `auth.otp.lockout`),
+attempts enforced by an **atomic guarded increment** (`UPDATE … WHERE attempts < 5` —
+concurrent wrong guesses serialize on the row lock and cannot exceed the cap; RC-4
+Finding 3), 5th kills the code even for the right value (logging `auth.otp.lockout`),
 consumed atomically (replay dead); resend cooldown 30 s + hourly caps; one generic
 failure response; passkeys verify challenge + origin + rpID via simplewebauthn with
 the challenge in a single-use 300 s httpOnly cookie; unknown credentials fail closed
 before any cryptography; passkey logins are phishing-resistant by construction
 (origin binding); all entry points are origin-checked server actions (CSRF).
-**Regression tests:** SEC _OTP replay_, _lockout + security event_, _passkey fails
+**Regression tests:** SEC _OTP replay_, _lockout + security event_, _**attempt cap
+holds under concurrency** (12 parallel wrong guesses ceiling at 5)_, _passkey fails
 closed (unknown credential)_, _enrollment rejects forged challenge_; INT _consumed
 code cannot be replayed_, _cooldown_, _attempts lockout survives right code_; E2E
 _full OTP journey_, _wrong code rejected_, _passkey-only sign-in via CDP virtual
@@ -160,22 +163,32 @@ raw table access; audit-trail tampering; policy bypass via connection-role privi
 **Attack vectors:** a future query missing its `WHERE org_id`; injected SQL (drizzle
 is parameterized throughout — no string SQL in product code); UPDATE/DELETE on
 `audit_log`; connecting with a role that has BYPASSRLS.
-**Mitigations:** `ENABLE` + **`FORCE`** RLS on all four tables; policies keyed to
-`current_setting(..., true)` → NULL when unset → **fail closed, zero rows**;
+**Mitigations:** `ENABLE` + **`FORCE`** RLS on all four tables; **read** policies
+(`USING`) keyed to `current_setting(..., true)` → NULL when unset → **fail closed,
+zero rows**; **write** policies (`WITH CHECK`, migration 0004) constrain every INSERT/
+UPDATE to the active tenant with **no self-row escape** — closing the RC-4 finding
+that `USING`-only policies let a caller self-grant `org:owner` on any org;
 `withTenant()` primitive for per-request `SET LOCAL` context; production role recipe
 is `NOSUPERUSER NOBYPASSRLS` with `audit_log` at SELECT + INSERT only (R-1) — audit
 immutability is enforced by grants, not convention.
 **Regression tests:** AUTHZ **RLS PROOF** — a dedicated non-superuser probe role sees
 org X's rows with X's context, **zero rows** cross-tenant, **zero rows** with no
-context; AUTHZ **AUDIT PROOF** — the production grant recipe gets `permission denied`
-on UPDATE and DELETE of `audit_log` at the SQL layer.
+context; AUTHZ **RLS WRITE PROOF** — the same role's self-escalating grant on a
+foreign org is rejected by `WITH CHECK`, a grant on the active org succeeds; AUTHZ
+**AUDIT PROOF** — the production grant recipe gets `permission denied` on UPDATE and
+DELETE of `audit_log` at the SQL layer.
 **Residual risks (recorded, pre-deploy):** the app does not yet route queries through
 `withTenant()` — locally the superuser connection is RLS-exempt, so the second lock
-is **proven but not yet load-bearing in the serving path**; under the production
-role, org pages would fail closed (empty, not leaky) until wired. Named work item for
+is **proven under the production role in tests but not yet load-bearing in the serving
+path**; under the production role, org pages would fail closed (empty/rejected, not
+leaky) until wired, and the two pre-tenant read patterns (invite-by-token,
+org-preview-before-membership) need reconciling at that time. Named work item for
 first deploy (closure report §6). Person-scoped tables carry no policies by design
-(pre-identity paths — [SESSIONS.md](SESSIONS.md) §4). `audit_log` has no hash chain
-(0A ruling; post-GA).
+(pre-identity — [SESSIONS.md](SESSIONS.md) §4); `organizations` is intentionally
+readable (org name is exposed to non-members via invite links by design —
+[AUTHORIZATION.md](AUTHORIZATION.md) §5), with app-layer 404 delivering
+non-disclosure and a membership-gated policy recorded as a pre-deploy option.
+`audit_log` has no hash chain (0A ruling; post-GA).
 
 ## 7 · Business Capability
 

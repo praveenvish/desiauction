@@ -64,32 +64,49 @@ Expired, revoked, replayed, and unknown tokens are indistinguishable failures.
 
 ## 5 · Row-Level Security — the second lock (D5, C-13)
 
-The app layer scopes every query; RLS makes cross-tenant leakage **structurally
-impossible for any non-superuser role**. Migration `0003`: `ENABLE` + `FORCE ROW LEVEL
-SECURITY` on the four org-scoped tables with policies keyed to
-`current_setting('app.person_id'|'app.org_id', true)` — `true` returns NULL when
-unset, so **policies fail closed** (zero rows, no error):
+The app layer scopes every query; RLS is the second lock — cross-tenant **reads** and
+**writes** are both blocked for any non-superuser role. Migration `0003`: `ENABLE` +
+`FORCE ROW LEVEL SECURITY` on the four org-scoped tables with **read** policies
+(`USING`) keyed to `current_setting('app.person_id'|'app.org_id', true)` — `true`
+returns NULL when unset, so **policies fail closed** (zero rows, no error). Migration
+`0004` adds the **write** side (`WITH CHECK`) after RC-4 found that `USING`-only
+policies let PostgreSQL reuse the read predicate — with its legitimate self-row
+disjunct — as the write check, permitting a caller to INSERT a grant scoped to any
+org (self-escalation to `org:owner`). The write check has **no self-row escape**:
 
-| Table         | Policy (USING)                                                              |
-| ------------- | ---------------------------------------------------------------------------- |
-| `org_members` | `org_id = app.org_id OR person_id = app.person_id`                            |
-| `invites`     | `org_id = app.org_id`                                                         |
-| `grants`      | `person_id = app.person_id OR (scope_type='org' AND scope_id = app.org_id)`   |
-| `audit_log`   | org rows by `app.org_id` · person rows by `app.person_id` · own-actor rows    |
+| Table         | Read (`USING`)                                                             | Write (`WITH CHECK`, migration 0004)                                       |
+| ------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `org_members` | `org_id = app.org_id OR person_id = app.person_id`                          | `org_id = app.org_id`                                                       |
+| `invites`     | `org_id = app.org_id`                                                       | `org_id = app.org_id`                                                       |
+| `grants`      | `person_id = app.person_id OR (scope_type='org' AND scope_id = app.org_id)` | `scope_type='org' AND scope_id = app.org_id`                               |
+| `audit_log`   | org rows by `app.org_id` · person rows by `app.person_id` · own-actor rows  | (org scope = `app.org_id` **or** person scope = `app.person_id`) **and** `actor = app.person_id` |
 
-`withTenant()` (`packages/db/src/index.ts`) is the tenant-context primitive: a
-transaction with `SET LOCAL app.person_id / app.org_id`.
+The read disjuncts (a person reading their own grants/memberships across orgs) are
+deliberate and safe; the write side strips them so you may only write rows scoped to
+your **active** tenant, and audit rows only **as yourself**. `withTenant()`
+(`packages/db/src/index.ts`) is the tenant-context primitive: a transaction with
+`SET LOCAL app.person_id / app.org_id`.
 
 **Recorded production fact:** the web app's queries do **not** yet run through
 `withTenant()` — locally the connection role is the Docker superuser, which PostgreSQL
-exempts from policies, so the app works while the **proof tests** run under a
-dedicated non-superuser role that mirrors production. Under a production
-non-BYPASSRLS role the FORCE'd policies fail closed (empty reads — breakage, not
-leakage). **Routing org-scoped queries through tenant context is a named pre-deploy
-work item** (first production deploy, IP-3/IP-4) — see RUNBOOKS R-1 and the closure
-report. Person-scoped tables (`people`, `sessions`, `otp_codes`,
-`passkey_credentials`) deliberately carry no policies: authentication runs
-pre-identity ([SESSIONS.md](SESSIONS.md) §4).
+exempts from policies, so the app works while the **proof tests** run under dedicated
+non-superuser roles that mirror production. Under a production non-BYPASSRLS role the
+FORCE'd policies fail closed (empty reads / rejected cross-tenant writes — breakage,
+not leakage). **Routing org-scoped queries through tenant context is a named
+pre-deploy work item** (first production deploy, IP-3/IP-4) — see RUNBOOKS R-1 and the
+closure report. That wiring must also resolve the two pre-tenant read patterns —
+invite-lookup-by-token and org-preview-before-membership — which cannot carry org
+context at read time ([RUNBOOKS.md](RUNBOOKS.md) R-1).
+
+**No RLS by design** (app-layer scoping is the lock, proven by tests): `people`,
+`sessions`, `otp_codes`, `passkey_credentials` run **pre-identity**
+([SESSIONS.md](SESSIONS.md) §4); `organizations` is **intentionally readable** — a
+non-member holding an invite link is deliberately shown the org name at `/join`
+(`previewInvite`), so org name/slug is semi-public, not tenant-confidential, and slugs
+carry an unenumerable ULID suffix. The "org existence is never disclosed" property is
+delivered at the app layer (404 for non-members), not by RLS on `organizations`. A
+membership-gated policy on `organizations` (reconciled with the invite-preview read)
+is a recorded pre-deploy option, not a freeze blocker.
 
 ## 6 · Audit substrate (D8)
 
@@ -105,9 +122,11 @@ anchoring is post-GA.
 ## 7 · Protecting tests
 
 Unit (`capabilities.test.ts`, 8): set expansion, fail-closed unknown sets, revocation,
-exact-scope, empty grants. Authz regression (11, real PG): owner-on-create, tenant
+exact-scope, empty grants. Authz regression (12, real PG): owner-on-create, tenant
 indistinguishability, cross-tenant Forbidden, invite lifecycle + replay, staff
 non-escalation, expired/revoked invites, unknown-set refusal, immediate revocation,
 **AUDIT PROOF**, **RLS PROOF** (non-superuser probe: cross-tenant zero rows; no
-context → zero rows). E2E `orgs.spec.ts`: the house journey — create, invite, accept,
+context → zero rows), **RLS WRITE PROOF** (non-superuser probe: a self-escalating
+grant scoped to a foreign org is rejected by `WITH CHECK`; a grant scoped to the
+active org succeeds). E2E `orgs.spec.ts`: the house journey — create, invite, accept,
 assign, revoke, replay-dead, and **A cannot reach B's org (404)** in real browsers.
