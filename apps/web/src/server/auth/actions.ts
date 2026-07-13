@@ -55,7 +55,9 @@ async function takeChallenge(): Promise<string | null> {
 
 async function requestIp(): Promise<string | null> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip");
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip");
+  // Loopback is the server/proxy itself, never a client — no IP context.
+  return ip === null || ip === "127.0.0.1" || ip === "::1" ? null : ip;
 }
 
 async function issueSessionCookie(personId: string): Promise<void> {
@@ -77,7 +79,15 @@ const sender = new DevInboxSender(db);
 export interface AuthFormState {
   step: "phone" | "code";
   phone: string;
+  next?: string;
   error?: string;
+}
+
+/** Open-redirect-free return targets: relative paths only (IP-2 §6). */
+function safeNext(value: string | undefined): string {
+  return value !== undefined && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : "/account";
 }
 
 function formString(formData: FormData, key: string): string {
@@ -98,10 +108,19 @@ export async function requestOtpAction(
         : result.reason === "cooldown"
           ? "Code already sent — wait 30 seconds before requesting again."
           : "Too many codes requested. Try again in an hour.";
-    return { step: "phone", phone, error: message };
+    return {
+      step: "phone",
+      phone,
+      ...(_previous.next !== undefined ? { next: _previous.next } : {}),
+      error: message,
+    };
   }
   const normalized = normalizePhone(phone);
-  return { step: "code", phone: normalized.ok ? normalized.phone : phone };
+  return {
+    step: "code",
+    phone: normalized.ok ? normalized.phone : phone,
+    ...(_previous.next !== undefined ? { next: _previous.next } : {}),
+  };
 }
 
 export async function verifyOtpAction(
@@ -115,7 +134,7 @@ export async function verifyOtpAction(
   }
   await logSecurityEvent(db, result.personId, "auth.login.otp");
   await issueSessionCookie(result.personId);
-  redirect("/account");
+  redirect(safeNext(previous.next));
 }
 
 // --- Passkeys (M-IP2-2) -----------------------------------------------------

@@ -7,8 +7,12 @@ import "./login.css";
 
 export const metadata = { title: "Sign in · DesiAuction" };
 
-export default async function LoginPage() {
-  const session = await currentSession();
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const [session, params] = await Promise.all([currentSession(), searchParams]);
   if (session !== null) {
     redirect("/account");
   }
@@ -17,7 +21,7 @@ export default async function LoginPage() {
       <div className="login-panel">
         <h1>DesiAuction</h1>
         <p className="login-sub">Sign in with your mobile number.</p>
-        <LoginForm />
+        <LoginForm {...(params.next !== undefined ? { next: params.next } : {})} />
         <PasskeyLogin />
       </div>
     </main>

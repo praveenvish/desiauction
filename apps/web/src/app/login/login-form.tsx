@@ -5,15 +5,13 @@ import { useActionState } from "react";
 
 import { requestOtpAction, verifyOtpAction, type AuthFormState } from "../../server/auth/actions";
 
-const INITIAL: AuthFormState = { step: "phone", phone: "" };
-
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(
     async (previous: AuthFormState, formData: FormData) =>
       previous.step === "phone"
         ? requestOtpAction(previous, formData)
         : verifyOtpAction(previous, formData),
-    INITIAL,
+    { step: "phone", phone: "", ...(next !== undefined ? { next } : {}) },
   );
 
   return (

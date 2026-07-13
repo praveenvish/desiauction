@@ -1,0 +1,136 @@
+.orgs,
+.org-home,
+.join {
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  padding: var(--space-10) var(--space-6);
+}
+
+.orgs-stack,
+.org-stack,
+.join-panel {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.orgs h1,
+.org-home h1,
+.join h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.orgs h2,
+.org-home h2 {
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  margin: 0 0 var(--space-3);
+}
+
+.orgs-error {
+  color: var(--danger-strong);
+  margin: 0;
+}
+
+.orgs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.org-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.org-link strong {
+  display: block;
+  color: var(--text-heading);
+}
+
+.org-slug {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+}
+
+.create-org {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 380px;
+}
+
+.member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.member-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.member-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  min-width: 140px;
+}
+
+.member-phone {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.member-sets {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.member-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.invite-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.invite-url {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-accent);
+  overflow-wrap: anywhere;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.join-panel p {
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-secondary);
+}

@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // M-IP2-1 journey: phone → dev inbox → code → session → account → logout,
 // exactly as a founder demo runs it. Unique phone per run.
 
-const PHONE = `98${String(Date.now()).slice(-8)}`;
+const PHONE = `90${String(Date.now()).slice(-8)}`;
 
 test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   await page.goto("/login");
@@ -13,7 +13,7 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
 
   const inbox = await page.context().newPage();
-  await inbox.goto("/dev/inbox");
+  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${PHONE}`)}`);
   const code = await inbox.getByTestId(`code-+91${PHONE}`).first().textContent();
   await inbox.close();
   expect(code).toMatch(/^\d{6}$/);

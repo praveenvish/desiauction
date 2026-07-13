@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { otpInbox } from "@desiauction/db";
 import { notFound } from "next/navigation";
 
@@ -8,17 +8,28 @@ import "./inbox.css";
 
 // Development-only OTP delivery surface (IP-2_DESIGN D3). Structurally absent
 // outside development: production builds 404 this route before any query.
+// ?phone=+91... filters server-side (the e2e suites rely on this).
 export const dynamic = "force-dynamic";
 
-export default async function DevInboxPage() {
+export default async function DevInboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ phone?: string }>;
+}) {
   if (env.NODE_ENV !== "development") {
     notFound();
   }
-  const rows = await db.select().from(otpInbox).orderBy(desc(otpInbox.createdAt)).limit(20);
+  const { phone } = await searchParams;
+  const rows = await db
+    .select()
+    .from(otpInbox)
+    .where(phone !== undefined ? eq(otpInbox.phone, phone) : undefined)
+    .orderBy(desc(otpInbox.createdAt))
+    .limit(100);
   return (
     <main className="inbox">
       <h1>Dev OTP inbox</h1>
-      <p>Latest 20 codes. This page does not exist outside development.</p>
+      <p>Latest 100 codes. This page does not exist outside development.</p>
       <table>
         <thead>
           <tr>

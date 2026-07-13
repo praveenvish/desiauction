@@ -5,6 +5,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  globalSetup: "./e2e/global-setup.ts",
   reporter: [["list"]],
   use: {
     // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.

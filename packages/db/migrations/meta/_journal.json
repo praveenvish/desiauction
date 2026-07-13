@@ -15,6 +15,20 @@
       "when": 1783958362749,
       "tag": "0001_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783959195893,
+      "tag": "0002_invite_revocation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783959209413,
+      "tag": "0003_rls_org_isolation",
+      "breakpoints": true
     }
   ]
 }

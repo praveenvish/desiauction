@@ -129,6 +129,7 @@ export const invites = pgTable("invites", {
   expiresAt: ts("expires_at").notNull(),
   acceptedBy: char("accepted_by", { length: 26 }),
   acceptedAt: ts("accepted_at"),
+  revokedAt: ts("revoked_at"),
 });
 
 export const auditLog = pgTable(
