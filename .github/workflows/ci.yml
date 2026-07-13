@@ -26,6 +26,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # Generated tokens are committed; a rebuild must be a no-op (IP-1_DESIGN §6).
+      - run: git diff --exit-code packages/ui/src/generated
       - run: pnpm format:check
       - run: pnpm depcruise
       - run: pnpm audit --prod --audit-level high

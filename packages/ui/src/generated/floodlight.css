@@ -1,0 +1,50 @@
+/**
+ * Do not edit directly, this file was auto-generated.
+ */
+
+[data-theme="floodlight"] {
+  --text-primary: #C9D4E8;
+  --text-secondary: #9FB0CC;
+  --text-muted: #7285A6;
+  --text-disabled: #48597A;
+  --text-inverse: #282824;
+  --text-on-accent: #070A0F;
+  --text-accent: #CDF53C;
+  --text-heading: #E8EEF9;
+  --surface: #0B1018;
+  --surface-raised: #101623;
+  --surface-overlay: #161E2E;
+  --surface-sunken: #070A0F;
+  --surface-inverse: #FBFBF9;
+  --border-subtle: #2C3A52;
+  --border-strong: #1F2A3D;
+  --border-interactive: #B4E11F;
+  --focus-ring: #B4E11F;
+  --accent: #CDF53C;
+  --accent-hover: #E2FF66;
+  --accent-pressed: #B4E11F;
+  --accent-subtle: #CDF53C1F;
+  --live: #CDF53C;
+  --success-subtle: #3DD68C26;
+  --success-base: #3DD68C;
+  --success-strong: #3DD68C;
+  --danger-subtle: #FF636926;
+  --danger-base: #FF6369;
+  --danger-strong: #FF6369;
+  --warning-subtle: #FFC53D26;
+  --warning-base: #FFC53D;
+  --warning-strong: #FFC53D;
+  --info-subtle: #5CA8FF26;
+  --info-base: #5CA8FF;
+  --info-strong: #5CA8FF;
+  --money-value: #F6F9FF;
+  --money-spent: #7285A6;
+  --money-remaining: #3DD68C;
+  --money-frozen: #FFC53D;
+  --ceremony-gold: #F0B429;
+  --ceremony-gold-deep: #B57F14;
+  --ceremony-glow: #FFD666;
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: none;
+}

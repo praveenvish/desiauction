@@ -1,0 +1,26 @@
+/* All faces self-hosted (doc 09; zero font CDNs). Clash Display vendored under
+   the ITF/Fontshare Free Font Licence (clash-display/LICENCE.txt); Geist and
+   Anek Devanagari via @fontsource packages. Weights per doc 09. */
+@import "@fontsource/geist-sans/400.css";
+@import "@fontsource/geist-sans/500.css";
+@import "@fontsource/geist-sans/600.css";
+@import "@fontsource/geist-mono/400.css";
+@import "@fontsource/geist-mono/500.css";
+@import "@fontsource/anek-devanagari/500.css";
+@import "@fontsource/anek-devanagari/600.css";
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("./clash-display/ClashDisplay-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Clash Display";
+  src: url("./clash-display/ClashDisplay-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}

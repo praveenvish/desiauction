@@ -10,3 +10,4 @@ coverage/
 drizzle/migrations/meta/
 playwright-report/
 test-results/
+packages/ui/src/generated/

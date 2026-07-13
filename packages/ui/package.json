@@ -4,14 +4,25 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./styles/primitives.css": "./src/generated/primitives.css",
+    "./styles/floodlight.css": "./src/generated/floodlight.css",
+    "./styles/daylight.css": "./src/generated/daylight.css",
+    "./styles/fonts.css": "./src/fonts/fonts.css"
   },
   "scripts": {
+    "build": "node style-dictionary.config.mjs",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@fontsource/anek-devanagari": "5.2.7",
+    "@fontsource/geist-mono": "5.2.8",
+    "@fontsource/geist-sans": "5.2.5"
+  },
   "devDependencies": {
     "@desiauction/config": "workspace:*",
+    "style-dictionary": "5.5.0",
     "typescript": "^5.9.0"
   }
 }

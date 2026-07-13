@@ -49,11 +49,11 @@ Electric pitch-green. The old brand's green, floodlit. **The only accent hue in 
 | volt-300 | `#E2FF66` | Glow edges, dark-theme hover |
 | volt-400 | `#CDF53C` | Primary accent on dark (live indicators, current bid, primary buttons on dark) |
 | volt-500 | `#B4E11F` | Primary buttons (dark theme), focus rings on dark |
-| volt-600 | `#8CB40D` | Primary actions on Daylight (AA on chalk-50) |
-| volt-700 | `#6E8F06` | Daylight hover/pressed, links on light |
+| volt-600 | `#8CB40D` | Daylight hover fills (measured 2.35:1 on chalk-50 — below the 3:1 UI floor; never sole affordance) |
+| volt-700 | `#6E8F06` | Primary fills/borders/focus on Daylight (measured 3.63:1 on chalk-50 ≥ 3:1; below 4.5:1 — not for body text) |
 | volt-900 | `#2E3D00` | Text on volt fills |
 
-Rules: text on volt-400/500 fills is always ink-950/volt-900 (never white). On Daylight, volt-600+ only for text/icons (contrast). Volt marks **live and actionable** — it never marks mere selection (that's ink/chalk fills).
+Rules: text on volt fills is always ink-950/volt-900 (never white — measured: ink-950 on volt-700 = 5.2:1, on volt-400 = 15.6:1). Accent-colored **text** on Daylight uses volt-900 only (11.3:1; volt-600/700 fail the 4.5:1 text floor — measured correction, IP-1). Volt marks **live and actionable** — it never marks mere selection (that's ink/chalk fills).
 
 ## Gold — earned only (C-5)
 

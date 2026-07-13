@@ -1,0 +1,141 @@
+/* Gallery chrome — semantic tokens only (doc 18: primitives are lint-banned
+   in product code; this file is the proof the semantic set suffices). */
+.gallery {
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+  padding: var(--space-10) var(--space-6) var(--space-16);
+  transition: background var(--duration-base) var(--ease-out);
+}
+
+.gallery-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: 1440px;
+  margin: 0 auto var(--space-10);
+}
+
+.gallery h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.gallery h2 {
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: var(--space-12) 0 var(--space-4);
+}
+
+.gallery section {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.theme-toggle {
+  font: inherit;
+  font-weight: 500;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.swatch {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.swatch-chip {
+  height: var(--space-12);
+}
+
+.swatch-meta {
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.swatch-meta code {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.type-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-4);
+  align-items: baseline;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.type-row .label {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.type-sample {
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.type-sample.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.money-sample {
+  font-family: var(--font-text);
+  font-variant-numeric: tabular-nums;
+  color: var(--money-value);
+}
+
+.pair-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.pair {
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+}

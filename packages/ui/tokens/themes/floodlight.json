@@ -1,0 +1,68 @@
+{
+  "surface": {
+    "default": { "$value": "{color.ink.900}", "$type": "color" },
+    "raised": { "$value": "{color.ink.850}", "$type": "color" },
+    "overlay": { "$value": "{color.ink.800}", "$type": "color" },
+    "sunken": { "$value": "{color.ink.950}", "$type": "color" },
+    "inverse": { "$value": "{color.chalk.50}", "$type": "color" }
+  },
+  "text": {
+    "primary": { "$value": "{color.ink.200}", "$type": "color" },
+    "secondary": { "$value": "{color.ink.300}", "$type": "color" },
+    "muted": { "$value": "{color.ink.400}", "$type": "color" },
+    "disabled": { "$value": "{color.ink.500}", "$type": "color" },
+    "inverse": { "$value": "{color.chalk.800}", "$type": "color" },
+    "on-accent": { "$value": "{color.ink.950}", "$type": "color" },
+    "accent": { "$value": "{color.volt.400}", "$type": "color" },
+    "heading": { "$value": "{color.ink.100}", "$type": "color" }
+  },
+  "border": {
+    "subtle": { "$value": "{color.ink.600}", "$type": "color" },
+    "strong": { "$value": "{color.ink.700}", "$type": "color" },
+    "interactive": { "$value": "{color.volt.500}", "$type": "color" }
+  },
+  "focus-ring": { "$value": "{color.volt.500}", "$type": "color" },
+  "accent": {
+    "default": { "$value": "{color.volt.400}", "$type": "color" },
+    "hover": { "$value": "{color.volt.300}", "$type": "color" },
+    "pressed": { "$value": "{color.volt.500}", "$type": "color" },
+    "subtle": { "$value": "#CDF53C1F", "$type": "color" }
+  },
+  "live": { "$value": "{color.volt.400}", "$type": "color" },
+  "success": {
+    "subtle": { "$value": "#3DD68C26", "$type": "color" },
+    "base": { "$value": "{color.green.dark}", "$type": "color" },
+    "strong": { "$value": "{color.green.dark}", "$type": "color" }
+  },
+  "danger": {
+    "subtle": { "$value": "#FF636926", "$type": "color" },
+    "base": { "$value": "{color.red.dark}", "$type": "color" },
+    "strong": { "$value": "{color.red.dark}", "$type": "color" }
+  },
+  "warning": {
+    "subtle": { "$value": "#FFC53D26", "$type": "color" },
+    "base": { "$value": "{color.amber.dark}", "$type": "color" },
+    "strong": { "$value": "{color.amber.dark}", "$type": "color" }
+  },
+  "info": {
+    "subtle": { "$value": "#5CA8FF26", "$type": "color" },
+    "base": { "$value": "{color.blue.dark}", "$type": "color" },
+    "strong": { "$value": "{color.blue.dark}", "$type": "color" }
+  },
+  "money": {
+    "value": { "$value": "{color.ink.50}", "$type": "color" },
+    "spent": { "$value": "{color.ink.400}", "$type": "color" },
+    "remaining": { "$value": "{color.green.dark}", "$type": "color" },
+    "frozen": { "$value": "{color.amber.dark}", "$type": "color" }
+  },
+  "ceremony": {
+    "gold": { "$value": "{color.gold.500}", "$type": "color" },
+    "gold-deep": { "$value": "{color.gold.700}", "$type": "color" },
+    "glow": { "$value": "{color.gold.300}", "$type": "color" }
+  },
+  "shadow": {
+    "1": { "$value": "none", "$type": "shadow" },
+    "2": { "$value": "none", "$type": "shadow" },
+    "3": { "$value": "none", "$type": "shadow" }
+  }
+}

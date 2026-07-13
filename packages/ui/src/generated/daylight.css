@@ -1,0 +1,50 @@
+/**
+ * Do not edit directly, this file was auto-generated.
+ */
+
+[data-theme="daylight"] {
+  --text-primary: #3E3E39;
+  --text-secondary: #5C5C55;
+  --text-muted: #5C5C55;
+  --text-disabled: #B0B0A5;
+  --text-inverse: #E8EEF9;
+  --text-on-accent: #070A0F;
+  --text-accent: #2E3D00;
+  --text-heading: #282824;
+  --surface: #FBFBF9;
+  --surface-raised: #FFFFFF;
+  --surface-overlay: #FFFFFF;
+  --surface-sunken: #F5F5F1;
+  --surface-inverse: #0B1018;
+  --border-subtle: #EAEAE3;
+  --border-strong: #D8D8CF;
+  --border-interactive: #6E8F06;
+  --focus-ring: #6E8F06;
+  --accent: #6E8F06;
+  --accent-hover: #8CB40D;
+  --accent-pressed: #2E3D00;
+  --accent-subtle: #8CB40D14;
+  --live: #6E8F06;
+  --success-subtle: #1D9E5F1A;
+  --success-base: #1D9E5F;
+  --success-strong: #15794A;
+  --danger-subtle: #D938431A;
+  --danger-base: #D93843;
+  --danger-strong: #C22F39;
+  --warning-subtle: #B87D081A;
+  --warning-base: #B87D08;
+  --warning-strong: #8F6106;
+  --info-subtle: #2673D61A;
+  --info-base: #2673D6;
+  --info-strong: #2266C4;
+  --money-value: #171715;
+  --money-spent: #5C5C55;
+  --money-remaining: #15794A;
+  --money-frozen: #8F6106;
+  --ceremony-gold: #F0B429;
+  --ceremony-gold-deep: #B57F14;
+  --ceremony-glow: #FFD666;
+  --shadow-1: 0 1px 2px rgb(23 23 21 / 0.06), 0 1px 3px rgb(23 23 21 / 0.10);
+  --shadow-2: 0 2px 4px rgb(23 23 21 / 0.06), 0 4px 12px rgb(23 23 21 / 0.12);
+  --shadow-3: 0 4px 8px rgb(23 23 21 / 0.08), 0 12px 32px rgb(23 23 21 / 0.16);
+}
