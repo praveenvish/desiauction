@@ -7,11 +7,11 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: "http://127.0.0.1:3050",
   },
   webServer: {
-    command: "pnpm exec next dev --port 3100",
-    url: "http://127.0.0.1:3100/healthz",
+    command: "pnpm exec next dev --port 3050",
+    url: "http://127.0.0.1:3050/healthz",
     reuseExistingServer: !process.env["CI"],
     timeout: 60_000,
   },

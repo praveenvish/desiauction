@@ -39,8 +39,10 @@ export default tseslint.config(
     },
   },
   {
-    // env.ts is the single sanctioned process.env boundary (§11).
-    files: ["**/env.ts"],
+    // env.ts is the sanctioned process.env boundary (§11). instrumentation.ts
+    // may read only NEXT_RUNTIME, which must be checked before env.ts is
+    // importable (RC-A2, the documented Next/Sentry guard pattern).
+    files: ["**/env.ts", "**/instrumentation.ts"],
     rules: {
       "no-restricted-syntax": "off",
     },

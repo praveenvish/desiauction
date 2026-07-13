@@ -1,0 +1,16 @@
+# RC-A1 (IP-0 acceptance condition; IP-0_DESIGN §31): security-only updates.
+# open-pull-requests-limit: 0 disables version-bump PRs while Dependabot
+# security update PRs remain enabled. Toolchain upgrades stay deliberate,
+# dedicated PRs (§9) — never drive-by.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
