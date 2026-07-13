@@ -157,6 +157,36 @@ describe("AUTHZ REGRESSION — tenancy + capability contract", () => {
     expect(await can(db, staff, scope, "player.verify")).toBe(false);
   });
 
+  it("AUDIT PROOF: a role on the production grant recipe cannot UPDATE or DELETE audit rows", async () => {
+    // The D8 append-only contract as a tested fact: the app role is granted
+    // SELECT + INSERT on audit_log and nothing else (the provisioning recipe
+    // in docs/identity/RUNBOOKS.md). Mutation must die at the SQL layer.
+    const role = `audit_probe_${RUN}`;
+    await handle.sql.unsafe(`drop role if exists ${role}`);
+    await handle.sql.unsafe(`create role ${role} login password 'probe' nosuperuser nobypassrls`);
+    await handle.sql.unsafe(`grant select, insert on audit_log to ${role}`);
+    const url = new URL(env.DATABASE_URL);
+    const probeHandle = createDb(
+      `postgres://${role}:probe@${url.hostname}:${url.port}${url.pathname}`,
+    );
+    const probe = probeHandle.sql;
+    try {
+      const mutate = (statement: "update" | "delete") =>
+        probe.begin(async (tx) => {
+          await tx`select set_config('app.person_id', ${owner}, true)`;
+          return statement === "update"
+            ? tx`update audit_log set action = 'tampered' where actor = ${owner}`
+            : tx`delete from audit_log where actor = ${owner}`;
+        });
+      await expect(mutate("update")).rejects.toThrow(/permission denied/);
+      await expect(mutate("delete")).rejects.toThrow(/permission denied/);
+    } finally {
+      await probe.end();
+      await handle.sql.unsafe(`drop owned by ${role}`);
+      await handle.sql.unsafe(`drop role if exists ${role}`);
+    }
+  });
+
   it("RLS PROOF: the database layer independently blocks cross-tenant reads", async () => {
     const role = `rls_probe_${RUN}`;
     await handle.sql.unsafe(`drop role if exists ${role}`);

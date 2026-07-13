@@ -1,6 +1,26 @@
 # PHASE GATE RECORDS
 ## Blueprint §4 universal checklist · one section per phase closure
 
+## IP-2 — Identity & Tenancy · ENGINEERING CLOSED 2026-07-14 · freeze pending RC-4
+
+Milestone decisions: M-IP2-1 **APPROVED** · M-IP2-2 **APPROVED** · M-IP2-3 **APPROVED** · M-IP2-4 = this closure.
+**Freeze gate:** the Blueprint's RC-4 independent review is the named exit — reviewer unnamed at DoD, so the phase closes **engineering complete · freeze pending review** (IP-2_DESIGN §8, IP-0 pattern). The tag `ip2-frozen` follows the RC-4 verdict (+ conditions, if any) and the founder demo (closure report §7). Review package: [IP-2_RC4_REVIEW_PACKAGE.md](IP-2_RC4_REVIEW_PACKAGE.md).
+
+| # | Gate | Evidence (2026-07-14, tree at closure commit) |
+|---|---|---|
+| 1 | Type safety | `tsc --strict` clean, 7/7 workspaces, zero suppressions in source |
+| 2 | Lint | 0 errors 7/7 workspaces |
+| 3 | Unit tests | 76 — core **17** (capability engine 8: fail-closed sets, revocation, exact-scope) · contracts 2 · engine 5 · ui 52 (IP-1 suite untouched) |
+| 4 | Integration | **27 vs live PG17** — auth 7 · security regression 7 · authz regression **11** incl. **RLS PROOF** (non-superuser probe: cross-tenant 0 rows, no-context 0 rows) and **AUDIT PROOF** (production grant recipe: UPDATE/DELETE on audit_log → permission denied); migrations re-applied idempotent |
+| 5 | Accessibility | axe **zero violations** on /login + /orgs and all IP-1 suites; keyboard-only login journey; 360px zero-overflow |
+| 6 | Performance | First-load JS shared 102 kB; /login 113 · /account 114 · /orgs 113 · /org/[slug] 110 · /join 108 kB; /gallery 113 kB vs 112 kB at IP-1 freeze (<1%, chunk attribution) — **unchanged**; prod server verified serving HSTS/DENY/nosniff |
+| 7 | Visual review | Founder approved the FLOODLIGHT identity journeys at M-IP2-1/-2/-3; demo script ready (closure §7) |
+| 8 | Founder review | M-IP2-1/2/3 decisions recorded above; M-IP2-4 = this record; **one open founder input: name the RC-4 reviewer** |
+| 9 | Documentation | Permanent set shipped: `docs/identity/` (AUTHENTICATION · SESSIONS · PASSKEYS · AUTHORIZATION · THREAT_MODEL · DPDP_DATA_INVENTORY · RUNBOOKS) + RC-4 package + closure report. Deviations recorded: NODE_ENV env-file build defect fixed (D-M4-1); local e2e workers=2 (D-M4-2); person-scoped RLS deliberately absent (D-M4-4); `withTenant()` serving-path wiring = named pre-deploy item (D-M4-5) |
+| 10 | Architecture review | Boundaries 0 violations / 325 modules (`db → drizzle+postgres` only, intact); e2e-in-CI decision still parked at the IP-3 gate; **independent review = RC-4, package ready, verdict pending — the freeze blocker** |
+
+**Security sweep (M-IP2-4):** three findings, all test/build infrastructure, fixed in-milestone — production build corrupted by env-file NODE_ENV; e2e flake under parallel dev-server load; audit append-only previously untested. Product code: zero defects found; residuals recorded in [THREAT_MODEL.md](../identity/THREAT_MODEL.md) and RC-4 package §5. Dev-inbox production exclusion **proven live** (404 on `next start`).
+
 ## IP-1 — FLOODLIGHT Design System · FROZEN 2026-07-13 · `ui@0.1.0` · tag `ip1-frozen`
 
 Milestone decisions: M-IP1-1 **APPROVED** · M-IP1-2 **APPROVED** · M-IP1-3 **APPROVED** (founder: "premium feel achieved, cohesive, worthy of the brand; mobile consistent") · M-IP1-4 **APPROVED** · M-IP1-5 = this freeze.

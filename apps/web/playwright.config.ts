@@ -5,6 +5,9 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  // Local runs share one on-demand `next dev` compiler; more workers overload
+  // it into moving 30s timeouts (M-IP2-4 sweep). CI keeps Playwright's default.
+  ...(process.env["CI"] ? {} : { workers: 2 }),
   globalSetup: "./e2e/global-setup.ts",
   reporter: [["list"]],
   use: {
