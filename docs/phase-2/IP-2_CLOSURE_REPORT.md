@@ -2,6 +2,15 @@
 
 ## M-IP2-4 "Papers in Order" · 2026-07-14 · CTO
 
+> **Revision note (RC-4 complete):** the independent reviewer (Fable) first pass
+> returned **APPROVE WITH CONDITIONS** with two verified defects (RLS write-side hole,
+> OTP attempt-counter race). Both were **fixed and independently re-proven** (commit
+> `9559d9e`, migration `0004` + atomic OTP guard + two new regression proofs); a third
+> finding (organizations no RLS) was reclassified as intentional and documented. On
+> re-review the reviewer returned **APPROVE WITH CONDITIONS — zero freeze blockers,
+> `ip2-frozen` cleared**. This report reflects the frozen tree. See §3 D-M4-6, §8, and
+> the verbatim verdict in GATES.md.
+
 ## 1 · What was completed
 
 M-IP2-4 added **zero business functionality** by directive. Delivered: the permanent
@@ -21,10 +30,10 @@ infrastructure, none in product code (§3).
 | TypeScript          | ✓ `tsc --strict` 7/7 workspaces, zero suppressions in source                                                        |
 | Lint                | ✓ 0 errors, 7/7 workspaces                                                                                          |
 | Unit                | ✓ 76 — core 17 (capability engine 8) · contracts 2 · engine 5 · ui 52                                               |
-| Integration (PG17)  | ✓ 27 — auth 7 · security regression 7 · **authz regression 11** (incl. RLS PROOF + new AUDIT PROOF) · engine 2      |
+| Integration (PG17)  | ✓ 29 — auth 7 · **security regression 8** (incl. concurrency proof) · **authz regression 12** (incl. RLS PROOF + RLS WRITE PROOF + AUDIT PROOF) · engine 2 |
 | Playwright          | ✓ 37/37 real Chrome — OTP journey, **passkey ceremony via CDP virtual authenticator**, house journey (invite → accept → revoke → 404 isolation), session management |
-| Security suite      | ✓ 7/7 (replay, enumeration, lockout+event, rotation, isolation, passkey fail-closed ×2)                             |
-| Authz suite         | ✓ 11/11 (escalation, revocation, invites ×4, tenancy, RLS, audit immutability)                                      |
+| Security suite      | ✓ 8/8 (replay, enumeration, lockout+event, **concurrency cap**, rotation, isolation, passkey fail-closed ×2)         |
+| Authz suite         | ✓ 12/12 (escalation, revocation, invites ×4, tenancy, RLS read, **RLS write**, audit immutability)                  |
 | Passkey coverage    | ✓ e2e enroll + passkey-only login + server-side fail-closed tests                                                   |
 | Boundaries          | ✓ dep-cruiser 0 violations / 325 modules / 566 deps (`db → drizzle+postgres` only, intact)                          |
 | RLS                 | ✓ SQL-layer proof under non-superuser probe: cross-tenant 0 rows; no-context 0 rows (fail closed)                   |
@@ -56,6 +65,17 @@ infrastructure, none in product code (§3).
   production role (IP-3/IP-4), tracked as a named pre-deploy work item (§6.1). A
   freeze-scope rewrite of every query path would have violated this directive's
   "no new functionality" and shipped untested plumbing.
+- **D-M4-6 · RC-4 remediation applied in-milestone** (commit `9559d9e`). The
+  independent review found the RLS second lock protected reads but not writes
+  (`USING`-only policies → self-escalation to `org:owner` on any org) and an OTP
+  attempt-counter race. Both are genuine defects, not new functionality, so they were
+  fixed inside the freeze milestone: migration `0004` adds `WITH CHECK` (writes
+  constrained to the active tenant, no self-row escape; audit rows require
+  `actor = app.person_id`); OTP verify uses an atomic guarded increment. Two new
+  permanent proofs (RLS WRITE PROOF, concurrency cap) pin them. `organizations`
+  remaining un-RLS'd was reclassified as intentional (org name is invite-link-public)
+  rather than patched with a policy that would break invite previews — documented, not
+  silently deferred.
 
 ## 4 · Security decisions (standing, from IP-2 as built)
 
@@ -72,22 +92,26 @@ production · platform origin-check + SameSite for CSRF · open-redirect-free re
 [THREAT_MODEL.md](../identity/THREAT_MODEL.md) covers the seven-stage chain
 (Identity → Authentication → Session → Authorization → Tenant Resolution → RLS →
 Business Capability), each with boundary, assets, threats, vectors, implemented
-mitigations, named tripwire tests, and residuals. Headline residuals: SIM-channel
-risks inherent to phone-first (passkeys are the mitigation path) · RLS proven but
-not yet load-bearing in the serving path (fail-closed, §3 D-M4-5) · DevInboxSender
-is the only sender until RC-1 (production login undeliverable by design) · no CSP
-until IP-3 · convention-enforced action pattern (RC-4 Q3 asks the reviewer to
-pressure-test it).
+mitigations, named tripwire tests, and residuals. The RLS stage now documents both
+the read lock (`USING`) and the write lock (`WITH CHECK`, added in remediation).
+Headline residuals: SIM-channel risks inherent to phone-first (passkeys are the
+mitigation path) · RLS proven for reads and writes but not yet load-bearing in the
+serving path (fail-closed, §3 D-M4-5) · DevInboxSender is the only sender until RC-1
+(production login undeliverable by design) · no CSP until IP-3 · convention-enforced
+action pattern (RC-4 Q3 asks the reviewer to pressure-test it).
 
 ## 6 · Remaining risks & work items
 
 1. **Pre-deploy (blocking first production traffic):** route org-scoped queries
-   through `withTenant()`; provision roles per R-1; RC-1 sender swap; set real
-   `RP_ID`/`RP_ORIGINS`.
+   through `withTenant()` (reconciling the invite-by-token and org-preview pre-tenant
+   reads); provision roles per R-1; RC-1 sender swap; set real `RP_ID`/`RP_ORIGINS`;
+   SMS-send circuit-breaker before paid delivery (RC-4 advisory).
 2. **Pre-GA (DPDP):** consent notice + record at signup; account deletion/anonymize
    path; grievance surface; data purge jobs (R-6 automates); phone-change flow.
-3. **Watching:** CSP at IP-3 · UV step-up policy when money arrives (IP-6) · audit
-   write transactionality with IP-6 idempotency work · org/invite creation rate
+3. **Watching (RC-4 advisories + carried):** wrap `acceptInvite`/`createOrg` in
+   transactions; `issueGrant` capability-set re-validation; membership-gated
+   `organizations` RLS option; CSP at IP-3 · UV step-up when money arrives (IP-6) ·
+   audit write transactionality with IP-6 idempotency · org/invite creation rate
    limits · counter-anomaly alarming.
 4. **Program:** no git remote/CI-on-push yet (IP-0 founder tail) — all gates local.
 
@@ -105,17 +129,24 @@ e2e `login → passkeys → orgs`, 37/37 green — the demo cannot surprise us.)
 
 Engineering for IP-2 is **complete and verified**; the surface is documented to the
 standard the directive demanded (a new team could build Competition, Auction Engine,
-Money, and Operations on these docs without redesigning identity). Freeze must wait
-for the one open gate the Blueprint itself named: **RC-4**. Recommendation: name the
-independent reviewer now; hand them [IP-2_RC4_REVIEW_PACKAGE.md](IP-2_RC4_REVIEW_PACKAGE.md);
-apply their conditions if any; then run the §7 demo and cut `ip2-frozen`. Tagging
-before the named exit gate would repeat the pattern this program's governance exists
-to prevent (IP-0 precedent).
+Money, and Operations on these docs without redesigning identity). The one gate the
+Blueprint named for freeze — the RC-4 independent review — is **cleared**: reviewer
+Fable returned APPROVE WITH CONDITIONS with **zero freeze blockers**, having
+independently re-proven that both defects the first pass flagged (RLS write-side
+self-escalation, OTP race) are fixed. The remaining conditions are all
+before-production / before-GA and recorded (§6). **Recommendation: FREEZE — cut
+`ip2-frozen`.** The `withTenant()` serving-path wiring (with the membership-gated
+`organizations` policy and pre-tenant-read reconciliation folded in) is the first
+task of the production-deploy tail, not a freeze blocker; the live founder demo of
+§7 exercises behavior already proven by 37 green e2e tests and can run any time
+post-freeze without affecting the tag.
 
 ## 9 · Phase readiness assessment
 
-**ENGINEERING CLOSED — freeze pending RC-4 verdict + founder demo** (the IP-2_DESIGN
-§8 "engineering complete · freeze pending review" pattern). All ten gates green at
-this tree; GATES.md entry recorded; zero open engineering items; IP-3 ("Competition")
-is unblocked for design work the moment the founder issues OPEN IP-3 — identity is a
-consumable, documented, tested subsystem as of this commit.
+**FROZEN** — tag `ip2-frozen` cut at this commit. All ten gates green; RC-4 cleared
+with the verdict recorded verbatim in GATES.md; zero open engineering items and zero
+open product-code defects. IP-2 is now a permanent, consumable, documented, tested
+identity subsystem: fail-closed capabilities, per-capability enforcement on one
+audited path, hashed rotating sessions, atomic invites, and a genuine dual-layer
+read+write RLS lock. **IP-3 ("Competition") is unblocked for design the moment the
+founder issues OPEN IP-3.** Engineering stops here per the directive.
