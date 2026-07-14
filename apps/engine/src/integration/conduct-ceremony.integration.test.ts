@@ -352,7 +352,7 @@ describe("COMPENSATING UNDO — history immutable, replay identical", () => {
       { reason: "wrong gavel" },
       { conduct: true, override: true },
     );
-    expect(undone.accepted).toBe(true);
+    expect(undone).toMatchObject({ accepted: true });
 
     // History grew — nothing was deleted or rewritten.
     const eventsAfter = await loadEvents(db, auctionId);

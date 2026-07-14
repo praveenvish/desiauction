@@ -171,6 +171,7 @@ export type {
   AuctionProjection,
   LotProjection,
   PaddleProjection,
+  BidProjection,
   OwnerInviteProjection,
   PaddleGrantProjection,
   LotOutcome,

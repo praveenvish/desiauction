@@ -311,9 +311,16 @@ export function ladderStep(slabs: readonly IncrementSlab[], price: Paise): Paise
 /**
  * The ladder is the deterministic price sequence base, base+step(base), … —
  * each rung advances by the step of the slab the CURRENT rung sits in. A bid
- * is well-formed only if it lands exactly on a rung (doc 41 check 7). Bounded
- * walk: rungs are ≥ the smallest step apart, so this terminates quickly for
- * realistic purses.
+ * is well-formed only if it lands exactly on a rung (doc 41 check 7).
+ *
+ * Computed in O(#slabs), NOT by walking rung-by-rung: a rung-by-rung walk is
+ * O((amount − base) / smallest-step), so a crafted amount up to
+ * Number.MAX_SAFE_INTEGER (which passes checks 4–6 before this check) would burn
+ * seconds of synchronous CPU on the single-writer engine — a fairness/liveness
+ * DoS reachable by any authorized bidder. Within one slab the reachable rungs
+ * are an arithmetic progression, so membership is a single modulo; between slabs
+ * we jump straight to the first rung at or past the slab boundary. Regression:
+ * the walk is retained as the oracle in auction.test.ts.
  */
 export function ladderContains(
   base: Paise,
@@ -323,9 +330,25 @@ export function ladderContains(
   if (amount < base) {
     return false;
   }
-  let rung = base;
-  while (rung < amount) {
-    rung = paise(rung + ladderStep(slabs, rung));
+  let rung: number = base;
+  for (const slab of slabs) {
+    if (rung >= amount) {
+      break;
+    }
+    // Skip slabs the current rung has already passed (base may start high).
+    if (slab.upTo !== null && rung >= slab.upTo) {
+      continue;
+    }
+    // `amount` falls in this slab's stepping range (or the slab is open-ended):
+    // it is reachable iff it sits exactly on a rung of this arithmetic step.
+    if (slab.upTo === null || amount < slab.upTo) {
+      return (amount - rung) % slab.step === 0;
+    }
+    // Otherwise advance to the first rung at or beyond this slab's ceiling — the
+    // rung from which the NEXT slab's step takes over (matches ladderStep's
+    // `price < upTo` boundary exactly) — then continue with the next slab.
+    const steps = Math.ceil((slab.upTo - rung) / slab.step);
+    rung += steps * slab.step;
   }
   return rung === amount;
 }
@@ -711,6 +734,21 @@ export interface PaddleProjection {
   paddleNumber: string;
   committed: number; // paise committed via sold lots
   released: boolean; // M-IP4-2: a released paddle can no longer bid
+  releasedAtMs: number | null; // when the claim ended — lets recovery heal the row exactly
+}
+
+/**
+ * The replayed bid ledger (M-IP4-4). The `bids` table is a PROJECTION of
+ * BidAccepted/BidInvalidated — and the most money-critical one: the sale price
+ * of a lot is read from the leading bid row. Modelling it here is what lets the
+ * watchdog verify those rows against the log instead of trusting them
+ * (certification drill, defect D-2).
+ */
+export interface BidProjection {
+  lotId: string;
+  paddleId: string;
+  amount: number; // paise
+  status: BidStatus;
 }
 
 /** The workflow states of the M-IP4-3 owner model, replayed from events. */
@@ -743,6 +781,7 @@ export interface AuctionProjection {
   status: AuctionStatus;
   lots: Record<string, LotProjection>;
   paddles: Record<string, PaddleProjection>;
+  bids: Record<string, BidProjection>;
   ownerInvites: Record<string, OwnerInviteProjection>;
   paddleGrants: Record<string, PaddleGrantProjection>;
   lastOutcome: LotOutcome | null;
@@ -769,6 +808,7 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
     status: "scheduled",
     lots: {},
     paddles: {},
+    bids: {},
     ownerInvites: {},
     paddleGrants: {},
     lastOutcome: null,
@@ -802,6 +842,7 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           paddleNumber: number,
           committed: 0,
           released: false,
+          releasedAtMs: null,
         };
         break;
       }
@@ -812,6 +853,9 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           return fail("unknown_paddle");
         }
         paddle.released = true;
+        // The event's atMs is the exact value the aggregate wrote to releasedAt,
+        // so recovery can heal the row precisely (M-IP4-4 defect D-3).
+        paddle.releasedAtMs = event.atMs;
         break;
       }
       case "LotPrepared": {
@@ -976,15 +1020,30 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
       }
       case "BidAccepted": {
         const lot = lotOf();
+        const lotId = str(event.payload, "lotId");
         const bidId = str(event.payload, "bidId");
         const paddleId = str(event.payload, "paddleId");
         const amount = num(event.payload, "amount");
-        if (lot === null || bidId === null || paddleId === null || amount === null) {
+        if (
+          lot === null ||
+          lotId === null ||
+          bidId === null ||
+          paddleId === null ||
+          amount === null
+        ) {
           return fail("malformed_bid");
         }
         if (lot.status !== "on_block" && lot.status !== "closing_soon") {
           return fail("illegal_replayed_transition");
         }
+        // The bid ledger: the outgoing leader is demoted, the new bid leads.
+        // Mirrors exactly what the aggregate writes to the `bids` rows, so the
+        // watchdog can compare the two.
+        const outgoing = lot.leadingBidId !== null ? projection.bids[lot.leadingBidId] : undefined;
+        if (outgoing !== undefined && outgoing.status === "accepted") {
+          outgoing.status = "outbid";
+        }
+        projection.bids[bidId] = { lotId, paddleId, amount, status: "accepted" };
         lot.bidCount += 1;
         lot.leadingBidId = bidId;
         lot.leadingPaddleId = paddleId;
@@ -992,9 +1051,18 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
         break;
       }
       case "BidRejected":
-        break; // evidence only — no state change
-      case "BidInvalidated":
-        break; // projection impact arrives with adjudication (post-M-IP4-1)
+        break; // evidence only — no bid row, no state change
+      case "BidInvalidated": {
+        // Voided-but-visible (undo / requeue override): the row survives as
+        // `invalidated` — history is never deleted (invariant 10).
+        const bidId = str(event.payload, "bidId");
+        const bid = bidId !== null ? projection.bids[bidId] : undefined;
+        if (bid === undefined) {
+          return fail("unknown_bid");
+        }
+        bid.status = "invalidated";
+        break;
+      }
       case "TimerExtended": {
         const lot = lotOf();
         const endsAtMs = num(event.payload, "endsAtMs");
@@ -1131,21 +1199,51 @@ export type UndoDecision =
   | { ok: false; reason: "nothing_to_undo" | "undo_window_closed" };
 
 /**
+ * Events that move a lot OUT of a resolved state. A resolution that one of
+ * these has already superseded can no longer be undone: the compensating
+ * LotReopened would land on a lot that replay sees as queued/withdrawn/frozen,
+ * writing an event the reducer must reject — an unreplayable log, i.e. an
+ * auction that can never recover. Certification drill M-IP4-4 (defect D-1).
+ */
+const LOT_SUPERSEDING_EVENTS: ReadonlySet<string> = new Set([
+  "LotQueued",
+  "LotRequeued",
+  "LotWithdrawn",
+  "LotHeld",
+]);
+
+/**
  * Walk backwards: the first resolution (LotSold/LotUnsold) is the target; any
  * LotOpened or LotReopened encountered first means a lot has been on the block
  * SINCE the last resolution — the undo window is closed (doc 41: "allowed
  * until the next lot opens").
+ *
+ * The window ALSO closes when the target lot itself has already been acted on
+ * (requeued, withdrawn, frozen) since it resolved — undoing a resolution the
+ * conductor has already moved past is both meaningless and unreplayable. The
+ * check is per-LOT, so acting on an unrelated lot never blocks a legitimate
+ * undo.
  */
 export function decideUndo(events: readonly AuctionEventEnvelope[]): UndoDecision {
+  const superseded = new Set<string>();
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i] as AuctionEventEnvelope;
     if (event.type === "LotOpened" || event.type === "LotReopened") {
       return { ok: false, reason: "undo_window_closed" };
     }
+    if (LOT_SUPERSEDING_EVENTS.has(event.type)) {
+      const lotId = str(event.payload, "lotId");
+      if (lotId !== null) {
+        superseded.add(lotId);
+      }
+    }
     if (event.type === "LotSold") {
       const lotId = str(event.payload, "lotId");
       if (lotId === null) {
         return { ok: false, reason: "nothing_to_undo" };
+      }
+      if (superseded.has(lotId)) {
+        return { ok: false, reason: "undo_window_closed" };
       }
       return {
         ok: true,
@@ -1163,6 +1261,9 @@ export function decideUndo(events: readonly AuctionEventEnvelope[]): UndoDecisio
       const lotId = str(event.payload, "lotId");
       if (lotId === null) {
         return { ok: false, reason: "nothing_to_undo" };
+      }
+      if (superseded.has(lotId)) {
+        return { ok: false, reason: "undo_window_closed" };
       }
       return {
         ok: true,

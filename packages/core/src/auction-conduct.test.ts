@@ -360,3 +360,162 @@ describe("FLOODLIGHT ceremony derivation (deterministic, presentation-only)", ()
     expect(JSON.stringify(sold)).not.toContain("per1");
   });
 });
+
+// --- M-IP4-4 CERTIFICATION REGRESSIONS ------------------------------------------
+// Two defects were found by attacking the platform during certification. Both
+// are locked here, in the pure core, where they cost microseconds to catch.
+
+describe("D-1 — undo may never write an unreplayable event", () => {
+  /** A lot goes UNSOLD, the conductor requeues it, then reaches for undo. */
+  function unsoldThenRequeued(): AuctionEventEnvelope[] {
+    seq = 0;
+    return [
+      ev("AuctionCreated", { competitionId: "comp", lotCount: 1 }),
+      ev("PaddleIssued", { paddleId: "pad1", teamId: "t1", personId: "per1", paddleNumber: "P01" }),
+      ev("LotPrepared", { lotId: "lot1", registrationId: "r1", lotNumber: "L001" }),
+      ev("LotQueued", { lotId: "lot1" }),
+      ev("AuctionOpened", {}),
+      ev("LotOpened", { lotId: "lot1", endsAtMs: at + 30_000 }),
+      ev("LotUnsold", { lotId: "lot1" }),
+      ev("LotRequeued", { lotId: "lot1" }),
+    ];
+  }
+
+  it("refuses to undo a resolution the conductor has already requeued past", () => {
+    expect(decideUndo(unsoldThenRequeued())).toEqual({
+      ok: false,
+      reason: "undo_window_closed",
+    });
+  });
+
+  it("refuses to undo a resolution whose lot was withdrawn after it resolved", () => {
+    const events = [...unsoldThenRequeued(), ev("LotWithdrawn", { lotId: "lot1" })];
+    expect(decideUndo(events)).toEqual({ ok: false, reason: "undo_window_closed" });
+  });
+
+  it("PROOF: the event undo WOULD have written is rejected by the reducer forever", () => {
+    // This is why D-1 was freeze-blocking: the compensating event lands on a
+    // lot that replay sees as `queued`, so the log stops folding — and since
+    // recovery IS a replay, the auction could never be recovered again.
+    const poisoned = [
+      ...unsoldThenRequeued(),
+      ev("LotReopened", { lotId: "lot1", compensatesSeq: 7, endsAtMs: at + 90_000 }),
+    ];
+    expect(replayAuction(poisoned)).toEqual({
+      ok: false,
+      atSeq: 9,
+      reason: "illegal_replayed_transition",
+    });
+  });
+
+  it("a LEGITIMATE undo is untouched: acting on ANOTHER lot never closes the window", () => {
+    seq = 0;
+    const events = [
+      ev("AuctionCreated", { competitionId: "comp", lotCount: 2 }),
+      ev("PaddleIssued", { paddleId: "pad1", teamId: "t1", personId: "per1", paddleNumber: "P01" }),
+      ev("LotPrepared", { lotId: "lot1", registrationId: "r1", lotNumber: "L001" }),
+      ev("LotPrepared", { lotId: "lot2", registrationId: "r2", lotNumber: "L002" }),
+      ev("LotQueued", { lotId: "lot1" }),
+      ev("AuctionOpened", {}),
+      ev("LotOpened", { lotId: "lot1", endsAtMs: at + 30_000 }),
+      ev("BidAccepted", { lotId: "lot1", bidId: "b1", paddleId: "pad1", amount: 1_000_000 }),
+      ev("LotSold", { lotId: "lot1", bidId: "b1", paddleId: "pad1", amount: 1_000_000 }),
+      // A DIFFERENT lot is queued after the sale — irrelevant to lot1's undo.
+      ev("LotQueued", { lotId: "lot2" }),
+    ];
+    expect(decideUndo(events)).toMatchObject({
+      ok: true,
+      target: { kind: "sold", lotId: "lot1", bidId: "b1", amount: 1_000_000 },
+    });
+  });
+});
+
+describe("D-2 — the bid ledger is replayed, so the money rows can be verified", () => {
+  it("an accepted bid demotes the previous leader to outbid", () => {
+    seq = 0;
+    const events = [
+      ev("AuctionCreated", { competitionId: "comp", lotCount: 1 }),
+      ev("PaddleIssued", { paddleId: "pad1", teamId: "t1", personId: "per1", paddleNumber: "P01" }),
+      ev("PaddleIssued", { paddleId: "pad2", teamId: "t2", personId: "per2", paddleNumber: "P02" }),
+      ev("LotPrepared", { lotId: "lot1", registrationId: "r1", lotNumber: "L001" }),
+      ev("LotQueued", { lotId: "lot1" }),
+      ev("AuctionOpened", {}),
+      ev("LotOpened", { lotId: "lot1", endsAtMs: at + 30_000 }),
+      ev("BidAccepted", { lotId: "lot1", bidId: "b1", paddleId: "pad1", amount: 1_000_000 }),
+      ev("BidAccepted", { lotId: "lot1", bidId: "b2", paddleId: "pad2", amount: 1_500_000 }),
+    ];
+    const result = replayAuction(events);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.projection.bids).toEqual({
+      b1: { lotId: "lot1", paddleId: "pad1", amount: 1_000_000, status: "outbid" },
+      b2: { lotId: "lot1", paddleId: "pad2", amount: 1_500_000, status: "accepted" },
+    });
+  });
+
+  it("an undone sale leaves the winning bid invalidated — voided, never deleted", () => {
+    const result = replayAuction(undoNight());
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.projection.bids["b1"]).toEqual({
+      lotId: "lot1",
+      paddleId: "pad1",
+      amount: 1_000_000,
+      status: "invalidated",
+    });
+  });
+
+  it("invalidating a bid the log never accepted fails the replay closed", () => {
+    seq = 0;
+    const events = [
+      ev("AuctionCreated", {}),
+      ev("BidInvalidated", { lotId: "lot1", bidId: "ghost", reason: "undo" }),
+    ];
+    expect(replayAuction(events)).toEqual({ ok: false, atSeq: 2, reason: "unknown_bid" });
+  });
+});
+
+describe("D-3 — the paddle projection carries what recovery needs to verify + heal rows", () => {
+  it("PaddleIssued folds identity with a null release timestamp", () => {
+    seq = 0;
+    const result = replayAuction([
+      ev("AuctionCreated", {}),
+      ev("PaddleIssued", { paddleId: "pad1", teamId: "t1", personId: "per1", paddleNumber: "P01" }),
+    ]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.projection.paddles["pad1"]).toEqual({
+      teamId: "t1",
+      personId: "per1",
+      paddleNumber: "P01",
+      committed: 0,
+      released: false,
+      releasedAtMs: null,
+    });
+  });
+
+  it("PaddleReleased records the EXACT release timestamp (so recovery heals releasedAt precisely)", () => {
+    seq = 0;
+    const events = [
+      ev("AuctionCreated", {}),
+      ev("PaddleIssued", { paddleId: "pad1", teamId: "t1", personId: "per1", paddleNumber: "P01" }),
+      ev("PaddleReleased", { paddleId: "pad1", teamId: "t1" }),
+    ];
+    const releaseAtMs = events[2]?.atMs;
+    const result = replayAuction(events);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const paddle = result.projection.paddles["pad1"];
+    expect(paddle?.released).toBe(true);
+    // The event's atMs is what the aggregate wrote to the row — recovery uses it.
+    expect(paddle?.releasedAtMs).toBe(releaseAtMs);
+  });
+});

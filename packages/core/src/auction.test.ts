@@ -241,6 +241,39 @@ describe("increment ladder (doc 41 slabs)", () => {
     expect(nextMinimumBid(base, slabs, paise(9_500_000))).toBe(10_000_000);
     expect(nextMinimumBid(base, slabs, paise(10_000_000))).toBe(11_000_000);
   });
+
+  // REGRESSION LOCK (cert defect: ladder-walk DoS). ladderContains was rewritten
+  // from an O((amount − base)/step) rung walk to an O(#slabs) arithmetic test.
+  // The retired walk is the equivalence oracle here; the DoS bound is asserted.
+  const walkOracle = (b: number, ss: readonly IncrementSlab[], amount: number): boolean => {
+    if (amount < b) {
+      return false;
+    }
+    let rung = b;
+    while (rung < amount) {
+      rung += ladderStep(ss, paise(rung));
+    }
+    return rung === amount;
+  };
+
+  it("EQUIVALENCE: arithmetic membership matches the rung-walk oracle everywhere", () => {
+    const bases = [base, paise(1_000_000), paise(9_500_000), paise(49_000_000), paise(60_000_000)];
+    for (const b of bases) {
+      // Dense sweep near/through both slab boundaries, plus every rung landed on.
+      for (let amount: number = b; amount <= b + 120_000_000; amount += 100_000) {
+        expect(ladderContains(b, slabs, paise(amount))).toBe(walkOracle(b, slabs, amount));
+      }
+    }
+  });
+
+  it("DoS BOUND: a near-MAX_SAFE amount resolves in O(1), not seconds", () => {
+    // 9e14 + 1: every rung is a multiple of ₹5k (500000 paise), so an odd-tailed
+    // amount is off-rung → false. The retired rung walk spent ~1.7s reaching it.
+    const hostile = paise(900_000_000_000_001);
+    const t0 = performance.now();
+    expect(ladderContains(base, slabs, hostile)).toBe(false);
+    expect(performance.now() - t0).toBeLessThan(50);
+  });
 });
 
 describe("bid validation gauntlet (doc 41 order, exact codes)", () => {
@@ -538,6 +571,7 @@ describe("replay reducer (the recovery spine)", () => {
         status: "scheduled",
         lots: {},
         paddles: {},
+        bids: {},
         ownerInvites: {},
         paddleGrants: {},
         lastOutcome: null,

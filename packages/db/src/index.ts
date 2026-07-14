@@ -32,7 +32,14 @@ export interface TenantContext {
 /**
  * RLS context (IP-2_DESIGN D5): runs `fn` in a transaction with
  * app.person_id / app.org_id set LOCAL, so policies see the caller.
- * The app layer still scopes queries — RLS is the second lock.
+ *
+ * NOT YET WIRED into the serving path (as of IP-4): no runtime code calls this,
+ * and the app connects as an RLS-exempt role — so at runtime tenant isolation is
+ * enforced by application-layer query scoping, and the RLS policies are latent
+ * defense-in-depth that engage only once queries route through here AND the app
+ * runs under a non-BYPASSRLS role. Named pre-deploy item (IP-3 closure report §6,
+ * identity/THREAT_MODEL residual risks); the RLS policy proofs exercise it under
+ * a dedicated non-superuser role in tests.
  */
 export async function withTenant<T>(
   handle: DbHandle,

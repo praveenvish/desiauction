@@ -20,6 +20,7 @@ import {
   type AuctionProjection,
   type AuctionStatus,
   type BidRejectionCode,
+  type BidStatus,
   type LotCommand,
   type LotStatus,
   type Paise,
@@ -92,6 +93,14 @@ function serverNowMs(): number {
 }
 
 /**
+ * The engine's self-actor for timer-driven writes (all-zero ULID). Mirrors the
+ * engine's ENGINE_ACTOR sentinel by value — packages never import apps — so the
+ * audit trail can attribute engine-authored events (timer close, closing-soon)
+ * to "engine" and human-originated commands to "web".
+ */
+const ENGINE_ACTOR = "00000000000000000000000000";
+
+/**
  * Append the next event in the auction's total order and its audit row.
  * The unique (auction_id, seq) index turns concurrent writers into loud
  * failures instead of silent interleaving — the M-IP4-1 stand-in for the
@@ -132,7 +141,9 @@ async function appendEvent(
     scopeId: auction.orgId,
     subject,
     meta: {
-      source: "web",
+      // Attribute by the writing tier: engine self-actor → "engine" (timer
+      // close, closing-soon, recovery it authors), everything else → "web".
+      source: actorId === ENGINE_ACTOR ? "engine" : "web",
       correlationId,
       eventSeq: String(seq),
       ...(reason !== undefined && reason !== "" ? { reason } : {}),
@@ -844,23 +855,99 @@ export async function loadEvents(db: Db, auctionId: string): Promise<AuctionEven
   return rows.map((row) => ({ ...row, payload: row.payload as Record<string, unknown> }));
 }
 
+export interface LotProjectionRow {
+  id: string;
+  status: LotStatus;
+  soldPrice: number | null;
+  soldToPaddleId: string | null;
+  roundsUsed: number;
+}
+
+/**
+ * The money rows (M-IP4-4). A lot's sale price is read from its leading bid
+ * row, so an unverified `bids` table is an unverified sale — certification
+ * defect D-2.
+ */
+export interface BidProjectionRow {
+  id: string;
+  lotId: string;
+  paddleId: string;
+  amount: number;
+  status: BidStatus;
+}
+
+export async function loadBidRows(db: Db, auctionId: string): Promise<BidProjectionRow[]> {
+  return db
+    .select({
+      id: bids.id,
+      lotId: bids.lotId,
+      paddleId: bids.paddleId,
+      amount: bids.amount,
+      status: bids.status,
+    })
+    .from(bids)
+    .where(eq(bids.auctionId, auctionId));
+}
+
+/**
+ * The identity + authority rows (M-IP4-4, defect D-3). A paddle's `personId`
+ * gates WHO may bid with it (`holder = paddle.personId === actor`), its `teamId`
+ * attributes every bid and sale to a purse/squad/role, and `releasedAt` gates
+ * whether it may bid at all. All three are read straight from this row by the
+ * gauntlet — so an unverified `paddles` table is an unverified authorization AND
+ * an unverified purse.
+ */
+export interface PaddleProjectionRow {
+  id: string;
+  teamId: string;
+  personId: string;
+  paddleNumber: string;
+  releasedAt: Date | null;
+}
+
+export async function loadPaddleRows(db: Db, auctionId: string): Promise<PaddleProjectionRow[]> {
+  return db
+    .select({
+      id: paddles.id,
+      teamId: paddles.teamId,
+      personId: paddles.personId,
+      paddleNumber: paddles.paddleNumber,
+      releasedAt: paddles.releasedAt,
+    })
+    .from(paddles)
+    .where(eq(paddles.auctionId, auctionId));
+}
+
 /**
  * Row-vs-events divergence report (exported for the engine's watchdog — the
  * same comparison recovery uses, without the healing).
+ *
+ * Covers EVERY row the engine derives truth from: the auction status, the lot
+ * rows (status, sale, rounds), the bid rows (amount, paddle, lot, status), and
+ * the paddle rows (team, person, number, released). A bid row that disagrees
+ * with its BidAccepted event is a money divergence; a paddle row that disagrees
+ * with its PaddleIssued event is an authorization AND purse divergence. Any of
+ * them halts the auction like any other integrity failure.
  */
 export function diffProjection(
   projection: AuctionProjection,
   auctionStatus: AuctionStatus,
-  lotRows: {
-    id: string;
-    status: LotStatus;
-    soldPrice: number | null;
-    soldToPaddleId: string | null;
-  }[],
+  lotRows: LotProjectionRow[],
+  bidRows: BidProjectionRow[],
+  paddleRows: PaddleProjectionRow[],
 ): string[] {
   const divergences: string[] = [];
   if (projection.status !== auctionStatus) {
     divergences.push(`auction: rows=${auctionStatus} events=${projection.status}`);
+  }
+  // A lot the log knows about with no row is a lot whose sale (soldPrice — the
+  // purse source) has silently vanished. Detected exactly like a missing bid or
+  // paddle row so a DELETE fails closed instead of inflating a team's purse.
+  const lotRowIds = new Set(lotRows.map((row) => row.id));
+  for (const lotId of Object.keys(projection.lots)) {
+    if (!lotRowIds.has(lotId)) {
+      divergences.push(`lot ${lotId}: row missing`);
+    }
   }
   for (const row of lotRows) {
     const replayed = projection.lots[row.id];
@@ -876,6 +963,66 @@ export function diffProjection(
     }
     if ((replayed.soldPaddleId ?? null) !== row.soldToPaddleId) {
       divergences.push(`lot ${row.id}: sold paddle diverged`);
+    }
+    if (replayed.roundsUsed !== row.roundsUsed) {
+      divergences.push(
+        `lot ${row.id}: rounds diverged (rows=${String(row.roundsUsed)} events=${String(replayed.roundsUsed)})`,
+      );
+    }
+  }
+  for (const row of paddleRows) {
+    const replayed = projection.paddles[row.id];
+    if (replayed === undefined) {
+      divergences.push(`paddle ${row.id}: missing from event log`);
+      continue;
+    }
+    if (replayed.teamId !== row.teamId) {
+      divergences.push(`paddle ${row.id}: team diverged`);
+    }
+    if (replayed.personId !== row.personId) {
+      divergences.push(`paddle ${row.id}: person diverged`);
+    }
+    if (replayed.paddleNumber !== row.paddleNumber) {
+      divergences.push(`paddle ${row.id}: number diverged`);
+    }
+    if (replayed.released !== (row.releasedAt !== null)) {
+      divergences.push(
+        `paddle ${row.id}: released diverged (rows=${String(row.releasedAt !== null)} events=${String(replayed.released)})`,
+      );
+    }
+  }
+  const paddleRowIds = new Set(paddleRows.map((row) => row.id));
+  for (const paddleId of Object.keys(projection.paddles)) {
+    if (!paddleRowIds.has(paddleId)) {
+      divergences.push(`paddle ${paddleId}: row missing`);
+    }
+  }
+  for (const row of bidRows) {
+    const replayed = projection.bids[row.id];
+    if (replayed === undefined) {
+      divergences.push(`bid ${row.id}: missing from event log`);
+      continue;
+    }
+    if (replayed.amount !== row.amount) {
+      divergences.push(
+        `bid ${row.id}: amount diverged (rows=${String(row.amount)} events=${String(replayed.amount)})`,
+      );
+    }
+    if (replayed.paddleId !== row.paddleId) {
+      divergences.push(`bid ${row.id}: paddle diverged`);
+    }
+    if (replayed.lotId !== row.lotId) {
+      divergences.push(`bid ${row.id}: lot diverged`);
+    }
+    if (replayed.status !== row.status) {
+      divergences.push(`bid ${row.id}: rows=${row.status} events=${replayed.status}`);
+    }
+  }
+  // A BidAccepted event with no row is money the engine would never see.
+  const rowIds = new Set(bidRows.map((row) => row.id));
+  for (const bidId of Object.keys(projection.bids)) {
+    if (!rowIds.has(bidId)) {
+      divergences.push(`bid ${bidId}: row missing`);
     }
   }
   return divergences;
@@ -911,10 +1058,19 @@ export async function recoverAuction(
       status: lots.status,
       soldPrice: lots.soldPrice,
       soldToPaddleId: lots.soldToPaddleId,
+      roundsUsed: lots.roundsUsed,
     })
     .from(lots)
     .where(eq(lots.auctionId, auction.id));
-  const divergences = diffProjection(replay.projection, auction.status, lotRows);
+  const bidRows = await loadBidRows(db, auction.id);
+  const paddleRows = await loadPaddleRows(db, auction.id);
+  const divergences = diffProjection(
+    replay.projection,
+    auction.status,
+    lotRows,
+    bidRows,
+    paddleRows,
+  );
 
   const correlationId = newId();
   const atMs = serverNowMs();
@@ -935,7 +1091,8 @@ export async function recoverAuction(
         if (
           replayed.status !== row.status ||
           (replayed.soldAmount ?? null) !== row.soldPrice ||
-          (replayed.soldPaddleId ?? null) !== row.soldToPaddleId
+          (replayed.soldPaddleId ?? null) !== row.soldToPaddleId ||
+          replayed.roundsUsed !== row.roundsUsed
         ) {
           await tx
             .update(lots)
@@ -943,8 +1100,59 @@ export async function recoverAuction(
               status: replayed.status,
               soldPrice: replayed.soldAmount,
               soldToPaddleId: replayed.soldPaddleId,
+              roundsUsed: replayed.roundsUsed,
             })
             .where(eq(lots.id, row.id));
+        }
+      }
+      // Heal the identity + authority rows from the log: team, person, number
+      // and the release state all come back from PaddleIssued/PaddleReleased. A
+      // paddle the log does not know about is NOT invented — it surfaces as a
+      // divergence and the engine stays halted.
+      for (const row of paddleRows) {
+        const replayed = replay.projection.paddles[row.id];
+        if (replayed === undefined) {
+          continue;
+        }
+        if (
+          replayed.teamId !== row.teamId ||
+          replayed.personId !== row.personId ||
+          replayed.paddleNumber !== row.paddleNumber ||
+          replayed.released !== (row.releasedAt !== null)
+        ) {
+          await tx
+            .update(paddles)
+            .set({
+              teamId: replayed.teamId,
+              personId: replayed.personId,
+              paddleNumber: replayed.paddleNumber,
+              releasedAt: replayed.releasedAtMs !== null ? new Date(replayed.releasedAtMs) : null,
+            })
+            .where(eq(paddles.id, row.id));
+        }
+      }
+      // Heal the money rows from the log: amount, paddle and lifecycle status
+      // all come back from BidAccepted/BidInvalidated. A row the log does not
+      // know about is NOT invented here — it surfaces as a divergence and the
+      // engine stays halted rather than fabricating a bid.
+      for (const row of bidRows) {
+        const replayed = replay.projection.bids[row.id];
+        if (replayed === undefined) {
+          continue;
+        }
+        if (
+          replayed.amount !== row.amount ||
+          replayed.paddleId !== row.paddleId ||
+          replayed.status !== row.status
+        ) {
+          await tx
+            .update(bids)
+            .set({
+              amount: replayed.amount,
+              paddleId: replayed.paddleId,
+              status: replayed.status,
+            })
+            .where(eq(bids.id, row.id));
         }
       }
     }
@@ -1434,6 +1642,13 @@ export async function undoLastAction(
   const lot = await loadLot(db, auction.id, target.lotId);
   if (lot === undefined) {
     return { ok: false, reason: "not_found" };
+  }
+  // Fail closed: LotReopened is only replayable onto a RESOLVED lot. If the lot
+  // has moved on since it resolved, writing the compensating event would poison
+  // the log — the reducer would reject it forever and recovery could never
+  // succeed. decideUndo already refuses this; the guard makes it structural.
+  if (lot.status !== target.kind) {
+    return { ok: false, reason: "undo_window_closed" };
   }
   const correlationId = newId();
   const atMs = serverNowMs();

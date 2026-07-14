@@ -13,7 +13,8 @@
     "env:check": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/check-env.ts",
     "db:generate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs migrate",
-    "perf:live": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-live.ts"
+    "perf:live": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-live.ts",
+    "perf:scale": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-scale.ts"
   },
   "dependencies": {
     "@desiauction/auction": "workspace:*",

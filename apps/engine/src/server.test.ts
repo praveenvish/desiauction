@@ -3,7 +3,7 @@ import { pino } from "pino";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AuctionEngine } from "./engine-core.js";
-import { buildServer, wsTicket } from "./server.js";
+import { buildServer, wsTicket, wsTicketValid, TICKET_WINDOW_MS } from "./server.js";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -82,9 +82,27 @@ describe("engine transport", () => {
     expect(wellFormed.json()).toMatchObject({ accepted: false, reason: "unknown_auction" });
   });
 
-  it("ws tickets are deterministic HMACs of the auction id", () => {
-    expect(wsTicket("auction-1", "s")).toBe(wsTicket("auction-1", "s"));
-    expect(wsTicket("auction-1", "s")).not.toBe(wsTicket("auction-2", "s"));
-    expect(wsTicket("auction-1", "s")).not.toBe(wsTicket("auction-1", "other"));
+  it("ws tickets are windowed HMACs: deterministic within a window, distinct across auctions/secrets", () => {
+    const t = 1_000_000_000_000;
+    expect(wsTicket("auction-1", "s", t)).toBe(wsTicket("auction-1", "s", t));
+    expect(wsTicket("auction-1", "s", t)).not.toBe(wsTicket("auction-2", "s", t));
+    expect(wsTicket("auction-1", "s", t)).not.toBe(wsTicket("auction-1", "other", t));
+    // A different window yields a different ticket — the lifetime is bounded.
+    expect(wsTicket("auction-1", "s", t)).not.toBe(
+      wsTicket("auction-1", "s", t + 2 * TICKET_WINDOW_MS),
+    );
+  });
+
+  it("ws ticket lifetime (MIN-2): current + previous window accepted; older/forged rejected", () => {
+    const t = 1_000_000_000_000;
+    const fresh = wsTicket("auction-1", "s", t);
+    expect(wsTicketValid("auction-1", "s", fresh, t)).toBe(true);
+    // Grace: a ticket minted just before a boundary still works one window on.
+    expect(wsTicketValid("auction-1", "s", fresh, t + TICKET_WINDOW_MS)).toBe(true);
+    // Bounded: two windows on, the ticket is dead (was infinite before the fix).
+    expect(wsTicketValid("auction-1", "s", fresh, t + 2 * TICKET_WINDOW_MS)).toBe(false);
+    // Forged and wrong-secret tickets are refused.
+    expect(wsTicketValid("auction-1", "s", "forged", t)).toBe(false);
+    expect(wsTicketValid("auction-1", "s", wsTicket("auction-1", "other", t), t)).toBe(false);
   });
 });

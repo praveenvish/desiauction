@@ -46,9 +46,18 @@ export async function sendEngineCommand(input: EngineCommandInput): Promise<Comm
   }
 }
 
-/** The spectate ticket the browser presents on the engine WebSocket. */
+// Ticket lifetime window — MUST match the engine's TICKET_WINDOW_MS. The two
+// apps share the secret and this algorithm (not code), so the constant is
+// duplicated deliberately, like the HMAC itself. MIN-2: bounds a leaked ticket.
+const TICKET_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** The spectate ticket the browser presents on the engine WebSocket. Windowed
+ *  so a leaked ticket expires within two windows (see engine wsTicket). */
 export function engineWsTicket(auctionId: string): string {
-  return createHmac("sha256", env.ENGINE_SECRET).update(auctionId).digest("hex");
+  const window = Math.floor(Date.now() / TICKET_WINDOW_MS);
+  return createHmac("sha256", env.ENGINE_SECRET)
+    .update(`${auctionId}.${String(window)}`)
+    .digest("hex");
 }
 
 export function engineWsUrl(auctionId: string): string {

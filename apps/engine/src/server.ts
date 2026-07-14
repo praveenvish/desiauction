@@ -21,9 +21,36 @@ export interface ServerDeps {
   nodeEnv: string;
 }
 
-/** Spectator tickets: HMAC(auctionId) — minted by the web tier, same secret. */
-export function wsTicket(auctionId: string, secret: string): string {
-  return createHmac("sha256", secret).update(auctionId).digest("hex");
+/**
+ * Spectator tickets: HMAC over (auctionId · time-window) — minted by the web
+ * tier with the same secret. Windowing gives the ticket a BOUNDED lifetime (a
+ * leaked ticket stops working within two windows) with no wire-format change —
+ * the URL still carries a single hex string. MIN-2 remediation.
+ */
+export const TICKET_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export function wsTicket(auctionId: string, secret: string, nowMs: number = Date.now()): string {
+  const window = Math.floor(nowMs / TICKET_WINDOW_MS);
+  return createHmac("sha256", secret)
+    .update(`${auctionId}.${String(window)}`)
+    .digest("hex");
+}
+
+/**
+ * Fail-closed validity: a ticket is accepted for the current OR the immediately
+ * previous window (grace for a ticket minted just before a boundary), so its
+ * lifetime is bounded by two windows instead of forever.
+ */
+export function wsTicketValid(
+  auctionId: string,
+  secret: string,
+  ticket: string,
+  nowMs: number = Date.now(),
+): boolean {
+  return (
+    safeEqual(ticket, wsTicket(auctionId, secret, nowMs)) ||
+    safeEqual(ticket, wsTicket(auctionId, secret, nowMs - TICKET_WINDOW_MS))
+  );
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -232,7 +259,7 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
     }
     const auctionId = url.searchParams.get("auction") ?? "";
     const ticket = url.searchParams.get("ticket") ?? "";
-    if (auctionId === "" || !safeEqual(ticket, wsTicket(auctionId, deps.engineSecret))) {
+    if (auctionId === "" || !wsTicketValid(auctionId, deps.engineSecret, ticket)) {
       socket.destroy();
       return;
     }

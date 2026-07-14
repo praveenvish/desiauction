@@ -38,7 +38,7 @@ import { pino } from "pino";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, sql } from "../db.js";
-import { AuctionEngine } from "../engine-core.js";
+import { AuctionEngine, ENGINE_ACTOR } from "../engine-core.js";
 
 const logger = pino({ level: "silent" });
 const RUN = String(Date.now()).slice(-7);
@@ -478,6 +478,21 @@ describe("LIVE ENGINE — the single writer under fire", () => {
       amountRaw: 99_000_000,
     });
     expect(late).toMatchObject({ accepted: false, reason: "LOT_NOT_OPEN" });
+  });
+
+  it("AUDIT SOURCE (MIN-1): timer-authored events attribute to the engine, human commands to web", async () => {
+    // The LATE BIDS drill closed lot1 through the watchdog tick — an ENGINE_ACTOR
+    // write. Its audit row must read source "engine"; a human command's "web".
+    const audits = await db
+      .select({ actor: auditLog.actor, meta: auditLog.meta })
+      .from(auditLog)
+      .where(eq(auditLog.scopeId, orgId));
+    const engineRow = audits.find((row) => row.actor === ENGINE_ACTOR);
+    expect(engineRow, "expected at least one engine-authored audit row").toBeDefined();
+    expect((engineRow?.meta as { source?: string }).source).toBe("engine");
+    const humanRow = audits.find((row) => row.actor !== ENGINE_ACTOR);
+    expect(humanRow, "expected at least one human-authored audit row").toBeDefined();
+    expect((humanRow?.meta as { source?: string }).source).toBe("web");
   });
 
   it("BROADCAST ORDERING: snapshot versions only ever increase", () => {

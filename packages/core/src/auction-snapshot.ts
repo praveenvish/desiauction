@@ -99,8 +99,10 @@ export interface AuctionSnapshot {
   /**
    * M-IP4-3: the most recent lot resolution (ceremony input — SOLD/UNSOLD/
    * HELD/REOPENED splashes render from the snapshot, never a side channel).
-   * Null while a fresh lot is on the block. Spectator-safe: numbers and team
-   * names only, no person identity.
+   * Null while a fresh lot is on the block. Spectator-safe: the auctioned
+   * player's name (the lot's subject), paddle numbers and team names — never a
+   * bidder's identity or contact details (the paddle holder's personId is not
+   * in the snapshot).
    */
   readonly lastOutcome: {
     readonly kind: LotOutcomeKind;
