@@ -26,9 +26,10 @@ import {
   transitionLot,
   type AuctionRecord,
   type RecoveryReport,
-} from "./auction-aggregate";
-import { auctionOf, auctionView, type AuctionView } from "./auctions";
+} from "@desiauction/auction";
+import { auctionOf, auctionView, type AuctionView } from "@desiauction/auction";
 import { auctionReady, type AuctionReadyProjection } from "./auction-ready";
+import { notifyEngineReset } from "./engine-client";
 
 // Auction internal RPC (M-IP4-1). One gate: session → tenant → auction.conduct
 // → aggregate. NO bidding endpoint exists this milestone (stop condition): the
@@ -226,6 +227,9 @@ export async function auctionLifecycleAction(
     command as Exclude<AuctionCommand, "reconcile">,
     reason,
   );
+  if (result.ok) {
+    await notifyEngineReset(auction.id);
+  }
   if (!result.ok) {
     return {
       ok: false,

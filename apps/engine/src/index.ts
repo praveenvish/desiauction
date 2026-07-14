@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/node";
 
-import { checkDb } from "./db.js";
+import { checkDb, db } from "./db.js";
+import { AuctionEngine } from "./engine-core.js";
 import { env } from "./env.js";
 import { logger } from "./logger.js";
 import { buildServer } from "./server.js";
@@ -28,8 +29,46 @@ process.on("uncaughtException", (error) => {
   void die("uncaught exception", error);
 });
 
-const server = buildServer({ logger, version: env.APP_VERSION, checkDb });
+const engine = new AuctionEngine({
+  db,
+  logger,
+  onSnapshot: (auctionId, serialized, version) => {
+    hub.broadcast(auctionId, serialized, version);
+  },
+});
+
+const { server, hub } = buildServer({
+  logger,
+  version: env.APP_VERSION,
+  checkDb,
+  engine,
+  engineSecret: env.ENGINE_SECRET,
+  nodeEnv: env.NODE_ENV,
+});
+
+// The watchdog cadence: 250ms timer authority (lot expiry, closing-soon),
+// 10s WS heartbeats, 30s deep verification of every touched auction.
+const TICK_MS = 250;
+const tickTimer = setInterval(() => {
+  const before = Date.now();
+  engine.tick();
+  const drift = Date.now() - before;
+  if (drift > 1_000) {
+    logger.warn({ driftMs: drift }, "watchdog tick ran long — possible stall/clock drift");
+  }
+}, TICK_MS);
+const heartbeatTimer = setInterval(() => {
+  hub.heartbeat();
+}, 10_000);
+
+server.addHook("onClose", (_instance, done) => {
+  clearInterval(tickTimer);
+  clearInterval(heartbeatTimer);
+  done();
+});
 
 server.listen({ host: "0.0.0.0", port: env.PORT }).catch((error: unknown) => {
   void die("engine failed to bind", error);
 });
+
+logger.info({ port: env.PORT }, "auction engine online — single writer, server time only");

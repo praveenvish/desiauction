@@ -14,6 +14,7 @@
     "perf:competition": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-competition.ts"
   },
   "dependencies": {
+    "@desiauction/auction": "workspace:*",
     "@desiauction/contracts": "workspace:*",
     "@desiauction/core": "workspace:*",
     "@desiauction/db": "workspace:*",

@@ -249,8 +249,8 @@ describe("bid validation gauntlet (doc 41 order, exact codes)", () => {
     lotStatus: "on_block",
     basePrice: paise(1_000_000),
     leadingAmount: paise(1_500_000),
-    leadingPaddleId: "paddle-other",
-    paddleId: "paddle-me",
+    leadingTeamId: "team-other",
+    teamId: "team-me",
     bidderAuthorized: true,
     amountRaw: 2_000_000,
     slabs: [{ upTo: null, step: paise(500_000) }],
@@ -280,7 +280,7 @@ describe("bid validation gauntlet (doc 41 order, exact codes)", () => {
       ok: false,
       code: "NOT_AUTHORIZED",
     });
-    expect(decideBid({ ...okInput, leadingPaddleId: "paddle-me" })).toEqual({
+    expect(decideBid({ ...okInput, leadingTeamId: "team-me" })).toEqual({
       ok: false,
       code: "ALREADY_LEADING",
     });
@@ -320,7 +320,7 @@ describe("bid validation gauntlet (doc 41 order, exact codes)", () => {
   it("closing_soon still accepts bids; the first bid needs no leader", () => {
     expect(decideBid({ ...okInput, lotStatus: "closing_soon" }).ok).toBe(true);
     expect(
-      decideBid({ ...okInput, leadingAmount: null, leadingPaddleId: null, amountRaw: 1_000_000 }),
+      decideBid({ ...okInput, leadingAmount: null, leadingTeamId: null, amountRaw: 1_000_000 }),
     ).toEqual({ ok: true, amount: 1_000_000 });
   });
 

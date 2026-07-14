@@ -362,8 +362,13 @@ export interface BidInput {
   lotStatus: LotStatus;
   basePrice: Paise;
   leadingAmount: Paise | null;
-  leadingPaddleId: string | null;
-  paddleId: string;
+  /**
+   * Check 3 compares TEAMS, not paddles (doc 41: "team is not already
+   * leading") — a team that releases its paddle and claims a new one still
+   * may not outbid itself (M-IP4-2 canon alignment).
+   */
+  leadingTeamId: string | null;
+  teamId: string;
   /** The action layer resolves capability/paddle ownership; core sees the verdict. */
   bidderAuthorized: boolean;
   amountRaw: number; // unvalidated wire value — check 4 owns its shape
@@ -399,7 +404,7 @@ export function decideBid(input: BidInput): BidDecision {
     return { ok: false, code: "NOT_AUTHORIZED" };
   }
   // 3 · self-outbidding is refused
-  if (input.leadingPaddleId !== null && input.leadingPaddleId === input.paddleId) {
+  if (input.leadingTeamId !== null && input.leadingTeamId === input.teamId) {
     return { ok: false, code: "ALREADY_LEADING" };
   }
   // 4 · a valid positive integer amount
@@ -603,6 +608,7 @@ export function lotNumber(seq: number): string {
 export type AuctionEventType =
   | "AuctionCreated"
   | "PaddleIssued"
+  | "PaddleReleased" // M-IP4-2: identity stays immutable; the claim ends
   | "LotPrepared"
   | "LotQueued"
   | "AuctionOpened"
@@ -621,11 +627,17 @@ export type AuctionEventType =
   | "BidAccepted"
   | "BidRejected"
   | "BidInvalidated"
-  | "TimerExtended";
+  | "TimerExtended"
+  // M-IP4-2: auction pause is TOTAL (doc 39) — the open lot's runway freezes
+  // with it and re-attaches on resume. Both flow through events so replay
+  // reproduces the exact remaining time.
+  | "TimerHeld"
+  | "TimerResumed";
 
 export const AUCTION_EVENT_TYPES: readonly AuctionEventType[] = [
   "AuctionCreated",
   "PaddleIssued",
+  "PaddleReleased",
   "LotPrepared",
   "LotQueued",
   "AuctionOpened",
@@ -645,6 +657,8 @@ export const AUCTION_EVENT_TYPES: readonly AuctionEventType[] = [
   "BidRejected",
   "BidInvalidated",
   "TimerExtended",
+  "TimerHeld",
+  "TimerResumed",
 ];
 
 /**
@@ -677,6 +691,7 @@ export interface LotProjection {
   soldPaddleId: string | null;
   roundsUsed: number;
   endsAtMs: number | null;
+  timerExtensions: number; // anti-snipe extensions on the current opening
 }
 
 export interface PaddleProjection {
@@ -684,6 +699,7 @@ export interface PaddleProjection {
   personId: string;
   paddleNumber: string;
   committed: number; // paise committed via sold lots
+  released: boolean; // M-IP4-2: a released paddle can no longer bid
 }
 
 export interface AuctionProjection {
@@ -735,7 +751,22 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
         if (paddleId === null || teamId === null || personId === null || number === null) {
           return fail("malformed_paddle");
         }
-        projection.paddles[paddleId] = { teamId, personId, paddleNumber: number, committed: 0 };
+        projection.paddles[paddleId] = {
+          teamId,
+          personId,
+          paddleNumber: number,
+          committed: 0,
+          released: false,
+        };
+        break;
+      }
+      case "PaddleReleased": {
+        const paddleId = str(event.payload, "paddleId");
+        const paddle = paddleId !== null ? projection.paddles[paddleId] : undefined;
+        if (paddle === undefined) {
+          return fail("unknown_paddle");
+        }
+        paddle.released = true;
         break;
       }
       case "LotPrepared": {
@@ -753,6 +784,7 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           soldPaddleId: null,
           roundsUsed: 0,
           endsAtMs: null,
+          timerExtensions: 0,
         };
         break;
       }
@@ -799,6 +831,7 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
         }
         lot.status = "on_block";
         lot.endsAtMs = num(event.payload, "endsAtMs");
+        lot.timerExtensions = 0;
         break;
       }
       case "LotClosingSoon": {
@@ -895,6 +928,31 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           return fail("timer_shrank"); // invariant 14 — replay re-proves it
         }
         lot.endsAtMs = endsAtMs;
+        lot.timerExtensions += 1;
+        // TimerExtended IS the anti-snipe `extend` edge (doc 39): a closing
+        // lot returns to the block. Found by the M-IP4-2 watchdog halting on
+        // a row/event divergence — now a permanent regression test.
+        if (lot.status === "closing_soon") {
+          lot.status = "on_block";
+        }
+        break;
+      }
+      case "TimerHeld": {
+        const lot = lotOf();
+        if (lot === null) {
+          return fail("unknown_lot");
+        }
+        // The runway freezes: no absolute end exists while the auction pauses.
+        lot.endsAtMs = null;
+        break;
+      }
+      case "TimerResumed": {
+        const lot = lotOf();
+        const endsAtMs = num(event.payload, "endsAtMs");
+        if (lot === null || endsAtMs === null) {
+          return fail("malformed_timer");
+        }
+        lot.endsAtMs = endsAtMs; // a fresh axis: the held remainder re-attached
         break;
       }
       default:

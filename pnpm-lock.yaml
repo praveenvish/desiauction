@@ -29,12 +29,18 @@ importers:
 
   apps/engine:
     dependencies:
+      '@desiauction/auction':
+        specifier: workspace:*
+        version: link:../../packages/auction
       '@desiauction/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@desiauction/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@desiauction/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@sentry/node':
         specifier: ^10.15.0
         version: 10.65.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))
@@ -87,6 +93,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@desiauction/auction':
+        specifier: workspace:*
+        version: link:../../packages/auction
       '@desiauction/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -151,6 +160,25 @@ importers:
       vitest:
         specifier: 3.2.7
         version: 3.2.7(@types/node@24.13.3)(jsdom@29.1.1)(terser@5.49.0)(tsx@4.23.0)
+
+  packages/auction:
+    dependencies:
+      '@desiauction/core':
+        specifier: workspace:*
+        version: link:../core
+      '@desiauction/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(postgres@3.4.9)
+    devDependencies:
+      '@desiauction/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
 
   packages/config:
     dependencies:

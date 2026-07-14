@@ -18,11 +18,22 @@ export default defineConfig({
     // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.
     baseURL: "http://localhost:3050",
   },
-  webServer: {
-    command:
-      "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3050",
-    url: "http://127.0.0.1:3050/healthz",
-    reuseExistingServer: !process.env["CI"],
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command:
+        "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3050",
+      url: "http://127.0.0.1:3050/healthz",
+      reuseExistingServer: !process.env["CI"],
+      timeout: 60_000,
+    },
+    {
+      // The live auction engine (M-IP4-2): the same process `pnpm dev` runs.
+      command:
+        "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs src/index.ts",
+      cwd: "../engine",
+      url: "http://127.0.0.1:4000/healthz",
+      reuseExistingServer: !process.env["CI"],
+      timeout: 60_000,
+    },
+  ],
 });

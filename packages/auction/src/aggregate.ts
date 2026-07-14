@@ -36,13 +36,31 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import type { CompetitionSummary } from "../competition/competitions";
-import type { AuctionReadyProjection } from "./auction-ready";
+// Input shapes (structural — web's CompetitionSummary and AuctionReadyProjection
+// satisfy them; the engine supplies them from its own reads). The package never
+// imports app code (boundary: packages never know apps exist).
+export interface CompetitionRef {
+  id: string;
+  orgId: string;
+  name: string;
+}
 
-// THE AUCTION AGGREGATE (M-IP4-1). The sole authority over auction, lot, bid
-// and paddle state — no route or service mutates these tables elsewhere.
+export interface PoolEntryRef {
+  readonly registrationId: string;
+  readonly basePriceBand: string | null;
+}
+
+export interface AuctionCreationGate {
+  readonly ok: boolean;
+  readonly competitionId: string;
+  readonly pool: readonly PoolEntryRef[];
+}
+
+// THE AUCTION AGGREGATE (M-IP4-1; shared web+engine since M-IP4-2). The sole
+// authority over auction, lot, bid and paddle state — no route or service
+// mutates these tables elsewhere.
 // Every operation follows one shape:
 //
 //   decide (pure core: machine / gauntlet / timer)
@@ -133,8 +151,8 @@ export type CreateAuctionResult =
  */
 export async function createAuction(
   db: Db,
-  competition: CompetitionSummary,
-  ready: AuctionReadyProjection,
+  competition: CompetitionRef,
+  ready: AuctionCreationGate,
   actorId: string,
   config: AuctionConfig,
 ): Promise<CreateAuctionResult> {
@@ -336,6 +354,24 @@ export async function transitionAuction(
   }
   const correlationId = newId();
   const atMs = serverNowMs();
+  // Pause is TOTAL (doc 39): the open lot's runway freezes with the auction
+  // and re-attaches on resume — both through events so replay restores the
+  // exact remaining time (M-IP4-2).
+  const [openLot] =
+    command === "pause" || command === "resume"
+      ? await db
+          .select({
+            id: lots.id,
+            endsAtMs: lots.endsAtMs,
+            heldRemainingMs: lots.heldRemainingMs,
+            timerExtensions: lots.timerExtensions,
+          })
+          .from(lots)
+          .where(
+            and(eq(lots.auctionId, auction.id), inArray(lots.status, ["on_block", "closing_soon"])),
+          )
+          .limit(1)
+      : [];
   await db.transaction(async (tx) => {
     await tx.update(auctions).set({ status: decision.next }).where(eq(auctions.id, auction.id));
     await appendEvent(
@@ -349,6 +385,40 @@ export async function transitionAuction(
       auction.id,
       reason,
     );
+    if (command === "pause" && openLot !== undefined && openLot.endsAtMs !== null) {
+      const remaining = holdRemainingMs(
+        { opensAtMs: 0, endsAtMs: openLot.endsAtMs, extensions: openLot.timerExtensions },
+        atMs,
+      );
+      await tx
+        .update(lots)
+        .set({ heldRemainingMs: remaining, endsAtMs: null })
+        .where(eq(lots.id, openLot.id));
+      await appendEvent(
+        tx,
+        auction,
+        actorId,
+        correlationId,
+        atMs,
+        "TimerHeld",
+        { lotId: openLot.id, heldRemainingMs: remaining },
+        openLot.id,
+      );
+    }
+    if (command === "resume" && openLot !== undefined && openLot.heldRemainingMs !== null) {
+      const endsAtMs = atMs + openLot.heldRemainingMs;
+      await tx.update(lots).set({ endsAtMs, heldRemainingMs: null }).where(eq(lots.id, openLot.id));
+      await appendEvent(
+        tx,
+        auction,
+        actorId,
+        correlationId,
+        atMs,
+        "TimerResumed",
+        { lotId: openLot.id, endsAtMs },
+        openLot.id,
+      );
+    }
   });
   return { ok: true, status: decision.next };
 }
@@ -386,8 +456,14 @@ async function loadLot(db: Db, auctionId: string, lotId: string): Promise<LotRow
 
 async function leadingBidOf(db: Db, lotId: string) {
   const [row] = await db
-    .select({ id: bids.id, paddleId: bids.paddleId, amount: bids.amount })
+    .select({
+      id: bids.id,
+      paddleId: bids.paddleId,
+      amount: bids.amount,
+      teamId: paddles.teamId,
+    })
     .from(bids)
+    .innerJoin(paddles, eq(paddles.id, bids.paddleId))
     .where(and(eq(bids.lotId, lotId), eq(bids.status, "accepted")))
     .orderBy(sql`${bids.eventSeq} desc`)
     .limit(1);
@@ -590,7 +666,7 @@ export async function placeBid(
     return { ok: false, code: "not_found" };
   }
   const [paddle] = await db
-    .select({ id: paddles.id, teamId: paddles.teamId })
+    .select({ id: paddles.id, teamId: paddles.teamId, releasedAt: paddles.releasedAt })
     .from(paddles)
     .where(and(eq(paddles.id, input.paddleId), eq(paddles.auctionId, auction.id)))
     .limit(1);
@@ -599,7 +675,8 @@ export async function placeBid(
   }
   const leading = await leadingBidOf(db, lot.id);
 
-  // Purse / squad / role projections from SOLD lots (committed money).
+  // Purse / squad / role projections are per TEAM (doc 41: purses belong to
+  // teams) — money committed through ANY of the team's paddles counts.
   const [purseRow] = await db
     .select({
       // int8 arrives as a string from the driver — parsed exactly below.
@@ -607,7 +684,8 @@ export async function placeBid(
       squad: sql<number>`count(*)::int`,
     })
     .from(lots)
-    .where(and(eq(lots.auctionId, auction.id), eq(lots.soldToPaddleId, paddle.id)));
+    .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+    .where(and(eq(lots.auctionId, auction.id), eq(paddles.teamId, paddle.teamId)));
   const committed = Number(purseRow?.committed ?? "0");
   const squadSize = purseRow?.squad ?? 0;
   const [roleRow] = await db
@@ -623,10 +701,11 @@ export async function placeBid(
     .select({ count: sql<number>`count(*)::int` })
     .from(lots)
     .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+    .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
     .where(
       and(
         eq(lots.auctionId, auction.id),
-        eq(lots.soldToPaddleId, paddle.id),
+        eq(paddles.teamId, paddle.teamId),
         eq(registrations.role, role),
       ),
     );
@@ -636,9 +715,10 @@ export async function placeBid(
     lotStatus: lot.status,
     basePrice: paise(lot.basePrice),
     leadingAmount: leading === null ? null : paise(leading.amount),
-    leadingPaddleId: leading?.paddleId ?? null,
-    paddleId: paddle.id,
-    bidderAuthorized: input.bidderAuthorized,
+    leadingTeamId: leading?.teamId ?? null,
+    teamId: paddle.teamId,
+    // A released paddle may never bid again (M-IP4-2 claim model).
+    bidderAuthorized: input.bidderAuthorized && paddle.releasedAt === null,
     amountRaw: input.amountRaw,
     slabs: auction.config.slabs,
     purseRemaining: paise(Math.max(0, auction.config.pursePerTeam - committed)),
@@ -761,7 +841,11 @@ export async function loadEvents(db: Db, auctionId: string): Promise<AuctionEven
   return rows.map((row) => ({ ...row, payload: row.payload as Record<string, unknown> }));
 }
 
-function diffProjection(
+/**
+ * Row-vs-events divergence report (exported for the engine's watchdog — the
+ * same comparison recovery uses, without the healing).
+ */
+export function diffProjection(
   projection: AuctionProjection,
   auctionStatus: AuctionStatus,
   lotRows: {
@@ -879,4 +963,198 @@ export async function recoverAuction(
     healed: divergences.length > 0,
     projectionStatus: replay.projection.status,
   };
+}
+
+// --- Paddle claims (M-IP4-2). Identity stays immutable: a claim ISSUES a new
+// paddle; a release ENDS the claim (released_at) — the row's identity fields
+// never change and numbers are never reissued.
+
+export type ClaimPaddleResult =
+  | { ok: true; paddleId: string; paddleNumber: string; alreadyHeld: boolean }
+  | { ok: false; reason: "terminal_auction" | "unknown_team" | "paddle_held" };
+
+export async function claimPaddle(
+  db: Db,
+  auction: AuctionRecord,
+  actorId: string,
+  teamId: string,
+): Promise<ClaimPaddleResult> {
+  if (
+    auction.status === "completed" ||
+    auction.status === "reconciled" ||
+    auction.status === "abandoned"
+  ) {
+    return { ok: false, reason: "terminal_auction" };
+  }
+  const [team] = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(and(eq(teams.id, teamId), eq(teams.competitionId, auction.competitionId)))
+    .limit(1);
+  if (team === undefined) {
+    return { ok: false, reason: "unknown_team" };
+  }
+  const [active] = await db
+    .select({ id: paddles.id, personId: paddles.personId, number: paddles.paddleNumber })
+    .from(paddles)
+    .where(
+      and(
+        eq(paddles.auctionId, auction.id),
+        eq(paddles.teamId, teamId),
+        isNull(paddles.releasedAt),
+      ),
+    )
+    .limit(1);
+  if (active !== undefined) {
+    // Claiming a paddle you already hold is idempotent; someone else's is refused.
+    if (active.personId === actorId) {
+      return { ok: true, paddleId: active.id, paddleNumber: active.number, alreadyHeld: true };
+    }
+    return { ok: false, reason: "paddle_held" };
+  }
+  const paddleId = newId();
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  try {
+    await db.transaction(async (tx) => {
+      const [countRow] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(paddles)
+        .where(eq(paddles.auctionId, auction.id));
+      // Numbers count EVERY paddle ever issued — never reused after release.
+      const number = paddleNumber((countRow?.count ?? 0) + 1);
+      await tx.insert(paddles).values({
+        id: paddleId,
+        orgId: auction.orgId,
+        auctionId: auction.id,
+        teamId,
+        personId: actorId,
+        paddleNumber: number,
+      });
+      await appendEvent(
+        tx,
+        auction,
+        actorId,
+        correlationId,
+        atMs,
+        "PaddleIssued",
+        { paddleId, teamId, personId: actorId, paddleNumber: number },
+        paddleId,
+        "claim",
+      );
+    });
+  } catch {
+    // The partial unique (auction, team) WHERE released_at IS NULL lost a race.
+    return { ok: false, reason: "paddle_held" };
+  }
+  const [issued] = await db
+    .select({ number: paddles.paddleNumber })
+    .from(paddles)
+    .where(eq(paddles.id, paddleId))
+    .limit(1);
+  return { ok: true, paddleId, paddleNumber: issued?.number ?? "", alreadyHeld: false };
+}
+
+export type ReleasePaddleResult =
+  { ok: true } | { ok: false; reason: "no_active_paddle" | "not_authorized" };
+
+export async function releasePaddle(
+  db: Db,
+  auction: AuctionRecord,
+  actorId: string,
+  teamId: string,
+  conduct: boolean,
+): Promise<ReleasePaddleResult> {
+  const [active] = await db
+    .select({ id: paddles.id, personId: paddles.personId })
+    .from(paddles)
+    .where(
+      and(
+        eq(paddles.auctionId, auction.id),
+        eq(paddles.teamId, teamId),
+        isNull(paddles.releasedAt),
+      ),
+    )
+    .limit(1);
+  if (active === undefined) {
+    return { ok: false, reason: "no_active_paddle" };
+  }
+  if (active.personId !== actorId && !conduct) {
+    return { ok: false, reason: "not_authorized" };
+  }
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(paddles)
+      .set({ releasedAt: new Date(atMs) })
+      .where(eq(paddles.id, active.id));
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "PaddleReleased",
+      { paddleId: active.id, teamId },
+      active.id,
+    );
+  });
+  return { ok: true };
+}
+
+// --- Live conduct helpers (M-IP4-2) ------------------------------------------------
+
+/**
+ * Close the lot on the block: with a leading bid → sold, without → unsold
+ * (doc 41 close semantics). One idempotent-by-machine operation for both the
+ * gavel and timer expiry — a lot that already resolved refuses with
+ * illegal_transition, which callers treat as "already closed".
+ */
+export async function closeLot(
+  db: Db,
+  auction: AuctionRecord,
+  lotId: string,
+  actorId: string,
+  reason?: string,
+): Promise<LotMutationResult> {
+  const leading = await leadingBidOf(db, lotId);
+  return transitionLot(db, auction, lotId, actorId, leading !== null ? "sell" : "pass", reason);
+}
+
+/**
+ * on_block → closing_soon when the timer runs under the extension window
+ * (doc 39: the SAME machine carries urgency so every surface agrees). Driven
+ * by the engine's timer loop; anti-snipe extension flips it back via placeBid.
+ */
+export async function markLotClosingSoon(
+  db: Db,
+  auction: AuctionRecord,
+  lotId: string,
+  actorId: string,
+): Promise<LotMutationResult> {
+  const lot = await loadLot(db, auction.id, lotId);
+  if (lot === undefined) {
+    return { ok: false, reason: "not_found" };
+  }
+  const decision = lotTransition(lot.status, "closing");
+  if (!decision.ok) {
+    return decision;
+  }
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  await db.transaction(async (tx) => {
+    await tx.update(lots).set({ status: decision.next }).where(eq(lots.id, lot.id));
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "LotClosingSoon",
+      { lotId: lot.id },
+      lot.id,
+    );
+  });
+  return { ok: true, status: decision.next };
 }

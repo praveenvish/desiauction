@@ -20,9 +20,16 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           <header className="dash-head">
             <div className="competition-title-row">
               <h1>{dashboard.competition.name}</h1>
-              <ButtonLink href={`/competitions/${slug}`} variant="secondary">
-                Competition
-              </ButtonLink>
+              <span className="date-row">
+                {dashboard.view !== null ? (
+                  <ButtonLink href={`/competitions/${slug}/auction/live`} data-testid="open-live">
+                    Go live
+                  </ButtonLink>
+                ) : null}
+                <ButtonLink href={`/competitions/${slug}`} variant="secondary">
+                  Competition
+                </ButtonLink>
+              </span>
             </div>
             <p className="competitions-hint">
               Auction engine foundation — architecture, not ceremony

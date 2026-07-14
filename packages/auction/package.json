@@ -1,0 +1,22 @@
+{
+  "name": "@desiauction/auction",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@desiauction/core": "workspace:*",
+    "@desiauction/db": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@desiauction/config": "workspace:*",
+    "typescript": "^5.9.0"
+  }
+}

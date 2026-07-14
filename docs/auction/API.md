@@ -35,3 +35,35 @@ typed reasons (`illegal_transition`, `guard_failed`, `not_found`,
 `auction_not_live`, `another_lot_open`, `not_ready`, `auction_exists`,
 `already_issued`, …) and bids return the doc-41 rejection codes verbatim —
 codes-to-copy mapping is a surface concern (doc 21), never an engine one.
+
+---
+
+## v1.1 · The live surface (M-IP4-2)
+
+## Engine transport (apps/engine)
+
+| Endpoint | Auth | Behavior |
+|---|---|---|
+| `POST /command` | `x-engine-secret` | Submit an `AuctionCommandEnvelope`; returns the deterministic `CommandAck` |
+| `GET /snapshot/:auctionId` | `x-engine-secret` | The current serialized snapshot (409 while halted) |
+| `GET /ws?auction&ticket` | HMAC ticket | Snapshot broadcast: full snapshot on join, then every change + 10s heartbeats |
+| `GET /healthz` | — | db + watchdog-stall checks, fail-closed 503 |
+| `POST /admin/reset` | secret, non-production | Drop in-memory state (≡ restart); replay-on-load rebuilds |
+
+## Commands (the closed set)
+
+`ClaimPaddle{teamId}` · `ReleasePaddle{teamId}` · `QueueLots` · `OpenLot{lotId}`
+· `PlaceBid{lotId, paddleId, amountRaw}` · `CloseLot{lotId}` (gavel — sell or
+pass by leading bid) · `PauseAuction` / `ResumeAuction` (timer held/resumed) ·
+`CompleteAuction` · `AbortAuction{reason}` · `RecoverAuction`. Conduct-only
+commands require the web gate's `auction.conduct`; `PlaceBid` requires holding
+the paddle (or conduct = doc 41 manual mode). Internal timer commands
+(`_TimerClose`, `_ClosingSoon`) are engine-enqueued only — the transport
+refuses them.
+
+## Web live actions (`live-actions.ts`)
+
+`liveAuctionView(slug)` — the live page's seed (ws URL + ticket, teams, my
+active paddle, viewer flags). `submitAuctionCommand(slug, commandId, type,
+payload)` — THE single command gateway: session → tenant → capability → engine;
+the client mints `commandId` so retries are idempotent end to end.

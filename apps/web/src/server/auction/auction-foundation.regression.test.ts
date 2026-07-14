@@ -53,8 +53,8 @@ import {
   transitionAuction,
   transitionLot,
   type AuctionRecord,
-} from "./auction-aggregate";
-import { auctionOf, auctionView, bidsOf } from "./auctions";
+} from "@desiauction/auction";
+import { auctionOf, auctionView, bidsOf } from "@desiauction/auction";
 import { auctionReady } from "./auction-ready";
 import { replayAuction } from "@desiauction/core";
 

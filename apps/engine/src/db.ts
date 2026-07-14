@@ -1,10 +1,11 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { createDb, type Db, type DbHandle } from "@desiauction/db";
 
 import { env } from "./env.js";
 
-export const sql = postgres(env.DATABASE_URL, { max: 10 });
-export const db = drizzle(sql);
+/** The shared data layer (schema-aware) — the aggregate package requires it. */
+export const handle: DbHandle = createDb(env.DATABASE_URL);
+export const db: Db = handle.db;
+export const sql = handle.sql;
 
 /** Fail-closed connectivity probe used by /healthz (§29). */
 export async function checkDb(): Promise<boolean> {

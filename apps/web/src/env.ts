@@ -12,6 +12,11 @@ const envSchema = z.object({
     .string()
     .default("http://localhost:3000,http://localhost:3050")
     .transform((value) => value.split(",").map((origin) => origin.trim())),
+  // The live Auction Engine (M-IP4-2): web submits commands over HTTP with the
+  // shared secret; browsers receive snapshots over the engine's WebSocket.
+  ENGINE_URL: z.url().default("http://localhost:4000"),
+  ENGINE_PUBLIC_WS_URL: z.string().default("ws://localhost:4000/ws"),
+  ENGINE_SECRET: z.string().min(8).default("dev-engine-secret"),
 });
 
 export type Env = z.infer<typeof envSchema>;

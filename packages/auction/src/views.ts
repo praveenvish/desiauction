@@ -12,7 +12,7 @@ import {
 } from "@desiauction/db";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
-import type { AuctionRecord } from "./auction-aggregate";
+import type { AuctionRecord } from "./aggregate";
 
 // Auction read models (M-IP4-1). Read-only, plain frozen shapes — the same
 // discipline as the Competition snapshots. Mutations live ONLY in the

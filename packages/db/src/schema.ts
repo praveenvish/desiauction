@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -378,10 +379,15 @@ export const paddles = pgTable(
     personId: char("person_id", { length: 26 }).notNull(),
     paddleNumber: text("paddle_number").notNull(),
     issuedAt: ts("issued_at").notNull().defaultNow(),
+    // M-IP4-2 claims: identity stays immutable; a release ENDS the claim. A
+    // released paddle never bids again and its number is never reissued.
+    releasedAt: ts("released_at"),
   },
-  // Immutable identity: one paddle per team per auction, numbers never reused.
+  // One ACTIVE paddle per team per auction; numbers never reused (all rows).
   (table) => [
-    uniqueIndex("paddles_auction_team_uq").on(table.auctionId, table.teamId),
+    uniqueIndex("paddles_auction_team_active_uq")
+      .on(table.auctionId, table.teamId)
+      .where(sql`released_at is null`),
     uniqueIndex("paddles_auction_number_uq").on(table.auctionId, table.paddleNumber),
     index("paddles_auction_idx").on(table.auctionId),
   ],

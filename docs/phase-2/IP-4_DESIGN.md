@@ -40,8 +40,8 @@ truth.
 
 | ID | Name | Scope | Status |
 |----|------|-------|--------|
-| M-IP4-1 | **Auction Engine Foundation** | Aggregates (Auction/Lot/Bid/Paddle), machines, gauntlet, Money VO, timer + auto-extension model, event model, replay + recovery, audit, AuctionReady, demo surfaces | **complete — this milestone** |
-| M-IP4-2 | Live bidding | Single-writer engine process, WebSockets, live timers/watchdog, owner paddle claims, real bidding surfaces | planned |
+| M-IP4-1 | **Auction Engine Foundation** | Aggregates (Auction/Lot/Bid/Paddle), machines, gauntlet, Money VO, timer + auto-extension model, event model, replay + recovery, audit, AuctionReady, demo surfaces | **APPROVED** |
+| M-IP4-2 | **Live bidding** | Single-writer engine process (command queue), AuctionSnapshot broadcast over WebSockets, live timers + anti-snipe execution, watchdog (fail-closed halts), replay-on-load recovery, paddle claims, owner console | **complete — this milestone** |
 | M-IP4-3 | Conduct & ceremony | Cockpit, manual conduct, undo (compensating events), FLOODLIGHT ceremony, spectators | planned |
 | M-IP4-4 | Auction freeze | Post-auction projections for IP-6 settlement, closure package, `ip4-frozen` | planned |
 

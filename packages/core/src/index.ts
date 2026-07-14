@@ -121,6 +121,28 @@ export {
   AUCTION_EVENT_TYPES,
   DEFAULT_AUCTION_CONFIG,
 } from "./auction";
+export {
+  buildAuctionSnapshot,
+  canonicalJson,
+  serializeSnapshot,
+  snapshotNextMinimumBid,
+  isAuctionCommandType,
+  AUCTION_COMMAND_TYPES,
+} from "./auction-snapshot";
+export type {
+  AuctionSnapshot,
+  SnapshotRefs,
+  SnapshotLotRef,
+  SnapshotPaddleRef,
+  SnapshotBidEntry,
+  SnapshotQueueEntry,
+  SnapshotPaddleEntry,
+  CurrentLotBids,
+  AuctionCommandType,
+  AuctionCommandEnvelope,
+  CommandAck,
+  CommandRejectReason,
+} from "./auction-snapshot";
 export type {
   AuctionStatus,
   AuctionCommand,

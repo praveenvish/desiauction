@@ -13,7 +13,7 @@ import {
   verifyReplayAction,
   type AuctionDashboard,
 } from "../../../../server/auction/actions";
-import type { RecoveryReport } from "../../../../server/auction/auction-aggregate";
+import type { RecoveryReport } from "@desiauction/auction";
 
 // The M-IP4-1 founder demonstration: AuctionReady, creation, the lot queue,
 // the three frozen state machines, the replay/recovery proof, and the timer

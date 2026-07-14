@@ -5,13 +5,19 @@ import { pino } from "pino";
 import { WebSocket } from "ws";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { checkDb, sql } from "../db.js";
+import { checkDb, db, sql } from "../db.js";
+import { AuctionEngine } from "../engine-core.js";
 import { buildServer } from "../server.js";
 
-const server = buildServer({
-  logger: pino({ level: "silent" }),
+const logger = pino({ level: "silent" });
+const engine = new AuctionEngine({ db, logger, onSnapshot: () => undefined });
+const { server } = buildServer({
+  logger,
   version: "integration",
   checkDb,
+  engine,
+  engineSecret: "integration-secret",
+  nodeEnv: "test",
 });
 
 afterAll(async () => {
@@ -26,27 +32,26 @@ describe("engine against real Postgres", () => {
     expect(healthResponseSchema.parse(response.json()).checks["db"]).toBe("ok");
   });
 
-  it("echoes over /ws (the deploy smoke contract, §20)", async () => {
+  it("ws refuses a bad ticket (transport auth is fail-closed)", async () => {
     await server.listen({ host: "127.0.0.1", port: 0 });
     const address = server.server.address();
     if (address === null || typeof address === "string") {
       throw new Error("expected a bound socket address");
     }
-    const ws = new WebSocket(`ws://127.0.0.1:${String(address.port)}/ws`);
-    const echoed = await new Promise<string>((resolve, reject) => {
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${String(address.port)}/ws?auction=nope&ticket=forged`,
+    );
+    const refused = await new Promise<boolean>((resolve) => {
       ws.on("open", () => {
-        ws.send("ping");
+        resolve(false);
       });
-      ws.on("message", (data) => {
-        if (Buffer.isBuffer(data)) {
-          resolve(data.toString("utf8"));
-        } else {
-          reject(new Error("expected a Buffer frame from the echo endpoint"));
-        }
+      ws.on("error", () => {
+        resolve(true);
       });
-      ws.on("error", reject);
+      ws.on("close", () => {
+        resolve(true);
+      });
     });
-    ws.close();
-    expect(echoed).toBe("ping");
+    expect(refused).toBe(true);
   });
 });
