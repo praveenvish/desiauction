@@ -8,6 +8,10 @@ export default defineConfig({
   // Local runs share one on-demand `next dev` compiler; more workers overload
   // it into moving 30s timeouts (M-IP2-4 sweep). CI keeps Playwright's default.
   ...(process.env["CI"] ? {} : { workers: 2 }),
+  // One retry absorbs first-hit dev-compile latency under parallel load (a fresh
+  // retry hits an already-warm server). Not a mask for logic flakes — every spec
+  // passes in isolation; this only covers the shared-compiler jitter (M-IP3-2).
+  retries: 1,
   globalSetup: "./e2e/global-setup.ts",
   reporter: [["list"]],
   use: {

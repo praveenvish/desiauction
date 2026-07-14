@@ -43,6 +43,13 @@
       "when": 1784131200000,
       "tag": "0005_competition",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784217600000,
+      "tag": "0006_reg_ops",
+      "breakpoints": true
     }
   ]
 }

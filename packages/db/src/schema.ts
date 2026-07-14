@@ -223,6 +223,11 @@ export const registrations = pgTable(
     })
       .notNull()
       .default("submitted"),
+    // Human-quotable reference derived from the id (M-IP3-2 search).
+    registrationNumber: text("registration_number").notNull().default(""),
+    // Optional pre-auction organizer grouping (M-IP3-2 team filter). NOT squad
+    // membership — that is an auction projection (doc 43, IP-4).
+    teamId: char("team_id", { length: 26 }),
     basePriceBand: text("base_price_band"),
     rejectionReason: text("rejection_reason"),
     rejectionNote: text("rejection_note"),
@@ -235,5 +240,7 @@ export const registrations = pgTable(
     uniqueIndex("registrations_competition_person_uq").on(table.competitionId, table.personId),
     index("registrations_competition_idx").on(table.competitionId),
     index("registrations_person_idx").on(table.personId),
+    index("registrations_number_idx").on(table.registrationNumber),
+    index("registrations_team_idx").on(table.teamId),
   ],
 );

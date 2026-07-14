@@ -157,3 +157,213 @@
   align-items: flex-end;
   flex-wrap: wrap;
 }
+
+/* --- Registration operations dashboard (M-IP3-2) --- */
+.registrations-dash {
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  padding: var(--space-10) var(--space-6);
+}
+
+.dash-stack {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.dash-head h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.competition-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.dash-hint {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  margin: var(--space-2) 0 0;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.stat-label {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.filter-bar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.bulk-bar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.reg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.reg-table th,
+.reg-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.reg-table th {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.reg-row.active td {
+  background: var(--surface-sunken);
+}
+
+.reg-number {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.reg-table .registration-name {
+  display: block;
+  font-weight: var(--font-weight-medium);
+  min-width: auto;
+}
+
+.reg-table .registration-phone {
+  display: block;
+  font-size: var(--text-sm-size);
+}
+
+.reg-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.timeline {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.timeline li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.timeline-at {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.timeline-note {
+  color: var(--text-secondary);
+}
+
+.note-row,
+.io-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.io-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.import-preview {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.import-errors {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--danger-strong);
+  font-size: var(--text-sm-size);
+}
+
+.csv-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  margin-bottom: var(--space-3);
+}

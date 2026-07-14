@@ -37,7 +37,8 @@ import {
   createSeason,
   teamsOf,
 } from "./competitions";
-import { registrationsOf, submitRegistration, triageRegistration } from "./registrations";
+import { registrationsOf, submitRegistration } from "./registrations";
+import { transition } from "./registration-aggregate";
 import { ForbiddenError } from "../orgs/authz";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
@@ -188,18 +189,18 @@ describe("COMPETITION REGRESSION — domain contract", () => {
       return;
     }
     // A reject with an unknown reason category is refused by core's machine.
-    const badReject = await triageRegistration(db, orgX.id, compId, reg.id, owner, {
+    const badReject = await transition(db, orgX.id, compId, reg.id, owner, {
       type: "reject",
       reason: "nonsense" as never,
     });
     expect(badReject).toEqual({ ok: false, reason: "reason_required" });
     // Approve is legal from submitted.
-    const approve = await triageRegistration(db, orgX.id, compId, reg.id, owner, {
+    const approve = await transition(db, orgX.id, compId, reg.id, owner, {
       type: "approve",
     });
     expect(approve).toEqual({ ok: true, status: "approved" });
     // Approving again is an illegal transition (approved is not re-approvable).
-    const again = await triageRegistration(db, orgX.id, compId, reg.id, owner, { type: "approve" });
+    const again = await transition(db, orgX.id, compId, reg.id, owner, { type: "approve" });
     expect(again).toEqual({ ok: false, reason: "illegal_transition" });
   });
 

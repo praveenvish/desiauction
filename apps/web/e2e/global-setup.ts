@@ -12,6 +12,7 @@ export default async function globalSetup(): Promise<void> {
     "/competitions",
     "/competitions/warmup",
     "/competitions/warmup/register",
+    "/competitions/warmup/registrations",
     "/dev/inbox",
     "/gallery",
     "/",

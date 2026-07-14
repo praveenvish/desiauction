@@ -1,4 +1,4 @@
-import { ToastProvider } from "@desiauction/ui";
+import { ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { competitionView } from "../../../server/competition/actions";
@@ -22,7 +22,18 @@ export default async function CompetitionHomePage({
     <ToastProvider>
       <main className="competition-home">
         <div className="competition-stack">
-          <h1 data-testid="competition-name">{view.competition.name}</h1>
+          <div className="competition-title-row">
+            <h1 data-testid="competition-name">{view.competition.name}</h1>
+            {view.viewer.canReview ? (
+              <ButtonLink
+                href={`/competitions/${slug}/registrations`}
+                variant="secondary"
+                data-testid="open-dashboard"
+              >
+                Manage registrations
+              </ButtonLink>
+            ) : null}
+          </div>
           <CompetitionPanel view={view} slug={slug} />
         </div>
       </main>

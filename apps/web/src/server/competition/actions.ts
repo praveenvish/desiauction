@@ -1,6 +1,12 @@
 "use server";
 
-import { isRejectionReason, type RegistrationEvent } from "@desiauction/core";
+import {
+  isRejectionReason,
+  parseRegistrationCsv,
+  type CsvRowError,
+  type RegistrationEvent,
+  type RegistrationStatus,
+} from "@desiauction/core";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -19,12 +25,21 @@ import {
   type CompetitionSummary,
   type TeamSummary,
 } from "./competitions";
+import { addNote, assignTeam, transition, transitionBatch } from "./registration-aggregate";
+import { commitRegistrationImport } from "./registration-import";
 import {
+  exportRegistrationsCsv,
   myRegistration,
+  queryRegistrations,
+  registrationStats,
   registrationsOf,
   submitRegistration,
-  triageRegistration,
+  timelineOf,
+  type RegistrationPage,
   type RegistrationRow,
+  type RegistrationSort,
+  type RegistrationStats,
+  type TimelineEntry,
 } from "./registrations";
 
 // Org-scoped internal RPC (C-14, IP-3_DESIGN D1). Every action resolves the
@@ -188,19 +203,24 @@ export async function createTeamAction(
   return { ok: true };
 }
 
-export async function triageRegistrationAction(
+export type TriageAction = "approve" | "reject" | "waitlist" | "restore" | "withdraw";
+
+/**
+ * Resolve tenant + require registration.review, then build the core event. The
+ * ONE gate every triage path (single + bulk) passes; the aggregate does the write.
+ */
+async function reviewGate(
   slug: string,
-  registrationId: string,
-  action: "approve" | "reject" | "waitlist",
-  reason?: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<
+  { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
+> {
   const session = await requireSession();
   const competition = await resolveCompetition(db, session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
   try {
-    // Approval's human gate (invariant 5): only a registration.review holder here.
+    // Approval's human gate (invariant 5): only a registration.review holder.
     await requireCompetitionCapability(
       db,
       session.personId,
@@ -210,27 +230,71 @@ export async function triageRegistrationAction(
   } catch {
     return { ok: false, error: "You can't review registrations here." };
   }
-  let event: RegistrationEvent;
+  return { ok: true, personId: session.personId, competition };
+}
+
+function triageEvent(action: TriageAction, reason?: string): RegistrationEvent | { error: string } {
   if (action === "reject") {
     if (reason === undefined || !isRejectionReason(reason)) {
-      return { ok: false, error: "Choose a reason to reject." };
+      return { error: "Choose a reason to reject." };
     }
-    event = { type: "reject", reason };
-  } else {
-    event = { type: action };
+    return { type: "reject", reason };
   }
-  const result = await triageRegistration(
+  return { type: action };
+}
+
+export async function triageRegistrationAction(
+  slug: string,
+  registrationId: string,
+  action: TriageAction,
+  reason?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const event = triageEvent(action, reason);
+  if ("error" in event) {
+    return { ok: false, error: event.error };
+  }
+  const result = await transition(
     db,
-    competition.orgId,
-    competition.id,
+    gate.competition.orgId,
+    gate.competition.id,
     registrationId,
-    session.personId,
+    gate.personId,
     event,
   );
   if (!result.ok) {
     return { ok: false, error: "That action isn't available for this registration." };
   }
   return { ok: true };
+}
+
+/** Bulk triage — same review gate, same core event, applied atomically (identical to N singles). */
+export async function bulkTriageAction(
+  slug: string,
+  registrationIds: string[],
+  action: TriageAction,
+  reason?: string,
+): Promise<{ ok: boolean; applied?: number; skipped?: number; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const event = triageEvent(action, reason);
+  if ("error" in event) {
+    return { ok: false, error: event.error };
+  }
+  const result = await transitionBatch(
+    db,
+    gate.competition.orgId,
+    gate.competition.id,
+    registrationIds,
+    gate.personId,
+    event,
+  );
+  return { ok: true, applied: result.applied.length, skipped: result.skipped.length };
 }
 
 // --- Player-facing registration (any authenticated person) -------------------
@@ -284,4 +348,169 @@ export async function submitRegistrationAction(
     };
   }
   return { done: true };
+}
+
+// --- Registration operations dashboard (M-IP3-2) -----------------------------
+
+export interface DashboardParams {
+  search?: string;
+  status?: string;
+  teamId?: string;
+  sort?: string;
+  page?: string;
+}
+
+export interface RegistrationDashboard {
+  competition: CompetitionSummary;
+  stats: RegistrationStats;
+  page: RegistrationPage;
+  teams: TeamSummary[];
+  viewer: { canReview: boolean };
+}
+
+const VALID_STATUS = new Set<RegistrationStatus>([
+  "submitted",
+  "approved",
+  "rejected",
+  "waitlisted",
+  "withdrawn",
+]);
+const VALID_SORT = new Set<RegistrationSort>(["recent", "oldest", "name", "number", "status"]);
+const PAGE_SIZE = 25;
+
+export async function registrationDashboard(
+  slug: string,
+  params: DashboardParams,
+): Promise<RegistrationDashboard | null> {
+  const session = await requireSession();
+  const competition = await resolveCompetition(db, session.personId, slug);
+  if (competition === null) {
+    return null;
+  }
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  const canReview = await canCompetition(db, session.personId, scope, "registration.review");
+  const pageNum = Number.parseInt(params.page ?? "1", 10);
+  const query = {
+    ...(params.search !== undefined && params.search !== "" ? { search: params.search } : {}),
+    ...(params.status !== undefined && VALID_STATUS.has(params.status as RegistrationStatus)
+      ? { status: params.status as RegistrationStatus }
+      : {}),
+    ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
+    sort: (VALID_SORT.has(params.sort as RegistrationSort) ? params.sort : "recent") as RegistrationSort,
+    page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
+    pageSize: PAGE_SIZE,
+  };
+  const [stats, page, teams] = await Promise.all([
+    registrationStats(db, competition.id),
+    queryRegistrations(db, competition.id, query),
+    teamsOf(db, competition.id),
+  ]);
+  return { competition, stats, page, teams, viewer: { canReview } };
+}
+
+export async function registrationTimelineAction(
+  slug: string,
+  registrationId: string,
+): Promise<TimelineEntry[]> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return [];
+  }
+  return timelineOf(db, registrationId);
+}
+
+export async function addNoteAction(
+  slug: string,
+  registrationId: string,
+  note: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const result = await addNote(db, gate.competition.orgId, registrationId, gate.personId, note);
+  return result.ok ? { ok: true } : { ok: false, error: "Write a note first." };
+}
+
+export async function assignTeamAction(
+  slug: string,
+  registrationId: string,
+  teamId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const competition = await resolveCompetition(db, session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await requireCompetitionCapability(
+      db,
+      session.personId,
+      { orgId: competition.orgId, competitionId: competition.id },
+      "team.manage",
+    );
+  } catch {
+    return { ok: false, error: "You can't assign teams here." };
+  }
+  await assignTeam(
+    db,
+    competition.orgId,
+    competition.id,
+    registrationId,
+    teamId === "" ? null : teamId,
+    session.personId,
+  );
+  return { ok: true };
+}
+
+// --- CSV import (validate → preview → commit) + export -----------------------
+
+export interface ImportPreview {
+  validCount: number;
+  errors: CsvRowError[];
+}
+
+/** Validate only — no writes. The organizer previews errors before committing. */
+export async function importPreviewAction(slug: string, csv: string): Promise<ImportPreview> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
+  }
+  const result = parseRegistrationCsv(csv);
+  return { validCount: result.rows.length, errors: result.errors };
+}
+
+/** Re-validate and commit atomically. Refuses any file with errors (no partial corruption). */
+export async function importCommitAction(
+  slug: string,
+  csv: string,
+): Promise<{ ok: boolean; imported?: number; duplicates?: number; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const parsed = parseRegistrationCsv(csv);
+  if (parsed.errors.length > 0) {
+    return { ok: false, error: `Fix ${String(parsed.errors.length)} row error(s) before importing.` };
+  }
+  const result = await commitRegistrationImport(
+    db,
+    gate.competition.id,
+    gate.competition.orgId,
+    gate.personId,
+    parsed.rows,
+  );
+  return { ok: true, imported: result.imported, duplicates: result.duplicates };
+}
+
+/** Export authorization = registration.review; deterministic, competition-scoped CSV. */
+export async function exportRegistrationsAction(
+  slug: string,
+): Promise<{ ok: true; csv: string; filename: string } | { ok: false; error: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const csv = await exportRegistrationsCsv(db, gate.competition.id);
+  return { ok: true, csv, filename: `${gate.competition.slug}-registrations.csv` };
 }

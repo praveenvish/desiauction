@@ -87,7 +87,8 @@ export type RegistrationEvent =
   | { type: "approve" } // requires a human — invariant 5 (enforced at the action layer)
   | { type: "reject"; reason: RejectionReason; note?: string } // private reason — invariant 6
   | { type: "waitlist" }
-  | { type: "withdraw" }; // player-initiated, available pre-pool-lock
+  | { type: "withdraw" } // player-initiated, available pre-pool-lock
+  | { type: "restore" }; // organizer undo: rejected/withdrawn → submitted (re-triageable)
 
 export type RejectionReason = "duplicate" | "ineligible" | "withdrew" | "capacity" | "other";
 
@@ -121,8 +122,10 @@ const REGISTRATION_EDGES: Record<RegistrationStatus, ReadonlySet<RegistrationEve
   submitted: new Set(["approve", "reject", "waitlist", "withdraw"]),
   waitlisted: new Set(["approve", "reject", "withdraw"]),
   approved: new Set(["withdraw"]), // withdrawable pre-pool-lock (doc 42); pool lock is IP-4
-  rejected: new Set(), // terminal for the applicant; a fresh registration is a new row
-  withdrawn: new Set(),
+  // Rejected / withdrawn are recoverable only via an explicit organizer restore —
+  // the single audited exit, never a hidden path (M-IP3-2 aggregate contract).
+  rejected: new Set(["restore"]),
+  withdrawn: new Set(["restore"]),
 };
 
 const EVENT_TARGET: Record<RegistrationEvent["type"], RegistrationStatus> = {
@@ -131,6 +134,7 @@ const EVENT_TARGET: Record<RegistrationEvent["type"], RegistrationStatus> = {
   reject: "rejected",
   waitlist: "waitlisted",
   withdraw: "withdrawn",
+  restore: "submitted",
 };
 
 export type RegistrationTransition =
@@ -153,6 +157,52 @@ export function registrationTransition(
     return { ok: false, reason: "reason_required" };
   }
   return { ok: true, next: EVENT_TARGET[event.type] };
+}
+
+// --- Bulk operations (M-IP3-2) ------------------------------------------------
+// The aggregate's bulk decision. Upholds the directive invariant "every bulk
+// action behaves identically to N individual actions": it is literally the
+// single-transition decision mapped over the batch, partitioned into the ones to
+// APPLY and the ones to SKIP (with the same reason a single call would give). No
+// bulk-only shortcut, no hidden path — the applier just executes this plan.
+
+export interface RegistrationBatchItem {
+  id: string;
+  status: RegistrationStatus;
+}
+
+export interface RegistrationBatchPlan {
+  apply: { id: string; next: RegistrationStatus }[];
+  skip: { id: string; reason: "illegal_transition" | "reason_required" }[];
+}
+
+export function planRegistrationBatch(
+  items: readonly RegistrationBatchItem[],
+  event: RegistrationEvent,
+): RegistrationBatchPlan {
+  const plan: RegistrationBatchPlan = { apply: [], skip: [] };
+  for (const item of items) {
+    const decision = registrationTransition(item.status, event);
+    if (decision.ok) {
+      plan.apply.push({ id: item.id, next: decision.next });
+    } else {
+      plan.skip.push({ id: item.id, reason: decision.reason });
+    }
+  }
+  return plan;
+}
+
+/**
+ * A stable, human-quotable reference derived from the ULID — deterministic, needs
+ * no counter (so no insert-time race), and searchable. Not a uniqueness key.
+ */
+export function registrationNumber(id: string): string {
+  return `R${id.slice(-6).toUpperCase()}`;
+}
+
+/** Normalized grouping key for deterministic duplicate-name detection (doc 42). */
+export function nameKey(name: string | null): string {
+  return (name ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 // --- Naming (shared with the orgs slug discipline) ----------------------------

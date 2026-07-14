@@ -1,0 +1,65 @@
+import { ToastProvider } from "@desiauction/ui";
+import { notFound } from "next/navigation";
+
+import { registrationDashboard } from "../../../../server/competition/actions";
+import { RegistrationDashboardPanel } from "./dashboard-panel";
+import "../../competitions.css";
+
+export const metadata = { title: "Registrations · DesiAuction" };
+
+export default async function RegistrationsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const { slug } = await params;
+  const sp = await searchParams;
+  const dashboard = await registrationDashboard(slug, {
+    ...(sp["q"] !== undefined ? { search: sp["q"] } : {}),
+    ...(sp["status"] !== undefined ? { status: sp["status"] } : {}),
+    ...(sp["team"] !== undefined ? { teamId: sp["team"] } : {}),
+    ...(sp["sort"] !== undefined ? { sort: sp["sort"] } : {}),
+    ...(sp["page"] !== undefined ? { page: sp["page"] } : {}),
+  });
+  if (dashboard === null) {
+    notFound();
+  }
+  if (!dashboard.viewer.canReview) {
+    return (
+      <main className="registrations-dash">
+        <div className="competitions-stack">
+          <h1>{dashboard.competition.name}</h1>
+          <p role="alert" className="competitions-hint">
+            You don&apos;t have permission to review registrations for this competition.
+          </p>
+        </div>
+      </main>
+    );
+  }
+  return (
+    <ToastProvider>
+      <main className="registrations-dash">
+        <div className="dash-stack">
+          <header className="dash-head">
+            <h1>{dashboard.competition.name}</h1>
+            <p className="competitions-hint">Registration operations</p>
+          </header>
+          <RegistrationDashboardPanel
+            slug={slug}
+            stats={dashboard.stats}
+            page={dashboard.page}
+            teams={dashboard.teams}
+            filters={{
+              search: sp["q"] ?? "",
+              status: sp["status"] ?? "",
+              team: sp["team"] ?? "",
+              sort: sp["sort"] ?? "recent",
+            }}
+          />
+        </div>
+      </main>
+    </ToastProvider>
+  );
+}

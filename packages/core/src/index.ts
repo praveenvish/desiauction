@@ -8,6 +8,9 @@ export type { Capability, CapabilitySet, GrantLike, Scope, ScopeType } from "./c
 export {
   competitionTransition,
   registrationTransition,
+  planRegistrationBatch,
+  registrationNumber,
+  nameKey,
   isRejectionReason,
   isRegistrationRole,
   validateName,
@@ -24,8 +27,12 @@ export type {
   RegistrationStatus,
   RegistrationEvent,
   RegistrationTransition,
+  RegistrationBatchItem,
+  RegistrationBatchPlan,
   RejectionReason,
   RegistrationRole,
   TransitionResult,
   NameResult,
 } from "./competition";
+export { parseRegistrationCsv, tokenizeCsv } from "./registration-csv";
+export type { CsvRegistrationRow, CsvRowError, CsvParseResult } from "./registration-csv";

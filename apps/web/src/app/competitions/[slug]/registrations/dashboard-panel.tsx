@@ -1,0 +1,618 @@
+"use client";
+
+import { REJECTION_REASONS } from "@desiauction/core";
+import { Badge, Button, Card, Field, Select, useToast, VisuallyHidden } from "@desiauction/ui";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  addNoteAction,
+  bulkTriageAction,
+  exportRegistrationsAction,
+  importCommitAction,
+  importPreviewAction,
+  registrationTimelineAction,
+  triageRegistrationAction,
+  type ImportPreview,
+  type RegistrationDashboard,
+  type TriageAction,
+} from "../../../../server/competition/actions";
+import type { TimelineEntry } from "../../../../server/competition/registrations";
+
+type Row = RegistrationDashboard["page"]["rows"][number];
+
+const REG_TONE = {
+  draft: "neutral",
+  submitted: "info",
+  approved: "success",
+  rejected: "danger",
+  waitlisted: "warning",
+  withdrawn: "neutral",
+} as const;
+
+const STATUS_FILTERS = ["", "submitted", "approved", "rejected", "waitlisted", "withdrawn"];
+const SORTS = ["recent", "oldest", "name", "number", "status"];
+
+export function RegistrationDashboardPanel({
+  slug,
+  stats,
+  page,
+  teams,
+  filters,
+}: {
+  slug: string;
+  stats: RegistrationDashboard["stats"];
+  page: RegistrationDashboard["page"];
+  teams: RegistrationDashboard["teams"];
+  filters: { search: string; status: string; team: string; sort: string };
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [rejectReason, setRejectReason] = useState(REJECTION_REASONS[0]);
+  const [cursor, setCursor] = useState(0);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [noteText, setNoteText] = useState("");
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const csvRef = useRef<HTMLTextAreaElement>(null);
+  const [search, setSearch] = useState(filters.search);
+  // Interactivity marker: this effect runs only after client hydration, so the
+  // attribute is a deterministic "the panel's handlers are live now" signal.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  const rows = page.rows;
+  const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
+
+  const pushQuery = useCallback(
+    (patch: Record<string, string>) => {
+      const next = new URLSearchParams();
+      const merged = { q: filters.search, status: filters.status, team: filters.team, sort: filters.sort, ...patch };
+      for (const [key, value] of Object.entries(merged)) {
+        if (value !== "") {
+          next.set(key, value);
+        }
+      }
+      router.push(`/competitions/${slug}/registrations?${next.toString()}`);
+    },
+    [router, slug, filters],
+  );
+
+  const toggle = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const runBulk = async (action: TriageAction) => {
+    if (selected.size === 0) {
+      return;
+    }
+    setBusy(true);
+    const result = await bulkTriageAction(
+      slug,
+      [...selected],
+      action,
+      action === "reject" ? rejectReason : undefined,
+    );
+    setBusy(false);
+    if (result.ok) {
+      toast({
+        title: `${String(result.applied ?? 0)} ${action}d · ${String(result.skipped ?? 0)} skipped`,
+        tone: "success",
+      });
+      setSelected(new Set());
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Bulk action failed.", tone: "danger" });
+    }
+  };
+
+  const runSingle = async (id: string, action: TriageAction) => {
+    setBusy(true);
+    const result = await triageRegistrationAction(
+      slug,
+      id,
+      action,
+      action === "reject" ? rejectReason : undefined,
+    );
+    setBusy(false);
+    if (result.ok) {
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Action failed.", tone: "danger" });
+    }
+  };
+
+  const openDetails = async (id: string) => {
+    if (expanded === id) {
+      setExpanded(null);
+      return;
+    }
+    setExpanded(id);
+    setNoteText("");
+    setTimeline(await registrationTimelineAction(slug, id));
+  };
+
+  const submitNote = async (id: string) => {
+    const result = await addNoteAction(slug, id, noteText);
+    if (result.ok) {
+      setNoteText("");
+      setTimeline(await registrationTimelineAction(slug, id));
+    } else {
+      toast({ title: result.error ?? "Could not add note.", tone: "danger" });
+    }
+  };
+
+  const doExport = async () => {
+    const result = await exportRegistrationsAction(slug);
+    if (!result.ok) {
+      toast({ title: result.error, tone: "danger" });
+      return;
+    }
+    const blob = new Blob([result.csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = result.filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const readCsvFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (csvRef.current) {
+        csvRef.current.value = typeof reader.result === "string" ? reader.result : "";
+      }
+      setPreview(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const runPreview = async () => {
+    const text = csvRef.current?.value ?? "";
+    if (text.trim() === "") {
+      return;
+    }
+    setPreview(await importPreviewAction(slug, text));
+  };
+
+  const commitImport = async () => {
+    const text = csvRef.current?.value ?? "";
+    setBusy(true);
+    const result = await importCommitAction(slug, text);
+    setBusy(false);
+    if (result.ok) {
+      toast({
+        title: `Imported ${String(result.imported ?? 0)} · ${String(result.duplicates ?? 0)} already registered`,
+        tone: "success",
+      });
+      setPreview(null);
+      if (csvRef.current) {
+        csvRef.current.value = "";
+      }
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Import failed.", tone: "danger" });
+    }
+  };
+
+  // Keyboard productivity: j/k move the cursor, x toggles selection, a approves
+  // the selection (doc 31 peek-driven review). Ignored while typing in a field.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const approveSelectedRef = useRef(() => {
+    /* replaced each render below */
+  });
+  approveSelectedRef.current = () => void runBulk("approve");
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) {
+        return;
+      }
+      const current = rowsRef.current;
+      if (event.key === "j") {
+        setCursor((c) => Math.min(c + 1, current.length - 1));
+      } else if (event.key === "k") {
+        setCursor((c) => Math.max(c - 1, 0));
+      } else if (event.key === "x") {
+        const row = current[cursor];
+        if (row) {
+          toggle(row.id);
+        }
+      } else if (event.key === "a" && selectedRef.current.size > 0) {
+        approveSelectedRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [cursor, toggle]);
+
+  const allOnPageSelected = useMemo(
+    () => rows.length > 0 && rows.every((r) => selected.has(r.id)),
+    [rows, selected],
+  );
+
+  return (
+    <>
+      <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
+        <StatTile label="Total" value={stats.total} testId="stat-total" />
+        <StatTile label="Submitted" value={stats.submitted} testId="stat-submitted" />
+        <StatTile label="Approved" value={stats.approved} testId="stat-approved" />
+        <StatTile label="Waitlisted" value={stats.waitlisted} testId="stat-waitlisted" />
+        <StatTile label="Rejected" value={stats.rejected} testId="stat-rejected" />
+      </div>
+
+      <Card>
+        <form
+          className="filter-bar"
+          onSubmit={(event) => {
+            event.preventDefault();
+            pushQuery({ q: search, page: "1" });
+          }}
+        >
+          <Field
+            label="Search"
+            name="q"
+            placeholder="name, phone, number or team"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+            }}
+          />
+          <Select
+            label="Status"
+            name="status"
+            value={filters.status}
+            onChange={(event) => {
+              pushQuery({ status: event.target.value, page: "1" });
+            }}
+          >
+            {STATUS_FILTERS.map((status) => (
+              <option key={status} value={status}>
+                {status === "" ? "All statuses" : status}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Team"
+            name="team"
+            value={filters.team}
+            onChange={(event) => {
+              pushQuery({ team: event.target.value, page: "1" });
+            }}
+          >
+            <option value="">All teams</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Sort"
+            name="sort"
+            value={filters.sort}
+            onChange={(event) => {
+              pushQuery({ sort: event.target.value, page: "1" });
+            }}
+          >
+            {SORTS.map((sort) => (
+              <option key={sort} value={sort}>
+                {sort}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" data-testid="search-submit">
+            Search
+          </Button>
+        </form>
+        <p className="dash-hint">Shortcuts: j/k move · x select · a approve selected</p>
+      </Card>
+
+      {selected.size > 0 ? (
+        <Card data-testid="bulk-bar">
+          <div className="bulk-bar">
+            <strong data-testid="bulk-count">{selected.size} selected</strong>
+            <Button size="sm" onClick={() => void runBulk("approve")} loading={busy} data-testid="bulk-approve">
+              Approve
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => void runBulk("waitlist")} loading={busy} data-testid="bulk-waitlist">
+              Waitlist
+            </Button>
+            <Select
+              label="Reject reason"
+              name="reason"
+              value={rejectReason}
+              onChange={(event) => {
+                setRejectReason(event.target.value as (typeof REJECTION_REASONS)[number]);
+              }}
+            >
+              {REJECTION_REASONS.map((reason) => (
+                <option key={reason} value={reason}>
+                  {reason}
+                </option>
+              ))}
+            </Select>
+            <Button size="sm" variant="danger" onClick={() => void runBulk("reject")} loading={busy} data-testid="bulk-reject">
+              Reject
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => void runBulk("restore")} loading={busy}>
+              Restore
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      <Card>
+        <div className="table-scroll">
+          <table className="reg-table" data-testid="reg-table">
+            <thead>
+              <tr>
+                <th>
+                  <VisuallyHidden>Select</VisuallyHidden>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all on page"
+                    checked={allOnPageSelected}
+                    onChange={() => {
+                      setSelected((prev) => {
+                        const next = new Set(prev);
+                        if (allOnPageSelected) {
+                          rows.forEach((r) => next.delete(r.id));
+                        } else {
+                          rows.forEach((r) => next.add(r.id));
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                </th>
+                <th>#</th>
+                <th>Player</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Team</th>
+                <th>
+                  <VisuallyHidden>Actions</VisuallyHidden>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <RegRow
+                  key={row.id}
+                  row={row}
+                  active={index === cursor}
+                  checked={selected.has(row.id)}
+                  onToggle={() => {
+                    toggle(row.id);
+                  }}
+                  onDetails={() => void openDetails(row.id)}
+                  onSingle={(action) => void runSingle(row.id, action)}
+                  busy={busy}
+                />
+              ))}
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="dash-hint">
+                    No registrations match these filters.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="pager">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={page.page <= 1}
+            onClick={() => {
+              pushQuery({ page: String(page.page - 1) });
+            }}
+            data-testid="page-prev"
+          >
+            Previous
+          </Button>
+          <span data-testid="page-indicator">
+            Page {page.page} of {totalPages} · {page.total} total
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={page.page >= totalPages}
+            onClick={() => {
+              pushQuery({ page: String(page.page + 1) });
+            }}
+            data-testid="page-next"
+          >
+            Next
+          </Button>
+        </div>
+      </Card>
+
+      {expanded !== null ? (
+        <Card data-testid="timeline-panel">
+          <h2>Timeline</h2>
+          <ol className="timeline">
+            {timeline.map((entry, index) => (
+              <li key={index}>
+                <Badge tone="neutral">{entry.action.replace("registration.", "")}</Badge>
+                <span className="timeline-at">{new Date(entry.at).toLocaleString()}</span>
+                {isNote(entry.meta) ? <span className="timeline-note">“{entry.meta.note}”</span> : null}
+              </li>
+            ))}
+          </ol>
+          <div className="note-row">
+            <Field
+              label="Add a note"
+              name="note"
+              value={noteText}
+              onChange={(event) => {
+                setNoteText(event.target.value);
+              }}
+              placeholder="Verified via club captain"
+            />
+            <Button size="sm" onClick={() => void submitNote(expanded)} disabled={noteText.trim() === ""}>
+              Add note
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      <Card data-testid="io-panel">
+        <h2>Import / export</h2>
+        <label className="io-file" htmlFor="csv-input">
+          <span>Import CSV — columns: name, phone, role, base_price_band</span>
+        </label>
+        <textarea
+          id="csv-input"
+          ref={csvRef}
+          className="csv-input"
+          data-testid="import-textarea"
+          rows={4}
+          placeholder="Paste CSV rows here, or choose a file"
+          defaultValue=""
+        />
+        <div className="io-row">
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            aria-label="Choose a CSV file"
+            data-testid="import-file"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                readCsvFile(file);
+              }
+            }}
+          />
+          <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
+            Preview
+          </Button>
+          <Button variant="ghost" onClick={() => void doExport()} data-testid="export-csv">
+            Export CSV
+          </Button>
+        </div>
+        {preview !== null ? (
+          <div className="import-preview" data-testid="import-preview">
+            <p>
+              {preview.validCount} valid row(s) · {preview.errors.length} error(s)
+            </p>
+            {preview.errors.length > 0 ? (
+              <ul className="import-errors">
+                {preview.errors.slice(0, 8).map((error, index) => (
+                  <li key={index}>
+                    Line {error.line}: {error.message}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <Button
+              onClick={() => void commitImport()}
+              loading={busy}
+              disabled={preview.errors.length > 0 || preview.validCount === 0}
+              data-testid="import-commit"
+            >
+              Import {preview.validCount} player(s)
+            </Button>
+          </div>
+        ) : null}
+      </Card>
+    </>
+  );
+}
+
+function StatTile({ label, value, testId }: { label: string; value: number; testId: string }) {
+  return (
+    <div className="stat-tile" data-testid={testId}>
+      <span className="stat-value">{value}</span>
+      <span className="stat-label">{label}</span>
+    </div>
+  );
+}
+
+function isNote(meta: unknown): meta is { note: string } {
+  return typeof meta === "object" && meta !== null && typeof (meta as { note?: unknown }).note === "string";
+}
+
+function RegRow({
+  row,
+  active,
+  checked,
+  onToggle,
+  onDetails,
+  onSingle,
+  busy,
+}: {
+  row: Row;
+  active: boolean;
+  checked: boolean;
+  onToggle: () => void;
+  onDetails: () => void;
+  onSingle: (action: TriageAction) => void;
+  busy: boolean;
+}) {
+  const canTriage = row.status === "submitted" || row.status === "waitlisted";
+  return (
+    <tr className={active ? "reg-row active" : "reg-row"} data-testid={`reg-${row.personId}`}>
+      <td>
+        <input
+          type="checkbox"
+          aria-label={`Select ${row.name ?? row.phone}`}
+          checked={checked}
+          onChange={onToggle}
+        />
+      </td>
+      <td className="reg-number">{row.number}</td>
+      <td>
+        <span className="registration-name">{row.name ?? "Unnamed"}</span>
+        <span className="registration-phone">{row.phone}</span>
+        {row.duplicateName ? (
+          <Badge tone="warning" data-testid="dup-flag">
+            possible duplicate
+          </Badge>
+        ) : null}
+      </td>
+      <td>{row.role.replace(/_/g, " ")}</td>
+      <td>
+        <Badge tone={REG_TONE[row.status]}>{row.status}</Badge>
+      </td>
+      <td>{row.teamName ?? "—"}</td>
+      <td className="reg-actions">
+        {canTriage ? (
+          <Button
+            size="sm"
+            onClick={() => {
+              onSingle("approve");
+            }}
+            loading={busy}
+          >
+            Approve
+          </Button>
+        ) : null}
+        <Button size="sm" variant="ghost" onClick={onDetails}>
+          Details
+        </Button>
+      </td>
+    </tr>
+  );
+}

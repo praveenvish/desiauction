@@ -76,10 +76,19 @@ describe("registration lifecycle machine", () => {
     });
   });
 
-  it("approved is withdrawable pre-lock; rejected and withdrawn are terminal", () => {
+  it("approved is withdrawable pre-lock; rejected/withdrawn exit only via restore", () => {
     expect(registrationTransition("approved", { type: "withdraw" })).toEqual({
       ok: true,
       next: "withdrawn",
+    });
+    // restore is the ONLY legal exit from rejected/withdrawn (M-IP3-2 undo).
+    expect(registrationTransition("rejected", { type: "restore" })).toEqual({
+      ok: true,
+      next: "submitted",
+    });
+    expect(registrationTransition("withdrawn", { type: "restore" })).toEqual({
+      ok: true,
+      next: "submitted",
     });
     for (const event of ["submit", "approve", "reject", "waitlist", "withdraw"] as const) {
       const evt = (
