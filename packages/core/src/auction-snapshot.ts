@@ -15,6 +15,7 @@ import {
   type AuctionProjection,
   type AuctionStatus,
   type IncrementSlab,
+  type LotOutcomeKind,
   type LotStatus,
 } from "./auction";
 import { paise, type Paise } from "./money";
@@ -95,6 +96,24 @@ export interface AuctionSnapshot {
   readonly paddles: readonly SnapshotPaddleEntry[]; // paddle-number order
   readonly lotsResolved: number;
   readonly lotsTotal: number;
+  /**
+   * M-IP4-3: the most recent lot resolution (ceremony input — SOLD/UNSOLD/
+   * HELD/REOPENED splashes render from the snapshot, never a side channel).
+   * Null while a fresh lot is on the block. Spectator-safe: numbers and team
+   * names only, no person identity.
+   */
+  readonly lastOutcome: {
+    readonly kind: LotOutcomeKind;
+    readonly lotId: string;
+    readonly lotNumber: string;
+    readonly playerName: string | null;
+    readonly amount: number | null;
+    readonly teamName: string | null;
+    readonly paddleNumber: string | null;
+    readonly atSeq: number;
+  } | null;
+  /** Count of AuctionRecovered events — the ceremony's "Recovered" trigger. */
+  readonly recoveries: number;
 }
 
 /**
@@ -192,6 +211,24 @@ export function buildAuctionSnapshot(
       entry.lot.status === "withdrawn",
   ).length;
 
+  let lastOutcome: AuctionSnapshot["lastOutcome"] = null;
+  if (projection.lastOutcome !== null) {
+    const outcome = projection.lastOutcome;
+    const lotRef = refs.lots[outcome.lotId];
+    const paddle = outcome.paddleId !== null ? projection.paddles[outcome.paddleId] : undefined;
+    const paddleRef = outcome.paddleId !== null ? refs.paddles[outcome.paddleId] : undefined;
+    lastOutcome = {
+      kind: outcome.kind,
+      lotId: outcome.lotId,
+      lotNumber: lotRef?.lotNumber ?? "?",
+      playerName: lotRef?.playerName ?? null,
+      amount: outcome.amount,
+      teamName: paddleRef?.teamName ?? null,
+      paddleNumber: paddle?.paddleNumber ?? null,
+      atSeq: outcome.atSeq,
+    };
+  }
+
   const snapshot: AuctionSnapshot = {
     version: projection.lastSeq,
     auctionId: refs.auctionId,
@@ -211,6 +248,8 @@ export function buildAuctionSnapshot(
     paddles: paddleEntries,
     lotsResolved: resolved,
     lotsTotal: lotEntries.length,
+    lastOutcome,
+    recoveries: projection.recoveries,
   };
   return deepFreeze(snapshot);
 }
@@ -273,7 +312,19 @@ export type AuctionCommandType =
   | "ResumeAuction"
   | "CompleteAuction"
   | "AbortAuction"
-  | "RecoverAuction";
+  | "RecoverAuction"
+  // M-IP4-3: conduct moves ENTIRELY onto the command path — the auction open
+  // edge, manual lot conduct, the owner workflow, and compensating undo. No
+  // setup surface writes through the aggregate directly anymore.
+  | "OpenAuction"
+  | "IssuePaddle"
+  | "WithdrawLot"
+  | "HoldLot"
+  | "RequeueLot"
+  | "UndoLastAction"
+  | "InviteOwner"
+  | "AcceptOwnerInvite"
+  | "GrantPaddle";
 
 export const AUCTION_COMMAND_TYPES: readonly AuctionCommandType[] = [
   "ClaimPaddle",
@@ -287,6 +338,15 @@ export const AUCTION_COMMAND_TYPES: readonly AuctionCommandType[] = [
   "CompleteAuction",
   "AbortAuction",
   "RecoverAuction",
+  "OpenAuction",
+  "IssuePaddle",
+  "WithdrawLot",
+  "HoldLot",
+  "RequeueLot",
+  "UndoLastAction",
+  "InviteOwner",
+  "AcceptOwnerInvite",
+  "GrantPaddle",
 ];
 
 export function isAuctionCommandType(value: string): value is AuctionCommandType {
@@ -305,6 +365,12 @@ export interface AuctionCommandEnvelope {
   type: AuctionCommandType;
   actor: string;
   conduct: boolean;
+  /**
+   * M-IP4-3: `auction.override` resolved by the web gate — required by
+   * UndoLastAction (doc 41: undo is the highest-friction action; conduct
+   * alone never suffices). Absent means false.
+   */
+  override?: boolean;
   payload: Readonly<Record<string, unknown>>;
 }
 

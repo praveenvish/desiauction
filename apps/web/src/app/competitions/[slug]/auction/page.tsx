@@ -26,6 +26,15 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     Go live
                   </ButtonLink>
                 ) : null}
+                {dashboard.view !== null && dashboard.viewer.canConduct ? (
+                  <ButtonLink
+                    href={`/competitions/${slug}/auction/cockpit`}
+                    variant="secondary"
+                    data-testid="open-cockpit"
+                  >
+                    Cockpit
+                  </ButtonLink>
+                ) : null}
                 <ButtonLink href={`/competitions/${slug}`} variant="secondary">
                   Competition
                 </ButtonLink>

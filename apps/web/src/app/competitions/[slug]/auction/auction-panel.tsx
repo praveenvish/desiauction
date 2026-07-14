@@ -12,8 +12,8 @@ import {
   queueAllLotsAction,
   verifyReplayAction,
   type AuctionDashboard,
+  type ReplayVerifyReport,
 } from "../../../../server/auction/actions";
-import type { RecoveryReport } from "@desiauction/auction";
 
 // The M-IP4-1 founder demonstration: AuctionReady, creation, the lot queue,
 // the three frozen state machines, the replay/recovery proof, and the timer
@@ -57,7 +57,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [paddleTeam, setPaddleTeam] = useState("");
-  const [report, setReport] = useState<RecoveryReport | null>(null);
+  const [report, setReport] = useState<ReplayVerifyReport | null>(null);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
@@ -315,10 +315,10 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             {report !== null ? (
               <p data-testid="replay-report" className="competitions-hint">
                 {report.ok
-                  ? report.divergences.length === 0
+                  ? report.divergences === 0
                     ? `Replayed ${String(report.eventCount)} events — projection matches persisted state exactly.`
-                    : `Replayed ${String(report.eventCount)} events — healed ${String(report.divergences.length)} divergence(s) from the log.`
-                  : `Replay failed closed at seq ${String(report.atSeq ?? 0)}: ${report.reason ?? ""}`}
+                    : `Replayed ${String(report.eventCount)} events — healed ${String(report.divergences)} divergence(s) from the log.`
+                  : `Replay failed closed: ${report.reason ?? ""}`}
               </p>
             ) : null}
             <ol className="timeline">

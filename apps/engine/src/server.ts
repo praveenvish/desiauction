@@ -41,12 +41,15 @@ export interface WsHub {
   join: (auctionId: string, socket: WebSocket) => void;
   roomSize: (auctionId: string) => number;
   heartbeat: () => void;
+  /** Millis since the last WS heartbeat sweep (diagnostics; 0 = never ran). */
+  heartbeatAgeMs: () => number;
   close: () => void;
 }
 
 export function createWsHub(engine: AuctionEngine, logger: FastifyBaseLogger): WsHub {
   const rooms = new Map<string, Room>();
   const alive = new WeakMap<WebSocket, boolean>();
+  let lastHeartbeatAtMs = 0;
 
   const envelope = (serialized: string, version: number): string =>
     // serverNowMs lives on the TRANSPORT envelope (drift correction), never in
@@ -84,7 +87,11 @@ export function createWsHub(engine: AuctionEngine, logger: FastifyBaseLogger): W
     roomSize(auctionId) {
       return rooms.get(auctionId)?.sockets.size ?? 0;
     },
+    heartbeatAgeMs() {
+      return lastHeartbeatAtMs === 0 ? 0 : Date.now() - lastHeartbeatAtMs;
+    },
     heartbeat() {
+      lastHeartbeatAtMs = Date.now();
       for (const [auctionId, room] of rooms) {
         const state = engine.snapshotOf(auctionId);
         for (const socket of room.sockets) {
@@ -158,9 +165,31 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
       type: body.type,
       actor: body.actor,
       conduct: body.conduct === true,
+      override: body.override === true,
       payload: body.payload ?? {},
     });
     return reply.status(200).send(ack);
+  });
+
+  // Read-only diagnostics (M-IP4-3): the recovery dashboard's feed. Web-tier
+  // only (shared secret) — spectators can NEVER reach engine internals.
+  server.get("/diagnostics/:auctionId", async (request, reply) => {
+    const secret = request.headers["x-engine-secret"];
+    if (typeof secret !== "string" || !safeEqual(secret, deps.engineSecret)) {
+      return reply.status(401).send({ error: "unauthorized" });
+    }
+    const { auctionId } = request.params as { auctionId: string };
+    const state = await deps.engine.ensureAuction(auctionId);
+    if (state === null) {
+      return reply.status(404).send({ error: "unknown_auction" });
+    }
+    const diagnostics = deps.engine.diagnosticsOf(auctionId);
+    return reply.status(200).send({
+      ...diagnostics,
+      connectedClients: hub.roomSize(auctionId),
+      wsHeartbeatAgeMs: hub.heartbeatAgeMs(),
+      serverNowMs: Date.now(),
+    });
   });
 
   server.get("/snapshot/:auctionId", async (request, reply) => {

@@ -478,3 +478,48 @@ export const auctionEvents = pgTable(
     index("auction_events_auction_idx").on(table.auctionId),
   ],
 );
+
+// --- Owner model (IP-4, M-IP4-3). The production paddle rule: no active paddle
+// without an explicit grant. Invitation → acceptance → grant → claim; every
+// step is an auction EVENT too (the ledger and replay carry the same history).
+// Tokens are stored only as hashes (the IP-2 invite discipline).
+
+export const auctionOwnerInvites = pgTable(
+  "auction_owner_invites",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    acceptedBy: char("accepted_by", { length: 26 }),
+    acceptedAt: ts("accepted_at"),
+    revokedAt: ts("revoked_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("owner_invites_auction_idx").on(table.auctionId)],
+);
+
+export const paddleGrants = pgTable(
+  "paddle_grants",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    grantedBy: char("granted_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    revokedAt: ts("revoked_at"),
+  },
+  // One ACTIVE grant per (auction, team, person); history survives revocation.
+  (table) => [
+    uniqueIndex("paddle_grants_active_uq")
+      .on(table.auctionId, table.teamId, table.personId)
+      .where(sql`revoked_at is null`),
+    index("paddle_grants_auction_idx").on(table.auctionId),
+    index("paddle_grants_person_idx").on(table.personId),
+  ],
+);

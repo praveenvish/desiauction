@@ -165,19 +165,32 @@ async function main(): Promise<void> {
   ) =>
     engine.submit({ commandId: newId(), auctionId, type: type as never, actor, conduct, payload });
 
-  // Setup: claim 10 paddles, queue, open, open first lot.
+  // Setup: the M-IP4-3 owner workflow per team, measured as OWNER JOIN
+  // (invite → accept → grant → claim), then queue + open on the command path.
+  const ownerJoin: number[] = [];
   for (let i = 0; i < 10; i++) {
-    await command("ClaimPaddle", bidderIds[i] as string, { teamId: teamIds[i] as string });
+    const bidder = bidderIds[i] as string;
+    const start = performance.now();
+    const invited = await command(
+      "InviteOwner",
+      ownerId,
+      {
+        teamId: teamIds[i] as string,
+        tokenHash: `${RUN}-h${String(i)}`,
+        expiresAtMs: Date.now() + 3_600_000,
+      },
+      true,
+    );
+    const inviteId = (invited.reason ?? "").replace("invite:", "");
+    await command("AcceptOwnerInvite", bidder, { inviteId });
+    await command("GrantPaddle", ownerId, { teamId: teamIds[i] as string, personId: bidder }, true);
+    await command("ClaimPaddle", bidder, { teamId: teamIds[i] as string });
+    ownerJoin.push(performance.now() - start);
   }
+  report("owner join (invite → accept → grant → claim)", ownerJoin);
   await command("QueueLots", ownerId, {}, true);
-  const { transitionAuction } = await import("@desiauction/auction");
-  const state = engine.snapshotOf(auctionId);
-  if (state === undefined) {
-    throw new Error("no engine state");
-  }
-  await transitionAuction(db, state.record, ownerId, "open");
-  engine.reset(auctionId);
-  const reloaded = await engine.ensureAuction(auctionId);
+  await command("OpenAuction", ownerId, {}, true);
+  const reloaded = engine.snapshotOf(auctionId);
   const lotId = reloaded?.snapshot?.queue[0]?.lotId ?? "";
   await command("OpenLot", ownerId, { lotId }, true);
 
@@ -258,6 +271,73 @@ async function main(): Promise<void> {
   }
   report("engine recovery (restart → replay → snapshot)", recovery);
 
+  // --- M-IP4-3: ledger generation (the canonical operational record).
+  const { ledgerOf } = await import("@desiauction/auction");
+  const ledgerGen: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const start = performance.now();
+    await ledgerOf(db, record);
+    ledgerGen.push(performance.now() - start);
+  }
+  const ledgerRows = (await ledgerOf(db, record)).length;
+  report(`ledger generation (${String(ledgerRows)} rows from events)`, ledgerGen);
+
+  // --- M-IP4-3: replay-viewer frame fold (events → snapshot at final seq).
+  const { buildAuctionSnapshot, serializeSnapshot } = await import("@desiauction/core");
+  const { snapshotRefs } = await import("@desiauction/auction");
+  const refs = await snapshotRefs(db, record);
+  const viewerFold: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const start = performance.now();
+    const replay = replayAuction(events);
+    if (replay.ok) {
+      serializeSnapshot(buildAuctionSnapshot(replay.projection, refs, null));
+    }
+    viewerFold.push(performance.now() - start);
+  }
+  report("replay-viewer frame (pure fold → snapshot → bytes)", viewerFold);
+
+  // --- M-IP4-3: diagnostics + cockpit-refresh proxies over real HTTP.
+  const diagFetch: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const start = performance.now();
+    await fetch(`http://127.0.0.1:${String(port)}/diagnostics/${auctionId}`, {
+      headers: { "x-engine-secret": SECRET },
+    }).then(async (response) => response.json());
+    diagFetch.push(performance.now() - start);
+  }
+  report("diagnostics refresh (HTTP, recovery dashboard feed)", diagFetch);
+  const snapshotFetch: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const start = performance.now();
+    await fetch(`http://127.0.0.1:${String(port)}/snapshot/${auctionId}`, {
+      headers: { "x-engine-secret": SECRET },
+    }).then(async (response) => response.text());
+    snapshotFetch.push(performance.now() - start);
+  }
+  report("snapshot fetch (HTTP, cockpit refresh path)", snapshotFetch);
+
+  // --- M-IP4-3: spectator join — WS connect → the full snapshot arrives.
+  const spectatorJoin: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    const ticket = wsTicket(auctionId, SECRET);
+    const start = performance.now();
+    await new Promise<void>((resolve, reject) => {
+      const socket = new WebSocket(
+        `ws://127.0.0.1:${String(port)}/ws?auction=${auctionId}&ticket=${ticket}`,
+      );
+      socket.on("message", (data) => {
+        if (String(data).includes('"kind":"snapshot"')) {
+          spectatorJoin.push(performance.now() - start);
+          socket.close();
+          resolve();
+        }
+      });
+      socket.on("error", reject);
+    });
+  }
+  report("spectator join (WS connect → full snapshot)", spectatorJoin);
+
   // --- Broadcast fan-out: N spectators over real WebSockets.
   for (const spectators of [50, 200]) {
     const ticket = wsTicket(auctionId, SECRET);
@@ -313,11 +393,36 @@ async function main(): Promise<void> {
   }
   console.log(`total broadcasts emitted: ${String(broadcastCount)}`);
 
+  // --- M-IP4-3: compensating undo → replay stays clean (runs after fan-out so
+  // the lot may resolve). Each round: gavel (sold) → undo (reopened).
+  const undoLatency: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    await command("CloseLot", ownerId, { lotId }, true);
+    const start = performance.now();
+    const undone = await engine.submit({
+      commandId: newId(),
+      auctionId,
+      type: "UndoLastAction",
+      actor: ownerId,
+      conduct: true,
+      override: true,
+      payload: {},
+    });
+    undoLatency.push(performance.now() - start);
+    if (!undone.accepted) {
+      throw new Error(`undo refused: ${undone.reason ?? ""}`);
+    }
+  }
+  report("UndoLastAction (compensating events + rebuild)", undoLatency);
+
   // --- Cleanup ---------------------------------------------------------------
   await server.close();
+  const { auctionOwnerInvites, paddleGrants } = await import("@desiauction/db");
   await db.delete(auctionEvents).where(eq(auctionEvents.orgId, orgId));
   await db.delete(bids).where(eq(bids.orgId, orgId));
   await db.delete(lots).where(eq(lots.orgId, orgId));
+  await db.delete(paddleGrants).where(eq(paddleGrants.orgId, orgId));
+  await db.delete(auctionOwnerInvites).where(eq(auctionOwnerInvites.orgId, orgId));
   await db.delete(paddles).where(eq(paddles.orgId, orgId));
   await db.delete(auctions).where(eq(auctions.orgId, orgId));
   await db.delete(registrations).where(eq(registrations.orgId, orgId));

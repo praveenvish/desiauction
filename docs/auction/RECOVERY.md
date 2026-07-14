@@ -59,3 +59,26 @@ Zero divergences = proceed. Healed divergences = proceed; the ledger already
 recorded what happened. Fail-closed replay = STOP: the log itself is damaged —
 this is a P0 requiring the audit trail and database forensics, never an
 automatic override.
+
+---
+
+## v1.2 · The recovery dashboard (M-IP4-3)
+
+## 5 · Operational visibility
+
+Recovery is no longer a developer act. `/competitions/[slug]/auction/engine`
+(conduct-gated) polls the engine's read-only diagnostics every 2s and shows:
+snapshot version + event sequence, replay duration, recovery duration, queue
+depth, recovery status (verified / HALTED with the fail-closed reason),
+watchdog (ticking/stalled + tick drift), connected clients, WS heartbeat age,
+projection status, recovery count, throughput, avg/max processing, broadcast
+latency, and the sha-256 snapshot + projection hashes. Hash equality across
+independent engine instances is the projection-equality proof an operator can
+SEE. The one button — Recover — submits the same `RecoverAuction` command as
+every other surface. The organizer runs the entire procedure of §4 without
+database access: halted state is visible, recovery is one click, and the
+ledger records the evidence.
+
+**Undo never threatens recovery.** Compensating events (`LotReopened` +
+`BidInvalidated`) replay like any others; the regression suite pins that a
+fresh engine folds an undone night to byte-identical snapshot state.

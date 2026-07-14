@@ -44,3 +44,24 @@ audit row carrying `{source, correlationId, eventSeq, reason?}`.
 **Replay integrity** (fail-closed reasons): `sequence_gap` · `unknown_event_type`
 · `illegal_replayed_transition` · `malformed_*` · `unknown_lot` /
 `unknown_paddle` · `timer_shrank`.
+
+---
+
+## v1.2 additions (M-IP4-3 — Conduct & Ceremony)
+
+| Event | Emitted by | Payload | Replay effect |
+|---|---|---|---|
+| `OwnerInvited` | inviteOwner (InviteOwner command) | inviteId, teamId | registers the invitation (secrets NEVER enter the log — the token hash lives only in `auction_owner_invites`) |
+| `OwnerAccepted` | acceptOwnerInvite (AcceptOwnerInvite command) | inviteId, teamId, personId | marks the invitation accepted; an unknown invitation fails replay closed (`unknown_invite`) |
+| `PaddleGranted` | grantPaddle (GrantPaddle command) | grantId, teamId, personId | registers the grant — the explicit authorization behind every claim |
+| `LotReopened` | undoLastAction (UndoLastAction command) | lotId, compensatesSeq, endsAtMs | THE COMPENSATING UNDO (doc 41 `lot.reopen`): legal only from `sold`/`unsold`; a sold reopen returns the amount to the team's purse and clears the sale; leading clears (its `BidInvalidated{reason:"undo"}` precedes this, same correlation); lot → `on_block` with the fresh window; `timerExtensions` reset |
+
+**Projection additions (v1.2).** `ownerInvites` / `paddleGrants` (the replayed
+workflow), `lastOutcome` (the most recent resolution — sold/unsold/withdrawn/
+held/reopened with amount + paddle; cleared by `LotOpened`; the ceremony's
+input), `recoveries` (count of `AuctionRecovered`). New fail-closed reasons:
+`malformed_invite` · `unknown_invite` · `malformed_grant` · `malformed_reopen`.
+
+**BidInvalidated (updated).** Now emitted by BOTH the frozen-leader requeue AND
+the compensating undo (`reason:"undo"`); the bid ROW transitions to
+`invalidated` — voided-but-visible, forever.

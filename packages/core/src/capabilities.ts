@@ -15,6 +15,10 @@ export type Capability =
   | "tournament.manage"
   | "player.verify"
   | "auction.conduct"
+  // M-IP4-3: the highest-friction conduct action (doc 41 undo — `lot.reopen`
+  // requires an override-level capability, doc 28 ladder 4). Held by owners
+  // only; conduct alone never suffices for compensating undo.
+  | "auction.override"
   // Competition domain (IP-3, additive — the sanctioned closed-union growth path).
   | "competition.create"
   | "competition.manage"
@@ -37,6 +41,7 @@ const SETS: Record<CapabilitySet, readonly Capability[]> = {
     "tournament.manage",
     "player.verify",
     "auction.conduct",
+    "auction.override",
     "competition.create",
     "competition.manage",
     "team.manage",

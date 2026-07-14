@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { liveAuctionView } from "../../../../../server/auction/live-actions";
 import { LivePanel } from "./live-panel";
 import "../../../competitions.css";
+import "../auction.css";
 
 export const metadata = { title: "Live auction · DesiAuction" };
 
@@ -20,9 +21,22 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
           <header className="dash-head">
             <div className="competition-title-row">
               <h1>{view.competition.name}</h1>
-              <ButtonLink href={`/competitions/${slug}/auction`} variant="secondary">
-                Auction setup
-              </ButtonLink>
+              <span className="date-row">
+                {view.viewer.canConduct ? (
+                  <ButtonLink
+                    href={`/competitions/${slug}/auction/cockpit`}
+                    data-testid="open-cockpit"
+                  >
+                    Cockpit
+                  </ButtonLink>
+                ) : null}
+                <ButtonLink href={`/competitions/${slug}/auction/spectate`} variant="ghost">
+                  Spectate
+                </ButtonLink>
+                <ButtonLink href={`/competitions/${slug}/auction`} variant="secondary">
+                  Auction setup
+                </ButtonLink>
+              </span>
             </div>
             <p className="competitions-hint">
               Live auction — every window converges to the same server snapshot

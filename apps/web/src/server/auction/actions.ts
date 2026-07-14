@@ -7,8 +7,6 @@ import {
   LOT_MACHINE,
   extendOnBid,
   openLotTimer,
-  type AuctionCommand,
-  type LotCommand,
   type MachineEdge,
 } from "@desiauction/core";
 import { redirect } from "next/navigation";
@@ -17,23 +15,15 @@ import { currentSession } from "../auth/actions";
 import { canCompetition, requireCompetitionCapability } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
 import { db } from "../db";
-import {
-  createAuction,
-  issuePaddle,
-  queueAllLots,
-  recoverAuction,
-  transitionAuction,
-  transitionLot,
-  type AuctionRecord,
-  type RecoveryReport,
-} from "@desiauction/auction";
+import { createAuction, type AuctionRecord } from "@desiauction/auction";
 import { auctionOf, auctionView, type AuctionView } from "@desiauction/auction";
 import { auctionReady, type AuctionReadyProjection } from "./auction-ready";
-import { notifyEngineReset } from "./engine-client";
+import { sendEngineCommand } from "./engine-client";
 
-// Auction internal RPC (M-IP4-1). One gate: session → tenant → auction.conduct
-// → aggregate. NO bidding endpoint exists this milestone (stop condition): the
-// bid aggregate is exercised by the regression suite only.
+// Auction internal RPC (M-IP4-1, rewired M-IP4-3). One gate: session → tenant
+// → auction.conduct. Creation is the aggregate's birth (no live state exists
+// yet); EVERY subsequent conduct step is an engine COMMAND — the setup surface
+// no longer writes through the aggregate (nothing bypasses the command path).
 
 async function requireSession() {
   const session = await currentSession();
@@ -171,6 +161,33 @@ export async function createAuctionAction(slug: string): Promise<{ ok: boolean; 
   return { ok: true };
 }
 
+/** Conduct step → engine command (M-IP4-3: nothing bypasses the command path). */
+async function conductCommand(
+  slug: string,
+  type: string,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; reason?: string; version?: number; error?: string }> {
+  const gate = await conductGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const auction = await requireAuction(gate.competition.id);
+  if (auction === null) {
+    return { ok: false, error: "Create the auction first." };
+  }
+  const ack = await sendEngineCommand({
+    auctionId: auction.id,
+    type: type as never,
+    actor: gate.personId,
+    conduct: true,
+    payload,
+  });
+  if (!ack.accepted) {
+    return { ok: false, reason: ack.reason ?? "", error: ack.reason ?? "Refused." };
+  }
+  return { ok: true, reason: ack.reason ?? "", version: ack.version };
+}
+
 export async function issuePaddleAction(
   slug: string,
   teamId: string,
@@ -179,143 +196,93 @@ export async function issuePaddleAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const auction = await requireAuction(gate.competition.id);
-  if (auction === null) {
-    return { ok: false, error: "Create the auction first." };
-  }
-  // M-IP4-1: the conductor holds the paddle (owner invitations arrive later).
-  const result = await issuePaddle(db, auction, gate.personId, teamId, gate.personId);
+  // Manual mode: the conductor holds the paddle — an EXPLICIT organizer act
+  // (the grant-then-claim self-service path lives on the cockpit).
+  const result = await conductCommand(slug, "IssuePaddle", {
+    teamId,
+    personId: gate.personId,
+  });
   if (!result.ok) {
-    const message = {
+    const message: Record<string, string> = {
       terminal_auction: "This auction has ended.",
       unknown_team: "Pick a team from this competition.",
       already_issued: "That team already has its paddle — paddles are never reissued.",
-    }[result.reason];
-    return { ok: false, error: message };
+      engine_unreachable: "The auction engine is offline.",
+    };
+    return { ok: false, error: message[result.reason ?? ""] ?? result.error ?? "Refused." };
   }
   return { ok: true };
 }
 
-const AUCTION_COMMANDS = new Set<Exclude<AuctionCommand, "reconcile">>([
-  "open",
-  "pause",
-  "resume",
-  "complete",
-  "abort",
-]);
+const AUCTION_COMMAND_OF: Record<string, string> = {
+  open: "OpenAuction",
+  pause: "PauseAuction",
+  resume: "ResumeAuction",
+  complete: "CompleteAuction",
+  abort: "AbortAuction",
+};
 
 export async function auctionLifecycleAction(
   slug: string,
   command: string,
   reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const gate = await conductGate(slug);
-  if (!gate.ok) {
-    return { ok: false, error: gate.error };
-  }
-  if (!AUCTION_COMMANDS.has(command as Exclude<AuctionCommand, "reconcile">)) {
+  const type = AUCTION_COMMAND_OF[command];
+  if (type === undefined) {
     return { ok: false, error: "Unknown auction command." };
   }
-  const auction = await requireAuction(gate.competition.id);
-  if (auction === null) {
-    return { ok: false, error: "Create the auction first." };
-  }
-  const result = await transitionAuction(
-    db,
-    auction,
-    gate.personId,
-    command as Exclude<AuctionCommand, "reconcile">,
-    reason,
-  );
-  if (result.ok) {
-    await notifyEngineReset(auction.id);
-  }
-  if (!result.ok) {
-    return {
-      ok: false,
-      error:
-        result.reason === "guard_failed"
-          ? "The guard refused: check paddles, the queue, and unresolved lots."
-          : "That step isn't available from this state.",
-    };
-  }
-  return { ok: true };
-}
-
-const LOT_COMMANDS = new Set<Exclude<LotCommand, "closing" | "extend">>([
-  "queue",
-  "open",
-  "hold",
-  "sell",
-  "pass",
-  "requeue",
-  "withdraw",
-]);
-
-export async function lotLifecycleAction(
-  slug: string,
-  lotId: string,
-  command: string,
-  reason?: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const gate = await conductGate(slug);
-  if (!gate.ok) {
-    return { ok: false, error: gate.error };
-  }
-  if (!LOT_COMMANDS.has(command as Exclude<LotCommand, "closing" | "extend">)) {
-    return { ok: false, error: "Unknown lot command." };
-  }
-  const auction = await requireAuction(gate.competition.id);
-  if (auction === null) {
-    return { ok: false, error: "Create the auction first." };
-  }
-  const result = await transitionLot(
-    db,
-    auction,
-    lotId,
-    gate.personId,
-    command as Exclude<LotCommand, "closing" | "extend">,
-    reason,
-  );
+  const result = await conductCommand(slug, type, reason === undefined ? {} : { reason });
   if (!result.ok) {
     const message: Record<string, string> = {
-      not_found: "That lot is not available.",
-      illegal_transition: "That step isn't available for this lot.",
-      guard_failed: "The guard refused (leading bid / requeue policy).",
-      auction_not_live: "Open the auction first.",
-      another_lot_open: "Another lot is already on the block.",
+      guard_failed: "The guard refused: check paddles, the queue, and unresolved lots.",
+      illegal_transition: "That step isn't available from this state.",
+      engine_unreachable: "The auction engine is offline.",
+      engine_halted: "The engine halted fail-closed — run recovery from the cockpit.",
     };
-    return { ok: false, error: message[result.reason] ?? "Refused." };
+    return { ok: false, error: message[result.reason ?? ""] ?? "Refused." };
   }
   return { ok: true };
 }
 
 export async function queueAllLotsAction(
   slug: string,
-): Promise<{ ok: boolean; applied?: number; skipped?: number; error?: string }> {
-  const gate = await conductGate(slug);
-  if (!gate.ok) {
-    return { ok: false, error: gate.error };
+): Promise<{ ok: boolean; applied?: number; error?: string }> {
+  const result = await conductCommand(slug, "QueueLots", {});
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "Refused." };
   }
-  const auction = await requireAuction(gate.competition.id);
-  if (auction === null) {
-    return { ok: false, error: "Create the auction first." };
-  }
-  const result = await queueAllLots(db, auction, gate.personId);
-  return { ok: true, ...result };
+  const applied = Number.parseInt((result.reason ?? "").replace("queued:", ""), 10);
+  return { ok: true, applied: Number.isFinite(applied) ? applied : 0 };
 }
 
+export interface ReplayVerifyReport {
+  ok: boolean;
+  eventCount: number;
+  divergences: number;
+  reason?: string;
+}
+
+/** Replay & verify via the engine's RecoverAuction — the same audited path. */
 export async function verifyReplayAction(
   slug: string,
-): Promise<{ ok: boolean; report?: RecoveryReport; error?: string }> {
-  const gate = await conductGate(slug);
-  if (!gate.ok) {
-    return { ok: false, error: gate.error };
+): Promise<{ ok: boolean; report?: ReplayVerifyReport; error?: string }> {
+  const result = await conductCommand(slug, "RecoverAuction", {});
+  if (!result.ok) {
+    return {
+      ok: true,
+      report: { ok: false, eventCount: 0, divergences: 0, reason: result.reason ?? "" },
+    };
   }
-  const auction = await requireAuction(gate.competition.id);
-  if (auction === null) {
-    return { ok: false, error: "Create the auction first." };
-  }
-  const report = await recoverAuction(db, auction, gate.personId);
-  return { ok: true, report };
+  const healed = (result.reason ?? "").startsWith("healed:")
+    ? Number.parseInt((result.reason ?? "").replace("healed:", ""), 10)
+    : 0;
+  return {
+    ok: true,
+    report: {
+      // The ack's version IS the last event seq — the count of the fold.
+      ok: true,
+      eventCount: result.version ?? 0,
+      divergences: Number.isFinite(healed) ? healed : 0,
+    },
+  };
 }

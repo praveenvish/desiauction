@@ -112,6 +112,7 @@ export {
   paddleNumber,
   lotNumber,
   replayAuction,
+  decideUndo,
   AUCTION_STATUSES,
   LOT_STATUSES,
   BID_STATUSES,
@@ -170,5 +171,15 @@ export type {
   AuctionProjection,
   LotProjection,
   PaddleProjection,
+  OwnerInviteProjection,
+  PaddleGrantProjection,
+  LotOutcome,
+  LotOutcomeKind,
+  UndoDecision,
+  UndoTarget,
   ReplayResult,
 } from "./auction";
+export { buildAuctionLedger } from "./auction-ledger";
+export type { AuctionLedgerRow } from "./auction-ledger";
+export { deriveCeremony } from "./auction-ceremony";
+export type { CeremonyPhase, CeremonyState } from "./auction-ceremony";

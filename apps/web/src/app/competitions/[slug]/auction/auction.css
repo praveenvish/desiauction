@@ -1,0 +1,339 @@
+/* Conduct & Ceremony surfaces (M-IP4-3). FLOODLIGHT tokens only — no raw
+   color. Motion is opt-in and collapses under prefers-reduced-motion (IP-1). */
+
+/* --- Live status ribbon: persistent, sticky, never blocks interaction ------ */
+
+.status-ribbon {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  font-size: var(--text-sm-size);
+}
+
+.ribbon-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ribbon-cell strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ribbon-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.ribbon-timer {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.ribbon-timer-hot {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ribbon-right {
+  margin-left: auto;
+}
+
+.ribbon-version {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* --- FLOODLIGHT ceremony stage --------------------------------------------- */
+
+.ceremony {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 260px;
+  padding: 32px 24px;
+  text-align: center;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  animation: ceremony-enter 300ms ease-out;
+}
+
+.ceremony-title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm-size);
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
+.ceremony-player {
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  line-height: 1.1;
+  color: var(--text-heading);
+}
+
+.ceremony-meta {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.ceremony-bid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  color: var(--money-value);
+  font-variant-numeric: tabular-nums;
+}
+
+.ceremony-bid-open {
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+}
+
+.ceremony-leader {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.ceremony-timer {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.ceremony-timer-hot {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Phase accents — deterministic, token-only. */
+.ceremony-sold {
+  border-color: var(--ceremony-gold);
+  box-shadow:
+    0 0 0 1px var(--ceremony-gold),
+    var(--shadow-2);
+}
+
+/* SOLD announces at display size: 24px counts as WCAG large text, where the
+   deep gold's ratio meets AA (doc 13) — the moment earns the prominence. */
+.ceremony-sold .ceremony-title {
+  color: var(--ceremony-gold-deep);
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.ceremony-extension .ceremony-title,
+.ceremony-reopened .ceremony-title {
+  color: var(--warning-strong);
+}
+
+.ceremony-unsold .ceremony-title,
+.ceremony-withdrawn .ceremony-title {
+  color: var(--text-muted);
+}
+
+.ceremony-paused {
+  border-color: var(--warning-base);
+}
+
+.ceremony-paused .ceremony-title {
+  color: var(--warning-strong);
+}
+
+.ceremony-recovered {
+  border-color: var(--info-base);
+}
+
+.ceremony-recovered .ceremony-title {
+  color: var(--info-strong);
+}
+
+/* Transform only — text NEVER fades (contrast holds at every animation frame,
+   doc 13 AA; motion stays within the IP-1 grammar). */
+@keyframes ceremony-enter {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ceremony {
+    animation: none;
+  }
+}
+
+/* --- Cockpit ---------------------------------------------------------------- */
+
+.cockpit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .cockpit-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.cockpit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.cockpit-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cockpit-queue li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.cockpit-queue .queue-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.owner-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.owner-row:last-child {
+  border-bottom: none;
+}
+
+.owner-url {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-accent);
+  word-break: break-all;
+}
+
+/* --- Diagnostics / recovery dashboard --------------------------------------- */
+
+.diag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.diag-tile {
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diag-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg-size);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+
+.diag-label {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.diag-ok {
+  color: var(--success-strong);
+}
+
+.diag-warn {
+  color: var(--warning-strong);
+}
+
+.diag-fail {
+  color: var(--danger-strong);
+}
+
+.diag-hash {
+  font-size: var(--text-sm-size);
+}
+
+/* --- Replay viewer ------------------------------------------------------------ */
+
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.replay-slider {
+  flex: 1;
+  min-width: 200px;
+  accent-color: var(--accent);
+}
+
+.replay-seq {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* --- Ledger -------------------------------------------------------------------- */
+
+/* Body-size table text: *-strong tokens only (AA 4.5:1 at 13px, doc 13).
+   The ceremony gold lives on LARGE display text where its ratio complies. */
+.ledger-result-sold {
+  color: var(--success-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ledger-result-undo {
+  color: var(--warning-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ledger-result-rejected {
+  color: var(--text-muted);
+}

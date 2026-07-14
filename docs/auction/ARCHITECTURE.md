@@ -162,3 +162,86 @@ Identity stays immutable: a CLAIM issues a new paddle to a person for a team
 reissued. Fairness check 3 upgraded to TEAMS (doc 41 verbatim): a team that
 swaps paddles still cannot outbid itself. Purse/squad/quota projections
 aggregate per TEAM across all its paddles.
+
+---
+
+## v1.2 · Conduct & Ceremony (M-IP4-3)
+
+## 14 · Everything on the command path
+
+The M-IP4-2 transitional note is closed: NO conduct mutation bypasses the
+engine anymore. The setup surface's lifecycle/queue/paddle actions, the
+cockpit, the owner workflow and the compensating undo all submit commands;
+`createAuction` alone remains web-side (the aggregate's birth — no live state
+exists before it). The command set grew to: `OpenAuction`, `IssuePaddle`,
+`WithdrawLot`, `HoldLot`, `RequeueLot`, `InviteOwner`, `AcceptOwnerInvite`,
+`GrantPaddle`, `UndoLastAction` (envelope now carries `override` — resolved
+from `auction.override` by the web gate, demanded by undo on top of conduct).
+"Skip lot" is not an edge: the cockpit opens ANY queued lot (doc 41 order
+control — skip and bring-forward are the same act).
+
+## 15 · The owner model (production paddle rule)
+
+`auction_owner_invites` (hashed one-time tokens) + `paddle_grants`
+(partial-unique active grant per auction/team/person), migration 0010, RLS
+read+write. Invitation → acceptance → grant → claim; each step is an engine
+command emitting `OwnerInvited` / `OwnerAccepted` / `PaddleGranted`, so
+replay, the ledger and the audit trail carry the identical workflow.
+`claimPaddle` refuses without an active grant (`no_grant`) — no active paddle
+without an explicit grant, ever. Multiple owners may hold grants per team; one
+ACTIVE paddle per team stands. Acceptance also inserts org MEMBERSHIP
+(identity domain, audited `auction.owner_join`) — membership confers zero
+capabilities. Conductor `issuePaddle` survives as manual mode: the
+explicit-grant degenerate case.
+
+## 16 · Compensating undo
+
+`decideUndo(events)` (pure): the most recent LotSold/LotUnsold is the target;
+any LotOpened/LotReopened first ⇒ `undo_window_closed` (doc 41: until the next
+lot opens). The aggregate appends `BidInvalidated{reason:"undo"}` +
+`LotReopened{compensatesSeq, endsAtMs}`; the winning bid row survives as
+`invalidated` (voided-but-visible); the lot returns to `on_block` with a fresh
+window; the purse restores BY PROJECTION (committed money is derived — nothing
+stored to compensate). Replay of an undone night is byte-identical across
+engine instances (regression-pinned).
+
+## 17 · AuctionLedger
+
+The canonical operational record — a PURE projection of the event store:
+`buildAuctionLedger(events, refs, actorNames)` in core, assembled by
+`ledgerOf`. One row per event (sequence · timestamp · actor · paddle · team ·
+lot · bid · result · reason · correlation), regenerated on read, immutable and
+append-only by construction. The ledger is a rendering, not a validator:
+unknown types display as themselves; replay integrity stays with the reducer.
+
+## 18 · Snapshot additions & the FLOODLIGHT ceremony
+
+AuctionSnapshot gained two spectator-safe fields: `lastOutcome` (the most
+recent resolution — kind/lot/names/amount/atSeq; cleared when the next lot
+opens) and `recoveries`. `deriveCeremony(prev, next)` in core turns two
+consecutive snapshots into the deterministic ceremony phase (recovery > pause
+> completion > reopened > opening/extension/bid/sold…), keyed so a moment
+triggers exactly once on every surface. The stage and the live status ribbon
+are presentation only; reduced motion collapses transitions (IP-1).
+
+## 19 · Diagnostics & the recovery dashboard
+
+The engine tracks per-auction counters (queue depth via the pending map,
+processed/accepted/rejected, avg/max processing, last replay/recovery
+durations, broadcast latency) plus sha-256 hashes of the canonical snapshot
+bytes and the folded projection. `GET /diagnostics/:auctionId` (shared secret)
+serves them with room size, WS heartbeat age and watchdog state; the web
+proxies conduct-gated. Spectator isolation is structural: sockets receive
+snapshots only, and the snapshot carries no person ids, no tokens, no
+grants, no engine internals (regression-pinned over the serialized bytes).
+
+## 20 · Surfaces
+
+`/auction/cockpit` (conduct) — ceremony stage, ribbon, conduct controls,
+lot queue with open-any/withdraw/freeze/requeue, undo (override-gated),
+owner workflow panel, purse board. `/auction/live` — bidder view (grant-gated
+claims). `/auction/spectate` — read-only ceremony + ribbon. `/auction/ledger`
+(conduct) — the operational record. `/auction/replay` (conduct) — scrub the
+log with core's fold; the final frame's bytes compared against the live
+engine snapshot. `/auction/engine` (conduct) — recovery dashboard +
+diagnostics, 2s polling. `/owner-join/[token]` — invitation acceptance.

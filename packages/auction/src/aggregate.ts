@@ -3,6 +3,7 @@ import {
   basePriceFor,
   bidTransition,
   decideBid,
+  decideUndo,
   extendOnBid,
   holdRemainingMs,
   lotNumber,
@@ -26,11 +27,13 @@ import {
 } from "@desiauction/core";
 import {
   auctionEvents,
+  auctionOwnerInvites,
   auctions,
   auditLog,
   bids,
   lots,
   newId,
+  paddleGrants,
   paddles,
   registrations,
   teams,
@@ -971,7 +974,7 @@ export async function recoverAuction(
 
 export type ClaimPaddleResult =
   | { ok: true; paddleId: string; paddleNumber: string; alreadyHeld: boolean }
-  | { ok: false; reason: "terminal_auction" | "unknown_team" | "paddle_held" };
+  | { ok: false; reason: "terminal_auction" | "unknown_team" | "paddle_held" | "no_grant" };
 
 export async function claimPaddle(
   db: Db,
@@ -993,6 +996,23 @@ export async function claimPaddle(
     .limit(1);
   if (team === undefined) {
     return { ok: false, reason: "unknown_team" };
+  }
+  // M-IP4-3 production rule: NO active paddle without an explicit grant. The
+  // temporary any-member rule is gone — only granted owners may claim.
+  const [grant] = await db
+    .select({ id: paddleGrants.id })
+    .from(paddleGrants)
+    .where(
+      and(
+        eq(paddleGrants.auctionId, auction.id),
+        eq(paddleGrants.teamId, teamId),
+        eq(paddleGrants.personId, actorId),
+        isNull(paddleGrants.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (grant === undefined) {
+    return { ok: false, reason: "no_grant" };
   }
   const [active] = await db
     .select({ id: paddles.id, personId: paddles.personId, number: paddles.paddleNumber })
@@ -1157,4 +1177,307 @@ export async function markLotClosingSoon(
     );
   });
   return { ok: true, status: decision.next };
+}
+
+// --- The owner model (M-IP4-3). Invitation → acceptance → grant → claim; every
+// step is one auction event + one audit row through the SAME appendEvent path
+// as everything else — the ledger and replay carry the full workflow.
+
+export type InviteOwnerResult =
+  { ok: true; inviteId: string } | { ok: false; reason: "terminal_auction" | "unknown_team" };
+
+/**
+ * Mint an owner invitation for a team. The raw token never reaches this layer:
+ * the web tier generates it and passes the HASH (the IP-2 invite discipline);
+ * the event records ids only — secrets never enter the immutable log.
+ */
+export async function inviteOwner(
+  db: Db,
+  auction: AuctionRecord,
+  actorId: string,
+  teamId: string,
+  tokenHash: string,
+  expiresAtMs: number,
+): Promise<InviteOwnerResult> {
+  if (
+    auction.status === "completed" ||
+    auction.status === "reconciled" ||
+    auction.status === "abandoned"
+  ) {
+    return { ok: false, reason: "terminal_auction" };
+  }
+  const [team] = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(and(eq(teams.id, teamId), eq(teams.competitionId, auction.competitionId)))
+    .limit(1);
+  if (team === undefined) {
+    return { ok: false, reason: "unknown_team" };
+  }
+  const inviteId = newId();
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  await db.transaction(async (tx) => {
+    await tx.insert(auctionOwnerInvites).values({
+      id: inviteId,
+      orgId: auction.orgId,
+      auctionId: auction.id,
+      teamId,
+      tokenHash,
+      createdBy: actorId,
+      expiresAt: new Date(expiresAtMs),
+    });
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "OwnerInvited",
+      { inviteId, teamId },
+      inviteId,
+    );
+  });
+  return { ok: true, inviteId };
+}
+
+export type AcceptOwnerInviteResult =
+  | { ok: true; teamId: string; alreadyAccepted: boolean }
+  | { ok: false; reason: "unknown_invite" | "expired" | "already_accepted" };
+
+/**
+ * One-time acceptance (atomic claim — only one accept flips acceptedAt from
+ * NULL). Revoked, expired and unknown invitations are indistinguishable
+ * failures; re-acceptance by the SAME person is idempotent.
+ */
+export async function acceptOwnerInvite(
+  db: Db,
+  auction: AuctionRecord,
+  actorId: string,
+  inviteId: string,
+): Promise<AcceptOwnerInviteResult> {
+  const [row] = await db
+    .select({
+      id: auctionOwnerInvites.id,
+      teamId: auctionOwnerInvites.teamId,
+      expiresAt: auctionOwnerInvites.expiresAt,
+      acceptedBy: auctionOwnerInvites.acceptedBy,
+      revokedAt: auctionOwnerInvites.revokedAt,
+    })
+    .from(auctionOwnerInvites)
+    .where(and(eq(auctionOwnerInvites.id, inviteId), eq(auctionOwnerInvites.auctionId, auction.id)))
+    .limit(1);
+  if (row === undefined || row.revokedAt !== null) {
+    return { ok: false, reason: "unknown_invite" };
+  }
+  if (row.acceptedBy !== null) {
+    return row.acceptedBy === actorId
+      ? { ok: true, teamId: row.teamId, alreadyAccepted: true }
+      : { ok: false, reason: "already_accepted" };
+  }
+  const atMs = serverNowMs();
+  if (row.expiresAt.getTime() < atMs) {
+    return { ok: false, reason: "expired" };
+  }
+  const correlationId = newId();
+  const claimed = await db
+    .update(auctionOwnerInvites)
+    .set({ acceptedBy: actorId, acceptedAt: new Date(atMs) })
+    .where(
+      and(
+        eq(auctionOwnerInvites.id, row.id),
+        isNull(auctionOwnerInvites.acceptedAt),
+        isNull(auctionOwnerInvites.revokedAt),
+      ),
+    )
+    .returning({ id: auctionOwnerInvites.id });
+  if (claimed.length === 0) {
+    return { ok: false, reason: "already_accepted" };
+  }
+  await db.transaction(async (tx) => {
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "OwnerAccepted",
+      { inviteId: row.id, teamId: row.teamId, personId: actorId },
+      row.id,
+    );
+  });
+  return { ok: true, teamId: row.teamId, alreadyAccepted: false };
+}
+
+export type GrantPaddleResult =
+  | { ok: true; grantId: string; alreadyGranted: boolean }
+  | { ok: false; reason: "terminal_auction" | "unknown_team" | "not_an_owner" };
+
+/**
+ * The explicit grant (directive: "no active paddle without explicit grant").
+ * Only an ACCEPTED owner of the team may be granted; the grant is durable
+ * authorization, not a token — claiming converts it into an active paddle.
+ */
+export async function grantPaddle(
+  db: Db,
+  auction: AuctionRecord,
+  actorId: string,
+  teamId: string,
+  personId: string,
+): Promise<GrantPaddleResult> {
+  if (
+    auction.status === "completed" ||
+    auction.status === "reconciled" ||
+    auction.status === "abandoned"
+  ) {
+    return { ok: false, reason: "terminal_auction" };
+  }
+  const [team] = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(and(eq(teams.id, teamId), eq(teams.competitionId, auction.competitionId)))
+    .limit(1);
+  if (team === undefined) {
+    return { ok: false, reason: "unknown_team" };
+  }
+  const [accepted] = await db
+    .select({ id: auctionOwnerInvites.id })
+    .from(auctionOwnerInvites)
+    .where(
+      and(
+        eq(auctionOwnerInvites.auctionId, auction.id),
+        eq(auctionOwnerInvites.teamId, teamId),
+        eq(auctionOwnerInvites.acceptedBy, personId),
+        isNull(auctionOwnerInvites.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (accepted === undefined) {
+    return { ok: false, reason: "not_an_owner" };
+  }
+  const grantId = newId();
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(paddleGrants).values({
+        id: grantId,
+        orgId: auction.orgId,
+        auctionId: auction.id,
+        teamId,
+        personId,
+        grantedBy: actorId,
+      });
+      await appendEvent(
+        tx,
+        auction,
+        actorId,
+        correlationId,
+        atMs,
+        "PaddleGranted",
+        { grantId, teamId, personId },
+        grantId,
+      );
+    });
+  } catch {
+    // The partial unique (auction, team, person) WHERE revoked_at IS NULL:
+    // granting twice is idempotent — the original grant stands.
+    const [existing] = await db
+      .select({ id: paddleGrants.id })
+      .from(paddleGrants)
+      .where(
+        and(
+          eq(paddleGrants.auctionId, auction.id),
+          eq(paddleGrants.teamId, teamId),
+          eq(paddleGrants.personId, personId),
+          isNull(paddleGrants.revokedAt),
+        ),
+      )
+      .limit(1);
+    return { ok: true, grantId: existing?.id ?? grantId, alreadyGranted: true };
+  }
+  return { ok: true, grantId, alreadyGranted: false };
+}
+
+// --- Compensating undo (M-IP4-3; doc 41 `lot.reopen`) ------------------------------
+
+export type UndoLastActionResult =
+  | { ok: true; lotId: string; kind: "sold" | "unsold"; compensatesSeq: number }
+  | {
+      ok: false;
+      reason: "auction_not_live" | "nothing_to_undo" | "undo_window_closed" | "not_found";
+    };
+
+/**
+ * Undo the most recent lot resolution with COMPENSATING events — history is
+ * never deleted (invariant 10). A sold undo voids the winning bid
+ * (voided-but-visible: the row survives as `invalidated`), clears the sale
+ * (the purse restores by projection — committed money is derived, never
+ * stored), and returns the lot to the block with a fresh opening window.
+ * Legal only until the next lot opens (doc 41) and only while live.
+ */
+export async function undoLastAction(
+  db: Db,
+  auction: AuctionRecord,
+  actorId: string,
+  reason?: string,
+): Promise<UndoLastActionResult> {
+  if (auction.status !== "live") {
+    return { ok: false, reason: "auction_not_live" };
+  }
+  const events = await loadEvents(db, auction.id);
+  const decision = decideUndo(events);
+  if (!decision.ok) {
+    return { ok: false, reason: decision.reason };
+  }
+  const target = decision.target;
+  const lot = await loadLot(db, auction.id, target.lotId);
+  if (lot === undefined) {
+    return { ok: false, reason: "not_found" };
+  }
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  const endsAtMs = openLotTimer(atMs, auction.config.timer).endsAtMs;
+  await db.transaction(async (tx) => {
+    if (target.kind === "sold" && target.bidId !== null) {
+      const voided = bidTransition("accepted", "invalidate");
+      if (voided.ok) {
+        await tx.update(bids).set({ status: voided.next }).where(eq(bids.id, target.bidId));
+      }
+      await appendEvent(
+        tx,
+        auction,
+        actorId,
+        correlationId,
+        atMs,
+        "BidInvalidated",
+        { lotId: target.lotId, bidId: target.bidId, reason: "undo" },
+        target.bidId,
+        reason,
+      );
+    }
+    await tx
+      .update(lots)
+      .set({
+        status: "on_block",
+        soldToPaddleId: null,
+        soldPrice: null,
+        endsAtMs,
+        heldRemainingMs: null,
+        timerExtensions: 0,
+      })
+      .where(eq(lots.id, target.lotId));
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "LotReopened",
+      { lotId: target.lotId, compensatesSeq: target.atSeq, endsAtMs },
+      target.lotId,
+      reason,
+    );
+  });
+  return { ok: true, lotId: target.lotId, kind: target.kind, compensatesSeq: target.atSeq };
 }

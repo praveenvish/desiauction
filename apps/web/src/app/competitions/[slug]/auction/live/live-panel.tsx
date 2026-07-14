@@ -1,27 +1,23 @@
 "use client";
 
-import { formatPaiseINR, paise, type AuctionSnapshot } from "@desiauction/core";
+import { formatPaiseINR, paise } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   submitAuctionCommand,
   type LiveAuctionView,
 } from "../../../../../server/auction/live-actions";
+import { CeremonyStage } from "../ceremony-stage";
+import { StatusRibbon } from "../status-ribbon";
+import { useAuctionSocket } from "../use-auction-socket";
 
-// The live client (M-IP4-2). This component DECIDES NOTHING: it renders the
-// broadcast AuctionSnapshot, sends commands, and shows acknowledgements. Time
-// is rendered from the snapshot's absolute endsAtMs corrected by the server
-// clock carried on transport envelopes — the client never owns time. Stale or
-// out-of-order frames are rejected by snapshot version.
-
-interface WireEnvelope {
-  kind: "snapshot" | "heartbeat";
-  serverNowMs: number;
-  version: number;
-  snapshot?: AuctionSnapshot;
-}
+// The live client (M-IP4-2, rewired M-IP4-3). This component DECIDES NOTHING:
+// it renders the broadcast AuctionSnapshot (shared socket hook), sends
+// commands, and shows acknowledgements. Claims are grant-gated: only teams
+// this person holds a paddle grant for are claimable (the production owner
+// model) — and the engine enforces it regardless.
 
 const AUCTION_TONE = {
   scheduled: "info",
@@ -39,87 +35,14 @@ function commandId(): string {
 export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView }) {
   const router = useRouter();
   const toast = useToast();
-  const [snapshot, setSnapshot] = useState<AuctionSnapshot | null>(null);
-  const [connection, setConnection] = useState<"connecting" | "open" | "reconnecting">(
-    "connecting",
-  );
-  const [drift, setDrift] = useState(0); // serverNow - clientNow at last frame
-  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const { snapshot, connection, remainingMs, version, ceremony } = useAuctionSocket(view.wsUrl);
   const [claimTeam, setClaimTeam] = useState(view.myPaddle?.teamId ?? "");
   const [customBid, setCustomBid] = useState("");
   const [busy, setBusy] = useState(false);
-  const versionRef = useRef(0);
-  const socketRef = useRef<WebSocket | null>(null);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
   }, []);
-
-  // --- WebSocket: connect, reconnect with backoff, version-guarded frames ------
-  useEffect(() => {
-    let closed = false;
-    let attempt = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const connect = () => {
-      const socket = new WebSocket(view.wsUrl);
-      socketRef.current = socket;
-      socket.onopen = () => {
-        attempt = 0;
-        setConnection("open");
-      };
-      socket.onmessage = (event) => {
-        try {
-          const frame = JSON.parse(event.data as string) as WireEnvelope;
-          setDrift(frame.serverNowMs - Date.now());
-          if (frame.kind === "snapshot" && frame.snapshot !== undefined) {
-            // Out-of-order rejection: never apply a frame older than what we have.
-            if (frame.version >= versionRef.current) {
-              versionRef.current = frame.version;
-              setSnapshot(frame.snapshot);
-            }
-          }
-        } catch {
-          // Malformed frame: ignore — the next snapshot supersedes everything.
-        }
-      };
-      socket.onclose = () => {
-        if (closed) {
-          return;
-        }
-        setConnection("reconnecting");
-        attempt += 1;
-        const backoff = Math.min(5_000, 250 * 2 ** attempt);
-        timer = setTimeout(connect, backoff);
-      };
-      socket.onerror = () => {
-        socket.close();
-      };
-    };
-    connect();
-    return () => {
-      closed = true;
-      if (timer !== undefined) {
-        clearTimeout(timer);
-      }
-      socketRef.current?.close();
-    };
-  }, [view.wsUrl]);
-
-  // --- Countdown: render-only; endsAt is server truth, drift-corrected ---------
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const endsAtMs = snapshot?.currentLot?.endsAtMs ?? null;
-      if (endsAtMs === null) {
-        setRemainingMs(null);
-        return;
-      }
-      setRemainingMs(Math.max(0, endsAtMs - (Date.now() + drift)));
-    }, 100);
-    return () => {
-      clearInterval(interval);
-    };
-  }, [snapshot, drift]);
 
   const send = useCallback(
     async (type: string, payload: Record<string, unknown>, done?: string) => {
@@ -158,6 +81,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
 
   const lot = snapshot?.currentLot ?? null;
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
+  const grantedTeams = view.teams.filter((team) => view.myGrantTeamIds.includes(team.id));
 
   return (
     <div
@@ -165,6 +89,8 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       data-testid="live-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
+      <StatusRibbon snapshot={snapshot} connection={connection} remainingMs={remainingMs} />
+
       <Card>
         <div className="competition-head">
           <h2>{snapshot?.auctionName ?? "Connecting…"}</h2>
@@ -181,7 +107,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               </Badge>
             ) : null}
             <span className="competitions-hint" data-testid="snapshot-version">
-              v{versionRef.current}
+              v{version}
             </span>
           </span>
         </div>
@@ -263,6 +189,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
         </Card>
       ) : (
         <Card>
+          <CeremonyStage snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
           <p className="competitions-hint" data-testid="no-lot">
             No lot on the block.
           </p>
@@ -275,7 +202,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           <p data-testid="my-paddle" className="registration-name">
             {view.myPaddle.paddleNumber} · bidding for {view.myPaddle.teamName}
           </p>
-        ) : (
+        ) : grantedTeams.length > 0 ? (
           <div className="date-row">
             <Select
               label="Team"
@@ -286,7 +213,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               }}
             >
               <option value="">Choose…</option>
-              {view.teams.map((team) => (
+              {grantedTeams.map((team) => (
                 <option key={team.id} value={team.id}>
                   {team.name}
                 </option>
@@ -301,6 +228,11 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               Claim paddle
             </Button>
           </div>
+        ) : (
+          <p className="competitions-hint" data-testid="no-grant-hint">
+            No paddle grant yet — accept your owner invitation and ask the organizer to grant your
+            paddle.
+          </p>
         )}
         {snapshot !== null ? (
           <ul className="conflict-list">

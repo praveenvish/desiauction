@@ -56,25 +56,37 @@ export function engineWsUrl(auctionId: string): string {
 }
 
 /**
- * Transitional (M-IP4-2): the auction SETUP surface still mutates through the
- * shared aggregate directly (its M-IP4-1 contract). Rows+events stay atomic,
- * but the engine's in-memory cache could serve a stale snapshot until its next
- * command — so setup mutations nudge the engine to drop cache and re-replay.
- * Best-effort: an unreachable engine is fine (it replays on next touch).
- * The full migration of setup conduct onto engine commands is M-IP4-3 scope.
+ * M-IP4-3: every conduct mutation now travels the command path — the reset
+ * nudge is gone. These read-only fetches feed the recovery dashboard and the
+ * replay viewer; both are web-tier only (shared secret), never spectators.
  */
-export async function notifyEngineReset(auctionId: string): Promise<void> {
+export async function fetchEngineDiagnostics(auctionId: string): Promise<unknown> {
   try {
-    await fetch(`${env.ENGINE_URL}/admin/reset`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-engine-secret": env.ENGINE_SECRET,
-      },
-      body: JSON.stringify({ auctionId }),
+    const response = await fetch(`${env.ENGINE_URL}/diagnostics/${auctionId}`, {
+      headers: { "x-engine-secret": env.ENGINE_SECRET },
       cache: "no-store",
     });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as unknown;
   } catch {
-    // Engine offline — it will replay from the event log on next touch.
+    return null; // engine unreachable — the dashboard says so, loudly
+  }
+}
+
+/** The engine's CURRENT serialized snapshot (replay-viewer comparison input). */
+export async function fetchEngineSnapshot(auctionId: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${env.ENGINE_URL}/snapshot/${auctionId}`, {
+      headers: { "x-engine-secret": env.ENGINE_SECRET },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return await response.text();
+  } catch {
+    return null;
   }
 }

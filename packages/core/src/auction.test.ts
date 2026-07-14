@@ -534,7 +534,17 @@ describe("replay reducer (the recovery spine)", () => {
     const result = replayAuction([]);
     expect(result).toEqual({
       ok: true,
-      projection: { status: "scheduled", lots: {}, paddles: {}, lastSeq: 0, eventCount: 0 },
+      projection: {
+        status: "scheduled",
+        lots: {},
+        paddles: {},
+        ownerInvites: {},
+        paddleGrants: {},
+        lastOutcome: null,
+        recoveries: 0,
+        lastSeq: 0,
+        eventCount: 0,
+      },
     });
   });
 });

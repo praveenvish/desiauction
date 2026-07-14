@@ -632,7 +632,14 @@ export type AuctionEventType =
   // with it and re-attaches on resume. Both flow through events so replay
   // reproduces the exact remaining time.
   | "TimerHeld"
-  | "TimerResumed";
+  | "TimerResumed"
+  // M-IP4-3: the production owner model (invitation → acceptance → grant →
+  // claim) and the compensating undo (doc 41 `lot.reopen` — NEVER a back edge;
+  // history stays immutable, the reversal is its own event).
+  | "OwnerInvited"
+  | "OwnerAccepted"
+  | "PaddleGranted"
+  | "LotReopened";
 
 export const AUCTION_EVENT_TYPES: readonly AuctionEventType[] = [
   "AuctionCreated",
@@ -659,6 +666,10 @@ export const AUCTION_EVENT_TYPES: readonly AuctionEventType[] = [
   "TimerExtended",
   "TimerHeld",
   "TimerResumed",
+  "OwnerInvited",
+  "OwnerAccepted",
+  "PaddleGranted",
+  "LotReopened",
 ];
 
 /**
@@ -702,10 +713,40 @@ export interface PaddleProjection {
   released: boolean; // M-IP4-2: a released paddle can no longer bid
 }
 
+/** The workflow states of the M-IP4-3 owner model, replayed from events. */
+export interface OwnerInviteProjection {
+  teamId: string;
+  acceptedBy: string | null;
+}
+
+export interface PaddleGrantProjection {
+  teamId: string;
+  personId: string;
+}
+
+/**
+ * The most recent lot resolution — the ceremony's input (presentation reads
+ * WHAT just happened from the snapshot, never from side channels). Cleared
+ * when the next lot opens.
+ */
+export type LotOutcomeKind = "sold" | "unsold" | "withdrawn" | "held" | "reopened";
+
+export interface LotOutcome {
+  kind: LotOutcomeKind;
+  lotId: string;
+  amount: number | null; // paise; sold only
+  paddleId: string | null; // sold only
+  atSeq: number;
+}
+
 export interface AuctionProjection {
   status: AuctionStatus;
   lots: Record<string, LotProjection>;
   paddles: Record<string, PaddleProjection>;
+  ownerInvites: Record<string, OwnerInviteProjection>;
+  paddleGrants: Record<string, PaddleGrantProjection>;
+  lastOutcome: LotOutcome | null;
+  recoveries: number;
   lastSeq: number;
   eventCount: number;
 }
@@ -728,6 +769,10 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
     status: "scheduled",
     lots: {},
     paddles: {},
+    ownerInvites: {},
+    paddleGrants: {},
+    lastOutcome: null,
+    recoveries: 0,
     lastSeq: 0,
     eventCount: 0,
   };
@@ -823,7 +868,10 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
         projection.status = "abandoned";
         break;
       case "AuctionRecovered":
-        break; // recovery leaves state as replayed — it IS the replay
+        // Recovery leaves state as replayed — it IS the replay. The count
+        // rides the snapshot so every surface can announce it (ceremony).
+        projection.recoveries += 1;
+        break;
       case "LotOpened": {
         const lot = lotOf();
         if (lot === null) {
@@ -832,6 +880,7 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
         lot.status = "on_block";
         lot.endsAtMs = num(event.payload, "endsAtMs");
         lot.timerExtensions = 0;
+        projection.lastOutcome = null; // a fresh lot supersedes the last result
         break;
       }
       case "LotClosingSoon": {
@@ -848,6 +897,13 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           return fail("unknown_lot");
         }
         lot.status = "frozen";
+        projection.lastOutcome = {
+          kind: "held",
+          lotId: str(event.payload, "lotId") ?? "",
+          amount: null,
+          paddleId: null,
+          atSeq: event.seq,
+        };
         break;
       }
       case "LotSold": {
@@ -865,6 +921,13 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           return fail("unknown_paddle");
         }
         paddle.committed += amount;
+        projection.lastOutcome = {
+          kind: "sold",
+          lotId: str(event.payload, "lotId") ?? "",
+          amount,
+          paddleId,
+          atSeq: event.seq,
+        };
         break;
       }
       case "LotUnsold": {
@@ -873,6 +936,13 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           return fail("unknown_lot");
         }
         lot.status = "unsold";
+        projection.lastOutcome = {
+          kind: "unsold",
+          lotId: str(event.payload, "lotId") ?? "",
+          amount: null,
+          paddleId: null,
+          atSeq: event.seq,
+        };
         break;
       }
       case "LotRequeued": {
@@ -895,6 +965,13 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
           return fail("unknown_lot");
         }
         lot.status = "withdrawn";
+        projection.lastOutcome = {
+          kind: "withdrawn",
+          lotId: str(event.payload, "lotId") ?? "",
+          amount: null,
+          paddleId: null,
+          atSeq: event.seq,
+        };
         break;
       }
       case "BidAccepted": {
@@ -955,6 +1032,77 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
         lot.endsAtMs = endsAtMs; // a fresh axis: the held remainder re-attached
         break;
       }
+      // --- M-IP4-3: the owner model. Workflow steps are auction events so the
+      // ledger, the audit trail and replay all carry the SAME history.
+      case "OwnerInvited": {
+        const inviteId = str(event.payload, "inviteId");
+        const teamId = str(event.payload, "teamId");
+        if (inviteId === null || teamId === null) {
+          return fail("malformed_invite");
+        }
+        projection.ownerInvites[inviteId] = { teamId, acceptedBy: null };
+        break;
+      }
+      case "OwnerAccepted": {
+        const inviteId = str(event.payload, "inviteId");
+        const personId = str(event.payload, "personId");
+        const invite = inviteId !== null ? projection.ownerInvites[inviteId] : undefined;
+        if (invite === undefined || personId === null) {
+          return fail("unknown_invite");
+        }
+        invite.acceptedBy = personId;
+        break;
+      }
+      case "PaddleGranted": {
+        const grantId = str(event.payload, "grantId");
+        const teamId = str(event.payload, "teamId");
+        const personId = str(event.payload, "personId");
+        if (grantId === null || teamId === null || personId === null) {
+          return fail("malformed_grant");
+        }
+        projection.paddleGrants[grantId] = { teamId, personId };
+        break;
+      }
+      // --- M-IP4-3: compensating undo (doc 41 `lot.reopen`, doc 39: NOT a back
+      // edge). The reversal is its own event: the sale amount returns to the
+      // team's purse, the lot returns to the block with a fresh window, prior
+      // bids stay voided-but-visible (their BidInvalidated precedes this).
+      case "LotReopened": {
+        const lot = lotOf();
+        const endsAtMs = num(event.payload, "endsAtMs");
+        if (lot === null || endsAtMs === null) {
+          return fail("malformed_reopen");
+        }
+        if (lot.status !== "sold" && lot.status !== "unsold") {
+          return fail("illegal_replayed_transition");
+        }
+        if (lot.status === "sold") {
+          if (lot.soldPaddleId === null || lot.soldAmount === null) {
+            return fail("malformed_reopen");
+          }
+          const paddle = projection.paddles[lot.soldPaddleId];
+          if (paddle === undefined) {
+            return fail("unknown_paddle");
+          }
+          paddle.committed -= lot.soldAmount; // the purse restoration
+        }
+        lot.status = "on_block";
+        lot.soldAmount = null;
+        lot.soldPaddleId = null;
+        lot.leadingBidId = null;
+        lot.leadingPaddleId = null;
+        lot.leadingAmount = null;
+        lot.endsAtMs = endsAtMs;
+        lot.timerExtensions = 0;
+        projection.lastOutcome = {
+          kind: "reopened",
+          lotId: str(event.payload, "lotId") ?? "",
+          amount: null,
+          paddleId: null,
+          atSeq: event.seq,
+        };
+        break;
+      }
       default:
         return fail("unknown_event_type");
     }
@@ -962,4 +1110,72 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
     projection.eventCount += 1;
   }
   return { ok: true, projection };
+}
+
+// --- Compensating undo (M-IP4-3; doc 41 `lot.reopen`) -----------------------------
+// Undo NEVER deletes history: it targets the most recent lot resolution and is
+// legal only until the next lot opens (doc 41's window). The decision is a pure
+// scan of the immutable log — same events, same verdict.
+
+export interface UndoTarget {
+  kind: "sold" | "unsold";
+  lotId: string;
+  atSeq: number;
+  bidId: string | null;
+  paddleId: string | null;
+  amount: number | null; // paise
+}
+
+export type UndoDecision =
+  | { ok: true; target: UndoTarget }
+  | { ok: false; reason: "nothing_to_undo" | "undo_window_closed" };
+
+/**
+ * Walk backwards: the first resolution (LotSold/LotUnsold) is the target; any
+ * LotOpened or LotReopened encountered first means a lot has been on the block
+ * SINCE the last resolution — the undo window is closed (doc 41: "allowed
+ * until the next lot opens").
+ */
+export function decideUndo(events: readonly AuctionEventEnvelope[]): UndoDecision {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i] as AuctionEventEnvelope;
+    if (event.type === "LotOpened" || event.type === "LotReopened") {
+      return { ok: false, reason: "undo_window_closed" };
+    }
+    if (event.type === "LotSold") {
+      const lotId = str(event.payload, "lotId");
+      if (lotId === null) {
+        return { ok: false, reason: "nothing_to_undo" };
+      }
+      return {
+        ok: true,
+        target: {
+          kind: "sold",
+          lotId,
+          atSeq: event.seq,
+          bidId: str(event.payload, "bidId"),
+          paddleId: str(event.payload, "paddleId"),
+          amount: num(event.payload, "amount"),
+        },
+      };
+    }
+    if (event.type === "LotUnsold") {
+      const lotId = str(event.payload, "lotId");
+      if (lotId === null) {
+        return { ok: false, reason: "nothing_to_undo" };
+      }
+      return {
+        ok: true,
+        target: {
+          kind: "unsold",
+          lotId,
+          atSeq: event.seq,
+          bidId: null,
+          paddleId: null,
+          amount: null,
+        },
+      };
+    }
+  }
+  return { ok: false, reason: "nothing_to_undo" };
 }

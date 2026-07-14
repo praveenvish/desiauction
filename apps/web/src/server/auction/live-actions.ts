@@ -2,7 +2,7 @@
 
 import { auctionOf, type AuctionRecord } from "@desiauction/auction";
 import { isAuctionCommandType, type CommandAck } from "@desiauction/core";
-import { paddles, teams, type Db } from "@desiauction/db";
+import { paddleGrants, paddles, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
@@ -12,10 +12,11 @@ import { resolveCompetition, type CompetitionSummary } from "../competition/comp
 import { db } from "../db";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 
-// Live auction actions (M-IP4-2). The web tier authenticates, resolves the
-// tenant and capability, then SUBMITS A COMMAND — the engine decides. Any org
-// member may claim a paddle and bid (owner grants arrive with team invitations
-// in a later milestone); conduct commands require auction.conduct.
+// Live auction actions (M-IP4-2, extended M-IP4-3). The web tier
+// authenticates, resolves the tenant and capabilities, then SUBMITS A COMMAND
+// — the engine decides. Claims require an explicit paddle grant (the
+// production owner model); conduct commands require auction.conduct; the
+// compensating undo additionally requires auction.override.
 
 async function requireSession() {
   const session = await currentSession();
@@ -30,9 +31,10 @@ interface LiveGate {
   competition: CompetitionSummary;
   auction: AuctionRecord;
   canConduct: boolean;
+  canOverride: boolean;
 }
 
-async function liveGate(slug: string): Promise<LiveGate | null> {
+export async function liveGate(slug: string): Promise<LiveGate | null> {
   const session = await requireSession();
   const competition = await resolveCompetition(db, session.personId, slug);
   if (competition === null) {
@@ -42,13 +44,12 @@ async function liveGate(slug: string): Promise<LiveGate | null> {
   if (auction === null) {
     return null;
   }
-  const canConduct = await canCompetition(
-    db,
-    session.personId,
-    { orgId: competition.orgId, competitionId: competition.id },
-    "auction.conduct",
-  );
-  return { personId: session.personId, competition, auction, canConduct };
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  const [canConduct, canOverride] = await Promise.all([
+    canCompetition(db, session.personId, scope, "auction.conduct"),
+    canCompetition(db, session.personId, scope, "auction.override"),
+  ]);
+  return { personId: session.personId, competition, auction, canConduct, canOverride };
 }
 
 export interface LiveAuctionView {
@@ -57,6 +58,8 @@ export interface LiveAuctionView {
   wsUrl: string;
   teams: { id: string; name: string }[];
   myPaddle: { paddleId: string; paddleNumber: string; teamId: string; teamName: string } | null;
+  /** Teams THIS person holds an active paddle grant for (claim eligibility). */
+  myGrantTeamIds: string[];
   viewer: { personId: string; canConduct: boolean };
 }
 
@@ -86,13 +89,23 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   if (gate === null) {
     return null;
   }
-  const [teamRows, mine] = await Promise.all([
+  const [teamRows, mine, grantRows] = await Promise.all([
     db
       .select({ id: teams.id, name: teams.name })
       .from(teams)
       .where(eq(teams.competitionId, gate.competition.id))
       .orderBy(asc(teams.name)),
     myActivePaddle(db, gate.auction.id, gate.personId),
+    db
+      .select({ teamId: paddleGrants.teamId })
+      .from(paddleGrants)
+      .where(
+        and(
+          eq(paddleGrants.auctionId, gate.auction.id),
+          eq(paddleGrants.personId, gate.personId),
+          isNull(paddleGrants.revokedAt),
+        ),
+      ),
   ]);
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
@@ -100,6 +113,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     wsUrl: engineWsUrl(gate.auction.id),
     teams: teamRows,
     myPaddle: mine,
+    myGrantTeamIds: grantRows.map((row) => row.teamId),
     viewer: { personId: gate.personId, canConduct: gate.canConduct },
   };
 }
@@ -113,7 +127,20 @@ const CONDUCT_ONLY = new Set([
   "CompleteAuction",
   "AbortAuction",
   "RecoverAuction",
+  // M-IP4-3: the full conduct surface.
+  "OpenAuction",
+  "IssuePaddle",
+  "WithdrawLot",
+  "HoldLot",
+  "RequeueLot",
+  "GrantPaddle",
+  "UndoLastAction",
 ]);
+
+// Token-flow commands never travel the generic gateway: invitations mint
+// secrets (dedicated action returns the URL) and acceptance must present the
+// TOKEN, not an invite id (owner-actions.ts owns both).
+const GATEWAY_BLOCKED = new Set(["InviteOwner", "AcceptOwnerInvite"]);
 
 /**
  * The single command gateway. `commandId` comes from the CLIENT so retries
@@ -130,10 +157,14 @@ export async function submitAuctionCommand(
   if (gate === null) {
     return { commandId, accepted: false, reason: "unknown_auction", version: 0 };
   }
-  if (!isAuctionCommandType(type)) {
+  if (!isAuctionCommandType(type) || GATEWAY_BLOCKED.has(type)) {
     return { commandId, accepted: false, reason: "unknown_command", version: 0 };
   }
   if (CONDUCT_ONLY.has(type) && !gate.canConduct) {
+    return { commandId, accepted: false, reason: "not_authorized", version: 0 };
+  }
+  // The highest-friction action: undo demands the override capability too.
+  if (type === "UndoLastAction" && !gate.canOverride) {
     return { commandId, accepted: false, reason: "not_authorized", version: 0 };
   }
   return sendEngineCommand({
@@ -142,6 +173,7 @@ export async function submitAuctionCommand(
     type,
     actor: gate.personId,
     conduct: gate.canConduct,
+    override: gate.canOverride,
     payload,
   });
 }

@@ -46,24 +46,6 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await organizer.getByLabel("Organization name").fill(`Live Org ${STAMP}`);
   await organizer.getByRole("button", { name: "Create organization" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
-  const orgUrl = organizer.url();
-
-  // Invites are SINGLE-USE (IP-2): mint one per bidder, reading each fresh URL.
-  const inviteUrls: string[] = [];
-  for (let i = 0; i < 3; i++) {
-    await organizer.getByTestId("create-invite").click();
-    await expect
-      .poll(
-        async () => {
-          const url = (await organizer.getByTestId("invite-url").textContent())?.trim() ?? "";
-          return url.includes("/join/") && !inviteUrls.includes(url) ? url : "";
-        },
-        { timeout: 20_000 },
-      )
-      .not.toBe("");
-    inviteUrls.push(((await organizer.getByTestId("invite-url").textContent()) ?? "").trim());
-  }
-  void orgUrl;
 
   await organizer.goto("/competitions");
   await organizer.getByLabel("Competition name").fill(`Live Cup ${STAMP}`);
@@ -112,20 +94,61 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     timeout: 20_000,
   });
 
-  // --- Three bidders join the org and the live room ------------------------------
+  // --- The owner model (M-IP4-3): invitation → acceptance → grant → claim -------
+  // The organizer mints one owner invitation per team from the cockpit.
+  const teamsByBidder = ["Team Alpha", "Team Bravo", "Team Charlie"];
+  await organizer.goto(`/competitions/${slug}/auction/cockpit`);
+  await expect(organizer.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  const ownerJoinUrls: string[] = [];
+  for (const team of teamsByBidder) {
+    await organizer.getByLabel("Team").selectOption({ label: team });
+    await organizer.getByTestId("invite-owner").click();
+    await expect
+      .poll(
+        async () => {
+          const url = (await organizer.getByTestId("owner-invite-url").textContent())?.trim() ?? "";
+          return url.includes("/owner-join/") && !ownerJoinUrls.includes(url) ? url : "";
+        },
+        { timeout: 20_000 },
+      )
+      .not.toBe("");
+    ownerJoinUrls.push(
+      ((await organizer.getByTestId("owner-invite-url").textContent()) ?? "").trim(),
+    );
+  }
+
+  // Owners accept their invitations (this also makes them org members).
   const bidders: { ctx: BrowserContext; page: Page }[] = [];
   for (let i = 0; i < 3; i++) {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await otpLogin(page, `87${STAMP.slice(0, 6)}${String(i)}0`);
-    await page.goto(inviteUrls[i] as string);
-    await page.getByTestId("accept-invite").click();
-    await expect(page.getByTestId("org-name")).toBeVisible();
+    await page.goto(ownerJoinUrls[i] as string);
+    await page.getByTestId("accept-owner-invite").click();
+    await expect(page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
+      timeout: 30_000,
+    });
     bidders.push({ ctx, page });
   }
 
-  // Bidders claim paddles on the live page (auction still scheduled — legal).
-  const teamsByBidder = ["Team Alpha", "Team Bravo", "Team Charlie"];
+  // The organizer grants each accepted owner a paddle (no claim without one).
+  await organizer.goto(`/competitions/${slug}/auction/cockpit`);
+  await expect(organizer.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  for (const team of teamsByBidder) {
+    await organizer
+      .locator(".owner-row", { hasText: team })
+      .getByRole("button", { name: "Grant paddle" })
+      .click();
+    await expect(
+      organizer.locator(".owner-row", { hasText: team }).getByText("granted", { exact: true }),
+    ).toBeVisible({ timeout: 20_000 });
+  }
+
+  // Granted owners claim their paddles on the live page.
   for (let i = 0; i < 3; i++) {
     const { page } = bidders[i] as { page: Page };
     await page.goto(`/competitions/${slug}/auction/live`);
@@ -136,6 +159,11 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     await page.getByTestId("claim-paddle").click();
     await expect(page.getByTestId("my-paddle")).toBeVisible({ timeout: 20_000 });
   }
+  // Back to the setup surface for queueing + opening (the M-IP4-1 journey).
+  await organizer.goto(`/competitions/${slug}/auction`);
+  await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
 
   // Organizer: queue lots + open the auction from the setup page, then go live.
   await organizer.getByTestId("queue-all").click();

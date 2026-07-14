@@ -1,18 +1,27 @@
-import type { AuctionConfig, AuctionStatus, BidStatus, LotStatus } from "@desiauction/core";
+import {
+  buildAuctionLedger,
+  type AuctionConfig,
+  type AuctionStatus,
+  type BidStatus,
+  type LotStatus,
+} from "@desiauction/core";
 import {
   auctionEvents,
+  auctionOwnerInvites,
   auctions,
   bids,
   lots,
+  paddleGrants,
   paddles,
   people,
   registrations,
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import type { AuctionRecord } from "./aggregate";
+import { loadEvents, type AuctionRecord } from "./aggregate";
+import { snapshotRefs } from "./live";
 
 // Auction read models (M-IP4-1). Read-only, plain frozen shapes — the same
 // discipline as the Competition snapshots. Mutations live ONLY in the
@@ -224,4 +233,121 @@ export async function bidsOf(db: Db, auctionId: string, lotId: string): Promise<
     .from(bids)
     .where(and(eq(bids.auctionId, auctionId), eq(bids.lotId, lotId)))
     .orderBy(asc(bids.eventSeq));
+}
+
+// --- AuctionLedger + owner board (M-IP4-3) ------------------------------------------
+
+/**
+ * The AuctionLedger read model: fold the immutable log through core's pure
+ * builder with names resolved. Regenerated on demand — a projection of the
+ * event store, so it can never diverge from history and nothing can mutate it.
+ */
+export async function ledgerOf(db: Db, auction: AuctionRecord) {
+  const [events, refs] = await Promise.all([loadEvents(db, auction.id), snapshotRefs(db, auction)]);
+  const actorIds = [...new Set(events.map((event) => event.actor))];
+  const actorRows =
+    actorIds.length > 0
+      ? await db
+          .select({ id: people.id, name: people.name })
+          .from(people)
+          .where(inArray(people.id, actorIds))
+      : [];
+  const actorNames: Record<string, string> = {
+    // The engine's own actions (timer expiry, closing-soon) attribute to it.
+    "00000000000000000000000000": "Engine",
+  };
+  for (const row of actorRows) {
+    if (row.name !== null) {
+      actorNames[row.id] = row.name;
+    }
+  }
+  return buildAuctionLedger(events, refs, actorNames);
+}
+
+export interface OwnerInviteView {
+  readonly id: string;
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly acceptedBy: string | null;
+  readonly acceptedByName: string | null;
+  readonly expiresAtMs: number;
+  readonly expired: boolean;
+}
+
+export interface PaddleGrantView {
+  readonly id: string;
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly personId: string;
+  readonly personName: string | null;
+  readonly claimed: boolean;
+}
+
+export interface OwnerBoard {
+  readonly invites: readonly OwnerInviteView[];
+  readonly grants: readonly PaddleGrantView[];
+}
+
+/** The cockpit's owner-workflow panel: invites, acceptances, grants, claims. */
+export async function ownerBoard(db: Db, auction: AuctionRecord): Promise<OwnerBoard> {
+  const [inviteRows, grantRows, activePaddles] = await Promise.all([
+    db
+      .select({
+        id: auctionOwnerInvites.id,
+        teamId: auctionOwnerInvites.teamId,
+        teamName: teams.name,
+        acceptedBy: auctionOwnerInvites.acceptedBy,
+        acceptedByName: people.name,
+        expiresAt: auctionOwnerInvites.expiresAt,
+      })
+      .from(auctionOwnerInvites)
+      .leftJoin(teams, eq(teams.id, auctionOwnerInvites.teamId))
+      .leftJoin(people, eq(people.id, auctionOwnerInvites.acceptedBy))
+      .where(
+        and(eq(auctionOwnerInvites.auctionId, auction.id), isNull(auctionOwnerInvites.revokedAt)),
+      )
+      .orderBy(asc(auctionOwnerInvites.createdAt)),
+    db
+      .select({
+        id: paddleGrants.id,
+        teamId: paddleGrants.teamId,
+        teamName: teams.name,
+        personId: paddleGrants.personId,
+        personName: people.name,
+      })
+      .from(paddleGrants)
+      .leftJoin(teams, eq(teams.id, paddleGrants.teamId))
+      .leftJoin(people, eq(people.id, paddleGrants.personId))
+      .where(and(eq(paddleGrants.auctionId, auction.id), isNull(paddleGrants.revokedAt)))
+      .orderBy(asc(paddleGrants.createdAt)),
+    db
+      .select({ teamId: paddles.teamId, personId: paddles.personId })
+      .from(paddles)
+      .where(and(eq(paddles.auctionId, auction.id), isNull(paddles.releasedAt))),
+  ]);
+  const nowMs = Date.now();
+  const held = new Set(activePaddles.map((paddle) => `${paddle.teamId}:${paddle.personId}`));
+  return Object.freeze({
+    invites: inviteRows.map((row) =>
+      Object.freeze({
+        id: row.id,
+        teamId: row.teamId,
+        teamName: row.teamName ?? "Unknown",
+        acceptedBy: row.acceptedBy,
+        acceptedByName: row.acceptedByName,
+        expiresAtMs: row.expiresAt.getTime(),
+        expired: row.expiresAt.getTime() < nowMs && row.acceptedBy === null,
+      }),
+    ),
+    grants: grantRows.map((row) =>
+      Object.freeze({
+        id: row.id,
+        teamId: row.teamId,
+        teamName: row.teamName ?? "Unknown",
+        personId: row.personId,
+        personName: row.personName,
+        claimed: held.has(`${row.teamId}:${row.personId}`),
+      }),
+    ),
+  });
 }

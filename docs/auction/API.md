@@ -67,3 +67,49 @@ refuses them.
 active paddle, viewer flags). `submitAuctionCommand(slug, commandId, type,
 payload)` — THE single command gateway: session → tenant → capability → engine;
 the client mints `commandId` so retries are idempotent end to end.
+
+---
+
+## v1.2 · Conduct & Ceremony (M-IP4-3)
+
+## Commands (additions to the closed set)
+
+`OpenAuction` · `IssuePaddle{teamId, personId}` (manual mode) ·
+`WithdrawLot{lotId}` · `HoldLot{lotId}` · `RequeueLot{lotId}` ·
+`InviteOwner{teamId, tokenHash, expiresAtMs}` ·
+`AcceptOwnerInvite{inviteId}` · `GrantPaddle{teamId, personId}` ·
+`UndoLastAction{reason?}` — conduct-only except AcceptOwnerInvite (any
+authenticated actor; validated against the invitation row); UndoLastAction
+additionally demands `override` on the envelope (`auction.override`, resolved
+by the web gate). `ClaimPaddle` now refuses without an active grant
+(`no_grant`). The generic web gateway BLOCKS `InviteOwner`/`AcceptOwnerInvite`
+(token flows live in dedicated actions — the raw token never transits the
+gateway). New reject reasons: `no_grant` · `not_an_owner` · `already_accepted`
+· `expired` · `unknown_invite` · `nothing_to_undo` · `undo_window_closed`.
+
+## Engine transport (additions)
+
+| Endpoint | Auth | Behavior |
+|---|---|---|
+| `GET /diagnostics/:auctionId` | `x-engine-secret` | Read-only diagnostics: version/eventCount, halted reason, queue depth, processed/accepted/rejected, avg/max/last processing ms, commands-per-minute, replay/recovery durations, broadcast latency, sha-256 snapshot + projection hashes, recoveries, watchdog (tick age/drift/stalled), connected clients, WS heartbeat age (contract: `engineDiagnosticsSchema`) |
+
+## Web actions (M-IP4-3)
+
+| Action | Capability | Behavior |
+|---|---|---|
+| `cockpitView(slug)` | `auction.conduct` | The cockpit seed: auction view, owner board, teams, ws URL, viewer flags (incl. `canOverride`) |
+| `spectatorView(slug)` | membership | Names + ws URL ONLY — no teams, no flags, no diagnostics |
+| `ledgerView(slug)` | `auction.conduct` | The AuctionLedger, regenerated from events (+ generation ms) |
+| `replayViewerData(slug)` | `auction.conduct` | Events + refs + the engine's current serialized snapshot (comparison target) |
+| `engineDiagnosticsAction(slug)` | `auction.conduct` | Zod-validated proxy to `/diagnostics` |
+| `inviteOwnerAction(slug, teamId)` | `auction.conduct` | Mints the one-time token (hash → InviteOwner command), returns `/owner-join/<token>` |
+| `ownerJoinPreview(token)` / `acceptOwnerJoin(token)` | session | Preview without consuming; accept = org membership (audited) + AcceptOwnerInvite command |
+| `grantPaddleAction(slug, teamId, personId)` | `auction.conduct` | GrantPaddle command |
+| `submitAuctionCommand(...)` | per-command | The single gateway — now resolves `override` and blocks token-flow commands |
+
+**Setup actions rewired.** `auctionLifecycleAction`, `queueAllLotsAction`,
+`issuePaddleAction`, `verifyReplayAction` now SUBMIT COMMANDS (OpenAuction /
+Pause / Resume / Complete / Abort, QueueLots, IssuePaddle, RecoverAuction) —
+`lotLifecycleAction` is gone (lot conduct lives on the cockpit through the
+gateway); `createAuctionAction` alone still calls the aggregate (creation
+precedes live state). The engine reset nudge (`notifyEngineReset`) is deleted.

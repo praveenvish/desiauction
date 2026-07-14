@@ -170,7 +170,40 @@ afterAll(async () => {
 });
 
 describe("LIVE ENGINE — paddles, queue, opening", () => {
-  it("ten bidders claim ten paddles through the command queue", async () => {
+  it("ten bidders claim ten paddles through the command queue (owner model: invite → accept → grant → claim)", async () => {
+    // M-IP4-3 production rule: no active paddle without an explicit grant.
+    // A claim without one is refused deterministically.
+    const ungranted = await command("ClaimPaddle", bidderIds[0] as string, {
+      teamId: teamIds[0],
+    });
+    expect(ungranted).toMatchObject({ accepted: false, reason: "no_grant" });
+
+    // Invitation → acceptance → grant, all through the command path.
+    for (let i = 0; i < 10; i++) {
+      const bidder = bidderIds[i] as string;
+      const invited = await command(
+        "InviteOwner",
+        ownerId,
+        {
+          teamId: teamIds[i],
+          tokenHash: `hash-${RUN}-${String(i)}`,
+          expiresAtMs: Date.now() + 3_600_000,
+        },
+        { conduct: true },
+      );
+      expect(invited.accepted).toBe(true);
+      const inviteId = (invited.reason ?? "").replace("invite:", "");
+      const acceptedInvite = await command("AcceptOwnerInvite", bidder, { inviteId });
+      expect(acceptedInvite.accepted).toBe(true);
+      const granted = await command(
+        "GrantPaddle",
+        ownerId,
+        { teamId: teamIds[i], personId: bidder },
+        { conduct: true },
+      );
+      expect(granted.accepted).toBe(true);
+    }
+
     const acks = await Promise.all(
       bidderIds.map((bidder, i) => command("ClaimPaddle", bidder, { teamId: teamIds[i] })),
     );
@@ -183,9 +216,34 @@ describe("LIVE ENGINE — paddles, queue, opening", () => {
     for (const row of rows) {
       paddleByBidder.set(row.personId, row.id);
     }
-    // Claiming an already-held paddle's team is refused with evidence.
+    // An ungranted person is refused BEFORE the held check (grants gate claims).
     const refused = await command("ClaimPaddle", ownerId, { teamId: teamIds[0] });
-    expect(refused).toMatchObject({ accepted: false, reason: "paddle_held" });
+    expect(refused).toMatchObject({ accepted: false, reason: "no_grant" });
+    // MULTIPLE owners may exist: a second granted owner of team 1 still cannot
+    // claim while the paddle is held (one ACTIVE paddle per team).
+    const second = bidderIds[1] as string;
+    const invited2 = await command(
+      "InviteOwner",
+      ownerId,
+      { teamId: teamIds[0], tokenHash: `hash-${RUN}-second`, expiresAtMs: Date.now() + 3_600_000 },
+      { conduct: true },
+    );
+    const inviteId2 = (invited2.reason ?? "").replace("invite:", "");
+    expect((await command("AcceptOwnerInvite", second, { inviteId: inviteId2 })).accepted).toBe(
+      true,
+    );
+    expect(
+      (
+        await command(
+          "GrantPaddle",
+          ownerId,
+          { teamId: teamIds[0], personId: second },
+          { conduct: true },
+        )
+      ).accepted,
+    ).toBe(true);
+    const held = await command("ClaimPaddle", second, { teamId: teamIds[0] });
+    expect(held).toMatchObject({ accepted: false, reason: "paddle_held" });
     // Re-claiming your own is idempotent-accepted.
     const again = await command("ClaimPaddle", bidderIds[0] as string, {
       teamId: teamIds[0],
@@ -216,25 +274,16 @@ describe("LIVE ENGINE — paddles, queue, opening", () => {
 });
 
 describe("LIVE ENGINE — the single writer under fire", () => {
-  it("opens the auction and the first lot", async () => {
-    // The auction OPEN edge (scheduled→live) is a conduct step of the setup
-    // surface (M-IP4-1); the engine consumes a live auction. Drive it directly
-    // through the shared aggregate, then reload engine state.
-    const { transitionAuction } = await import("@desiauction/auction");
-    const state = engine.snapshotOf(auctionId);
-    expect(state).toBeDefined();
-    const result = await transitionAuction(
-      db,
-      (state as { record: AuctionRecord }).record,
-      ownerId,
-      "open",
-    );
-    expect(result.ok).toBe(true);
-    engine.reset(auctionId); // pick up the out-of-band transition (restart-equivalent)
-    const reloaded = await engine.ensureAuction(auctionId);
-    expect(reloaded?.snapshot?.auctionStatus).toBe("live");
-    const opened = await command("OpenLot", ownerId, { lotId: lot1 }, { conduct: true });
+  it("opens the auction and the first lot — the OpenAuction edge is a COMMAND (M-IP4-3)", async () => {
+    // Nothing bypasses the command path anymore: the scheduled→live edge
+    // travels the same queue as everything else.
+    const denied = await command("OpenAuction", bidderIds[0] as string, {});
+    expect(denied).toMatchObject({ accepted: false, reason: "not_authorized" });
+    const opened = await command("OpenAuction", ownerId, {}, { conduct: true });
     expect(opened.accepted).toBe(true);
+    expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("live");
+    const lotOpened = await command("OpenLot", ownerId, { lotId: lot1 }, { conduct: true });
+    expect(lotOpened.accepted).toBe(true);
     const after = engine.snapshotOf(auctionId);
     expect(after?.snapshot?.currentLot?.lotId).toBe(lot1);
     expect(after?.snapshot?.currentLot?.endsAtMs).not.toBeNull();
@@ -520,19 +569,9 @@ describe("LIVE ENGINE — restart, recovery, fail-closed", () => {
       .from(lotsTable)
       .where(eq(lotsTable.id, lot2));
     expect(row?.status).toBe("unsold");
-    // Withdraw the final lot, then the auction can complete.
-    const { transitionLot } = await import("@desiauction/auction");
-    const state = engine.snapshotOf(auctionId);
-    const withdrawn = await transitionLot(
-      db,
-      (state as { record: AuctionRecord }).record,
-      lot3,
-      ownerId,
-      "withdraw",
-    );
-    expect(withdrawn.ok).toBe(true);
-    engine.reset(auctionId);
-    await engine.ensureAuction(auctionId);
+    // Withdraw the final lot ON the command path, then the auction completes.
+    const withdrawn = await command("WithdrawLot", ownerId, { lotId: lot3 }, { conduct: true });
+    expect(withdrawn.accepted).toBe(true);
     const completed = await command("CompleteAuction", ownerId, {}, { conduct: true });
     expect(completed.accepted).toBe(true);
     expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("completed");

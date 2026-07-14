@@ -1,6 +1,13 @@
+import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
+
 import {
+  acceptOwnerInvite,
   claimPaddle,
   closeLot,
+  grantPaddle,
+  inviteOwner,
+  issuePaddle,
   markLotClosingSoon,
   placeBid,
   queueAllLots,
@@ -8,10 +15,12 @@ import {
   releasePaddle,
   transitionAuction,
   transitionLot,
+  undoLastAction,
   type AuctionRecord,
 } from "@desiauction/auction";
 import { buildLiveSnapshot } from "@desiauction/auction";
 import {
+  canonicalJson,
   isAuctionCommandType,
   type AuctionCommandEnvelope,
   type AuctionSnapshot,
@@ -40,6 +49,28 @@ interface QueuedCommand extends Omit<AuctionCommandEnvelope, "type"> {
   type: AuctionCommandEnvelope["type"] | InternalCommandType;
 }
 
+/** Per-auction operational counters (M-IP4-3 diagnostics — read-only surface). */
+export interface EngineStats {
+  processed: number;
+  accepted: number;
+  rejected: number;
+  totalProcessMs: number;
+  lastProcessMs: number;
+  maxProcessMs: number;
+  /** Millis when this auction loaded into the engine (throughput window). */
+  loadedAtMs: number;
+  lastCommandAtMs: number;
+  /** Last event-log fold + snapshot rebuild duration. */
+  lastReplayMs: number;
+  /** Last RecoverAuction (replay → diff → heal) duration. */
+  lastRecoveryMs: number;
+  /** Rebuild start → broadcast handoff. */
+  lastBroadcastLatencyMs: number;
+  snapshotHash: string;
+  projectionHash: string;
+  eventCount: number;
+}
+
 export interface AuctionState {
   record: AuctionRecord;
   snapshot: AuctionSnapshot | null; // null only while halted at load
@@ -48,6 +79,31 @@ export interface AuctionState {
   /** Fail-closed flag: non-null halts every command except RecoverAuction. */
   halted: string | null;
   acks: Map<string, CommandAck>;
+  stats: EngineStats;
+}
+
+/** The read-only diagnostics view (never exposes snapshot payloads or secrets). */
+export interface AuctionDiagnostics {
+  auctionId: string;
+  auctionStatus: string | null;
+  version: number;
+  eventCount: number;
+  halted: string | null;
+  queueDepth: number;
+  processed: number;
+  accepted: number;
+  rejected: number;
+  avgProcessMs: number;
+  lastProcessMs: number;
+  maxProcessMs: number;
+  commandsPerMinute: number;
+  lastReplayMs: number;
+  lastRecoveryMs: number;
+  lastBroadcastLatencyMs: number;
+  snapshotHash: string;
+  projectionHash: string;
+  recoveries: number;
+  watchdog: { lastTickMs: number; tickDriftMs: number; stalled: boolean };
 }
 
 export interface EngineDeps {
@@ -60,9 +116,34 @@ export interface EngineDeps {
 
 const ACK_CACHE_LIMIT = 512;
 
+function freshStats(nowMs: number): EngineStats {
+  return {
+    processed: 0,
+    accepted: 0,
+    rejected: 0,
+    totalProcessMs: 0,
+    lastProcessMs: 0,
+    maxProcessMs: 0,
+    loadedAtMs: nowMs,
+    lastCommandAtMs: 0,
+    lastReplayMs: 0,
+    lastRecoveryMs: 0,
+    lastBroadcastLatencyMs: 0,
+    snapshotHash: "",
+    projectionHash: "",
+    eventCount: 0,
+  };
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 export class AuctionEngine {
   private readonly states = new Map<string, AuctionState>();
   private readonly queues = new Map<string, Promise<unknown>>();
+  /** Commands enqueued but not yet finished — the diagnostics queue depth. */
+  private readonly pending = new Map<string, number>();
   private readonly deps: EngineDeps;
   private readonly now: () => number;
   public lastTickMs = 0;
@@ -83,6 +164,7 @@ export class AuctionEngine {
 
   private enqueue(envelope: QueuedCommand): Promise<CommandAck> {
     const tail = this.queues.get(envelope.auctionId) ?? Promise.resolve();
+    this.pending.set(envelope.auctionId, (this.pending.get(envelope.auctionId) ?? 0) + 1);
     const next = tail
       .then(() => this.process(envelope))
       .catch((error: unknown) => {
@@ -92,6 +174,10 @@ export class AuctionEngine {
           "engine_halted",
           this.states.get(envelope.auctionId)?.version ?? 0,
         );
+      })
+      .finally(() => {
+        const depth = (this.pending.get(envelope.auctionId) ?? 1) - 1;
+        this.pending.set(envelope.auctionId, Math.max(0, depth));
       });
     // The chain never breaks: failures resolve to rejections, the tail advances.
     this.queues.set(
@@ -115,7 +201,10 @@ export class AuctionEngine {
     if (record === null) {
       return null;
     }
+    const stats = freshStats(Date.now());
+    const replayStart = performance.now();
     const built = await buildLiveSnapshot(this.deps.db, record);
+    stats.lastReplayMs = performance.now() - replayStart;
     if (!built.ok) {
       const state: AuctionState = {
         record,
@@ -124,6 +213,7 @@ export class AuctionEngine {
         version: 0,
         halted: `replay_failed:${built.reason}@${String(built.atSeq)}`,
         acks: new Map(),
+        stats,
       };
       this.states.set(auctionId, state);
       this.deps.logger.error(
@@ -132,6 +222,9 @@ export class AuctionEngine {
       );
       return state;
     }
+    stats.snapshotHash = sha256(built.serialized);
+    stats.projectionHash = sha256(canonicalJson(built.projection));
+    stats.eventCount = built.projection.eventCount;
     const state: AuctionState = {
       record,
       snapshot: built.snapshot,
@@ -140,6 +233,7 @@ export class AuctionEngine {
       halted:
         built.divergences.length > 0 ? `projection_mismatch:${built.divergences.join("; ")}` : null,
       acks: new Map(),
+      stats,
     };
     if (state.halted !== null) {
       this.deps.logger.error(
@@ -187,6 +281,43 @@ export class AuctionEngine {
     return this.states.get(auctionId);
   }
 
+  /** The read-only diagnostics projection (M-IP4-3) — no payloads, no secrets. */
+  diagnosticsOf(auctionId: string): AuctionDiagnostics | null {
+    const state = this.states.get(auctionId);
+    if (state === undefined) {
+      return null;
+    }
+    const stats = state.stats;
+    const now = Date.now();
+    const windowMs = Math.max(1, now - stats.loadedAtMs);
+    return {
+      auctionId,
+      auctionStatus: state.snapshot?.auctionStatus ?? null,
+      version: state.version,
+      eventCount: stats.eventCount,
+      halted: state.halted,
+      queueDepth: this.pending.get(auctionId) ?? 0,
+      processed: stats.processed,
+      accepted: stats.accepted,
+      rejected: stats.rejected,
+      avgProcessMs: stats.processed > 0 ? stats.totalProcessMs / stats.processed : 0,
+      lastProcessMs: stats.lastProcessMs,
+      maxProcessMs: stats.maxProcessMs,
+      commandsPerMinute: (stats.processed * 60_000) / windowMs,
+      lastReplayMs: stats.lastReplayMs,
+      lastRecoveryMs: stats.lastRecoveryMs,
+      lastBroadcastLatencyMs: stats.lastBroadcastLatencyMs,
+      snapshotHash: stats.snapshotHash,
+      projectionHash: stats.projectionHash,
+      recoveries: state.snapshot?.recoveries ?? 0,
+      watchdog: {
+        lastTickMs: this.lastTickMs,
+        tickDriftMs: this.tickDriftMs,
+        stalled: this.lastTickMs !== 0 && Date.now() - this.lastTickMs > 5_000,
+      },
+    };
+  }
+
   private async process(envelope: QueuedCommand): Promise<CommandAck> {
     const state = await this.ensureAuction(envelope.auctionId);
     if (state === null) {
@@ -201,9 +332,22 @@ export class AuctionEngine {
       return this.remember(state, this.reject(envelope, "engine_halted", state.version));
     }
 
+    const started = performance.now();
     const ack = await this.execute(state, envelope);
     // Rebuild + verify + broadcast after every executed command (fail closed).
     await this.rebuild(state, envelope.auctionId);
+    const elapsed = performance.now() - started;
+    const stats = state.stats;
+    stats.processed += 1;
+    stats.totalProcessMs += elapsed;
+    stats.lastProcessMs = elapsed;
+    stats.maxProcessMs = Math.max(stats.maxProcessMs, elapsed);
+    stats.lastCommandAtMs = Date.now();
+    if (ack.accepted) {
+      stats.accepted += 1;
+    } else {
+      stats.rejected += 1;
+    }
     const finalAck: CommandAck = { ...ack, version: state.version };
     return this.remember(state, finalAck);
   }
@@ -321,6 +465,7 @@ export class AuctionEngine {
         const result = await markLotClosingSoon(db, auction, lotId, actor);
         return result.ok ? accept() : rejected(result.reason);
       }
+      case "OpenAuction":
       case "PauseAuction":
       case "ResumeAuction":
       case "CompleteAuction":
@@ -329,20 +474,104 @@ export class AuctionEngine {
           return rejected("not_authorized");
         }
         const command = {
+          OpenAuction: "open",
           PauseAuction: "pause",
           ResumeAuction: "resume",
           CompleteAuction: "complete",
           AbortAuction: "abort",
-        }[envelope.type] as "pause" | "resume" | "complete" | "abort";
+        }[envelope.type] as "open" | "pause" | "resume" | "complete" | "abort";
         const reasonText = this.str(envelope.payload, "reason") ?? undefined;
         const result = await transitionAuction(db, auction, actor, command, reasonText);
         return result.ok ? accept() : rejected(result.reason);
+      }
+      // Manual conduct (M-IP4-3): withdraw / freeze / requeue — the same
+      // machine-decided aggregate steps, now on the command path.
+      case "WithdrawLot":
+      case "HoldLot":
+      case "RequeueLot": {
+        if (!envelope.conduct) {
+          return rejected("not_authorized");
+        }
+        const lotId = this.str(envelope.payload, "lotId");
+        if (lotId === null) {
+          return rejected("invalid_payload");
+        }
+        const command = {
+          WithdrawLot: "withdraw",
+          HoldLot: "hold",
+          RequeueLot: "requeue",
+        }[envelope.type] as "withdraw" | "hold" | "requeue";
+        const reasonText = this.str(envelope.payload, "reason") ?? undefined;
+        const result = await transitionLot(db, auction, lotId, actor, command, reasonText);
+        return result.ok ? accept() : rejected(result.reason);
+      }
+      case "IssuePaddle": {
+        if (!envelope.conduct) {
+          return rejected("not_authorized");
+        }
+        const teamId = this.str(envelope.payload, "teamId");
+        const personId = this.str(envelope.payload, "personId");
+        if (teamId === null || personId === null) {
+          return rejected("invalid_payload");
+        }
+        const result = await issuePaddle(db, auction, actor, teamId, personId);
+        return result.ok ? accept() : rejected(result.reason);
+      }
+      // The owner workflow (M-IP4-3): invitation → acceptance → grant.
+      case "InviteOwner": {
+        if (!envelope.conduct) {
+          return rejected("not_authorized");
+        }
+        const teamId = this.str(envelope.payload, "teamId");
+        const tokenHash = this.str(envelope.payload, "tokenHash");
+        const expiresAtMs = envelope.payload["expiresAtMs"];
+        if (teamId === null || tokenHash === null || typeof expiresAtMs !== "number") {
+          return rejected("invalid_payload");
+        }
+        const result = await inviteOwner(db, auction, actor, teamId, tokenHash, expiresAtMs);
+        return result.ok
+          ? accept({ reason: `invite:${result.inviteId}` })
+          : rejected(result.reason);
+      }
+      case "AcceptOwnerInvite": {
+        const inviteId = this.str(envelope.payload, "inviteId");
+        if (inviteId === null) {
+          return rejected("invalid_payload");
+        }
+        const result = await acceptOwnerInvite(db, auction, actor, inviteId);
+        return result.ok ? accept({ reason: `team:${result.teamId}` }) : rejected(result.reason);
+      }
+      case "GrantPaddle": {
+        if (!envelope.conduct) {
+          return rejected("not_authorized");
+        }
+        const teamId = this.str(envelope.payload, "teamId");
+        const personId = this.str(envelope.payload, "personId");
+        if (teamId === null || personId === null) {
+          return rejected("invalid_payload");
+        }
+        const result = await grantPaddle(db, auction, actor, teamId, personId);
+        return result.ok ? accept() : rejected(result.reason);
+      }
+      // Compensating undo (doc 41): conduct is not enough — the web gate must
+      // have resolved auction.override on this actor.
+      case "UndoLastAction": {
+        if (!envelope.conduct || envelope.override !== true) {
+          return rejected("not_authorized");
+        }
+        const reasonText = this.str(envelope.payload, "reason") ?? undefined;
+        const result = await undoLastAction(db, auction, actor, reasonText);
+        return result.ok
+          ? accept({ reason: `reopened:${result.lotId}@${String(result.compensatesSeq)}` })
+          : rejected(result.reason);
       }
       case "RecoverAuction": {
         if (!envelope.conduct) {
           return rejected("not_authorized");
         }
+        const recoveryStart = performance.now();
         const report = await recoverAuction(db, auction, actor);
+        state.stats.lastRecoveryMs = performance.now() - recoveryStart;
         if (!report.ok) {
           return rejected(`replay_failed:${report.reason ?? ""}`);
         }
@@ -362,11 +591,14 @@ export class AuctionEngine {
    * halts the auction — a lying snapshot is never served.
    */
   private async rebuild(state: AuctionState, auctionId: string): Promise<void> {
+    const rebuildStart = performance.now();
     const record = await this.loadRecord(auctionId);
     if (record !== null) {
       state.record = record;
     }
+    const replayStart = performance.now();
     const built = await buildLiveSnapshot(this.deps.db, state.record);
+    state.stats.lastReplayMs = performance.now() - replayStart;
     if (!built.ok) {
       state.halted = `replay_failed:${built.reason}@${String(built.atSeq)}`;
       this.deps.logger.error({ auctionId, reason: built.reason }, "REPLAY FAILED — auction halted");
@@ -383,7 +615,12 @@ export class AuctionEngine {
     state.snapshot = built.snapshot;
     state.serialized = built.serialized;
     state.version = built.snapshot.version;
+    state.stats.snapshotHash = sha256(built.serialized);
+    state.stats.projectionHash = sha256(canonicalJson(built.projection));
+    state.stats.eventCount = built.projection.eventCount;
     this.deps.onSnapshot(auctionId, built.serialized, built.snapshot.version);
+    // Command completion → broadcast handoff, the diagnostics broadcast latency.
+    state.stats.lastBroadcastLatencyMs = performance.now() - rebuildStart;
   }
 
   /**

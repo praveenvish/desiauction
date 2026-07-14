@@ -71,6 +71,13 @@
       "when": 1784476800000,
       "tag": "0009_paddle_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784563200000,
+      "tag": "0010_conduct_ceremony",
+      "breakpoints": true
     }
   ]
 }
