@@ -27,6 +27,15 @@ export default async function CompetitionHomePage({
             <span className="date-row">
               {view.viewer.canManage ? (
                 <ButtonLink
+                  href={`/competitions/${slug}/auction`}
+                  variant="secondary"
+                  data-testid="open-auction"
+                >
+                  Auction
+                </ButtonLink>
+              ) : null}
+              {view.viewer.canManage ? (
+                <ButtonLink
                   href={`/competitions/${slug}/fixtures`}
                   variant="secondary"
                   data-testid="open-fixtures"

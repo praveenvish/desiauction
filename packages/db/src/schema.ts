@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   char,
   index,
@@ -335,5 +336,139 @@ export const fixtures = pgTable(
     index("fixtures_competition_kickoff_idx").on(table.competitionId, table.kickoffAt),
     index("fixtures_ground_kickoff_idx").on(table.groundId, table.kickoffAt),
     index("fixtures_org_kickoff_idx").on(table.orgId, table.kickoffAt),
+  ],
+);
+
+// --- Auction engine foundation (IP-4, M-IP4-1). Org-scoped; RLS read+write in
+// migration 0008. Money columns are integer paise (bigint — C-7, no floats);
+// timer instants are integer epoch milliseconds (the deterministic core model).
+// auction_events is the APPEND-ONLY replay log: (auction_id, seq) is the total
+// order and the fairness proof (doc 41 single-writer).
+
+export const auctions = pgTable(
+  "auctions",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    name: text("name").notNull(),
+    status: text("status", {
+      enum: ["scheduled", "live", "paused", "completed", "reconciled", "abandoned"],
+    })
+      .notNull()
+      .default("scheduled"),
+    // AuctionConfig (doc 41), locked at creation; changes are audited overrides.
+    config: jsonb("config").notNull(),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("auctions_org_idx").on(table.orgId),
+    index("auctions_competition_idx").on(table.competitionId),
+  ],
+);
+
+export const paddles = pgTable(
+  "paddles",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    paddleNumber: text("paddle_number").notNull(),
+    issuedAt: ts("issued_at").notNull().defaultNow(),
+  },
+  // Immutable identity: one paddle per team per auction, numbers never reused.
+  (table) => [
+    uniqueIndex("paddles_auction_team_uq").on(table.auctionId, table.teamId),
+    uniqueIndex("paddles_auction_number_uq").on(table.auctionId, table.paddleNumber),
+    index("paddles_auction_idx").on(table.auctionId),
+  ],
+);
+
+export const lots = pgTable(
+  "lots",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    registrationId: char("registration_id", { length: 26 }).notNull(),
+    lotNumber: text("lot_number").notNull(),
+    seq: integer("seq").notNull(), // deterministic queue order
+    basePrice: bigint("base_price", { mode: "number" }).notNull(),
+    status: text("status", {
+      enum: [
+        "prepared",
+        "queued",
+        "on_block",
+        "closing_soon",
+        "sold",
+        "unsold",
+        "frozen",
+        "withdrawn",
+      ],
+    })
+      .notNull()
+      .default("prepared"),
+    roundsUsed: integer("rounds_used").notNull().default(0),
+    endsAtMs: bigint("ends_at_ms", { mode: "number" }),
+    heldRemainingMs: bigint("held_remaining_ms", { mode: "number" }),
+    timerExtensions: integer("timer_extensions").notNull().default(0),
+    soldToPaddleId: char("sold_to_paddle_id", { length: 26 }),
+    soldPrice: bigint("sold_price", { mode: "number" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("lots_auction_seq_uq").on(table.auctionId, table.seq),
+    uniqueIndex("lots_auction_number_uq").on(table.auctionId, table.lotNumber),
+    uniqueIndex("lots_auction_registration_uq").on(table.auctionId, table.registrationId),
+    index("lots_auction_status_idx").on(table.auctionId, table.status),
+  ],
+);
+
+export const bids = pgTable(
+  "bids",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    lotId: char("lot_id", { length: 26 }).notNull(),
+    paddleId: char("paddle_id", { length: 26 }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    status: text("status", { enum: ["accepted", "outbid", "invalidated"] })
+      .notNull()
+      .default("accepted"),
+    // The immutable evidence link: the BidAccepted event's (auction, seq).
+    eventSeq: integer("event_seq").notNull(),
+    placedAtMs: bigint("placed_at_ms", { mode: "number" }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("bids_auction_event_uq").on(table.auctionId, table.eventSeq),
+    index("bids_lot_idx").on(table.lotId, table.eventSeq),
+    index("bids_auction_idx").on(table.auctionId),
+  ],
+);
+
+export const auctionEvents = pgTable(
+  "auction_events",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    seq: integer("seq").notNull(),
+    type: text("type").notNull(),
+    atMs: bigint("at_ms", { mode: "number" }).notNull(),
+    actor: char("actor", { length: 26 }).notNull(),
+    correlationId: char("correlation_id", { length: 26 }).notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // The unique (auction, seq) IS the single-writer total order: a concurrent
+  // writer fails loudly instead of interleaving silently.
+  (table) => [
+    uniqueIndex("auction_events_auction_seq_uq").on(table.auctionId, table.seq),
+    index("auction_events_auction_idx").on(table.auctionId),
   ],
 );

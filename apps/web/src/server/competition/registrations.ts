@@ -85,6 +85,8 @@ export interface RegistrationRow {
   status: RegistrationStatus;
   teamId: string | null;
   teamName: string | null;
+  // Surfaced for the IP-4 AuctionReady pool (additive projection field, M-IP4-1).
+  basePriceBand: string | null;
   rejectionReason: string | null;
   duplicateName: boolean;
 }
@@ -233,6 +235,7 @@ export async function queryRegistrations(
       status: registrations.status,
       teamId: registrations.teamId,
       teamName: teams.name,
+      basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
     })
     .from(registrations)

@@ -1,5 +1,14 @@
-export { paise, addPaise, deductPaise, formatPaiseINR } from "./money";
-export type { Paise, DeductResult } from "./money";
+export {
+  paise,
+  addPaise,
+  deductPaise,
+  comparePaise,
+  multiplyPaise,
+  serializePaise,
+  parsePaise,
+  formatPaiseINR,
+} from "./money";
+export type { Paise, DeductResult, ParsePaiseResult } from "./money";
 export type { Clock } from "./clock";
 export { normalizePhone } from "./phone";
 export type { NormalizedPhone, PhoneResult } from "./phone";
@@ -80,3 +89,64 @@ export {
   DEFAULT_FIXTURE_DURATION_MINUTES,
 } from "./fixture-csv";
 export type { CsvFixtureRow, CsvFixtureError, FixtureCsvResult } from "./fixture-csv";
+export {
+  auctionTransition,
+  lotTransition,
+  bidTransition,
+  decideBid,
+  ladderStep,
+  ladderContains,
+  nextMinimumBid,
+  isValidSlabs,
+  openLotTimer,
+  extendOnBid,
+  holdRemainingMs,
+  resumeLotTimer,
+  isTimerExpired,
+  isClosingSoon,
+  isValidTimerPolicy,
+  validateAuctionConfig,
+  minPossiblePrice,
+  basePriceFor,
+  requeueAllowed,
+  paddleNumber,
+  lotNumber,
+  replayAuction,
+  AUCTION_STATUSES,
+  LOT_STATUSES,
+  BID_STATUSES,
+  AUCTION_MACHINE,
+  LOT_MACHINE,
+  BID_MACHINE,
+  AUCTION_EVENT_TYPES,
+  DEFAULT_AUCTION_CONFIG,
+} from "./auction";
+export type {
+  AuctionStatus,
+  AuctionCommand,
+  AuctionReadiness,
+  AuctionTransition,
+  LotStatus,
+  LotCommand,
+  LotGuards,
+  LotTransition,
+  BidStatus,
+  BidCommand,
+  BidTransition,
+  BidRejectionCode,
+  BidInput,
+  BidDecision,
+  IncrementSlab,
+  TimerPolicy,
+  LotTimer,
+  UnsoldPolicy,
+  AuctionConfig,
+  ConfigValidation,
+  MachineEdge,
+  AuctionEventType,
+  AuctionEventEnvelope,
+  AuctionProjection,
+  LotProjection,
+  PaddleProjection,
+  ReplayResult,
+} from "./auction";
