@@ -19,7 +19,10 @@ export type Capability =
   | "competition.create"
   | "competition.manage"
   | "team.manage"
-  | "registration.review";
+  | "registration.review"
+  // Fixtures & venues (M-IP3-3, same additive path).
+  | "venue.manage"
+  | "fixture.manage";
 
 export type CapabilitySet = "org:owner" | "org:staff" | "viewer";
 
@@ -38,8 +41,17 @@ const SETS: Record<CapabilitySet, readonly Capability[]> = {
     "competition.manage",
     "team.manage",
     "registration.review",
+    "venue.manage",
+    "fixture.manage",
   ],
-  "org:staff": ["tournament.manage", "player.verify", "team.manage", "registration.review"],
+  "org:staff": [
+    "tournament.manage",
+    "player.verify",
+    "team.manage",
+    "registration.review",
+    "venue.manage",
+    "fixture.manage",
+  ],
   viewer: [],
 };
 

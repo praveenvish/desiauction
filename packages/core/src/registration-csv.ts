@@ -107,9 +107,7 @@ export function parseRegistrationCsv(text: string): CsvParseResult {
     const rawPhone = (fields[index["phone"] ?? -1] ?? "").trim();
     const rawRole = (fields[index["role"] ?? -1] ?? "").trim().toLowerCase();
     const band =
-      index["base_price_band"] !== undefined
-        ? (fields[index["base_price_band"]] ?? "").trim()
-        : "";
+      index["base_price_band"] !== undefined ? (fields[index["base_price_band"]] ?? "").trim() : "";
 
     const rowErrors: string[] = [];
     if (rawName.length < 3) {

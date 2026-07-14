@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { currentSession } from "../../server/auth/actions";
 import { competitionsView } from "../../server/competition/actions";
+import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { CreateCompetitionForm } from "./create-competition-form";
 import "./competitions.css";
 
@@ -21,11 +22,33 @@ export default async function CompetitionsPage() {
   if (session === null) {
     redirect("/login");
   }
-  const view = await competitionsView();
+  const [view, schedule] = await Promise.all([competitionsView(), organizerScheduleView()]);
   return (
     <main className="competitions">
       <div className="competitions-stack">
         <h1>Competitions</h1>
+        {schedule.length > 0 ? (
+          <Card data-testid="organizer-schedule">
+            <h2>Your schedule</h2>
+            <ul className="calendar-day-list">
+              {schedule.map((fixture) => (
+                <li className="calendar-fixture" key={fixture.id}>
+                  <span className="reg-number">{fixture.number}</span>
+                  <span className="registration-name">
+                    {fixture.homeTeamName} vs {fixture.awayTeamName}
+                  </span>
+                  <span className="registration-phone">
+                    {fixture.kickoffAt?.replace("T", " ") ?? ""}
+                    {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
+                  </span>
+                  <Link href={`/competitions/${fixture.competitionSlug}/fixtures`}>
+                    {fixture.competitionName}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
         {view.competitions.length === 0 ? (
           <Card>
             <EmptyState

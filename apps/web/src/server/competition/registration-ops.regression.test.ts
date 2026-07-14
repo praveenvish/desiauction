@@ -81,7 +81,9 @@ async function seed(
   status: "submitted" | "waitlisted" | "approved" | "rejected" = "submitted",
 ): Promise<string> {
   const personId = newId();
-  await db.insert(people).values({ id: personId, phone: `${SEED_PHONE_PREFIX}${phoneSuffix}`, name });
+  await db
+    .insert(people)
+    .values({ id: personId, phone: `${SEED_PHONE_PREFIX}${phoneSuffix}`, name });
   seededPersonIds.push(personId);
   const id = newId();
   await db.insert(registrationsTable).values({
@@ -267,7 +269,11 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     await seed(compId, org.id, "Twin Player", "dup2", "submitted");
     const keys = await duplicateNameKeys(db, compId);
     expect(keys.has("twin player")).toBe(true);
-    const page = await queryRegistrations(db, compId, { search: "Twin Player", page: 1, pageSize: 25 });
+    const page = await queryRegistrations(db, compId, {
+      search: "Twin Player",
+      page: 1,
+      pageSize: 25,
+    });
     expect(page.rows.every((r) => r.duplicateName)).toBe(true);
   });
 
@@ -289,7 +295,9 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const numbers = lines.slice(1).map((l) => l.split(",")[0] ?? "");
     expect(numbers).toEqual([...numbers].sort()); // stable by registration number
     // No rival-org rows: a foreign competition's registration never appears.
-    const rival = await createCompetition(db, orgOutsider.id, outsider, { name: `Rival Cup ${RUN}` });
+    const rival = await createCompetition(db, orgOutsider.id, outsider, {
+      name: `Rival Cup ${RUN}`,
+    });
     await seed(rival.id, orgOutsider.id, "Rival Player", "rv01", "submitted");
     const ourCsv = await exportRegistrationsCsv(db, compId);
     expect(ourCsv).not.toContain("Rival Player");
@@ -297,10 +305,20 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
 
   it("export authorization: an outsider lacks registration.review on this competition", async () => {
     expect(
-      await canCompetition(db, outsider, { orgId: org.id, competitionId: compId }, "registration.review"),
+      await canCompetition(
+        db,
+        outsider,
+        { orgId: org.id, competitionId: compId },
+        "registration.review",
+      ),
     ).toBe(false);
     expect(
-      await canCompetition(db, owner, { orgId: org.id, competitionId: compId }, "registration.review"),
+      await canCompetition(
+        db,
+        owner,
+        { orgId: org.id, competitionId: compId },
+        "registration.review",
+      ),
     ).toBe(true);
   });
 

@@ -24,15 +24,26 @@ export default async function CompetitionHomePage({
         <div className="competition-stack">
           <div className="competition-title-row">
             <h1 data-testid="competition-name">{view.competition.name}</h1>
-            {view.viewer.canReview ? (
-              <ButtonLink
-                href={`/competitions/${slug}/registrations`}
-                variant="secondary"
-                data-testid="open-dashboard"
-              >
-                Manage registrations
-              </ButtonLink>
-            ) : null}
+            <span className="date-row">
+              {view.viewer.canManage ? (
+                <ButtonLink
+                  href={`/competitions/${slug}/fixtures`}
+                  variant="secondary"
+                  data-testid="open-fixtures"
+                >
+                  Fixtures
+                </ButtonLink>
+              ) : null}
+              {view.viewer.canReview ? (
+                <ButtonLink
+                  href={`/competitions/${slug}/registrations`}
+                  variant="secondary"
+                  data-testid="open-dashboard"
+                >
+                  Manage registrations
+                </ButtonLink>
+              ) : null}
+            </span>
           </div>
           <CompetitionPanel view={view} slug={slug} />
         </div>

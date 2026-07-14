@@ -1,4 +1,5 @@
 import {
+  boolean,
   char,
   index,
   integer,
@@ -242,5 +243,97 @@ export const registrations = pgTable(
     index("registrations_person_idx").on(table.personId),
     index("registrations_number_idx").on(table.registrationNumber),
     index("registrations_team_idx").on(table.teamId),
+  ],
+);
+
+// --- Fixtures & venues (M-IP3-3). Org-scoped; RLS read+write in migration 0007.
+// Venue → Ground is the physical hierarchy; fixtures reference GROUNDS only —
+// venue information is never duplicated onto a fixture row.
+
+export const venues = pgTable(
+  "venues",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    name: text("name").notNull(),
+    address: text("address"),
+    city: text("city"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // One venue name per org — venue information exists exactly once.
+  (table) => [
+    uniqueIndex("venues_org_name_uq").on(table.orgId, table.name),
+    index("venues_org_idx").on(table.orgId),
+  ],
+);
+
+export const grounds = pgTable(
+  "grounds",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    venueId: char("venue_id", { length: 26 }).notNull(),
+    name: text("name").notNull(),
+    surface: text("surface", {
+      enum: ["turf", "matting", "astroturf", "concrete", "other"],
+    })
+      .notNull()
+      .default("turf"),
+    capacity: integer("capacity"),
+    floodlights: boolean("floodlights").notNull().default(false),
+    indoor: boolean("indoor").notNull().default(false),
+    status: text("status", { enum: ["active", "unavailable"] })
+      .notNull()
+      .default("active"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("grounds_venue_name_uq").on(table.venueId, table.name),
+    index("grounds_org_idx").on(table.orgId),
+    index("grounds_venue_idx").on(table.venueId),
+  ],
+);
+
+export const fixtures = pgTable(
+  "fixtures",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    // Deterministic human reference (MPL26-F001) — derived once, stable forever.
+    fixtureNumber: text("fixture_number").notNull(),
+    // Per-competition creation sequence: the number's source, unique under race.
+    seq: integer("seq").notNull(),
+    round: integer("round"),
+    homeTeamId: char("home_team_id", { length: 26 }).notNull(),
+    awayTeamId: char("away_team_id", { length: 26 }).notNull(),
+    groundId: char("ground_id", { length: 26 }),
+    // Local wall-clock "YYYY-MM-DDTHH:MM" (matches competitions.starts_on TEXT
+    // discipline): lexicographic order IS chronological order, byte-stable for
+    // export/import, no timezone drift in a local-first deployment.
+    kickoffAt: text("kickoff_at"),
+    durationMinutes: integer("duration_minutes"),
+    status: text("status", {
+      enum: ["draft", "scheduled", "published", "in_progress", "completed", "cancelled"],
+    })
+      .notNull()
+      .default("draft"),
+    cancelReason: text("cancel_reason"),
+    publishedAt: ts("published_at"),
+    startedAt: ts("started_at"),
+    completedAt: ts("completed_at"),
+    cancelledAt: ts("cancelled_at"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("fixtures_competition_seq_uq").on(table.competitionId, table.seq),
+    uniqueIndex("fixtures_competition_number_uq").on(table.competitionId, table.fixtureNumber),
+    // Calendar/timeline queries page on (kickoff, seq) — indexed for 500+.
+    index("fixtures_competition_kickoff_idx").on(table.competitionId, table.kickoffAt),
+    index("fixtures_ground_kickoff_idx").on(table.groundId, table.kickoffAt),
+    index("fixtures_org_kickoff_idx").on(table.orgId, table.kickoffAt),
   ],
 );

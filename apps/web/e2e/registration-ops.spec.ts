@@ -64,11 +64,9 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
 
   // Import 8 players by CSV (set the file input's content directly).
   // The textarea is uncontrolled (read via ref) — set its DOM value directly.
-  await page
-    .getByTestId("import-textarea")
-    .evaluate((el, csv) => {
-      (el as HTMLTextAreaElement).value = csv;
-    }, playersCsv());
+  await page.getByTestId("import-textarea").evaluate((el, csv) => {
+    (el as HTMLTextAreaElement).value = csv;
+  }, playersCsv());
   await page.getByTestId("import-preview-btn").click();
   // First hit compiles the import server action under dev — allow generous time.
   await expect(page.getByTestId("import-preview")).toContainText("8 valid", { timeout: 20_000 });

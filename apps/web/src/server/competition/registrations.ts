@@ -127,10 +127,7 @@ export interface RegistrationStats {
   withdrawn: number;
 }
 
-export async function registrationStats(
-  db: Db,
-  competitionId: string,
-): Promise<RegistrationStats> {
+export async function registrationStats(db: Db, competitionId: string): Promise<RegistrationStats> {
   const rows = await db
     .select({ status: registrations.status, count: sql<number>`count(*)::int` })
     .from(registrations)

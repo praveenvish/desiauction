@@ -396,7 +396,9 @@ export async function registrationDashboard(
       ? { status: params.status as RegistrationStatus }
       : {}),
     ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
-    sort: (VALID_SORT.has(params.sort as RegistrationSort) ? params.sort : "recent") as RegistrationSort,
+    sort: (VALID_SORT.has(params.sort as RegistrationSort)
+      ? params.sort
+      : "recent") as RegistrationSort,
     page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
     pageSize: PAGE_SIZE,
   };
@@ -491,7 +493,10 @@ export async function importCommitAction(
   }
   const parsed = parseRegistrationCsv(csv);
   if (parsed.errors.length > 0) {
-    return { ok: false, error: `Fix ${String(parsed.errors.length)} row error(s) before importing.` };
+    return {
+      ok: false,
+      error: `Fix ${String(parsed.errors.length)} row error(s) before importing.`,
+    };
   }
   const result = await commitRegistrationImport(
     db,

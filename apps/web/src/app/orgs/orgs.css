@@ -134,3 +134,11 @@
   line-height: var(--text-md-line);
   color: var(--text-secondary);
 }
+
+.org-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}

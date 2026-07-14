@@ -71,7 +71,13 @@ export function RegistrationDashboardPanel({
   const pushQuery = useCallback(
     (patch: Record<string, string>) => {
       const next = new URLSearchParams();
-      const merged = { q: filters.search, status: filters.status, team: filters.team, sort: filters.sort, ...patch };
+      const merged = {
+        q: filters.search,
+        status: filters.status,
+        team: filters.team,
+        sort: filters.sort,
+        ...patch,
+      };
       for (const [key, value] of Object.entries(merged)) {
         if (value !== "") {
           next.set(key, value);
@@ -330,10 +336,21 @@ export function RegistrationDashboardPanel({
         <Card data-testid="bulk-bar">
           <div className="bulk-bar">
             <strong data-testid="bulk-count">{selected.size} selected</strong>
-            <Button size="sm" onClick={() => void runBulk("approve")} loading={busy} data-testid="bulk-approve">
+            <Button
+              size="sm"
+              onClick={() => void runBulk("approve")}
+              loading={busy}
+              data-testid="bulk-approve"
+            >
               Approve
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => void runBulk("waitlist")} loading={busy} data-testid="bulk-waitlist">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void runBulk("waitlist")}
+              loading={busy}
+              data-testid="bulk-waitlist"
+            >
               Waitlist
             </Button>
             <Select
@@ -350,10 +367,21 @@ export function RegistrationDashboardPanel({
                 </option>
               ))}
             </Select>
-            <Button size="sm" variant="danger" onClick={() => void runBulk("reject")} loading={busy} data-testid="bulk-reject">
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => void runBulk("reject")}
+              loading={busy}
+              data-testid="bulk-reject"
+            >
               Reject
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => void runBulk("restore")} loading={busy}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void runBulk("restore")}
+              loading={busy}
+            >
               Restore
             </Button>
           </div>
@@ -457,7 +485,9 @@ export function RegistrationDashboardPanel({
               <li key={index}>
                 <Badge tone="neutral">{entry.action.replace("registration.", "")}</Badge>
                 <span className="timeline-at">{new Date(entry.at).toLocaleString()}</span>
-                {isNote(entry.meta) ? <span className="timeline-note">“{entry.meta.note}”</span> : null}
+                {isNote(entry.meta) ? (
+                  <span className="timeline-note">“{entry.meta.note}”</span>
+                ) : null}
               </li>
             ))}
           </ol>
@@ -471,7 +501,11 @@ export function RegistrationDashboardPanel({
               }}
               placeholder="Verified via club captain"
             />
-            <Button size="sm" onClick={() => void submitNote(expanded)} disabled={noteText.trim() === ""}>
+            <Button
+              size="sm"
+              onClick={() => void submitNote(expanded)}
+              disabled={noteText.trim() === ""}
+            >
               Add note
             </Button>
           </div>
@@ -551,7 +585,11 @@ function StatTile({ label, value, testId }: { label: string; value: number; test
 }
 
 function isNote(meta: unknown): meta is { note: string } {
-  return typeof meta === "object" && meta !== null && typeof (meta as { note?: unknown }).note === "string";
+  return (
+    typeof meta === "object" &&
+    meta !== null &&
+    typeof (meta as { note?: unknown }).note === "string"
+  );
 }
 
 function RegRow({

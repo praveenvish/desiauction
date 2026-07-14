@@ -1,4 +1,4 @@
-import { ToastProvider } from "@desiauction/ui";
+import { ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { orgView } from "../../../server/orgs/actions";
@@ -18,7 +18,12 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     <ToastProvider>
       <main className="org-home">
         <div className="org-stack">
-          <h1 data-testid="org-name">{view.org.name}</h1>
+          <div className="org-title-row">
+            <h1 data-testid="org-name">{view.org.name}</h1>
+            <ButtonLink href={`/org/${slug}/venues`} variant="secondary" data-testid="open-venues">
+              Venues
+            </ButtonLink>
+          </div>
           <MembersPanel view={view} slug={slug} />
         </div>
       </main>

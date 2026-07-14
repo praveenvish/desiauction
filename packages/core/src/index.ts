@@ -36,3 +36,47 @@ export type {
 } from "./competition";
 export { parseRegistrationCsv, tokenizeCsv } from "./registration-csv";
 export type { CsvRegistrationRow, CsvRowError, CsvParseResult } from "./registration-csv";
+export {
+  fixtureTransition,
+  canEditFixture,
+  canRescheduleFixture,
+  competitionCode,
+  fixtureNumber,
+  isValidKickoff,
+  kickoffToMinutes,
+  addDays,
+  roundRobinPairings,
+  planRoundRobin,
+  detectConflicts,
+  conflictsInvolving,
+  blockingConflicts,
+  isGroundSurface,
+  isGroundStatus,
+  FIXTURE_STATUSES,
+  CONFLICT_SEVERITY,
+  GROUND_SURFACES,
+  GROUND_STATUSES,
+} from "./fixture";
+export type {
+  FixtureStatus,
+  FixtureEvent,
+  FixtureReadiness,
+  FixtureTransition,
+  RoundRobinPairing,
+  GeneratePlanInput,
+  GeneratePlanResult,
+  PlannedFixture,
+  ConflictType,
+  ConflictSeverity,
+  Conflict,
+  FixtureForConflicts,
+  CompetitionWindow,
+  GroundSurface,
+  GroundStatus,
+} from "./fixture";
+export {
+  parseFixtureCsv,
+  FIXTURE_CSV_HEADER,
+  DEFAULT_FIXTURE_DURATION_MINUTES,
+} from "./fixture-csv";
+export type { CsvFixtureRow, CsvFixtureError, FixtureCsvResult } from "./fixture-csv";
