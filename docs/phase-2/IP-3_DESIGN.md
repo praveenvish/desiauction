@@ -111,8 +111,8 @@ team, register a player, approve them — on FLOODLIGHT screens, axe zero, 360px
 |----|------|-------|
 | M-IP3-1 | **Domain Foundation** | Season + Competition + Team + Registration schema; core machines + rules; capability extension; web services + a demonstrable FLOODLIGHT slice (create competition → team → register → triage); full gates | **APPROVED** |
 | M-IP3-2 | **Registration at Scale** | Registration operations dashboard: server-driven search/filter/sort/pagination, statistics, bulk approve/reject/waitlist, restore, notes + audit timeline, duplicate detection, CSV import (validate→preview→commit) + export, keyboard shortcuts; the Competition registration **aggregate** as the sole mutation choke point; scale-proven to 300+ | **complete — this milestone** |
-| M-IP3-3 | Fixtures & Venues | Venues, grounds, fixtures, match lifecycle, results, standings, statistics (doc 38 H2 lens brought into scope by the directive) | planned |
-| M-IP3-4 | Competition APIs & Freeze | shared contracts for engine consumption (IP-4 input), DoD sweep → freeze | planned |
+| M-IP3-3 | Fixtures & Venues | Venues, grounds, fixture lifecycle, deterministic scheduling + shared conflict engine, calendar/match-day, CSV, 500+ scale (results/standings deliberately excluded — the OPEN M-IP3-3 directive scoped this milestone to scheduling only, superseding this row's earlier wider wording) | **APPROVED** |
+| M-IP3-4 | Competition Freeze | ScheduleSnapshot (the canonical downstream read model), `docs/competition/` closure package (architecture, 5 ADRs, API, threat model, DPDP, runbooks, performance, review package), full sweep rerun → **FROZEN `ip3-frozen`** | **complete — freeze** |
 
 ## 7 · Definition of Done (phase)
 

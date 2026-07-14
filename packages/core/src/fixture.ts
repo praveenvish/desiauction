@@ -481,13 +481,18 @@ export function detectConflicts(
     }
   }
 
-  // Pairwise checks (ids ascending → deterministic emission).
+  // Pairwise checks (ids ascending → deterministic emission). Intervals, pair
+  // keys and dates are computed ONCE per fixture, not per pair — kickoff parsing
+  // inside the O(n²) loop dominated at 500+ fixtures (measured, M-IP3-4).
+  const intervals = active.map(intervalOf);
+  const pairKeys = active.map(pairKey);
+  const dates = active.map((f) => f.kickoffAt?.slice(0, 10) ?? null);
   for (let i = 0; i < active.length; i++) {
     for (let j = i + 1; j < active.length; j++) {
       const a = active[i] as FixtureForConflicts;
       const b = active[j] as FixtureForConflicts;
-      const ia = intervalOf(a);
-      const ib = intervalOf(b);
+      const ia = intervals[i] ?? null;
+      const ib = intervals[j] ?? null;
       const overlap = ia !== null && ib !== null && overlaps(ia, ib);
       if (overlap && sharesTeam(a, b)) {
         conflicts.push(
@@ -508,12 +513,7 @@ export function detectConflicts(
           conflict("venue_overlap", [a.id, b.id], "two fixtures overlap at the same venue"),
         );
       }
-      if (
-        a.kickoffAt !== null &&
-        b.kickoffAt !== null &&
-        a.kickoffAt.slice(0, 10) === b.kickoffAt.slice(0, 10) &&
-        pairKey(a) === pairKey(b)
-      ) {
+      if (dates[i] !== null && dates[i] === dates[j] && pairKeys[i] === pairKeys[j]) {
         conflicts.push(
           conflict("duplicate_fixture", [a.id, b.id], "the same teams meet twice on one day"),
         );

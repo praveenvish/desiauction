@@ -1,6 +1,26 @@
 # PHASE GATE RECORDS
 ## Blueprint §4 universal checklist · one section per phase closure
 
+## IP-3 — Competition Core · FROZEN 2026-07-14 · tag `ip3-frozen`
+
+Milestone decisions: M-IP3-1 **APPROVED** · M-IP3-2 **APPROVED** · M-IP3-3 **APPROVED** · M-IP3-4 = this freeze.
+**Freeze meaning:** Competition is a platform dependency. The domain (machines, scheduling engine, conflict engine), aggregates, read models (FixtureSnapshot, **ScheduleSnapshot**), capability set, schema and RLS posture are stable; future phases (Auction IP-4 onward) **consume** Competition via the documented surfaces ([API](../competition/API.md), `scheduleSnapshot`) and do not redesign it. Regressions are defects.
+
+| # | Gate | Evidence (2026-07-14, freeze-candidate tree, everything rerun fresh) |
+|---|---|---|
+| 1 | Type safety | `tsc --strict` clean, 7/7 workspaces, zero suppressions in source |
+| 2 | Lint | 0 errors, 7/7 workspaces |
+| 3 | Unit tests | **134** — core **75** (fixture machine/generator/conflict engine/CSV **32** · competition machines 14 · capabilities 8 · registration ops 12 · money/phone 9) · ui 52 · engine 5 · contracts 2 |
+| 4 | Integration | **75 vs live PG17** — fixture-ops **25** (deterministic generation, team/ground/window conflict refusals, reschedule provenance, illegal transitions, published protection, completed immutability, mutation + import rollback, audit completeness, **SCHEDULE SNAPSHOT** determinism/deep-immutability/reconciliation, **RLS READ + WRITE PROOFS** on venues/grounds/fixtures, **520-fixture scale**) · registration-ops 13 (bulk ≡ N singles, bulk rollback, import atomicity, export scoping, 300-row scale) · competition 10 (incl. RLS proofs on the four M-IP3-1 tables) · authz 12 · security 8 · auth 7; migrations 0000–0007 re-applied idempotent |
+| 5 | Accessibility | axe **zero violations** on /competitions, registrations dashboard, fixtures dashboard, venues (+ all IP-1/IP-2 suites); keyboard triage shortcuts (j/k/x/a); 360px zero-overflow carried |
+| 6 | Performance | **Measured** (perf harness `perf:competition`, PG17 local, median/p95 over 20 runs): 520-fixture stats 0.4 ms · page-1 4.4 ms · deep page-21 3.7 ms · pure conflict engine 2.3 ms · conflict-checked reschedule 6.4 ms · **ScheduleSnapshot 4.4 ms** · CSV serialize 0.2 ms · 300-registration dashboard ≤ 9.2 ms p95. One measured defect fixed in-milestone: O(n²) kickoff re-parsing in the conflict engine (127 ms → 2.3 ms, behavior identical). First-load JS: heaviest competition route 114 kB |
+| 7 | Visual review | Founder walked M-IP3-1/2/3 journeys on FLOODLIGHT surfaces; the canonical Competition walkthrough (create → register → import → approve → venue → grounds → generate → publish → resolve conflict → calendar → export) is the exact 44/44-green e2e journey |
+| 8 | Founder review | M-IP3-1/2/3 decisions recorded above; M-IP3-3 blocking/warning conflict split confirmed at M-IP3-4 authorization; M-IP3-4 = this record |
+| 9 | Documentation | Permanent set shipped: `docs/competition/` (ARCHITECTURE · **ADRS ×5** (CompetitionAggregate, FixtureAggregate, ConflictEngine, ScheduleSnapshot, RegistrationModel) · API · THREAT_MODEL · DPDP_REVIEW · PERFORMANCE · RUNBOOKS · REVIEW_PACKAGE) + [closure report](IP-3_CLOSURE_REPORT.md). Deviations recorded: wall-clock TEXT time model (single-TZ assumption) · drafts hold slots · `start` on the FixtureAggregate · generation refused over live fixtures |
+| 10 | Architecture review | dep-cruiser 0 violations / 363 modules / 963 deps; one-way dependency direction verified (nothing in Competition imports Auction/Money — they do not exist); Playwright 44/44 real Chrome (one pre-existing orgs-axe spec flaked under parallel dev-compile load, passed on retry AND clean in isolation — the documented M-IP2-4 jitter, not a logic defect); e2e-in-CI decision (parked at this gate since IP-0) remains parked with the no-remote risk — CI cannot exist before the repository has a remote (founder tail item) |
+
+**Conditions carried forward (none freeze-blocking):** (1, before-production, carried from IP-2 and now spanning IP-2+IP-3 tables) wire `withTenant()` into the serving path; (2, IP-4 entry requirement) the Auction engine consumes Competition ONLY via `scheduleSnapshot`/approved-registration projections and must add the `AuctionReady` gate before ingesting; (3, advisory) serializable-transaction upgrade for conflict pre-checks if multi-organizer concurrency becomes real; (4, advisory) sweep-line interval index inside the conflict engine beyond ~2k live fixtures per org. All recorded in the closure report §6 and REVIEW_PACKAGE §14.
+
 ## IP-2 — Identity & Tenancy · FROZEN 2026-07-14 · tag `ip2-frozen`
 
 Milestone decisions: M-IP2-1 **APPROVED** · M-IP2-2 **APPROVED** · M-IP2-3 **APPROVED** · M-IP2-4 = this freeze.

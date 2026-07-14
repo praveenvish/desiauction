@@ -377,41 +377,20 @@ export async function organizerSchedule(
   });
 }
 
-// --- Export + audit timeline -------------------------------------------------------
-
-export const FIXTURE_EXPORT_HEADER =
-  "fixture_number,round,home_team,away_team,kickoff,venue,ground,status,duration_minutes";
-
-function csvCell(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
+// --- Snapshot constituents + audit timeline ------------------------------------------
 
 /**
- * Deterministic CSV export — stable (seq) order, snapshot fields only,
- * competition-scoped by the caller's capability + tenant resolution.
+ * Every fixture snapshot of a competition in seq order — the ScheduleSnapshot's
+ * fixture list (see schedule-snapshot.ts, the canonical downstream read model).
  */
-export async function exportFixturesCsv(db: Db, competitionId: string): Promise<string> {
+export async function competitionFixtureSnapshots(
+  db: Db,
+  competitionId: string,
+): Promise<FixtureSnapshot[]> {
   const rows = await snapshotQuery(db)
     .where(eq(fixtures.competitionId, competitionId))
     .orderBy(asc(fixtures.seq));
-  const lines = rows
-    .map(toSnapshot)
-    .map((f) =>
-      [
-        f.number,
-        f.round === null ? "" : String(f.round),
-        f.homeTeamName,
-        f.awayTeamName,
-        f.kickoffAt ?? "",
-        f.venueName ?? "",
-        f.groundName ?? "",
-        f.status,
-        f.durationMinutes === null ? "" : String(f.durationMinutes),
-      ]
-        .map(csvCell)
-        .join(","),
-    );
-  return [FIXTURE_EXPORT_HEADER, ...lines].join("\n");
+  return rows.map(toSnapshot);
 }
 
 export interface FixtureTimelineEntry {

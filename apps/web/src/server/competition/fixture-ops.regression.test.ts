@@ -51,13 +51,13 @@ import { commitFixtureImport } from "./fixture-import";
 import {
   calendarRange,
   competitionTimeline,
-  exportFixturesCsv,
   fixtureStats,
   fixtureTimeline,
   matchDay,
   queryFixtures,
   upcomingFixtures,
 } from "./fixtures";
+import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
 import { activeGroundsOf, createGround, createVenue, setGroundStatus, venuesOf } from "./venues";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
@@ -562,8 +562,8 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
     expect((await fixtureStats(db, comp.id)).total).toBe(before);
   });
 
-  it("EXPORT: deterministic seq order, tenant-scoped, and authorization enforced", async () => {
-    const csv = await exportFixturesCsv(db, comp.id);
+  it("EXPORT: a pure snapshot serialization — seq order, tenant-scoped, authz enforced", async () => {
+    const csv = serializeScheduleCsv(await scheduleSnapshot(db, comp));
     const lines = csv.split("\n");
     expect(lines[0]).toBe(
       "fixture_number,round,home_team,away_team,kickoff,venue,ground,status,duration_minutes",
@@ -581,7 +581,7 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
       homeTeamId: rt1.team.id,
       awayTeamId: rt2.team.id,
     });
-    expect(await exportFixturesCsv(db, comp.id)).not.toContain("Rival Reds");
+    expect(serializeScheduleCsv(await scheduleSnapshot(db, comp))).not.toContain("Rival Reds");
     // Export authorization = fixture.manage, which the outsider lacks here.
     expect(
       await canCompetition(
@@ -591,6 +591,39 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
         "fixture.manage",
       ),
     ).toBe(false);
+  });
+
+  it("SCHEDULE SNAPSHOT: deterministic, deeply immutable, and complete (M-IP3-4)", async () => {
+    const first = await scheduleSnapshot(db, comp);
+    const second = await scheduleSnapshot(db, comp);
+    // Deterministic: identical database state → identical snapshot value.
+    expect(second).toEqual(first);
+    expect(serializeScheduleCsv(second)).toBe(serializeScheduleCsv(first));
+    // Deeply immutable: the snapshot and every nested node are frozen.
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.competition)).toBe(true);
+    expect(Object.isFrozen(first.fixtures)).toBe(true);
+    expect(first.fixtures.every((f) => Object.isFrozen(f))).toBe(true);
+    expect(Object.isFrozen(first.venues)).toBe(true);
+    expect(first.venues.every((v) => Object.isFrozen(v) && Object.isFrozen(v.grounds))).toBe(true);
+    expect(Object.isFrozen(first.teams)).toBe(true);
+    expect(Object.isFrozen(first.stats)).toBe(true);
+    // Complete + consistent: fixtures reconcile with stats, ordering is total,
+    // and every referenced ground resolves inside the snapshot itself.
+    expect(first.fixtures.length).toBe(first.stats.total);
+    expect(first.fixtures.map((f) => f.seq)).toEqual(
+      [...first.fixtures.map((f) => f.seq)].sort((a, b) => a - b),
+    );
+    const groundIds = new Set(first.venues.flatMap((v) => v.grounds.map((g) => g.id)));
+    for (const fixture of first.fixtures) {
+      if (fixture.groundId !== null) {
+        expect(groundIds.has(fixture.groundId)).toBe(true);
+      }
+    }
+    // The competition code matches the fixture-number prefix.
+    expect(first.fixtures.every((f) => f.number.startsWith(`${first.competition.code}-F`))).toBe(
+      true,
+    );
   });
 
   it("RLS PROOF (fixtures/venues/grounds): cross-tenant + no-context reads are empty", async () => {

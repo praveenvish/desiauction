@@ -36,7 +36,6 @@ import { commitFixtureImport, unknownImportNames } from "./fixture-import";
 import {
   calendarRange,
   competitionTimeline,
-  exportFixturesCsv,
   fixtureStats,
   fixtureTimeline,
   matchDay,
@@ -54,6 +53,7 @@ import {
   type MatchDayGround,
   type OrganizerFixture,
 } from "./fixtures";
+import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
 import {
   activeGroundsOf,
   createGround,
@@ -551,7 +551,10 @@ export async function fixtureImportCommitAction(
   return { ok: true, imported: result.imported };
 }
 
-/** Export authorization = fixture.manage; deterministic, competition-scoped CSV. */
+/**
+ * Export authorization = fixture.manage. The CSV is a pure serialization of the
+ * ScheduleSnapshot — exports never read mutable fixture entities (M-IP3-4).
+ */
 export async function exportFixturesAction(
   slug: string,
 ): Promise<{ ok: true; csv: string; filename: string } | { ok: false; error: string }> {
@@ -559,6 +562,10 @@ export async function exportFixturesAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const csv = await exportFixturesCsv(db, gate.competition.id);
-  return { ok: true, csv, filename: `${gate.competition.slug}-fixtures.csv` };
+  const snapshot = await scheduleSnapshot(db, gate.competition);
+  return {
+    ok: true,
+    csv: serializeScheduleCsv(snapshot),
+    filename: `${gate.competition.slug}-fixtures.csv`,
+  };
 }
