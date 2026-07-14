@@ -219,3 +219,116 @@ instances is the projection-equality proof operators can see.
 **Evidence.** Regression: diagnostics shape; snapshot-hash = sha256(broadcast
 bytes); halted visibility + recovery duration; spectator isolation over the
 serialized snapshot.
+
+---
+
+## ADR-6 · The bid ledger lives in the replay reducer (M-IP4-4)
+
+**Status.** Accepted · 2026-07-14 · certification defect **D-2**.
+
+**Context.** The `bids` table is a projection of `BidAccepted`/`BidInvalidated`,
+and it is the row the gavel reads the **sale price** from (`leadingBidOf` →
+`soldPrice` → the `LotSold` event). The reducer did not model bids, so
+`diffProjection` could not verify them: a bid row corrupted in the database would
+be **sold at the corrupted price**, and the lie written into the immutable log as
+history. Proved live: a doubled bid amount left the watchdog silent (`halted: null`).
+
+**Decision.** The reducer folds a `bids` projection (`BidAccepted` records the bid
+and demotes the previous leader to `outbid`; `BidInvalidated` voids it, and an
+unknown bid id fails replay closed). `diffProjection` verifies every bid row's
+amount, paddle, lot and status against the log — plus rows missing from the log
+and events missing a row. `recoverAuction` heals bid rows from the events.
+
+**Alternatives rejected.** (a) Verify bids in the aggregate rather than the
+reducer — that would create a second authority on what the events say. (b) Trust
+the rows because only the engine writes them — precisely the assumption
+certification exists to destroy; the threat model's A5 (database write access) is
+real, and the drill proved the hole.
+
+**Consequences.** The rule now holds without exception: **if the engine reads a
+row to make a decision, the watchdog verifies that row against the log.** An
+attacker with write access to the projection tables cannot steal a lot — tampering
+is detected on the next command, halts the auction, and is healed from the log.
+Cost: the `bids` map in the projection, and one extra query per rebuild (folded
+into the existing parallel read; `buildLiveSnapshot` at 2 500 lots = 25.3 ms).
+
+**Evidence.** `certification.integration.test.ts` §RECOVERY (tampered amount →
+halt → heal; re-crowned losing bid → halt → heal) · `auction-conduct.test.ts` §D-2.
+
+---
+
+## ADR-7 · The undo window closes per-LOT, not only on the next open (M-IP4-4)
+
+**Status.** Accepted · 2026-07-14 · certification defect **D-1** (freeze-blocking).
+
+**Context.** Doc 41: undo is allowed "until the next lot opens". `decideUndo`
+implemented exactly that — and so it happily targeted a resolution that a later
+`LotRequeued` had already superseded, writing `LotReopened` onto a lot that replay
+sees as `queued`. The reducer rejects that transition, so the log **stopped
+folding, permanently**; and because recovery *is* a replay, `RecoverAuction` failed
+too. The auction was **unrecoverable**. Reachable by an ordinary conductor: lot
+goes unsold → requeue it → change your mind → Undo.
+
+**Decision.** The window also closes when the **target lot** has been requeued,
+withdrawn or frozen since it resolved. The check is **per-lot**: acting on an
+unrelated lot never blocks a legitimate undo. Defence in depth: `undoLastAction`
+re-checks the lot's row status before writing, so an unreplayable compensating
+event requires two independent failures.
+
+**Alternatives rejected.** (a) Close the window on *any* subsequent lot event —
+simpler, but it would refuse legitimate undos (e.g. queueing an unrelated lot after
+a sale). (b) Make the reducer *tolerate* `LotReopened` from `queued` — this would
+have "fixed" the crash by making the compensating event silently mean something
+different depending on state, which is exactly the class of ambiguity event
+sourcing exists to prevent.
+
+**Consequences.** Undo is now total: for every reachable log, `UndoLastAction`
+either produces a replayable compensating pair or refuses with
+`undo_window_closed`. The reducer's fail-closed rejection of the poisoned event is
+retained *and pinned by a regression* — the mechanism that made this catastrophic
+is what caught it.
+
+**Evidence.** `auction-conduct.test.ts` §D-1 (incl. a test asserting the poisoned
+event is still rejected by the reducer) · `certification.integration.test.ts`
+§REGRESSION D-1 (undo after requeue; undo after withdraw).
+
+---
+
+## ADR-8 · The paddle rows are verified against the log (M-IP4-4)
+
+**Status.** Accepted · 2026-07-14 · **independent hostile audit**, freeze-blocking defect **D-3**.
+
+**Context.** ADR-6 (D-2) brought the `bids` table under projection verification but
+stopped there. The independent certification review attacked the `paddles` table —
+which the engine reads on the bid hot path: `personId` gates *who* may bid
+(`holder = paddle.personId === actor`), `teamId` attributes every bid and sale to a
+purse/squad/role, and `releasedAt` gates whether the paddle may bid at all. None
+was verified. Proved live: reassigning a paddle's `personId` directly in the
+database, then restarting the engine, left `halted: null` — an **undetected
+authorization hijack**, plus latent purse misattribution via `teamId`.
+
+**Decision.** `diffProjection` now verifies every paddle row (team, person, number,
+released) against the reducer's `PaddleProjection`, and `recoverAuction` heals them
+from `PaddleIssued`/`PaddleReleased`. The reducer additionally records the exact
+release timestamp (`releasedAtMs`, from the event `atMs`) so `released_at` heals
+precisely. Lot `roundsUsed` (the unsold-policy counter, already folded by the
+reducer) was verified in the same change.
+
+**Alternatives rejected.** (a) Rely on the DB partial-unique index `(auction_id,
+team_id) WHERE released_at IS NULL` — it blocks *some* team swaps but does nothing
+for `personId`, and the drill proved it. (b) Treat paddle identity as immutable
+"reference data" exempt from verification — false: it lives in a mutable table an
+operator or attacker can write, and the engine reads it to authorize money.
+
+**Consequences.** The verification rule is now **absolute and complete**: every row
+the engine reads to make a decision — auction status, lots (incl. rounds), bids,
+paddles — is verified against the log and healed from it. An attacker with
+projection-table write access can corrupt none of them undetected. Cost: one small
+`loadPaddleRows` query per rebuild (≈10 rows regardless of pool size); measured
+performance is unchanged.
+
+**Evidence.** `certification.integration.test.ts` §RECOVERY (corrupted paddle
+person → halt → heal; corrupted paddle release → halt → heal; corrupted lot rounds
+→ halt → heal) · `auction-conduct.test.ts` §D-3 (the reducer records the release
+timestamp). Found by the independent audit; the throwaway probe that found it is
+promoted into these permanent drills.

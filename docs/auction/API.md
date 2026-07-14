@@ -46,7 +46,7 @@ codes-to-copy mapping is a surface concern (doc 21), never an engine one.
 |---|---|---|
 | `POST /command` | `x-engine-secret` | Submit an `AuctionCommandEnvelope`; returns the deterministic `CommandAck` |
 | `GET /snapshot/:auctionId` | `x-engine-secret` | The current serialized snapshot (409 while halted) |
-| `GET /ws?auction&ticket` | HMAC ticket | Snapshot broadcast: full snapshot on join, then every change + 10s heartbeats |
+| `GET /ws?auction&ticket` | windowed HMAC ticket (bounded ≤ 48h) | Snapshot broadcast: full snapshot on join, then every change + 10s heartbeats |
 | `GET /healthz` | — | db + watchdog-stall checks, fail-closed 503 |
 | `POST /admin/reset` | secret, non-production | Drop in-memory state (≡ restart); replay-on-load rebuilds |
 
@@ -113,3 +113,28 @@ Pause / Resume / Complete / Abort, QueueLots, IssuePaddle, RecoverAuction) —
 `lotLifecycleAction` is gone (lot conduct lives on the cockpit through the
 gateway); `createAuctionAction` alone still calls the aggregate (creation
 precedes live state). The engine reset nudge (`notifyEngineReset`) is deleted.
+
+---
+
+## FROZEN (M-IP4-4)
+
+The auction API surface is **frozen**. The full command contract — authority,
+validation, transition, events, ledger impact and recovery behaviour for each of
+the 20 commands — is specified in [COMMAND_MODEL](COMMAND_MODEL.md). The wire
+contract every surface renders is specified in [SNAPSHOT](SNAPSHOT.md).
+
+### Engine endpoints (web-tier only — `x-engine-secret`, constant-time compared)
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /command` | the single mutation gateway; returns a deterministic `CommandAck` |
+| `GET /snapshot/:auctionId` | current snapshot bytes; **409 while halted** — a lying snapshot is never served |
+| `GET /diagnostics/:auctionId` | counters + hashes only; never payloads, never secrets ([DIAGNOSTICS](DIAGNOSTICS.md)) |
+| `GET /healthz` | `db` + `watchdog`; **503** if the timer authority has stalled |
+| `POST /admin/reset` | drop in-memory state ≙ restart. **404 in production** |
+| `WS /ws?auction=&ticket=` | **snapshots only**; windowed HMAC ticket (bounded ≤ 48h), constant-time compared |
+
+**Stability contract.** Additive fields are a minor version. Removing or re-typing
+a field, adding a command, or adding an event type is a **breaking change
+requiring an ADR and a thaw** — downstream phases consume these surfaces and must
+never need them changed.

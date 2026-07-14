@@ -82,3 +82,69 @@ ledger records the evidence.
 **Undo never threatens recovery.** Compensating events (`LotReopened` +
 `BidInvalidated`) replay like any others; the regression suite pins that a
 fresh engine folds an undone night to byte-identical snapshot state.
+
+---
+
+## CERTIFICATION UPDATE (M-IP4-4)
+
+### The diff now covers every row the engine derives truth from
+
+`diffProjection` verifies the auction status, the lot rows (status, sale price,
+sold paddle) **and — new in M-IP4-4 — the bid rows** (amount, paddle, lot,
+status), plus rows the log does not know about and events with no row.
+
+This closed **defect D-2**: the `bids` table is where the gavel reads the sale
+price from, and it was previously unverified. `recoverAuction` now **heals bid
+rows from the events** as well.
+
+### Healable vs. unhealable — the load-bearing distinction
+
+| Class | Example | Recovery |
+|---|---|---|
+| **Derived rows diverge from the log** | lot status, sale price, **bid amount**, auction status | **Healed FROM the log.** The log wins; rows are rebuilt. |
+| **The log itself is corrupt** | `sequence_gap`, `illegal_replayed_transition`, `unknown_event_type`, `timer_shrank`, `unknown_bid` | **NEVER healed.** Replay stops, **no snapshot is ever served**, and `RecoverAuction` refuses. |
+
+The platform **will not invent history**. Folding around a hole would produce a
+*plausible but false* auction — exactly what C-2 (zero silent failures) forbids.
+Operator procedure for an unhealable log: [RUNBOOKS](RUNBOOKS.md) §4.
+
+### Measured
+
+| Auction size | Restart → replay → verify → snapshot |
+|---|---|
+| 100 lots | **3.1 ms** |
+| 500 lots | 6.5 ms |
+| 2 500 lots (5 063 events) | **28.5 ms** |
+
+Recovery is a **non-risk**: it is not on the critical path of anything. This is
+why availability is answered by fast recovery rather than by replication — and why
+a second writer is architecturally forbidden (C-9).
+
+### Certified drills
+
+Kill + restart (byte-identical snapshot from the log alone) · corrupted lot row ·
+**corrupted bid amount** · **re-crowned losing bid** · corrupted auction status ·
+corrupted snapshot cache (derived, never authoritative — dropping it restores from
+the log) · poisoned log with a sequence gap (halts, stays halted, recovery
+refuses) · duplicate commands · deep verification. Commands are asserted **refused
+while halted**. See `apps/engine/src/integration/certification.integration.test.ts`.
+
+### The verified rows (complete set, after D-3)
+
+`diffProjection` and `recoverAuction` cover **every row the engine reads to make a
+decision**:
+
+| Table | Verified against the log | Healed from |
+|---|---|---|
+| `auctions` | status | `Auction*` events |
+| `lots` | status, sale price, sold paddle, **rounds used** | lot events |
+| `bids` | amount, paddle, lot, status | `BidAccepted` / `BidInvalidated` (D-2) |
+| `paddles` | **team, person, number, released** | `PaddleIssued` / `PaddleReleased` (D-3) |
+
+Defect **D-3**: the `paddles` table gates authorization (`personId`) and purse/
+squad/role attribution (`teamId`), yet was outside verification — a reassigned
+paddle was an undetected authorization hijack. The reducer already folded the
+paddle identity; it now also records the exact release timestamp so the row heals
+precisely. Both gaps (D-2 bids, D-3 paddles) were found by hostile drills, and the
+rule is now absolute: **if the engine reads a row to decide, the watchdog verifies
+it.**

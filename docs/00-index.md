@@ -143,6 +143,15 @@ Ratified cross-cutting decisions. Every document cites these as `C-n`.
 | Architecture Review | [reviews/architecture-review.md](reviews/architecture-review.md) |
 | CTO Review | [reviews/cto-review.md](reviews/cto-review.md) |
 
+### Permanent engineering assets (built phase by phase; the canon above governs them)
+
+| Domain | Index |
+|--------|-------|
+| **Auction** (IP-4 · **frozen**) | [auction/ARCHITECTURE](auction/ARCHITECTURE.md) · [ADRS ×8](auction/ADRS.md) · [COMMAND_MODEL](auction/COMMAND_MODEL.md) · [EVENT_CATALOG](auction/EVENT_CATALOG.md) · [SNAPSHOT](auction/SNAPSHOT.md) · [LEDGER](auction/LEDGER.md) · [RECOVERY](auction/RECOVERY.md) · [DIAGNOSTICS](auction/DIAGNOSTICS.md) · [PERFORMANCE](auction/PERFORMANCE.md) · [SECURITY](auction/SECURITY.md) · [THREAT_MODEL](auction/THREAT_MODEL.md) · [RUNBOOKS](auction/RUNBOOKS.md) · [API](auction/API.md) · [MONEY](auction/MONEY.md) · [REVIEW_PACKAGE](auction/REVIEW_PACKAGE.md) · [IP-4 closure](auction/IP-4_CLOSURE_REPORT.md) |
+| **Competition** (IP-3 · frozen) | [competition/ARCHITECTURE](competition/ARCHITECTURE.md) · [ADRS](competition/ADRS.md) · [API](competition/API.md) · [PERFORMANCE](competition/PERFORMANCE.md) · [RUNBOOKS](competition/RUNBOOKS.md) · [THREAT_MODEL](competition/THREAT_MODEL.md) · [REVIEW_PACKAGE](competition/REVIEW_PACKAGE.md) |
+| **Identity** (IP-2 · frozen) | [identity/](identity/) |
+| Phase gate records | [phase-2/GATES.md](phase-2/GATES.md) |
+
 ## Glossary (canonical terms)
 
 - **Engine** — the single server-authoritative auction runtime; the only writer of auction money and outcomes.

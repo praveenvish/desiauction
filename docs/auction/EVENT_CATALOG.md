@@ -65,3 +65,48 @@ input), `recoveries` (count of `AuctionRecovered`). New fail-closed reasons:
 **BidInvalidated (updated).** Now emitted by BOTH the frozen-leader requeue AND
 the compensating undo (`reason:"undo"`); the bid ROW transitions to
 `invalidated` — voided-but-visible, forever.
+
+---
+
+## v1.3 — CERTIFICATION (M-IP4-4) · **CATALOG CLOSED**
+
+**28 event types. The set is FROZEN.** The reducer fails closed on anything else
+(`unknown_event_type`) — which is also why an older engine reading a newer log
+**halts loudly** instead of mis-folding it. Adding an event type is an ADR.
+
+### The bid ledger is now replayed (defect D-2)
+
+The `bids` table is a projection of `BidAccepted`/`BidInvalidated` — and it is the
+row the gavel reads the **sale price** from (`leadingBidOf` → `soldPrice` → the
+`LotSold` event). Until M-IP4-4 the reducer did not model it, so those rows were
+outside projection verification: a corrupted bid row would have been **sold at the
+corrupted price**, with the lie then written into the immutable log as history.
+
+The reducer now folds a `bids` projection, so the money rows can be verified
+against the log on every command:
+
+| Event | Additional replay effect (v1.3) |
+|---|---|
+| `BidAccepted` | records the bid `{lotId, paddleId, amount, status:"accepted"}` **and demotes the previous leader to `outbid`** — mirroring exactly what the aggregate writes to the rows, so the two can be compared |
+| `BidInvalidated` | the bid → `invalidated` (voided-but-visible). An id the log never accepted fails replay closed (**`unknown_bid`**) |
+
+**Projection addition (v1.3):** `bids: Record<bidId, {lotId, paddleId, amount, status}>`.
+
+**Replay integrity — the complete closed set of fail-closed reasons:**
+`sequence_gap` · `unknown_event_type` · `illegal_replayed_transition` ·
+`malformed_*` · `unknown_lot` · `unknown_paddle` · `unknown_invite` ·
+**`unknown_bid`** · `timer_shrank`.
+
+**Certified:** a bid amount tampered with directly in the database now **halts the
+engine** (`bid …: amount diverged (rows=X events=Y)`) and is **healed from
+`BidAccepted`** by `RecoverAuction`. See [SECURITY](SECURITY.md) §4,
+[DIAGNOSTICS](DIAGNOSTICS.md) §3.
+
+### The paddle rows are now verified (defect D-3)
+
+`PaddleReleased` additionally records the **release timestamp** on the projection
+(`PaddleProjection.releasedAtMs`, from the event's `atMs`) so recovery can heal the
+`paddles.released_at` column precisely. The `paddles` table gates authorization
+(`personId`) and purse/squad/role attribution (`teamId`); it is now verified
+against `PaddleIssued`/`PaddleReleased` on every command, and healed on recovery.
+See [SECURITY](SECURITY.md) §4, [RECOVERY](RECOVERY.md).

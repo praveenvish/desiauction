@@ -137,8 +137,9 @@ clock rides the TRANSPORT envelope for client drift correction.
 
 ## 11 · WebSocket model
 
-Snapshots only — never rules, never timer logic. Connect requires an
-HMAC ticket minted by the web tier; on join the client receives the full
+Snapshots only — never rules, never timer logic. Connect requires a
+windowed HMAC ticket minted by the web tier (HMAC over `auctionId · 24h-window`,
+bounded ≤ 48h lifetime); on join the client receives the full
 current snapshot (reconnect ≡ snapshot replay); heartbeats every 10s carry
 `serverNowMs` (drift) and terminate dead sockets; clients reject frames whose
 version is older than what they hold. Countdown rendering is
@@ -245,3 +246,57 @@ claims). `/auction/spectate` — read-only ceremony + ribbon. `/auction/ledger`
 log with core's fold; the final frame's bytes compared against the live
 engine snapshot. `/auction/engine` (conduct) — recovery dashboard +
 diagnostics, 2s polling. `/owner-join/[token]` — invitation acceptance.
+
+---
+
+## 21 · Certification & freeze (M-IP4-4)
+
+The architecture above is **FROZEN**. The certification package that justifies
+the freeze:
+
+| Document | Certifies |
+|---|---|
+| [COMMAND_MODEL](COMMAND_MODEL.md) | the closed set of 20 commands: authority, validation, transition, events, ledger and recovery behaviour for each |
+| [SNAPSHOT](SNAPSHOT.md) | the wire contract; determinism measured (two independent engines → byte-identical bytes) |
+| [EVENT_CATALOG](EVENT_CATALOG.md) | the closed set of 28 events, incl. the replayed **bid ledger** (v1.3) |
+| [LEDGER](LEDGER.md) | immutable and append-only **by construction** — a pure fold, never a table |
+| [RECOVERY](RECOVERY.md) | healable vs. unhealable; measured (28.5 ms @2 500 lots) |
+| [DIAGNOSTICS](DIAGNOSTICS.md) | every watchdog halt condition and its recoverability |
+| [PERFORMANCE](PERFORMANCE.md) | the measured scale matrix and the certified operating envelope |
+| [SECURITY](SECURITY.md) · [THREAT_MODEL](THREAT_MODEL.md) | capability enforcement; what an attacker with DB write access can and cannot do |
+| [RUNBOOKS](RUNBOOKS.md) | operating the platform without the original authors |
+| [REVIEW_PACKAGE](REVIEW_PACKAGE.md) · [IP-4_CLOSURE_REPORT](IP-4_CLOSURE_REPORT.md) | the freeze decision |
+
+### The three defects certification found
+
+All were caught by **attacking** the platform, not by re-running its own passing
+tests, and all are now regression-locked. Their common thread is the whole point
+of hostile review: each was a row or a transition the engine *trusted*.
+
+- **D-1** — `UndoLastAction` after a requeue wrote an **unreplayable** `LotReopened`
+  event. Replay stopped folding at that seq, and since recovery *is* a replay, the
+  auction was **bricked forever**. Reachable by ordinary conduct. Fixed in the pure
+  core: the undo window now also closes when the **target lot itself** has been
+  requeued/withdrawn/frozen since it resolved (checked **per-lot**, so an unrelated
+  lot never blocks a legitimate undo), with a second guard in the aggregate.
+- **D-2** — the **`bids` table**, the row the gavel reads the **sale price** from,
+  was outside projection verification. The reducer now folds a bid ledger, the
+  watchdog verifies every bid row (amount, paddle, lot, status) against the log,
+  and recovery heals them from `BidAccepted`.
+- **D-3** — the **`paddles` table**, which gates *who* may bid (`personId`) and
+  attributes every bid and sale to a purse (`teamId`), was outside projection
+  verification — an **undetected authorization hijack**. Found by the independent
+  hostile audit re-attacking the very claim D-2 had declared true. The watchdog now
+  verifies every paddle row (team, person, number, released) against the log and
+  heals it. The verification rule is now complete: **every row the engine reads to
+  decide is verified.** ([ADR-6/7/8](ADRS.md))
+
+### The architectural boundary the freeze creates
+
+**One auction, one writer — permanently.** Not a stage to be grown out of.
+Horizontal scaling of a *single* auction is forbidden; fast recovery is the
+availability answer. Downstream phases **consume** Auction: they may read the
+ledger and snapshots, but they may not write `auction_events`, may not add a
+second source of truth for money, may not mutate lots/bids/paddles outside the
+aggregate, and may not require an auction-rule change to function. If one does,
+that is an **ADR and a thaw**, not a patch.
