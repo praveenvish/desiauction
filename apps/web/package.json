@@ -11,13 +11,16 @@
     "typecheck": "tsc --noEmit",
     "env:check": "tsx scripts/check-env.ts",
     "test:integration": "vitest run src/server",
-    "perf:competition": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-competition.ts"
+    "perf:competition": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-competition.ts",
+    "perf:collections": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-collections.ts",
+    "perf:closure": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-closure.ts"
   },
   "dependencies": {
     "@desiauction/auction": "workspace:*",
     "@desiauction/contracts": "workspace:*",
     "@desiauction/core": "workspace:*",
     "@desiauction/db": "workspace:*",
+    "@desiauction/settlement": "workspace:*",
     "@desiauction/ui": "workspace:*",
     "@sentry/nextjs": "10.65.0",
     "@simplewebauthn/browser": "^13.3.0",

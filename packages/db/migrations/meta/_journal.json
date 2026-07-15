@@ -78,6 +78,27 @@
       "when": 1784563200000,
       "tag": "0010_conduct_ceremony",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784649600000,
+      "tag": "0011_settlement_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784736000000,
+      "tag": "0012_collections_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784822400000,
+      "tag": "0013_closure_evidence",
+      "breakpoints": true
     }
   ]
 }

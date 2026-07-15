@@ -523,3 +523,194 @@ export const paddleGrants = pgTable(
     index("paddle_grants_person_idx").on(table.personId),
   ],
 );
+
+// --- Settlement (IP-5, M-IP5-1). Purely additive: nothing above this line changes.
+// Org-scoped; RLS read+write in migration 0011. Money is integer paise (bigint).
+// settlement_events is the APPEND-ONLY log of THREE streams (case · journal ·
+// payment) — the unique (stream_type, stream_id, seq) is the single-writer total
+// order, exactly as (auction_id, seq) is for the frozen auction log. Every other
+// settlement table below it is a DISPOSABLE projection, rebuildable from events.
+
+export const settlementEvents = pgTable(
+  "settlement_events",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    streamType: text("stream_type", { enum: ["case", "journal", "payment"] }).notNull(),
+    // caseId · orgId (the journal is per-org) · paymentId — all ULIDs.
+    streamId: char("stream_id", { length: 26 }).notNull(),
+    seq: integer("seq").notNull(),
+    type: text("type").notNull(),
+    atMs: bigint("at_ms", { mode: "number" }).notNull(),
+    actor: char("actor", { length: 26 }).notNull(),
+    correlationId: char("correlation_id", { length: 26 }).notNull(),
+    // The idempotency key of the CAUSE: a ULID for human commands, a derived id
+    // (`case:{id}:{seq}:{policy}`) for coordinated ones — so a policy re-run
+    // after a crash returns the original ack instead of posting twice.
+    commandId: text("command_id").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("settlement_events_stream_seq_uq").on(table.streamType, table.streamId, table.seq),
+    uniqueIndex("settlement_events_command_uq").on(
+      table.streamType,
+      table.streamId,
+      table.commandId,
+    ),
+    index("settlement_events_stream_idx").on(table.streamType, table.streamId),
+    index("settlement_events_org_idx").on(table.orgId),
+  ],
+);
+
+export const settlementCases = pgTable(
+  "settlement_cases",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    status: text("status", {
+      enum: ["opened", "verified", "discrepant", "settling", "settled", "closed", "voided"],
+    })
+      .notNull()
+      .default("opened"),
+    basis: text("basis", { enum: ["committed", "fixed", "none"] }).notNull(),
+    // The intake PIN: what the frozen auction log looked like when trusted.
+    sourceEventCount: integer("source_event_count").notNull(),
+    sourceDigest: text("source_digest").notNull(),
+    foldDigest: text("fold_digest"),
+    // Closure (M-IP5-3): the immutable evidence package + the closed anchor.
+    // Both are re-derivable from the CaseClosed event — this column is a
+    // disposable projection, rebuilt by recovery, verified against the log.
+    closureEvidence: jsonb("closure_evidence"),
+    closedAtSeq: integer("closed_at_seq"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // One live case per auction; a voided case never blocks a fresh attempt.
+  (table) => [
+    uniqueIndex("settlement_cases_auction_live_uq")
+      .on(table.auctionId)
+      .where(sql`status <> 'voided'`),
+    index("settlement_cases_org_idx").on(table.orgId),
+  ],
+);
+
+export const settlementObligations = pgTable(
+  "settlement_obligations",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    caseId: char("case_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    // Every counter is NON-NEGATIVE money; outstanding is DERIVED from them and
+    // stored nowhere (invariant: no balance has a column).
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    increased: bigint("increased", { mode: "number" }).notNull().default(0),
+    reduced: bigint("reduced", { mode: "number" }).notNull().default(0),
+    discharged: bigint("discharged", { mode: "number" }).notNull().default(0),
+    waived: bigint("waived", { mode: "number" }).notNull().default(0),
+    reinstated: bigint("reinstated", { mode: "number" }).notNull().default(0),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("settlement_obligations_case_team_uq").on(table.caseId, table.teamId),
+    index("settlement_obligations_org_idx").on(table.orgId),
+  ],
+);
+
+export const journalPostings = pgTable(
+  "journal_postings",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    // The journal stream is per-org, so (org, event seq) is the posting's place
+    // in the one total order money moves in.
+    eventSeq: integer("event_seq").notNull(),
+    template: text("template", {
+      enum: ["obligation", "collection", "overpaid-collection", "waiver", "refund"],
+    }).notNull(),
+    caseId: char("case_id", { length: 26 }),
+    teamId: char("team_id", { length: 26 }),
+    // Provenance: the event that caused it. ONE cause, ONE posting.
+    sourceStream: text("source_stream").notNull(),
+    sourceSeq: integer("source_seq").notNull(),
+    memo: text("memo"),
+    atMs: bigint("at_ms", { mode: "number" }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("journal_postings_org_event_uq").on(table.orgId, table.eventSeq),
+    uniqueIndex("journal_postings_source_uq").on(table.orgId, table.sourceStream, table.sourceSeq),
+    index("journal_postings_case_idx").on(table.orgId, table.caseId),
+  ],
+);
+
+export const journalLegs = pgTable(
+  "journal_legs",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    postingId: char("posting_id", { length: 26 }).notNull(),
+    legIndex: integer("leg_index").notNull(),
+    account: text("account").notNull(),
+    direction: text("direction", { enum: ["debit", "credit"] }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("journal_legs_posting_index_uq").on(table.postingId, table.legIndex),
+    index("journal_legs_account_idx").on(table.orgId, table.account),
+  ],
+);
+
+export const journalCheckpoints = pgTable(
+  "journal_checkpoints",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    seq: integer("seq").notNull(),
+    digest: text("digest").notNull(),
+    // The canonical fold bytes. Disposable acceleration, never truth: trusted
+    // only once a genesis re-fold proves it byte-identical (verified_at).
+    bytes: text("bytes").notNull(),
+    verifiedAt: ts("verified_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("journal_checkpoints_org_seq_uq").on(table.orgId, table.seq)],
+);
+
+// --- Collections (IP-5, M-IP5-2). Additive: nothing above changes. The `payments`
+// table is the DISPOSABLE projection of the payment stream — one row per attempt,
+// rebuildable from settlement_events. Money is integer paise (bigint); the id IS
+// the stream id (paymentId). RLS read+write in migration 0012.
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    caseId: char("case_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    method: text("method", {
+      enum: ["gateway:razorpay", "manual:cash", "manual:upi-direct", "manual:bank"],
+    }).notNull(),
+    status: text("status", {
+      enum: ["created", "authorized", "captured", "refunded", "failed", "disputed"],
+    })
+      .notNull()
+      .default("created"),
+    // Pinned at initiation; the amount every later provider claim is checked against.
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    captured: bigint("captured", { mode: "number" }).notNull().default(0),
+    refundedTotal: bigint("refunded_total", { mode: "number" }).notNull().default(0),
+    attested: boolean("attested").notNull().default(false),
+    attestedBy: char("attested_by", { length: 26 }),
+    providerRef: text("provider_ref"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("payments_org_idx").on(table.orgId),
+    index("payments_case_idx").on(table.caseId),
+  ],
+);
