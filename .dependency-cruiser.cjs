@@ -25,6 +25,39 @@ module.exports = {
       to: { path: "^apps" },
     },
     {
+      name: "no-app-to-finops-runner",
+      comment: "the runner is a leaf process; no app imports it (IP-6 §4)",
+      severity: "error",
+      from: { path: "^apps/(web|engine)" },
+      to: { path: "^apps/finops-runner" },
+    },
+    {
+      name: "finops-runner-imports-packages-only",
+      comment: "the runner holds no edge into web or engine (IP-6 §4)",
+      severity: "error",
+      from: { path: "^apps/finops-runner" },
+      to: { path: "^apps/(web|engine)" },
+    },
+    {
+      name: "finops-domain-is-pure",
+      comment:
+        "packages/financial-operations outside server/ is pure domain: no db, no auction, no apps (IP-6 §5; only src/server may touch @desiauction/db)",
+      severity: "error",
+      from: {
+        path: "^packages/financial-operations/src",
+        pathNot: "^packages/financial-operations/src/server",
+      },
+      to: { path: "^packages/(db|auction)|^apps" },
+    },
+    {
+      name: "finops-never-imports-settlement-server",
+      comment:
+        "finops consumes frozen settlement PURE folds only; the settlement writer/store live in apps/web and stay out of reach (IP-6 §4)",
+      severity: "error",
+      from: { path: "^packages/financial-operations" },
+      to: { path: "^apps/web/src/server/settlement" },
+    },
+    {
       name: "no-ui-to-core",
       severity: "error",
       from: { path: "^packages/ui" },

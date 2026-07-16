@@ -714,3 +714,264 @@ export const payments = pgTable(
     index("payments_case_idx").on(table.caseId),
   ],
 );
+
+// --- Financial Operations (IP-6, M-IP6-1). Purely additive: nothing above this
+// line changes. Org-scoped; RLS read+write in migration 0014. finops_events is
+// the APPEND-ONLY log of FIVE streams (profile · series · dispatch · export ·
+// period) — the unique (stream_type, stream_id, seq) is the single-writer total
+// order, the settlement discipline applied one platform up. Every finops table
+// below it is a DISPOSABLE projection (rebuildable from events) or operational
+// runner state (cursors, jobs — re-derivable, never truth). NO MONEY IS
+// CALCULATED HERE: every amount is a quoted settlement fact (integer paise).
+
+export const finopsEvents = pgTable(
+  "finops_events",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    streamType: text("stream_type", {
+      enum: ["profile", "series", "dispatch", "export", "period"],
+    }).notNull(),
+    // orgId (profile) · seriesId · dispatchId · exportId · periodId — all ULIDs.
+    streamId: char("stream_id", { length: 26 }).notNull(),
+    seq: integer("seq").notNull(),
+    type: text("type").notNull(),
+    atMs: bigint("at_ms", { mode: "number" }).notNull(),
+    actor: char("actor", { length: 26 }).notNull(),
+    correlationId: char("correlation_id", { length: 26 }).notNull(),
+    // ULID for human commands, a derived id for policy/scheduled ones — a re-run
+    // returns the original ack instead of acting twice.
+    commandId: text("command_id").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("finops_events_stream_seq_uq").on(table.streamType, table.streamId, table.seq),
+    uniqueIndex("finops_events_command_uq").on(table.streamType, table.streamId, table.commandId),
+    index("finops_events_stream_idx").on(table.streamType, table.streamId),
+    index("finops_events_org_idx").on(table.orgId),
+  ],
+);
+
+export const finopsProfiles = pgTable("finops_profiles", {
+  // The row id IS the stream id (orgId): byte-stable across recovery.
+  id: id(),
+  orgId: char("org_id", { length: 26 }).notNull().unique(),
+  legalName: text("legal_name").notNull(),
+  posture: text("posture", { enum: ["none", "gst-registered"] }).notNull(),
+  gstin: text("gstin"),
+  autoReceipt: boolean("auto_receipt").notNull().default(false),
+  version: integer("version").notNull(),
+  declaredBy: char("declared_by", { length: 26 }).notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+export const finopsSeries = pgTable(
+  "finops_series",
+  {
+    // The row id IS the stream id (seriesId).
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    kind: text("kind", { enum: ["receipt", "tax-invoice", "correction"] }).notNull(),
+    fy: text("fy").notNull(),
+    prefix: text("prefix").notNull(),
+    status: text("status", { enum: ["open", "closed"] })
+      .notNull()
+      .default("open"),
+    documentCount: integer("document_count").notNull().default(0),
+    registerDigest: text("register_digest"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // ONE numbering lane per org · kind · fiscal year — forever, closed included.
+  (table) => [
+    uniqueIndex("finops_series_key_uq").on(table.orgId, table.kind, table.fy),
+    index("finops_series_org_idx").on(table.orgId),
+  ],
+);
+
+export const finopsDocuments = pgTable(
+  "finops_documents",
+  {
+    // The row id IS the docId from the DocumentIssued event: byte-stable.
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    seriesId: char("series_id", { length: 26 }).notNull(),
+    number: integer("number").notNull(),
+    kind: text("kind", { enum: ["receipt", "tax-invoice", "correction"] }).notNull(),
+    partyType: text("party_type").notNull(),
+    partyId: text("party_id").notNull(),
+    // Label SNAPSHOT at issue — readable after renames/erasure (doc 48/49).
+    partyLabel: text("party_label").notNull(),
+    // A QUOTED settlement amount (integer paise) — never computed here.
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    corrects: char("corrects", { length: 26 }),
+    sourceRef: text("source_ref"),
+    profileSeq: integer("profile_seq").notNull(),
+    watermark: jsonb("watermark").notNull(),
+    contentDigest: text("content_digest").notNull(),
+    issuedAtSeq: integer("issued_at_seq").notNull(),
+    issuedBy: char("issued_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    // DENSE numbering is a schema fact, not just a reducer promise.
+    uniqueIndex("finops_documents_series_number_uq").on(table.seriesId, table.number),
+    // One settlement cause, one document per series.
+    uniqueIndex("finops_documents_source_uq")
+      .on(table.seriesId, table.sourceRef)
+      .where(sql`source_ref is not null`),
+    index("finops_documents_org_idx").on(table.orgId),
+  ],
+);
+
+export const finopsDispatches = pgTable(
+  "finops_dispatches",
+  {
+    // The row id IS the stream id (dispatchId).
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    status: text("status", { enum: ["requested", "sent", "confirmed", "failed"] })
+      .notNull()
+      .default("requested"),
+    channel: text("channel", { enum: ["in-app", "email", "whatsapp", "org-webhook"] }).notNull(),
+    recipientRef: text("recipient_ref").notNull(),
+    templateId: text("template_id").notNull(),
+    templateVersion: text("template_version").notNull(),
+    subjectRef: text("subject_ref").notNull(),
+    providerRef: text("provider_ref"),
+    providerEventRef: text("provider_event_ref"),
+    failureCode: text("failure_code"),
+    requestedBy: char("requested_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("finops_dispatches_org_idx").on(table.orgId)],
+);
+
+export const finopsExports = pgTable(
+  "finops_exports",
+  {
+    // The row id IS the stream id (exportId).
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    status: text("status", { enum: ["requested", "completed", "failed"] })
+      .notNull()
+      .default("requested"),
+    kind: text("kind", {
+      enum: ["tally-xml", "journal-csv", "gstr1-json", "audit-bundle", "archive-bundle"],
+    }).notNull(),
+    params: jsonb("params").notNull(),
+    requestedBy: char("requested_by", { length: 26 }).notNull(),
+    artifactRef: text("artifact_ref"),
+    artifactDigest: text("artifact_digest"),
+    rowCount: integer("row_count"),
+    watermark: jsonb("watermark"),
+    failureCode: text("failure_code"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("finops_exports_org_idx").on(table.orgId)],
+);
+
+export const finopsPeriods = pgTable(
+  "finops_periods",
+  {
+    // The row id IS the stream id (periodId).
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    fy: text("fy").notNull(),
+    status: text("status", { enum: ["open", "closed"] })
+      .notNull()
+      .default("open"),
+    openedBy: char("opened_by", { length: 26 }).notNull(),
+    openingWatermark: jsonb("opening_watermark").notNull(),
+    lastWatermark: jsonb("last_watermark").notNull(),
+    // The sealed evidence of the most recent close — a disposable projection of
+    // the PeriodClosed event, rebuilt by recovery, verified against the log.
+    evidence: jsonb("evidence"),
+    closedAtSeq: integer("closed_at_seq"),
+    openExceptions: integer("open_exceptions").notNull().default(0),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // ONE period per org · fiscal year, forever (reopen re-enters the same one).
+  (table) => [
+    uniqueIndex("finops_periods_org_fy_uq").on(table.orgId, table.fy),
+    index("finops_periods_org_idx").on(table.orgId),
+  ],
+);
+
+export const finopsPeriodDays = pgTable(
+  "finops_period_days",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    periodId: char("period_id", { length: 26 }).notNull(),
+    date: text("date").notNull(),
+    attestor: char("attestor", { length: 26 }).notNull(),
+    attestorKind: text("attestor_kind", { enum: ["system", "human"] }).notNull(),
+    failures: integer("failures").notNull().default(0),
+    checks: jsonb("checks").notNull(),
+    watermark: jsonb("watermark").notNull(),
+    attestedAtSeq: integer("attested_at_seq").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  // Latest attestation per date (history lives in the log).
+  (table) => [
+    uniqueIndex("finops_period_days_date_uq").on(table.periodId, table.date),
+    index("finops_period_days_org_idx").on(table.orgId),
+  ],
+);
+
+export const finopsCursors = pgTable(
+  "finops_cursors",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    // The consumed frontier over the READ-ONLY settlement streams. Operational
+    // state, never truth: rewinding to zero is always safe (effects are
+    // idempotent by derived command id).
+    streamType: text("stream_type").notNull(),
+    streamId: char("stream_id", { length: 26 }).notNull(),
+    lastSeq: integer("last_seq").notNull(),
+    updatedAtMs: bigint("updated_at_ms", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("finops_cursors_stream_uq").on(table.orgId, table.streamType, table.streamId),
+    index("finops_cursors_org_idx").on(table.orgId),
+  ],
+);
+
+export const finopsJobs = pgTable(
+  "finops_jobs",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    kind: text("kind").notNull(),
+    // The derived key: the same (kind, org, occasion) enqueues at most ONE job,
+    // so a crashed or double-fired scheduler is idempotent by the schema.
+    dedupeKey: text("dedupe_key").notNull(),
+    state: text("state", { enum: ["queued", "leased", "done", "dead"] })
+      .notNull()
+      .default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull(),
+    notBeforeMs: bigint("not_before_ms", { mode: "number" }).notNull(),
+    leasedUntilMs: bigint("leased_until_ms", { mode: "number" }),
+    lastError: text("last_error"),
+    payload: jsonb("payload").notNull(),
+    updatedAtMs: bigint("updated_at_ms", { mode: "number" }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("finops_jobs_dedupe_uq").on(table.orgId, table.dedupeKey),
+    index("finops_jobs_claim_idx").on(table.state, table.notBeforeMs),
+    index("finops_jobs_org_idx").on(table.orgId),
+  ],
+);
+
+// Platform schedule slots — ZERO tenant data (slot names and epoch instants
+// only), hence the one finops table without org_id/RLS. Documented in
+// IP-6_ARCHITECTURE §20 posture: RLS guards tenant rows; this holds none.
+export const finopsSchedules = pgTable("finops_schedules", {
+  slot: text("slot", { enum: ["daily-ops", "year-end"] }).primaryKey(),
+  nextDueMs: bigint("next_due_ms", { mode: "number" }).notNull(),
+  lastFiredMs: bigint("last_fired_ms", { mode: "number" }),
+});

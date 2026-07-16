@@ -99,6 +99,13 @@
       "when": 1784822400000,
       "tag": "0013_closure_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784908800000,
+      "tag": "0014_financial_operations_foundation",
+      "breakpoints": true
     }
   ]
 }

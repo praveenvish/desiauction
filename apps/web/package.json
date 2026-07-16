@@ -13,13 +13,15 @@
     "test:integration": "vitest run src/server",
     "perf:competition": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-competition.ts",
     "perf:collections": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-collections.ts",
-    "perf:closure": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-closure.ts"
+    "perf:closure": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-closure.ts",
+    "perf:finops": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-finops.ts"
   },
   "dependencies": {
     "@desiauction/auction": "workspace:*",
     "@desiauction/contracts": "workspace:*",
     "@desiauction/core": "workspace:*",
     "@desiauction/db": "workspace:*",
+    "@desiauction/financial-operations": "workspace:*",
     "@desiauction/settlement": "workspace:*",
     "@desiauction/ui": "workspace:*",
     "@sentry/nextjs": "10.65.0",
