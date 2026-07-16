@@ -1002,3 +1002,82 @@ re-measured fresh:
 holds at this artifact pending Founder review. No milestone is open; no
 implementation, schema, or code is authorized by this document.*
 
+---
+
+## 30 · Implementation reconciliation (IP-6 freeze · 2026-07-16)
+
+The architecture above (§1–§29) was ratified before implementation and built
+across M-IP6-1…4. Where the ratified design and the built system differ,
+**the documentation is corrected here to match the code** (the IP-4/IP-5
+rule; implementation won, and no certification challenge proved the
+implementation wrong). The catalog closed at exactly the ratified 23 types;
+every delta below is a refinement inside the ratified boundaries:
+
+- **Package and writer home (ADR-12).** The package is
+  `packages/financial-operations` (the authorization's name, not §5's
+  `finops` shorthand), and the writer/store/follower/pipelines live in its
+  `server/` subtree — the only code permitted to import `@desiauction/db`
+  (dependency-cruiser rule) — so `apps/web` and `apps/finops-runner` share
+  ONE mutation authority. §5's app-side writer placement is superseded.
+- **Job substrate (ADR-11).** The runner runs on an in-house Postgres
+  queue/schedule (`finops_jobs`/`finops_schedules`, SKIP-LOCKED leases, pure
+  deterministic backoff) rather than §5's pg-boss — doc 53's constitutional
+  core preserved; pg-boss remains a store-level swap. Org-scoped draining is
+  the landed sharding seam.
+- **Stream identity.** Streams are ULID-identified (`series:{seriesId}`,
+  `period:{periodId}`), with the ratified composite keys enforced as schema
+  uniques: ONE series per org·kind·fy and ONE period per org·fy — forever
+  (not §7's live-partial-unique).
+- **Tables.** Eleven tables shipped in migration `0014` (§5 listed nine):
+  the ratified nine minus a persisted `finops_attention` (the attention queue
+  is DERIVED — `complianceQueueSnapshot`) plus `finops_jobs` and
+  `finops_schedules`; `finops_schedules` is the one non-RLS table (platform
+  slots, zero tenant rows). No migration was needed after M-IP6-1.
+- **Period semantics.** `ExceptionNoted.date` is required; there is no
+  `acknowledgeException` command — acknowledgment IS a human `DayAttested`
+  at a later seq (deterministic, replay-enforced, §8.5's intent made exact).
+  Close coverage runs from the period's OPENING day (mid-year adoption is
+  sealable) and requires the year fully elapsed; the evidence is v2 with
+  prefix pins (§8.5's sketch completed; ADR-10), guarded against races
+  (`period_advanced_retry`).
+- **Documents.** Issuance commands arrived in M-IP6-2 exactly as the
+  foundation's dormant branches anticipated; corrections live in their own
+  lanes and quote compensating settlement facts only; **GST decomposition
+  did not ship** — registered issuers are refused invoices
+  (`tax_decomposition_not_available`, ADR-6). Party labels resolve through a
+  read-only `ReferencePort`. The §8.6 doc-impact policy edge (auto
+  `ExceptionNoted` on upstream compensations touching documented facts) was
+  NOT implemented — corrections are human-initiated; the gap is a recorded
+  operational item, not a silent one.
+- **Dispatch/Exports.** `DispatchConfirmed` covers provider callbacks,
+  synchronous channels AND manual attestation (`manual:{commandId}`); manual
+  cancellation maps onto `DispatchFailed(cancelled)`; transient provider
+  attempts are audited breadcrumbs, not events. Exports serialize the
+  DOCUMENT register only (the M-IP6-3 authorization narrowed §11's
+  journal-posting serialization — settlement's journal remains unexported
+  pending a future authorization); artifacts live behind
+  `ArtifactStorePort` (filesystem adapter shipped; S3 is a drop-in);
+  verification semantics per ADR-9. Coordination is scan-based throughout
+  (ADR-13) — §8.6's writer-side policy enqueueing never existed.
+- **Governance.** Certification and year-end verdicts are DERIVED facts with
+  audit breadcrumbs, not events (ADR-14); health derivation, the 8-check
+  operational checklist and the supervisor implement §15/§16 with the
+  clock always injected; supervisor thresholds are deterministic constants.
+- **Deferred, explicitly** (each visible in snapshots or refused
+  deterministically, never silent): GST decomposition (ADR-6) · the
+  doc-impact attention policy · `packages/contracts` wire schemas and any
+  public `/v1` surface (arrive with the first external consumer) ·
+  provider/S3 adapters (pre-deploy configuration) · dispatch `retryOf`
+  event-payload linkage (export retries carry it in params; dispatch retries
+  are traceable by subject+recipient).
+
+Everything else in §1–§29 is implemented as written. The freeze artifact and
+certification evidence are in [IP-6_FREEZE](IP-6_FREEZE.md); the closed
+catalog in [EVENT_CATALOG](EVENT_CATALOG.md); operating procedures in
+[RUNBOOKS](RUNBOOKS.md); the attacker model in [SECURITY](SECURITY.md); the
+ratified-and-earned decisions in [ADRS](ADRS.md); the milestone record in
+[M-IP6-1](M-IP6-1_REPORT.md) · [M-IP6-2](M-IP6-2_REPORT.md) ·
+[M-IP6-3](M-IP6-3_REPORT.md) · [M-IP6-4](M-IP6-4_REPORT.md).
+
+*§1–§29 are design-time (ratified before implementation). §30 is the freeze
+reconciliation to implemented truth.*

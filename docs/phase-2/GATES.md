@@ -1,6 +1,26 @@
 # PHASE GATE RECORDS
 ## Blueprint §4 universal checklist · one section per phase closure
 
+## IP-6 — Financial Operations · **FROZEN** 2026-07-16 · tag `ip6-frozen`
+
+Milestone decisions: M-IP6-1 **APPROVED** · M-IP6-2 **APPROVED** · M-IP6-3 **APPROVED** · M-IP6-4 **APPROVED** · IP-6 Freeze = this certification.
+**Freeze meaning:** Financial Operations is the platform's operational-governance layer and a pure CONSUMER forever: it follows frozen Settlement (read-only), issues reproducible documents that QUOTE it, delivers and archives them over fail-closed ports, attests days, seals years with prefix-pinned evidence, supervises health by derivation and certifies itself from replay. The closed 23-type catalog, the five aggregates, one writer, the follower/runner contracts, the capability partition and the RLS posture are **stable**. Downstream phases consume the registers, snapshots and ports; they never write finops events, never mint numbers outside the series lanes, and never require a finops or settlement rule change. Regressions are defects.
+
+| # | Gate | Evidence (2026-07-16, freeze tree, everything rerun fresh) |
+|---|---|---|
+| 1 | Type safety | `tsc --strict` clean, 11/11 workspaces, zero suppressions in source |
+| 2 | Lint | 0 errors, 11/11 workspaces (`--max-warnings 0`); prettier clean |
+| 3 | Unit tests | **84 finops** (profile 7 · series 10 · period 10 · dispatch 5 · export-run 4 · documents 15 · exporters 7 · operations 11 · capabilities 4 · follower 6 · runner 5) + all frozen suites green serially (settlement 89 unchanged) |
+| 4 | Integration | **261 vs live PG17** — finops **77** across four permanent hostile suites (foundation 30 · documents 15 · delivery 17 · governance 15) + frozen identity/competition/auction/settlement 184, all green together, three consecutive full runs; migration replay from EMPTY DB → 15 migrations · 42 tables · 35 RLS policies |
+| 5 | Accessibility | n/a this phase by scope order (no UI beyond engineering verification surfaces); all frozen a11y suites carried green |
+| 6 | Performance | **Measured** (`perf:finops`, live PG17, median/p95/worst): follower initial catch-up 31 ms @32 streams · steady-state 1.4 ms · issueReceipt 7.6/11.0 ms · reproduceDocument 1.9/2.3 ms · dispatch send 7.1/8.5 ms · export generate 67 ms @32 docs · closePeriod (seal, evidence v2) 10.8 ms · reproduceFiscalEvidence 3.6/4.3 ms · superviseOperations 383/404 ms · certifyOperations (double-derived) 828/892 ms · follower full rebuild 27 ms. Command paths single-to-low-double-digit ms; governance sweeps off the command path |
+| 7 | Visual review | The certified journeys are the four green regression suites: a real frozen night → followed → documented → delivered → exported → attested → sealed → supervised → certified, with every hostile drill inline |
+| 8 | Founder review | M-IP6-1/2/3/4 approved; IP-6 Freeze = this record |
+| 9 | Documentation | Permanent set shipped: `docs/financial-operations/` (IP-6_ARCHITECTURE +§30 reconciliation · EVENT_CATALOG · **ADRS ×14** · RUNBOOKS · SECURITY · M-IP6-1..4 reports · IP-6_FREEZE · IP-6_CLOSURE_REPORT · REVIEW_PACKAGE) |
+| 10 | Architecture review | dep-cruiser **0 violations** / 537 modules / 1930 deps (incl. 4 IP-6 boundary rules: runner is a leaf, finops domain is pure, only `server/` touches db, settlement server unreachable); **zero-diff vs `ip5-frozen`: 0 lines** over every frozen tree, **14/14 frozen migrations byte-identical**, frozen capability model and settlement catalog untouched; the settlement-log boundary meter is bit-identical at the end of every finops suite run |
+
+**Conditions carried forward (none freeze-blocking, all named in [RUNBOOKS](../financial-operations/RUNBOOKS.md) §10):** (1) wire `withTenant` + non-BYPASSRLS role (inherited MAJ-2); (2) restrict `finops_events` writes to the writer role; (3) schedule the settlement sweeps where settlement's writer lives — the finops supervisor flags their absence; (4) wire provider/S3 credentials and durable storage roots; (5) deferred by scope order, refused deterministically at runtime: GST decomposition (ADR-6), doc-impact attention policy, public `/v1` + contracts schemas.
+
 ## IP-4 — Auction Platform · **FREEZE CANDIDATE** 2026-07-14 · awaiting CTO approval
 
 Milestone decisions: M-IP4-1 **APPROVED** · M-IP4-2 **APPROVED** · M-IP4-3 **APPROVED** · M-IP4-4 = this certification.
