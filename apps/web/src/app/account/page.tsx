@@ -2,6 +2,7 @@ import { Badge, Button, Card, ToastProvider } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { accountSecurity, currentSession, logoutAction } from "../../server/auth/actions";
+import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
 import "./account.css";
 
@@ -10,7 +11,8 @@ export const metadata = { title: "Account · DesiAuction" };
 export default async function AccountPage() {
   const session = await currentSession();
   if (session === null) {
-    redirect("/login");
+    // PX-3 session-expiry UX: come back exactly here after signing in.
+    redirect("/login?next=/account");
   }
   const security = await accountSecurity();
   return (
@@ -19,14 +21,14 @@ export default async function AccountPage() {
         <div className="account-stack">
           <Card className="account-card">
             <div className="account-head">
-              <h1>Signed in</h1>
+              <h1>Account</h1>
               <Badge tone="success">Active session</Badge>
             </div>
             <dl>
               <dt>Phone</dt>
               <dd data-testid="account-phone">{session.phone}</dd>
               <dt>Name</dt>
-              <dd>{session.name ?? "— (set during registration)"}</dd>
+              <dd data-testid="account-name">{session.name ?? "—"}</dd>
             </dl>
             <form action={logoutAction}>
               <Button type="submit" variant="secondary">
@@ -34,6 +36,12 @@ export default async function AccountPage() {
               </Button>
             </form>
           </Card>
+          <ProfilePanel
+            personId={session.personId}
+            phone={session.phone}
+            name={session.name}
+            passkeyCount={security?.passkeys.length ?? 0}
+          />
           {security !== null ? <SecurityPanels security={security} /> : null}
         </div>
       </main>

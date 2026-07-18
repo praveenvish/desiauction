@@ -1,0 +1,121 @@
+.onboarding {
+  min-height: 60vh;
+  display: grid;
+  place-items: start center;
+  padding: var(--space-6) var(--space-4);
+  font-family: var(--font-text);
+  color: var(--text-primary);
+}
+
+.onboarding-panel {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-8) var(--space-6);
+}
+
+.onboarding-panel h1 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  color: var(--text-heading);
+  margin: 0 0 var(--space-1);
+}
+
+.onboarding-panel h2 {
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.onboarding-sub {
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-4);
+}
+
+.onboarding-progress {
+  list-style: none;
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-6);
+  padding: 0;
+}
+
+.onboarding-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.onboarding-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  font-size: var(--text-xs-size);
+}
+
+.onboarding-step-current {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.onboarding-step-current .onboarding-step-number {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.onboarding-step-done .onboarding-step-number {
+  background: var(--success-subtle);
+  border-color: var(--success-base);
+  color: var(--success-strong);
+}
+
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.onboarding-hint {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.onboarding-org {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.onboarding-divider {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.onboarding-skip {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.onboarding-skip a {
+  color: var(--text-accent);
+}

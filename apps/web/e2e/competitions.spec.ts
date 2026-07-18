@@ -16,6 +16,9 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   }
   await page.getByLabel("Mobile number").fill(phone);
   await page.getByRole("button", { name: "Send code" }).click();
+  // Await the send completing (data-step flips only after the action commits)
+  // before reading the inbox — the login.spec idiom; a bare read races the mint.
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
   const inbox = await page.context().newPage();
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
@@ -77,8 +80,13 @@ test("the competition journey: create, open, team, register, approve", async ({
     await expect(playerPage).toHaveURL(/\/login\?next=/);
     await otpLogin(playerPage, PHONE_PLAYER);
     await playerPage.goto(registerUrl);
+    // PX-5 multi-step flow: profile → role → review → submit (a fresh
+    // account is nameless, so the profile step comes first).
+    await playerPage.getByLabel("Your name").fill("Player One");
+    await playerPage.getByRole("button", { name: "Continue" }).click();
     await playerPage.getByLabel("Playing role").selectOption("all_rounder");
-    await playerPage.getByRole("button", { name: "Submit registration" }).click();
+    await playerPage.getByTestId("register-continue").click();
+    await playerPage.getByTestId("register-submit").click();
     await expect(playerPage.getByTestId("registration-submitted")).toBeVisible();
   });
 

@@ -1,0 +1,209 @@
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.skip {
+  position: absolute;
+  left: var(--space-2);
+  top: var(--space-2);
+  z-index: 30;
+  transform: translateY(-200%);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+}
+
+.skip:focus-visible {
+  transform: none;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-4);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-lg-size);
+  color: var(--text-heading);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rail {
+  display: none;
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.content {
+  /* No global border-box reset exists; padded full-width containers must
+     opt in or they overflow small viewports (PX-3 360px finding). */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4);
+  padding-bottom: calc(var(--space-8) + 64px);
+  outline: none;
+}
+
+.bottom-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-subtle);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-1) 0 var(--space-2);
+  min-height: 52px;
+  justify-content: center;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+}
+
+.tab-active {
+  color: var(--text-accent);
+  background: var(--accent-subtle);
+}
+
+.tab-icon,
+.rail-icon {
+  display: inline-flex;
+}
+
+.tab:focus-visible,
+.rail-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+@media (min-width: 720px) {
+  .shell {
+    display: grid;
+    grid-template-columns: 216px 1fr;
+    grid-template-rows: 56px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "rail body";
+  }
+
+  .topbar {
+    grid-area: topbar;
+  }
+
+  .rail {
+    grid-area: rail;
+    display: block;
+    position: sticky;
+    top: 56px;
+    align-self: start;
+    height: calc(100dvh - 56px);
+    padding: var(--space-3) var(--space-2);
+    border-right: 1px solid var(--border-subtle);
+    background: var(--surface-raised);
+  }
+
+  .body {
+    grid-area: body;
+  }
+
+  .content {
+    padding: var(--space-6) var(--space-5);
+  }
+
+  .bottom-tabs {
+    display: none;
+  }
+}
+
+.rail-group + .rail-group {
+  margin-top: var(--space-4);
+}
+
+.rail-group-label {
+  display: block;
+  padding: 0 var(--space-3);
+  margin-bottom: var(--space-1);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.rail-item:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.rail-item-active,
+.rail-item-active:hover {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}

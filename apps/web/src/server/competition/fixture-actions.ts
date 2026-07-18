@@ -1,10 +1,11 @@
 "use server";
 
 import { parseFixtureCsv, type Conflict, type FixtureStatus } from "@desiauction/core";
+import { withTenantDb, type Db } from "@desiauction/db";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
-import { db } from "../db";
+import { dbHandle, systemDb } from "../db";
 import { can } from "../orgs/authz";
 import { resolveTenant } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
@@ -67,6 +68,11 @@ import {
 // Fixtures & venues internal RPC (M-IP3-3). The one gate pattern: session →
 // tenant → capability → aggregate. Routes never touch scheduling rules — every
 // decision is core's; every mutation is the FixtureAggregate's.
+//
+// PRP-1 §1 tenant wiring: slug resolution runs on the system pool (the
+// membership join is the gate — competitions carries an org-arm-only policy);
+// gated work runs inside withTenantDb boundaries. The cross-org organizer
+// schedule strip is a membership-joined union and stays on the system pool.
 
 async function requireSession() {
   const session = await currentSession();
@@ -76,6 +82,14 @@ async function requireSession() {
   return session;
 }
 
+function inCompetitionOrg<T>(
+  personId: string,
+  competition: { orgId: string },
+  fn: (db: Db) => Promise<T>,
+): Promise<T> {
+  return withTenantDb(dbHandle, { personId, orgId: competition.orgId }, fn);
+}
+
 /** Resolve competition + require fixture.manage — every fixture mutation's gate. */
 async function fixtureGate(
   slug: string,
@@ -83,16 +97,18 @@ async function fixtureGate(
   { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
 > {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
   try {
-    await requireCompetitionCapability(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "fixture.manage",
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "fixture.manage",
+      ),
     );
   } catch {
     return { ok: false, error: "You can't manage fixtures here." };
@@ -131,29 +147,44 @@ export interface VenuesView {
 
 export async function venuesView(orgSlug: string): Promise<VenuesView | null> {
   const session = await requireSession();
-  const org = await resolveTenant(db, session.personId, orgSlug);
+  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    resolveTenant(db, session.personId, orgSlug),
+  );
   if (org === null) {
     return null;
   }
-  const [list, canManage] = await Promise.all([
-    venuesOf(db, org.id),
-    can(db, session.personId, { scopeType: "org", scopeId: org.id }, "venue.manage"),
-  ]);
-  return { org, venues: list, viewer: { canManage } };
+  return withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => {
+    const [list, canManage] = await Promise.all([
+      venuesOf(db, org.id),
+      can(db, session.personId, { scopeType: "org", scopeId: org.id }, "venue.manage"),
+    ]);
+    return { org, venues: list, viewer: { canManage } };
+  });
 }
 
 async function venueGate(
   orgSlug: string,
 ): Promise<{ ok: true; personId: string; orgId: string } | { ok: false; error: string }> {
   const session = await requireSession();
-  const org = await resolveTenant(db, session.personId, orgSlug);
+  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    resolveTenant(db, session.personId, orgSlug),
+  );
   if (org === null) {
     return { ok: false, error: "Not available." };
   }
-  if (!(await can(db, session.personId, { scopeType: "org", scopeId: org.id }, "venue.manage"))) {
+  const allowed = await withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: org.id },
+    (db) => can(db, session.personId, { scopeType: "org", scopeId: org.id }, "venue.manage"),
+  );
+  if (!allowed) {
     return { ok: false, error: "You can't manage venues here." };
   }
   return { ok: true, personId: session.personId, orgId: org.id };
+}
+
+function inOrg<T>(personId: string, orgId: string, fn: (db: Db) => Promise<T>): Promise<T> {
+  return withTenantDb(dbHandle, { personId, orgId }, fn);
 }
 
 export async function createVenueAction(
@@ -166,7 +197,9 @@ export async function createVenueAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await createVenue(db, gate.orgId, gate.personId, name, address, city);
+  const result = await inOrg(gate.personId, gate.orgId, (db) =>
+    createVenue(db, gate.orgId, gate.personId, name, address, city),
+  );
   if (!result.ok) {
     return {
       ok: false,
@@ -194,7 +227,9 @@ export async function createGroundAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await createGround(db, gate.orgId, venueId, gate.personId, input);
+  const result = await inOrg(gate.personId, gate.orgId, (db) =>
+    createGround(db, gate.orgId, venueId, gate.personId, input),
+  );
   if (!result.ok) {
     const message = {
       invalid_name: "Give the ground a name of at least 3 characters.",
@@ -216,7 +251,9 @@ export async function setGroundStatusAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await setGroundStatus(db, gate.orgId, groundId, gate.personId, status);
+  const result = await inOrg(gate.personId, gate.orgId, (db) =>
+    setGroundStatus(db, gate.orgId, groundId, gate.personId, status),
+  );
   return result.ok ? { ok: true } : { ok: false, error: "Could not update the ground." };
 }
 
@@ -257,39 +294,41 @@ export async function fixtureDashboard(
   params: FixtureDashboardParams,
 ): Promise<FixtureDashboard | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const canManage = await canCompetition(db, session.personId, scope, "fixture.manage");
   const pageNum = Number.parseInt(params.page ?? "1", 10);
-  const [stats, page, teamList, groundList, conflicts] = await Promise.all([
-    fixtureStats(db, competition.id),
-    queryFixtures(db, competition.id, {
-      ...(params.status !== undefined && VALID_STATUS.has(params.status as FixtureStatus)
-        ? { status: params.status as FixtureStatus }
-        : {}),
-      ...(params.team !== undefined && params.team !== "" ? { teamId: params.team } : {}),
-      ...(params.ground !== undefined && params.ground !== "" ? { groundId: params.ground } : {}),
-      ...(params.q !== undefined && params.q !== "" ? { search: params.q } : {}),
-      sort: (VALID_SORT.has(params.sort as FixtureSort) ? params.sort : "kickoff") as FixtureSort,
-      page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
-      pageSize: PAGE_SIZE,
-    }),
-    teamsOf(db, competition.id),
-    activeGroundsOf(db, competition.orgId),
-    competitionConflicts(db, competition),
-  ]);
-  return {
-    competition,
-    stats,
-    page,
-    teams: teamList,
-    grounds: groundList,
-    conflicts,
-    viewer: { canManage },
-  };
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [canManage, stats, page, teamList, groundList, conflicts] = await Promise.all([
+      canCompetition(db, session.personId, scope, "fixture.manage"),
+      fixtureStats(db, competition.id),
+      queryFixtures(db, competition.id, {
+        ...(params.status !== undefined && VALID_STATUS.has(params.status as FixtureStatus)
+          ? { status: params.status as FixtureStatus }
+          : {}),
+        ...(params.team !== undefined && params.team !== "" ? { teamId: params.team } : {}),
+        ...(params.ground !== undefined && params.ground !== "" ? { groundId: params.ground } : {}),
+        ...(params.q !== undefined && params.q !== "" ? { search: params.q } : {}),
+        sort: (VALID_SORT.has(params.sort as FixtureSort) ? params.sort : "kickoff") as FixtureSort,
+        page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
+        pageSize: PAGE_SIZE,
+      }),
+      teamsOf(db, competition.id),
+      activeGroundsOf(db, competition.orgId),
+      competitionConflicts(db, competition),
+    ]);
+    return {
+      competition,
+      stats,
+      page,
+      teams: teamList,
+      grounds: groundList,
+      conflicts,
+      viewer: { canManage },
+    };
+  });
 }
 
 // --- Aggregate operations (thin, gated pass-throughs) --------------------------------
@@ -302,7 +341,9 @@ export async function generateFixturesAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await generateFixtures(db, gate.competition, gate.personId, input);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    generateFixtures(db, gate.competition, gate.personId, input),
+  );
   if (!result.ok) {
     if (result.reason === "conflicts") {
       return { ok: false, error: conflictMessages(result.conflicts) };
@@ -330,7 +371,9 @@ export async function createFixtureAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await createFixture(db, gate.competition, gate.personId, input);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    createFixture(db, gate.competition, gate.personId, input),
+  );
   if (!result.ok) {
     const message = {
       invalid_input: "Check the teams, kickoff and duration.",
@@ -355,13 +398,15 @@ export async function fixtureLifecycleAction(
     return { ok: false, error: gate.error };
   }
   const { competition, personId } = gate;
-  const result: FixtureMutationResult = await {
-    schedule: () => scheduleFixture(db, competition, fixtureId, personId),
-    publish: () => publishFixture(db, competition, fixtureId, personId),
-    start: () => startFixture(db, competition, fixtureId, personId),
-    complete: () => completeFixture(db, competition, fixtureId, personId),
-    cancel: () => cancelFixture(db, competition, fixtureId, personId, cancelReason),
-  }[action]();
+  const result: FixtureMutationResult = await inCompetitionOrg(personId, competition, (db) =>
+    ({
+      schedule: () => scheduleFixture(db, competition, fixtureId, personId),
+      publish: () => publishFixture(db, competition, fixtureId, personId),
+      start: () => startFixture(db, competition, fixtureId, personId),
+      complete: () => completeFixture(db, competition, fixtureId, personId),
+      cancel: () => cancelFixture(db, competition, fixtureId, personId, cancelReason),
+    })[action](),
+  );
   return result.ok ? { ok: true } : { ok: false, error: mutationError(result) };
 }
 
@@ -374,7 +419,9 @@ export async function editFixtureAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await editFixture(db, gate.competition, fixtureId, gate.personId, patch);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    editFixture(db, gate.competition, fixtureId, gate.personId, patch),
+  );
   return result.ok ? { ok: true } : { ok: false, error: mutationError(result) };
 }
 
@@ -387,7 +434,9 @@ export async function rescheduleFixtureAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await rescheduleFixture(db, gate.competition, fixtureId, gate.personId, patch);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    rescheduleFixture(db, gate.competition, fixtureId, gate.personId, patch),
+  );
   return result.ok ? { ok: true } : { ok: false, error: mutationError(result) };
 }
 
@@ -398,7 +447,9 @@ export async function scheduleAllAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await scheduleAllDrafts(db, gate.competition, gate.personId);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    scheduleAllDrafts(db, gate.competition, gate.personId),
+  );
   return { ok: true, ...result };
 }
 
@@ -409,7 +460,9 @@ export async function publishAllAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await publishAllScheduled(db, gate.competition, gate.personId);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    publishAllScheduled(db, gate.competition, gate.personId),
+  );
   return { ok: true, ...result };
 }
 
@@ -421,7 +474,7 @@ export async function fixtureTimelineAction(
   if (!gate.ok) {
     return [];
   }
-  return fixtureTimeline(db, fixtureId);
+  return inCompetitionOrg(gate.personId, gate.competition, (db) => fixtureTimeline(db, fixtureId));
 }
 
 // --- Calendar / timeline / match-day views -------------------------------------------
@@ -442,7 +495,7 @@ export async function calendarView(
   params: { view?: string; date?: string },
 ): Promise<CalendarView | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -451,16 +504,18 @@ export async function calendarView(
     params.date !== undefined && DATE_SHAPE.test(params.date)
       ? params.date
       : nowWallClock().slice(0, 10);
-  const [days, timeline, upcoming] = await Promise.all([
-    view === "week"
-      ? weekView(db, competition.id, date)
-      : view === "day"
-        ? calendarRange(db, competition.id, date, date)
-        : Promise.resolve([]),
-    view === "timeline" ? competitionTimeline(db, competition.id) : Promise.resolve([]),
-    upcomingFixtures(db, competition.id, nowWallClock()),
-  ]);
-  return { competition, view, date, days, timeline, upcoming };
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [days, timeline, upcoming] = await Promise.all([
+      view === "week"
+        ? weekView(db, competition.id, date)
+        : view === "day"
+          ? calendarRange(db, competition.id, date, date)
+          : Promise.resolve([]),
+      view === "timeline" ? competitionTimeline(db, competition.id) : Promise.resolve([]),
+      upcomingFixtures(db, competition.id, nowWallClock()),
+    ]);
+    return { competition, view, date, days, timeline, upcoming };
+  });
 }
 
 export interface MatchDayView {
@@ -475,7 +530,7 @@ export async function matchDayView(
   params: { date?: string },
 ): Promise<MatchDayView | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -483,22 +538,25 @@ export async function matchDayView(
     params.date !== undefined && DATE_SHAPE.test(params.date)
       ? params.date
       : nowWallClock().slice(0, 10);
-  const [groundGroups, canManage] = await Promise.all([
-    matchDay(db, competition.id, date),
-    canCompetition(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "fixture.manage",
-    ),
-  ]);
-  return { competition, date, groundGroups, viewer: { canManage } };
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [groundGroups, canManage] = await Promise.all([
+      matchDay(db, competition.id, date),
+      canCompetition(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "fixture.manage",
+      ),
+    ]);
+    return { competition, date, groundGroups, viewer: { canManage } };
+  });
 }
 
 /** The organizer schedule strip on /competitions (across every org they belong to). */
 export async function organizerScheduleView(): Promise<OrganizerFixture[]> {
   const session = await requireSession();
-  return organizerSchedule(db, session.personId, nowWallClock());
+  // Cross-org union scoped by the membership join — system pool by design.
+  return organizerSchedule(systemDb, session.personId, nowWallClock());
 }
 
 // --- CSV import (validate → preview → commit) + export --------------------------------
@@ -518,7 +576,9 @@ export async function fixtureImportPreviewAction(
     return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
   }
   const parsed = parseFixtureCsv(csv);
-  const nameErrors = await unknownImportNames(db, gate.competition, parsed.rows);
+  const nameErrors = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    unknownImportNames(db, gate.competition, parsed.rows),
+  );
   return {
     validCount: nameErrors.length === 0 ? parsed.rows.length : 0,
     errors: [...parsed.errors, ...nameErrors],
@@ -541,7 +601,9 @@ export async function fixtureImportCommitAction(
       error: `Fix ${String(parsed.errors.length)} row error(s) before importing.`,
     };
   }
-  const result = await commitFixtureImport(db, gate.competition, gate.personId, parsed.rows);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    commitFixtureImport(db, gate.competition, gate.personId, parsed.rows),
+  );
   if (!result.ok) {
     return {
       ok: false,
@@ -562,7 +624,9 @@ export async function exportFixturesAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const snapshot = await scheduleSnapshot(db, gate.competition);
+  const snapshot = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    scheduleSnapshot(db, gate.competition),
+  );
   return {
     ok: true,
     csv: serializeScheduleCsv(snapshot),

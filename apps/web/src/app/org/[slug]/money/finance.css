@@ -1,0 +1,224 @@
+/*
+ * PX-8 Financial Operations Workspace. Tokens only (doc 18). Reuses the console
+ * conventions (.registrations-dash / .dash-stack / .stat-row / .money-table)
+ * and adds only what an operations console genuinely needs: health lamps, the
+ * attention queue, delivery lanes and the audit rail.
+ */
+
+.finance-stack {
+  max-width: 1120px;
+}
+
+/* --- Health lamps: the ops board's spine ----------------------------------------- */
+
+.health-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.health-lamp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-left: var(--space-1) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+.health-lamp[data-status="healthy"] {
+  border-left-color: var(--success-base);
+}
+
+.health-lamp[data-status="degraded"] {
+  border-left-color: var(--warning-base);
+}
+
+.health-lamp[data-status="failed"] {
+  border-left-color: var(--danger-base);
+}
+
+.health-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+}
+
+.health-detail {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* --- The attention queue --------------------------------------------------------- */
+
+.attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.attention-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  flex-wrap: wrap;
+}
+
+.attention-subject {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.attention-action {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* --- Delivery lanes -------------------------------------------------------------- */
+
+.lane-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+
+.lane-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+.lane-tile[aria-current="page"] {
+  border-color: var(--accent);
+  background: var(--surface-sunken);
+}
+
+.lane-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.lane-label {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+/* --- The audit rail -------------------------------------------------------------- */
+
+.audit-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.audit-rail li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.audit-at {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-stream {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* --- Watermark / freshness meta -------------------------------------------------- */
+
+.freshness {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  margin: 0;
+}
+
+.freshness strong {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- Key/value grids (settlement reference, evidence) ---------------------------- */
+
+.kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.kv-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.kv-grid dt {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.kv-grid dd {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .attention-item {
+    flex-direction: column;
+  }
+}
+
+/* The auto-receipt toggle — a checkbox that reads as a sentence, not a widget. */
+.checkbox-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  margin-top: var(--space-05);
+  flex: 0 0 auto;
+}

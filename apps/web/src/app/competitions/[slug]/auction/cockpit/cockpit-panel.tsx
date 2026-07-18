@@ -9,6 +9,7 @@ import type { CockpitView } from "../../../../../server/auction/conduct-actions"
 import { grantPaddleAction, inviteOwnerAction } from "../../../../../server/auction/owner-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
 import { CeremonyStage } from "../ceremony-stage";
+import { AuctionProgress } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 
@@ -91,6 +92,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       data-hydrated={hydrated ? "true" : "false"}
     >
       <StatusRibbon snapshot={snapshot} connection={connection} remainingMs={remainingMs} />
+      <AuctionProgress snapshot={snapshot} />
 
       <div className="cockpit-grid">
         <div className="competitions-stack">

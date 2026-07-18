@@ -7,10 +7,12 @@ import {
   type RegistrationEvent,
   type RegistrationStatus,
 } from "@desiauction/core";
+import { competitions, withTenantDb, type Db } from "@desiauction/db";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
-import { db } from "../db";
+import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { orgsFor } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
@@ -44,6 +46,15 @@ import {
 
 // Org-scoped internal RPC (C-14, IP-3_DESIGN D1). Every action resolves the
 // session, then the tenant, then the capability, then acts — no other path.
+//
+// PRP-1 §1 tenant wiring: slug resolution and the public registration landing
+// are PRE-TENANT reads (competitions carries an org-arm-only policy and the
+// resolver's membership join / the landing's open-status gate ARE the scope) —
+// they run on the system pool, mirroring the invite-token precedent. Every
+// org-scoped read and every write runs inside a withTenantDb boundary whose
+// orgId comes from that resolution; player registration paths run under the
+// competition's org context, legitimized by the aggregate's open/duplicate
+// gates.
 
 async function requireSession() {
   const session = await currentSession();
@@ -58,6 +69,22 @@ function formString(formData: FormData, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/** Membership-gated slug → competition (system pool; the join is the gate). */
+async function resolveCompetitionScoped(
+  personId: string,
+  slug: string,
+): Promise<CompetitionSummary | null> {
+  return resolveCompetition(systemDb, personId, slug);
+}
+
+function inCompetitionOrg<T>(
+  personId: string,
+  competition: { orgId: string },
+  fn: (db: Db) => Promise<T>,
+): Promise<T> {
+  return withTenantDb(dbHandle, { personId, orgId: competition.orgId }, fn);
+}
+
 export interface CompetitionsView {
   orgs: { id: string; name: string }[];
   competitions: (CompetitionSummary & { orgName: string })[];
@@ -66,8 +93,9 @@ export interface CompetitionsView {
 export async function competitionsView(): Promise<CompetitionsView> {
   const session = await requireSession();
   const [orgs, competitions] = await Promise.all([
-    orgsFor(db, session.personId),
-    competitionsForPerson(db, session.personId),
+    withTenantDb(dbHandle, { personId: session.personId }, (db) => orgsFor(db, session.personId)),
+    // Cross-org union scoped by the membership join — system pool by design.
+    competitionsForPerson(systemDb, session.personId),
   ]);
   return { orgs: orgs.map((o) => ({ id: o.id, name: o.name })), competitions };
 }
@@ -83,19 +111,27 @@ export async function createCompetitionAction(
   const startsOn = formString(formData, "startsOn");
   const endsOn = formString(formData, "endsOn");
   // Membership + capability: only an owner/staff of THIS org may create in it.
-  const memberships = await orgsFor(db, session.personId);
+  const memberships = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    orgsFor(db, session.personId),
+  );
   if (!memberships.some((o) => o.id === orgId)) {
     return { error: "Choose one of your organizations." };
   }
   let slug: string;
   try {
-    await requireCompetitionCapability(db, session.personId, { orgId }, "competition.create");
-    const competition = await createCompetition(db, orgId, session.personId, {
-      name,
-      location,
-      startsOn,
-      endsOn,
-    });
+    const competition = await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId },
+      async (db) => {
+        await requireCompetitionCapability(db, session.personId, { orgId }, "competition.create");
+        return createCompetition(db, orgId, session.personId, {
+          name,
+          location,
+          startsOn,
+          endsOn,
+        });
+      },
+    );
     slug = competition.slug;
   } catch (error) {
     if (error instanceof ForbiddenError) {
@@ -115,18 +151,20 @@ export interface CompetitionView {
 
 export async function competitionView(slug: string): Promise<CompetitionView | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const [teams, registrations, canManage, canReview] = await Promise.all([
-    teamsOf(db, competition.id),
-    registrationsOf(db, competition.id),
-    canCompetition(db, session.personId, scope, "competition.manage"),
-    canCompetition(db, session.personId, scope, "registration.review"),
-  ]);
-  return { competition, teams, registrations, viewer: { canManage, canReview } };
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [teams, registrations, canManage, canReview] = await Promise.all([
+      teamsOf(db, competition.id),
+      registrationsOf(db, competition.id),
+      canCompetition(db, session.personId, scope, "competition.manage"),
+      canCompetition(db, session.personId, scope, "registration.review"),
+    ]);
+    return { competition, teams, registrations, viewer: { canManage, canReview } };
+  });
 }
 
 export async function advanceCompetitionAction(
@@ -134,21 +172,25 @@ export async function advanceCompetitionAction(
   to: CompetitionSummary["status"],
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
   try {
-    await requireCompetitionCapability(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "competition.manage",
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
     );
   } catch {
     return { ok: false, error: "You can't manage this competition." };
   }
-  const result = await advanceCompetition(db, competition, session.personId, to);
+  const result = await inCompetitionOrg(session.personId, competition, (db) =>
+    advanceCompetition(db, competition, session.personId, to),
+  );
   if (!result.ok) {
     return {
       ok: false,
@@ -161,6 +203,37 @@ export async function advanceCompetitionAction(
   return { ok: true };
 }
 
+// PX-5: publish/unpublish the public competition page. A thin write to the
+// EXISTING visibility column (schema-designed, dormant until now), behind the
+// existing competition.manage capability. No new rules: the directory and
+// /c/[slug] read this column; nothing else changes.
+export async function setCompetitionVisibilityAction(
+  slug: string,
+  visibility: "private" | "public",
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage this competition." };
+  }
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    db.update(competitions).set({ visibility }).where(eq(competitions.id, competition.id)),
+  );
+  return { ok: true };
+}
+
 export async function createTeamAction(
   slug: string,
   name: string,
@@ -168,28 +241,32 @@ export async function createTeamAction(
   primaryColor: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
   try {
-    await requireCompetitionCapability(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "team.manage",
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "team.manage",
+      ),
     );
   } catch {
     return { ok: false, error: "You can't manage teams here." };
   }
-  const result = await createTeam(
-    db,
-    competition.orgId,
-    competition.id,
-    session.personId,
-    name,
-    shortName,
-    primaryColor,
+  const result = await inCompetitionOrg(session.personId, competition, (db) =>
+    createTeam(
+      db,
+      competition.orgId,
+      competition.id,
+      session.personId,
+      name,
+      shortName,
+      primaryColor,
+    ),
   );
   if (!result.ok) {
     return {
@@ -215,17 +292,19 @@ async function reviewGate(
   { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
 > {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
   try {
     // Approval's human gate (invariant 5): only a registration.review holder.
-    await requireCompetitionCapability(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "registration.review",
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "registration.review",
+      ),
     );
   } catch {
     return { ok: false, error: "You can't review registrations here." };
@@ -257,13 +336,15 @@ export async function triageRegistrationAction(
   if ("error" in event) {
     return { ok: false, error: event.error };
   }
-  const result = await transition(
-    db,
-    gate.competition.orgId,
-    gate.competition.id,
-    registrationId,
-    gate.personId,
-    event,
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    transition(
+      db,
+      gate.competition.orgId,
+      gate.competition.id,
+      registrationId,
+      gate.personId,
+      event,
+    ),
   );
   if (!result.ok) {
     return { ok: false, error: "That action isn't available for this registration." };
@@ -286,13 +367,15 @@ export async function bulkTriageAction(
   if ("error" in event) {
     return { ok: false, error: event.error };
   }
-  const result = await transitionBatch(
-    db,
-    gate.competition.orgId,
-    gate.competition.id,
-    registrationIds,
-    gate.personId,
-    event,
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    transitionBatch(
+      db,
+      gate.competition.orgId,
+      gate.competition.id,
+      registrationIds,
+      gate.personId,
+      event,
+    ),
   );
   return { ok: true, applied: result.applied.length, skipped: result.skipped.length };
 }
@@ -302,16 +385,21 @@ export async function bulkTriageAction(
 export interface RegistrationLanding {
   competitionName: string;
   open: boolean;
-  mine: { status: string; role: string } | null;
+  // PX-5: the number is the player's human-quotable reference on the status view.
+  mine: { status: string; role: string; number: string } | null;
 }
 
 export async function registrationLanding(slug: string): Promise<RegistrationLanding | null> {
   const session = await requireSession();
-  const competition = await competitionForRegistration(db, slug);
+  // Public landing lookup (documented no-membership read) — system pool.
+  const competition = await competitionForRegistration(systemDb, slug);
   if (competition === null) {
     return null;
   }
-  const mine = await myRegistration(db, competition.id, session.personId);
+  // Own-registration read rides the person arm of the registrations policy.
+  const mine = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    myRegistration(db, competition.id, session.personId),
+  );
   return {
     competitionName: competition.name,
     open: competition.status === "registration_open",
@@ -325,17 +413,15 @@ export async function submitRegistrationAction(
   formData: FormData,
 ): Promise<{ error?: string; done?: boolean }> {
   const session = await requireSession();
-  const competition = await competitionForRegistration(db, slug);
+  const competition = await competitionForRegistration(systemDb, slug);
   if (competition === null) {
     return { error: "This competition is not available." };
   }
   const role = formString(formData, "role");
-  const result = await submitRegistration(
-    db,
-    competition.id,
-    competition.orgId,
-    session.personId,
-    role,
+  const result = await withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: competition.orgId },
+    (db) => submitRegistration(db, competition.id, competition.orgId, session.personId, role),
   );
   if (!result.ok) {
     return {
@@ -383,12 +469,11 @@ export async function registrationDashboard(
   params: DashboardParams,
 ): Promise<RegistrationDashboard | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const canReview = await canCompetition(db, session.personId, scope, "registration.review");
   const pageNum = Number.parseInt(params.page ?? "1", 10);
   const query = {
     ...(params.search !== undefined && params.search !== "" ? { search: params.search } : {}),
@@ -402,12 +487,15 @@ export async function registrationDashboard(
     page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
     pageSize: PAGE_SIZE,
   };
-  const [stats, page, teams] = await Promise.all([
-    registrationStats(db, competition.id),
-    queryRegistrations(db, competition.id, query),
-    teamsOf(db, competition.id),
-  ]);
-  return { competition, stats, page, teams, viewer: { canReview } };
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [canReview, stats, page, teams] = await Promise.all([
+      canCompetition(db, session.personId, scope, "registration.review"),
+      registrationStats(db, competition.id),
+      queryRegistrations(db, competition.id, query),
+      teamsOf(db, competition.id),
+    ]);
+    return { competition, stats, page, teams, viewer: { canReview } };
+  });
 }
 
 export async function registrationTimelineAction(
@@ -418,7 +506,7 @@ export async function registrationTimelineAction(
   if (!gate.ok) {
     return [];
   }
-  return timelineOf(db, registrationId);
+  return inCompetitionOrg(gate.personId, gate.competition, (db) => timelineOf(db, registrationId));
 }
 
 export async function addNoteAction(
@@ -430,7 +518,9 @@ export async function addNoteAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await addNote(db, gate.competition.orgId, registrationId, gate.personId, note);
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    addNote(db, gate.competition.orgId, registrationId, gate.personId, note),
+  );
   return result.ok ? { ok: true } : { ok: false, error: "Write a note first." };
 }
 
@@ -440,27 +530,31 @@ export async function assignTeamAction(
   teamId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
   try {
-    await requireCompetitionCapability(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "team.manage",
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "team.manage",
+      ),
     );
   } catch {
     return { ok: false, error: "You can't assign teams here." };
   }
-  await assignTeam(
-    db,
-    competition.orgId,
-    competition.id,
-    registrationId,
-    teamId === "" ? null : teamId,
-    session.personId,
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    assignTeam(
+      db,
+      competition.orgId,
+      competition.id,
+      registrationId,
+      teamId === "" ? null : teamId,
+      session.personId,
+    ),
   );
   return { ok: true };
 }
@@ -498,12 +592,14 @@ export async function importCommitAction(
       error: `Fix ${String(parsed.errors.length)} row error(s) before importing.`,
     };
   }
-  const result = await commitRegistrationImport(
-    db,
-    gate.competition.id,
-    gate.competition.orgId,
-    gate.personId,
-    parsed.rows,
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    commitRegistrationImport(
+      db,
+      gate.competition.id,
+      gate.competition.orgId,
+      gate.personId,
+      parsed.rows,
+    ),
   );
   return { ok: true, imported: result.imported, duplicates: result.duplicates };
 }
@@ -516,6 +612,8 @@ export async function exportRegistrationsAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const csv = await exportRegistrationsCsv(db, gate.competition.id);
+  const csv = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    exportRegistrationsCsv(db, gate.competition.id),
+  );
   return { ok: true, csv, filename: `${gate.competition.slug}-registrations.csv` };
 }

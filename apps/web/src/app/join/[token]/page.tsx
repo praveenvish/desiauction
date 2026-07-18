@@ -1,8 +1,9 @@
-import { Badge, Button, Card } from "@desiauction/ui";
+import { Badge, Card } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../../server/auth/actions";
 import { acceptInviteAction, invitePreview } from "../../../server/orgs/actions";
+import { AcceptInviteButton } from "./accept-button";
 import "../../orgs/orgs.css";
 
 export const metadata = { title: "Join · DesiAuction" };
@@ -37,9 +38,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
                 await acceptInviteAction(token);
               }}
             >
-              <Button type="submit" data-testid="accept-invite">
-                Accept invitation
-              </Button>
+              <AcceptInviteButton />
             </form>
           </Card>
         )}

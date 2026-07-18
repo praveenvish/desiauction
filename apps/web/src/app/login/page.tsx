@@ -14,13 +14,17 @@ export default async function LoginPage({
 }) {
   const [session, params] = await Promise.all([currentSession(), searchParams]);
   if (session !== null) {
-    redirect("/account");
+    redirect("/home");
   }
   return (
     <main className="login">
       <div className="login-panel">
         <h1>DesiAuction</h1>
-        <p className="login-sub">Sign in with your mobile number.</p>
+        <p className="login-sub">
+          {params.next !== undefined
+            ? "Sign in to continue where you were headed."
+            : "Sign in with your mobile number."}
+        </p>
         <LoginForm {...(params.next !== undefined ? { next: params.next } : {})} />
         <PasskeyLogin />
       </div>

@@ -16,6 +16,9 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   }
   await page.getByLabel("Mobile number").fill(phone);
   await page.getByRole("button", { name: "Send code" }).click();
+  // Await the send completing (data-step flips only after the action commits)
+  // before reading the inbox — the login.spec idiom; a bare read races the mint.
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
   const inbox = await page.context().newPage();
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();

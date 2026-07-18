@@ -27,12 +27,18 @@ function slugify(name: string): string {
   return base === "" ? "org" : base;
 }
 
-export async function createOrg(db: Db, personId: string, name: string): Promise<OrgSummary> {
+export async function createOrg(
+  db: Db,
+  personId: string,
+  name: string,
+  // Callers inside a withTenantDb boundary must mint the id first — the org's
+  // WITH CHECK'd member/grant/audit rows only pass under app.org_id = orgId.
+  orgId: string = newId(),
+): Promise<OrgSummary> {
   const trimmed = name.trim();
   if (trimmed.length < 3) {
     throw new Error("organization name must be at least 3 characters");
   }
-  const orgId = newId();
   // ULID suffix keeps slugs unique without a retry loop.
   const slug = `${slugify(trimmed)}-${orgId.slice(-4).toLowerCase()}`;
   await db.insert(organizations).values({ id: orgId, name: trimmed, slug, createdBy: personId });

@@ -1,0 +1,79 @@
+# Nightly verification (PRP-1 §5): the drills CI is too slow for — the full
+# e2e journey suite (parked out of per-PR CI by the IP-3 gate decision), the
+# fresh-migration proof, the RLS runtime probe under the non-BYPASSRLS role
+# recipe, and the snapshot-consistent backup restore-verify. 03:00 IST.
+name: nightly-verify
+
+on:
+  schedule:
+    - cron: "30 21 * * *" # 03:00 IST
+  workflow_dispatch:
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: desiauction
+          POSTGRES_PASSWORD: desiauction
+          POSTGRES_DB: desiauction
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U desiauction"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://desiauction:desiauction@localhost:5433/desiauction
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Fresh migrations on a fresh database — the §36 proof, nightly.
+      - run: pnpm --filter @desiauction/db db:migrate
+      - run: pnpm --filter @desiauction/engine db:migrate
+
+      - run: pnpm test:integration
+
+      # RLS runtime verification under the production role recipe.
+      - name: RLS probe under non-BYPASSRLS role
+        run: |
+          PGPASSWORD=desiauction psql -h localhost -p 5433 -U desiauction -d desiauction \
+            -v app_password='nightly-app' -v system_password='nightly-system' \
+            -f ops/db/create-app-role.sql
+          APP_DATABASE_URL='postgres://desiauction_app:nightly-app@localhost:5433/desiauction' \
+            pnpm --filter @desiauction/web rls:verify
+
+      # Snapshot-consistent backup restore drill (host pg tools match the
+      # service major via the postgres apt repo).
+      - name: Restore-verify
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+          RESTORE_VERIFY_CONTAINER="" pnpm --filter @desiauction/web db:restore-verify
+
+      # PX-8: the finance journeys read the seeded exemplar. Financial
+      # Operations has no issuance UI (issuing is not in PX-8's scope), so a
+      # browser cannot provision documents for itself — the demo seed is the
+      # project's own fixture for exactly this, and it is idempotent.
+      - name: Seed the demo exemplar
+        run: pnpm seed:demo
+
+      # The full journey suite (real web + real engine + real WebSockets).
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: End-to-end journeys
+        run: npx playwright test
+        working-directory: apps/web
+        env:
+          CI: "true"

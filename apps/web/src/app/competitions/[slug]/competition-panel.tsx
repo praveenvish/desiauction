@@ -2,12 +2,14 @@
 
 import { REJECTION_REASONS } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select, useToast } from "@desiauction/ui";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
   advanceCompetitionAction,
   createTeamAction,
+  setCompetitionVisibilityAction,
   triageRegistrationAction,
   type CompetitionView,
 } from "../../../server/competition/actions";
@@ -77,6 +79,22 @@ export function CompetitionPanel({ view, slug }: { view: CompetitionView; slug: 
     }
   };
 
+  // PX-5: publish/unpublish the public page (existing visibility column).
+  const setVisibility = async (visibility: "private" | "public") => {
+    setBusy(true);
+    const result = await setCompetitionVisibilityAction(slug, visibility);
+    setBusy(false);
+    if (result.ok) {
+      toast({
+        title: visibility === "public" ? "Public page published" : "Public page unpublished",
+        tone: "success",
+      });
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
   const triage = async (
     registrationId: string,
     action: "approve" | "reject" | "waitlist",
@@ -115,10 +133,45 @@ export function CompetitionPanel({ view, slug }: { view: CompetitionView; slug: 
             Registration link: {registrationUrl}
           </p>
         ) : null}
+        <p className="competitions-hint">
+          <Link href={`/competitions/${slug}/readiness`} data-testid="open-readiness">
+            Review readiness
+          </Link>{" "}
+          — one view of every gate between here and auction night.
+        </p>
+        <div className="visibility-row" data-testid="visibility-row">
+          <Badge tone={view.competition.visibility === "public" ? "success" : "neutral"}>
+            {view.competition.visibility === "public" ? "Public page live" : "Not listed publicly"}
+          </Badge>
+          {view.competition.visibility === "public" ? (
+            <Link href={`/c/${slug}`} data-testid="open-public-page">
+              View public page
+            </Link>
+          ) : null}
+          {view.viewer.canManage ? (
+            <Button
+              variant="ghost"
+              loading={busy}
+              data-testid="toggle-visibility"
+              onClick={() =>
+                void setVisibility(view.competition.visibility === "public" ? "private" : "public")
+              }
+            >
+              {view.competition.visibility === "public"
+                ? "Unpublish public page"
+                : "Publish public page"}
+            </Button>
+          ) : null}
+        </div>
       </Card>
 
       <Card data-testid="teams-panel">
-        <h2>Teams</h2>
+        <div className="competition-head">
+          <h2>Teams</h2>
+          <Link href={`/competitions/${slug}/teams`} data-testid="open-teams">
+            Open team workspace
+          </Link>
+        </div>
         {view.teams.length === 0 ? (
           <p className="competitions-hint">No teams yet.</p>
         ) : (

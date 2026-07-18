@@ -9,5 +9,11 @@ export default defineConfig({
         process.env["DATABASE_URL"] ??
         "postgres://desiauction:desiauction@localhost:5433/desiauction",
     },
+    // The settlement/finops regression suites drive the SHARED job queue and
+    // event streams in the one dev database; parallel test FILES drain each
+    // other's jobs and skew injected-clock assertions (PX-4 finding: the
+    // delivery suite is green 5/5 in isolation and flaky only under parallel
+    // full-suite runs). Integration files therefore run serially.
+    fileParallelism: false,
   },
 });

@@ -67,7 +67,7 @@ export async function finishEnrollment(
     transports: credential.transports?.join(",") ?? null,
     name: deviceName.trim() === "" ? "Passkey" : deviceName.trim().slice(0, 60),
   });
-  await logSecurityEvent(db, personId, "auth.passkey.enrolled", { device: deviceName });
+  await logSecurityEvent(personId, "auth.passkey.enrolled", { device: deviceName });
   return { ok: true };
 }
 
@@ -110,7 +110,7 @@ export async function finishAuthentication(
     .update(passkeyCredentials)
     .set({ counter: verification.authenticationInfo.newCounter, lastUsedAt: new Date() })
     .where(eq(passkeyCredentials.id, credential.id));
-  await logSecurityEvent(db, credential.personId, "auth.login.passkey", {
+  await logSecurityEvent(credential.personId, "auth.login.passkey", {
     device: credential.name,
   });
   return { ok: true, personId: credential.personId };
@@ -145,12 +145,12 @@ export async function renamePasskey(
     .update(passkeyCredentials)
     .set({ name: name.trim().slice(0, 60) })
     .where(and(eq(passkeyCredentials.id, passkeyId), eq(passkeyCredentials.personId, personId)));
-  await logSecurityEvent(db, personId, "auth.passkey.renamed");
+  await logSecurityEvent(personId, "auth.passkey.renamed");
 }
 
 export async function removePasskey(db: Db, personId: string, passkeyId: string): Promise<void> {
   await db
     .delete(passkeyCredentials)
     .where(and(eq(passkeyCredentials.id, passkeyId), eq(passkeyCredentials.personId, personId)));
-  await logSecurityEvent(db, personId, "auth.passkey.removed");
+  await logSecurityEvent(personId, "auth.passkey.removed");
 }

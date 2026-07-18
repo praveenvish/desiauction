@@ -2,15 +2,16 @@
 
 import { auctionOf, type AuctionRecord } from "@desiauction/auction";
 import { isAuctionCommandType, type CommandAck } from "@desiauction/core";
-import { paddleGrants, paddles, teams, type Db } from "@desiauction/db";
+import { paddleGrants, paddles, teams, withTenantDb, type Db } from "@desiauction/db";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { canCompetition } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
-import { db } from "../db";
+import { dbHandle, systemDb } from "../db";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
+import { resolvedLots, rulesOf, type AuctionRules, type ResolvedLot } from "./live-summary";
 
 // Live auction actions (M-IP4-2, extended M-IP4-3). The web tier
 // authenticates, resolves the tenant and capabilities, then SUBMITS A COMMAND
@@ -36,20 +37,26 @@ interface LiveGate {
 
 export async function liveGate(slug: string): Promise<LiveGate | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return null;
   }
-  const auction = await auctionOf(db, competition.id);
-  if (auction === null) {
-    return null;
-  }
-  const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const [canConduct, canOverride] = await Promise.all([
-    canCompetition(db, session.personId, scope, "auction.conduct"),
-    canCompetition(db, session.personId, scope, "auction.override"),
-  ]);
-  return { personId: session.personId, competition, auction, canConduct, canOverride };
+  return withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: competition.orgId },
+    async (db) => {
+      const auction = await auctionOf(db, competition.id);
+      if (auction === null) {
+        return null;
+      }
+      const scope = { orgId: competition.orgId, competitionId: competition.id };
+      const [canConduct, canOverride] = await Promise.all([
+        canCompetition(db, session.personId, scope, "auction.conduct"),
+        canCompetition(db, session.personId, scope, "auction.override"),
+      ]);
+      return { personId: session.personId, competition, auction, canConduct, canOverride };
+    },
+  );
 }
 
 export interface LiveAuctionView {
@@ -61,6 +68,9 @@ export interface LiveAuctionView {
   /** Teams THIS person holds an active paddle grant for (claim eligibility). */
   myGrantTeamIds: string[];
   viewer: { personId: string; canConduct: boolean };
+  // PX-6: the locked rules (display) and the resolved history (late joiners).
+  rules: AuctionRules;
+  resolved: ResolvedLot[];
 }
 
 async function myActivePaddle(dbc: Db, auctionId: string, personId: string) {
@@ -89,24 +99,30 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   if (gate === null) {
     return null;
   }
-  const [teamRows, mine, grantRows] = await Promise.all([
-    db
-      .select({ id: teams.id, name: teams.name })
-      .from(teams)
-      .where(eq(teams.competitionId, gate.competition.id))
-      .orderBy(asc(teams.name)),
-    myActivePaddle(db, gate.auction.id, gate.personId),
-    db
-      .select({ teamId: paddleGrants.teamId })
-      .from(paddleGrants)
-      .where(
-        and(
-          eq(paddleGrants.auctionId, gate.auction.id),
-          eq(paddleGrants.personId, gate.personId),
-          isNull(paddleGrants.revokedAt),
-        ),
-      ),
-  ]);
+  const [teamRows, mine, grantRows, resolved] = await withTenantDb(
+    dbHandle,
+    { personId: gate.personId, orgId: gate.competition.orgId },
+    (db) =>
+      Promise.all([
+        db
+          .select({ id: teams.id, name: teams.name })
+          .from(teams)
+          .where(eq(teams.competitionId, gate.competition.id))
+          .orderBy(asc(teams.name)),
+        myActivePaddle(db, gate.auction.id, gate.personId),
+        db
+          .select({ teamId: paddleGrants.teamId })
+          .from(paddleGrants)
+          .where(
+            and(
+              eq(paddleGrants.auctionId, gate.auction.id),
+              eq(paddleGrants.personId, gate.personId),
+              isNull(paddleGrants.revokedAt),
+            ),
+          ),
+        resolvedLots(db, gate.auction.id),
+      ]),
+  );
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionId: gate.auction.id,
@@ -115,6 +131,8 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     myPaddle: mine,
     myGrantTeamIds: grantRows.map((row) => row.teamId),
     viewer: { personId: gate.personId, canConduct: gate.canConduct },
+    rules: rulesOf(gate.auction.config),
+    resolved,
   };
 }
 

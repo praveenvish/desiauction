@@ -64,6 +64,8 @@ export interface CompetitionSummary {
   name: string;
   slug: string;
   status: CompetitionStatus;
+  // PX-5: the public-page switch (existing column, now surfaced).
+  visibility: "private" | "public";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -116,6 +118,7 @@ export async function createCompetition(
     name: valid.value,
     slug,
     status: "draft",
+    visibility: "private",
     location: input.location ?? null,
     startsOn: input.startsOn ?? null,
     endsOn: input.endsOn ?? null,
@@ -134,6 +137,7 @@ export async function competitionsForPerson(
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
+      visibility: competitions.visibility,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -159,6 +163,7 @@ export async function resolveCompetition(
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
+      visibility: competitions.visibility,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,

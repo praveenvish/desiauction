@@ -111,7 +111,14 @@ export const grants = pgTable(
   {
     id: id(),
     personId: char("person_id", { length: 26 }).notNull(),
-    scopeType: text("scope_type", { enum: ["org", "tournament", "team"] }).notNull(),
+    // PX-9: "platform" joins the TYPE union — a type-only widening, not a schema
+    // change. The column is and always was plain `text` (migration 0000; the
+    // drizzle snapshot records no enum), so this emits no migration. It exists
+    // so the singleton platform scope can be named in TypeScript. Writing such a
+    // row remains impossible for the application role: `grants_tenant`'s WITH
+    // CHECK (0004) admits `scope_type = 'org'` only, so the platform grant is
+    // installable solely on the RLS-exempt system pool, by the seed.
+    scopeType: text("scope_type", { enum: ["org", "tournament", "team", "platform"] }).notNull(),
     scopeId: char("scope_id", { length: 26 }).notNull(),
     capabilitySet: text("capability_set").notNull(),
     grantedBy: char("granted_by", { length: 26 }).notNull(),

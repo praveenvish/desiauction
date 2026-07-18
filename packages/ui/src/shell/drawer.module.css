@@ -1,0 +1,64 @@
+.drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: min(320px, 85vw);
+  border: none;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  padding: 0;
+  box-shadow: var(--shadow-3);
+}
+
+.start {
+  inset: 0 auto 0 0;
+  border-left: none;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.drawer::backdrop {
+  background: var(--scrim);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.close {
+  display: inline-flex;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  padding: var(--space-1);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+}
+
+.body {
+  padding: var(--space-3) var(--space-4);
+  overflow-y: auto;
+}

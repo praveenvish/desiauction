@@ -115,3 +115,59 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.profile-id h2 {
+  margin: 0;
+}
+
+.profile-phone {
+  margin: var(--space-05) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.profile-completion {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.profile-completion-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.profile-completion ul {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+}
+
+.profile-completion li[data-done="true"] {
+  color: var(--success-strong);
+}
+
+.profile-hint {
+  color: var(--text-muted);
+}

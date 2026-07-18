@@ -35,3 +35,41 @@ export { PlayerImage } from "./identity/player-image";
 export type { PlayerImageProps, PlayerImageSize } from "./identity/player-image";
 export { PlayerCard } from "./identity/player-card";
 export type { PlayerCardProps, PlayerRole, PlayerStatus } from "./identity/player-card";
+
+// Shell kit (PX-2): the three product shells and their navigation/system parts.
+export { AppShell, NavigationRail, NavigationGroup, NavigationItem } from "./shell/app-shell";
+export type { AppShellProps, ShellNavItem } from "./shell/app-shell";
+export { PublicShell } from "./shell/public-shell";
+export type { PublicShellProps, PublicShellLink } from "./shell/public-shell";
+export { LiveShell } from "./shell/live-shell";
+export type { LiveShellProps } from "./shell/live-shell";
+export { Breadcrumb } from "./shell/breadcrumb";
+export type { BreadcrumbProps, BreadcrumbItem } from "./shell/breadcrumb";
+export { PageHeader, SectionHeader, QuickActionBar } from "./shell/page-header";
+export type { PageHeaderProps, SectionHeaderProps, QuickActionBarProps } from "./shell/page-header";
+export { SubNavTabs, ContextBar } from "./shell/sub-nav-tabs";
+export type { SubNavTabsProps, SubNavTab, ContextBarProps } from "./shell/sub-nav-tabs";
+export { PopoverMenu } from "./shell/popover-menu";
+export type { PopoverMenuProps, PopoverMenuItem } from "./shell/popover-menu";
+export { Drawer } from "./shell/drawer";
+export type { DrawerProps } from "./shell/drawer";
+export { CommandPalette } from "./shell/command-palette";
+export type { CommandPaletteProps, PaletteGroup, PaletteItem } from "./shell/command-palette";
+export { LoadingState } from "./shell/loading-state";
+export type { LoadingStateProps } from "./shell/loading-state";
+export { ErrorState } from "./primitives/error-state";
+export type { ErrorStateProps } from "./primitives/error-state";
+export {
+  IconHome,
+  IconTrophy,
+  IconUsers,
+  IconRupee,
+  IconHelp,
+  IconSearch,
+  IconBell,
+  IconMenu,
+  IconClose,
+  IconChevronDown,
+  IconArrowLeft,
+  IconAlert,
+} from "./shell/icons";

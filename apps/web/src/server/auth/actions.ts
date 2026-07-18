@@ -10,10 +10,14 @@ import type {
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { people, withTenantDb } from "@desiauction/db";
+import { eq } from "drizzle-orm";
+
 import { env } from "../../env";
-import { db } from "../db";
+import { db, dbHandle } from "../db";
 import { requestOtp, verifyOtp } from "./otp";
-import { DevInboxSender } from "./otp-sender";
+import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
+import { safeNext } from "./redirect";
 import {
   finishAuthentication,
   finishEnrollment,
@@ -73,8 +77,9 @@ async function issueSessionCookie(personId: string): Promise<void> {
 }
 
 // Server actions = the internal RPC surface (C-14, IP-2_DESIGN D7).
-// RC-1: swap DevInboxSender for the real provider adapter; nothing else moves.
-const sender = new DevInboxSender(db);
+// PX-3: the sender is selected by validated env — DevInboxSender in dev,
+// the MSG91 adapter in production. Auth logic never changed (the ED-1 port).
+const sender = createOtpSenderFromEnv(env, db);
 
 export interface AuthFormState {
   step: "phone" | "code";
@@ -83,13 +88,9 @@ export interface AuthFormState {
   error?: string;
 }
 
-/** Open-redirect-free return targets: relative paths only (IP-2 §6). */
-function safeNext(value: string | undefined): string {
-  return value !== undefined && value.startsWith("/") && !value.startsWith("//")
-    ? value
-    : "/account";
-}
-
+/** Open-redirect-free return targets: relative paths only (IP-2 §6).
+ * PX-2: the authenticated landing is /home — /account is never a login
+ * destination (PX-1 01 §5). */
 function formString(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
@@ -100,7 +101,22 @@ export async function requestOtpAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   const phone = formString(formData, "phone");
-  const result = await requestOtp(db, sender, phone, await requestIp());
+  let result: Awaited<ReturnType<typeof requestOtp>>;
+  try {
+    result = await requestOtp(db, sender, phone, await requestIp());
+  } catch (error) {
+    // PX-3: provider failure (or open breaker) is an honest, retryable state —
+    // never a crash screen on the front door.
+    if (error instanceof OtpSendError) {
+      return {
+        step: "phone",
+        phone,
+        ...(_previous.next !== undefined ? { next: _previous.next } : {}),
+        error: "We couldn't send the code right now. Wait a minute and try again.",
+      };
+    }
+    throw error;
+  }
   if (!result.ok) {
     const message =
       result.reason === "invalid-phone"
@@ -132,7 +148,7 @@ export async function verifyOtpAction(
   if (!result.ok) {
     return { step: "code", phone: previous.phone, error: "That code didn't work. Try again." };
   }
-  await logSecurityEvent(db, result.personId, "auth.login.otp");
+  await logSecurityEvent(result.personId, "auth.login.otp");
   await issueSessionCookie(result.personId);
   redirect(safeNext(previous.next));
 }
@@ -221,7 +237,7 @@ export async function accountSecurity(): Promise<AccountSecurity | null> {
   const [passkeys, sessionList, events] = await Promise.all([
     listPasskeys(db, session.personId),
     listSessions(db, session.personId),
-    listSecurityEvents(db, session.personId),
+    listSecurityEvents(session.personId),
   ]);
   return {
     passkeys,
@@ -238,7 +254,7 @@ export async function revokeSessionAction(sessionId: string): Promise<void> {
   const owned = await listSessions(db, session.personId);
   if (owned.some((entry) => entry.id === sessionId)) {
     await revokeSession(db, sessionId);
-    await logSecurityEvent(db, session.personId, "auth.session.revoked");
+    await logSecurityEvent(session.personId, "auth.session.revoked");
   }
 }
 
@@ -261,4 +277,32 @@ export async function currentSession() {
     return null;
   }
   return getSessionByToken(db, token);
+}
+
+// --- Profile (PX-3) -----------------------------------------------------------
+// The one authorized identity write (PX-1 01 §7.2): sets the EXISTING
+// people.name column inside the person's tenant boundary. No new identity model.
+
+export interface ProfileFormState {
+  error?: string;
+  saved?: boolean;
+}
+
+export async function updateProfileAction(
+  _previous: ProfileFormState,
+  formData: FormData,
+): Promise<ProfileFormState> {
+  const session = await currentSession();
+  if (session === null) {
+    redirect("/login?next=/account");
+  }
+  const name = formString(formData, "name").trim().replace(/\s+/g, " ");
+  if (name.length < 2 || name.length > 60) {
+    return { error: "Names are 2–60 characters." };
+  }
+  await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    db.update(people).set({ name }).where(eq(people.id, session.personId)),
+  );
+  await logSecurityEvent(session.personId, "profile.name.updated");
+  return { saved: true };
 }

@@ -123,6 +123,7 @@ async function main(): Promise<void> {
     name: `Perf Season ${RUN}`,
     slug: `perf-season-${RUN}`,
     status: "registration_closed",
+    visibility: "private" as const,
     location: "Local",
     startsOn: "2026-01-01",
     endsOn: "2026-12-31",
@@ -166,6 +167,7 @@ async function main(): Promise<void> {
     name: `Perf Season ${RUN}`,
     slug: `perf-season-${RUN}`,
     status: "registration_closed" as const,
+    visibility: "private" as const,
     location: "Local",
     startsOn: "2026-01-01",
     endsOn: "2026-12-31",
@@ -184,10 +186,14 @@ async function main(): Promise<void> {
   await transitionAuction(db, auction, owner, "open");
   auction = (await auctionOf(db, compId)) as AuctionRecord;
   const view = await auctionView(db, auction);
+  // Bid each lot's own base: lot seq derives from same-millisecond ULIDs, so
+  // queue position does not track registration band — a fixed band-by-position
+  // amount intermittently lands under an A-band base (PVP-1 D3). Obligations
+  // below use a fixed basis, so sale amounts only need to be valid bids.
   const sales = [
-    { player: view.lots[0]?.playerName, paddle: paddles[0], amount: 5_000_000 },
-    { player: view.lots[1]?.playerName, paddle: paddles[0], amount: 5_000_000 },
-    { player: view.lots[2]?.playerName, paddle: paddles[1], amount: 2_500_000 },
+    { player: view.lots[0]?.playerName, paddle: paddles[0], amount: view.lots[0]?.basePrice ?? 0 },
+    { player: view.lots[1]?.playerName, paddle: paddles[0], amount: view.lots[1]?.basePrice ?? 0 },
+    { player: view.lots[2]?.playerName, paddle: paddles[1], amount: view.lots[2]?.basePrice ?? 0 },
   ];
   for (const sale of sales) {
     const lot = view.lots.find((l) => l.playerName === sale.player);

@@ -6,12 +6,19 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   // Local runs share one on-demand `next dev` compiler; more workers overload
-  // it into moving 30s timeouts (M-IP2-4 sweep). CI keeps Playwright's default.
-  ...(process.env["CI"] ? {} : { workers: 2 }),
+  // it into moving 30s timeouts (M-IP2-4 sweep). At PX-5 the suite crossed 70
+  // tests and even 2 workers rotate long-journey flakes (compiler + shared-DB
+  // contention); single-worker runs are ~6 min and fully deterministic.
+  // CI keeps Playwright's default (pre-compiled service containers).
+  ...(process.env["CI"] ? {} : { workers: 1 }),
   // One retry absorbs first-hit dev-compile latency under parallel load (a fresh
   // retry hits an already-warm server). Not a mask for logic flakes — every spec
   // passes in isolation; this only covers the shared-compiler jitter (M-IP3-2).
   retries: 1,
+  // PX-4: the suite grew past 60 tests and the PX-2 shell adds navigation reads
+  // to every authenticated SSR; long multi-actor journeys now brush Playwright's
+  // 30s default under the shared dev compiler. Same jitter class as above.
+  timeout: 60_000,
   globalSetup: "./e2e/global-setup.ts",
   reporter: [["list"]],
   use: {

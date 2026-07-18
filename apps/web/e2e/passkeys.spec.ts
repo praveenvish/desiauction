@@ -9,13 +9,18 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Mobile number").fill(phone);
   await page.getByRole("button", { name: "Send code" }).click();
+  // Await the send completing (data-step flips only after the action commits)
+  // before reading the inbox — the login.spec idiom; a bare read races the mint.
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
   const inbox = await page.context().newPage();
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
   await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page).toHaveURL(/\/account/);
+  // PX-3: new accounts land on onboarding; security panels live on /account.
+  await expect(page).toHaveURL(/\/(home|onboarding)/);
+  await page.goto("/account");
 }
 
 test("the founder journey: enroll passkey, sign out, passkey-only sign in", async ({ page }) => {
@@ -43,7 +48,8 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByTestId("passkey-login").click();
-  await expect(page).toHaveURL(/\/account/, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/(home|onboarding)/, { timeout: 10_000 });
+  await page.goto("/account");
   await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
   await expect(page.getByTestId("events-panel")).toContainText("auth.login.passkey");
 });

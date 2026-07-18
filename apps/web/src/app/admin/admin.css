@@ -1,0 +1,223 @@
+/* PX-9 Platform Administration. Reuses the console's dash/stat/table language
+   (competitions.css) — administration is a console, not a new design system.
+   Only what administration genuinely adds lives here. */
+
+.admin-stack {
+  max-width: 1120px;
+}
+
+/* The observation banner: administration states its own nature, once, at the
+   top of the console, so an operator never wonders whether a click will DO
+   something. It is the read-only guarantee, said out loud. */
+.admin-readonly {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.admin-section-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  color: var(--text-heading);
+  margin: 0 0 var(--space-3);
+}
+
+/* Attention queue: each row is another platform's verdict, carried across. */
+.admin-attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-attention li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  flex-wrap: wrap;
+}
+
+.admin-attention-subject {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-attention-kind {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* The activity timeline — audit rows, newest first. */
+.admin-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-timeline li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-timeline li:last-child {
+  border-bottom: none;
+}
+
+.admin-action {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.admin-meta {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.admin-when {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ULIDs and digests: monospace, and never allowed to widen the page. */
+.admin-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.admin-evidence {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.admin-filters {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.admin-filters .admin-filter-grow {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* The GET-form controls. The Field/Select primitives are client components
+   bound to onChange; administration's filters are a plain form that submits,
+   so these are styled to match them rather than to reinvent them. */
+.admin-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  min-height: 40px;
+}
+
+.admin-search-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.admin-search-submit {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.admin-search-submit:hover {
+  background: var(--surface-sunken);
+}
+
+.admin-search-submit:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.admin-health-org {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.admin-chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.admin-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 360px (PX-1 04 §9): tables scroll inside their own container, never the page. */
+@media (max-width: 640px) {
+  .admin-timeline li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-attention li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

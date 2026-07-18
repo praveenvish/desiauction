@@ -1,0 +1,61 @@
+# FinOps runner deploys (engine precedent, PRP-1 §2): staging on every main
+# push once the Fly account exists (§32 founder externals); production is
+# manual dispatch only. No public surface — the post-deploy smoke checks the
+# machine is running, not an endpoint.
+name: deploy-finops-runner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/finops-runner/**"
+      - "packages/financial-operations/**"
+      - "packages/db/**"
+      - "packages/core/**"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Fly credentials
+        id: creds
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "FLY_API_TOKEN not configured — deploy skipped (IP-0_DESIGN §32 founder externals pending)." >> "$GITHUB_STEP_SUMMARY"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.creds.outputs.configured == 'true'
+      - name: Deploy
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          APP="desiauction-finops-runner-${{ inputs.environment || 'staging' }}"
+          flyctl deploy --config apps/finops-runner/fly.toml --app "$APP" \
+            --build-arg APP_VERSION="${GITHUB_SHA::7}" --remote-only
+      - name: Post-deploy smoke
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          APP="desiauction-finops-runner-${{ inputs.environment || 'staging' }}"
+          STATE=$(flyctl machine list --app "$APP" --json |
+            node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const m=JSON.parse(d);console.log(m.length>0&&m.every(x=>x.state==="started")?"ok":"bad")})')
+          if [ "$STATE" = "ok" ]; then echo "runner machines started"; exit 0; fi
+          echo "runner machines not healthy"; exit 1

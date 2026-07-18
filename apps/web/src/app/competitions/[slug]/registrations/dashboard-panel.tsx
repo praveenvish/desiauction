@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   addNoteAction,
+  assignTeamAction,
   bulkTriageAction,
   exportRegistrationsAction,
   importCommitAction,
@@ -53,6 +54,7 @@ export function RegistrationDashboardPanel({
   const [rejectReason, setRejectReason] = useState(REJECTION_REASONS[0]);
   const [cursor, setCursor] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [assignTeamId, setAssignTeamId] = useState("");
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [noteText, setNoteText] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -258,11 +260,51 @@ export function RegistrationDashboardPanel({
   return (
     <>
       <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
-        <StatTile label="Total" value={stats.total} testId="stat-total" />
-        <StatTile label="Submitted" value={stats.submitted} testId="stat-submitted" />
-        <StatTile label="Approved" value={stats.approved} testId="stat-approved" />
-        <StatTile label="Waitlisted" value={stats.waitlisted} testId="stat-waitlisted" />
-        <StatTile label="Rejected" value={stats.rejected} testId="stat-rejected" />
+        <StatTile
+          label="Total"
+          value={stats.total}
+          testId="stat-total"
+          active={filters.status === ""}
+          onSelect={() => {
+            pushQuery({ status: "", page: "1" });
+          }}
+        />
+        <StatTile
+          label="Submitted"
+          value={stats.submitted}
+          testId="stat-submitted"
+          active={filters.status === "submitted"}
+          onSelect={() => {
+            pushQuery({ status: "submitted", page: "1" });
+          }}
+        />
+        <StatTile
+          label="Approved"
+          value={stats.approved}
+          testId="stat-approved"
+          active={filters.status === "approved"}
+          onSelect={() => {
+            pushQuery({ status: "approved", page: "1" });
+          }}
+        />
+        <StatTile
+          label="Waitlisted"
+          value={stats.waitlisted}
+          testId="stat-waitlisted"
+          active={filters.status === "waitlisted"}
+          onSelect={() => {
+            pushQuery({ status: "waitlisted", page: "1" });
+          }}
+        />
+        <StatTile
+          label="Rejected"
+          value={stats.rejected}
+          testId="stat-rejected"
+          active={filters.status === "rejected"}
+          onSelect={() => {
+            pushQuery({ status: "rejected", page: "1" });
+          }}
+        />
       </div>
 
       <Card>
@@ -509,6 +551,43 @@ export function RegistrationDashboardPanel({
               Add note
             </Button>
           </div>
+          {teams.length > 0 ? (
+            <div className="note-row" data-testid="assign-team-row">
+              <Select
+                label="Assign to team"
+                value={assignTeamId}
+                onChange={(event) => {
+                  setAssignTeamId(event.target.value);
+                }}
+              >
+                <option value="">Choose a team…</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                size="sm"
+                disabled={assignTeamId === ""}
+                data-testid="assign-team"
+                onClick={() => {
+                  // PX-4: the certified assignTeamAction finally gets a UI —
+                  // capability (team.manage) is enforced server-side.
+                  void assignTeamAction(slug, expanded, assignTeamId).then((result) => {
+                    if (result.ok) {
+                      toast({ title: "Assigned to team", tone: "success" });
+                      router.refresh();
+                    } else {
+                      toast({ title: result.error ?? "Assignment failed.", tone: "danger" });
+                    }
+                  });
+                }}
+              >
+                Assign
+              </Button>
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -575,12 +654,40 @@ export function RegistrationDashboardPanel({
   );
 }
 
-function StatTile({ label, value, testId }: { label: string; value: number; testId: string }) {
-  return (
+function StatTile({
+  label,
+  value,
+  testId,
+  onSelect,
+  active,
+}: {
+  label: string;
+  value: number;
+  testId: string;
+  /** PX-4: tiles double as one-click status views (URL-backed, shareable). */
+  onSelect?: () => void;
+  active?: boolean;
+}) {
+  const tile = (
     <div className="stat-tile" data-testid={testId}>
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
     </div>
+  );
+  if (onSelect === undefined) {
+    return tile;
+  }
+  return (
+    <button
+      type="button"
+      className="stat-tile-link"
+      data-active={active === true}
+      aria-pressed={active === true}
+      aria-label={`Filter: ${label}`}
+      onClick={onSelect}
+    >
+      {tile}
+    </button>
   );
 }
 

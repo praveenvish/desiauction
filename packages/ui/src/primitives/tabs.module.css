@@ -2,6 +2,12 @@
   display: flex;
   gap: var(--space-1);
   border-bottom: 1px solid var(--border-subtle);
+  /* A tab row must never widen the PAGE (doc 14): past three or four tabs it
+     cannot fit 360px, so it scrolls within itself instead of pushing the
+     document sideways. Keyboard users are unaffected — roving tabindex scrolls
+     the focused tab into view natively. */
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .tab {
@@ -16,6 +22,9 @@
   padding: var(--space-2) var(--space-4);
   margin-bottom: -1px;
   cursor: pointer;
+  /* Tabs keep their whole label rather than squashing into ellipses. */
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .tab:hover {

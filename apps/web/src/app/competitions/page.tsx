@@ -20,7 +20,8 @@ const STATUS_TONE = {
 export default async function CompetitionsPage() {
   const session = await currentSession();
   if (session === null) {
-    redirect("/login");
+    // PX-3 session-expiry UX: come back exactly here after signing in.
+    redirect("/login?next=/competitions");
   }
   const [view, schedule] = await Promise.all([competitionsView(), organizerScheduleView()]);
   return (

@@ -14,6 +14,7 @@ import {
   type AuctionDashboard,
   type ReplayVerifyReport,
 } from "../../../../server/auction/actions";
+import { ConnectionCheck, RulesCard } from "./live-experience";
 
 // The M-IP4-1 founder demonstration: AuctionReady, creation, the lot queue,
 // the three frozen state machines, the replay/recovery proof, and the timer
@@ -97,6 +98,9 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
       data-testid="auction-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
+      {dashboard.rules !== null ? <RulesCard rules={dashboard.rules} /> : null}
+      {dashboard.wsUrl !== null ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
+
       <Card data-testid="ready-panel">
         <h2>AuctionReady</h2>
         <p className="competitions-hint">

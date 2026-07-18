@@ -5,6 +5,14 @@
 module.exports = {
   forbidden: [
     {
+      name: "no-circular",
+      comment:
+        "PX-11 architecture gate: no import cycles, including type-only ones (tsPreCompilationDeps is on). A type-only cycle is harmless at runtime but is a real coupling smell and a latent init-order trap; this caught deliveries ↔ views in the finops web layer.",
+      severity: "error",
+      from: {},
+      to: { circular: true },
+    },
+    {
       name: "no-app-to-app",
       comment: "apps never import each other (§8)",
       severity: "error",
@@ -56,6 +64,26 @@ module.exports = {
       severity: "error",
       from: { path: "^packages/financial-operations" },
       to: { path: "^apps/web/src/server/settlement" },
+    },
+    {
+      name: "admin-is-read-only",
+      comment:
+        "PX-9: Platform Administration OBSERVES. It may not import any DOMAIN's writer, store or server actions — the modules through which every business mutation on this platform passes. Administration reads tables and certified snapshots; the day someone needs a button here, this rule fails and the conversation happens at review, not in production. (`auth/actions` is deliberately absent from this list: `currentSession` is where EVERY gate in the app — settlement's, finops' and now administration's — resolves identity, so forbidding it would forbid the gate itself. Auth's own writes are person-scoped self-service, not administration of others, and the runtime proof in admin-foundation.regression.test.ts covers what this rule cannot: it drives every admin view through a db handle that throws on insert/update/delete, so a write would fail the suite no matter which module it came through.)",
+      severity: "error",
+      from: { path: "^apps/web/src/(server|app)/admin" },
+      to: {
+        path: "^apps/web/src/server/(settlement|financial-operations|auction|competition|orgs)/(actions|writer|store|conduct-actions|live-actions|owner-actions|webhook|recovery)",
+      },
+    },
+    {
+      name: "admin-never-imports-finops-commands",
+      comment:
+        "PX-9: the finops server barrel carries the WRITER alongside the snapshots. Administration's views may consume snapshots (imported by name), but nothing under admin may reach the command surface of a domain package.",
+      severity: "error",
+      from: { path: "^apps/web/src/(server|app)/admin" },
+      to: {
+        path: "^packages/(financial-operations|settlement|auction)/src/server/(writer|commands)",
+      },
     },
     {
       name: "no-ui-to-core",

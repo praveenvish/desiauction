@@ -20,7 +20,9 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
 
   await page.getByLabel(`Code sent to +91${PHONE}`).fill(code ?? "");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page).toHaveURL(/\/account/);
+  // PX-3: a brand-new (nameless) account is onboarded before the console.
+  await expect(page).toHaveURL(/\/onboarding/);
+  await page.goto("/account");
   await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
 
   await page.getByRole("button", { name: "Sign out" }).click();

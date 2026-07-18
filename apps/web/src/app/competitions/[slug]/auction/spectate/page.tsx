@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { spectatorView } from "../../../../../server/auction/conduct-actions";
+import { publicSpectatorView, spectatorView } from "../../../../../server/auction/conduct-actions";
 import { SpectatePanel } from "./spectate-panel";
 import "../../../competitions.css";
 import "../auction.css";
@@ -12,7 +12,9 @@ export const metadata = { title: "Live auction · DesiAuction" };
 
 export default async function SpectatePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const view = await spectatorView(slug);
+  // PX-6: published competitions are publicly watchable (no sign-in); the
+  // member-gated path remains for unpublished auctions.
+  const view = (await publicSpectatorView(slug)) ?? (await spectatorView(slug));
   if (view === null) {
     notFound();
   }
@@ -23,7 +25,7 @@ export default async function SpectatePage({ params }: { params: Promise<{ slug:
           <h1>{view.auctionName}</h1>
           <p className="competitions-hint">{view.competitionName} — spectator view</p>
         </header>
-        <SpectatePanel wsUrl={view.wsUrl} />
+        <SpectatePanel wsUrl={view.wsUrl} slug={slug} resolved={view.resolved} />
       </div>
     </main>
   );

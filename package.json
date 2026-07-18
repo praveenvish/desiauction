@@ -7,17 +7,22 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "node scripts/dev-banner.mjs && turbo run dev",
+    "setup:local": "node scripts/setup-local.mjs",
+    "health": "node scripts/health.mjs",
+    "seed:demo": "pnpm --filter @desiauction/web seed:demo",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "env:check": "turbo run env:check",
+    "preflight:production": "node scripts/preflight-production.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "depcruise": "depcruise apps packages",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check && pnpm depcruise"
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check && pnpm depcruise",
+    "verify:local": "pnpm verify && pnpm build && pnpm test:integration && pnpm env:check && node scripts/health.mjs --no-apps"
   },
   "devDependencies": {
     "@desiauction/config": "workspace:*",

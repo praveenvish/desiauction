@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { createDb } from "@desiauction/db";
 import { finopsDeps, followAllOrgs, runnerTick } from "@desiauction/financial-operations/server";
 
@@ -23,7 +25,7 @@ import { logger } from "./logger";
  */
 
 const handle = createDb(env.DATABASE_URL);
-const deps = finopsDeps(handle.db);
+const deps = finopsDeps(handle.db, { storageDir: resolve(process.cwd(), env.FINOPS_STORAGE_DIR) });
 
 let stopping = false;
 

@@ -1,0 +1,99 @@
+.register-status-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.register-status-head h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  color: var(--text-heading);
+}
+
+.register-hint {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  margin: 0 0 var(--space-3);
+}
+
+.register-progress {
+  list-style: none;
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.register-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.register-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  font-size: var(--text-xs-size);
+}
+
+.register-step-current {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.register-step-current .register-step-number {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.register-step-done .register-step-number {
+  background: var(--success-subtle);
+  border-color: var(--success-base);
+  color: var(--success-strong);
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.register-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.register-review {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--text-md-size);
+}
+
+.register-review dt {
+  color: var(--text-muted);
+}
+
+.register-review dd {
+  margin: 0;
+}
+
+.register-error {
+  color: var(--danger-strong);
+  font-size: var(--text-sm-size);
+  margin: 0;
+}

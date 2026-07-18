@@ -1,0 +1,346 @@
+/*
+ * PX-7 Settlement Experience. Tokens only — no literal colour, no literal
+ * spacing (doc 18). The money surfaces reuse the console conventions
+ * (.registrations-dash / .dash-stack / .stat-row) and add only what settlement
+ * genuinely needs: a lifecycle stepper, money tables that stay readable on a
+ * phone, and the override well.
+ */
+
+.money-stack {
+  max-width: 1040px;
+}
+
+/* --- The case lifecycle stepper ------------------------------------------------- */
+
+.case-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.case-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.case-step[data-state="done"] {
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+
+.case-step[data-state="current"] {
+  color: var(--text-heading);
+  border-color: var(--accent);
+  background: var(--surface-sunken);
+  font-weight: var(--font-weight-medium);
+}
+
+.case-step[data-state="blocked"] {
+  color: var(--text-muted);
+  border-style: dashed;
+}
+
+.case-step-mark {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+}
+
+/* --- Money tables ---------------------------------------------------------------- */
+
+.money-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.money-table th,
+.money-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.money-table th {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.money-table td.num,
+.money-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.money-table tfoot td {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+  border-bottom: none;
+  border-top: 1px solid var(--border-strong);
+}
+
+.money-table .settled-row td {
+  color: var(--text-muted);
+}
+
+.money-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+/* --- Forms: the collection recorder ---------------------------------------------- */
+
+.money-form {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.money-form > * {
+  min-width: 0;
+}
+
+.money-form-amount {
+  max-width: 12rem;
+}
+
+.fixed-dues {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  margin: var(--space-4) 0 0;
+}
+
+.fixed-dues legend {
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* --- The override well: high-friction acts look high-friction (doc 28 ladder 4) --- */
+
+.override-well {
+  border: 1px solid var(--border-subtle);
+  border-left: var(--space-1) solid var(--danger-base);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.override-well h3 {
+  margin: 0;
+  font-size: var(--text-base-size);
+  color: var(--text-heading);
+}
+
+.override-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* --- Evidence & digests ---------------------------------------------------------- */
+
+.digest {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.evidence-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.evidence-grid dt {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.evidence-grid dd {
+  margin: 0;
+}
+
+.check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.check-list li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+/* --- Case cards on the dashboard worklist ---------------------------------------- */
+
+.case-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.case-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  text-decoration: none;
+  color: inherit;
+}
+
+.case-card:hover,
+.case-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.case-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.case-card-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.case-card-money {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.case-card-money strong {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- Saved views ----------------------------------------------------------------- */
+
+.saved-views {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.section-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* --- Phone (04 §9): money tables collapse to labelled rows, never a scrollbar ----- */
+
+@media (max-width: 640px) {
+  .money-table thead {
+    display: none;
+  }
+
+  .money-table,
+  .money-table tbody,
+  .money-table tr,
+  .money-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .money-table tr {
+    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--space-2) 0;
+  }
+
+  .money-table td {
+    border-bottom: none;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
+  }
+
+  .money-table td.num {
+    text-align: right;
+  }
+
+  /* The header the <thead> stopped carrying rides the cell itself. */
+  .money-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .money-table td[data-label=""]::before {
+    content: none;
+  }
+
+  .money-table tfoot td {
+    border-top: none;
+  }
+
+  .money-row-actions {
+    justify-content: flex-start;
+  }
+
+  .money-form > * {
+    width: 100%;
+  }
+
+  .money-form-amount {
+    max-width: none;
+  }
+}
+
+/* The stated reason for an override — quoted, because it is someone's words. */
+.timeline-reason {
+  color: var(--text-secondary);
+  font-style: italic;
+  flex-basis: 100%;
+}

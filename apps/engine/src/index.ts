@@ -67,6 +67,32 @@ server.addHook("onClose", (_instance, done) => {
   done();
 });
 
+// PX-11 reliability: graceful shutdown. On a deploy the orchestrator sends
+// SIGTERM; without a handler the process is hard-killed after the grace period,
+// dropping WebSocket clients abruptly. (The snapshot-recovery model tolerates a
+// hard kill — proven by the restart-mid-auction e2e — so this is a clean drain,
+// not a correctness fix.) server.close() fires the onClose hook that clears the
+// timers; then flush Sentry and exit 0 so the platform records a clean stop.
+let shuttingDown = false;
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    logger.info({ signal }, "shutting down — draining connections");
+    void server
+      .close()
+      .catch((error: unknown) => {
+        logger.error({ err: error }, "error during close");
+      })
+      .finally(() => Sentry.flush(2000).catch(() => undefined))
+      .finally(() => {
+        process.exit(0);
+      });
+  });
+}
+
 server.listen({ host: "0.0.0.0", port: env.PORT }).catch((error: unknown) => {
   void die("engine failed to bind", error);
 });

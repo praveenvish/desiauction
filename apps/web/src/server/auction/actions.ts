@@ -11,14 +11,17 @@ import {
 } from "@desiauction/core";
 import { redirect } from "next/navigation";
 
+import { withTenantDb, type Db } from "@desiauction/db";
+
 import { currentSession } from "../auth/actions";
 import { canCompetition, requireCompetitionCapability } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
-import { db } from "../db";
+import { dbHandle, systemDb } from "../db";
 import { createAuction, type AuctionRecord } from "@desiauction/auction";
 import { auctionOf, auctionView, type AuctionView } from "@desiauction/auction";
 import { auctionReady, type AuctionReadyProjection } from "./auction-ready";
-import { sendEngineCommand } from "./engine-client";
+import { rulesOf, type AuctionRules } from "./live-summary";
+import { engineWsUrl, sendEngineCommand } from "./engine-client";
 
 // Auction internal RPC (M-IP4-1, rewired M-IP4-3). One gate: session → tenant
 // → auction.conduct. Creation is the aggregate's birth (no live state exists
@@ -33,22 +36,32 @@ async function requireSession() {
   return session;
 }
 
+function inCompetitionOrg<T>(
+  personId: string,
+  competition: { orgId: string },
+  fn: (db: Db) => Promise<T>,
+): Promise<T> {
+  return withTenantDb(dbHandle, { personId, orgId: competition.orgId }, fn);
+}
+
 async function conductGate(
   slug: string,
 ): Promise<
   { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
 > {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
   try {
-    await requireCompetitionCapability(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "auction.conduct",
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "auction.conduct",
+      ),
     );
   } catch {
     return { ok: false, error: "You can't conduct auctions here." };
@@ -56,7 +69,7 @@ async function conductGate(
   return { ok: true, personId: session.personId, competition };
 }
 
-async function requireAuction(competitionId: string): Promise<AuctionRecord | null> {
+async function requireAuction(db: Db, competitionId: string): Promise<AuctionRecord | null> {
   return auctionOf(db, competitionId);
 }
 
@@ -80,6 +93,10 @@ export interface AuctionDashboard {
   };
   timerDemo: { initialSeconds: number; extensionSeconds: number; steps: TimerDemoStep[] };
   viewer: { canConduct: boolean };
+  /** PX-6 lobby: the locked rules (doc 41), display-only. Null pre-creation. */
+  rules: AuctionRules | null;
+  /** PX-6 lobby: snapshot stream address for the connection check. */
+  wsUrl: string | null;
 }
 
 /** A deterministic worked example of the timer model — computed, not animated. */
@@ -114,17 +131,29 @@ function timerDemo(): AuctionDashboard["timerDemo"] {
 
 export async function auctionDashboard(slug: string): Promise<AuctionDashboard | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(db, session.personId, slug);
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const [ready, auction, canConduct] = await Promise.all([
-    auctionReady(db, competition),
-    requireAuction(competition.id),
-    canCompetition(db, session.personId, scope, "auction.conduct"),
-  ]);
-  const view = auction === null ? null : await auctionView(db, auction);
+  const { ready, view, canConduct, rules, wsUrl } = await inCompetitionOrg(
+    session.personId,
+    competition,
+    async (db) => {
+      const [readyProjection, auction, conduct] = await Promise.all([
+        auctionReady(db, competition),
+        requireAuction(db, competition.id),
+        canCompetition(db, session.personId, scope, "auction.conduct"),
+      ]);
+      return {
+        ready: readyProjection,
+        view: auction === null ? null : await auctionView(db, auction),
+        canConduct: conduct,
+        rules: auction === null ? null : rulesOf(auction.config),
+        wsUrl: auction === null ? null : engineWsUrl(auction.id),
+      };
+    },
+  );
   return {
     competition,
     ready,
@@ -132,6 +161,8 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     machines: { auction: AUCTION_MACHINE, lot: LOT_MACHINE, bid: BID_MACHINE },
     timerDemo: timerDemo(),
     viewer: { canConduct },
+    rules,
+    wsUrl,
   };
 }
 
@@ -142,14 +173,10 @@ export async function createAuctionAction(slug: string): Promise<{ ok: boolean; 
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const ready = await auctionReady(db, gate.competition);
-  const result = await createAuction(
-    db,
-    gate.competition,
-    ready,
-    gate.personId,
-    DEFAULT_AUCTION_CONFIG,
-  );
+  const result = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const ready = await auctionReady(db, gate.competition);
+    return createAuction(db, gate.competition, ready, gate.personId, DEFAULT_AUCTION_CONFIG);
+  });
   if (!result.ok) {
     const message = {
       not_ready: "The competition isn't auction-ready yet — see the checklist.",
@@ -171,7 +198,9 @@ async function conductCommand(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const auction = await requireAuction(gate.competition.id);
+  const auction = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    requireAuction(db, gate.competition.id),
+  );
   if (auction === null) {
     return { ok: false, error: "Create the auction first." };
   }

@@ -62,8 +62,10 @@ const CONFIG: AuctionConfig = {
 async function main(): Promise<void> {
   const orgId = newId();
   const ownerId = newId();
-  const bidderIds = Array.from({ length: 10 }, () => newId());
-  const teamIds = Array.from({ length: 10 }, () => newId());
+  // PERF_BIDDERS scales the concurrent-burst scenario (PVP-1 asks for 10 and 50).
+  const bidderCount = Number(process.env["PERF_BIDDERS"] ?? "10");
+  const bidderIds = Array.from({ length: bidderCount }, () => newId());
+  const teamIds = Array.from({ length: bidderCount }, () => newId());
   const compId = newId();
 
   await db.insert(people).values([
@@ -168,7 +170,7 @@ async function main(): Promise<void> {
   // Setup: the M-IP4-3 owner workflow per team, measured as OWNER JOIN
   // (invite → accept → grant → claim), then queue + open on the command path.
   const ownerJoin: number[] = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < bidderIds.length; i++) {
     const bidder = bidderIds[i] as string;
     const start = performance.now();
     const invited = await command(
@@ -206,7 +208,7 @@ async function main(): Promise<void> {
   // event → rebuild → broadcast round trip).
   const bidLatency: number[] = [];
   for (let i = 0; i < 40; i++) {
-    const bidder = bidderIds[(i + 1) % 10] as string;
+    const bidder = bidderIds[(i + 1) % bidderIds.length] as string;
     const next = engine.snapshotOf(auctionId)?.snapshot?.currentLot?.nextMinimumBid ?? 0;
     const start = performance.now();
     const ack = await command("PlaceBid", bidder, {
@@ -237,7 +239,7 @@ async function main(): Promise<void> {
     );
     burst.push(performance.now() - start);
   }
-  report("10 concurrent bids (burst wall time, 1 winner)", burst);
+  report(`${String(bidderCount)} concurrent bids (burst wall time, 1 winner)`, burst);
 
   // --- Snapshot generation + replay duration at current log size.
   const events = await loadEvents(db, auctionId);
@@ -360,7 +362,7 @@ async function main(): Promise<void> {
     const fanout: number[] = [];
     for (let i = 0; i < 5; i++) {
       const next = engine.snapshotOf(auctionId)?.snapshot?.currentLot?.nextMinimumBid ?? 0;
-      const bidder = bidderIds[(i + 3) % 10] as string;
+      const bidder = bidderIds[(i + 3) % bidderIds.length] as string;
       const expectVersion = (engine.snapshotOf(auctionId)?.version ?? 0) + 1;
       const start = performance.now();
       const received = Promise.all(

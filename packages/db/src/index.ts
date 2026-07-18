@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { ulid } from "ulidx";
@@ -53,4 +54,28 @@ export async function withTenant<T>(
     }
     return fn(tx);
   }) as Promise<T>;
+}
+
+/**
+ * The serving-path form of withTenant (PRP-1 §1): the same transaction-scoped
+ * GUC boundary (set_config with is_local = true), expressed through drizzle's
+ * own transaction so domain functions that take `Db` run under tenant context
+ * unchanged. Under a non-BYPASSRLS runtime role the RLS policies are
+ * load-bearing inside this boundary and fail closed outside it. Only set an
+ * orgId the caller has already verified membership for (resolveTenant).
+ */
+export async function withTenantDb<T>(
+  handle: DbHandle,
+  context: TenantContext,
+  fn: (db: Db) => Promise<T>,
+): Promise<T> {
+  return handle.db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.person_id', ${context.personId}, true)`);
+    if (context.orgId !== undefined) {
+      await tx.execute(sql`select set_config('app.org_id', ${context.orgId}, true)`);
+    }
+    // PgTransaction carries the full query-builder surface of Db; nested
+    // db.transaction() calls become savepoints.
+    return fn(tx);
+  });
 }

@@ -14,13 +14,15 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 
 import { currentSession } from "../auth/actions";
-import { db } from "../db";
+import { systemDb } from "../db";
 import { sendEngineCommand } from "./engine-client";
 import { liveGate } from "./live-actions";
 
 // The owner invitation workflow (M-IP4-3). Tokens follow the IP-2 invite
 // discipline: one-time, expiring, stored only as hashes, and the platform
-// sends nothing — the organizer forwards the link. The auction-side state
+// sends nothing — the organizer forwards the link. PRP-1 §1: the token
+// lookups are the documented pre-tenant reads (the token is the capability)
+// and run on the system pool, exactly like org invites. The auction-side state
 // (invite row + OwnerInvited/OwnerAccepted events) mutates ONLY through
 // engine commands; the identity-side membership insert is the one
 // identity-domain step, audited separately.
@@ -75,7 +77,7 @@ export interface OwnerJoinPreview {
 
 /** Look up a live owner invitation without consuming it (the landing view). */
 export async function ownerJoinPreview(token: string): Promise<OwnerJoinPreview | null> {
-  const [row] = await db
+  const [row] = await systemDb
     .select({
       acceptedAt: auctionOwnerInvites.acceptedAt,
       revokedAt: auctionOwnerInvites.revokedAt,
@@ -120,7 +122,7 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
   if (session === null) {
     return { ok: false };
   }
-  const [row] = await db
+  const [row] = await systemDb
     .select({
       id: auctionOwnerInvites.id,
       orgId: auctionOwnerInvites.orgId,
@@ -146,11 +148,11 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
   }
   // Identity side: the owner becomes an org member (viewer-level; grants-not-
   // roles means membership alone confers NO capabilities).
-  await db
+  await systemDb
     .insert(orgMembers)
     .values({ orgId: row.orgId, personId: session.personId })
     .onConflictDoNothing();
-  await db.insert(auditLog).values({
+  await systemDb.insert(auditLog).values({
     id: newId(),
     actor: session.personId,
     action: "auction.owner_join",

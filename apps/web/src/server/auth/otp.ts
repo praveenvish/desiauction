@@ -130,7 +130,7 @@ export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise
     if (bumped !== undefined && bumped.attempts >= MAX_ATTEMPTS) {
       const [lockedPerson] = await db.select().from(people).where(eq(people.phone, phone)).limit(1);
       if (lockedPerson !== undefined) {
-        await logSecurityEvent(db, lockedPerson.id, "auth.otp.lockout");
+        await logSecurityEvent(lockedPerson.id, "auth.otp.lockout");
       }
     }
     return { ok: false, reason: "invalid" };

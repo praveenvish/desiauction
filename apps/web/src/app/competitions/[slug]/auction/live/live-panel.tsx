@@ -3,13 +3,22 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   submitAuctionCommand,
   type LiveAuctionView,
 } from "../../../../../server/auction/live-actions";
 import { CeremonyStage } from "../ceremony-stage";
+import {
+  AuctionProgress,
+  AuctionSummaryCard,
+  AuctionTimeline,
+  BidLadder,
+  ConnectionQuality,
+  MyTeamCard,
+  useLiveFeed,
+} from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 
@@ -35,7 +44,11 @@ function commandId(): string {
 export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView }) {
   const router = useRouter();
   const toast = useToast();
-  const { snapshot, connection, remainingMs, version, ceremony } = useAuctionSocket(view.wsUrl);
+  const { snapshot, connection, remainingMs, version, ceremony, drift } = useAuctionSocket(
+    view.wsUrl,
+  );
+  const feed = useLiveFeed(view.resolved, snapshot);
+  const readOnly = connection !== "open";
   const [claimTeam, setClaimTeam] = useState(view.myPaddle?.teamId ?? "");
   const [customBid, setCustomBid] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,6 +92,39 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     await send("PlaceBid", { lotId, paddleId: view.myPaddle.paddleId, amountRaw: amount });
   };
 
+  // PX-6 bidder notifications: outbid (I was leading, now someone else) and
+  // won (last outcome SOLD to my paddle). Pure observation of server truth.
+  const prevLeaderRef = useRef<string | null>(null);
+  const wonSeqRef = useRef<number>(0);
+  useEffect(() => {
+    if (snapshot === null || view.myPaddle === null) {
+      return;
+    }
+    const mine = view.myPaddle.paddleNumber;
+    const leader = snapshot.currentLot?.currentBid?.paddleNumber ?? null;
+    if (prevLeaderRef.current === mine && leader !== null && leader !== mine) {
+      const amount = snapshot.currentLot?.currentBid?.amount;
+      toast({
+        title: `Outbid — ${snapshot.currentLot?.currentBid?.teamName ?? "another team"}${amount !== undefined ? ` at ${formatPaiseINR(paise(amount))}` : ""}`,
+        tone: "info",
+      });
+    }
+    prevLeaderRef.current = leader;
+    const outcome = snapshot.lastOutcome;
+    if (
+      outcome !== null &&
+      outcome.atSeq > wonSeqRef.current &&
+      outcome.kind.toLowerCase() === "sold" &&
+      outcome.paddleNumber === mine
+    ) {
+      wonSeqRef.current = outcome.atSeq;
+      toast({
+        title: `You signed ${outcome.playerName ?? outcome.lotNumber}${outcome.amount !== null ? ` for ${formatPaiseINR(paise(outcome.amount))}` : ""}!`,
+        tone: "success",
+      });
+    }
+  }, [snapshot, view.myPaddle, toast]);
+
   const lot = snapshot?.currentLot ?? null;
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const grantedTeams = view.teams.filter((team) => view.myGrantTeamIds.includes(team.id));
@@ -109,14 +155,31 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             <span className="competitions-hint" data-testid="snapshot-version">
               v{version}
             </span>
+            <ConnectionQuality connection={connection} drift={drift} />
           </span>
         </div>
-        <p className="competitions-hint">
-          {snapshot !== null
-            ? `${String(snapshot.lotsResolved)}/${String(snapshot.lotsTotal)} lots resolved`
-            : "Waiting for the first snapshot…"}
-        </p>
+        {readOnly && snapshot !== null ? (
+          <p role="alert" className="live-readonly" data-testid="readonly-banner">
+            Reconnecting — you&apos;re seeing the last known state; bidding is disabled until
+            we&apos;re live again.
+          </p>
+        ) : null}
+        {snapshot !== null ? (
+          <AuctionProgress snapshot={snapshot} />
+        ) : (
+          <p className="competitions-hint">Waiting for the first snapshot…</p>
+        )}
       </Card>
+
+      {snapshot !== null && snapshot.auctionStatus === "completed" ? (
+        <AuctionSummaryCard
+          snapshot={snapshot}
+          feed={feed}
+          slug={slug}
+          canConduct={view.viewer.canConduct}
+          viewerTeamName={view.myPaddle?.teamName ?? null}
+        />
+      ) : null}
 
       {lot !== null ? (
         <Card data-testid="current-lot">
@@ -148,11 +211,13 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               ? `Leading: ${formatPaiseINR(paise(lot.currentBid.amount))} — ${lot.currentBid.teamName} (${lot.currentBid.paddleNumber})`
               : "No bids yet"}
           </p>
+          <BidLadder lot={lot} slabs={view.rules.slabs} />
           {view.myPaddle !== null ? (
             <div className="date-row">
               <Button
                 onClick={() => void bid(lot.nextMinimumBid)}
                 loading={busy}
+                disabled={readOnly}
                 data-testid="bid-next"
               >
                 Bid {formatPaiseINR(paise(lot.nextMinimumBid))}
@@ -170,7 +235,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
                 variant="secondary"
                 onClick={() => void bid(Number.parseInt(customBid, 10))}
                 loading={busy}
-                disabled={customBid === ""}
+                disabled={customBid === "" || readOnly}
                 data-testid="bid-custom"
               >
                 Bid custom
@@ -195,6 +260,19 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           </p>
         </Card>
       )}
+
+      {view.myPaddle !== null ? (
+        <MyTeamCard
+          snapshot={snapshot}
+          myTeamId={view.myPaddle.teamId}
+          myTeamName={view.myPaddle.teamName}
+          myPaddleNumber={view.myPaddle.paddleNumber}
+          rules={view.rules}
+          feed={feed}
+        />
+      ) : null}
+
+      <AuctionTimeline feed={feed} />
 
       <Card data-testid="paddle-panel">
         <h2>Your paddle</h2>

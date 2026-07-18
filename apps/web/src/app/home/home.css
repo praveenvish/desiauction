@@ -1,0 +1,129 @@
+.home {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-hint {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.home-attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.home-attention-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.home-attention-row:hover {
+  background: var(--surface-sunken);
+}
+
+.home-attention-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.home-attention-label {
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.home-attention-detail {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.home-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  text-decoration: none;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.home-card-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.home-card-sub {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.home-shortcut-card {
+  position: relative;
+}
+
+.home-pin-button {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--text-accent);
+  font-size: var(--text-lg-size);
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: var(--space-05);
+}
+
+.home-pin-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+}
+
+.home-schedule {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.home-schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+}
+
+.home-schedule-teams {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.home-schedule-when {
+  color: var(--text-secondary);
+}

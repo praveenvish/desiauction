@@ -1,0 +1,128 @@
+.shell-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.shell-icon-button:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.shell-icon-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.shell-bell {
+  position: relative;
+}
+
+.shell-bell-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  border: 1px solid var(--surface-raised);
+}
+
+.shell-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.shell-org-name {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-header-link {
+  color: var(--text-accent);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.shell-header-link:hover {
+  text-decoration: underline;
+}
+
+.shell-desktop-only {
+  display: none;
+}
+
+.shell-mobile-only {
+  display: inline-flex;
+}
+
+@media (min-width: 720px) {
+  .shell-desktop-only {
+    display: inline-flex;
+  }
+
+  .shell-mobile-only {
+    display: none;
+  }
+}
+
+.shell-drawer-session {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-2);
+}
+
+.shell-drawer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-drawer-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: var(--space-2) var(--space-1);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.shell-drawer-link:hover {
+  background: var(--surface-sunken);
+}
+
+.shell-drawer-danger {
+  color: var(--danger-strong);
+}

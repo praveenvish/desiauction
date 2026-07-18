@@ -20,7 +20,7 @@ export function PasskeyLogin() {
       const response = await startAuthentication({ optionsJSON: options });
       const result = await finishPasskeyLoginAction(response);
       if (result.ok) {
-        router.push("/account");
+        router.push("/home");
         return;
       }
       setError("That passkey wasn't recognised.");

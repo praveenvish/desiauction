@@ -14,7 +14,7 @@
 //   D-2 the bids table — the row the gavel reads the sale price FROM — was not
 //       covered by projection verification, so a corrupted bid row sold at the
 //       corrupted price and the log recorded the lie as history.
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 
 import {
   buildLiveSnapshot,
@@ -57,7 +57,10 @@ import { db, sql } from "../db.js";
 import { AuctionEngine } from "../engine-core.js";
 
 const logger = pino({ level: "silent" });
-const RUN = String(Date.now()).slice(-7);
+// Random, not time-derived: Date.now() digits repeat every ~2.8h, so a run
+// whose window collides with residue another harness left in the shared dev
+// DB fails on people_phone_unique (PVP-1 D1). Randomness makes reruns clean.
+const RUN = String(randomInt(0, 10_000_000)).padStart(7, "0");
 
 const CONFIG: AuctionConfig = {
   ...DEFAULT_AUCTION_CONFIG,
