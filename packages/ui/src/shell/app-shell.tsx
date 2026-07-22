@@ -1,6 +1,7 @@
 import type { ElementType, ReactNode } from "react";
 
 import styles from "./app-shell.module.css";
+import { BrandGlyph } from "./icons";
 
 /**
  * The Console shell (PX-1 01 §1 S2, 04 §6). Pure presentational: navigation
@@ -46,6 +47,9 @@ export function AppShell({
       </a>
       <header className={styles["topbar"]}>
         <Link href={wordmarkHref} className={styles["wordmark"]}>
+          <span className={styles["wordmark-glyph"]} aria-hidden>
+            <BrandGlyph />
+          </span>
           {wordmark}
         </Link>
         <div className={styles["top-actions"]}>{topActions}</div>

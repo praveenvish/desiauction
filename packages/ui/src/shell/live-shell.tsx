@@ -22,7 +22,10 @@ export function LiveShell({
   children,
 }: LiveShellProps) {
   return (
-    <div className={styles["live"]}>
+    // Canon 04 §3: the Live shell is pinned to Floodlight — the show is always
+    // dark, projector-honest. This scopes the dark token set to everything the
+    // auction renders (cockpit, live, spectate, replay).
+    <div className={styles["live"]} data-theme="floodlight">
       <a className={styles["skip"]} href="#live-content">
         Skip to content
       </a>

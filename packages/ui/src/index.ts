@@ -72,4 +72,5 @@ export {
   IconChevronDown,
   IconArrowLeft,
   IconAlert,
+  BrandGlyph,
 } from "./shell/icons";

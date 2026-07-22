@@ -23,6 +23,9 @@ export interface PopoverMenuProps {
   /** Optional heading row inside the menu (e.g. the signed-in phone). */
   header?: ReactNode;
   align?: "start" | "end";
+  /** Appended to the trigger button's class list, so callers can restyle it
+   * to match surrounding chrome (e.g. a header nav link). */
+  triggerClassName?: string;
 }
 
 /**
@@ -30,7 +33,14 @@ export interface PopoverMenuProps {
  * WAI-ARIA menu-button pattern: Enter/Space/ArrowDown open and focus the first
  * item, arrows cycle, Escape returns focus to the trigger, outside click closes.
  */
-export function PopoverMenu({ label, trigger, items, header, align = "end" }: PopoverMenuProps) {
+export function PopoverMenu({
+  label,
+  trigger,
+  items,
+  header,
+  align = "end",
+  triggerClassName,
+}: PopoverMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -98,7 +108,7 @@ export function PopoverMenu({ label, trigger, items, header, align = "end" }: Po
       <button
         ref={triggerRef}
         type="button"
-        className={styles["trigger"]}
+        className={[styles["trigger"], triggerClassName].filter(Boolean).join(" ")}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}

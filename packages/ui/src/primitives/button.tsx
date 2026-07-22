@@ -5,7 +5,7 @@ import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes } from
 import styles from "./button.module.css";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "sm" | "md";
+export type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonStyleProps {
   variant?: ButtonVariant;
