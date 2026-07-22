@@ -22,7 +22,8 @@ export type ProductEventName =
   | "onboarding.completed"
   | "org.created"
   | "org.invitation_accepted"
-  | "org.switched";
+  | "org.switched"
+  | "register.photo_added";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

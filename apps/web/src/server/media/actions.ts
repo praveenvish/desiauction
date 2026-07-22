@@ -12,7 +12,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
-import { resolveCompetition } from "../competition/competitions";
+import { competitionForRegistration, resolveCompetition } from "../competition/competitions";
 import { dbHandle, systemDb } from "../db";
 import {
   ForbiddenError,
@@ -222,4 +222,81 @@ export async function removePlayerPhoto(
     }
     throw error;
   }
+}
+
+// --- Player self-service photo (registration-time; no org membership needed) ---
+// A logged-in player sets their OWN photo while registration is open. subjectId
+// is always session.personId (no cross-tenant surface); the competition only
+// supplies the storage-key org path + open-window gate. Reuses the S2 key bind,
+// persistMediaKey, and the S3 audit event.
+
+export async function requestOwnPhotoUpload(input: {
+  slug: string;
+  contentType: string;
+  byteSize: number;
+}): Promise<UploadRequestResult> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Please sign in to upload." };
+  }
+  if (!isAllowedImageType(input.contentType)) {
+    return { ok: false, error: "Only JPEG, PNG or WebP images are allowed." };
+  }
+  const check = validateUpload({ contentType: input.contentType, byteSize: input.byteSize });
+  if (!check.ok) {
+    return { ok: false, error: check.error };
+  }
+  const competition = await competitionForRegistration(systemDb, input.slug);
+  if (competition === null || competition.status !== "registration_open") {
+    return { ok: false, error: "Registration is not open for this competition." };
+  }
+  const contentType: AllowedImageType = input.contentType;
+  const upload = await storage.presignUpload({
+    orgId: competition.orgId,
+    subject: "player",
+    subjectId: session.personId,
+    contentType,
+    token: newId(),
+  });
+  return { ok: true, uploadUrl: upload.uploadUrl, key: upload.key };
+}
+
+export async function attachOwnPhoto(input: { slug: string; key: string }): Promise<AttachResult> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Please sign in." };
+  }
+  const competition = await competitionForRegistration(systemDb, input.slug);
+  if (competition === null || competition.status !== "registration_open") {
+    return { ok: false, error: "Registration is not open." };
+  }
+  // Bind the key to THIS person (S2): subjectId must be the caller themselves.
+  if (
+    !mediaKeyBelongsTo(input.key, {
+      orgId: competition.orgId,
+      subject: "player",
+      subjectId: session.personId,
+    })
+  ) {
+    return { ok: false, error: "Invalid image reference." };
+  }
+  await withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: competition.orgId },
+    async (db) => {
+      const resolved = { storageSubjectId: session.personId, ownerPersonId: session.personId };
+      await persistMediaKey(db, "player", resolved, input.key, new Date(), "self_upload");
+      await db.insert(auditLog).values({
+        id: newId(),
+        actor: session.personId,
+        action: "media.attached",
+        scopeType: "org",
+        scopeId: competition.orgId,
+        subject: session.personId,
+        meta: { subject: "player", competitionId: competition.id, via: "self_upload", self: true },
+      });
+    },
+  );
+  revalidatePath(`/c/${input.slug}`);
+  return { ok: true, url: storage.readUrl(input.key) };
 }

@@ -13,6 +13,7 @@ import { useEffect, useState, useTransition } from "react";
 import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
+import { SelfPhotoUploader } from "./self-photo-uploader";
 
 const ROLE_LABEL: Record<string, string> = {
   batter: "Batter",
@@ -266,6 +267,13 @@ export function RegisterFlow({
             <dt>Playing role</dt>
             <dd>{ROLE_LABEL[role] ?? role}</dd>
           </dl>
+          <div className="register-photo">
+            <SelfPhotoUploader slug={slug} name={name} />
+            <p className="competitions-hint">
+              A photo makes your player card stand out on the live board. You can add or remove it
+              any time.
+            </p>
+          </div>
           {error !== null ? (
             <p role="alert" className="register-error">
               {error}

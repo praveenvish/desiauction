@@ -658,3 +658,11 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+.register-photo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border-subtle);
+}
