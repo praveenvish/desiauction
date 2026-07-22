@@ -727,3 +727,9 @@
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
+
+.squads-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
