@@ -26,7 +26,8 @@ app-layer"); production flips to `desiauction_app` (NOBYPASSRLS).
 
 | Subsystem | Level | Evidence |
 |---|---|---|
-| core: media validators / key bind (S1/S2) · player-profile · CSV | **EXECUTION** | core suite 168 |
+| core: media validators / key bind (S1/S2) · player-profile · CSV · **share-card model** | **EXECUTION** | core suite **178** (10 new: `share-card.test.ts`) |
+| **share images: competition OG/Twitter card raster** | **RUNTIME** ✅ | `next/og` rasterized 1200×630 PNGs (live-status card + non-public fallback) from the card model; visually verified on-brand |
 | showcase: filter/sort/squads/params/csv · upload orchestration | **EXECUTION** | web unit 15 |
 | ui: ImageUploader | **EXECUTION** | `packages/ui` (jsdom) 67 |
 | **migrations `0000`–`0018` apply** | **RUNTIME** ✅ | `drizzle-kit migrate` green on PG17; new columns present |
@@ -35,12 +36,12 @@ app-layer"); production flips to `desiauction_app` (NOBYPASSRLS).
 | **public showcase read model · self-photo actions** | **RUNTIME** ✅ | covered by the passing suite + build |
 | **production build** | **RUNTIME** ✅ | `next build` exit 0 — "Compiled successfully"; all routes emitted |
 | preflight guard (D1) | **EXECUTION** | ran in 3 env configs |
-| ShowcaseGrid UI wiring (filters/dialog/CSV/URL sync) · Blob download | **SOURCE** | no jsdom env in `apps/web`; pure cores are EXECUTION; interaction verifies via e2e/browser |
+| ShowcaseGrid UI wiring (filters/dialog/CSV/URL sync) · Blob download · **OG-image route DB→model→ImageResponse composition** | **SOURCE** | no jsdom env in `apps/web`; pure cores are EXECUTION, raster is RUNTIME; the read-model fetch seam verifies via e2e/browser |
 
 ## Release Confidence Index (summary)
 
 - **Static** (typecheck 11/11 · lint · no schema drift): ✅
-- **Unit/EXECUTION** (pure cores): ✅ core 168 · ui 67 · web unit 15
+- **Unit/EXECUTION** (pure cores): ✅ core 178 · ui 67 · web unit 15
 - **Integration/RUNTIME**: ✅ **453/453** web tests on real Postgres 17
 - **Migration apply**: ✅ RUNTIME (all 19 migrations)
 - **Build**: ✅ RUNTIME (`next build` clean)
@@ -52,11 +53,20 @@ an independent Release Authority on a production-like deploy.**
 ## Evidence backlog (ranked)
 
 1. ~~RUNTIME: migrations + suite + build~~ — **DONE** (native PG17).
-2. **e2e:** upload flows + showcase browse/export in a real browser (Playwright).
-3. **UI integration tests:** add a jsdom env + `@testing-library/react` to
+2. **e2e:** upload flows + showcase browse/export in a real browser (Playwright);
+   **add** a crawler-meta assertion — `GET /c/<slug>` head carries `og:image` +
+   `twitter:image` (`summary_large_image`), and `GET /c/<slug>/opengraph-image`
+   returns `image/png`.
+3. **`next build` recompile:** confirm the new `opengraph-image`/`twitter-image`
+   metadata routes emit in a full production build (needs PG17 + env, per §Env).
+4. **UI integration tests:** add a jsdom env + `@testing-library/react` to
    `apps/web`, cover ShowcaseGrid interactions (dep decision).
-4. **a11y gate:** axe over `/c/[slug]`.
-5. **perf baseline:** showcase render at 1k / 10k players.
+5. **share-image i18n:** the OG card uses the `next/og` built-in (Latin) font, so
+   Devanagari competition names tofu. Load Noto Sans Devanagari at the image
+   boundary before promoting non-Latin names. (Monogram fallback already covers
+   the null case.)
+6. **a11y gate:** axe over `/c/[slug]`.
+7. **perf baseline:** showcase render at 1k / 10k players.
 
 ## To reproduce the RUNTIME run
 

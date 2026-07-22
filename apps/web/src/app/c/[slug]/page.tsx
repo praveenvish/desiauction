@@ -35,7 +35,9 @@ export async function generateMetadata({
     // Unlisted-but-open pages work by link; only published pages invite indexing.
     robots: view.listed ? { index: true, follow: true } : { index: false, follow: false },
     openGraph: { title: view.name, description, url, type: "website", siteName: "DesiAuction" },
-    twitter: { card: "summary", title: view.name, description },
+    // The `opengraph-image` / `twitter-image` routes inject the card image; the
+    // large card lets it render full-bleed instead of a thumbnail.
+    twitter: { card: "summary_large_image", title: view.name, description },
   };
 }
 
@@ -45,10 +47,7 @@ export default async function PublicCompetitionPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [view, players] = await Promise.all([
-    publicCompetitionView(slug),
-    publicShowcase(slug),
-  ]);
+  const [view, players] = await Promise.all([publicCompetitionView(slug), publicShowcase(slug)]);
   if (view === null) {
     notFound();
   }
