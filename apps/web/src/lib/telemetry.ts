@@ -23,7 +23,8 @@ export type ProductEventName =
   | "org.created"
   | "org.invitation_accepted"
   | "org.switched"
-  | "register.photo_added";
+  | "register.photo_added"
+  | "showcase.player_viewed";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

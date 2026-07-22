@@ -1,6 +1,6 @@
 "use client";
 
-import { PlayerImage } from "@desiauction/ui";
+import { Dialog, PlayerImage } from "@desiauction/ui";
 import { useMemo, useState } from "react";
 
 import {
@@ -8,6 +8,7 @@ import {
   type ShowcaseFilter,
   type ShowcaseSort,
 } from "../../../components/showcase/showcase-filter";
+import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer } from "../../../server/competition/public";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -27,6 +28,7 @@ export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ShowcaseFilter>("all");
   const [sort, setSort] = useState<ShowcaseSort>("number");
+  const [selected, setSelected] = useState<ShowcasePlayer | null>(null);
 
   const counts = useMemo(
     () => ({
@@ -98,34 +100,89 @@ export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
         <ul className="showcase-grid" data-testid="showcase-grid">
           {shown.map((p) => (
             <li key={p.number} className="showcase-card" data-status={p.status}>
-              <PlayerImage
-                name={p.name}
-                seed={p.number}
-                size="xl"
-                {...(p.photoUrl !== null ? { src: p.photoUrl } : {})}
-              />
-              <div className="showcase-card-body">
-                <span className="showcase-card-name">{p.name}</span>
-                <span className="showcase-card-meta">
-                  {ROLE_LABEL[p.role] ?? p.role}
-                  {p.age !== null ? ` · ${String(p.age)} yrs` : ""}
-                </span>
-                {p.battingStyle !== null || p.bowlingStyle !== null ? (
-                  <span className="showcase-card-sub">
-                    {[p.battingStyle, p.bowlingStyle]
-                      .filter((s): s is string => s !== null)
-                      .map((s) => s.replace(/_/g, " "))
-                      .join(" · ")}
+              <button
+                type="button"
+                className="showcase-card-btn"
+                aria-label={`View ${p.name}`}
+                onClick={() => {
+                  setSelected(p);
+                  track("showcase.player_viewed");
+                }}
+              >
+                <PlayerImage
+                  name={p.name}
+                  seed={p.number}
+                  size="xl"
+                  {...(p.photoUrl !== null ? { src: p.photoUrl } : {})}
+                />
+                <span className="showcase-card-body">
+                  <span className="showcase-card-name">{p.name}</span>
+                  <span className="showcase-card-meta">
+                    {ROLE_LABEL[p.role] ?? p.role}
+                    {p.age !== null ? ` · ${String(p.age)} yrs` : ""}
                   </span>
-                ) : null}
-                <span className="showcase-card-status" data-status={p.status}>
-                  {p.status === "sold" ? (p.teamName ?? "Sold") : "Available"}
+                  {p.battingStyle !== null || p.bowlingStyle !== null ? (
+                    <span className="showcase-card-sub">
+                      {[p.battingStyle, p.bowlingStyle]
+                        .filter((s): s is string => s !== null)
+                        .map((s) => s.replace(/_/g, " "))
+                        .join(" · ")}
+                    </span>
+                  ) : null}
+                  <span className="showcase-card-status" data-status={p.status}>
+                    {p.status === "sold" ? (p.teamName ?? "Sold") : "Available"}
+                  </span>
                 </span>
-              </div>
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      <Dialog
+        open={selected !== null}
+        onClose={() => {
+          setSelected(null);
+        }}
+        title={selected?.name ?? "Player"}
+      >
+        {selected !== null ? (
+          <div className="showcase-detail">
+            <PlayerImage
+              name={selected.name}
+              seed={selected.number}
+              size="hero"
+              {...(selected.photoUrl !== null ? { src: selected.photoUrl } : {})}
+            />
+            <dl className="showcase-detail-meta">
+              <dt>Number</dt>
+              <dd>{selected.number}</dd>
+              <dt>Role</dt>
+              <dd>{ROLE_LABEL[selected.role] ?? selected.role}</dd>
+              {selected.age !== null ? (
+                <>
+                  <dt>Age</dt>
+                  <dd>{selected.age} yrs</dd>
+                </>
+              ) : null}
+              {selected.battingStyle !== null ? (
+                <>
+                  <dt>Batting</dt>
+                  <dd>{selected.battingStyle.replace(/_/g, " ")}</dd>
+                </>
+              ) : null}
+              {selected.bowlingStyle !== null ? (
+                <>
+                  <dt>Bowling</dt>
+                  <dd>{selected.bowlingStyle.replace(/_/g, " ")}</dd>
+                </>
+              ) : null}
+              <dt>Status</dt>
+              <dd>{selected.status === "sold" ? (selected.teamName ?? "Sold") : "Available"}</dd>
+            </dl>
+          </div>
+        ) : null}
+      </Dialog>
     </div>
   );
 }
