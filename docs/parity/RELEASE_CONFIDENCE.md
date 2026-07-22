@@ -49,12 +49,14 @@ app-layer"); production flips to `desiauction_app` (NOBYPASSRLS).
 - **Integration/RUNTIME**: ✅ **453/453** web tests on real Postgres 17
 - **Migration apply**: ✅ RUNTIME (all 19 migrations)
 - **Build**: ✅ RUNTIME (`next build` clean)
-- **Critical E2E**: ❌ **not green this session** — the Playwright harness boots and
-  drives a browser, but the local e2e DB (`.env.local` → **:5433**, distinct from
-  the :5432 regression DB) carries residue and `public-registration.spec.ts` fails
-  at pre-existing gates (onboarding, public-page state) before reaching the new
-  share-card/attribution assertions. Those assertions are **WRITTEN**, pending a
-  clean-DB (CI/ephemeral) run. See `RELEASE_RISK_REGISTER.md` R-E1/R-E2.
+- **Critical E2E**: ⚠️ **partial-RUNTIME** — after healing a corrupted Docker VM
+  (`pnpm setup:local` green: compose + migrate + RLS roles + seed on `:5433`), the
+  publish→discover→register journey runs green and the new share-card/attribution
+  assertions (og:image · twitter `summary_large_image` · `/opengraph-image`→png ·
+  `?ref`→register-CTA) **passed** (`public-registration.spec.ts`: 4 passed, 1 flaky
+  teardown). The earlier "residue" hypothesis was wrong — the blocker was Docker.
+  Remaining for LOCAL GO: the full 70-test suite + stabilize the flaky teardown
+  (R-E1/R-E3).
 - **a11y / perf / security-review**: partial (per-feature review; no automated a11y/perf gate)
 
 **Overall: SOURCE + EXECUTION + RUNTIME(unit/integration/build) green. Release

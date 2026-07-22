@@ -12,8 +12,9 @@
 
 | # | Area | Risk | Cust. impact | Likelihood | Severity | Mitigation | Verification | Blocks GO |
 |---|---|---|---|---|---|---|---|---|
-| R-E1 | **E2E — critical journeys** | E2E is blocked at the infrastructure layer: `docker compose up` for the repo DB (`:5433`) fails because **Docker Desktop's VM storage is corrupted** (`read-only file system` / containerd `input/output error`; the `desiauction-next-db-1` container cannot mount/restart). Root cause is NOT test residue (earlier hypothesis corrected). No CLI heals it (`pull`/`start`/`rm` all fail). The repo's `pnpm setup:local` is a correct one-command bootstrap; the machine's Docker is the defect. | High (core flows unrun) | Medium | **High** | **Restart Docker Desktop** (or Troubleshoot → Clean/Purge, or reboot) → `pnpm setup:local` → migrate/seed → `playwright test`. Hardened: `setup:local` now detects the corruption and prints recovery guidance; `TROUBLESHOOTING.md` documents it. CI is unaffected (ephemeral Postgres). | `RUNTIME` (setup hint verified) / journeys still `WRITTEN` | **YES** (until Docker restarted) |
-| R-E2 | E2E — share surfaces | New assertions (og:image + twitter `summary_large_image`, `/opengraph-image` → image/png, `?ref` → register CTA) are appended to `public-registration.spec.ts` but blocked behind R-E1. | Medium | Medium | Same as R-E1; the underlying logic is RUNTIME via the raster harness + regression. | `WRITTEN` | No (logic RUNTIME elsewhere) |
+| R-E1 | **E2E — critical journeys** | Was blocked by a corrupted Docker Desktop VM (`read-only file system`); **RESOLVED** by a full Docker restart (quit incl. `com.docker.backend`, relaunch) → `pnpm setup:local` green (compose + migrate + RLS roles + seed; `HEALTH: PASS`). The publish→discover→register critical journey now runs green (`public-registration.spec.ts`: **4 passed, 1 flaky**). Root cause was Docker, NOT test residue (earlier hypothesis corrected). | High (core flows) | Low (env restored) | High | Environment restored + reproducible via one command. `setup:local` now self-diagnoses the corruption (hardened). **Remaining:** run the full 70-test suite for complete LOCAL GO. | `RUNTIME` (public-registration journey green) / full suite pending | Partial — run full suite |
+| R-E2 | E2E — share surfaces | og:image + twitter `summary_large_image` + `/opengraph-image`→image/png + `?ref`→register-CTA assertions in `public-registration.spec.ts`. | Medium | Low | Medium | — | **RUNTIME** ✅ (passed in "organizer publishes" against clean :5433) | **No** |
+| R-E3 | E2E — determinism | `public-registration` "player journey" is **flaky** — fails intermittently at `context.close()` teardown in the `inSecondBrowser` helper (passes on the configured 1 retry). Pre-existing; not an assertion failure. | Low | Medium | Low | Await the second-browser context's navigations before `context.close()`, or `page.close()` first. | `RUNTIME` (flake observed) | No |
 | R-A1 | Accessibility | `@axe-core/playwright` is wired into specs, but no automated a11y gate ran this session; no axe pass over `/c/[slug]`, `/c/[slug]/p/[n]`, `/admin`. | Medium | Medium | Medium | Add an axe gate to the share/register/admin specs; run in CI. | `NONE` (this session) | No (not a hard gate yet) |
 | R-P1 | Performance | No perf baseline for the showcase/board at scale (300–1k+ players); public pages are SSR + revalidate but unmeasured. | Medium | Low | Medium | Bench the showcase render + paginate/virtualize if needed. | `NONE` | No |
 | R-S1 | Security | Recent reviews done (media authz/traversal, JSON-LD XSS, open-redirect `safeNext`, `?ref` allowlist-bounding). No full external pen-test. | High if breached | Low | High | Continue per-feature review; external review pre-GA. | `EXECUTION` (per-feature) | No |
@@ -32,7 +33,7 @@
 | Unit tests passing | ✅ (core 201 · ui 67 · web unit 15) |
 | Integration tests passing | ✅ (web regression on PG17, incl. clone + attribution) |
 | Runtime validation | ✅ (migrations, regression, build, raster) |
-| **Critical E2E complete** | ❌ **not green this session (R-E1)** |
+| **Critical E2E complete** | ⚠️ **partial** — env restored; publish→register journey + share-card/attribution assertions green (`4 passed, 1 flaky`); full 70-test suite run pending (R-E1) |
 | Accessibility reviewed | ⚠️ partial (no axe gate run — R-A1) |
 | Performance acceptable | ⚠️ unmeasured (R-P1) |
 | Security reviewed | ✅ per-feature (R-S1); external review pending |
@@ -40,9 +41,9 @@
 | Rollback validated | ⚠️ schema-free by construction; no drill (R-D1) |
 | Release notes prepared | ✅ per-investment ledger + confidence index |
 
-### Verdict: **NO-GO**
+### Verdict: **NO-GO** (materially advanced)
 
-**Blocking evidence:** (1) **R-E1** — no green run of the critical-journey E2E suite this session (local DB residue on :5433); GO requires a green CI run on an ephemeral DB. (2) **R-C1** — founder-owned launch externals (SMS/storage/staging) are unresolved (Tier C). All engineering gates except Critical-E2E are green; the honest blocker is E2E execution + external launch readiness, not feature completeness.
+**Since last assessment:** the local environment was **restored** (Docker healed → `pnpm setup:local` green → `:5433` migrated + seeded), and the critical publish→register journey plus the share-card/attribution assertions now run **RUNTIME-green**. Remaining to reach LOCAL GO: (1) **R-E1** — run the full 70-test Playwright suite green (the environment blocker is cleared; this is now execution, not infrastructure); (2) **R-E3** — a flaky teardown to stabilize. GA still additionally needs (3) **R-C1** — founder launch externals (Tier C). The honest blocker is no longer "can't run E2E" — it's "run the whole suite + provision externals."
 
 ## Top release-hardening priorities (ranked)
 1. **CI e2e on an ephemeral Postgres** → clears R-E1/R-E2, the only engineering NO-GO gate. Also fixes the local :5433 residue fragility.
