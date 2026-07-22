@@ -123,6 +123,18 @@ check(
   `FINOPS_STORAGE_DIR=${env.FINOPS_STORAGE_DIR ?? "(unset)"}`,
   "set FINOPS_STORAGE_DIR to an absolute/durable path shared by web + runner (the local relative default loses artifacts across a multi-host deploy)",
 );
+check(
+  "MEDIA_STORAGE-bucket",
+  env.MEDIA_STORAGE === "bucket",
+  `MEDIA_STORAGE=${env.MEDIA_STORAGE ?? "(unset → defaults to local)"}`,
+  "set MEDIA_STORAGE=bucket — the 'local' default writes uploads to public/_media on the app host (dev-only; not served by a built server and an authenticated-write path surface)",
+);
+check(
+  "MEDIA_PUBLIC_BASE-https",
+  env.MEDIA_STORAGE !== "bucket" || isHttps(env.MEDIA_PUBLIC_BASE),
+  `MEDIA_PUBLIC_BASE=${env.MEDIA_PUBLIC_BASE ?? "(unset)"}`,
+  "set MEDIA_PUBLIC_BASE to the https CDN/bucket base that serves media keys",
+);
 
 // --- Observability -----------------------------------------------------------
 warn(
