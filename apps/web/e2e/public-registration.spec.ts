@@ -42,6 +42,9 @@ async function inSecondBrowser(browser: Browser, fn: (page: Page) => Promise<voi
   try {
     await fn(page);
   } finally {
+    // Drop the Next dev HMR socket before teardown so context.close() does not
+    // race an in-flight Fast-Refresh reconnect (a dev-server-only teardown flake).
+    await page.goto("about:blank").catch(() => {});
     await context.close();
   }
 }
@@ -127,9 +130,11 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
       "content",
       "summary_large_image",
     );
-    const ogImage = await anon.goto(`${publicUrl}/opengraph-image`);
-    expect(ogImage?.status()).toBe(200);
-    expect(ogImage?.headers()["content-type"]).toContain("image/png");
+    // Use an API request, not page.goto: navigating a browser page to a raw PNG
+    // aborts the navigation (net::ERR_ABORTED). request.get just checks the route.
+    const ogImage = await anon.request.get(`${publicUrl}/opengraph-image`);
+    expect(ogImage.status()).toBe(200);
+    expect(ogImage.headers()["content-type"]).toContain("image/png");
 
     // Share attribution (INV-5): a shared `?ref` forwards onto the register CTA so
     // the source reaches registration.

@@ -32,6 +32,12 @@ export default defineConfig({
       url: "http://127.0.0.1:3050/healthz",
       reuseExistingServer: !process.env["CI"],
       timeout: 60_000,
+      // Raise the dev-server heap ceiling: across the full 25-spec suite the
+      // default heap fills and Next restarts the worker mid-test ("approaching
+      // memory threshold, restarting"), which ECONNRESETs in-flight requests and
+      // cascades into failures/flakes. A larger heap keeps one stable server for
+      // the whole run. (CI uses a pre-compiled server and is unaffected.)
+      env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=4096" },
     },
     {
       // The live auction engine (M-IP4-2): the same process `pnpm dev` runs.
