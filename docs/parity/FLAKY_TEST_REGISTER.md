@@ -24,9 +24,32 @@ Three distinct causes, separated by targeted isolation runs:
    NEXT" + `app-version`, content removed when `/` became the marketing landing
    (`28a11d8`). Rewritten to assert the real landing; now 2/2 green.
 
-Net: the full-suite RED is ~environmental (causes 1+2), plus the single stale test
-(3). No product-logic regressions were found — every other failed spec passes in
-isolation on a fresh server.
+4. **Corrupted `.next` webpack cache → server death (run #3).** After killing the
+   stale server for a clean run, run #3 showed **73 failed / 0 flaky / only 1
+   restart** — the heap fix DID stop restarts, but the web server was **dead** the
+   whole run (`net::ERR_CONNECTION_REFUSED at :3050` ×74). Log root cause:
+   `ENOENT … .next/cache/webpack/.../N.pack.gz` — the `pkill` corrupted the webpack
+   cache, so when the server hit its one restart it couldn't recover and :3050 went
+   dark. `rm -rf .next` did not fully clear it (`rename '…pack.gz_' → '…pack.gz'`
+   ENOENT persisted) — a cache-write race amplified by the restart.
+
+Net: the full-suite RED across three runs is **entirely local-infrastructure**
+(memory-restart, stale-server reuse, cache-write races/server-death) — three
+DIFFERENT failure modes, none a product-logic regression. Evidence: every spec
+passes in isolation on a fresh healthy server, and `auth-onboarding` passed cleanly
+in run #1 and only degraded in the later thrashed runs. The single genuine defect
+(stale `foundation` test) is fixed.
+
+## Conclusion & authoritative gate
+On this machine, under sustained load, a full 25-spec single-session `next dev` run
+is not converging to green — each attempt hits a distinct infra fragility. This is
+**not** a product or test-logic problem. The durable gates:
+- **CI is authoritative** — pre-compiled server + ephemeral DB + clean cache;
+  immune to all three failure modes. This is where "full suite green" is proven.
+- **Locally**, to run the full suite reliably: `rm -rf apps/web/.next` + kill :3050
+  first, then **shard** (a few spec files per invocation, fresh server each,
+  reseed between) so no single session accumulates heap/cache pressure.
+Do NOT keep re-running the whole suite in one `next dev` session — it thrashes.
 
 ## Register
 
