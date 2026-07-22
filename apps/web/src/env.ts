@@ -38,6 +38,11 @@ const envSchema = z.object({
   // seed, runner) starts one directory deep — so all three land on the same
   // repo-root `.local/finops-artifacts`. Deployments set an absolute path.
   FINOPS_STORAGE_DIR: z.string().min(1).default("../../.local/finops-artifacts"),
+  // Player/team media (parity §3.1). "local" writes under public/_media and is
+  // DEV/e2e ONLY (a built server does not serve runtime-written public files —
+  // ARCHITECTURE R4); production sets "bucket" + an S3/R2 public base (D1).
+  MEDIA_STORAGE: z.enum(["local", "bucket"]).default("local"),
+  MEDIA_PUBLIC_BASE: z.url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
