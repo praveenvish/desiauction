@@ -1,5 +1,7 @@
 import {
   deriveAge,
+  isBattingStyle,
+  isBowlingStyle,
   isRegistrationRole,
   nameKey,
   registrationNumber,
@@ -27,6 +29,35 @@ export type SubmitResult =
   | { ok: true; registrationId: string }
   | { ok: false; reason: "invalid_role" | "not_open" | "duplicate" };
 
+/** Optional self-declared player profile captured at registration (parity §3.2).
+ * Each field is validated here; invalid values are dropped, never persisted. */
+export interface PlayerProfileInput {
+  dateOfBirth?: string;
+  battingStyle?: string;
+  bowlingStyle?: string;
+}
+
+function validProfile(profile: PlayerProfileInput | undefined): Partial<{
+  dateOfBirth: string;
+  battingStyle: string;
+  bowlingStyle: string;
+}> {
+  if (profile === undefined) {
+    return {};
+  }
+  const out: { dateOfBirth?: string; battingStyle?: string; bowlingStyle?: string } = {};
+  if (profile.dateOfBirth !== undefined && deriveAge(profile.dateOfBirth, new Date()) !== null) {
+    out.dateOfBirth = profile.dateOfBirth;
+  }
+  if (profile.battingStyle !== undefined && isBattingStyle(profile.battingStyle)) {
+    out.battingStyle = profile.battingStyle;
+  }
+  if (profile.bowlingStyle !== undefined && isBowlingStyle(profile.bowlingStyle)) {
+    out.bowlingStyle = profile.bowlingStyle;
+  }
+  return out;
+}
+
 /**
  * A Person applies to a Competition. Any authenticated person may register while
  * intake is open (they need not be an org member — they are a player, doc 42).
@@ -39,6 +70,7 @@ export async function submitRegistration(
   personId: string,
   role: string,
   basePriceBand?: string,
+  profile?: PlayerProfileInput,
 ): Promise<SubmitResult> {
   if (!isRegistrationRole(role)) {
     return { ok: false, reason: "invalid_role" };
@@ -62,6 +94,7 @@ export async function submitRegistration(
       status: "submitted",
       registrationNumber: registrationNumber(id),
       ...(basePriceBand !== undefined && basePriceBand !== "" ? { basePriceBand } : {}),
+      ...validProfile(profile),
     });
   } catch {
     return { ok: false, reason: "duplicate" };

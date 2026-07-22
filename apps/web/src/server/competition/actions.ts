@@ -425,10 +425,24 @@ export async function submitRegistrationAction(
     return { error: "This competition is not available." };
   }
   const role = formString(formData, "role");
+  const profile = {
+    dateOfBirth: formString(formData, "dateOfBirth"),
+    battingStyle: formString(formData, "battingStyle"),
+    bowlingStyle: formString(formData, "bowlingStyle"),
+  };
   const result = await withTenantDb(
     dbHandle,
     { personId: session.personId, orgId: competition.orgId },
-    (db) => submitRegistration(db, competition.id, competition.orgId, session.personId, role),
+    (db) =>
+      submitRegistration(
+        db,
+        competition.id,
+        competition.orgId,
+        session.personId,
+        role,
+        undefined,
+        profile,
+      ),
   );
   if (!result.ok) {
     return {

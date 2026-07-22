@@ -1,6 +1,12 @@
 "use client";
 
-import { REGISTRATION_ROLES } from "@desiauction/core";
+import {
+  BATTING_STYLES,
+  BOWLING_STYLES,
+  REGISTRATION_ROLES,
+  battingStyleLabel,
+  bowlingStyleLabel,
+} from "@desiauction/core";
 import { Badge, Button, Card, Field, Select } from "@desiauction/ui";
 import { useEffect, useState, useTransition } from "react";
 
@@ -39,6 +45,10 @@ export function RegisterFlow({
   const [name, setName] = useState(initialName);
   const [nameDone, setNameDone] = useState(initialName.trim() !== "");
   const [role, setRole] = useState("");
+  // Optional player profile (parity §3.2). Not gated — a bare role still submits.
+  const [dob, setDob] = useState("");
+  const [batting, setBatting] = useState("");
+  const [bowling, setBowling] = useState("");
   const [step, setStep] = useState<Step>(nameDone ? "role" : "profile");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -83,6 +93,15 @@ export function RegisterFlow({
     startTransition(async () => {
       const formData = new FormData();
       formData.set("role", role);
+      if (dob !== "") {
+        formData.set("dateOfBirth", dob);
+      }
+      if (batting !== "") {
+        formData.set("battingStyle", batting);
+      }
+      if (bowling !== "") {
+        formData.set("bowlingStyle", bowling);
+      }
       const result = await submitRegistrationAction(slug, {}, formData);
       if (result.done === true) {
         window.localStorage.removeItem(draftKey(slug));
@@ -169,6 +188,46 @@ export function RegisterFlow({
             {REGISTRATION_ROLES.map((entry) => (
               <option key={entry} value={entry}>
                 {ROLE_LABEL[entry] ?? entry}
+              </option>
+            ))}
+          </Select>
+          <Field
+            label="Date of birth (optional)"
+            name="dateOfBirth"
+            type="date"
+            value={dob}
+            onChange={(event) => {
+              setDob(event.target.value);
+            }}
+            help="Shows your age on the player card."
+          />
+          <Select
+            label="Batting style (optional)"
+            name="battingStyle"
+            value={batting}
+            onChange={(event) => {
+              setBatting(event.target.value);
+            }}
+          >
+            <option value="">Not specified</option>
+            {BATTING_STYLES.map((style) => (
+              <option key={style} value={style}>
+                {battingStyleLabel(style)}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Bowling style (optional)"
+            name="bowlingStyle"
+            value={bowling}
+            onChange={(event) => {
+              setBowling(event.target.value);
+            }}
+          >
+            <option value="">Not specified</option>
+            {BOWLING_STYLES.map((style) => (
+              <option key={style} value={style}>
+                {bowlingStyleLabel(style)}
               </option>
             ))}
           </Select>
