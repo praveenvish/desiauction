@@ -1,5 +1,6 @@
 import {
   competitionCode,
+  csvCell,
   type CompetitionStatus,
   type GroundStatus,
   type GroundSurface,
@@ -166,10 +167,6 @@ export async function scheduleSnapshot(
 
 export const SCHEDULE_CSV_HEADER =
   "fixture_number,round,home_team,away_team,kickoff,venue,ground,status,duration_minutes";
-
-function csvCell(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
 
 /** The fixtures CSV export IS a serialization of the snapshot — nothing else. */
 export function serializeScheduleCsv(snapshot: ScheduleSnapshot): string {

@@ -5,6 +5,7 @@ import {
   isRegistrationRole,
   nameKey,
   registrationNumber,
+  toCsv,
   type RegistrationStatus,
 } from "@desiauction/core";
 import {
@@ -359,15 +360,10 @@ export async function exportRegistrationsCsv(db: Db, competitionId: string): Pro
     .leftJoin(teams, eq(teams.id, registrations.teamId))
     .where(eq(registrations.competitionId, competitionId))
     .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
-  const header = "registration_number,name,phone,role,status,team";
-  const lines = rows.map((r) =>
-    [r.number, r.name ?? "", r.phone, r.role, r.status, r.team ?? ""].map(csvCell).join(","),
+  return toCsv(
+    ["registration_number", "name", "phone", "role", "status", "team"],
+    rows.map((r) => [r.number, r.name ?? "", r.phone, r.role, r.status, r.team ?? ""]),
   );
-  return [header, ...lines].join("\n");
-}
-
-function csvCell(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
 /** Bulk existence check for a set of ids in a competition (aggregate helper). */
