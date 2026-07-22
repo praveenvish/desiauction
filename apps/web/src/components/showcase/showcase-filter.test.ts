@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterSortPlayers, type ShowcaseItem } from "./showcase-filter";
+import { filterSortPlayers, groupSquads, type ShowcaseItem } from "./showcase-filter";
 
 const P: ShowcaseItem[] = [
   { number: "10", name: "Zara Khan", status: "available" },
@@ -50,5 +50,31 @@ describe("filterSortPlayers", () => {
     const before = [...P];
     expect(filterSortPlayers(P, { query: "nobody", filter: "all", sort: "number" })).toEqual([]);
     expect(P).toEqual(before);
+  });
+});
+
+describe("groupSquads", () => {
+  const S = [
+    { number: "3", name: "C", status: "sold" as const, teamName: "Zeta" },
+    { number: "1", name: "A", status: "sold" as const, teamName: "Alpha" },
+    { number: "2", name: "B", status: "sold" as const, teamName: "Alpha" },
+    { number: "4", name: "D", status: "available" as const, teamName: null },
+    { number: "5", name: "E", status: "sold" as const, teamName: null },
+  ];
+
+  it("groups sold players by team (A→Z), players by number; excludes available/teamless", () => {
+    const squads = groupSquads(S);
+    expect(squads.map((s) => s.teamName)).toEqual(["Alpha", "Zeta"]);
+    expect(squads[0]?.players.map((p) => p.number)).toEqual(["1", "2"]);
+    expect(squads[1]?.players.map((p) => p.number)).toEqual(["3"]);
+    // "E" is sold but teamless → excluded; "D" is available → excluded.
+    expect(squads.flatMap((s) => s.players.map((p) => p.name))).not.toContain("E");
+    expect(squads.flatMap((s) => s.players.map((p) => p.name))).not.toContain("D");
+  });
+
+  it("returns [] pre-auction (no sold players)", () => {
+    expect(groupSquads([{ number: "1", name: "A", status: "available", teamName: null }])).toEqual(
+      [],
+    );
   });
 });

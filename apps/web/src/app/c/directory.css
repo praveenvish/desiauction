@@ -631,3 +631,99 @@
   color: var(--text-primary);
   text-transform: capitalize;
 }
+
+/* Players/Squads view toggle */
+.showcase-viewtoggle {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  align-self: flex-start;
+}
+
+.showcase-view {
+  padding: var(--space-1) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.showcase-view[data-active="true"] {
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-1);
+}
+
+.showcase-view:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Squads */
+.squads {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.squad {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-4);
+}
+
+.squad-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.squad-name {
+  margin: 0;
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+}
+
+.squad-count {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.squad-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.squad-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.squad-player-name {
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.squad-player-num {
+  margin-left: auto;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}

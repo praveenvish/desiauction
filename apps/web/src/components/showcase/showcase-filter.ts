@@ -17,6 +17,39 @@ export interface ShowcaseQuery {
   sort: ShowcaseSort;
 }
 
+export interface Squad<T> {
+  teamName: string;
+  players: T[];
+}
+
+/**
+ * Group SOLD players into squads by team name (teams A→Z, players by number).
+ * Pure — the public Squads view renders directly from this. Available players
+ * and any sold row missing a team name are excluded.
+ */
+export function groupSquads<T extends ShowcaseItem & { teamName: string | null }>(
+  items: readonly T[],
+): Squad<T>[] {
+  const byTeam = new Map<string, T[]>();
+  for (const it of items) {
+    if (it.status !== "sold" || it.teamName === null || it.teamName === "") {
+      continue;
+    }
+    const bucket = byTeam.get(it.teamName);
+    if (bucket === undefined) {
+      byTeam.set(it.teamName, [it]);
+    } else {
+      bucket.push(it);
+    }
+  }
+  return [...byTeam.entries()]
+    .map(([teamName, players]) => ({
+      teamName,
+      players: [...players].sort((a, b) => byNumber(a.number, b.number)),
+    }))
+    .sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: "base" }));
+}
+
 /** Case-insensitive match on player name or registration number. */
 function matches(item: ShowcaseItem, needle: string): boolean {
   if (needle === "") {

@@ -10,6 +10,7 @@ import {
 } from "../../../components/showcase/showcase-filter";
 import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer } from "../../../server/competition/public";
+import { SquadsView } from "./squads-view";
 
 const ROLE_LABEL: Record<string, string> = {
   batter: "Batter",
@@ -29,6 +30,7 @@ export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
   const [filter, setFilter] = useState<ShowcaseFilter>("all");
   const [sort, setSort] = useState<ShowcaseSort>("number");
   const [selected, setSelected] = useState<ShowcasePlayer | null>(null);
+  const [view, setView] = useState<"players" | "squads">("players");
 
   const counts = useMemo(
     () => ({
@@ -45,6 +47,28 @@ export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
 
   return (
     <div className="showcase">
+      <div className="showcase-viewtoggle" role="tablist" aria-label="Showcase view">
+        {(["players", "squads"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={view === v}
+            className="showcase-view"
+            data-active={view === v}
+            onClick={() => {
+              setView(v);
+            }}
+          >
+            {v === "players" ? "Players" : "Squads"}
+          </button>
+        ))}
+      </div>
+
+      {view === "squads" ? (
+        <SquadsView players={players} />
+      ) : (
+        <>
       <div className="showcase-controls">
         <input
           type="search"
@@ -137,6 +161,8 @@ export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
             </li>
           ))}
         </ul>
+      )}
+        </>
       )}
 
       <Dialog
