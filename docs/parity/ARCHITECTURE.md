@@ -396,6 +396,7 @@ into sequencing — none is a blocker, but ignoring them is.
 | **R5** | "Random / Sequence" player pick vs the engine's **no-randomness** rule | Selection is seeded **at the edge** (server/cockpit), the chosen lot is recorded in the event log, so replay stays deterministic. Core stays pure. |
 | **R6** | Presigned-upload seam could become an **open write** | Both the presign action *and* the local upload route must capability-check that the caller may attach to that subject (registrant-self or organizer). One shared authz guard. |
 | **R7** | Public showcase live-updates = socket fan-out to many anonymous viewers | Public grid = cached SSR + light polling / revalidate; the real-time socket stays for operator/owner/spectate. Add an edge cache before opening the socket to the public. |
+| **R8** | Presign (`requestMediaUpload`) has no rate limit → authenticated bucket storage-cost abuse | **ACCEPTED (Medium, P1)**: bounded by auth + 5 MB cap + real-PUT effort; a correct fix is a shared DB-backed per-actor/window limiter (mirror the OTP counter) — deferred, not a release blocker. |
 
 ---
 
