@@ -1,13 +1,19 @@
 "use client";
 
 import { Dialog, PlayerImage } from "@desiauction/ui";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   filterSortPlayers,
   type ShowcaseFilter,
   type ShowcaseSort,
 } from "../../../components/showcase/showcase-filter";
+import {
+  parseShowcaseParams,
+  serializeShowcaseParams,
+  type ShowcaseView,
+} from "../../../components/showcase/showcase-params";
 import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer } from "../../../server/competition/public";
 import { SquadsView } from "./squads-view";
@@ -26,11 +32,24 @@ const ROLE_LABEL: Record<string, string> = {
  * mark (PlayerImage / C-25); no phones are ever in the data.
  */
 export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<ShowcaseFilter>("all");
-  const [sort, setSort] = useState<ShowcaseSort>("number");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Seed state from the URL (only the useState initializers below read this, on
+  // first render); subsequent URL writes are driven by state, never read back.
+  const initial = parseShowcaseParams(new URLSearchParams(searchParams.toString()));
+
+  const [query, setQuery] = useState(initial.query);
+  const [filter, setFilter] = useState<ShowcaseFilter>(initial.filter);
+  const [sort, setSort] = useState<ShowcaseSort>(initial.sort);
   const [selected, setSelected] = useState<ShowcasePlayer | null>(null);
-  const [view, setView] = useState<"players" | "squads">("players");
+  const [view, setView] = useState<ShowcaseView>(initial.view);
+
+  // Keep the URL in sync so a filtered/squads view is shareable + back-friendly.
+  useEffect(() => {
+    const qs = serializeShowcaseParams({ view, filter, sort, query });
+    router.replace(qs === "" ? pathname : `${pathname}?${qs}`, { scroll: false });
+  }, [view, filter, sort, query, pathname, router]);
 
   const counts = useMemo(
     () => ({
