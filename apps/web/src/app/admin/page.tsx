@@ -2,7 +2,7 @@ import { LoadingState } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { adminOverview } from "../../server/admin/actions";
+import { adminOutcomes, adminOverview } from "../../server/admin/actions";
 import { platformAdminGate } from "../../server/admin/authz";
 import { OverviewPanel } from "./overview-panel";
 import "../competitions/competitions.css";
@@ -47,10 +47,10 @@ export default async function AdminPage() {
 }
 
 async function Board() {
-  const overview = await adminOverview();
-  if (overview === null) {
+  const [overview, outcomes] = await Promise.all([adminOverview(), adminOutcomes()]);
+  if (overview === null || outcomes === null) {
     // Unreachable — the gate above already proved the grant. Fail closed anyway.
     notFound();
   }
-  return <OverviewPanel overview={overview} />;
+  return <OverviewPanel overview={overview} outcomes={outcomes} />;
 }

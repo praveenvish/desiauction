@@ -209,6 +209,8 @@ export {
 } from "./media";
 export type { AllowedImageType, MediaSubject, MediaUpload, MediaValidation } from "./media";
 export { csvCell, toCsv } from "./csv";
+export { OUTCOME_ACTIONS, summarizeOutcomes } from "./outcomes";
+export type { OutcomeMetrics } from "./outcomes";
 export { buildCompetitionShareCard, buildPlayerShareCard } from "./share-card";
 export type {
   CompetitionShareCard,

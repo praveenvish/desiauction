@@ -1,5 +1,7 @@
 "use server";
 
+import type { OutcomeMetrics } from "@desiauction/core";
+
 import { systemDb } from "../db";
 import { webFinopsDeps } from "../financial-operations/deps";
 import { platformAdminGate } from "./authz";
@@ -8,6 +10,7 @@ import {
   auditExplorer,
   organizationDetail,
   organizationDirectory,
+  outcomesProjection,
   platformHealth,
   platformOverview,
   userDetail,
@@ -49,6 +52,14 @@ export async function adminOverview(): Promise<PlatformOverview | null> {
     return null;
   }
   return platformOverview(deps(), systemDb);
+}
+
+// Outcome Governance: the audit-log-backed North-Star metrics (last N days).
+export async function adminOutcomes(windowDays = 30): Promise<OutcomeMetrics | null> {
+  if ((await platformAdminGate()) === null) {
+    return null;
+  }
+  return outcomesProjection(systemDb, windowDays);
 }
 
 export async function adminOrganizations(

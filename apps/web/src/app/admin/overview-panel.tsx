@@ -1,8 +1,13 @@
+import type { OutcomeMetrics } from "@desiauction/core";
 import { Badge, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
 import type { PlatformOverview } from "../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, statusTone } from "./admin-ui";
+
+function pct(rate: number): number {
+  return Math.round(rate * 100);
+}
 
 /**
  * PX-9 §1 — the platform overview.
@@ -12,7 +17,13 @@ import { ReadOnlyNotice, RelativeTime, statusTone } from "./admin-ui";
  * reports `healthy`, the follower reports `current`, and the attention queue is
  * the union of verdicts other platforms already reached. This renders them.
  */
-export function OverviewPanel({ overview }: { overview: PlatformOverview }) {
+export function OverviewPanel({
+  overview,
+  outcomes,
+}: {
+  overview: PlatformOverview;
+  outcomes: OutcomeMetrics;
+}) {
   const { totals, runner, followers, attention, recent } = overview;
   return (
     <>
@@ -29,6 +40,21 @@ export function OverviewPanel({ overview }: { overview: PlatformOverview }) {
           <Tile label="Auctions" value={totals.auctions} />
           <Tile label="Settlement cases" value={totals.cases} />
           <Tile label="Finance orgs" value={totals.financeOrgs} href="/admin/health" />
+        </div>
+      </section>
+
+      <section aria-labelledby="admin-outcomes">
+        <h2 className="admin-section-title" id="admin-outcomes">
+          Outcomes · last {outcomes.windowDays} days
+        </h2>
+        <div className="stat-row" data-testid="admin-outcomes">
+          <Tile label="Competitions created" value={outcomes.competitionsCreated} />
+          <Tile label="Cloned (run it again)" value={outcomes.competitionsCloned} />
+          <Tile label="Clone share %" value={pct(outcomes.cloneAdoptionRate)} />
+          <Tile label="Repeat orgs" value={outcomes.orgsRepeating} />
+          <Tile label="Repeat org rate %" value={pct(outcomes.repeatOrgRate)} />
+          <Tile label="Registrations" value={outcomes.registrationsSubmitted} />
+          <Tile label="Players placed" value={outcomes.playersAssigned} />
         </div>
       </section>
 

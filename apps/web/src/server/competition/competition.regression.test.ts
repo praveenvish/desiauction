@@ -42,6 +42,7 @@ import {
 import { registrationsOf, submitRegistration } from "./registrations";
 import { transition } from "./registration-aggregate";
 import { ForbiddenError } from "../orgs/authz";
+import { outcomesProjection } from "../admin/views";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -214,6 +215,21 @@ describe("COMPETITION REGRESSION — domain contract", () => {
       .from(auditLog)
       .where(eq(auditLog.subject, cloned.competition.id));
     expect(audit.some((a) => a.action === "competition.cloned")).toBe(true);
+  });
+
+  it("the outcomes projection reads live audit events back (Outcome Governance)", async () => {
+    // The suite created competitions, teams and a clone above; the projection
+    // aggregates them from the audit log (cross-tenant, like the admin console).
+    const outcomes = await outcomesProjection(db, 3650);
+    expect(outcomes.competitionsCreated).toBeGreaterThanOrEqual(1);
+    expect(outcomes.competitionsCloned).toBeGreaterThanOrEqual(1);
+    expect(outcomes.teamsCreated).toBeGreaterThanOrEqual(1);
+    expect(outcomes.orgsCreating).toBeGreaterThanOrEqual(1);
+    // A clone is also a creation, so creations ≥ clones; rates are well-formed.
+    expect(outcomes.competitionsCreated).toBeGreaterThanOrEqual(outcomes.competitionsCloned);
+    expect(outcomes.repeatOrgRate).toBeGreaterThanOrEqual(0);
+    expect(outcomes.repeatOrgRate).toBeLessThanOrEqual(1);
+    expect(outcomes.cloneAdoptionRate).toBeGreaterThan(0);
   });
 
   it("team names are unique within a competition", async () => {

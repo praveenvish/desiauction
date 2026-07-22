@@ -21,6 +21,7 @@ import {
   type ProviderHealthSnapshot,
   type RunnerHealthSnapshot,
 } from "@desiauction/financial-operations/server";
+import { OUTCOME_ACTIONS, summarizeOutcomes, type OutcomeMetrics } from "@desiauction/core";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 
 /**
@@ -58,6 +59,30 @@ import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from 
  * it, and qualifies the outer reference (`organizations.id`) in raw SQL. Do not
  * "tidy" these back into interpolation.
  */
+
+// --- Business outcomes (Outcome Governance) --------------------------------------------
+// Audit-log-backed North-Star metrics: two grouped counts over `audit_log`,
+// folded by the pure core `summarizeOutcomes`. READ ONLY, cross-tenant by design
+// (the whole module is) — `platformAdminGate` precedes every caller.
+export async function outcomesProjection(db: Db, windowDays: number): Promise<OutcomeMetrics> {
+  const since = new Date(Date.now() - windowDays * 86_400_000);
+  const actionCounts = await db
+    .select({ action: auditLog.action, count: sql<number>`count(*)::int` })
+    .from(auditLog)
+    .where(and(inArray(auditLog.action, [...OUTCOME_ACTIONS]), gte(auditLog.at, since)))
+    .groupBy(auditLog.action);
+  // Per-org tally of competition creations → the repeat-usage basis.
+  const orgRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(auditLog)
+    .where(and(eq(auditLog.action, "competition.created"), gte(auditLog.at, since)))
+    .groupBy(auditLog.scopeId);
+  return summarizeOutcomes({
+    windowDays,
+    actionCounts,
+    orgCompetitionCounts: orgRows.map((row) => row.count),
+  });
+}
 
 // --- Platform dashboard (CTO §1) -------------------------------------------------------
 
