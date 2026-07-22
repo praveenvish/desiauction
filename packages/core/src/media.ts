@@ -61,3 +61,19 @@ export function deriveMediaKey(args: {
   const ext = EXTENSION[args.contentType];
   return `org/${args.orgId}/${args.subject}/${args.subjectId}/${args.token}.${ext}`;
 }
+
+// Exactly the shape `deriveMediaKey` emits: `org/{26}/{subject}/{26}/{26}.{ext}`.
+// ids are ULIDs (char 26). Each segment is [0-9A-Za-z] only — no `.` and no `/`
+// inside a segment — so `..` and path separators are structurally impossible.
+// This is the SECURITY boundary a storage adapter uses before touching a path.
+const MEDIA_KEY_RE =
+  /^org\/[0-9A-Za-z]{26}\/(?:player|team|competition)\/[0-9A-Za-z]{26}\/[0-9A-Za-z]{26}\.(?:jpg|png|webp)$/;
+
+/**
+ * True only for a well-formed, traversal-safe media key (the exact output of
+ * `deriveMediaKey`). Callers that turn a key into a filesystem path or a storage
+ * object MUST gate on this — a key arriving from the client is untrusted.
+ */
+export function isValidMediaKey(key: string): boolean {
+  return MEDIA_KEY_RE.test(key);
+}

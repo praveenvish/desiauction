@@ -1,4 +1,4 @@
-import { validateUpload } from "@desiauction/core";
+import { isValidMediaKey, validateUpload } from "@desiauction/core";
 import { withTenantDb } from "@desiauction/db";
 import { NextResponse } from "next/server";
 
@@ -34,6 +34,11 @@ export async function PUT(request: Request): Promise<NextResponse> {
   const key = new URL(request.url).searchParams.get("key");
   if (key === null) {
     return NextResponse.json({ error: "Missing key." }, { status: 400 });
+  }
+  // Reject anything that is not the exact, traversal-safe key shape BEFORE the
+  // orgId is trusted or the path is touched (S1). `..` cannot pass this gate.
+  if (!isValidMediaKey(key)) {
+    return NextResponse.json({ error: "Malformed key." }, { status: 400 });
   }
   const orgId = orgIdFromKey(key);
   if (orgId === null) {

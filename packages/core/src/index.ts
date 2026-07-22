@@ -200,5 +200,6 @@ export {
   isAllowedImageType,
   validateUpload,
   deriveMediaKey,
+  isValidMediaKey,
 } from "./media";
 export type { AllowedImageType, MediaSubject, MediaUpload, MediaValidation } from "./media";

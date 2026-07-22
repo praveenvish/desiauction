@@ -1,7 +1,12 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { deriveMediaKey, isAllowedImageType, type AllowedImageType } from "@desiauction/core";
+import {
+  deriveMediaKey,
+  isAllowedImageType,
+  isValidMediaKey,
+  type AllowedImageType,
+} from "@desiauction/core";
 
 /**
  * Media storage port (parity foundation, §3.1) — same idiom as the OTP sender
@@ -58,6 +63,9 @@ export class LocalStorage implements StoragePort {
   }
 
   async delete(key: string): Promise<void> {
+    if (!isValidMediaKey(key)) {
+      throw new Error("Rejected: malformed media key");
+    }
     await rm(join(LOCAL_ROOT, key), { force: true });
   }
 
@@ -66,6 +74,11 @@ export class LocalStorage implements StoragePort {
   async writeLocal(key: string, contentType: string, bytes: Buffer): Promise<void> {
     if (!isAllowedImageType(contentType)) {
       throw new Error("Rejected: not an allowed image type");
+    }
+    // Defense in depth (S1): never resolve a path from an unvalidated key, even
+    // if a future caller forgets the route-level gate. `..` cannot pass this.
+    if (!isValidMediaKey(key)) {
+      throw new Error("Rejected: malformed media key");
     }
     const dest = join(LOCAL_ROOT, key);
     await mkdir(dirname(dest), { recursive: true });
