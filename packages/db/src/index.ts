@@ -16,7 +16,17 @@ export interface DbHandle {
 
 /** One factory for every consumer; apps pass their validated env URL (§11). */
 export function createDb(url: string): DbHandle {
-  const sql = postgres(url, { max: 10 });
+  const sql = postgres(url, {
+    max: 10,
+    // Recycle connections so the pool can never hand out a dead socket. Without
+    // these, a connection is held forever and a machine sleep, database
+    // restart, or an idle cutoff upstream (managed Postgres, PgBouncer, a load
+    // balancer) leaves the pool serving corpses — the next query fails with an
+    // opaque "Failed query" even though the database is healthy.
+    idle_timeout: 60, // close idle connections after 1 minute
+    max_lifetime: 60 * 30, // retire any connection after 30 minutes
+    connect_timeout: 10, // fail fast instead of hanging a request
+  });
   return { db: drizzle(sql, { schema }), sql };
 }
 

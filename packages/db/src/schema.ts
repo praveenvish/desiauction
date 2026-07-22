@@ -208,6 +208,8 @@ export const teams = pgTable(
     name: text("name").notNull(),
     shortName: text("short_name"),
     primaryColor: text("primary_color"),
+    // Non-bidding team staff (organizer metadata; not an authenticated role).
+    coachName: text("coach_name"),
     createdBy: char("created_by", { length: 26 }).notNull(),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
@@ -236,8 +238,14 @@ export const registrations = pgTable(
     // Human-quotable reference derived from the id (M-IP3-2 search).
     registrationNumber: text("registration_number").notNull().default(""),
     // Optional pre-auction organizer grouping (M-IP3-2 team filter). NOT squad
-    // membership — that is an auction projection (doc 43, IP-4).
+    // membership — that is an auction projection (doc 43, IP-4). For icon
+    // players (isIcon), teamId IS a pre-signed squad assignment: they are
+    // retained to that team and excluded from the auction pool.
     teamId: char("team_id", { length: 26 }),
+    // Icon (marquee) player: pre-assigned to their team, not auctioned.
+    isIcon: boolean("is_icon").notNull().default(false),
+    // Team captain marker (display + team-sheet ordering; not a system role).
+    isCaptain: boolean("is_captain").notNull().default(false),
     basePriceBand: text("base_price_band"),
     rejectionReason: text("rejection_reason"),
     rejectionNote: text("rejection_note"),
@@ -981,4 +989,12 @@ export const finopsSchedules = pgTable("finops_schedules", {
   slot: text("slot", { enum: ["daily-ops", "year-end"] }).primaryKey(),
   nextDueMs: bigint("next_due_ms", { mode: "number" }).notNull(),
   lastFiredMs: bigint("last_fired_ms", { mode: "number" }),
+});
+
+// Home page "Stay updated" capture. Platform-level, ZERO tenant data (same
+// posture as finops_schedules above) — no org_id, no RLS.
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: id(),
+  email: text("email").notNull().unique(),
+  createdAt: ts("created_at").notNull().defaultNow(),
 });
