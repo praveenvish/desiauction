@@ -16,16 +16,16 @@
       "50": { "$value": "#F6F9FF", "$type": "color" }
     },
     "chalk": {
-      "50": { "$value": "#FBFBF9", "$type": "color" },
-      "100": { "$value": "#F5F5F1", "$type": "color" },
-      "200": { "$value": "#EAEAE3", "$type": "color" },
-      "300": { "$value": "#D8D8CF", "$type": "color" },
-      "400": { "$value": "#B0B0A5", "$type": "color" },
-      "500": { "$value": "#83837A", "$type": "color" },
-      "600": { "$value": "#5C5C55", "$type": "color" },
-      "700": { "$value": "#3E3E39", "$type": "color" },
-      "800": { "$value": "#282824", "$type": "color" },
-      "900": { "$value": "#171715", "$type": "color" }
+      "50": { "$value": "#F3F5FB", "$type": "color" },
+      "100": { "$value": "#EDEFF6", "$type": "color" },
+      "200": { "$value": "#E6E8F1", "$type": "color" },
+      "300": { "$value": "#DBDEEA", "$type": "color" },
+      "400": { "$value": "#A9AEC2", "$type": "color" },
+      "500": { "$value": "#7B8298", "$type": "color" },
+      "600": { "$value": "#545B74", "$type": "color" },
+      "700": { "$value": "#2B3145", "$type": "color" },
+      "800": { "$value": "#171C2E", "$type": "color" },
+      "900": { "$value": "#0E1220", "$type": "color" }
     },
     "volt": {
       "300": { "$value": "#E2FF66", "$type": "color" },
@@ -35,9 +35,18 @@
       "700": { "$value": "#6E8F06", "$type": "color" },
       "900": { "$value": "#2E3D00", "$type": "color" }
     },
+    "indigo": {
+      "200": { "$value": "#A79CF9", "$type": "color" },
+      "300": { "$value": "#C4BCFB", "$type": "color" },
+      "400": { "$value": "#8B7FF5", "$type": "color" },
+      "500": { "$value": "#6A5CF0", "$type": "color" },
+      "600": { "$value": "#5A4BEA", "$type": "color" },
+      "700": { "$value": "#4F40DD", "$type": "color" },
+      "900": { "$value": "#2A2470", "$type": "color" }
+    },
     "gold": {
-      "300": { "$value": "#FFD666", "$type": "color" },
-      "500": { "$value": "#F0B429", "$type": "color" },
+      "300": { "$value": "#F3D078", "$type": "color" },
+      "500": { "$value": "#E6B24A", "$type": "color" },
       "700": { "$value": "#B57F14", "$type": "color" }
     },
     "green": {

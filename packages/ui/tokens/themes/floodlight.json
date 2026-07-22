@@ -12,25 +12,25 @@
     "muted": { "$value": "{color.ink.400}", "$type": "color" },
     "disabled": { "$value": "{color.ink.500}", "$type": "color" },
     "inverse": { "$value": "{color.chalk.800}", "$type": "color" },
-    "on-accent": { "$value": "{color.ink.950}", "$type": "color" },
+    "on-accent": { "$value": "{color.white}", "$type": "color" },
     "on-danger": { "$value": "{color.ink.950}", "$type": "color" },
-    "accent": { "$value": "{color.volt.400}", "$type": "color" },
+    "accent": { "$value": "{color.indigo.200}", "$type": "color" },
     "heading": { "$value": "{color.ink.100}", "$type": "color" }
   },
   "border": {
     "subtle": { "$value": "{color.ink.600}", "$type": "color" },
     "strong": { "$value": "{color.ink.700}", "$type": "color" },
-    "interactive": { "$value": "{color.volt.500}", "$type": "color" }
+    "interactive": { "$value": "{color.indigo.400}", "$type": "color" }
   },
-  "focus-ring": { "$value": "{color.volt.500}", "$type": "color" },
+  "focus-ring": { "$value": "{color.indigo.400}", "$type": "color" },
   "scrim": { "$value": "#070A0F99", "$type": "color" },
   "accent": {
-    "default": { "$value": "{color.volt.400}", "$type": "color" },
-    "hover": { "$value": "{color.volt.300}", "$type": "color" },
-    "pressed": { "$value": "{color.volt.500}", "$type": "color" },
-    "subtle": { "$value": "#CDF53C1F", "$type": "color" }
+    "default": { "$value": "{color.indigo.500}", "$type": "color" },
+    "hover": { "$value": "{color.indigo.400}", "$type": "color" },
+    "pressed": { "$value": "{color.indigo.600}", "$type": "color" },
+    "subtle": { "$value": "#6A5CF033", "$type": "color" }
   },
-  "live": { "$value": "{color.volt.400}", "$type": "color" },
+  "live": { "$value": "{color.green.dark}", "$type": "color" },
   "success": {
     "subtle": { "$value": "#3DD68C26", "$type": "color" },
     "base": { "$value": "{color.green.dark}", "$type": "color" },
@@ -68,8 +68,8 @@
     "line": { "$value": "{color.ink.600}", "$type": "color" },
     "line-soft": { "$value": "{color.ink.700}", "$type": "color" },
     "glyph": { "$value": "{color.ink.50}", "$type": "color" },
-    "accent": { "$value": "{color.volt.400}", "$type": "color" },
-    "accent-soft": { "$value": "{color.volt.300}", "$type": "color" }
+    "accent": { "$value": "{color.gold.500}", "$type": "color" },
+    "accent-soft": { "$value": "{color.gold.300}", "$type": "color" }
   },
   "shadow": {
     "1": { "$value": "none", "$type": "shadow" },
