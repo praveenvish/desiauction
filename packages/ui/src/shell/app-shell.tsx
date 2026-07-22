@@ -40,28 +40,41 @@ export function AppShell({
   contextBar,
   children,
 }: AppShellProps) {
+  const brand = (
+    <Link href={wordmarkHref} className={styles["wordmark"]}>
+      <span className={styles["wordmark-glyph"]} aria-hidden>
+        <BrandGlyph />
+      </span>
+      <span className={styles["wordmark-text"]}>{wordmark}</span>
+    </Link>
+  );
   return (
     <div className={styles["shell"]}>
       <a className={styles["skip"]} href="#main-content">
         Skip to content
       </a>
-      <header className={styles["topbar"]}>
-        <Link href={wordmarkHref} className={styles["wordmark"]}>
-          <span className={styles["wordmark-glyph"]} aria-hidden>
-            <BrandGlyph />
-          </span>
-          {wordmark}
-        </Link>
-        <div className={styles["top-actions"]}>{topActions}</div>
-      </header>
+      {/* Full-height brand sidebar (≥720px): logo atop the navigation rail. */}
       <NavigationRail label="Primary">
+        <div className={styles["rail-brand"]}>{brand}</div>
         <NavigationGroup>
           {nav.map((item) => (
             <NavigationItem key={item.key} item={item} linkComponent={Link} />
           ))}
         </NavigationGroup>
       </NavigationRail>
-      <nav className={styles["bottom-tabs"]} aria-label="Primary">
+      <div className={styles["body"]}>
+        <header className={styles["topbar"]}>
+          {/* The brand rides the top bar only on mobile, where the rail is hidden. */}
+          <div className={styles["topbar-brand"]}>{brand}</div>
+          <div className={styles["top-actions"]}>{topActions}</div>
+        </header>
+        {contextBar}
+        {/* Pages own their <main> landmark; this is the skip-link target. */}
+        <div id="main-content" className={styles["content"]} tabIndex={-1}>
+          {children}
+        </div>
+      </div>
+      <nav className={styles["bottom-tabs"]} aria-label="Sections">
         {nav.map((item) => (
           <Link
             key={item.key}
@@ -76,13 +89,6 @@ export function AppShell({
           </Link>
         ))}
       </nav>
-      <div className={styles["body"]}>
-        {contextBar}
-        {/* Pages own their <main> landmark; this is the skip-link target. */}
-        <div id="main-content" className={styles["content"]} tabIndex={-1}>
-          {children}
-        </div>
-      </div>
     </div>
   );
 }
