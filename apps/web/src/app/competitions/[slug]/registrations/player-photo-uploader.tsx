@@ -4,6 +4,7 @@ import { Button, ImageUploader, useToast, type UploadOutcome } from "@desiauctio
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runMediaUpload } from "../../../../components/media/run-media-upload";
 import {
   attachMedia,
   removePlayerPhoto,
@@ -44,35 +45,15 @@ export function PlayerPhotoUploader({
   }
 
   async function onUpload(file: File): Promise<UploadOutcome> {
-    const requested = await requestMediaUpload({
-      slug,
-      subject: "player",
-      subjectId: registrationId,
-      contentType: file.type,
-      byteSize: file.size,
-    });
-    if (!requested.ok) {
-      return { ok: false, error: requested.error };
+    const outcome = await runMediaUpload(
+      file,
+      (i) => requestMediaUpload({ slug, subject: "player", subjectId: registrationId, ...i }),
+      (key) => attachMedia({ slug, subject: "player", subjectId: registrationId, key }),
+    );
+    if (outcome.ok) {
+      router.refresh();
     }
-    const put = await fetch(requested.uploadUrl, {
-      method: "PUT",
-      headers: { "content-type": file.type },
-      body: file,
-    });
-    if (!put.ok) {
-      return { ok: false, error: "Upload failed. Please try again." };
-    }
-    const attached = await attachMedia({
-      slug,
-      subject: "player",
-      subjectId: registrationId,
-      key: requested.key,
-    });
-    if (!attached.ok) {
-      return { ok: false, error: attached.error };
-    }
-    router.refresh();
-    return { ok: true, url: attached.url };
+    return outcome;
   }
 
   return (

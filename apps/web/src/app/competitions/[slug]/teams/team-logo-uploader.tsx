@@ -3,6 +3,7 @@
 import { ImageUploader, type UploadOutcome } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 
+import { runMediaUpload } from "../../../../components/media/run-media-upload";
 import { attachMedia, requestMediaUpload } from "../../../../server/media/actions";
 
 /**
@@ -25,35 +26,15 @@ export function TeamLogoUploader({
   const router = useRouter();
 
   async function onUpload(file: File): Promise<UploadOutcome> {
-    const requested = await requestMediaUpload({
-      slug,
-      subject: "team",
-      subjectId: teamId,
-      contentType: file.type,
-      byteSize: file.size,
-    });
-    if (!requested.ok) {
-      return { ok: false, error: requested.error };
+    const outcome = await runMediaUpload(
+      file,
+      (i) => requestMediaUpload({ slug, subject: "team", subjectId: teamId, ...i }),
+      (key) => attachMedia({ slug, subject: "team", subjectId: teamId, key }),
+    );
+    if (outcome.ok) {
+      router.refresh();
     }
-    const put = await fetch(requested.uploadUrl, {
-      method: "PUT",
-      headers: { "content-type": file.type },
-      body: file,
-    });
-    if (!put.ok) {
-      return { ok: false, error: "Upload failed. Please try again." };
-    }
-    const attached = await attachMedia({
-      slug,
-      subject: "team",
-      subjectId: teamId,
-      key: requested.key,
-    });
-    if (!attached.ok) {
-      return { ok: false, error: attached.error };
-    }
-    router.refresh();
-    return { ok: true, url: attached.url };
+    return outcome;
   }
 
   return (
