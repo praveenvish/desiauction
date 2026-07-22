@@ -1,7 +1,16 @@
 "use client";
 
 import { REJECTION_REASONS } from "@desiauction/core";
-import { Badge, Button, Card, Field, Select, useToast, VisuallyHidden } from "@desiauction/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  PlayerImage,
+  Select,
+  useToast,
+  VisuallyHidden,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -19,6 +28,7 @@ import {
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
+import { PlayerPhotoUploader } from "./player-photo-uploader";
 import { formatDateTime } from "../../../../lib/format-date";
 import type { TimelineEntry } from "../../../../server/competition/registrations";
 
@@ -528,6 +538,19 @@ export function RegistrationDashboardPanel({
 
       {expanded !== null ? (
         <Card data-testid="timeline-panel">
+          {(() => {
+            const detail = rows.find((r) => r.id === expanded);
+            return detail !== undefined ? (
+              <div className="reg-photo-manage">
+                <PlayerPhotoUploader
+                  slug={slug}
+                  registrationId={detail.id}
+                  playerName={detail.name ?? "Player"}
+                  {...(detail.photoUrl !== null ? { currentUrl: detail.photoUrl } : {})}
+                />
+              </div>
+            ) : null;
+          })()}
           <h2>Timeline</h2>
           <ol className="timeline">
             {timeline.map((entry, index) => (
@@ -738,27 +761,48 @@ function RegRow({
       </td>
       <td className="reg-number">{row.number}</td>
       <td>
-        <span className="registration-name">
-          {row.name ?? "Unnamed"}
-          {row.isCaptain ? (
-            <Badge tone="info" data-testid="captain-flag">
-              Captain
-            </Badge>
-          ) : null}
-          {row.isIcon ? (
-            <Badge tone="success" data-testid="icon-flag">
-              Icon
-            </Badge>
-          ) : null}
-        </span>
-        <span className="registration-phone">{row.phone}</span>
-        {row.duplicateName ? (
-          <Badge tone="warning" data-testid="dup-flag">
-            possible duplicate
-          </Badge>
+        <div className="reg-identity">
+          <PlayerImage
+            name={row.name ?? "Player"}
+            seed={row.personId}
+            size="sm"
+            {...(row.photoUrl !== null ? { src: row.photoUrl } : {})}
+          />
+          <div className="reg-identity-text">
+            <span className="registration-name">
+              {row.name ?? "Unnamed"}
+              {row.isCaptain ? (
+                <Badge tone="info" data-testid="captain-flag">
+                  Captain
+                </Badge>
+              ) : null}
+              {row.isIcon ? (
+                <Badge tone="success" data-testid="icon-flag">
+                  Icon
+                </Badge>
+              ) : null}
+            </span>
+            <span className="registration-phone">{row.phone}</span>
+            {row.duplicateName ? (
+              <Badge tone="warning" data-testid="dup-flag">
+                possible duplicate
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+      </td>
+      <td>
+        {row.role.replace(/_/g, " ")}
+        {row.age !== null ? <span className="reg-sub">{row.age} yrs</span> : null}
+        {row.battingStyle !== null || row.bowlingStyle !== null ? (
+          <span className="reg-sub">
+            {[row.battingStyle, row.bowlingStyle]
+              .filter((s): s is string => s !== null)
+              .map((s) => s.replace(/_/g, " "))
+              .join(" · ")}
+          </span>
         ) : null}
       </td>
-      <td>{row.role.replace(/_/g, " ")}</td>
       <td>
         <Badge tone={REG_TONE[row.status]}>{row.status}</Badge>
       </td>

@@ -138,6 +138,32 @@
   min-width: 140px;
 }
 
+.reg-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.reg-identity-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  min-width: 0;
+}
+
+.reg-sub {
+  display: block;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.reg-photo-manage {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .registration-phone {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;

@@ -1,4 +1,5 @@
 import {
+  deriveAge,
   isRegistrationRole,
   nameKey,
   registrationNumber,
@@ -14,6 +15,8 @@ import {
   type Db,
 } from "@desiauction/db";
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+
+import { storage } from "../media";
 
 // Registration reads + creation (IP-3 §4, doc 42). STATE TRANSITIONS live only in
 // registration-aggregate.ts; this module never writes the `status` column. The
@@ -93,6 +96,12 @@ export interface RegistrationRow {
   basePriceBand: string | null;
   rejectionReason: string | null;
   duplicateName: boolean;
+  // Parity §3.2 profile. photoUrl is DPDP-gated: null unless photo_consent_at is
+  // set (render gate, DPDP §5). age is derived from DOB, never stored.
+  photoUrl: string | null;
+  age: number | null;
+  battingStyle: string | null;
+  bowlingStyle: string | null;
 }
 
 /** Legacy triage list for the M-IP3-1 competition page (latest first, unpaged). */
@@ -243,6 +252,11 @@ export async function queryRegistrations(
       isCaptain: registrations.isCaptain,
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
+      photoKey: people.photoUrl,
+      photoConsentAt: people.photoConsentAt,
+      dateOfBirth: registrations.dateOfBirth,
+      battingStyle: registrations.battingStyle,
+      bowlingStyle: registrations.bowlingStyle,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -253,10 +267,16 @@ export async function queryRegistrations(
     .offset((page - 1) * pageSize);
 
   const dupKeys = await duplicateNameKeys(db, competitionId);
-  const rows: RegistrationRow[] = raw.map((r) => ({
-    ...r,
-    duplicateName: dupKeys.has(nameKey(r.name)),
-  }));
+  const now = new Date();
+  const rows: RegistrationRow[] = raw.map(
+    ({ photoKey, photoConsentAt, dateOfBirth, ...r }) => ({
+      ...r,
+      duplicateName: dupKeys.has(nameKey(r.name)),
+      // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
+      photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
+      age: deriveAge(dateOfBirth, now),
+    }),
+  );
   return { rows, total, page, pageSize };
 }
 
