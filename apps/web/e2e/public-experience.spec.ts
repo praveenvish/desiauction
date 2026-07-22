@@ -83,8 +83,10 @@ test("founder demo: landing → discover → help → legal → register → sig
   await axeClean(page, "/help/getting-started");
 
   // --- Views legal information ----------------------------------------------
+  // .first(): the redesigned footer's bottom bar also carries a "Privacy
+  // Policy" link; the article link inside <main> comes first in the DOM.
   await page.goto("/legal");
-  await page.getByRole("link", { name: "Privacy Policy" }).click();
+  await page.getByRole("link", { name: "Privacy Policy" }).first().click();
   await expect(page).toHaveURL(/\/legal\/privacy$/);
   await expect(page.getByText("beta draft").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Version history" })).toBeVisible();
@@ -121,7 +123,7 @@ test("founder demo: landing → discover → help → legal → register → sig
 
   // --- Search reaches every public destination -------------------------------
   await page.goto("/search?q=refund");
-  await expect(page.getByRole("link", { name: /Refund Policy/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Refund Policy/ }).first()).toBeVisible();
   await page.goto("/search?q=pricing");
   await expect(page.getByRole("link", { name: /Pricing/ }).first()).toBeVisible();
   await page.goto("/search?q=release");
@@ -144,8 +146,9 @@ test("invalid routes render the branded 404 — no crash, no leak", async ({ pag
 test("search is navigation only and honest about no matches", async ({ page }) => {
   await page.goto("/search?q=zzzznothingmatchesthis");
   await expect(page.getByTestId("search-empty")).toBeVisible();
-  // No form on the results posts anything — it's a GET search.
-  const posts = await page.locator('form[method="post"]').count();
+  // No form on the results posts anything — it's a GET search. Scoped to main:
+  // the shell footer legitimately carries the newsletter POST form everywhere.
+  const posts = await page.locator("main").locator('form[method="post"]').count();
   expect(posts).toBe(0);
 });
 

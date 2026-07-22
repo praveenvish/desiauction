@@ -1,10 +1,104 @@
 .onboarding {
-  min-height: 60vh;
+  /* Fill the console canvas so the panel is centered, not marooned near the
+     top of a tall, wide content area. */
+  min-height: min(76vh, 760px);
   display: grid;
-  place-items: start center;
-  padding: var(--space-6) var(--space-4);
+  place-items: center;
+  padding: var(--space-6) var(--space-2);
   font-family: var(--font-text);
   color: var(--text-primary);
+}
+
+.onboarding-grid {
+  width: 100%;
+  display: grid;
+  gap: var(--space-8);
+  align-items: center;
+  justify-items: center;
+}
+
+@media (min-width: 900px) {
+  .onboarding-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 480px);
+    gap: clamp(var(--space-10), 6vw, var(--space-24));
+    justify-items: stretch;
+  }
+}
+
+/* Orientation column (desktop only). */
+.onboarding-aside {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .onboarding-aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    max-width: 26rem;
+    justify-self: end;
+  }
+}
+
+.onboarding-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-lg-size);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.onboarding-brand-glyph {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--identity-field);
+  border: 1px solid var(--identity-line);
+  color: var(--identity-accent);
+}
+
+.onboarding-aside-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-2xl-size), 2.6vw, var(--display-sm-size));
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--text-heading);
+  max-width: 15ch;
+}
+
+.onboarding-aside-marks {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-md-size);
+}
+
+.onboarding-aside-marks li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.onboarding-aside-marks li::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
 }
 
 .onboarding-panel {

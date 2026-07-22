@@ -1,6 +1,18 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+/**
+ * v1.1 (G2): closing a lot requires a real, timed HOLD (useHoldGate measures
+ * elapsed milliseconds on a clock). A click is deliberately inert — that is the
+ * safety property — so the suite holds past the gate's threshold.
+ */
+async function holdGavel(page: Page): Promise<void> {
+  await page.getByTestId("cockpit-gavel").hover();
+  await page.mouse.down();
+  await page.waitForTimeout(900); // > the 600ms gate
+  await page.mouse.up();
+}
+
 // M-IP4-3 FOUNDER DEMONSTRATION: conduct & ceremony. Organizer invites a team
 // owner → grants a paddle → owner claims → auction opens from the COCKPIT →
 // live bids → gavel → compensating UNDO → ledger → replay viewer → engine
@@ -208,7 +220,13 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   }
 
   // --- Gavel → SOLD ceremony → compensating UNDO → back on the block ----------
+  // v1.1 (G2): the gavel is a HOLD, not a click. Prove the safety property
+  // first — a plain click must NOT close the lot — then close it properly.
   await organizer.getByTestId("cockpit-gavel").click();
+  await expect(organizer.getByTestId("ceremony")).not.toHaveAttribute("data-phase", "sold", {
+    timeout: 2_000,
+  });
+  await holdGavel(organizer);
   await expect(organizer.getByTestId("ceremony")).toHaveAttribute("data-phase", "sold", {
     timeout: 20_000,
   });
@@ -248,7 +266,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(bigScreen.getByTestId("ceremony")).toHaveAttribute("data-phase", "extension", {
     timeout: 20_000,
   });
-  await organizer.getByTestId("cockpit-gavel").click();
+  await holdGavel(organizer);
   await expect(organizer.getByTestId("ceremony")).toHaveAttribute("data-phase", "sold", {
     timeout: 20_000,
   });

@@ -13,6 +13,7 @@ import {
   startPasskeyEnrollmentAction,
   type AccountSecurity,
 } from "../../server/auth/actions";
+import { formatDate, formatDateTime } from "../../lib/format-date";
 
 export function SecurityPanels({ security }: { security: AccountSecurity }) {
   const router = useRouter();
@@ -63,7 +64,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 <span className="security-name">{passkey.name}</span>
                 <span className="security-meta">
                   {passkey.lastUsedAt !== null
-                    ? `last used ${passkey.lastUsedAt.toLocaleDateString()}`
+                    ? `last used ${formatDate(passkey.lastUsedAt)}`
                     : "never used"}
                 </span>
                 <span className="security-actions">
@@ -121,8 +122,8 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 {session.userAgent?.slice(0, 48) ?? "Unknown device"}
               </span>
               <span className="security-meta">
-                since {session.createdAt.toLocaleDateString()}
-                {session.current ? <Badge tone="live"> This device</Badge> : null}
+                since {formatDate(session.createdAt)}{" "}
+                {session.current ? <Badge tone="info">This device</Badge> : null}
               </span>
               <span className="security-actions">
                 {!session.current ? (
@@ -150,7 +151,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
           {security.events.map((event, index) => (
             <li key={index}>
               <span className="security-name">{event.action}</span>
-              <span className="security-meta">{event.at.toLocaleString()}</span>
+              <span className="security-meta">{formatDateTime(event.at)}</span>
             </li>
           ))}
         </ul>

@@ -1,3 +1,4 @@
+import { BrandGlyph } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../server/auth/actions";
@@ -23,8 +24,29 @@ export default async function OnboardingPage() {
   const step: "name" | "org" | "done" = !nameDone ? "name" : orgs.length === 0 ? "org" : "done";
   return (
     <main className="onboarding">
-      <div className="onboarding-panel">
-        <OnboardingPanel step={step} phone={session.phone} name={session.name ?? ""} />
+      <div className="onboarding-grid">
+        {/* Desktop-only orientation column: reassurance + brand, so the form
+            isn't a small card marooned in the wide console canvas. The form
+            panel still carries every accessible word (aside is aria-hidden). */}
+        <aside className="onboarding-aside" aria-hidden="true">
+          <p className="onboarding-brand">
+            <span className="onboarding-brand-glyph">
+              <BrandGlyph size={22} />
+            </span>
+            DesiAuction
+          </p>
+          <p className="onboarding-aside-headline">
+            You&rsquo;re a minute away from your first auction.
+          </p>
+          <ul className="onboarding-aside-marks">
+            <li>Create or join an organization</li>
+            <li>Invite co-organizers whenever you like</li>
+            <li>Run server-verified live auctions</li>
+          </ul>
+        </aside>
+        <div className="onboarding-panel">
+          <OnboardingPanel step={step} phone={session.phone} name={session.name ?? ""} />
+        </div>
       </div>
     </main>
   );

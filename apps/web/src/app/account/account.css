@@ -1,11 +1,14 @@
 .account {
-  min-height: 100vh;
+  /* Lives inside the console AppShell content region (which already paints the
+     surface, pads, and reserves the top bar / mobile tab bar). Top-align in
+     flow — the old min-height:100vh + place-items:center centred the settings
+     stack in a box taller than the viewport, leaving a dead gap on desktop and
+     colliding with the mobile bottom tabs. */
   display: grid;
-  place-items: center;
-  background: var(--surface);
+  place-items: start center;
   color: var(--text-primary);
   font-family: var(--font-text);
-  padding: var(--space-6);
+  padding: var(--space-2) 0 var(--space-8);
 }
 
 .account-stack {

@@ -1,22 +1,156 @@
+/* The login gate is one continuous floodlit surface (data-theme="floodlight"
+   on <main>): dark scene on the left, dark form card on the right, sharing a
+   single ambient wash so there is no hard seam between the two columns. This
+   also gives the primary CTA the brand's vibrant lime accent instead of the
+   muddy daylight olive. */
 .login {
-  min-height: 100vh;
+  /* Fills the viewport below the public shell's 64px glass header. */
+  min-height: calc(100dvh - 64px);
   display: grid;
-  place-items: center;
-  background: var(--surface);
+  grid-template-columns: minmax(0, 1fr);
+  background:
+    radial-gradient(
+      60rem 40rem at 8% -12%,
+      color-mix(in srgb, var(--accent) 15%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      48rem 34rem at 112% 118%,
+      color-mix(in srgb, var(--info-base) 12%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(165deg, var(--surface-sunken), var(--surface) 55%);
   color: var(--text-primary);
   font-family: var(--font-text);
-  padding: var(--space-6);
+}
+
+@media (min-width: 960px) {
+  .login {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  }
+}
+
+/* The floodlit brand panel — scenery, not content (aria-hidden). */
+.login-scene {
+  display: none;
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 960px) {
+  .login-scene {
+    display: flex;
+    align-items: center;
+  }
+}
+
+/* A hairline of light down the seam between the two columns. */
+.login-scene::after {
+  content: "";
+  position: absolute;
+  inset: 12% 0 12% auto;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 42%, transparent),
+    transparent
+  );
+}
+
+.login-scene-inner {
+  max-width: 34rem;
+  padding: var(--space-16) clamp(var(--space-8), 6vw, var(--space-20));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.login-scene-kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.login-scene-line {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-3xl-size), 3.6vw, var(--display-md-size));
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.login-scene-marks {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-md-size);
+}
+
+.login-scene-marks li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.login-scene-marks li::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* The form column. */
+.login-side {
+  display: grid;
+  place-items: center;
+  padding: var(--space-12) var(--space-5);
 }
 
 .login-panel {
   box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
   width: 100%;
-  max-width: 380px;
+  max-width: 424px;
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-2);
-  padding: var(--space-8) var(--space-6);
+  border-radius: var(--radius-2xl);
+  padding: clamp(var(--space-8), 4vw, var(--space-10)) clamp(var(--space-6), 4vw, var(--space-8));
+  /* Floodlight has no drop shadows — depth comes from the border plus a faint
+     inner top highlight, so the card reads as lifted glass. */
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-heading) 8%, transparent);
+}
+
+/* Accent hairline across the top edge of the card. */
+.login-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.65;
+}
+
+.login-eyebrow {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-accent);
 }
 
 .login-panel h1 {
@@ -24,6 +158,7 @@
   font-weight: 600;
   font-size: var(--text-3xl-size);
   line-height: var(--text-3xl-line);
+  letter-spacing: -0.01em;
   color: var(--text-heading);
   margin: 0 0 var(--space-1);
 }
@@ -39,6 +174,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* Recess the inputs below the card surface so they read on the dark panel
+   (both default to --surface-raised otherwise). Base state only — the module's
+   :hover/:focus-visible rules keep winning for interactive borders. */
+.login-panel input {
+  background: var(--surface-sunken);
+  border-color: var(--border-subtle);
 }
 
 .login-error {
@@ -77,10 +220,27 @@
   outline-offset: 2px;
 }
 
+/* "or" rule separating the OTP form from the passkey path. */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-6) 0 var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
 .passkey-login {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
