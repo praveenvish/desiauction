@@ -1,4 +1,5 @@
-import { auctions, competitions, organizations, people, registrations } from "@desiauction/db";
+import { deriveAge } from "@desiauction/core";
+import { auctions, competitions, organizations, people, registrations, teams } from "@desiauction/db";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { storage } from "../media";
@@ -106,6 +107,71 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     teams,
     fixtures: fixtures.rows.map(toPublicFixture),
   };
+}
+
+export interface ShowcasePlayer {
+  number: string;
+  name: string;
+  role: string;
+  age: number | null;
+  battingStyle: string | null;
+  bowlingStyle: string | null;
+  /** Consent-gated (null unless photo_consent_at is set — DPDP §5). */
+  photoUrl: string | null;
+  status: "available" | "sold";
+  teamName: string | null;
+}
+
+/**
+ * Public pre-auction showcase (parity §3.3): the APPROVED player pool for a
+ * public/open competition. Anonymous, system-pool. Never exposes phones (C-23)
+ * or non-approved registrations; photos are consent-gated. `status` reflects
+ * persisted squad assignment (assigned = sold); live snapshot status is a P2
+ * enhancement.
+ */
+export async function publicShowcase(slug: string): Promise<ShowcasePlayer[] | null> {
+  const [comp] = await systemDb
+    .select({ id: competitions.id, status: competitions.status, visibility: competitions.visibility })
+    .from(competitions)
+    .where(eq(competitions.slug, slug))
+    .limit(1);
+  if (comp === undefined) {
+    return null;
+  }
+  const open = comp.status === "registration_open";
+  if (comp.visibility !== "public" && !open) {
+    return null;
+  }
+  const now = new Date();
+  const rows = await systemDb
+    .select({
+      number: registrations.registrationNumber,
+      name: people.name,
+      role: registrations.role,
+      dateOfBirth: registrations.dateOfBirth,
+      battingStyle: registrations.battingStyle,
+      bowlingStyle: registrations.bowlingStyle,
+      photoKey: people.photoUrl,
+      photoConsentAt: people.photoConsentAt,
+      teamId: registrations.teamId,
+      teamName: teams.name,
+    })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .leftJoin(teams, eq(teams.id, registrations.teamId))
+    .where(and(eq(registrations.competitionId, comp.id), eq(registrations.status, "approved")))
+    .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
+  return rows.map((r) => ({
+    number: r.number,
+    name: r.name ?? "Unnamed",
+    role: r.role,
+    age: deriveAge(r.dateOfBirth, now),
+    battingStyle: r.battingStyle,
+    bowlingStyle: r.bowlingStyle,
+    photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
+    status: r.teamId !== null ? "sold" : "available",
+    teamName: r.teamName,
+  }));
 }
 
 export interface DirectoryEntry {

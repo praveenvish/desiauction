@@ -4,10 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { env } from "../../../env";
-import { publicCompetitionView } from "../../../server/competition/public";
+import { publicCompetitionView, publicShowcase } from "../../../server/competition/public";
 import { serializeJsonLd } from "../../../server/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import { formatDateRange } from "../format";
+import { ShowcaseGrid } from "./showcase-grid";
 import "../../marketing.css";
 import "../directory.css";
 
@@ -44,7 +45,10 @@ export default async function PublicCompetitionPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const view = await publicCompetitionView(slug);
+  const [view, players] = await Promise.all([
+    publicCompetitionView(slug),
+    publicShowcase(slug),
+  ]);
   if (view === null) {
     notFound();
   }
@@ -126,6 +130,13 @@ export default async function PublicCompetitionPage({
             squads.
           </p>
         </section>
+
+        {players !== null && players.length > 0 ? (
+          <section className="public-section" aria-labelledby="players-heading">
+            <h2 id="players-heading">Players</h2>
+            <ShowcaseGrid players={players} />
+          </section>
+        ) : null}
 
         {view.teams.length > 0 ? (
           <section className="public-section" aria-labelledby="teams-heading">
