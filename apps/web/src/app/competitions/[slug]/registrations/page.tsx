@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { registrationDashboard } from "../../../../server/competition/actions";
 import { RegistrationDashboardPanel } from "./dashboard-panel";
+import { ShareRegistration } from "./share-registration";
 import "../../competitions.css";
 
 export const metadata = { title: "Registrations · DesiAuction" };
@@ -46,6 +47,7 @@ export default async function RegistrationsPage({
             <h1>{dashboard.competition.name}</h1>
             <p className="competitions-hint">Registration operations</p>
           </header>
+          <ShareRegistration slug={slug} />
           <RegistrationDashboardPanel
             slug={slug}
             stats={dashboard.stats}

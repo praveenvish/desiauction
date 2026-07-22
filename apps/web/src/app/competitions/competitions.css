@@ -617,3 +617,44 @@
   color: var(--text-accent);
   font-size: var(--text-sm-size);
 }
+
+/* --- Recruit-players share control (parity §E) --- */
+.share-reg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.share-reg-label {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.share-reg-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.share-reg-input {
+  flex: 1;
+  min-width: 220px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-family: var(--font-mono, monospace);
+}
+
+.share-reg-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
