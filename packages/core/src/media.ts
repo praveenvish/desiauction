@@ -77,3 +77,19 @@ const MEDIA_KEY_RE =
 export function isValidMediaKey(key: string): boolean {
   return MEDIA_KEY_RE.test(key);
 }
+
+/**
+ * True only when `key` is a valid media key AND its embedded org/subject/subjectId
+ * segments match the just-authorized target (S2). Binds an attach to what the
+ * caller was actually authorized for, so a client cannot attach an arbitrary or
+ * cross-tenant key. The token/extension tail stays free (the uploaded object).
+ */
+export function mediaKeyBelongsTo(
+  key: string,
+  target: { orgId: string; subject: MediaSubject; subjectId: string },
+): boolean {
+  return (
+    isValidMediaKey(key) &&
+    key.startsWith(`org/${target.orgId}/${target.subject}/${target.subjectId}/`)
+  );
+}

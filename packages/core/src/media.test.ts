@@ -5,6 +5,7 @@ import {
   deriveMediaKey,
   isAllowedImageType,
   isValidMediaKey,
+  mediaKeyBelongsTo,
   validateUpload,
 } from "./media";
 
@@ -84,5 +85,34 @@ describe("isValidMediaKey (S1 — traversal-safe key gate)", () => {
     expect(isValidMediaKey(`org/${ULID}/team/${ULID}/${ULID}.gif`)).toBe(false);
     expect(isValidMediaKey(`org/short/team/${ULID}/${ULID}.png`)).toBe(false); // short id
     expect(isValidMediaKey(`s3://bucket/${ULID}.png`)).toBe(false);
+  });
+});
+
+describe("mediaKeyBelongsTo (S2 — attach binding)", () => {
+  const ORG = "01HZORG0000000000000000000";
+  const SUBJ = "01HZSUBJECT000000000000000";
+  const OTHER = "01HZOTHER00000000000000000";
+  const target = { orgId: ORG, subject: "team" as const, subjectId: SUBJ };
+  const own = deriveMediaKey({
+    orgId: ORG,
+    subject: "team",
+    subjectId: SUBJ,
+    contentType: "image/png",
+    token: "01HZTOKEN00000000000000000",
+  });
+
+  it("accepts the key the caller was authorized to write", () => {
+    expect(mediaKeyBelongsTo(own, target)).toBe(true);
+  });
+
+  it("REJECTS a cross-tenant org, a foreign subjectId, or a wrong subject type", () => {
+    expect(mediaKeyBelongsTo(own, { ...target, orgId: OTHER })).toBe(false);
+    expect(mediaKeyBelongsTo(own, { ...target, subjectId: OTHER })).toBe(false);
+    expect(mediaKeyBelongsTo(own, { ...target, subject: "player" })).toBe(false);
+  });
+
+  it("REJECTS a malformed key regardless of target", () => {
+    expect(mediaKeyBelongsTo(`org/${ORG}/team/${SUBJ}/../../x`, target)).toBe(false);
+    expect(mediaKeyBelongsTo("", target)).toBe(false);
   });
 });

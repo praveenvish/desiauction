@@ -2,6 +2,7 @@
 
 import {
   isAllowedImageType,
+  mediaKeyBelongsTo,
   validateUpload,
   type AllowedImageType,
   type MediaSubject,
@@ -105,6 +106,18 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
           throw new ForbiddenError();
         }
         await requireMediaWrite(db, session.personId, competition, input.subject, resolved);
+        // Bind the key to what was just authorized (S2): reject any key that is
+        // malformed or whose org/subject/subjectId doesn't match this target,
+        // so a client cannot attach an arbitrary or cross-tenant object.
+        if (
+          !mediaKeyBelongsTo(input.key, {
+            orgId: competition.orgId,
+            subject: input.subject,
+            subjectId: resolved.storageSubjectId,
+          })
+        ) {
+          throw new ForbiddenError();
+        }
         const via =
           resolved.ownerPersonId === session.personId
             ? "self_upload"
