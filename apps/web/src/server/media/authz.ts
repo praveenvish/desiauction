@@ -106,4 +106,13 @@ export async function persistMediaKey(
     .where(eq(people.id, resolved.storageSubjectId));
 }
 
+/** Consent withdrawal (PR1, DPDP §5): null the photo key + all consent fields.
+ * The storage object is deleted separately (best-effort) by the caller. */
+export async function clearPlayerPhoto(db: Db, personId: string): Promise<void> {
+  await db
+    .update(people)
+    .set({ photoUrl: null, photoUploadedAt: null, photoConsentAt: null, photoConsentVia: null })
+    .where(eq(people.id, personId));
+}
+
 export { ForbiddenError };

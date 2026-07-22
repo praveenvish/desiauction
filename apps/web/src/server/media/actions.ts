@@ -7,13 +7,20 @@ import {
   type AllowedImageType,
   type MediaSubject,
 } from "@desiauction/core";
-import { auditLog, newId, withTenantDb } from "@desiauction/db";
+import { auditLog, newId, people, withTenantDb } from "@desiauction/db";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
 import { resolveCompetition } from "../competition/competitions";
 import { dbHandle, systemDb } from "../db";
-import { ForbiddenError, persistMediaKey, requireMediaWrite, resolveMediaSubject } from "./authz";
+import {
+  ForbiddenError,
+  clearPlayerPhoto,
+  persistMediaKey,
+  requireMediaWrite,
+  resolveMediaSubject,
+} from "./authz";
 import { storage } from "./index";
 
 // Media writes (parity §3.1). Every action: session → membership-gated
@@ -143,6 +150,75 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
   } catch (error) {
     if (error instanceof ForbiddenError) {
       return { ok: false, error: "You don't have permission to attach this image." };
+    }
+    throw error;
+  }
+}
+
+export interface RemovePhotoInput {
+  slug: string;
+  registrationId: string;
+}
+
+/**
+ * Consent withdrawal (PR1, DPDP §5): null the photo + all consent fields AND
+ * delete the storage object so a withdrawn photo is not left publicly fetchable.
+ * Same authorization as attach (registrant-self or organizer with review).
+ */
+export async function removePlayerPhoto(
+  input: RemovePhotoInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Please sign in." };
+  }
+  const competition = await resolveCompetition(systemDb, session.personId, input.slug);
+  if (competition === null) {
+    return { ok: false, error: "Competition not found." };
+  }
+  try {
+    const removedKey = await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId: competition.orgId },
+      async (db) => {
+        const resolved = await resolveMediaSubject(db, competition, "player", input.registrationId);
+        if (resolved === null) {
+          throw new ForbiddenError();
+        }
+        await requireMediaWrite(db, session.personId, competition, "player", resolved);
+        const [row] = await db
+          .select({ photoUrl: people.photoUrl })
+          .from(people)
+          .where(eq(people.id, resolved.storageSubjectId))
+          .limit(1);
+        await clearPlayerPhoto(db, resolved.storageSubjectId);
+        await db.insert(auditLog).values({
+          id: newId(),
+          actor: session.personId,
+          action: "media.removed",
+          scopeType: "org",
+          scopeId: competition.orgId,
+          subject: resolved.storageSubjectId,
+          meta: { subject: "player", competitionId: competition.id },
+        });
+        return row?.photoUrl ?? null;
+      },
+    );
+    // Consent is already withdrawn (DB committed). Object deletion is best-effort
+    // — a malformed legacy key must not block the withdrawal itself.
+    if (removedKey !== null) {
+      try {
+        await storage.delete(removedKey);
+      } catch {
+        // Object already gone or key not deletable; consent removal stands.
+      }
+    }
+    revalidatePath(`/c/${competition.slug}`);
+    revalidatePath(`/competitions/${competition.slug}/registrations`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: "You don't have permission to remove this photo." };
     }
     throw error;
   }

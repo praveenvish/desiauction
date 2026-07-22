@@ -1,9 +1,14 @@
 "use client";
 
-import { ImageUploader, type UploadOutcome } from "@desiauction/ui";
+import { Button, ImageUploader, useToast, type UploadOutcome } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { attachMedia, requestMediaUpload } from "../../../../server/media/actions";
+import {
+  attachMedia,
+  removePlayerPhoto,
+  requestMediaUpload,
+} from "../../../../server/media/actions";
 
 /**
  * Organizer player-photo upload (parity §3.1). Same three-step flow as the team
@@ -23,6 +28,20 @@ export function PlayerPhotoUploader({
   currentUrl?: string;
 }) {
   const router = useRouter();
+  const toast = useToast();
+  const [removing, setRemoving] = useState(false);
+
+  async function onRemove() {
+    setRemoving(true);
+    const result = await removePlayerPhoto({ slug, registrationId });
+    setRemoving(false);
+    if (result.ok) {
+      toast({ title: "Photo removed", tone: "success" });
+      router.refresh();
+    } else {
+      toast({ title: result.error, tone: "danger" });
+    }
+  }
 
   async function onUpload(file: File): Promise<UploadOutcome> {
     const requested = await requestMediaUpload({
@@ -57,14 +76,21 @@ export function PlayerPhotoUploader({
   }
 
   return (
-    <ImageUploader
-      label="Player photo"
-      name={playerName}
-      seed={registrationId}
-      size="lg"
-      shape="round"
-      onUpload={onUpload}
-      {...(currentUrl !== undefined ? { currentUrl } : {})}
-    />
+    <div className="player-photo-control">
+      <ImageUploader
+        label="Player photo"
+        name={playerName}
+        seed={registrationId}
+        size="lg"
+        shape="round"
+        onUpload={onUpload}
+        {...(currentUrl !== undefined ? { currentUrl } : {})}
+      />
+      {currentUrl !== undefined ? (
+        <Button variant="ghost" size="sm" onClick={() => void onRemove()} disabled={removing}>
+          {removing ? "Removing…" : "Remove photo (withdraw consent)"}
+        </Button>
+      ) : null}
+    </div>
   );
 }

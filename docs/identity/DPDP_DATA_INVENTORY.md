@@ -79,7 +79,11 @@ on their behalf — the `via` value records which) consents at photo upload, **b
 any rendering on Stage/Owner Room/Overlay surfaces. No photo may render without a
 non-null `photo_consent_at` — this becomes an IP-3 acceptance criterion. Withdrawal =
 photo removal + consent fields nulled; the branded placeholder (C-25) makes removal
-non-degrading by design.
+non-degrading by design. **Implemented (parity, PR1):** `removePlayerPhoto`
+(server/media/actions) nulls `photo_url` + all consent fields **and** deletes the
+storage object (best-effort, so a legacy key cannot block the withdrawal), writes a
+`media.removed` audit row, and the organizer surface exposes a "Remove photo
+(withdraw consent)" control.
 
 ## 6 · Audit evidence available today
 
