@@ -18,6 +18,7 @@ import { orgsFor } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   advanceCompetition,
+  cloneCompetition,
   competitionForRegistration,
   competitionsForPerson,
   createCompetition,
@@ -208,6 +209,38 @@ export async function advanceCompetitionAction(
     };
   }
   return { ok: true };
+}
+
+// Retention ("run it again"): clone a competition into a fresh draft in the same
+// org — team shells + coach carry over, the player pool does NOT (fresh
+// registration, no PII copy). Gated by `competition.create` (you are creating a
+// new competition), scoped to the source's org.
+export async function cloneCompetitionAction(
+  sourceSlug: string,
+): Promise<{ ok: boolean; slug?: string; error?: string }> {
+  const session = await requireSession();
+  const source = await resolveCompetitionScoped(session.personId, sourceSlug);
+  if (source === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    const result = await inCompetitionOrg(session.personId, source, async (db) => {
+      await requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: source.orgId, competitionId: source.id },
+        "competition.create",
+      );
+      const teams = await teamsOf(db, source.id);
+      return cloneCompetition(db, source.orgId, session.personId, source, teams);
+    });
+    return { ok: true, slug: result.competition.slug };
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: "You can't create competitions in this organization." };
+    }
+    return { ok: false, error: "Could not duplicate this competition." };
+  }
 }
 
 // PX-5: publish/unpublish the public competition page. A thin write to the

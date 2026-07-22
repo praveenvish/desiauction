@@ -8,11 +8,13 @@ import { useState } from "react";
 
 import {
   advanceCompetitionAction,
+  cloneCompetitionAction,
   createTeamAction,
   setCompetitionVisibilityAction,
   triageRegistrationAction,
   type CompetitionView,
 } from "../../../server/competition/actions";
+import { track } from "../../../lib/telemetry";
 
 const STATUS_TONE = {
   draft: "neutral",
@@ -79,6 +81,21 @@ export function CompetitionPanel({ view, slug }: { view: CompetitionView; slug: 
     }
   };
 
+  // Retention ("run it again"): clone this competition into a fresh draft and
+  // jump the organizer straight into next season's setup.
+  const runItAgain = async () => {
+    setBusy(true);
+    const result = await cloneCompetitionAction(slug);
+    setBusy(false);
+    if (result.ok && result.slug !== undefined) {
+      track("competition.cloned");
+      toast({ title: "New draft created from this competition.", tone: "success" });
+      router.push(`/competitions/${result.slug}`);
+    } else {
+      toast({ title: result.error ?? "Could not duplicate.", tone: "danger" });
+    }
+  };
+
   // PX-5: publish/unpublish the public page (existing visibility column).
   const setVisibility = async (visibility: "private" | "public") => {
     setBusy(true);
@@ -139,6 +156,16 @@ export function CompetitionPanel({ view, slug }: { view: CompetitionView; slug: 
           </Link>{" "}
           — one view of every gate between here and auction night.
         </p>
+        {view.viewer.canManage ? (
+          <Button
+            variant="ghost"
+            loading={busy}
+            data-testid="run-it-again"
+            onClick={() => void runItAgain()}
+          >
+            Run it again → new season
+          </Button>
+        ) : null}
         <div className="visibility-row" data-testid="visibility-row">
           <Badge tone={view.competition.visibility === "public" ? "success" : "neutral"}>
             {view.competition.visibility === "public" ? "Public page live" : "Not listed publicly"}

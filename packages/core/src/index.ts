@@ -25,6 +25,7 @@ export {
   validateName,
   slugifyName,
   isValidSeasonYear,
+  nextSeasonName,
   COMPETITION_STATUSES,
   REGISTRATION_STATUSES,
   REGISTRATION_ROLES,

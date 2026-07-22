@@ -23,6 +23,7 @@ export type ProductEventName =
   | "org.created"
   | "org.invitation_accepted"
   | "org.switched"
+  | "competition.cloned"
   | "register.photo_added"
   | "showcase.player_viewed"
   | "showcase.player_profile_opened"

@@ -229,3 +229,23 @@ export function slugifyName(name: string): string {
 export function isValidSeasonYear(year: number): boolean {
   return Number.isInteger(year) && year >= 2000 && year <= 2100;
 }
+
+/**
+ * Name for a cloned competition ("Run it again" — retention). If the name ends
+ * in a season year (19xx/20xx), bump it: "Sunday League 2026" → "Sunday League
+ * 2027". Otherwise append " (Copy)". Deterministic; the caller still gets a
+ * unique slug from the ULID suffix, so a duplicate name never collides.
+ */
+export function nextSeasonName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed === "") {
+    return "Competition (Copy)";
+  }
+  const match = /^(.*\s)((?:19|20)\d{2})$/.exec(trimmed);
+  if (match !== null) {
+    const prefix = match[1] ?? "";
+    const year = Number(match[2]);
+    return `${prefix}${String(year + 1)}`;
+  }
+  return `${trimmed} (Copy)`;
+}

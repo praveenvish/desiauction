@@ -30,11 +30,13 @@ import { createOrg } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   advanceCompetition,
+  cloneCompetition,
   createCompetition,
   createTeam,
   resolveCompetition,
   seasonsOf,
   createSeason,
+  setTeamCoach,
   teamsOf,
 } from "./competitions";
 import { registrationsOf, submitRegistration } from "./registrations";
@@ -160,6 +162,58 @@ describe("COMPETITION REGRESSION — domain contract", () => {
     expect((await advanceCompetition(db, comp, owner, "registration_open")).ok).toBe(true);
     comp = must(await resolveCompetition(db, owner, compSlug), "competition");
     expect(comp.status).toBe("registration_open");
+  });
+
+  it("clones a competition into a fresh draft — team shells + coach carry over, the player pool does NOT (retention)", async () => {
+    const src = await createCompetition(db, orgX.id, owner, {
+      name: `Malad League ${RUN} 2026`,
+      location: "Malad",
+      startsOn: "2026-08-01",
+      endsOn: "2026-08-15",
+    });
+    // Open registration and seed a real player into the SOURCE pool.
+    let source = must(await resolveCompetition(db, owner, src.slug), "source");
+    expect((await advanceCompetition(db, source, owner, "setup")).ok).toBe(true);
+    source = must(await resolveCompetition(db, owner, src.slug), "source");
+    expect((await advanceCompetition(db, source, owner, "registration_open")).ok).toBe(true);
+    source = must(await resolveCompetition(db, owner, src.slug), "source");
+    await createTeam(db, orgX.id, source.id, owner, `Alpha ${RUN}`, "ALP", "#ff0000");
+    const beta = await createTeam(
+      db,
+      orgX.id,
+      source.id,
+      owner,
+      `Beta ${RUN}`,
+      undefined,
+      "#00ff00",
+    );
+    if (beta.ok) {
+      await setTeamCoach(db, orgX.id, source.id, beta.team.id, "Coach Bob", owner);
+    }
+    await submitRegistration(db, source.id, orgX.id, player, "batter");
+    const sourceTeams = await teamsOf(db, source.id);
+
+    const cloned = await cloneCompetition(db, orgX.id, owner, source, sourceTeams);
+
+    // A fresh DRAFT with the season year bumped and dates reset.
+    expect(cloned.competition.status).toBe("draft");
+    expect(cloned.competition.id).not.toBe(source.id);
+    expect(cloned.competition.name).toBe(`Malad League ${RUN} 2027`);
+    expect(cloned.competition.location).toBe("Malad");
+    expect(cloned.competition.startsOn).toBeNull();
+    // Team shells (incl. coach) carried; the player pool did not.
+    expect(cloned.teamsCloned).toBe(2);
+    const newTeams = await teamsOf(db, cloned.competition.id);
+    expect(newTeams.map((t) => t.name).sort()).toEqual([`Alpha ${RUN}`, `Beta ${RUN}`].sort());
+    expect(newTeams.find((t) => t.name === `Beta ${RUN}`)?.coachName).toBe("Coach Bob");
+    expect(await registrationsOf(db, cloned.competition.id)).toHaveLength(0);
+    expect((await registrationsOf(db, source.id)).length).toBeGreaterThan(0);
+    // The clone is audited against the new competition.
+    const audit = await db
+      .select()
+      .from(auditLog)
+      .where(eq(auditLog.subject, cloned.competition.id));
+    expect(audit.some((a) => a.action === "competition.cloned")).toBe(true);
   });
 
   it("team names are unique within a competition", async () => {

@@ -1,5 +1,6 @@
 import {
   competitionTransition,
+  nextSeasonName,
   slugifyName,
   validateName,
   type CompetitionStatus,
@@ -294,6 +295,62 @@ export async function createTeam(
       logoUrl: null,
     },
   };
+}
+
+export interface CloneResult {
+  competition: CompetitionSummary;
+  teamsCloned: number;
+}
+
+/**
+ * Clone a competition into a fresh DRAFT in the same org — the "run it again"
+ * retention path (collapses the cost of a second season). Copies identity (name
+ * with the season year bumped, location) and the TEAM SHELLS (name / short /
+ * colour / coach). Does NOT copy the player pool (no PII — the new season opens
+ * fresh registration), fixtures, or auction state; dates reset so the organizer
+ * sets the new schedule. Composes the existing audited primitives and emits one
+ * `competition.cloned` event.
+ */
+export async function cloneCompetition(
+  db: Db,
+  orgId: string,
+  personId: string,
+  source: CompetitionSummary,
+  sourceTeams: TeamSummary[],
+): Promise<CloneResult> {
+  const competition = await createCompetition(db, orgId, personId, {
+    name: nextSeasonName(source.name),
+    ...(source.location !== null ? { location: source.location } : {}),
+  });
+  let teamsCloned = 0;
+  for (const team of sourceTeams) {
+    const created = await createTeam(
+      db,
+      orgId,
+      competition.id,
+      personId,
+      team.name,
+      team.shortName ?? undefined,
+      team.primaryColor ?? undefined,
+    );
+    if (!created.ok) {
+      continue;
+    }
+    teamsCloned += 1;
+    if (team.coachName !== null && team.coachName !== "") {
+      await setTeamCoach(db, orgId, competition.id, created.team.id, team.coachName, personId);
+    }
+  }
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action: "competition.cloned",
+    scopeType: "org",
+    scopeId: orgId,
+    subject: competition.id,
+    meta: { source: source.id, teamsCloned: String(teamsCloned) },
+  });
+  return { competition, teamsCloned };
 }
 
 /** Set (or clear) a team's coach — non-bidding organizer metadata. */

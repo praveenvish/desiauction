@@ -7,6 +7,7 @@ import {
   isRegistrationRole,
   isRejectionReason,
   isValidSeasonYear,
+  nextSeasonName,
   registrationTransition,
   slugifyName,
   validateName,
@@ -156,5 +157,26 @@ describe("declared status sets are closed", () => {
   it("exposes the four competition statuses and six registration statuses", () => {
     expect(COMPETITION_STATUSES).toContain("registration_open");
     expect(REGISTRATION_STATUSES).toHaveLength(6);
+  });
+});
+
+describe("nextSeasonName (clone / run-it-again)", () => {
+  it("bumps a trailing season year", () => {
+    expect(nextSeasonName("Sunday Premier League 2026")).toBe("Sunday Premier League 2027");
+    expect(nextSeasonName("MPL 2019")).toBe("MPL 2020");
+    expect(nextSeasonName("Cup 2099")).toBe("Cup 2100");
+  });
+
+  it("appends (Copy) when there is no trailing year", () => {
+    expect(nextSeasonName("Spring Cup")).toBe("Spring Cup (Copy)");
+    // A leading/embedded year is not a season suffix — do not touch it.
+    expect(nextSeasonName("2020 Memorial Trophy")).toBe("2020 Memorial Trophy (Copy)");
+    // A trailing non-year number is not a season — leave it.
+    expect(nextSeasonName("Ground 1234")).toBe("Ground 1234 (Copy)");
+  });
+
+  it("trims and degrades a blank name", () => {
+    expect(nextSeasonName("  Night League 2025  ")).toBe("Night League 2026");
+    expect(nextSeasonName("   ")).toBe("Competition (Copy)");
   });
 });
