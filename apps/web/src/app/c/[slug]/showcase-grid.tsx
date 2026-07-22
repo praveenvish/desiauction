@@ -1,6 +1,6 @@
 "use client";
 
-import { Dialog, PlayerImage } from "@desiauction/ui";
+import { Button, Dialog, PlayerImage } from "@desiauction/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -14,6 +14,7 @@ import {
   serializeShowcaseParams,
   type ShowcaseView,
 } from "../../../components/showcase/showcase-params";
+import { showcaseToCsv } from "../../../components/showcase/showcase-csv";
 import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer } from "../../../server/competition/public";
 import { SquadsView } from "./squads-view";
@@ -64,6 +65,17 @@ export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
     [players, query, filter, sort],
   );
 
+  function downloadCsv() {
+    const blob = new Blob([showcaseToCsv(shown)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "players.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    track("showcase.exported");
+  }
+
   return (
     <div className="showcase">
       <div className="showcase-viewtoggle" role="tablist" aria-label="Showcase view">
@@ -112,6 +124,14 @@ export function ShowcaseGrid({ players }: { players: ShowcasePlayer[] }) {
             <option value="status">Sort: status</option>
           </select>
         </label>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={downloadCsv}
+          disabled={shown.length === 0}
+        >
+          Download CSV
+        </Button>
       </div>
 
       <div className="showcase-filters" role="tablist" aria-label="Filter players">
