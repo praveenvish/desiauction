@@ -120,6 +120,23 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
     expect(jsonLd).toContain('"@type":"SportsEvent"');
     expect(jsonLd).toContain(`Monsoon Cup ${STAMP}`);
 
+    // Share-card metadata (INV-1): the file-convention OG/Twitter image is injected
+    // into the head, and the route itself serves a real PNG.
+    await expect(anon.locator('meta[property="og:image"]')).toHaveCount(1);
+    await expect(anon.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      "content",
+      "summary_large_image",
+    );
+    const ogImage = await anon.goto(`${publicUrl}/opengraph-image`);
+    expect(ogImage?.status()).toBe(200);
+    expect(ogImage?.headers()["content-type"]).toContain("image/png");
+
+    // Share attribution (INV-5): a shared `?ref` forwards onto the register CTA so
+    // the source reaches registration.
+    await anon.goto(`${publicUrl}?ref=whatsapp`);
+    const ctaHref = await anon.getByTestId("public-register-cta").getAttribute("href");
+    expect(ctaHref).toContain("ref=whatsapp");
+
     // The never-published draft is a 404, not a leak.
     const hidden = await anon.goto(privateSlugUrl);
     expect(hidden?.status()).toBe(404);

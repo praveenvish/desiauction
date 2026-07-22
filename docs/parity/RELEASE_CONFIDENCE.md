@@ -49,10 +49,17 @@ app-layer"); production flips to `desiauction_app` (NOBYPASSRLS).
 - **Integration/RUNTIME**: ✅ **453/453** web tests on real Postgres 17
 - **Migration apply**: ✅ RUNTIME (all 19 migrations)
 - **Build**: ✅ RUNTIME (`next build` clean)
+- **Critical E2E**: ❌ **not green this session** — the Playwright harness boots and
+  drives a browser, but the local e2e DB (`.env.local` → **:5433**, distinct from
+  the :5432 regression DB) carries residue and `public-registration.spec.ts` fails
+  at pre-existing gates (onboarding, public-page state) before reaching the new
+  share-card/attribution assertions. Those assertions are **WRITTEN**, pending a
+  clean-DB (CI/ephemeral) run. See `RELEASE_RISK_REGISTER.md` R-E1/R-E2.
 - **a11y / perf / security-review**: partial (per-feature review; no automated a11y/perf gate)
 
-**Overall: SOURCE + EXECUTION + RUNTIME all green. PRODUCTION VERIFIED pending
-an independent Release Authority on a production-like deploy.**
+**Overall: SOURCE + EXECUTION + RUNTIME(unit/integration/build) green. Release
+Authority verdict = NO-GO — blocked on Critical-E2E execution (R-E1) and
+founder-owned launch externals (R-C1). See `RELEASE_RISK_REGISTER.md`.**
 
 ## Evidence backlog (ranked)
 
