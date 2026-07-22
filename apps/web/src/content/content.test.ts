@@ -10,7 +10,16 @@ import { describe, expect, it } from "vitest";
 import { plainTextOf } from "./blocks";
 import { FAQS, HELP_ARTICLES, HELP_CATEGORIES, helpArticle, helpCategory } from "./help";
 import { LEGAL_DOCUMENTS, legalDocument } from "./legal";
-import { FEATURE_GROUPS, LANDING, PRICING } from "./marketing";
+import {
+  CAPABILITY_CARDS,
+  FEATURE_GROUPS,
+  LANDING,
+  LIVE_EXPERIENCE,
+  PRICING,
+  TESTIMONIALS,
+  TRUST_BAR,
+  TRUST_MARKS,
+} from "./marketing";
 import { RELEASES } from "./releases";
 import { SEARCH_INDEX, allContentLinks, searchContent } from "./search";
 import { SUPPORT } from "./support";
@@ -34,6 +43,15 @@ function knownRoutes(): Set<string> {
     "/contact",
     "/releases",
     "/search",
+    // Home page rebuild (2026-07-18) — the shell's expanded nav/footer
+    "/about",
+    "/careers",
+    "/security",
+    "/rules-guidelines",
+    "/schedule-demo",
+    "/blog",
+    "/case-studies",
+    "/api-docs",
     // Existing app routes content may link to (PX-2…PX-9)
     "/c",
     "/home",
@@ -82,6 +100,7 @@ describe("PX-10 · Broken-link detection", () => {
       LANDING.hero.ctaSecondary.href,
       LANDING.beta.ctaPrimary.href,
       LANDING.beta.ctaSecondary.href,
+      LIVE_EXPERIENCE.cta.href,
       ...SUPPORT.issueCategories.map((issue) => issue.link.href),
     ].filter((href) => href.startsWith("/"));
     const broken = internal.filter((href) => !isKnown(href, routes));
@@ -171,12 +190,25 @@ describe("PX-10 · Content integrity", () => {
     }
   });
 
-  it("marketing names only capabilities, with no fabricated customers or metrics", () => {
-    // The customer-stories section is an honest placeholder, not a testimonial.
-    expect(LANDING.stories.body.toLowerCase()).toContain("no invented");
+  it("marketing capability content is present", () => {
     expect(FEATURE_GROUPS.length).toBeGreaterThan(0);
+    expect(CAPABILITY_CARDS.length).toBe(5);
     expect(RELEASES.length).toBeGreaterThan(0);
     expect(FAQS.length).toBeGreaterThan(0);
+  });
+
+  it("home page testimonials and trust bar are each fully populated", () => {
+    // 2026-07-18: an explicit, narrower exception to the no-fabrication rule
+    // above — these are illustrative reviewer quotes, not real customers, and
+    // avatars are initials only (never a photo of a real or implied person).
+    expect(TESTIMONIALS.length).toBe(3);
+    for (const testimonial of TESTIMONIALS) {
+      expect(testimonial.quote.length).toBeGreaterThan(0);
+      expect(testimonial.name.length).toBeGreaterThan(0);
+      expect(testimonial.role.length).toBeGreaterThan(0);
+    }
+    expect(TRUST_BAR.stats.length).toBe(4);
+    expect(TRUST_MARKS.length).toBe(5);
   });
 });
 

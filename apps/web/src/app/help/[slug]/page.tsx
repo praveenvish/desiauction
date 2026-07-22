@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { env } from "../../../env";
@@ -42,9 +43,9 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
     return (
       <main className="content-page content-narrow">
         <p className="article-meta no-print">
-          <a href="/help" className="prose-link">
-            ← All help
-          </a>
+          <Link href="/help" className="prose-link">
+            <span aria-hidden="true">←</span> All help
+          </Link>
         </p>
         <h1>Frequently asked questions</h1>
         <div className="content-section">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { env } from "../../env";
 import { HELP_ARTICLES, HELP_CATEGORIES, helpArticlesIn } from "../../content/help";
 import "../content.css";
+import "../marketing.css";
 
 export const metadata: Metadata = {
   title: "Help centre · DesiAuction",
@@ -19,7 +20,8 @@ export const metadata: Metadata = {
  */
 export default function HelpIndexPage() {
   return (
-    <main className="content-page">
+    <main className="content-page mk">
+      <p className="mk-kicker">Guides &amp; answers</p>
       <h1>Help centre</h1>
       <p className="content-lead">
         Everything you need to run a tournament on DesiAuction — described exactly as the platform

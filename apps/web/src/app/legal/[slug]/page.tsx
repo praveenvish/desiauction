@@ -42,7 +42,7 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
     <main className="content-page content-narrow">
       <p className="article-meta no-print">
         <Link href="/legal" className="prose-link">
-          ← All legal documents
+          <span aria-hidden="true">←</span> All legal documents
         </Link>
       </p>
       <h1>{doc.title}</h1>

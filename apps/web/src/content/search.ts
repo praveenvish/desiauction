@@ -110,7 +110,7 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "Get help",
     "contact support bug report issue auction night email",
   ),
-  doc("Contact", "/contact", "Support", "Reach us", "contact email support whatsapp response time"),
+  doc("Contact", "/contact", "Support", "Reach us", "contact email support response time"),
   doc(
     "Release notes",
     "/releases",

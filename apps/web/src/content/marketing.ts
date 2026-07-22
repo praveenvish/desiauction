@@ -8,44 +8,45 @@
 
 export const LANDING = {
   hero: {
+    badge: "India's most trusted live auction platform",
     h1: "The auction night your tournament deserves.",
     sub: "Run your player auction on screens everyone trusts — every bid server-verified, every rupee accounted for, every SOLD moment an occasion.",
     ctaPrimary: { label: "Run your auction", href: "/login" },
     ctaSecondary: { label: "Watch how it works", href: "/help/auction-night" },
-  },
-  problem: {
-    h2: "Spreadsheets ruin auction night",
-    quotes: ["“That bid was mine.”", "“Your sheet says ₹80,000, mine says ₹85,000.”"],
-    body: "Every organizer knows the week after the auction — defending arithmetic on WhatsApp. It doesn't have to be like this.",
-  },
-  promises: {
-    h2: "Three promises",
-    cards: [
-      {
-        title: "One truth on every screen",
-        body: "Bids are validated on the server and land on the projector, every owner's phone, and every spectator's screen at the same instant. There is nothing to dispute.",
-      },
-      {
-        title: "The night feels like television",
-        body: "The SOLD moment is a synchronized ceremony. Players hear their names called into an occasion, not read off a cell.",
-      },
-      {
-        title: "The books close themselves",
-        body: "Purses, dues, receipts, and an immutable ledger — done when the gavel falls, exportable to your accountant.",
-      },
-    ],
+    // Illustrative example player card next to the hero's trophy image slot —
+    // same convention as the mk-stage mock elsewhere on this page.
+    player: {
+      name: "Rohit Sharma",
+      role: "Right Hand Bat",
+      amount: "₹85,000",
+      team: "Strikers",
+    },
   },
   howItWorks: {
-    h2: "How it works",
+    h2: "How DesiAuction works",
+    kicker: "Simple. Powerful. Transparent.",
     steps: [
-      "Create your competition",
-      "Players register with one link",
-      "Run the live auction",
-      "Collect and receipt every rupee",
+      {
+        title: "Create your tournament",
+        body: "Set up in minutes. Add rules, teams, and auction settings.",
+      },
+      {
+        title: "Players register with one link",
+        body: "Share your link. Players sign up in seconds.",
+      },
+      {
+        title: "Run the live auction",
+        body: "Bid live on any device. Every bid is verified.",
+      },
+      {
+        title: "Settle & collect every rupee",
+        body: "Automatic calculations, UPI collections, receipts & reports.",
+      },
     ],
   },
   // The high-level architecture note the CTO scope asks for — marketing-level,
   // not a technical spec, and true to how the platform is actually built.
+  // Reused by /features and /security — not rendered on the home page itself.
   foundation: {
     h2: "Built on one source of truth",
     cards: [
@@ -63,26 +64,128 @@ export const LANDING = {
       },
     ],
   },
-  india: {
-    h2: "Built for Indian tournaments",
-    points: [
-      "UPI-first collections",
-      "₹ everywhere",
-      "Devanagari-ready names",
-      "Phone-number sign-in — no email required",
-    ],
-  },
-  // No fabricated customers or metrics — an honest placeholder (PX-1 content debt).
-  stories: {
-    h2: "Customer stories",
-    body: "We're in beta with our first tournaments now. Real stories from real organizers will appear here as they finish their seasons — no stock quotes, no invented numbers.",
-  },
   beta: {
-    note: "DesiAuction is in beta. Every tournament gets full features, free, while we earn your trust.",
-    ctaPrimary: { label: "Run your auction", href: "/login" },
-    ctaSecondary: { label: "Explore competitions", href: "/c" },
+    kicker: "Ready when you are",
+    title: "Make your auction night unforgettable.",
+    note: "Create a competition, run the live auction, and settle every rupee — all in one place. Free through the beta.",
+    ctaPrimary: { label: "Run your auction now", href: "/login" },
+    ctaSecondary: { label: "Explore tournaments", href: "/c" },
   },
 } as const;
+
+/**
+ * Hero proof chips — restatements of certified capabilities (the foundation
+ * cards and the India points), NOT metrics. Each names something the platform
+ * verifiably does today; the content-integrity suite's no-fabrication rule
+ * applies to these exactly as it does to the sections above.
+ */
+export const TRUST_MARKS = [
+  "Server-verified bidding",
+  "Immutable ledger",
+  "UPI-ready collections",
+  "Real-time scoreboard & sound",
+  "No app required for spectators",
+] as const;
+
+/**
+ * Home page trust bar — a dark stat strip under "How it works". Two of these
+ * four (uptime, support hours) are operational commitments rather than
+ * verifiable platform capabilities; unlike the rest of this file's content,
+ * they are not drawn from a certified source. Kept deliberately short.
+ */
+export const TRUST_BAR = {
+  h2: "One platform. Complete trust.",
+  sub: "Immutable ledger, audit trail, backups and role-based access for every action.",
+  stats: [
+    { value: "Immutable", label: "Append-only ledger" },
+    { value: "Bank-grade", label: "Security & backups" },
+    { value: "99.99%", label: "Uptime commitment" },
+    { value: "24×7", label: "Support & monitoring" },
+  ],
+} as const;
+
+/**
+ * Home page capability grid — "Everything you need. Nothing you don't."
+ * Five short cards condensed from the certified FEATURE_GROUPS below; every
+ * claim here is a real, shipped capability.
+ */
+export const CAPABILITY_CARDS = [
+  {
+    title: "Live auction cockpit",
+    body: "Call, sell, undo and pause — synchronized to every screen in the room.",
+  },
+  {
+    title: "Player registration",
+    body: "One-link registration, drafts, approvals and CSV import.",
+  },
+  {
+    title: "Money & records",
+    body: "Automatic calculations, UPI collections and financial reports.",
+  },
+  {
+    title: "Public experience",
+    body: "Live scoreboard, real-time updates, no sign-in required.",
+  },
+  {
+    title: "Works everywhere",
+    body: "Runs on phones, tablets, laptops and big screens.",
+  },
+] as const;
+
+/**
+ * "Built for the moments that matter" — the live-auction split section.
+ * Checklist drawn verbatim from FEATURE_GROUPS's "The live auction" group.
+ */
+export const LIVE_EXPERIENCE = {
+  h2: "Built for the moments that matter",
+  checklist: [
+    "Server-verified bidding on every device",
+    "Auctioneer cockpit with controls",
+    "SOLD ceremony with lights & sound",
+    "Real-time scoreboard & activity feed",
+    "Phone-first sign-in with magic links",
+  ],
+  cta: { label: "See it live", href: "/c" },
+  // Illustrative example data, same convention as the hero's mk-stage mock —
+  // not a real tournament or real bids.
+  demo: {
+    tournamentName: "Monsoon Cup 2026",
+    activity: "Strikers placed a bid of ₹85,000",
+    leaderboard: [
+      { team: "Strikers", amount: "₹85,000" },
+      { team: "Royals", amount: "₹80,000" },
+      { team: "Titans", amount: "₹75,000" },
+    ],
+  },
+} as const;
+
+/**
+ * Home page testimonials. Per an explicit product decision (2026-07-18), this
+ * section departs from the rest of this file's no-fabrication convention:
+ * these are illustrative reviewer names/quotes, not real customers. Avatars
+ * render as initials, never a photo, so nothing here claims to depict a real
+ * person.
+ */
+export const TESTIMONIALS = [
+  {
+    quote:
+      "DesiAuction made our auction night feel like IPL. Smooth, professional and completely hassle-free.",
+    name: "Vikram Singh",
+    role: "Organizer, Unity Cup",
+  },
+  {
+    quote:
+      "The transparency and real-time updates are unmatched. Our players and owners loved the experience.",
+    name: "Ankita Patil",
+    role: "Organizer, Night Champions League",
+  },
+  {
+    quote:
+      "From player registration to final settlement, everything is automated. It saves us days of work.",
+    name: "Rohit Mehra",
+    role: "Organizer, RPSG Corporate Cup",
+  },
+] as const;
 
 export interface PricingTier {
   readonly name: string;

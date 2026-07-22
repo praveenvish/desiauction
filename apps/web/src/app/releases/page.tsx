@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { env } from "../../env";
 import { RELEASES } from "../../content/releases";
+import { slugify } from "../../lib/slug";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -18,19 +19,22 @@ export default function ReleasesPage() {
       <p className="content-lead">
         What each update delivered. Running version <code>{env.APP_VERSION}</code>.
       </p>
-      {RELEASES.map((release) => (
-        <section key={release.version} className="release" aria-labelledby={release.version}>
-          <h2 id={release.version}>{release.title}</h2>
-          <p className="release-meta">
-            {release.version} · {release.date}
-          </p>
-          <ul>
-            {release.highlights.map((highlight) => (
-              <li key={highlight}>{highlight}</li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {RELEASES.map((release) => {
+        const releaseId = `release-${slugify(release.version)}`;
+        return (
+          <section key={release.version} className="release" aria-labelledby={releaseId}>
+            <h2 id={releaseId}>{release.title}</h2>
+            <p className="release-meta">
+              {release.version} · {release.date}
+            </p>
+            <ul>
+              {release.highlights.map((highlight) => (
+                <li key={highlight}>{highlight}</li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
     </main>
   );
 }

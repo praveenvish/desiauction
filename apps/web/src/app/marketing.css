@@ -1,0 +1,3048 @@
+/* ============================================================================
+   The public design layer (`mk-`) — the visual language of every marketing and
+   discovery surface: landing, features, pricing, directory, help and the
+   content pages that borrow its bands and cards.
+
+   Principles:
+   • Cinematic, not decorated — dark sections are real theme scopes
+     (data-theme="floodlight"), so every color pair inside them is a certified
+     token pair. No bespoke palettes, no hex.
+   • Show, don't explain — product vignettes are built from the same tokens the
+     product renders with, so the marketing "screenshot" can never drift from
+     the truth.
+   • Motion is transform-first: nothing scroll-driven ever animates opacity on
+     text (WCAG contrast is a constant, not a keyframe), and every movement
+     collapses under prefers-reduced-motion.
+   • Every layout survives 360px with zero horizontal scroll.
+   ========================================================================== */
+
+/* --- Scaffold ------------------------------------------------------------- */
+
+.mk {
+  font-family: var(--font-text);
+  color: var(--text-primary);
+}
+
+.mk-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: var(--space-5);
+  padding-right: var(--space-5);
+  box-sizing: border-box;
+}
+
+.mk-narrow {
+  max-width: 780px;
+}
+
+/* --- Type ------------------------------------------------------------------ */
+
+.mk-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.mk-kicker::before {
+  content: "";
+  width: var(--space-5);
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+.mk-h1 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(2.375rem, 6.5vw, var(--display-xl-size));
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-5);
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* Compact hero headline — sized to land in three lines, not four. */
+.mk-hero .mk-h1 {
+  font-size: clamp(2.25rem, 5vw, 64px);
+  line-height: 1.05;
+}
+
+.mk-h2 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(1.75rem, 4vw, var(--display-md-size));
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-3);
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.mk-lead {
+  font-size: clamp(var(--text-md-size), 2vw, var(--text-xl-size));
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-6);
+  max-width: 52ch;
+}
+
+.mk-center {
+  text-align: center;
+}
+
+.mk-center .mk-lead {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mk-center .mk-kicker::after {
+  content: "";
+  width: var(--space-5);
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+/* --- Bands: the section rhythm --------------------------------------------- */
+
+.mk-band {
+  padding: clamp(var(--space-8), 4vw, var(--space-12)) 0;
+  background: var(--surface);
+}
+
+.mk-band--sunken {
+  background: var(--surface-sunken);
+}
+
+/* The proof strip's band: a thin dark shelf directly under the hero image,
+   flowing into the floodlit "how it works" band beneath it. */
+.mk-proof-band {
+  padding: var(--space-6) 0 0;
+  background: var(--surface-sunken);
+}
+
+.mk-proof-band .mk-proof {
+  margin-top: 0;
+}
+
+/* Dark bands carry the floodlight scope themselves; the gradient wash keeps
+   them from reading as flat panels. */
+.mk-band--dark {
+  background:
+    radial-gradient(
+      100% 130% at 85% -30%,
+      color-mix(in srgb, var(--accent) 7%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(180deg, var(--surface-sunken), var(--surface));
+}
+
+.mk-band-head {
+  max-width: 640px;
+  margin-bottom: clamp(var(--space-5), 3vw, var(--space-8));
+}
+
+.mk-band-head--center {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+/* --- Hero -------------------------------------------------------------------
+   A floodlit night: two beams sweep in from the top corners, the volt halo
+   sits behind the headline, and a hairline pitch arc grounds the bottom. All
+   gradient light is mixed from tokens. */
+
+/* Reset the browser's default 8px body margin — without it, the white page
+   canvas shows as a frame around full-bleed dark sections like the hero. */
+body {
+  margin: 0;
+}
+
+.mk-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface-sunken) 0%, var(--surface) 100%);
+  padding: clamp(var(--space-8), 3.5vw, var(--space-12)) 0
+    clamp(var(--space-6), 3vw, var(--space-8));
+}
+
+/* Home only (scoped by :has on the .landing wrapper): the public header floats
+   as a FIXED, transparent bar so the stadium photo is unbroken from the very top
+   of the page down through the hero — the nav sits on the stadium, not on a black
+   band above it. The header still densifies to opaque glass over the first scroll
+   (so it stays readable over the lower, light sections). The hero gains top
+   padding to clear the floating bar. Browsers without :has() simply keep the
+   default sticky glass header and the hero's normal padding — a clean fallback.
+   Every other public page (pricing, help, …) is untouched. */
+body:has(.landing.mk) header[data-theme="floodlight"] {
+  position: fixed;
+  inset: 0 0 auto 0;
+  background-color: transparent;
+  background-image: none;
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+
+body:has(.landing.mk) .mk-hero {
+  padding-top: clamp(6.5rem, 5vw + 3.5rem, 9rem);
+  padding-bottom: clamp(4rem, 4vw, 6rem);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    /* Keep the scroll-linked densify, but start it fully transparent so the
+       photo shows through at the top; timeline + range cascade from .header. */
+    body:has(.landing.mk) header[data-theme="floodlight"] {
+      animation-name: mk-header-home;
+    }
+  }
+}
+
+@keyframes mk-header-home {
+  from {
+    background-color: transparent;
+    border-bottom-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+
+  to {
+    background-color: color-mix(in srgb, var(--surface) 92%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--border-subtle) 80%, transparent);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--surface-sunken) 40%, transparent);
+  }
+}
+
+/* The hero floor is a SINGLE stadium photo painted full-bleed by .mk-hero-photo
+   (below), so it fills the whole hero at every width — no dark void on the right,
+   no second copy, no seam. A left-weighted scrim keeps the copy column legible
+   while the floodlit glow, the trophy, and the far stands all stay lit. */
+
+.mk-hero::after {
+  /* The boundary rope: a lit hairline that separates the night from the page. */
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent) 50%,
+    transparent
+  );
+}
+
+/* Background photo slot: a real photo file at /marketing/hero-stadium.jpg
+   paints first; the floodlit-night gradient (two beams sweeping in from the
+   top corners, a warm glow grounding the bottom) is a second background-image
+   layer so it shows through automatically whenever the photo layer is absent
+   or still 404ing — CSS simply skips a failed image layer and paints the next
+   one, no JS or :has() feature-detection required. A dark scrim keeps hero
+   text legible over any photo without touching text opacity (axe: WCAG
+   contrast must hold at every frame, not just the no-photo fallback). */
+.mk-hero-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    url("/marketing/hero-stadium.jpg"),
+    radial-gradient(
+      70rem 32rem at 18% -18%,
+      color-mix(in srgb, var(--accent) 24%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      64rem 30rem at 88% -22%,
+      color-mix(in srgb, var(--info-base) 20%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      46rem 24rem at 50% 120%,
+      color-mix(in srgb, var(--accent) 16%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(180deg, var(--surface-sunken) 0%, var(--surface) 100%);
+  background-size: cover, auto, auto, auto, auto;
+  /* Full-bleed cover, weighted so the trophy reads as the focal point. */
+  background-position: 64% center;
+  background-repeat: no-repeat;
+}
+
+/* Desktop: scale the photo up a touch beyond cover so there is horizontal room
+   to pan — that pulls the trophy in from the right edge toward the centre,
+   widening the gap to the corner card. The zoom stays large enough to keep full
+   height coverage down to the 1024px breakpoint. */
+@media (min-width: 1024px) {
+  .mk-hero-photo {
+    /* Cap the photo HEIGHT so the trophy is a fixed, consistent size at every
+       screen width instead of scaling up with the viewport (which pushed the
+       finial into the nav and cropped the plinth on wide monitors). Below
+       ~1440px the image still covers the full width; above it the stadium
+       becomes a centred band and the surrounding dark — where the copy and the
+       card already sit — takes over. The left edge is feathered into that dark
+       so the band never ends on a hard line. */
+    background-size:
+      auto min(53.3vw, 770px),
+      auto,
+      auto,
+      auto,
+      auto;
+    background-position: 42% 34%;
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      #000 13%,
+      #000 87%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(90deg, transparent 0%, #000 13%, #000 87%, transparent 100%);
+  }
+}
+
+/* A dark-light-dark valley across the pane: near-solid at the LEFT so the copy
+   column sits on clean page-dark (never a muddy stretch of dim stands), opening
+   to a clear window over the floodlit glow and the trophy in the middle, then
+   ramping back to near-solid at the RIGHT so the pane dissolves into the page's
+   own dark with no visible edge. A soft vertical wash anchors the top (under the
+   nav) and the bottom boundary without dimming the cup. */
+.mk-hero-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-sunken) 97%, transparent) 0%,
+      color-mix(in srgb, var(--surface-sunken) 93%, transparent) 22%,
+      color-mix(in srgb, var(--surface-sunken) 70%, transparent) 42%,
+      color-mix(in srgb, var(--surface-sunken) 34%, transparent) 58%,
+      color-mix(in srgb, var(--surface-sunken) 12%, transparent) 74%,
+      color-mix(in srgb, var(--surface-sunken) 8%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-sunken) 52%, transparent) 0%,
+      color-mix(in srgb, var(--surface-sunken) 16%, transparent) 22%,
+      color-mix(in srgb, var(--surface-sunken) 8%, transparent) 62%,
+      color-mix(in srgb, var(--surface-sunken) 26%, transparent) 100%
+    );
+}
+
+/* Narrow screens stack the copy over the photo: recentre on the trophy and
+   deepen the scrim to a flat wash so the text keeps contrast everywhere. */
+@media (max-width: 1023px) {
+  .mk-hero-photo {
+    background-position: 68% center;
+  }
+
+  .mk-hero-photo::after {
+    background: color-mix(in srgb, var(--surface-sunken) 66%, transparent);
+  }
+}
+
+.mk-hero > .mk-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Atmosphere (mk-fx) ------------------------------------------------------
+   The cinematic layer the dark bands share: two floodlight beams sweeping very
+   slowly from the top corners, a field of stadium dust drifting upward, and a
+   film-grain wash so no dark surface ever reads as flat pixels. Purely
+   decorative (the div is aria-hidden), all color mixed from tokens, and every
+   movement is transform-only so it composites on the GPU and freezes cleanly
+   under prefers-reduced-motion. */
+
+.mk-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Film grain: an inline feTurbulence tile at whisper opacity. */
+.mk-fx::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+  opacity: 0.07;
+}
+
+.mk-fx-beam {
+  position: absolute;
+  top: -30%;
+  height: 135%;
+  width: clamp(220px, 26vw, 420px);
+  transform-origin: 50% 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 17%, transparent),
+    transparent 72%
+  );
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 32% 68%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 32% 68%, transparent);
+}
+
+.mk-fx-beam--left {
+  left: 4%;
+  transform: rotate(14deg);
+}
+
+.mk-fx-beam--right {
+  right: 4%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--info-base) 15%, transparent),
+    transparent 72%
+  );
+  transform: rotate(-14deg);
+}
+
+/* Stadium dust: a repeating particle tile that climbs by exactly one tile per
+   loop, so the drift is seamless. The element overshoots the section by one
+   tile height; .mk-fx clips the overshoot. */
+.mk-fx-particles {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(100% + 480px);
+  opacity: 0.5;
+  background-repeat: repeat;
+  background-size: 480px 480px;
+  background-image:
+    radial-gradient(
+      circle at 11% 22%,
+      color-mix(in srgb, var(--accent) 60%, transparent) 0 1.5px,
+      transparent 2.5px
+    ),
+    radial-gradient(
+      circle at 34% 74%,
+      color-mix(in srgb, var(--ceremony-gold) 55%, transparent) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 58% 38%,
+      color-mix(in srgb, var(--text-heading) 40%, transparent) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 79% 61%,
+      color-mix(in srgb, var(--accent) 45%, transparent) 0 1.2px,
+      transparent 2.2px
+    ),
+    radial-gradient(
+      circle at 92% 14%,
+      color-mix(in srgb, var(--info-base) 45%, transparent) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 22% 90%,
+      color-mix(in srgb, var(--ceremony-gold) 40%, transparent) 0 1px,
+      transparent 2px
+    );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-fx-beam--left {
+    animation: mk-beam-left 17s ease-in-out infinite alternate;
+  }
+
+  .mk-fx-beam--right {
+    animation: mk-beam-right 21s ease-in-out infinite alternate;
+  }
+
+  .mk-fx-particles {
+    animation: mk-drift-up 36s linear infinite;
+  }
+}
+
+@keyframes mk-beam-left {
+  from {
+    transform: rotate(11deg);
+  }
+
+  to {
+    transform: rotate(17deg);
+  }
+}
+
+@keyframes mk-beam-right {
+  from {
+    transform: rotate(-11deg);
+  }
+
+  to {
+    transform: rotate(-17deg);
+  }
+}
+
+@keyframes mk-drift-up {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, -480px, 0);
+  }
+}
+
+.mk-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mk-hero-badge svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-accent);
+  flex: none;
+}
+
+/* The highlighted word: solid token color (axe: gradient-clipped text can drop
+   below contrast mid-gradient, so the "gradient" lives in the glow and the
+   drawn underline instead — the glyphs themselves never move off a certified
+   pair). The underline draws in after the stagger settles. */
+.mk-hero-highlight {
+  position: relative;
+  color: var(--text-accent);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.mk-hero-highlight::after {
+  content: "";
+  position: absolute;
+  left: 0.02em;
+  right: 0.05em;
+  bottom: -0.08em;
+  height: 0.06em;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--ceremony-gold) 60%, var(--accent))
+  );
+  transform-origin: 0 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-hero-highlight::after {
+    animation: mk-underline var(--duration-slow) var(--ease-out) 0.7s both;
+  }
+}
+
+@keyframes mk-underline {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.mk-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-10), 6vw, var(--space-16));
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .mk-hero-grid {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    /* Kept tight: the photo pane is height-fit, so a shorter hero directly
+       shrinks the trophy and lets the proof-strip band ride up the fold. */
+    min-height: clamp(340px, 22vw, 420px);
+  }
+}
+
+.mk-hero-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-8);
+}
+
+/* Proof strip: one full-width rounded bar under the hero, five tiled capability
+   marks in a single line on desktop (dividers between), wrapping gracefully on
+   narrower screens. Not metrics — restatements of certified capabilities. */
+.mk-proof {
+  list-style: none;
+  margin: clamp(var(--space-6), 4vw, var(--space-10)) 0 0;
+  padding: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  gap: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+}
+
+.mk-proof li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.25;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
+}
+
+/* Each capability mark is touchable: the row lifts, the tile pops and glows —
+   the same micro-language as every card on the page. */
+.mk-proof li:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--surface-raised) 85%, transparent);
+}
+
+.mk-proof li:hover .mk-proof-tile {
+  transform: scale(1.1) rotate(-4deg);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.mk-proof-tile {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--text-accent);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.mk-proof-tile svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Desktop: lock to a flush single row of five with hairline dividers. */
+@media (min-width: 1024px) {
+  .mk-proof {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .mk-proof li + li {
+    border-left: 1px solid var(--border-subtle);
+  }
+}
+
+/* --- The stage visual --------------------------------------------------------
+   A live-auction frame built from product tokens: lot header, player, the
+   bid, the SOLD stamp, purse chips. Decorative (aria-hidden) but truthful —
+   it is the real information hierarchy of the live room. */
+
+.mk-hero-visual {
+  position: relative;
+}
+
+/* Over the stadium photo the card yields the spotlight: the drawn trophy
+   plate is redundant beside the photo's real cup and stays hidden, and on
+   desktop the card docks smaller to the column's top-right so the cup rises
+   to its left and the plinth's gold "DesiAuction" stays visible beneath. */
+.mk-hero-visual .mk-hero-trophy {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .mk-hero-visual {
+    align-self: end;
+    justify-self: end;
+    width: 100%;
+    max-width: 360px;
+    --mk-stage-scale: 0.72;
+    transform: scale(var(--mk-stage-scale));
+    transform-origin: bottom right;
+    /* The full-bleed photo puts the trophy centre-right of the VIEWPORT, so the
+       card is pinned ~28px from the viewport's right edge — not the 1200px
+       container's — or it drifts back over the cup as the screen widens. The
+       container's content-box right sits at (50vw + 580px); shifting to
+       (100vw − 28px) needs margin-right (608px − 50vw), clamped to ≤ 0 so narrow
+       desktops keep the card inside the column. `translate` lifts it a touch
+       (mk-rise-stage owns `transform`). It reads as a live bid beside the cup. */
+    margin-right: min(0px, calc(596px - 50vw));
+    translate: 0 -1.25rem;
+  }
+}
+
+/* Trophy photo slot, sitting behind the stage card. Same photo-then-gradient
+   fallback pattern as .mk-hero-photo: a warm ceremony-gold glow stands in
+   until a real photo lands at /marketing/trophy.png, with a large outlined
+   trophy glyph (the same IconTrophy used in "How it works") as a watermark so
+   the empty slot still reads as intentional, not placeholder. */
+.mk-hero-trophy {
+  position: absolute;
+  /* Deliberately larger than — and risen above — the stage card it sits
+     behind: inset:0 would size this layer to match the card exactly, hiding
+     it completely under the card's own opaque background. Rising it above
+     the card's top edge is what makes the trophy glyph and its glow actually
+     visible, echoing the reference's trophy rising above the card. */
+  left: -8%;
+  right: -8%;
+  top: -46%;
+  bottom: 6%;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background-image:
+    url("/marketing/trophy.png"),
+    radial-gradient(
+      24rem 20rem at 50% 22%,
+      color-mix(in srgb, var(--ceremony-gold) 32%, transparent),
+      transparent 68%
+    ),
+    linear-gradient(165deg, var(--surface-overlay) 0%, var(--surface-sunken) 100%);
+  background-size: cover, auto, auto;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.mk-hero-trophy-icon {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8%;
+  color: color-mix(in srgb, var(--ceremony-gold) 55%, transparent);
+}
+
+.mk-hero-trophy-icon svg {
+  width: 34%;
+  height: auto;
+  aspect-ratio: 1;
+  stroke-width: 1;
+  filter: drop-shadow(0 0 28px color-mix(in srgb, var(--ceremony-gold) 45%, transparent));
+}
+
+.mk-stage {
+  position: relative;
+  z-index: 1;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  /* Frosted glass over the stadium photo: enough translucency that the
+     trophy's gold glow reads through the panel, enough tint (plus the
+     backdrop blur) that the card's text keeps its contrast. */
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--surface-overlay) 82%, transparent) 0%,
+    color-mix(in srgb, var(--surface-raised) 76%, transparent) 45%,
+    color-mix(in srgb, var(--surface) 80%, transparent) 100%
+  );
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow:
+    0 24px 80px color-mix(in srgb, var(--surface-sunken) 55%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-heading) 7%, transparent);
+  padding: var(--space-6);
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* The card's halo: a conic gradient rim, one hairline proud of the border, so
+   the glass panel reads as lit from the stadium around it. The angle is a
+   registered custom property so the light can circle the card at broadcast
+   pace; browsers without @property keep the static rim via the 0deg fallback. */
+@property --mk-ring {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.mk-stage::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: calc(var(--radius-2xl) + 2px);
+  background: conic-gradient(
+    from var(--mk-ring, 0deg),
+    color-mix(in srgb, var(--accent) 60%, transparent),
+    color-mix(in srgb, var(--info-base) 40%, transparent) 28%,
+    color-mix(in srgb, var(--accent) 10%, transparent) 52%,
+    color-mix(in srgb, var(--ceremony-gold) 50%, transparent) 78%,
+    color-mix(in srgb, var(--accent) 60%, transparent)
+  );
+}
+
+/* Screen reflection: a soft glass streak sweeping the panel every few beats.
+   It carries no text and never dips text opacity — it is a pseudo overlay at
+   7% of the heading tone, the token-mixed equivalent of studio glass. */
+.mk-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 42%,
+    color-mix(in srgb, var(--text-heading) 7%, transparent) 50%,
+    transparent 58%
+  );
+  background-size: 260% 100%;
+  background-position: 130% 0;
+}
+
+@media (min-width: 1024px) {
+  .mk-stage {
+    transform: rotate(2.6deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-stage::before {
+    animation: mk-ring-spin 16s linear infinite;
+  }
+
+  .mk-stage::after {
+    animation: mk-sheen 9s var(--ease-out) 1.4s infinite;
+  }
+
+  /* Idle float: the whole panel breathes, keeping its broadcast tilt. */
+  @media (min-width: 1024px) {
+    .mk-stage {
+      animation: mk-stage-float 9s ease-in-out infinite;
+    }
+  }
+}
+
+@keyframes mk-ring-spin {
+  to {
+    --mk-ring: 360deg;
+  }
+}
+
+@keyframes mk-sheen {
+  0% {
+    background-position: 130% 0;
+  }
+
+  24% {
+    background-position: -30% 0;
+  }
+
+  100% {
+    background-position: -30% 0;
+  }
+}
+
+@keyframes mk-stage-float {
+  0%,
+  100% {
+    transform: rotate(2.6deg) translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: rotate(2.8deg) translate3d(0, -7px, 0);
+  }
+}
+
+.mk-stage-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.mk-stage-live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.mk-stage-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--live);
+  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--live) 55%, transparent);
+  animation: mk-pulse 2s var(--ease-out) infinite;
+}
+
+.mk-stage-lot {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mk-stage-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.mk-stage-mark {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--identity-field), var(--identity-field-deep));
+  border: 1px solid var(--identity-line);
+  color: var(--identity-accent);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  letter-spacing: 0.02em;
+}
+
+.mk-stage-name {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  color: var(--text-heading);
+}
+
+.mk-stage-role {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.mk-stage-bid {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface-sunken) 78%, transparent);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-4);
+}
+
+.mk-stage-bid-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.mk-stage-amount {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--display-sm-size);
+  line-height: 1;
+  color: var(--money-value);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.mk-stage-sold {
+  position: relative;
+  flex: none;
+  align-self: center;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  letter-spacing: 0.16em;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  transform: rotate(-6deg);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 45%, transparent);
+  animation: mk-stamp var(--duration-ceremony) var(--ease-out) both;
+}
+
+/* After the stamp lands, a shockwave ring keeps radiating from it — the SOLD
+   moment stays an occasion. Shadow-only, so the lettering never flickers. */
+.mk-stage-sold::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-stage-sold::after {
+    animation: mk-sold-ping 3s var(--ease-out) var(--duration-ceremony) infinite;
+  }
+
+  /* The winning team's swatch pulses like the live dot: the current bidder. */
+  .mk-stage-team-a i {
+    animation: mk-pulse 2.4s var(--ease-out) infinite;
+  }
+}
+
+@keyframes mk-sold-ping {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  45%,
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+
+/* Bid momentum: a tiny broadcast sparkline under the amount — seven bars of a
+   bidding war climbing to the winning gold bar. Bars grow in on load, then the
+   winning bar keeps a heartbeat. Decorative (inside the aria-hidden stage). */
+.mk-stage-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  height: 28px;
+  margin-bottom: var(--space-4);
+  padding: 0 var(--space-1);
+}
+
+.mk-stage-spark i {
+  flex: 1;
+  border-radius: var(--radius-sm) var(--radius-sm) 1px 1px;
+  transform-origin: 50% 100%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 70%, transparent),
+    color-mix(in srgb, var(--accent) 20%, transparent)
+  );
+}
+
+.mk-stage-spark i:nth-child(1) {
+  height: 32%;
+}
+
+.mk-stage-spark i:nth-child(2) {
+  height: 52%;
+}
+
+.mk-stage-spark i:nth-child(3) {
+  height: 40%;
+}
+
+.mk-stage-spark i:nth-child(4) {
+  height: 64%;
+}
+
+.mk-stage-spark i:nth-child(5) {
+  height: 50%;
+}
+
+.mk-stage-spark i:nth-child(6) {
+  height: 78%;
+}
+
+.mk-stage-spark i:nth-child(7) {
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    var(--ceremony-gold),
+    color-mix(in srgb, var(--ceremony-gold) 30%, transparent)
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ceremony-gold) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-stage-spark i {
+    animation: mk-spark-grow var(--duration-slow) var(--ease-out) both;
+  }
+
+  .mk-stage-spark i:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .mk-stage-spark i:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  .mk-stage-spark i:nth-child(4) {
+    animation-delay: 180ms;
+  }
+
+  .mk-stage-spark i:nth-child(5) {
+    animation-delay: 240ms;
+  }
+
+  .mk-stage-spark i:nth-child(6) {
+    animation-delay: 300ms;
+  }
+
+  .mk-stage-spark i:nth-child(7) {
+    animation:
+      mk-spark-grow var(--duration-slow) var(--ease-out) 360ms both,
+      mk-spark-beat 2.2s ease-in-out 1.4s infinite alternate;
+  }
+}
+
+@keyframes mk-spark-grow {
+  from {
+    transform: scaleY(0);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes mk-spark-beat {
+  from {
+    transform: scaleY(1);
+  }
+
+  to {
+    transform: scaleY(1.08);
+  }
+}
+
+.mk-stage-teams {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.mk-stage-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-stage-team i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.mk-stage-team-a i {
+  background: var(--accent);
+}
+
+.mk-stage-team-b i {
+  background: var(--info-base);
+}
+
+.mk-stage-team-c i {
+  background: var(--ceremony-gold);
+}
+
+/* --- Cards ------------------------------------------------------------------ */
+
+.mk-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+/* Four-up inventory (the capabilities band): tighter minimum so four cards
+   share the row on desktop instead of orphaning the last one. */
+.mk-cards--4 {
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+}
+
+/* Five-up inventory (the capabilities band): auto-fit wraps 2–3-up on tablet,
+   then locks to a single flush row of five on desktop — no orphaned fifth card. */
+@media (min-width: 1080px) {
+  .mk-cards--5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Capability cards: icon and title share the top line; body spans beneath. */
+.mk-cards--5 .mk-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-3);
+  row-gap: var(--space-4);
+}
+
+.mk-cards--5 .mk-card h3 {
+  font-size: var(--text-md-size);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mk-cards--5 .mk-card p {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mk-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.mk-card:hover {
+  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+/* --- The premium card finish -------------------------------------------------
+   One physical language for every card on the public surfaces: a gradient
+   hairline along the top edge that brightens and widens on hover (light
+   catching the bevel), and — on capability cards — a soft ceiling spotlight
+   fading in above the icon. Both are pseudo layers with no text, so opacity
+   here is free. */
+
+.mk-card::before,
+.mk-steps li::before,
+.mk-testi::before,
+.mk-tier::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: var(--space-6);
+  right: var(--space-6);
+  height: 1px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    transparent
+  );
+  opacity: 0.45;
+  transition:
+    opacity var(--duration-base) var(--ease-out),
+    left var(--duration-base) var(--ease-out),
+    right var(--duration-base) var(--ease-out);
+}
+
+.mk-card:hover::before,
+.mk-steps li:hover::before,
+.mk-testi:hover::before,
+.mk-tier:hover::before {
+  opacity: 1;
+  left: var(--space-3);
+  right: var(--space-3);
+}
+
+.mk-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    24rem 12rem at 50% -20%,
+    color-mix(in srgb, var(--accent) 9%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.mk-card:hover::after {
+  opacity: 1;
+}
+
+.mk-card h3 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.mk-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.mk-icon-tile {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text-accent);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.mk-icon-tile svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* A small, consistent "pop" on every icon tile whenever its containing card
+   is hovered — the same micro-interaction wherever an mk-icon-tile appears
+   (capability cards, how-it-works steps), so hover feels like one system
+   rather than a one-off. Transform-only, so it's free to run under
+   prefers-reduced-motion too (no opacity/text involved). */
+.mk-card:hover .mk-icon-tile,
+.mk-steps li:hover .mk-icon-tile {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+/* Checklist inside cards and tiers */
+.mk-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mk-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+}
+
+.mk-checklist svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--text-accent);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.mk-checklist li:hover svg {
+  transform: scale(1.2);
+}
+
+/* --- Steps timeline ----------------------------------------------------------- */
+
+.mk-steps {
+  list-style: none;
+  counter-reset: mkstep;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.mk-steps li {
+  position: relative;
+  counter-increment: mkstep;
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.mk-steps li:hover {
+  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+/* Hovering a step makes its number badge pulse once — a tap on the shoulder,
+   not a siren. */
+@media (prefers-reduced-motion: no-preference) {
+  .mk-steps li:hover .mk-step-top::before {
+    animation: mk-num-pulse 0.55s var(--ease-out);
+  }
+}
+
+@keyframes mk-num-pulse {
+  45% {
+    transform: scale(1.14);
+  }
+}
+
+.mk-step-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* The step number sits INSIDE the icon row (.mk-step-top is a flex row), so the
+   "01" badge and the icon tile share one line. */
+.mk-step-top::before {
+  content: "0" counter(mkstep);
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  letter-spacing: 0.08em;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  width: fit-content;
+  padding: var(--space-05) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.mk-steps h3 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm-size);
+  line-height: 1.3;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mk-steps p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.55;
+}
+
+/* Connector: an arrow between cards on wide screens, in the row's own gutter. */
+@media (min-width: 900px) {
+  .mk-steps {
+    position: relative;
+  }
+
+  .mk-steps li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    right: calc(-1 * var(--space-3));
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    border-top: 2px solid var(--border-strong);
+    border-right: 2px solid var(--border-strong);
+    transform: translateY(-50%) rotate(45deg);
+  }
+}
+
+/* --- Stats panel ("One platform. Complete trust.") -------------------------- */
+
+.mk-stats-panel {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  padding: clamp(var(--space-6), 3vw, var(--space-8));
+  background:
+    radial-gradient(
+      40rem 20rem at 85% -25%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--surface-sunken), var(--surface));
+}
+
+/* The panel shares the cards' lit top edge — static here; it is a monument,
+   not a button. */
+.mk-stats-panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: var(--space-8);
+  right: var(--space-8);
+  height: 1px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 45%, transparent),
+    transparent
+  );
+}
+
+.mk-stat:hover .mk-icon-tile {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.mk-stats-head {
+  max-width: 640px;
+  margin: 0 auto clamp(var(--space-6), 4vw, var(--space-10));
+  text-align: center;
+}
+
+.mk-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: var(--space-6);
+}
+
+.mk-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.mk-stat-value {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  color: var(--text-heading);
+}
+
+.mk-stat-label {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+/* --- Contained panels: floating cards on the dark "night" band ------------
+   The top of the home page (How it works as a light panel, One platform as a
+   dark split panel) extends the hero's night into two framed cards, matching
+   the product screenshot. The band carries data-theme="floodlight"; the light
+   panel re-scopes to data-theme="daylight". */
+.mk-panel {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  padding: clamp(var(--space-6), 3.5vw, var(--space-10)) clamp(var(--space-6), 4vw, var(--space-10));
+}
+
+.mk-panel-actions {
+  margin: clamp(var(--space-4), 2vw, var(--space-6)) 0 0;
+}
+
+/* One platform: heading block on the left, the four assurances in a row on the
+   right — each an icon tile beside its stacked value/label. */
+.mk-stats-panel--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-12));
+  align-items: center;
+  text-align: left;
+}
+
+@media (min-width: 900px) {
+  .mk-stats-panel--split {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.8fr);
+  }
+}
+
+.mk-stats-lead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-4);
+  row-gap: var(--space-3);
+}
+
+.mk-stats-lead > div {
+  display: contents;
+}
+
+.mk-stats-lead .mk-icon-tile {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.mk-stats-lead .mk-h2 {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  font-size: clamp(var(--text-2xl-size), 2.6vw, var(--text-3xl-size));
+}
+
+.mk-stats-lead p {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 40ch;
+}
+
+.mk-icon-tile--lg {
+  width: 52px;
+  height: 52px;
+}
+
+.mk-icon-tile--lg svg {
+  width: 26px;
+  height: 26px;
+}
+
+.mk-stats-panel--split .mk-stats-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+}
+
+.mk-stats-panel--split .mk-stat-value {
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  white-space: nowrap;
+}
+
+/* Desktop: the four assurances in a single flush row beside the heading. */
+@media (min-width: 1080px) {
+  .mk-stats-panel--split .mk-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.mk-stats-panel--split .mk-stat {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.mk-stat-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  min-width: 0;
+}
+
+/* Compact the assurance tiles so four fit the row with real breathing room. */
+.mk-stats-panel--split .mk-stat .mk-icon-tile {
+  width: 36px;
+  height: 36px;
+}
+
+.mk-stats-panel--split .mk-stat .mk-icon-tile svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* --- Live experience split (video mock) -------------------------------------- */
+
+.mk-video-mock {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-subtle);
+  aspect-ratio: 4 / 3;
+  box-shadow: var(--shadow-2);
+}
+
+/* The broadcast frame's picture is its own layer so a very slow camera drift
+   (scale + pan, GPU transform only) can play beneath the chrome — the frame
+   never sits perfectly still, like any live feed. The photo-then-gradient
+   fallback stack is unchanged. */
+.mk-video-mock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    url("/marketing/live-video-bg.jpg"),
+    radial-gradient(
+      30rem 24rem at 18% 12%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      28rem 24rem at 88% 90%,
+      color-mix(in srgb, var(--info-base) 18%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(
+      165deg,
+      var(--surface-overlay) 0%,
+      var(--surface-sunken) 55%,
+      var(--surface) 100%
+    );
+  background-size: cover, auto, auto, auto;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-video-mock::before {
+    animation: mk-kenburns 26s ease-in-out infinite alternate;
+  }
+
+  /* The activity toast bobs gently — a notification treading water. */
+  .mk-video-activity {
+    animation: mk-bob 5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes mk-kenburns {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: scale(1.07) translate3d(-1.2%, 1%, 0);
+  }
+}
+
+@keyframes mk-bob {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+.mk-video-mock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-sunken) 25%, transparent) 0%,
+    color-mix(in srgb, var(--surface-sunken) 70%, transparent) 100%
+  );
+}
+
+.mk-video-badge {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-4);
+  left: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--live);
+  color: var(--text-on-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mk-video-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--text-on-accent);
+  animation: mk-pulse 2s var(--ease-out) infinite;
+}
+
+.mk-video-play {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  color: var(--text-heading);
+  box-shadow: var(--shadow-3);
+}
+
+.mk-video-play svg {
+  width: 26px;
+  height: 26px;
+  margin-left: 3px;
+}
+
+.mk-video-caption {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-4);
+  right: var(--space-4);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm-size);
+}
+
+.mk-video-activity {
+  position: absolute;
+  z-index: 1;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+}
+
+.mk-video-activity time {
+  color: var(--text-muted);
+}
+
+.mk-board {
+  position: absolute;
+  z-index: 1;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  box-shadow: var(--shadow-2);
+}
+
+.mk-board-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-size: var(--text-xs-size);
+  color: var(--text-primary);
+}
+
+.mk-board-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mk-board-team i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.mk-board-amount {
+  font-variant-numeric: tabular-nums;
+  color: var(--money-value);
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- Testimonials -------------------------------------------------------------- */
+
+.mk-testi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.mk-testi {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  text-align: left;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.mk-testi:hover {
+  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+.mk-testi-stars {
+  display: flex;
+  gap: 2px;
+  color: var(--ceremony-gold);
+}
+
+.mk-testi-stars svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Hovering a review makes its five stars take a bow, left to right. */
+@media (prefers-reduced-motion: no-preference) {
+  .mk-testi:hover .mk-testi-stars svg {
+    animation: mk-star-pop 0.5s var(--ease-out);
+  }
+
+  .mk-testi:hover .mk-testi-stars svg:nth-child(2) {
+    animation-delay: 45ms;
+  }
+
+  .mk-testi:hover .mk-testi-stars svg:nth-child(3) {
+    animation-delay: 90ms;
+  }
+
+  .mk-testi:hover .mk-testi-stars svg:nth-child(4) {
+    animation-delay: 135ms;
+  }
+
+  .mk-testi:hover .mk-testi-stars svg:nth-child(5) {
+    animation-delay: 180ms;
+  }
+}
+
+@keyframes mk-star-pop {
+  45% {
+    transform: scale(1.28) rotate(-10deg);
+  }
+}
+
+.mk-testi-quote {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.mk-testi-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+}
+
+.mk-testi-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--text-accent);
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-sm-size);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.mk-testi:hover .mk-testi-avatar {
+  transform: scale(1.08);
+}
+
+.mk-testi-name {
+  display: block;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm-size);
+}
+
+.mk-testi-role {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.mk-testi-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.mk-testi-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+}
+
+.mk-testi-dots i:first-child {
+  background: var(--accent);
+}
+
+/* --- CTA band ------------------------------------------------------------------ */
+
+/* Closing CTA: a full-bleed dark band that flows straight into the footer. The
+   player photo bleeds off the SECTION's right edge (masked into the band); a
+   green floodlit glow sits behind it as the token fallback until the real photo
+   lands at /marketing/cta-player.png. */
+.mk-cta-band {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(var(--space-4), 1.8vw, var(--space-6));
+  background:
+    radial-gradient(
+      46rem 30rem at 86% 45%,
+      color-mix(in srgb, var(--accent) 20%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      52rem 28rem at 6% 0%,
+      color-mix(in srgb, var(--info-base) 14%, transparent),
+      transparent 58%
+    ),
+    var(--surface);
+}
+
+.mk-cta-band > .mk-container {
+  position: relative;
+  z-index: 1;
+}
+
+.mk-cta-photo {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 0;
+  width: min(46%, 760px);
+  background-image:
+    url("/marketing/cta-player.png"),
+    radial-gradient(
+      32rem 32rem at 68% 42%,
+      color-mix(in srgb, var(--accent) 32%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      24rem 38rem at 100% 26%,
+      color-mix(in srgb, var(--ceremony-gold) 16%, transparent),
+      transparent 60%
+    );
+  background-size: cover, auto, auto;
+  background-position: center right;
+  background-repeat: no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 52%);
+  mask-image: linear-gradient(90deg, transparent, black 52%);
+}
+
+.mk-cta {
+  display: flex;
+  align-items: center;
+  gap: clamp(var(--space-6), 4vw, var(--space-12));
+  text-align: left;
+}
+
+.mk-cta-copy {
+  flex: 0 1 auto;
+  max-width: 40rem;
+}
+
+/* Tighter eyebrow spacing so the compact band stays low-profile. */
+.mk-cta-copy .mk-kicker {
+  margin-bottom: var(--space-2);
+}
+
+.mk-cta-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-xl-size), 2.2vw, var(--text-2xl-size));
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+
+.mk-cta-note {
+  margin: var(--space-2) 0 0;
+  max-width: 46ch;
+  font-size: clamp(var(--text-sm-size), 1.1vw, var(--text-md-size));
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.mk-cta-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 899px) {
+  .mk-cta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-6);
+    min-height: 0;
+  }
+
+  .mk-cta-photo {
+    width: 72%;
+    opacity: 0.5;
+  }
+}
+
+/* --- Pricing --------------------------------------------------------------------- */
+
+.mk-note {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  max-width: 720px;
+  margin: 0 auto var(--space-10);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+  border-radius: var(--radius-xl);
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  line-height: 1.55;
+  text-align: left;
+}
+
+.mk-note svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--text-accent);
+}
+
+.mk-tiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-5);
+  align-items: stretch;
+  margin-bottom: var(--space-10);
+}
+
+.mk-tier {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-6) var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.mk-tier:hover {
+  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
+  box-shadow: var(--shadow-3);
+}
+
+.mk-tier h2,
+.mk-tier h3 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.mk-tier-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.mk-tier-amount {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-3xl-size), 4vw, var(--display-sm-size));
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--money-value);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-tier-cadence {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.mk-tier-limits {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mk-tier--featured {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle));
+  background:
+    radial-gradient(
+      30rem 16rem at 50% -30%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 4px var(--accent-subtle);
+}
+
+/* The featured plan breathes: its halo swells and settles on a slow tide.
+   Shadow-only — the card's text never changes. */
+@media (prefers-reduced-motion: no-preference) {
+  .mk-tier--featured {
+    animation: mk-tier-glow 4.5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes mk-tier-glow {
+  from {
+    box-shadow:
+      var(--shadow-2),
+      0 0 0 4px var(--accent-subtle);
+  }
+
+  to {
+    box-shadow:
+      var(--shadow-3),
+      0 0 0 5px var(--accent-subtle),
+      0 16px 44px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+
+.mk-tier-flag {
+  position: absolute;
+  top: calc(-1 * var(--space-3));
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.mk-trustline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  max-width: 900px;
+  margin: 0 auto clamp(var(--space-10), 6vw, var(--space-16));
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+@media (min-width: 860px) {
+  .mk-trustline span {
+    white-space: nowrap;
+  }
+}
+
+.mk-trustline svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--text-accent);
+}
+
+/* --- FAQ --------------------------------------------------------------------------- */
+
+.mk-faq {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.mk-faq-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  margin-bottom: var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.mk-faq-item[open] {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+.mk-faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-4) var(--space-5);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-heading);
+  border-radius: var(--radius-lg);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.mk-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.mk-faq-item summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mk-faq-item summary:hover {
+  color: var(--text-accent);
+}
+
+/* True height-animated accordion where the platform can do it (interpolate-size
+   + ::details-content). Elsewhere the accordion opens instantly, exactly as
+   before — the enhancement costs nothing. */
+@supports (interpolate-size: allow-keywords) {
+  .mk-faq {
+    interpolate-size: allow-keywords;
+  }
+
+  .mk-faq-item::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--duration-slow) var(--ease-out),
+      content-visibility var(--duration-slow) allow-discrete;
+  }
+
+  .mk-faq-item[open]::details-content {
+    block-size: auto;
+  }
+}
+
+.mk-faq-item summary::after {
+  content: "+";
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xl-size);
+  line-height: 1;
+  color: var(--text-accent);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.mk-faq-item[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.mk-faq-item p {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-5);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* --- Showcase rows (features page) --------------------------------------------------- */
+
+.mk-show {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-16));
+  align-items: center;
+  padding: clamp(var(--space-10), 6vw, var(--space-16)) 0;
+}
+
+.mk-show + .mk-show {
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (min-width: 960px) {
+  .mk-show {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .mk-show--flip > .mk-show-visual {
+    order: -1;
+  }
+}
+
+.mk-show h2 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-2xl-size), 3vw, var(--text-3xl-size));
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-4);
+}
+
+/* A product vignette frame: window chrome + content built from tokens. */
+.mk-vignette {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+.mk-vignette-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.mk-vignette-bar i {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+}
+
+.mk-vignette-bar span {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.mk-vignette-body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mk-vrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+.mk-vrow strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.mk-vrow .mk-vmeta {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-vpill {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
+  padding: var(--space-05) var(--space-2);
+}
+
+.mk-vpill--ok {
+  color: var(--success-strong);
+  background: var(--success-subtle);
+}
+
+.mk-vpill--wait {
+  color: var(--warning-strong);
+  background: var(--warning-subtle);
+}
+
+.mk-vpill--info {
+  color: var(--info-strong);
+  background: var(--info-subtle);
+}
+
+.mk-vbar {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.mk-vbar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+}
+
+/* --- Honest placeholder (customer stories) -------------------------------------------- */
+
+.mk-placeholder {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-8);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-2xl);
+  text-align: center;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  background: color-mix(in srgb, var(--surface-raised) 60%, transparent);
+}
+
+/* --- Motion ------------------------------------------------------------------------------
+   Load-time hero entrance (short, ease-out, done before anyone reads); scroll
+   reveals are transform-only so contrast never varies mid-scroll. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-hero-copy > * {
+    animation: mk-rise var(--duration-slow) var(--ease-out) both;
+  }
+
+  .mk-hero-copy > *:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .mk-hero-copy > *:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  .mk-hero-copy > *:nth-child(4) {
+    animation-delay: 180ms;
+  }
+
+  .mk-hero-copy > *:nth-child(5) {
+    animation-delay: 240ms;
+  }
+
+  .mk-hero-visual {
+    animation: mk-rise-stage 0.7s var(--ease-out) 160ms both;
+  }
+
+  .mk-proof {
+    animation: mk-rise var(--duration-slow) var(--ease-out) 260ms both;
+  }
+
+  @supports (animation-timeline: view()) {
+    .mk-card,
+    .mk-tier,
+    .mk-steps li,
+    .mk-testi,
+    .mk-stat,
+    .mk-band-head {
+      animation: mk-drift linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+
+    /* Sequential reveal: siblings finish progressively later in the viewport,
+       so a row of cards ripples in left-to-right instead of arriving as one
+       slab. Range offsets, not delays — scroll-driven timelines ignore
+       animation-delay. */
+    .mk-card:nth-child(2),
+    .mk-steps li:nth-child(2),
+    .mk-testi:nth-child(2),
+    .mk-stat:nth-child(2) {
+      animation-range: entry 8% entry 68%;
+    }
+
+    .mk-card:nth-child(3),
+    .mk-steps li:nth-child(3),
+    .mk-testi:nth-child(3),
+    .mk-stat:nth-child(3) {
+      animation-range: entry 16% entry 76%;
+    }
+
+    .mk-card:nth-child(4),
+    .mk-steps li:nth-child(4),
+    .mk-stat:nth-child(4) {
+      animation-range: entry 24% entry 84%;
+    }
+
+    .mk-card:nth-child(5) {
+      animation-range: entry 32% entry 92%;
+    }
+
+    /* The workflow's connecting arrows draw in after their cards land. */
+    @media (min-width: 900px) {
+      .mk-steps li:not(:last-child)::after {
+        animation: mk-arrow-in linear both;
+        animation-timeline: view();
+        animation-range: entry 40% entry 90%;
+      }
+    }
+  }
+}
+
+@keyframes mk-arrow-in {
+  from {
+    transform: translateY(-50%) translateX(-8px) rotate(45deg);
+  }
+
+  to {
+    transform: translateY(-50%) translateX(0) rotate(45deg);
+  }
+}
+
+/* The stage rises with a breath of scale — the one entrance that may, because
+   the card is decorative imagery, not text. */
+/* The entrance lands on --mk-stage-scale (not a hard scale(1)) so the docked
+   desktop size survives the animation's fill-mode: both. */
+@keyframes mk-rise-stage {
+  from {
+    transform: translateY(var(--space-5)) scale(calc(var(--mk-stage-scale, 1) * 0.97));
+  }
+
+  to {
+    transform: translateY(0) scale(var(--mk-stage-scale, 1));
+  }
+}
+
+/* Transform-only: axe scans color-contrast on VISUAL content regardless of
+   aria-hidden, so no keyframe here may ever pass through a low-opacity text
+   state (the /features SOLD stamp taught us this the hard way). */
+@keyframes mk-rise {
+  from {
+    transform: translateY(var(--space-4));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Transform-only: text keeps full contrast at every scroll position. */
+@keyframes mk-drift {
+  from {
+    transform: translateY(var(--space-6));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes mk-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes mk-stamp {
+  0% {
+    transform: rotate(-6deg) scale(1.6);
+  }
+
+  55% {
+    transform: rotate(-6deg) scale(0.94);
+  }
+
+  100% {
+    transform: rotate(-6deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-card,
+  .mk-tier,
+  .mk-steps li,
+  .mk-testi,
+  .mk-icon-tile,
+  .mk-proof li,
+  .mk-proof-tile,
+  .mk-testi-avatar,
+  .mk-checklist svg,
+  .mk-card:hover,
+  .mk-tier:hover,
+  .mk-steps li:hover,
+  .mk-testi:hover,
+  .mk-proof li:hover,
+  .mk-checklist li:hover svg,
+  .mk-testi:hover .mk-testi-avatar,
+  .mk-card:hover .mk-icon-tile,
+  .mk-steps li:hover .mk-icon-tile,
+  .mk-stat:hover .mk-icon-tile,
+  .mk-proof li:hover .mk-proof-tile {
+    transform: none;
+    transition: none;
+  }
+
+  .mk-stage-sold {
+    animation: none;
+  }
+
+  .mk-stage-live i,
+  .mk-video-badge i {
+    animation: none;
+  }
+
+  .mk-card::before,
+  .mk-steps li::before,
+  .mk-testi::before,
+  .mk-tier::before,
+  .mk-card::after,
+  .mk-faq-item summary {
+    transition: none;
+  }
+
+  @supports (interpolate-size: allow-keywords) {
+    .mk-faq-item::details-content {
+      transition: none;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .mk-stage {
+      transform: none;
+    }
+  }
+}
+
+/* --- Parallax hero layers (client: HeroStage) ------------------------------
+   The trophy plate and stage card are lifted into their own layers so a pointer
+   parallax can separate them for depth. JS sets the transform inline; the short
+   ease smooths tracking and lets the pointer-leave reset glide back. The stage
+   card keeps its own CSS tilt because the parallax translate lives on the
+   WRAPPER, not the card. */
+.mk-stage-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+.mk-parallax-layer {
+  transition: transform var(--duration-base) var(--ease-out);
+  will-change: transform;
+}
+
+/* --- Testimonials carousel (client: TestimonialCarousel) -------------------
+   A native scroll-snap scroller: swipeable and complete with JS off, and on
+   desktop the three cards fit with no overflow so it reads as a static 3-up
+   grid. JS adds arrows/dots and auto-advance. Motion is scroll/transform only. */
+.mk-carousel {
+  position: relative;
+}
+
+.mk-carousel-viewport {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.mk-carousel-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.mk-carousel-viewport > .mk-testi {
+  box-sizing: border-box;
+  flex: 0 0 calc((100% - 2 * var(--space-4)) / 3);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 899px) {
+  .mk-carousel-viewport > .mk-testi {
+    flex-basis: calc((100% - var(--space-4)) / 2);
+  }
+}
+
+@media (max-width: 619px) {
+  .mk-carousel-viewport > .mk-testi {
+    flex-basis: 100%;
+  }
+}
+
+/* Desktop: all three reviews visible as a static row — no scroll, no controls
+   (the carousel only engages on narrower screens where they don't all fit). */
+@media (min-width: 900px) {
+  .mk-carousel-viewport {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    scroll-snap-type: none;
+    padding: 0;
+  }
+}
+
+.mk-carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.mk-carousel-arrow {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.mk-carousel-arrow svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mk-carousel-arrow:first-child svg {
+  transform: rotate(180deg);
+}
+
+.mk-carousel-arrow:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-subtle));
+}
+
+.mk-carousel-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mk-carousel-arrow:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mk-carousel-dots {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mk-carousel-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.mk-carousel-dot[data-active="true"] {
+  background: var(--accent);
+  transform: scale(1.3);
+}
+
+.mk-carousel-dot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-parallax-layer {
+    transform: none !important;
+    transition: none;
+  }
+
+  .mk-carousel-arrow,
+  .mk-carousel-dot {
+    transition: none;
+  }
+}
+
+/* --- Page chrome: smooth scroll, reading progress, back-to-top ---------------
+   Marketing pages scroll like film dollies, show how far into the story the
+   reader is (a 2px accent hairline above the header), and offer a way back up
+   once the hero is long gone. The progress bar and the FAB reveal are driven
+   by scroll timelines — no JS, no scroll listeners — and simply don't appear
+   on browsers without animation-timeline support. */
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.mk) {
+    scroll-behavior: smooth;
+  }
+}
+
+.mk-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--ceremony-gold) 55%, var(--accent))
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+@supports (animation-timeline: scroll()) {
+  .mk-progress {
+    animation: mk-progress-grow linear both;
+    animation-timeline: scroll();
+  }
+}
+
+@keyframes mk-progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.mk-top {
+  position: fixed;
+  right: clamp(var(--space-4), 3vw, var(--space-6));
+  bottom: clamp(var(--space-4), 3vw, var(--space-6));
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.mk-top svg {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-90deg);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.mk-top:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+  box-shadow:
+    var(--shadow-3),
+    0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* The icon's x-axis points up once rotated, so this nudges the arrow upward. */
+.mk-top:hover svg {
+  transform: rotate(-90deg) translateX(2px);
+}
+
+/* Keyboard users can reach the FAB at any scroll position; !important is the
+   one lever that outranks the scroll-timeline's animation fill, so focus can
+   never land on an invisible control. */
+.mk-top:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+@supports (animation-timeline: scroll()) {
+  .mk-top {
+    animation: mk-top-reveal linear both;
+    animation-timeline: scroll();
+    animation-range: 480px 800px;
+  }
+}
+
+@keyframes mk-top-reveal {
+  from {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+}
