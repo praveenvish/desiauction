@@ -29,6 +29,9 @@ describe("shellKind", () => {
     expect(shellKind("/competitions/mpl-2026/auction/replay")).toBe("live");
     expect(shellKind("/gallery")).toBe("bare");
     expect(shellKind("/dev/inbox")).toBe("bare");
+    // The OBS overlay and public live board are chrome-free, never Live-framed.
+    expect(shellKind("/competitions/mpl-2026/auction/overlay")).toBe("bare");
+    expect(shellKind("/competitions/mpl-2026/auction/board")).toBe("bare");
   });
 });
 

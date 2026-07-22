@@ -69,6 +69,63 @@
   text-decoration: underline;
 }
 
+/* The public header's primary door: a compact accent button. */
+.shell-header-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background var(--duration-instant) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.shell-header-cta:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: translateY(-1px);
+}
+
+.shell-header-cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* At rest the door glows softly, like it's plugged in. Scoped to :not(:hover)
+   so the hover shadow (a transition) isn't overridden by the animation. */
+@media (prefers-reduced-motion: no-preference) {
+  .shell-header-cta:not(:hover) {
+    animation: shell-cta-glow 3.5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes shell-cta-glow {
+  from {
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+
+  to {
+    box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 36%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-header-cta,
+  .shell-header-cta:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
 .shell-desktop-only {
   display: none;
 }

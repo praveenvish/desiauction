@@ -28,6 +28,13 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { INBOX_SEEN_KEY } from "../../app/inbox/inbox-list";
+import { NewsletterForm } from "../../components/marketing/newsletter-form";
+import {
+  IconCamera,
+  IconGlobe,
+  IconMessageCircle,
+  IconPlay,
+} from "../../components/marketing/icons";
 import { track } from "../../lib/telemetry";
 import {
   ADMIN_TABS,
@@ -409,33 +416,90 @@ export function ProductShell({
           { label: "Features", href: "/features" },
           { label: "Pricing", href: "/pricing" },
           { label: "Competitions", href: "/c" },
-          { label: "Help", href: "/help" },
+          {
+            label: "Resources",
+            href: "/help",
+            children: [
+              { label: "Help center", href: "/help" },
+              { label: "Blog", href: "/blog" },
+              { label: "Case studies", href: "/case-studies" },
+              { label: "API docs", href: "/api-docs" },
+            ],
+          },
+          { label: "About", href: "/about" },
         ]}
         headerAction={
           session !== null ? (
-            <Link className="shell-header-link" href="/home">
+            <Link className="shell-header-cta" href="/home">
               Open console
             </Link>
           ) : (
-            <Link className="shell-header-link" href="/login">
-              Sign in
-            </Link>
+            <>
+              <Link className="shell-header-link" href="/login">
+                Sign in
+              </Link>
+              <Link className="shell-header-cta shell-desktop-only" href="/login">
+                Run your auction
+              </Link>
+            </>
           )
         }
         // PX-10: the complete public footer (PX-1 01 §3) — only routes that
         // exist (the PX-2 no-dead-links ruling), all shipped in this milestone.
-        footerLinks={[
-          { label: "Features", href: "/features" },
-          { label: "Pricing", href: "/pricing" },
-          { label: "Help", href: "/help" },
-          { label: "Support", href: "/support" },
-          { label: "Contact", href: "/contact" },
-          { label: "Terms", href: "/legal/terms" },
-          { label: "Privacy", href: "/legal/privacy" },
-          { label: "Refunds", href: "/legal/refunds" },
-          { label: "Legal", href: "/legal" },
+        footerGroups={[
+          {
+            label: "Product",
+            links: [
+              { label: "Features", href: "/features" },
+              { label: "How it works", href: "/#how" },
+              { label: "Pricing", href: "/pricing" },
+              { label: "Security", href: "/security" },
+            ],
+          },
+          {
+            label: "Tournaments",
+            links: [
+              { label: "All competitions", href: "/c" },
+              { label: "Create tournament", href: "/login" },
+              { label: "Rules & guidelines", href: "/rules-guidelines" },
+              { label: "Schedule demo", href: "/schedule-demo" },
+            ],
+          },
+          {
+            label: "Resources",
+            links: [
+              { label: "Help center", href: "/help" },
+              { label: "Blog", href: "/blog" },
+              { label: "Case studies", href: "/case-studies" },
+              { label: "API docs", href: "/api-docs" },
+            ],
+          },
+          {
+            label: "Company",
+            links: [
+              { label: "About us", href: "/about" },
+              { label: "Careers", href: "/careers" },
+              { label: "Contact us", href: "/contact" },
+              { label: "Legal", href: "/legal" },
+            ],
+          },
         ]}
+        footerTagline="The most trusted platform to run live player auctions for tournaments across India."
+        footerSocial={
+          <>
+            <IconCamera />
+            <IconPlay />
+            <IconMessageCircle />
+            <IconGlobe />
+          </>
+        }
+        footerNewsletter={<NewsletterForm />}
         footerNote="© 2026 DesiAuction — in beta. Tournament auctions, taken seriously."
+        footerBottomLinks={[
+          { label: "Privacy Policy", href: "/legal/privacy" },
+          { label: "Terms of Use", href: "/legal/terms" },
+          { label: "Refund Policy", href: "/legal/refunds" },
+        ]}
         linkComponent={Link}
       >
         {children}

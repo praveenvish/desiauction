@@ -9,6 +9,9 @@ export type ShellKind = "public" | "console" | "live" | "bare";
 
 const LIVE_SEGMENTS = new Set(["live", "cockpit", "spectate", "replay"]);
 
+/** Chrome-free auction surfaces: the OBS overlay and the public live board. */
+const BARE_AUCTION_RE = /^\/competitions\/[^/]+\/auction\/(overlay|board)(\/|$)/;
+
 /** /competitions/{slug}/auction/{live|cockpit|spectate|replay}[/...] */
 export function liveMatch(pathname: string): { slug: string; segment: string } | null {
   const match = /^\/competitions\/([^/]+)\/auction\/([^/]+)/.exec(pathname);
@@ -19,7 +22,13 @@ export function liveMatch(pathname: string): { slug: string; segment: string } |
 }
 
 export function shellKind(pathname: string): ShellKind {
-  if (pathname.startsWith("/gallery") || pathname.startsWith("/dev")) {
+  // The overlay and public board are bare, chrome-free surfaces — checked
+  // before `liveMatch` so the auction segment never frames them in the Live shell.
+  if (
+    pathname.startsWith("/gallery") ||
+    pathname.startsWith("/dev") ||
+    BARE_AUCTION_RE.test(pathname)
+  ) {
     return "bare";
   }
   if (liveMatch(pathname) !== null) {
@@ -41,6 +50,16 @@ export function shellKind(pathname: string): ShellKind {
     pathname.startsWith("/support") ||
     pathname.startsWith("/releases") ||
     pathname.startsWith("/search") ||
+    // Marketing & company surfaces added with the mk- design layer. Without
+    // these a signed-in visitor would see them framed in the console shell.
+    pathname.startsWith("/about") ||
+    pathname.startsWith("/security") ||
+    pathname.startsWith("/rules-guidelines") ||
+    pathname.startsWith("/schedule-demo") ||
+    pathname.startsWith("/blog") ||
+    pathname.startsWith("/careers") ||
+    pathname.startsWith("/case-studies") ||
+    pathname.startsWith("/api-docs") ||
     /^\/competitions\/[^/]+\/register/.test(pathname)
   ) {
     return "public";
