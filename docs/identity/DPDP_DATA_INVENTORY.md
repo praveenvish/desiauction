@@ -9,6 +9,12 @@
 > exists yet — IP-0 founder tail). Production target: **Neon, Mumbai region** (C-24);
 > photos (IP-3+): S3/MinIO `ap-south-1`.
 
+> **Amendment · 2026-07-22 · parity programme (`feat/parity-superiority`, R1).**
+> Migrations `0017_media` / `0018_player_profile` add player/team media and
+> player-profile personal data. Columns are landed; **capture UX ships with the
+> parity registration work** (same "column exists, capture pending" convention as
+> `people.name`). Rows added to §1; the photo-render consent gate is reaffirmed in §5.
+
 ## 1 · Data map (implemented tables, personal-data columns)
 
 | Table · column                                   | Personal data                       | Purpose                                                        | Collected via                                | Retention (implemented)                                     |
@@ -16,6 +22,9 @@
 | `people.phone`                                    | Mobile number (identity anchor)     | Authentication, account identity (C-24)                         | Login form, first successful OTP verify       | Life of account — **no deletion path implemented** (§4)      |
 | `people.name`                                     | Display name                        | Display to fellow org members                                   | **No capture UI exists yet** — column is null in practice (IP-3) | as above                                    |
 | `people.photo_consent_at` / `photo_consent_via`   | Consent fact (photo)                | DPDP consent evidence for player photos (C-25 × R-9)            | **Designed, not captured** — capture UX ships with IP-3 registration (§5) | as above                       |
+| `people.photo_url` / `photo_uploaded_at`          | Player photograph (storage key)     | Player card, showcase, Stage/Overlay display                    | **Column landed (0017); capture UX pending** — renders only when `photo_consent_at` set (§5) | Life of account; withdrawal = key deleted + consent nulled |
+| `registrations.date_of_birth` / `father_name`     | Date of birth, parent name          | Age display, player identification on the card (parity)         | **Column landed (0018); capture UX pending** — registration form         | Life of the registration; anonymize with `people` erasure (§4) |
+| `registrations.jersey_name/_number`, `tshirt_size`, `trouser_size` | Kit sizing + name on shirt | Optional kit/merchandise fulfilment for the competition          | **Column landed (0018); capture UX pending** — registration form         | Life of the registration                                     |
 | `otp_codes.phone` + `code_hash` + `request_ip`    | Phone, hashed code, requester IP    | Login codes; rate limiting (phone 5/h, IP 20/h)                 | OTP request                                   | Codes dead ≤ 5 min; **rows retained, no purge job** (R-6 manual SQL) |
 | `otp_inbox.phone` + `code` (plaintext)            | Phone, live code                    | **Development-only** delivery (`/dev/inbox`; 404 in production — proven) | Dev OTP request                     | Dev DB only; R-1 grants production roles nothing on it       |
 | `sessions.user_agent` (+ `token_hash`)            | Device description                  | Account-security device list; session continuity                | Login                                         | Revoked/expired rows retained (audit); no purge job          |
@@ -61,6 +70,9 @@ public (C-23: contact details of people are never public).
 
 Schema fields exist and are null until capture: `photo_consent_at` (when) and
 `photo_consent_via` (how — e.g. `registration_form`, `organizer_upload_attestation`).
+The storage-key column `people.photo_url` now also exists (migration `0017`,
+parity programme) but stays null until the capture UX lands; the render gate below
+is unchanged and enforced at every display surface.
 Consent points defined for IP-3 registration: the player (or the organizer attesting
 on their behalf — the `via` value records which) consents at photo upload, **before**
 any rendering on Stage/Owner Room/Overlay surfaces. No photo may render without a

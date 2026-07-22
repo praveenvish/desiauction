@@ -26,6 +26,10 @@ export const people = pgTable("people", {
   // C-25 × DPDP (R-9): consent designed now, captured at IP-3 registration.
   photoConsentAt: ts("photo_consent_at"),
   photoConsentVia: text("photo_consent_via"),
+  // Storage KEY (not a signed URL) for the person's photo; signed at read time
+  // by the media storage port. Only meaningful once photoConsentAt is set.
+  photoUrl: text("photo_url"),
+  photoUploadedAt: ts("photo_uploaded_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
@@ -190,6 +194,8 @@ export const competitions = pgTable(
     visibility: text("visibility", { enum: ["private", "public"] })
       .notNull()
       .default("private"),
+    // Storage KEY for the auction crest; signed at read time by the media port.
+    logoUrl: text("logo_url"),
     location: text("location"),
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),
@@ -208,6 +214,9 @@ export const teams = pgTable(
     name: text("name").notNull(),
     shortName: text("short_name"),
     primaryColor: text("primary_color"),
+    // Storage KEY for the team crest; signed at read time by the media port.
+    // Falls back to the monogram + primaryColor swatch when absent.
+    logoUrl: text("logo_url"),
     // Non-bidding team staff (organizer metadata; not an authenticated role).
     coachName: text("coach_name"),
     createdBy: char("created_by", { length: 26 }).notNull(),
@@ -246,6 +255,23 @@ export const registrations = pgTable(
     isIcon: boolean("is_icon").notNull().default(false),
     // Team captain marker (display + team-sheet ordering; not a system role).
     isCaptain: boolean("is_captain").notNull().default(false),
+    // Retained player: kept from a prior season, excluded from the pool like an
+    // icon. Vice-captain is a display marker only (not a system role).
+    isRetained: boolean("is_retained").notNull().default(false),
+    isViceCaptain: boolean("is_vice_captain").notNull().default(false),
+    // --- Player profile (M-parity: matches the incumbent's player card) ---
+    // ISO yyyy-mm-dd; age is DERIVED at read time, never stored (it rots).
+    dateOfBirth: text("date_of_birth"),
+    // Structured playing style (display + set filtering). Freeform-tolerant text
+    // validated against enums in packages/core/src/player-profile.ts.
+    battingStyle: text("batting_style"),
+    bowlingStyle: text("bowling_style"),
+    fatherName: text("father_name"),
+    // Kit block — optional; only organizers who order jerseys populate it.
+    jerseyName: text("jersey_name"),
+    jerseyNumber: text("jersey_number"),
+    tshirtSize: text("tshirt_size"),
+    trouserSize: text("trouser_size"),
     basePriceBand: text("base_price_band"),
     rejectionReason: text("rejection_reason"),
     rejectionNote: text("rejection_note"),
