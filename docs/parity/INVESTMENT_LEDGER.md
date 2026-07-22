@@ -29,12 +29,12 @@ clone-share, repeat orgs + rate, registrations, players placed.
 | **Problem** | Every shared `/c/[slug]` link previewed blank — the WhatsApp loop was invisible. |
 | **Hypothesis** | If shared competition links render a rich card, click-through → competition-view rises. |
 | **Implementation** | `buildCompetitionShareCard` + `next/og` routes (`c03e088`). |
-| **Metric / Method** | Referral-sourced competition views / (needs UTM or referrer capture — not yet wired). |
-| **Success threshold** | ≥ 10% of new competition views from shared links. |
+| **Metric / Method** | `registrationsBySource` (`?ref` → audit → projection, **live** as of INV-5). View-level attribution still needs referrer capture. |
+| **Success threshold** | ≥ 10% of registrations attributed to a shared link. |
 | **Review window** | 30 days post-launch. |
 | **Output** | ✅ Shipped, RUNTIME-verified raster. |
-| **Outcome / Impact** | — |
-| **Status** | **Hypothesis** (measurement needs referrer capture — see Future). |
+| **Outcome / Impact** | Registration attribution wired (INV-5); baseline 0 pre-launch. |
+| **Status** | **Measuring** (conversion attribution live; view attribution pending). |
 
 ## INV-2 · Player profile + share card
 
@@ -44,12 +44,12 @@ clone-share, repeat orgs + rate, registrations, players placed.
 | **Problem** | Players had no shareable identity; the biggest viral unit was unaddressable. |
 | **Hypothesis** | If a player can share their own card, registrations from player referrals rise. |
 | **Implementation** | `/c/[slug]/p/[number]` page + player OG card (`cf44c57`). |
-| **Metric / Method** | `showcase.player_profile_opened` telemetry + registrations referred from `/p/`. |
-| **Success threshold** | ≥ 15% of registrations touch a player profile first. |
+| **Metric / Method** | `registrationsBySource["player"]` — registrations from a `?ref=player` link (live as of INV-5; the player-page share affordance is the remaining wiring). |
+| **Success threshold** | ≥ 15% of registrations attributed to `player`. |
 | **Review window** | 30 days post-launch. |
 | **Output** | ✅ Shipped, RUNTIME-verified raster; page noindex. |
-| **Outcome / Impact** | — |
-| **Status** | **Hypothesis**. |
+| **Outcome / Impact** | Attribution channel live; needs a `?ref=player` share affordance on `/p/`. |
+| **Status** | **Measuring** (channel ready; share affordance pending — see Future). |
 
 ## INV-3 · "Run it again" (clone competition)
 
@@ -78,6 +78,19 @@ clone-share, repeat orgs + rate, registrations, players placed.
 | **Output** | ✅ Shipped; core 6 tests + RUNTIME projection on PG17. |
 | **Status** | **Validated (output)** — INV-3 advanced to `Measuring` because of it. |
 
+## INV-5 · Share attribution (`?ref` → registrationsBySource)
+
+| | |
+|---|---|
+| **Capability** | Acquire Players / Referral — measurement |
+| **Problem** | INV-1/INV-2 shipped but couldn't tell whether a share drove a registration. |
+| **Hypothesis** | If registrations are attributed to their share source, we can prove (and tune) the acquisition loop. |
+| **Implementation** | `normalizeShareSource` (core, bounded allowlist) → captured in the `registration.submitted` audit meta → `registrationsBySource` projection + `/admin` breakdown. `?ref` threaded `/c/[slug]` → register. |
+| **Metric / Method** | `registrationsBySource` on `/admin` (audit-backed). |
+| **Security** | `?ref` is attacker-controlled → bounded to an allowlist before it touches the jsonb audit meta (cardinality + injection). |
+| **Output** | ✅ Shipped; core 13 tests + RUNTIME attribution proof on PG17 (submit→audit meta→projection). |
+| **Status** | **Validated (output)** — advanced INV-1 + INV-2 to `Measuring`. |
+
 ---
 
 ## Lessons learned
@@ -90,10 +103,12 @@ clone-share, repeat orgs + rate, registrations, players placed.
   get the metric for free.
 
 ## Future opportunities (ranked by the ledger)
-1. **Referrer / UTM capture** on `/c/[slug]` and `/p/` → unblocks INV-1/INV-2
-   Outcome measurement (currently their only gap).
-2. **Post-auction organizer hub** — results + share + "Run it again" in one moment;
+1. **`?ref=player` share affordance on `/p/`** + `?ref` on the recruit link → the
+   remaining wiring for INV-2's `player` channel and organizer recruit attribution.
+2. **View-level attribution** (referrer/UTM on `/c/[slug]` page views) → the last gap
+   for INV-1 (conversion is now attributed; top-of-funnel views are not).
+3. **Post-auction organizer hub** — results + share + "Run it again" in one moment;
    compounds INV-2 (share) and INV-3 (retention).
-3. **Trend, not snapshot** — persist daily outcome rollups so `repeatOrgRate` can be
+4. **Trend, not snapshot** — persist daily outcome rollups so `repeatOrgRate` can be
    compared *before/after* a feature (the experiment loop needs a baseline series).
-4. **Monetize** — still Tier C (commercial decision); revisit once retention shows signal.
+5. **Monetize** — still Tier C (commercial decision); revisit once retention shows signal.

@@ -50,8 +50,19 @@ const STATUS_COPY: Record<
 // truth (name → people.name, submission → registrations row); the only client
 // draft is the pre-submit role choice, kept device-local so refresh and
 // browser restarts resume mid-flow. Status view = the same page, post-submit.
-export default async function RegisterPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function RegisterPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ ref?: string | string[] }>;
+}) {
   const { slug } = await params;
+  const { ref } = await searchParams;
+  // Share attribution: the `?ref` carried from a shared link (bounded server-side
+  // at submit). Attribution is lost across the login hop for signed-out users —
+  // acceptable; we don't touch the open-redirect-sensitive `next` path for it.
+  const source = typeof ref === "string" ? ref : "";
   const session = await currentSession();
   if (session === null) {
     redirect(`/login?next=/competitions/${slug}/register`);
@@ -102,6 +113,7 @@ export default async function RegisterPage({ params }: { params: Promise<{ slug:
             competitionName={landing.competitionName}
             phone={session.phone}
             initialName={session.name ?? ""}
+            source={source}
           />
         )}
       </div>

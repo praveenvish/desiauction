@@ -211,6 +211,13 @@ export type { AllowedImageType, MediaSubject, MediaUpload, MediaValidation } fro
 export { csvCell, toCsv } from "./csv";
 export { OUTCOME_ACTIONS, summarizeOutcomes } from "./outcomes";
 export type { OutcomeMetrics } from "./outcomes";
+export {
+  SHARE_SOURCES,
+  ATTRIBUTION_DIRECT,
+  ATTRIBUTION_OTHER,
+  normalizeShareSource,
+} from "./attribution";
+export type { ShareSource } from "./attribution";
 export { buildCompetitionShareCard, buildPlayerShareCard } from "./share-card";
 export type {
   CompetitionShareCard,

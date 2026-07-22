@@ -43,10 +43,15 @@ export async function generateMetadata({
 
 export default async function PublicCompetitionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ ref?: string | string[] }>;
 }) {
   const { slug } = await params;
+  const { ref } = await searchParams;
+  // Carry a shared link's `?ref` through to registration for attribution.
+  const refSuffix = typeof ref === "string" && ref !== "" ? `?ref=${encodeURIComponent(ref)}` : "";
   const [view, players] = await Promise.all([publicCompetitionView(slug), publicShowcase(slug)]);
   if (view === null) {
     notFound();
@@ -105,7 +110,7 @@ export default async function PublicCompetitionPage({
             ) : null}
             {view.open ? (
               <ButtonLink
-                href={`/competitions/${view.slug}/register`}
+                href={`/competitions/${view.slug}/register${refSuffix}`}
                 size="lg"
                 data-testid="public-register-cta"
               >

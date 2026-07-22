@@ -463,6 +463,7 @@ export async function submitRegistrationAction(
     battingStyle: formString(formData, "battingStyle"),
     bowlingStyle: formString(formData, "bowlingStyle"),
   };
+  const source = formString(formData, "source");
   const result = await withTenantDb(
     dbHandle,
     { personId: session.personId, orgId: competition.orgId },
@@ -475,6 +476,7 @@ export async function submitRegistrationAction(
         role,
         undefined,
         profile,
+        source,
       ),
   );
   if (!result.ok) {

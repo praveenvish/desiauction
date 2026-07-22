@@ -77,10 +77,21 @@ export async function outcomesProjection(db: Db, windowDays: number): Promise<Ou
     .from(auditLog)
     .where(and(eq(auditLog.action, "competition.created"), gte(auditLog.at, since)))
     .groupBy(auditLog.scopeId);
+  // Registrations by share source (the `?ref` recorded in the audit meta). Single
+  // table, so the unqualified `"meta"` binds correctly (see the subquery caveat).
+  const sourceRows = await db
+    .select({
+      source: sql<string | null>`${auditLog.meta} ->> 'source'`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(auditLog)
+    .where(and(eq(auditLog.action, "registration.submitted"), gte(auditLog.at, since)))
+    .groupBy(sql`${auditLog.meta} ->> 'source'`);
   return summarizeOutcomes({
     windowDays,
     actionCounts,
     orgCompetitionCounts: orgRows.map((row) => row.count),
+    registrationSources: sourceRows,
   });
 }
 

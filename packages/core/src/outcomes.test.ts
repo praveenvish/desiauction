@@ -75,4 +75,30 @@ describe("summarizeOutcomes", () => {
     expect(OUTCOME_ACTIONS).toContain("competition.cloned");
     expect(OUTCOME_ACTIONS).toHaveLength(5);
   });
+
+  it("folds registration sources into a bounded breakdown", () => {
+    const m = summarizeOutcomes({
+      windowDays: 30,
+      actionCounts: [],
+      orgCompetitionCounts: [],
+      registrationSources: [
+        { source: "whatsapp", count: 12 },
+        { source: "twitter", count: 3 }, // alias → x
+        { source: null, count: 5 }, // → direct
+        { source: "myspace", count: 2 }, // unknown → other
+        { source: "x", count: 4 }, // merges with the twitter alias
+      ],
+    });
+    expect(m.registrationsBySource).toEqual({
+      whatsapp: 12,
+      x: 7,
+      direct: 5,
+      other: 2,
+    });
+  });
+
+  it("defaults registrationsBySource to an empty object", () => {
+    const m = summarizeOutcomes({ windowDays: 7, actionCounts: [], orgCompetitionCounts: [] });
+    expect(m.registrationsBySource).toEqual({});
+  });
 });

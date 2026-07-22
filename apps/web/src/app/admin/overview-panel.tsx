@@ -56,6 +56,18 @@ export function OverviewPanel({
           <Tile label="Registrations" value={outcomes.registrationsSubmitted} />
           <Tile label="Players placed" value={outcomes.playersAssigned} />
         </div>
+        {Object.keys(outcomes.registrationsBySource).length > 0 ? (
+          <div className="admin-chips" data-testid="admin-outcomes-sources">
+            <span className="admin-meta">Registrations by share source:</span>
+            {Object.entries(outcomes.registrationsBySource)
+              .sort((a, b) => b[1] - a[1])
+              .map(([src, n]) => (
+                <Badge key={src} tone="neutral">
+                  {src} {n}
+                </Badge>
+              ))}
+          </div>
+        ) : null}
       </section>
 
       <div className="admin-grid">

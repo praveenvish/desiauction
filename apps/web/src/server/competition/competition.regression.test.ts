@@ -232,6 +232,41 @@ describe("COMPETITION REGRESSION — domain contract", () => {
     expect(outcomes.cloneAdoptionRate).toBeGreaterThan(0);
   });
 
+  it("attributes a registration to its share source — audit meta + projection (Outcome Governance)", async () => {
+    const c = await createCompetition(db, orgX.id, owner, {
+      name: `Attrib ${RUN}`,
+      location: "Malad",
+      startsOn: "2026-08-01",
+      endsOn: "2026-08-15",
+    });
+    let comp = must(await resolveCompetition(db, owner, c.slug), "attrib comp");
+    expect((await advanceCompetition(db, comp, owner, "setup")).ok).toBe(true);
+    comp = must(await resolveCompetition(db, owner, c.slug), "attrib comp");
+    expect((await advanceCompetition(db, comp, owner, "registration_open")).ok).toBe(true);
+    comp = must(await resolveCompetition(db, owner, c.slug), "attrib comp");
+
+    const res = await submitRegistration(
+      db,
+      comp.id,
+      orgX.id,
+      player,
+      "batter",
+      undefined,
+      undefined,
+      "whatsapp",
+    );
+    expect(res.ok).toBe(true);
+    const registrationId = res.ok ? res.registrationId : "";
+
+    // The write bounds + records the source in the audit meta.
+    const [auditRow] = await db.select().from(auditLog).where(eq(auditLog.subject, registrationId));
+    expect((auditRow?.meta as { source?: string } | null)?.source).toBe("whatsapp");
+
+    // The projection reads it back, grouped by source (SQL meta->>'source' → core fold).
+    const outcomes = await outcomesProjection(db, 3650);
+    expect(outcomes.registrationsBySource.whatsapp ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
   it("team names are unique within a competition", async () => {
     const first = await createTeam(db, orgX.id, compId, owner, "Malad Mavericks");
     expect(first.ok).toBe(true);

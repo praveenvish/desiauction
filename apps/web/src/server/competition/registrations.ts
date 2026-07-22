@@ -4,6 +4,7 @@ import {
   isBowlingStyle,
   isRegistrationRole,
   nameKey,
+  normalizeShareSource,
   registrationNumber,
   toCsv,
   type RegistrationStatus,
@@ -72,6 +73,8 @@ export async function submitRegistration(
   role: string,
   basePriceBand?: string,
   profile?: PlayerProfileInput,
+  /** Raw `?ref` share source (bounded to an allowlist before it is persisted). */
+  source?: string,
 ): Promise<SubmitResult> {
   if (!isRegistrationRole(role)) {
     return { ok: false, reason: "invalid_role" };
@@ -107,7 +110,7 @@ export async function submitRegistration(
     scopeType: "org",
     scopeId: orgId,
     subject: id,
-    meta: { competitionId, role },
+    meta: { competitionId, role, source: normalizeShareSource(source) },
   });
   return { ok: true, registrationId: id };
 }
@@ -302,15 +305,13 @@ export async function queryRegistrations(
 
   const dupKeys = await duplicateNameKeys(db, competitionId);
   const now = new Date();
-  const rows: RegistrationRow[] = raw.map(
-    ({ photoKey, photoConsentAt, dateOfBirth, ...r }) => ({
-      ...r,
-      duplicateName: dupKeys.has(nameKey(r.name)),
-      // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
-      photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
-      age: deriveAge(dateOfBirth, now),
-    }),
-  );
+  const rows: RegistrationRow[] = raw.map(({ photoKey, photoConsentAt, dateOfBirth, ...r }) => ({
+    ...r,
+    duplicateName: dupKeys.has(nameKey(r.name)),
+    // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
+    photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
+    age: deriveAge(dateOfBirth, now),
+  }));
   return { rows, total, page, pageSize };
 }
 

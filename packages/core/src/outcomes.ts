@@ -11,6 +11,8 @@
  * `repeatOrgRate` and `cloneAdoptionRate` ("share of creations that were clones").
  */
 
+import { normalizeShareSource } from "./attribution";
+
 export const OUTCOME_ACTIONS = [
   "competition.created",
   "competition.cloned",
@@ -35,7 +37,16 @@ export interface OutcomeMetrics {
   repeatOrgRate: number;
   /** competitionsCloned / competitionsCreated, 0..1. */
   cloneAdoptionRate: number;
+  /** Registrations broken down by (bounded) share source — the acquisition loop. */
+  registrationsBySource: Record<string, number>;
 }
+
+type CountField =
+  | "competitionsCreated"
+  | "competitionsCloned"
+  | "teamsCreated"
+  | "registrationsSubmitted"
+  | "playersAssigned";
 
 const ACTION_FIELD = {
   "competition.created": "competitionsCreated",
@@ -43,7 +54,7 @@ const ACTION_FIELD = {
   "team.created": "teamsCreated",
   "registration.submitted": "registrationsSubmitted",
   "registration.team_assigned": "playersAssigned",
-} as const satisfies Record<(typeof OUTCOME_ACTIONS)[number], keyof OutcomeMetrics>;
+} as const satisfies Record<(typeof OUTCOME_ACTIONS)[number], CountField>;
 
 function rate(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
@@ -58,6 +69,8 @@ export function summarizeOutcomes(input: {
   windowDays: number;
   actionCounts: readonly { action: string; count: number }[];
   orgCompetitionCounts: readonly number[];
+  /** Grouped `registration.submitted` counts keyed by raw (untrusted) source. */
+  registrationSources?: readonly { source: string | null; count: number }[];
 }): OutcomeMetrics {
   const metrics: OutcomeMetrics = {
     windowDays: input.windowDays,
@@ -70,8 +83,9 @@ export function summarizeOutcomes(input: {
     orgsRepeating: 0,
     repeatOrgRate: 0,
     cloneAdoptionRate: 0,
+    registrationsBySource: {},
   };
-  const fieldFor = ACTION_FIELD as Record<string, keyof OutcomeMetrics>;
+  const fieldFor = ACTION_FIELD as Record<string, CountField | undefined>;
   for (const row of input.actionCounts) {
     const field = fieldFor[row.action];
     if (field !== undefined) {
@@ -82,5 +96,12 @@ export function summarizeOutcomes(input: {
   metrics.orgsRepeating = input.orgCompetitionCounts.filter((count) => count >= 2).length;
   metrics.repeatOrgRate = rate(metrics.orgsRepeating, metrics.orgsCreating);
   metrics.cloneAdoptionRate = rate(metrics.competitionsCloned, metrics.competitionsCreated);
+  // Re-normalize the source at read time too: an old audit row may predate the
+  // write-time allowlist, and cardinality must stay bounded regardless.
+  for (const row of input.registrationSources ?? []) {
+    const key = normalizeShareSource(row.source);
+    metrics.registrationsBySource[key] =
+      (metrics.registrationsBySource[key] ?? 0) + Math.max(0, Math.trunc(row.count));
+  }
   return metrics;
 }

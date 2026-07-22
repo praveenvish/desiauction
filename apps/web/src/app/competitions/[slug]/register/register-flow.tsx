@@ -37,11 +37,14 @@ export function RegisterFlow({
   competitionName,
   phone,
   initialName,
+  source,
 }: {
   slug: string;
   competitionName: string;
   phone: string;
   initialName: string;
+  /** Share-attribution `?ref` from the landing URL; "" when direct. */
+  source: string;
 }) {
   const [name, setName] = useState(initialName);
   const [nameDone, setNameDone] = useState(initialName.trim() !== "");
@@ -102,6 +105,9 @@ export function RegisterFlow({
       }
       if (bowling !== "") {
         formData.set("bowlingStyle", bowling);
+      }
+      if (source !== "") {
+        formData.set("source", source);
       }
       const result = await submitRegistrationAction(slug, {}, formData);
       if (result.done === true) {

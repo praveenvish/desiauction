@@ -26,7 +26,8 @@ app-layer"); production flips to `desiauction_app` (NOBYPASSRLS).
 
 | Subsystem | Level | Evidence |
 |---|---|---|
-| core: media validators / key bind (S1/S2) · player-profile (+`roleLabel`/`styleLabel`) · CSV · **share-card model** · `nextSeasonName` · **`summarizeOutcomes`** | **EXECUTION** | core suite **194** |
+| core: media/profile/CSV · share-card · `nextSeasonName` · `summarizeOutcomes` · **`normalizeShareSource` (bounded attribution)** | **EXECUTION** | core suite **201** |
+| **share attribution — `?ref`→bounded audit meta→`registrationsBySource`** | **RUNTIME** ✅ | `competition.regression.test.ts` 13/13 on PG17: submit(source=whatsapp)→audit meta→projection breakdown |
 | **retention: clone competition ("run it again") — draft, season-year bump, team shells+coach, NO pool copy, audit** | **RUNTIME** ✅ | `competition.regression.test.ts` 12/12 on PG17; asserts fresh draft, carried teams, empty clone pool, `competition.cloned` audit |
 | **outcomes projection (Outcome Governance) — audit-log North-Star metrics for `/admin`** | **RUNTIME** ✅ | `outcomesProjection` reads live audit events on PG17 (same suite); read-only (depcruise `admin-is-read-only` holds) |
 | **share images: competition + player OG/Twitter card raster** | **RUNTIME** ✅ | `next/og` rasterized 1200×630 PNGs (competition live-status + non-public fallback; player sold + available) from the card models; visually verified on-brand |
@@ -44,7 +45,7 @@ app-layer"); production flips to `desiauction_app` (NOBYPASSRLS).
 ## Release Confidence Index (summary)
 
 - **Static** (typecheck 11/11 · lint · no schema drift): ✅
-- **Unit/EXECUTION** (pure cores): ✅ core 194 · ui 67 · web unit 15
+- **Unit/EXECUTION** (pure cores): ✅ core 201 · ui 67 · web unit 15
 - **Integration/RUNTIME**: ✅ **453/453** web tests on real Postgres 17
 - **Migration apply**: ✅ RUNTIME (all 19 migrations)
 - **Build**: ✅ RUNTIME (`next build` clean)
