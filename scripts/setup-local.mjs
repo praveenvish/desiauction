@@ -63,7 +63,23 @@ ENGINE_SECRET=dev-engine-secret
 
 // 3 · Infrastructure ----------------------------------------------------------
 step("3/7 infrastructure (docker compose)");
-run("docker compose up -d");
+const compose = capture("docker compose up -d");
+if (compose.code !== 0) {
+  // The most common non-obvious failure is a corrupted Docker Desktop VM store
+  // (read-only overlayfs / containerd I/O error) — no CLI command heals it.
+  const corruptStore = /read-only file system|input\/output error|meta\.db|failed to mount/i.test(
+    compose.out,
+  );
+  fail(
+    "docker compose up failed",
+    corruptStore
+      ? "Docker Desktop's VM storage is corrupted (read-only FS / I/O error). " +
+          "Restart Docker Desktop — or Docker Desktop → Troubleshoot → Clean / Purge data " +
+          "(or reboot) — then re-run `pnpm setup:local`. See docs/operations/LOCAL_SETUP.md.\n  " +
+          compose.out.trim().split("\n").slice(-2).join("\n  ")
+      : compose.out.trim().slice(-500),
+  );
+}
 process.stdout.write("waiting for postgres ");
 let dbUp = false;
 for (let i = 0; i < 60; i++) {

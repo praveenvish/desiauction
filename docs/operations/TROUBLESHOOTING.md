@@ -18,6 +18,7 @@ docker compose ps  # infra containers
 | `web refused to start — invalid environment` | Missing/typo'd var in `.env.local` | The message names the exact variable; compare with the template in `scripts/setup-local.mjs` |
 | Ports 3000/4000 already in use | Stale dev processes | `lsof -tnP -iTCP:3000 -iTCP:4000 -sTCP:LISTEN \| xargs kill`, then `pnpm dev` |
 | `pg_isready` FAIL / port 5433 refused | Docker not running or container stopped | `docker compose up -d`; if it loops, `docker compose logs db` |
+| `docker compose up` fails with **`read-only file system`** / **`input/output error`** / `meta.db` (often after sleep) | Docker Desktop's VM storage is corrupted — no CLI command heals it (`docker pull`, `docker start`, `rm image` all fail) | **Restart Docker Desktop** (menu-bar whale → Restart), or Docker Desktop → **Troubleshoot → Clean / Purge data**, or reboot; then `pnpm setup:local`. `setup:local` now detects this and prints the same guidance. |
 | Login code never appears in `/dev/inbox` | Per-phone OTP cap (5/hour) or resend cooldown | Wait, or use another demo phone; the cap is a real production guard, not a bug |
 | `new row violates row-level security` | Running production-posture mode and hitting an unwired path | Expected fail-closed behavior; check which action it was and compare with the wiring pattern in `apps/web/src/server/orgs/actions.ts` |
 | Integration test fails on `people_phone_unique` | Residue collision with time-derived seed phones | Rerun once; the durable fix pattern is documented in the PVP-1 report (defect S1) |
