@@ -49,14 +49,17 @@ app-layer"); production flips to `desiauction_app` (NOBYPASSRLS).
 - **Integration/RUNTIME**: ✅ **453/453** web tests on real Postgres 17
 - **Migration apply**: ✅ RUNTIME (all 19 migrations)
 - **Build**: ✅ RUNTIME (`next build` clean)
-- **Critical E2E**: ⚠️ **partial-RUNTIME** — after healing a corrupted Docker VM
-  (`pnpm setup:local` green: compose + migrate + RLS roles + seed on `:5433`), the
-  publish→discover→register journey runs green and the new share-card/attribution
-  assertions (og:image · twitter `summary_large_image` · `/opengraph-image`→png ·
-  `?ref`→register-CTA) **passed** (`public-registration.spec.ts`: 4 passed, 1 flaky
-  teardown). The earlier "residue" hypothesis was wrong — the blocker was Docker.
-  Remaining for LOCAL GO: the full 70-test suite + stabilize the flaky teardown
-  (R-E1/R-E3).
+- **Critical E2E**: ⚠️ **partial-RUNTIME, full suite RED** — env healed
+  (`setup:local` green on `:5433`). Individual specs are green in isolation
+  (`public-registration` 5/0; `primitives` 6/6; `foundation` 2/2 after fixing a
+  stale test), and the new share-card/attribution assertions pass. But the **full
+  25-spec suite is RED** (run #2: 19 failed / 7 flaky) — diagnosed as ~environmental
+  (dev-server memory restarts + degraded-server reuse), NOT product regressions
+  (see `FLAKY_TEST_REGISTER.md`). Fixes landed: opengraph `request.get`, R-E3
+  teardown, `foundation` stale test, twitter-image route config, dev-server heap
+  ceiling. The heap fix needs a **clean-server full run** to validate; full green
+  may require sharding on this loaded machine. CI (pre-compiled + ephemeral DB) is
+  the authoritative gate.
 - **a11y / perf / security-review**: partial (per-feature review; no automated a11y/perf gate)
 
 **Overall: SOURCE + EXECUTION + RUNTIME(unit/integration/build) green. Release
