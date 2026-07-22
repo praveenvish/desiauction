@@ -36,7 +36,7 @@ describe("ImageUploader", () => {
       revokeObjectURL: vi.fn(),
     });
     const onUpload = vi.fn(
-      async (): Promise<UploadOutcome> => ({ ok: true, url: "/_media/ok.jpg" }),
+      (): Promise<UploadOutcome> => Promise.resolve({ ok: true, url: "/_media/ok.jpg" }),
     );
     render(<ImageUploader label="Photo" name="Ravi" onUpload={onUpload} />);
     const good = new File(["bytes"], "p.jpg", { type: "image/jpeg" });
