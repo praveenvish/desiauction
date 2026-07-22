@@ -23,11 +23,18 @@ import {
   createCompetition,
   createTeam,
   resolveCompetition,
+  setTeamCoach,
   teamsOf,
   type CompetitionSummary,
   type TeamSummary,
 } from "./competitions";
-import { addNote, assignTeam, transition, transitionBatch } from "./registration-aggregate";
+import {
+  addNote,
+  assignTeam,
+  setRegistrationMarks,
+  transition,
+  transitionBatch,
+} from "./registration-aggregate";
 import { commitRegistrationImport } from "./registration-import";
 import {
   exportRegistrationsCsv,
@@ -555,6 +562,74 @@ export async function assignTeamAction(
       teamId === "" ? null : teamId,
       session.personId,
     ),
+  );
+  return { ok: true };
+}
+
+/**
+ * Set icon / captain / team marks on a registration (organizer, `team.manage`).
+ * Icon players are retained to their team and excluded from the auction pool.
+ */
+export async function markRegistrationAction(
+  slug: string,
+  registrationId: string,
+  marks: { isIcon?: boolean; isCaptain?: boolean; teamId?: string | null },
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "team.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage players here." };
+  }
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    setRegistrationMarks(
+      db,
+      competition.orgId,
+      competition.id,
+      registrationId,
+      marks,
+      session.personId,
+    ),
+  );
+  return { ok: true };
+}
+
+/** Set (or clear) a team's coach (organizer, `team.manage`). */
+export async function setTeamCoachAction(
+  slug: string,
+  teamId: string,
+  coachName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "team.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage teams here." };
+  }
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    setTeamCoach(db, competition.orgId, competition.id, teamId, coachName, session.personId),
   );
   return { ok: true };
 }

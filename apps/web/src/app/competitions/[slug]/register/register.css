@@ -1,3 +1,26 @@
+/* The public door: a quiet floodlight wash behind the form, the `mk-` type
+   scale on the heading. Layout overrides only — the flow itself (steps,
+   fields, cards) is the certified PX-5 markup untouched. */
+.register {
+  min-height: calc(100dvh - 64px);
+  background:
+    radial-gradient(
+      48rem 22rem at 85% -20%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 60%
+    ),
+    var(--surface);
+}
+
+.register-panel {
+  max-width: 640px;
+}
+
+.register h1 {
+  font-size: clamp(2rem, 4.5vw, var(--display-sm-size));
+  letter-spacing: -0.015em;
+}
+
 .register-status-head {
   display: flex;
   align-items: center;

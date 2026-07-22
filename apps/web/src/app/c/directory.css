@@ -1,32 +1,41 @@
+/* Public discovery surfaces (/c and /c/[slug]) — the `mk-` design layer's
+   directory dialect: banner-art competition cards, the floodlit competition
+   hero, and the public sections. Tokens only; every banner recipe is a mix of
+   certified support colors so the art never fights the badges. */
+
 .public-page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4) var(--space-10);
   font-family: var(--font-text);
   color: var(--text-primary);
-  box-sizing: border-box;
 }
 
-.public-page h1 {
+.public-head {
+  padding: clamp(var(--space-10), 6vw, var(--space-16)) 0 var(--space-8);
+}
+
+.public-head h1 {
   font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
-  font-size: var(--display-sm-size);
-  line-height: var(--display-sm-line);
+  font-size: clamp(2.25rem, 5vw, var(--display-md-size));
+  line-height: 1.05;
+  letter-spacing: -0.015em;
   color: var(--text-heading);
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--space-2);
 }
 
 .public-sub {
   color: var(--text-secondary);
-  margin: 0 0 var(--space-5);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  margin: 0 0 var(--space-6);
+  max-width: 56ch;
 }
 
 .public-search {
   display: flex;
   gap: var(--space-2);
   align-items: flex-end;
-  margin-bottom: var(--space-5);
   flex-wrap: wrap;
+  max-width: 560px;
 }
 
 .public-search > :first-child {
@@ -34,30 +43,158 @@
   min-width: 200px;
 }
 
+.public-body {
+  padding-bottom: clamp(var(--space-12), 7vw, var(--space-20));
+}
+
+/* --- Directory cards ---------------------------------------------------------- */
+
 .public-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--space-5);
 }
 
 .public-card-link {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: block;
   text-decoration: none;
   color: var(--text-primary);
   min-width: 0;
+  border-radius: var(--radius-2xl);
 }
 
 .public-card-link:focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-md);
+  outline-offset: 3px;
+}
+
+.public-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  height: 100%;
+  box-sizing: border-box;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.public-card-link:hover .public-card {
+  transform: translateY(calc(-1 * var(--space-1)));
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+/* Banner art: a floodlit night in one of four color moods, chosen
+   deterministically from the slug so a competition keeps its colors. */
+.public-card-art {
+  position: relative;
+  height: 112px;
+  background:
+    radial-gradient(
+      18rem 9rem at 82% -30%,
+      color-mix(in srgb, var(--art-glow) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      14rem 8rem at 12% 120%,
+      color-mix(in srgb, var(--art-glow) 30%, transparent),
+      transparent 65%
+    ),
+    linear-gradient(160deg, var(--identity-field), var(--identity-field-deep));
+}
+
+.public-card-art::after {
+  /* Pitch arcs: two hairline ellipses, the ground under the light. */
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -70%;
+  width: 130%;
+  height: 100%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--identity-glyph) 22%, transparent);
+  box-shadow: 0 0 0 28px color-mix(in srgb, var(--identity-glyph) 7%, transparent);
+}
+
+.public-card-art[data-art="0"] {
+  --art-glow: var(--identity-accent);
+}
+
+.public-card-art[data-art="1"] {
+  --art-glow: var(--info-base);
+}
+
+.public-card-art[data-art="2"] {
+  --art-glow: var(--ceremony-gold);
+}
+
+.public-card-art[data-art="3"] {
+  --art-glow: var(--success-base);
+}
+
+.public-card-mark {
+  position: absolute;
+  left: var(--space-5);
+  bottom: calc(-1 * var(--space-5));
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, var(--identity-field), var(--identity-field-deep));
+  border: 1px solid var(--identity-line);
+  box-shadow: var(--shadow-2);
+  color: var(--identity-accent);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-md-size);
+  letter-spacing: 0.02em;
+}
+
+.public-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-5) var(--space-5);
+  flex: 1;
+}
+
+.public-card-name {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  color: var(--text-heading);
+  overflow-wrap: break-word;
 }
 
 .public-card-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
   color: var(--text-secondary);
+  min-width: 0;
+}
+
+.public-card-sub svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.public-card-foot {
+  margin-top: auto;
+  padding-top: var(--space-3);
 }
 
 .public-pagination {
@@ -65,39 +202,114 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  margin-top: var(--space-5);
+  margin-top: var(--space-8);
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
 
+/* --- Competition hero (/c/[slug]) ------------------------------------------------- */
+
 .public-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(var(--space-12), 7vw, var(--space-20)) 0;
+  background:
+    radial-gradient(
+      55rem 26rem at 80% -30%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      40rem 20rem at 8% 115%,
+      color-mix(in srgb, var(--info-base) 10%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--surface-sunken), var(--surface));
+}
+
+.public-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent) 50%,
+    transparent
+  );
+}
+
+.public-hero-inner {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-5);
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.public-hero h1 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(2.25rem, 6vw, var(--display-lg-size));
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  margin: 0;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .public-hero-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-2) var(--space-5);
   color: var(--text-secondary);
-  font-size: var(--text-sm-size);
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+}
+
+.public-hero-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.public-hero-meta svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--text-accent);
 }
 
 .public-cta-row {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-3);
   flex-wrap: wrap;
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* --- Public sections ----------------------------------------------------------------- */
+
+.public-sections {
+  padding: clamp(var(--space-8), 5vw, var(--space-12)) 0
+    clamp(var(--space-12), 7vw, var(--space-20));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
 .public-section {
-  margin-top: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-6);
 }
 
 .public-section h2 {
-  font-size: var(--text-lg-size);
+  font-family: var(--font-display);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   margin: 0 0 var(--space-3);
@@ -116,16 +328,20 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
+  background: var(--surface);
   font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
 }
 
 .public-team-swatch {
   width: 10px;
   height: 10px;
   border-radius: var(--radius-full);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-subtle) 60%, transparent);
 }
 
 .public-fixture-list {
@@ -134,26 +350,31 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
 }
 
 .public-fixture {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-2) var(--space-3);
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
   font-size: var(--text-sm-size);
   border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: var(--space-2);
+  padding: var(--space-3) 0;
 }
 
 .public-fixture:last-child {
   border-bottom: none;
+  padding-bottom: 0;
+}
+
+.public-fixture:first-child {
+  padding-top: 0;
 }
 
 .public-fixture-teams {
   font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
+  color: var(--text-heading);
 }
 
 .public-fixture-when {
@@ -163,6 +384,15 @@
 
 .public-hint {
   color: var(--text-secondary);
-  font-size: var(--text-sm-size);
+  font-size: var(--text-base-size);
+  line-height: 1.6;
   margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-card,
+  .public-card-link:hover .public-card {
+    transition: none;
+    transform: none;
+  }
 }

@@ -20,6 +20,7 @@ import {
   type FixtureImportPreview,
   type FixtureLifecycleAction,
 } from "../../../../server/competition/fixture-actions";
+import { formatDateTime } from "../../../../lib/format-date";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
 
 type Snapshot = FixtureDashboard["page"]["rows"][number];
@@ -604,7 +605,7 @@ export function FixturesPanel({
             {timeline.map((entry, index) => (
               <li key={index}>
                 <Badge tone="neutral">{entry.action.replace("fixture.", "")}</Badge>
-                <span className="timeline-at">{new Date(entry.at).toLocaleString()}</span>
+                <span className="timeline-at">{formatDateTime(entry.at)}</span>
                 {isMove(entry.meta) ? (
                   <span className="timeline-note">
                     {entry.meta.fromKickoff} → {entry.meta.toKickoff}

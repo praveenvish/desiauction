@@ -5,14 +5,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { createTeamAction } from "../../../../server/competition/actions";
+import { createTeamAction, setTeamCoachAction } from "../../../../server/competition/actions";
 import type { RegistrationDashboard } from "../../../../server/competition/actions";
 
 type RosterRow = RegistrationDashboard["page"]["rows"][number];
 
 export interface TeamsPanelProps {
   slug: string;
-  teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
+  teams: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    primaryColor: string | null;
+    coachName: string | null;
+  }[];
   canManage: boolean;
   approvedCount: number;
   selectedTeamId: string | null;
@@ -95,6 +101,11 @@ export function TeamsPanel({
                 {team.shortName !== null && team.shortName !== "" ? (
                   <Badge tone="neutral">{team.shortName}</Badge>
                 ) : null}
+                {team.coachName !== null && team.coachName !== "" ? (
+                  <span className="competitions-hint" data-testid={`team-coach-${team.id}`}>
+                    Coach: {team.coachName}
+                  </span>
+                ) : null}
                 <span className="teams-row-actions">
                   <Link
                     href={`/competitions/${slug}/teams?team=${team.id}`}
@@ -120,6 +131,14 @@ export function TeamsPanel({
               Manage in Registrations
             </ButtonLink>
           </div>
+          {canManage ? (
+            <CoachEditor
+              key={selected.id}
+              slug={slug}
+              teamId={selected.id}
+              initial={selected.coachName ?? ""}
+            />
+          ) : null}
           {roster === null || roster.length === 0 ? (
             <EmptyState
               headingLevel={3}
@@ -192,5 +211,44 @@ export function TeamsPanel({
         </Card>
       ) : null}
     </>
+  );
+}
+
+/** Inline coach editor for the selected team (non-bidding staff metadata). */
+function CoachEditor({ slug, teamId, initial }: { slug: string; teamId: string; initial: string }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [coach, setCoach] = useState(initial);
+  const [saving, startSaving] = useTransition();
+  return (
+    <div className="teams-form" data-testid="coach-editor">
+      <Field
+        label="Coach"
+        name="team-coach"
+        placeholder="e.g. Ravi Shastri"
+        value={coach}
+        onChange={(event) => {
+          setCoach(event.target.value);
+        }}
+      />
+      <Button
+        variant="secondary"
+        loading={saving}
+        onClick={() => {
+          startSaving(async () => {
+            const result = await setTeamCoachAction(slug, teamId, coach);
+            if (!result.ok) {
+              toast({ tone: "danger", title: result.error ?? "Couldn't save the coach." });
+              return;
+            }
+            toast({ tone: "success", title: "Coach saved" });
+            router.refresh();
+          });
+        }}
+        data-testid="save-coach"
+      >
+        Save coach
+      </Button>
+    </div>
   );
 }

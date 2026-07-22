@@ -85,6 +85,10 @@ export interface RegistrationRow {
   status: RegistrationStatus;
   teamId: string | null;
   teamName: string | null;
+  // Icon (marquee) player: pre-assigned to their team, excluded from the auction.
+  isIcon: boolean;
+  // Team captain marker (display + team-sheet ordering).
+  isCaptain: boolean;
   // Surfaced for the IP-4 AuctionReady pool (additive projection field, M-IP4-1).
   basePriceBand: string | null;
   rejectionReason: string | null;
@@ -235,6 +239,8 @@ export async function queryRegistrations(
       status: registrations.status,
       teamId: registrations.teamId,
       teamName: teams.name,
+      isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
     })

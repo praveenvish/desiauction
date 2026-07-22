@@ -12,12 +12,14 @@ import {
   exportRegistrationsAction,
   importCommitAction,
   importPreviewAction,
+  markRegistrationAction,
   registrationTimelineAction,
   triageRegistrationAction,
   type ImportPreview,
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
+import { formatDateTime } from "../../../../lib/format-date";
 import type { TimelineEntry } from "../../../../server/competition/registrations";
 
 type Row = RegistrationDashboard["page"]["rows"][number];
@@ -476,6 +478,11 @@ export function RegistrationDashboardPanel({
                   }}
                   onDetails={() => void openDetails(row.id)}
                   onSingle={(action) => void runSingle(row.id, action)}
+                  onMark={(marks) =>
+                    void markRegistrationAction(slug, row.id, marks).then(() => {
+                      router.refresh();
+                    })
+                  }
                   busy={busy}
                 />
               ))}
@@ -526,7 +533,7 @@ export function RegistrationDashboardPanel({
             {timeline.map((entry, index) => (
               <li key={index}>
                 <Badge tone="neutral">{entry.action.replace("registration.", "")}</Badge>
-                <span className="timeline-at">{new Date(entry.at).toLocaleString()}</span>
+                <span className="timeline-at">{formatDateTime(entry.at)}</span>
                 {isNote(entry.meta) ? (
                   <span className="timeline-note">“{entry.meta.note}”</span>
                 ) : null}
@@ -706,6 +713,7 @@ function RegRow({
   onToggle,
   onDetails,
   onSingle,
+  onMark,
   busy,
 }: {
   row: Row;
@@ -714,6 +722,7 @@ function RegRow({
   onToggle: () => void;
   onDetails: () => void;
   onSingle: (action: TriageAction) => void;
+  onMark: (marks: { isIcon?: boolean; isCaptain?: boolean }) => void;
   busy: boolean;
 }) {
   const canTriage = row.status === "submitted" || row.status === "waitlisted";
@@ -729,7 +738,19 @@ function RegRow({
       </td>
       <td className="reg-number">{row.number}</td>
       <td>
-        <span className="registration-name">{row.name ?? "Unnamed"}</span>
+        <span className="registration-name">
+          {row.name ?? "Unnamed"}
+          {row.isCaptain ? (
+            <Badge tone="info" data-testid="captain-flag">
+              Captain
+            </Badge>
+          ) : null}
+          {row.isIcon ? (
+            <Badge tone="success" data-testid="icon-flag">
+              Icon
+            </Badge>
+          ) : null}
+        </span>
         <span className="registration-phone">{row.phone}</span>
         {row.duplicateName ? (
           <Badge tone="warning" data-testid="dup-flag">
@@ -754,6 +775,26 @@ function RegRow({
             Approve
           </Button>
         ) : null}
+        <Button
+          size="sm"
+          variant={row.isIcon ? "secondary" : "ghost"}
+          onClick={() => {
+            onMark({ isIcon: !row.isIcon });
+          }}
+          data-testid={`icon-toggle-${row.personId}`}
+        >
+          {row.isIcon ? "Icon ✓" : "Icon"}
+        </Button>
+        <Button
+          size="sm"
+          variant={row.isCaptain ? "secondary" : "ghost"}
+          onClick={() => {
+            onMark({ isCaptain: !row.isCaptain });
+          }}
+          data-testid={`captain-toggle-${row.personId}`}
+        >
+          {row.isCaptain ? "Captain ✓" : "Captain"}
+        </Button>
         <Button size="sm" variant="ghost" onClick={onDetails}>
           Details
         </Button>

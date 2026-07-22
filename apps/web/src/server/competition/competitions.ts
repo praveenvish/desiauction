@@ -236,6 +236,7 @@ export interface TeamSummary {
   name: string;
   shortName: string | null;
   primaryColor: string | null;
+  coachName: string | null;
 }
 
 export type CreateTeamResult =
@@ -285,8 +286,35 @@ export async function createTeam(
       name: valid.value,
       shortName: shortName ?? null,
       primaryColor: primaryColor ?? null,
+      coachName: null,
     },
   };
+}
+
+/** Set (or clear) a team's coach — non-bidding organizer metadata. */
+export async function setTeamCoach(
+  db: Db,
+  orgId: string,
+  competitionId: string,
+  teamId: string,
+  coachName: string | null,
+  actorId: string,
+): Promise<{ ok: boolean }> {
+  const trimmed = coachName === null || coachName.trim() === "" ? null : coachName.trim();
+  await db
+    .update(teams)
+    .set({ coachName: trimmed })
+    .where(and(eq(teams.id, teamId), eq(teams.competitionId, competitionId)));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: actorId,
+    action: "team.coach_set",
+    scopeType: "org",
+    scopeId: orgId,
+    subject: teamId,
+    meta: trimmed !== null ? { coachName: trimmed } : {},
+  });
+  return { ok: true };
 }
 
 export async function teamsOf(db: Db, competitionId: string): Promise<TeamSummary[]> {
@@ -296,6 +324,7 @@ export async function teamsOf(db: Db, competitionId: string): Promise<TeamSummar
       name: teams.name,
       shortName: teams.shortName,
       primaryColor: teams.primaryColor,
+      coachName: teams.coachName,
     })
     .from(teams)
     .where(eq(teams.competitionId, competitionId))

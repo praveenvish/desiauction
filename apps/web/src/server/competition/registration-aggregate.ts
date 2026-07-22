@@ -188,6 +188,52 @@ export async function assignTeam(
   return { ok: true };
 }
 
+/**
+ * Set organizer marks on a registration: icon (pre-signed marquee, excluded from
+ * the auction), captain, and/or the pre-auction team. Any omitted field is left
+ * unchanged. Append-only audit, same pattern as assignTeam.
+ */
+export async function setRegistrationMarks(
+  db: Db,
+  orgId: string,
+  competitionId: string,
+  registrationId: string,
+  marks: { isIcon?: boolean; isCaptain?: boolean; teamId?: string | null },
+  actorId: string,
+): Promise<{ ok: boolean }> {
+  const set: Partial<{ isIcon: boolean; isCaptain: boolean; teamId: string | null }> = {};
+  if (marks.isIcon !== undefined) {
+    set.isIcon = marks.isIcon;
+  }
+  if (marks.isCaptain !== undefined) {
+    set.isCaptain = marks.isCaptain;
+  }
+  if (marks.teamId !== undefined) {
+    set.teamId = marks.teamId;
+  }
+  if (Object.keys(set).length === 0) {
+    return { ok: true };
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(registrations)
+      .set(set)
+      .where(
+        and(eq(registrations.id, registrationId), eq(registrations.competitionId, competitionId)),
+      );
+    await tx.insert(auditLog).values({
+      id: newId(),
+      actor: actorId,
+      action: "registration.marks_set",
+      scopeType: "org",
+      scopeId: orgId,
+      subject: registrationId,
+      meta: Object.fromEntries(Object.entries(set).map(([key, value]) => [key, String(value)])),
+    });
+  });
+  return { ok: true };
+}
+
 /** Append an organizer note to a registration's timeline (append-only audit). */
 export async function addNote(
   db: Db,
