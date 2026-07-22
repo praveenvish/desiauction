@@ -133,11 +133,22 @@ export default async function PublicCompetitionPage({
             <ul className="public-team-list" data-testid="public-teams">
               {view.teams.map((team) => (
                 <li key={team.id} className="public-team">
-                  <span
-                    className="public-team-swatch"
-                    style={{ background: team.primaryColor ?? "var(--accent)" }}
-                    aria-hidden
-                  />
+                  {team.logoUrl !== null ? (
+                    <img
+                      className="public-team-crest"
+                      src={team.logoUrl}
+                      alt=""
+                      width={28}
+                      height={28}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span
+                      className="public-team-swatch"
+                      style={{ background: team.primaryColor ?? "var(--accent)" }}
+                      aria-hidden
+                    />
+                  )}
                   {team.name}
                 </li>
               ))}

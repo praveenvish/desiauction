@@ -489,6 +489,23 @@
   flex-shrink: 0;
 }
 
+.teams-crest {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface-sunken);
+}
+
+.teams-manage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
 .teams-row-actions {
   margin-left: auto;
 }

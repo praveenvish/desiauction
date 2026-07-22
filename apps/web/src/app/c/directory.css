@@ -139,6 +139,14 @@
   --art-glow: var(--success-base);
 }
 
+.public-card-logo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .public-card-mark {
   position: absolute;
   left: var(--space-5);
@@ -342,6 +350,15 @@
   height: 10px;
   border-radius: var(--radius-full);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+
+.public-team-crest {
+  width: 28px;
+  height: 28px;
+  margin: calc(-1 * var(--space-1)) 0;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-sunken);
 }
 
 .public-fixture-list {

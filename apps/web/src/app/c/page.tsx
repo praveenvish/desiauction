@@ -100,7 +100,16 @@ export default async function DirectoryPage({
                 <Link key={entry.slug} href={`/c/${entry.slug}`} className="public-card-link">
                   <article className="public-card">
                     <div className="public-card-art" data-art={artIndex(entry.slug)} aria-hidden>
-                      <span className="public-card-mark">{monogram(entry.name)}</span>
+                      {entry.logoUrl !== null ? (
+                        <img
+                          className="public-card-logo"
+                          src={entry.logoUrl}
+                          alt=""
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="public-card-mark">{monogram(entry.name)}</span>
+                      )}
                     </div>
                     <div className="public-card-body">
                       <span className="public-card-name">{entry.name}</span>

@@ -33,6 +33,8 @@ export { placeholderIdentity, initialsFor } from "./identity/placeholder";
 export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
 export { PlayerImage } from "./identity/player-image";
 export type { PlayerImageProps, PlayerImageSize } from "./identity/player-image";
+export { ImageUploader } from "./identity/image-uploader";
+export type { ImageUploaderProps, UploadOutcome } from "./identity/image-uploader";
 export { PlayerCard } from "./identity/player-card";
 export type { PlayerCardProps, PlayerRole, PlayerStatus } from "./identity/player-card";
 

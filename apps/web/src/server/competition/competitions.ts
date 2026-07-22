@@ -16,6 +16,8 @@ import {
 } from "@desiauction/db";
 import { and, desc, eq } from "drizzle-orm";
 
+import { storage } from "../media";
+
 // Competition + Season + Team persistence (IP-3 §4). All rules come from core;
 // this module fetches/writes and writes audit. Web actions are the only callers.
 
@@ -237,6 +239,8 @@ export interface TeamSummary {
   shortName: string | null;
   primaryColor: string | null;
   coachName: string | null;
+  /** Ready-to-render crest URL (storage key resolved), or null for the fallback. */
+  logoUrl: string | null;
 }
 
 export type CreateTeamResult =
@@ -287,6 +291,7 @@ export async function createTeam(
       shortName: shortName ?? null,
       primaryColor: primaryColor ?? null,
       coachName: null,
+      logoUrl: null,
     },
   };
 }
@@ -318,15 +323,20 @@ export async function setTeamCoach(
 }
 
 export async function teamsOf(db: Db, competitionId: string): Promise<TeamSummary[]> {
-  return db
+  const rows = await db
     .select({
       id: teams.id,
       name: teams.name,
       shortName: teams.shortName,
       primaryColor: teams.primaryColor,
       coachName: teams.coachName,
+      logoKey: teams.logoUrl,
     })
     .from(teams)
     .where(eq(teams.competitionId, competitionId))
     .orderBy(desc(teams.createdAt));
+  return rows.map(({ logoKey, ...team }) => ({
+    ...team,
+    logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
+  }));
 }

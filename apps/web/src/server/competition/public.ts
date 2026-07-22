@@ -1,6 +1,7 @@
 import { auctions, competitions, organizations, people, registrations } from "@desiauction/db";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 
+import { storage } from "../media";
 import { systemDb } from "../db";
 import { teamsOf, type TeamSummary } from "./competitions";
 import { queryFixtures, type FixtureSnapshot } from "./fixtures";
@@ -31,6 +32,8 @@ export interface PublicCompetitionView {
   orgName: string;
   open: boolean;
   listed: boolean;
+  /** Ready-to-render competition crest URL, or null for the monogram fallback. */
+  logoUrl: string | null;
   /** PX-6: the live door on the public page (null until an auction exists). */
   auctionStatus: string | null;
   teams: TeamSummary[];
@@ -60,6 +63,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
       orgName: organizations.name,
+      logoKey: competitions.logoUrl,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -97,6 +101,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     orgName: row.orgName,
     open,
     listed: row.visibility === "public",
+    logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
     auctionStatus: auctionRows[0]?.status ?? null,
     teams,
     fixtures: fixtures.rows.map(toPublicFixture),
@@ -111,6 +116,7 @@ export interface DirectoryEntry {
   startsOn: string | null;
   endsOn: string | null;
   open: boolean;
+  logoUrl: string | null;
 }
 
 export interface DirectoryPage {
@@ -157,6 +163,7 @@ export async function publicCompetitionsDirectory(params: {
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
       orgName: organizations.name,
+      logoKey: competitions.logoUrl,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -173,6 +180,7 @@ export async function publicCompetitionsDirectory(params: {
       startsOn: row.startsOn,
       endsOn: row.endsOn,
       open: row.status === "registration_open",
+      logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
     })),
     page,
     totalPages: Math.max(1, Math.ceil(total / DIRECTORY_PAGE_SIZE)),

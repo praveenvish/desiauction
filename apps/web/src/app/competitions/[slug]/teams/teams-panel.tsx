@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 
 import { createTeamAction, setTeamCoachAction } from "../../../../server/competition/actions";
 import type { RegistrationDashboard } from "../../../../server/competition/actions";
+import { TeamLogoUploader } from "./team-logo-uploader";
 
 type RosterRow = RegistrationDashboard["page"]["rows"][number];
 
@@ -18,6 +19,7 @@ export interface TeamsPanelProps {
     shortName: string | null;
     primaryColor: string | null;
     coachName: string | null;
+    logoUrl: string | null;
   }[];
   canManage: boolean;
   approvedCount: number;
@@ -92,11 +94,22 @@ export function TeamsPanel({
           <ul className="teams-list" data-testid="teams-list">
             {teams.map((team) => (
               <li key={team.id} className="teams-row">
-                <span
-                  className="teams-swatch"
-                  style={{ background: team.primaryColor ?? "var(--accent)" }}
-                  aria-hidden
-                />
+                {team.logoUrl !== null ? (
+                  <img
+                    className="teams-crest"
+                    src={team.logoUrl}
+                    alt=""
+                    width={28}
+                    height={28}
+                    loading="lazy"
+                  />
+                ) : (
+                  <span
+                    className="teams-swatch"
+                    style={{ background: team.primaryColor ?? "var(--accent)" }}
+                    aria-hidden
+                  />
+                )}
                 <span className="registration-name">{team.name}</span>
                 {team.shortName !== null && team.shortName !== "" ? (
                   <Badge tone="neutral">{team.shortName}</Badge>
@@ -132,12 +145,20 @@ export function TeamsPanel({
             </ButtonLink>
           </div>
           {canManage ? (
-            <CoachEditor
-              key={selected.id}
-              slug={slug}
-              teamId={selected.id}
-              initial={selected.coachName ?? ""}
-            />
+            <div className="teams-manage">
+              <TeamLogoUploader
+                slug={slug}
+                teamId={selected.id}
+                teamName={selected.name}
+                {...(selected.logoUrl !== null ? { currentUrl: selected.logoUrl } : {})}
+              />
+              <CoachEditor
+                key={selected.id}
+                slug={slug}
+                teamId={selected.id}
+                initial={selected.coachName ?? ""}
+              />
+            </div>
           ) : null}
           {roster === null || roster.length === 0 ? (
             <EmptyState
