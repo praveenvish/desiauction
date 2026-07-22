@@ -7,7 +7,7 @@ import {
   type AllowedImageType,
   type MediaSubject,
 } from "@desiauction/core";
-import { newId, withTenantDb } from "@desiauction/db";
+import { auditLog, newId, withTenantDb } from "@desiauction/db";
 import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
@@ -123,6 +123,17 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
             ? "self_upload"
             : "organizer_upload_attestation";
         await persistMediaKey(db, input.subject, resolved, input.key, new Date(), via);
+        // Append-only evidence (S3, DPDP §6): who attached media to what, and how
+        // consent was captured. Metadata only — never the image or PII content.
+        await db.insert(auditLog).values({
+          id: newId(),
+          actor: session.personId,
+          action: "media.attached",
+          scopeType: "org",
+          scopeId: competition.orgId,
+          subject: resolved.storageSubjectId,
+          meta: { subject: input.subject, competitionId: competition.id, via },
+        });
       },
     );
     revalidatePath(`/c/${competition.slug}`);
