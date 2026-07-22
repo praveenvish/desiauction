@@ -133,7 +133,7 @@ export default async function PublicCompetitionPage({
         {players !== null && players.length > 0 ? (
           <section className="public-section" aria-labelledby="players-heading">
             <h2 id="players-heading">Players</h2>
-            <ShowcaseGrid players={players} />
+            <ShowcaseGrid players={players} slug={view.slug} />
           </section>
         ) : null}
 

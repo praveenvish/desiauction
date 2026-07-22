@@ -14,6 +14,8 @@
  * lifecycle → status-label mapping.
  */
 
+import { roleLabel, styleLabel } from "./player-profile";
+
 export interface CompetitionShareCardInput {
   name: string;
   organizer: string;
@@ -110,4 +112,53 @@ export function buildCompetitionShareCard(input: CompetitionShareCardInput): Com
     statusTone,
     stats: buildStats(input.teamCount, input.playerCount),
   };
+}
+
+export interface PlayerShareCardInput {
+  name: string;
+  /** Registration number (always present). */
+  number: string;
+  role: string;
+  age: number | null;
+  /** Raw enum keys from the DB (labeled here via the core label functions). */
+  battingStyle: string | null;
+  bowlingStyle: string | null;
+  status: "available" | "sold";
+  teamName: string | null;
+  competitionName: string;
+}
+
+export interface PlayerShareCard {
+  name: string;
+  /** "#12 · Sunday Premier League". */
+  subtitle: string;
+  /** "All-rounder · 24 yrs" (age omitted when unknown). */
+  roleLine: string;
+  /** "Right Hand Opener · Off-Break", or null when no styles are set. */
+  styleLine: string | null;
+  statusLabel: string;
+  statusTone: ShareCardTone;
+}
+
+/**
+ * Normalize a single approved player into the card model rendered by the
+ * per-player OG/Twitter image routes (`/c/[slug]/p/[number]`). A "sold" player
+ * is a celebratory outcome — it carries the accent (live) tone. Never throws.
+ */
+export function buildPlayerShareCard(input: PlayerShareCardInput): PlayerShareCard {
+  const name = truncate(input.name, MAX_TITLE) || "Player";
+  const subtitle = `#${input.number} · ${truncate(input.competitionName, MAX_ORGANIZER)}`;
+  const roleLine =
+    input.age !== null
+      ? `${roleLabel(input.role)} · ${String(input.age)} yrs`
+      : roleLabel(input.role);
+  const styleLine = buildMeta(styleLabel(input.battingStyle), styleLabel(input.bowlingStyle));
+  const { statusLabel, statusTone }: { statusLabel: string; statusTone: ShareCardTone } =
+    input.status === "sold"
+      ? {
+          statusLabel: input.teamName !== null ? `Sold to ${input.teamName}` : "Sold",
+          statusTone: "live",
+        }
+      : { statusLabel: "Available", statusTone: "open" };
+  return { name, subtitle, roleLine, styleLine, statusLabel, statusTone };
 }

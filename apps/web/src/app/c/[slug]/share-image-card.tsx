@@ -1,4 +1,4 @@
-import type { CompetitionShareCard } from "@desiauction/core";
+import type { CompetitionShareCard, PlayerShareCard, ShareCardTone } from "@desiauction/core";
 
 // Pure presentational layer for the social share image — no IO, no server
 // imports, so it renders identically in the OG route, the Twitter route, and an
@@ -26,8 +26,8 @@ const TONE: Record<CompetitionShareCard["statusTone"], string> = {
   closed: C.muted,
 };
 
-function StatusChip({ card }: { card: CompetitionShareCard }) {
-  const color = TONE[card.statusTone];
+function StatusChip({ label, tone }: { label: string; tone: ShareCardTone }) {
+  const color = TONE[tone];
   return (
     <div
       style={{
@@ -43,7 +43,28 @@ function StatusChip({ card }: { card: CompetitionShareCard }) {
       }}
     >
       <div style={{ width: 14, height: 14, borderRadius: 999, background: color }} />
-      {card.statusLabel}
+      {label}
+    </div>
+  );
+}
+
+function MonogramTile({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 104,
+        height: 104,
+        borderRadius: 24,
+        background: C.accent,
+        color: C.onAccent,
+        fontSize: 46,
+        fontWeight: 700,
+      }}
+    >
+      {text}
     </div>
   );
 }
@@ -78,23 +99,8 @@ export function renderShareCard(model: CompetitionShareCard, monogram: string) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 104,
-            height: 104,
-            borderRadius: 24,
-            background: C.accent,
-            color: C.onAccent,
-            fontSize: 46,
-            fontWeight: 700,
-          }}
-        >
-          {monogram}
-        </div>
-        <StatusChip card={model} />
+        <MonogramTile text={monogram} />
+        <StatusChip label={model.statusLabel} tone={model.statusTone} />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -120,6 +126,44 @@ export function renderShareCard(model: CompetitionShareCard, monogram: string) {
             </div>
           ))}
         </div>
+        <Wordmark />
+      </div>
+    </div>
+  );
+}
+
+/** The shareable single-player card (`/c/[slug]/p/[number]`). */
+export function renderPlayerShareCard(model: PlayerShareCard, monogram: string) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        padding: 72,
+        background: C.surface,
+        backgroundImage: `radial-gradient(900px 500px at 0% -10%, ${C.surfaceRaised}, ${C.surface})`,
+        color: C.heading,
+        fontFamily: "sans-serif",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <MonogramTile text={monogram} />
+        <StatusChip label={model.statusLabel} tone={model.statusTone} />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", fontSize: 68, lineHeight: 1.05, color: C.heading }}>
+          {model.name}
+        </div>
+        <div style={{ display: "flex", fontSize: 30, color: C.secondary }}>{model.subtitle}</div>
+        <div style={{ display: "flex", fontSize: 34, color: C.accent }}>{model.roleLine}</div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", fontSize: 28, color: C.muted }}>{model.styleLine ?? ""}</div>
         <Wordmark />
       </div>
     </div>

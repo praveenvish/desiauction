@@ -25,8 +25,24 @@ export const BOWLING_STYLES = [
   "left_arm_chinaman",
 ] as const;
 
+/** The four playing roles the register form and showcase key off. */
+export const PLAYER_ROLES = ["batter", "bowler", "all_rounder", "wicket_keeper"] as const;
+
 export type BattingStyle = (typeof BATTING_STYLES)[number];
 export type BowlingStyle = (typeof BOWLING_STYLES)[number];
+export type PlayerRole = (typeof PLAYER_ROLES)[number];
+
+const ROLE_LABELS: Record<PlayerRole, string> = {
+  batter: "Batter",
+  bowler: "Bowler",
+  all_rounder: "All-rounder",
+  wicket_keeper: "Wicket-keeper",
+};
+
+/** Human label for a role; unknown/legacy values pass through unchanged. */
+export function roleLabel(role: string): string {
+  return (ROLE_LABELS as Record<string, string>)[role] ?? role;
+}
 
 export function isBattingStyle(value: string): value is BattingStyle {
   return (BATTING_STYLES as readonly string[]).includes(value);
@@ -63,6 +79,24 @@ const LABELS: Record<BattingStyle | BowlingStyle, string> = {
 };
 
 /**
+ * Label any batting OR bowling enum key (the two sets are disjoint), passing an
+ * unknown/legacy value through unchanged and `null` through as `null`. The one
+ * style formatter for the showcase, the player page, and the share card.
+ */
+export function styleLabel(style: string | null): string | null {
+  if (style === null) {
+    return null;
+  }
+  if (isBattingStyle(style)) {
+    return battingStyleLabel(style);
+  }
+  if (isBowlingStyle(style)) {
+    return bowlingStyleLabel(style);
+  }
+  return style;
+}
+
+/**
  * Derive integer age (completed years) from an ISO `yyyy-mm-dd` DOB against
  * `now`. Returns null for an absent/invalid/future date. Deterministic: the
  * caller supplies `now` (no `Date.now()` here — house rule 2.1).
@@ -89,8 +123,7 @@ export function deriveAge(dateOfBirth: string | null, now: Date): number | null 
   }
   let age = now.getUTCFullYear() - year;
   const beforeBirthday =
-    now.getUTCMonth() < month - 1 ||
-    (now.getUTCMonth() === month - 1 && now.getUTCDate() < day);
+    now.getUTCMonth() < month - 1 || (now.getUTCMonth() === month - 1 && now.getUTCDate() < day);
   if (beforeBirthday) {
     age -= 1;
   }

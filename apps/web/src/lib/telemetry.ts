@@ -25,6 +25,7 @@ export type ProductEventName =
   | "org.switched"
   | "register.photo_added"
   | "showcase.player_viewed"
+  | "showcase.player_profile_opened"
   | "showcase.exported";
 
 export type TelemetryProps = Record<string, string | number | boolean>;

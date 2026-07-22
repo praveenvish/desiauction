@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCompetitionShareCard, type CompetitionShareCardInput } from "./share-card";
+import {
+  buildCompetitionShareCard,
+  buildPlayerShareCard,
+  type CompetitionShareCardInput,
+  type PlayerShareCardInput,
+} from "./share-card";
 
 const base: CompetitionShareCardInput = {
   name: "Sunday Premier League",
@@ -99,5 +104,69 @@ describe("buildCompetitionShareCard", () => {
 
   it("degrades a blank name to a branded default rather than empty", () => {
     expect(buildCompetitionShareCard({ ...base, name: "   " }).title).toBe("Untitled competition");
+  });
+});
+
+const player: PlayerShareCardInput = {
+  name: "Rohit Sharma",
+  number: "12",
+  role: "all_rounder",
+  age: 24,
+  battingStyle: "right_hand_opener",
+  bowlingStyle: "off_break",
+  status: "available",
+  teamName: null,
+  competitionName: "Sunday Premier League",
+};
+
+describe("buildPlayerShareCard", () => {
+  it("builds the identity and subtitle", () => {
+    const card = buildPlayerShareCard(player);
+    expect(card.name).toBe("Rohit Sharma");
+    expect(card.subtitle).toBe("#12 · Sunday Premier League");
+  });
+
+  it("labels the role and appends age when known", () => {
+    expect(buildPlayerShareCard(player).roleLine).toBe("All-rounder · 24 yrs");
+    expect(buildPlayerShareCard({ ...player, age: null }).roleLine).toBe("All-rounder");
+  });
+
+  it("labels batting/bowling styles via the core label functions", () => {
+    expect(buildPlayerShareCard(player).styleLine).toBe("Right Hand Opener · Off-Break");
+    expect(buildPlayerShareCard({ ...player, bowlingStyle: null }).styleLine).toBe(
+      "Right Hand Opener",
+    );
+    expect(
+      buildPlayerShareCard({ ...player, battingStyle: null, bowlingStyle: null }).styleLine,
+    ).toBeNull();
+  });
+
+  it("passes an unknown/legacy style key through unchanged", () => {
+    expect(buildPlayerShareCard({ ...player, battingStyle: "switch_hit" }).styleLine).toBe(
+      "switch_hit · Off-Break",
+    );
+  });
+
+  it("shows Available (open tone) for an unsold player", () => {
+    expect(buildPlayerShareCard(player)).toMatchObject({
+      statusLabel: "Available",
+      statusTone: "open",
+    });
+  });
+
+  it("celebrates a sale with the team name and the accent (live) tone", () => {
+    expect(
+      buildPlayerShareCard({ ...player, status: "sold", teamName: "Mumbai Indians" }),
+    ).toMatchObject({ statusLabel: "Sold to Mumbai Indians", statusTone: "live" });
+    expect(buildPlayerShareCard({ ...player, status: "sold", teamName: null })).toMatchObject({
+      statusLabel: "Sold",
+      statusTone: "live",
+    });
+  });
+
+  it("truncates an over-long name and degrades a blank one", () => {
+    const long = buildPlayerShareCard({ ...player, name: "X".repeat(200) });
+    expect(long.name.length).toBeLessThanOrEqual(70);
+    expect(buildPlayerShareCard({ ...player, name: "  " }).name).toBe("Player");
   });
 });

@@ -187,13 +187,16 @@ export type { CeremonyPhase, CeremonyState } from "./auction-ceremony";
 export {
   BATTING_STYLES,
   BOWLING_STYLES,
+  PLAYER_ROLES,
   isBattingStyle,
   isBowlingStyle,
   battingStyleLabel,
   bowlingStyleLabel,
+  roleLabel,
+  styleLabel,
   deriveAge,
 } from "./player-profile";
-export type { BattingStyle, BowlingStyle } from "./player-profile";
+export type { BattingStyle, BowlingStyle, PlayerRole } from "./player-profile";
 export {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -205,10 +208,12 @@ export {
 } from "./media";
 export type { AllowedImageType, MediaSubject, MediaUpload, MediaValidation } from "./media";
 export { csvCell, toCsv } from "./csv";
-export { buildCompetitionShareCard } from "./share-card";
+export { buildCompetitionShareCard, buildPlayerShareCard } from "./share-card";
 export type {
   CompetitionShareCard,
   CompetitionShareCardInput,
+  PlayerShareCard,
+  PlayerShareCardInput,
   ShareCardStat,
   ShareCardTone,
 } from "./share-card";

@@ -1,5 +1,12 @@
 import { deriveAge } from "@desiauction/core";
-import { auctions, competitions, organizations, people, registrations, teams } from "@desiauction/db";
+import {
+  auctions,
+  competitions,
+  organizations,
+  people,
+  registrations,
+  teams,
+} from "@desiauction/db";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { storage } from "../media";
@@ -122,6 +129,34 @@ export interface ShowcasePlayer {
   teamName: string | null;
 }
 
+interface ShowcaseRow {
+  number: string;
+  name: string | null;
+  role: string;
+  dateOfBirth: string | null;
+  battingStyle: string | null;
+  bowlingStyle: string | null;
+  photoKey: string | null;
+  photoConsentAt: Date | null;
+  teamId: string | null;
+  teamName: string | null;
+}
+
+/** Row → public player: consent-gates the photo, derives age, maps squad→status. */
+function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
+  return {
+    number: r.number,
+    name: r.name ?? "Unnamed",
+    role: r.role,
+    age: deriveAge(r.dateOfBirth, now),
+    battingStyle: r.battingStyle,
+    bowlingStyle: r.bowlingStyle,
+    photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
+    status: r.teamId !== null ? "sold" : "available",
+    teamName: r.teamName,
+  };
+}
+
 /**
  * Public pre-auction showcase (parity §3.3): the APPROVED player pool for a
  * public/open competition. Anonymous, system-pool. Never exposes phones (C-23)
@@ -131,7 +166,11 @@ export interface ShowcasePlayer {
  */
 export async function publicShowcase(slug: string): Promise<ShowcasePlayer[] | null> {
   const [comp] = await systemDb
-    .select({ id: competitions.id, status: competitions.status, visibility: competitions.visibility })
+    .select({
+      id: competitions.id,
+      status: competitions.status,
+      visibility: competitions.visibility,
+    })
     .from(competitions)
     .where(eq(competitions.slug, slug))
     .limit(1);
@@ -161,17 +200,72 @@ export async function publicShowcase(slug: string): Promise<ShowcasePlayer[] | n
     .leftJoin(teams, eq(teams.id, registrations.teamId))
     .where(and(eq(registrations.competitionId, comp.id), eq(registrations.status, "approved")))
     .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
-  return rows.map((r) => ({
-    number: r.number,
-    name: r.name ?? "Unnamed",
-    role: r.role,
-    age: deriveAge(r.dateOfBirth, now),
-    battingStyle: r.battingStyle,
-    bowlingStyle: r.bowlingStyle,
-    photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
-    status: r.teamId !== null ? "sold" : "available",
-    teamName: r.teamName,
-  }));
+  return rows.map((r) => toShowcasePlayer(r, now));
+}
+
+export interface PublicPlayer extends ShowcasePlayer {
+  competitionName: string;
+  competitionSlug: string;
+}
+
+/**
+ * A single approved player for the public profile + share card
+ * (`/c/[slug]/p/[number]`, parity §Phase 2). Same visibility + consent gates as
+ * the showcase; returns null when the competition isn't public or `number` is
+ * not an approved player. Carries the competition identity for the card + back
+ * link.
+ */
+export async function publicPlayer(slug: string, number: string): Promise<PublicPlayer | null> {
+  const [comp] = await systemDb
+    .select({
+      id: competitions.id,
+      name: competitions.name,
+      slug: competitions.slug,
+      status: competitions.status,
+      visibility: competitions.visibility,
+    })
+    .from(competitions)
+    .where(eq(competitions.slug, slug))
+    .limit(1);
+  if (comp === undefined) {
+    return null;
+  }
+  const open = comp.status === "registration_open";
+  if (comp.visibility !== "public" && !open) {
+    return null;
+  }
+  const [row] = await systemDb
+    .select({
+      number: registrations.registrationNumber,
+      name: people.name,
+      role: registrations.role,
+      dateOfBirth: registrations.dateOfBirth,
+      battingStyle: registrations.battingStyle,
+      bowlingStyle: registrations.bowlingStyle,
+      photoKey: people.photoUrl,
+      photoConsentAt: people.photoConsentAt,
+      teamId: registrations.teamId,
+      teamName: teams.name,
+    })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .leftJoin(teams, eq(teams.id, registrations.teamId))
+    .where(
+      and(
+        eq(registrations.competitionId, comp.id),
+        eq(registrations.status, "approved"),
+        eq(registrations.registrationNumber, number),
+      ),
+    )
+    .limit(1);
+  if (row === undefined) {
+    return null;
+  }
+  return {
+    ...toShowcasePlayer(row, new Date()),
+    competitionName: comp.name,
+    competitionSlug: comp.slug,
+  };
 }
 
 export interface DirectoryEntry {
