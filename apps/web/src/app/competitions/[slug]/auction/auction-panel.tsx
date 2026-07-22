@@ -14,6 +14,7 @@ import {
   type AuctionDashboard,
   type ReplayVerifyReport,
 } from "../../../../server/auction/actions";
+import { formatTime } from "../../../../lib/format-date";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 
 // The M-IP4-1 founder demonstration: AuctionReady, creation, the lot queue,
@@ -330,7 +331,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 <li key={event.seq}>
                   <Badge tone="neutral">#{event.seq}</Badge>
                   <span className="registration-name">{event.type}</span>
-                  <span className="timeline-at">{new Date(event.atMs).toLocaleTimeString()}</span>
+                  <span className="timeline-at">{formatTime(event.atMs)}</span>
                 </li>
               ))}
             </ol>

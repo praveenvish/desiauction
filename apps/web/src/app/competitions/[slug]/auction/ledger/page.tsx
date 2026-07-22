@@ -3,6 +3,7 @@ import { ButtonLink } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { ledgerView } from "../../../../../server/auction/conduct-actions";
+import { formatTime } from "../../../../../lib/format-date";
 import "../../../competitions.css";
 import "../auction.css";
 
@@ -67,7 +68,7 @@ export default async function LedgerPage({ params }: { params: Promise<{ slug: s
               {view.rows.map((row) => (
                 <tr key={row.seq} data-testid={`ledger-row-${String(row.seq)}`}>
                   <td>{row.seq}</td>
-                  <td>{new Date(row.atMs).toLocaleTimeString()}</td>
+                  <td>{formatTime(row.atMs)}</td>
                   <td>{row.actorName}</td>
                   <td>{row.paddleNumber ?? "—"}</td>
                   <td>{row.teamName ?? "—"}</td>

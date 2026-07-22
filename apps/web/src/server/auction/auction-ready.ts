@@ -66,14 +66,18 @@ export async function auctionReady(
       pageSize: 100,
     });
     pool.push(
-      ...result.rows.map((row) => ({
-        registrationId: row.id,
-        personId: row.personId,
-        playerName: row.name,
-        role: row.role,
-        basePriceBand: row.basePriceBand,
-        registrationNumber: row.number,
-      })),
+      // Icon (marquee) players are pre-signed to their team and never enter the
+      // block — they are retained squad, not auction lots.
+      ...result.rows
+        .filter((row) => !row.isIcon)
+        .map((row) => ({
+          registrationId: row.id,
+          personId: row.personId,
+          playerName: row.name,
+          role: row.role,
+          basePriceBand: row.basePriceBand,
+          registrationNumber: row.number,
+        })),
     );
     if (page * result.pageSize >= result.total) {
       break;

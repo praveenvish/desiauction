@@ -60,6 +60,8 @@
 /* --- FLOODLIGHT ceremony stage --------------------------------------------- */
 
 .ceremony {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -72,6 +74,12 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   animation: ceremony-enter 300ms ease-out;
+}
+
+/* The announced content always sits above the decorative SOLD celebration. */
+.ceremony > *:not(.ceremony-celebration) {
+  position: relative;
+  z-index: 1;
 }
 
 .ceremony-title {
@@ -91,6 +99,55 @@
 .ceremony-meta {
   color: var(--text-secondary);
   font-size: var(--text-sm-size);
+}
+
+/* Waiting state: the stage before the first lot opens (or between lots) — a
+   composed "the show is about to begin" moment instead of a bare empty box. */
+.ceremony-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ceremony-waiting-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--live, var(--accent));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ceremony-waiting-dot {
+    animation: ceremony-waiting-pulse 1.8s var(--ease-out, ease-in-out) infinite;
+  }
+}
+
+@keyframes ceremony-waiting-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--live, var(--accent)) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--live, var(--accent)) 0%, transparent);
+  }
+}
+
+.ceremony-waiting-title {
+  font-family: var(--font-display);
+  font-size: var(--display-sm-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-heading);
+}
+
+.ceremony-waiting-hint {
+  max-width: 42ch;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
 }
 
 .ceremony-bid {
@@ -139,6 +196,97 @@
   color: var(--ceremony-gold-deep);
   font-size: 1.5rem;
   font-weight: var(--font-weight-semibold);
+}
+
+/* --- SOLD celebration: decorative gold burst ------------------------------- */
+/* Fully decorative (aria-hidden) and behind the announced content (z-index 0).
+   Motion only — no text ever animates, so contrast holds at every frame (doc
+   13 AA). The whole layer is removed under prefers-reduced-motion below; the
+   static gold border on `.ceremony-sold` is the moment's non-motion marker. */
+.ceremony-celebration {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  /* Fall distance; the fullscreen stage overrides this for a taller cascade. */
+  --fall: 340px;
+}
+
+.ceremony-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--ceremony-glow, var(--ceremony-gold)) 38%, transparent),
+    transparent 62%
+  );
+  opacity: 0;
+  animation: ceremony-glow-pulse 1600ms var(--ease-out, ease-out) forwards;
+}
+
+.ceremony-confetti {
+  position: absolute;
+  top: -8%;
+  left: calc((var(--i) + 0.5) * (100% / 30));
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--ceremony-gold);
+  opacity: 0;
+  /* Deterministic drift: pieces near the left lean left, right lean right —
+     a fountain spread, no randomness, identical on every surface. */
+  --drift: calc((var(--i) - 14.5) * 3px);
+  animation: ceremony-fall 1500ms var(--ease-out, cubic-bezier(0.2, 0.6, 0.2, 1)) forwards;
+  animation-delay: calc(var(--i) * 22ms);
+}
+
+.ceremony-confetti:nth-child(2n) {
+  background: var(--ceremony-gold-deep);
+}
+.ceremony-confetti:nth-child(3n) {
+  background: var(--live, var(--accent));
+}
+.ceremony-confetti:nth-child(5n) {
+  background: color-mix(in srgb, var(--ceremony-gold) 55%, #fff);
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+}
+
+@keyframes ceremony-glow-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes ceremony-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), var(--fall), 0) rotate(540deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ceremony-celebration {
+    display: none;
+  }
 }
 
 .ceremony-extension .ceremony-title,
@@ -454,10 +602,129 @@
   display: none;
 }
 
-.stage-mode {
-  font-size: 1.35em;
+/* Big screen: the stage becomes a projected show — fills the viewport, no box,
+   huge type, centred. clamp() sizes are absolute (rem/vw) so they scale with
+   the screen, not the container. Benefits the live current-lot hero and the
+   waiting state alike. */
+.stage-mode .ceremony {
+  min-height: calc(100dvh - var(--space-10));
+  justify-content: center;
+  gap: var(--space-4);
+  border: none;
+  background: transparent;
+  padding: var(--space-8) var(--space-6);
+}
+
+/* Fullscreen broadcast: the confetti cascades the height of the stage. */
+.stage-mode .ceremony-celebration {
+  --fall: 82vh;
+}
+.stage-mode .ceremony-confetti {
+  width: 10px;
+  height: 17px;
+}
+
+.stage-mode .ceremony-title {
+  font-size: clamp(1rem, 2.4vw, 1.75rem);
+  letter-spacing: 0.24em;
+}
+
+.stage-mode .ceremony-player {
+  font-size: clamp(3rem, 11vw, 8.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+
+.stage-mode .ceremony-bid {
+  font-size: clamp(2.5rem, 8vw, 6rem);
+}
+
+.stage-mode .ceremony-timer {
+  font-size: clamp(1.5rem, 4vw, 3rem);
+}
+
+.stage-mode .ceremony-waiting-title {
+  font-size: clamp(2.5rem, 9vw, 6rem);
+}
+
+.stage-mode .ceremony-waiting-hint,
+.stage-mode .ceremony-meta {
+  font-size: clamp(1rem, 2vw, 1.5rem);
 }
 
 .stage-mode .stage-toggle-row {
   display: flex;
+}
+
+/* --- v1.1 · cockpit operator controls (Tier 1) ------------------------------ */
+
+/* The gavel: a HOLD, not a click. The fill is presentation only — useHoldGate
+   measures real elapsed time, so reduced motion changes how this looks and
+   never how long the hold takes. */
+.cockpit-gavel {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--border-interactive, var(--accent));
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  min-height: 44px;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.cockpit-gavel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cockpit-gavel:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.cockpit-gavel-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform-origin: left center;
+  background: var(--accent);
+  opacity: 0.35;
+  will-change: transform;
+}
+
+.cockpit-gavel[data-holding="true"] {
+  border-color: var(--accent);
+}
+
+.cockpit-gavel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Shortcut legend */
+.cockpit-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.cockpit-keys kbd,
+.cockpit-gavel kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  padding: 1px 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
 }

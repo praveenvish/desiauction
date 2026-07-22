@@ -3,8 +3,14 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { Badge, Button, Card, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import {
+  COCKPIT_SHORTCUTS,
+  resolveKeyDown,
+  resolveKeyUp,
+} from "../../../../../components/auction/cockpit-keys";
+import { GavelButton, type GavelHandle } from "./gavel-button";
 import type { CockpitView } from "../../../../../server/auction/conduct-actions";
 import { grantPaddleAction, inviteOwnerAction } from "../../../../../server/auction/owner-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
@@ -77,6 +83,75 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const status = snapshot?.auctionStatus ?? view.view.auction.status;
   const lot = snapshot?.currentLot ?? null;
   const queue = snapshot?.queue ?? [];
+
+  /**
+   * v1.1 G1 — page-level keyboard control. Every guard lives in the pure
+   * `resolveKeyDown`/`resolveKeyUp` (unit-tested): typing in a field, a focused
+   * control's native Space, modifier chords and in-flight commands are all
+   * refused there, so this effect only routes an already-approved intent.
+   * Space drives the SAME hold gate the gavel button owns — it can never close a
+   * lot on its own.
+   */
+  const gavelRef = useRef<GavelHandle>(null);
+  useEffect(() => {
+    const context = {
+      status,
+      hasOpenLot: lot !== null,
+      hasQueue: queue.length > 0,
+      busy,
+    };
+    const describe = (target: EventTarget | null) => {
+      const element = target as HTMLElement | null;
+      return {
+        targetTag: element?.tagName.toLowerCase() ?? "",
+        isContentEditable: element?.isContentEditable === true,
+      };
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      const action = resolveKeyDown(
+        {
+          key: event.key,
+          repeat: event.repeat,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          altKey: event.altKey,
+          ...describe(event.target),
+        },
+        context,
+      );
+      if (action === null) {
+        return;
+      }
+      // Only now do we own the keystroke (Space would otherwise scroll).
+      event.preventDefault();
+      if (action === "hold-start") {
+        gavelRef.current?.start();
+      } else if (action === "open-next") {
+        const next = queue[0];
+        if (next !== undefined) {
+          void send("OpenLot", { lotId: next.lotId }, `${next.lotNumber} on the block`);
+        }
+      } else if (action === "toggle-pause") {
+        void (status === "paused"
+          ? send("ResumeAuction", {}, "Resumed")
+          : send("PauseAuction", {}, "Paused"));
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (resolveKeyUp({ key: event.key, ...describe(event.target) }) === "hold-stop") {
+        gavelRef.current?.stop();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+    // Re-subscribed whenever the room state the guards read changes. `send`
+    // closes over only stable values (slug prop, router, toast, setBusy), so it
+    // cannot go stale between these re-subscriptions.
+  }, [status, lot, queue, busy, send]);
   const grantable = view.owners.invites.filter(
     (entry) =>
       entry.acceptedBy !== null &&
@@ -139,15 +214,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               </Button>
               {lot !== null ? (
                 <>
-                  <Button
-                    onClick={() =>
-                      void send("CloseLot", { lotId: lot.lotId }, "Gavel — lot closed")
-                    }
-                    loading={busy}
-                    data-testid="cockpit-gavel"
-                  >
-                    Gavel (close lot)
-                  </Button>
+                  {/* v1.1 G2: closing a lot is a HOLD, not a click. */}
+                  <GavelButton
+                    ref={gavelRef}
+                    disabled={busy}
+                    onConfirm={() => {
+                      void send("CloseLot", { lotId: lot.lotId }, "Gavel — lot closed");
+                    }}
+                  />
                   <Button
                     variant="secondary"
                     onClick={() => void send("HoldLot", { lotId: lot.lotId }, "Lot frozen")}
@@ -187,6 +261,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                 Complete auction
               </Button>
             </div>
+            {/* v1.1 G1: shortcuts are discoverable, not folklore. */}
+            <p className="cockpit-keys" id="cockpit-gavel-hint" data-testid="cockpit-shortcuts">
+              {COCKPIT_SHORTCUTS.map((shortcut) => (
+                <span key={shortcut.keys}>
+                  <kbd>{shortcut.keys}</kbd> {shortcut.label}
+                </span>
+              ))}
+            </p>
           </Card>
 
           <Card data-testid="queue-card">

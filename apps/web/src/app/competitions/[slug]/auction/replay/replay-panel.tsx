@@ -13,6 +13,7 @@ import { Badge, Card } from "@desiauction/ui";
 import { useEffect, useMemo, useState } from "react";
 
 import type { ReplayViewerData } from "../../../../../server/auction/conduct-actions";
+import { formatTime } from "../../../../../lib/format-date";
 
 // THE REPLAY VIEWER (M-IP4-3). The founder scrubs through the immutable event
 // log; every frame is core's pure fold of events[0..n] — the EXACT reducer the
@@ -110,7 +111,7 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
         </div>
         <p className="competitions-hint" data-testid="replay-event">
           {event !== undefined
-            ? `#${String(event.seq)} · ${event.type} · ${new Date(event.atMs).toLocaleTimeString()}`
+            ? `#${String(event.seq)} · ${event.type} · ${formatTime(event.atMs)}`
             : "Before the first event — the initial scheduled state."}
         </p>
         {converged !== null ? (

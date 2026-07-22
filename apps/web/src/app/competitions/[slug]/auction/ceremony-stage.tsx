@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type CeremonyState } from "@desiauction/core";
+import type { CSSProperties } from "react";
 
 // The FLOODLIGHT ceremony stage (M-IP4-3). Presentation ONLY: renders the
 // deterministic ceremony phase derived from consecutive AuctionSnapshots.
@@ -22,6 +23,15 @@ const PHASE_TITLE: Record<CeremonyState["phase"], string> = {
   recovered: "ENGINE RECOVERED — STATE VERIFIED",
   completed: "AUCTION COMPLETE",
 };
+
+// The SOLD celebration is 30 fixed confetti pieces — a fixed count, no
+// randomness, so every connected surface (cockpit, stage, spectate, live)
+// renders the identical burst for the same moment, exactly as the ceremony
+// phases already do (each keyed on `ceremony.key`). The whole layer is
+// decorative (aria-hidden) and collapses to nothing under prefers-reduced-
+// motion; the static gold border on `.ceremony-sold` remains the non-motion
+// marker, so nothing about the announced outcome depends on animation.
+const CONFETTI = Array.from({ length: 30 }, (_, i) => i);
 
 export function CeremonyStage({
   snapshot,
@@ -50,6 +60,14 @@ export function CeremonyStage({
       data-testid="ceremony"
       data-phase={ceremony.phase}
     >
+      {ceremony.phase === "sold" ? (
+        <div className="ceremony-celebration" aria-hidden="true">
+          <span className="ceremony-glow" />
+          {CONFETTI.map((i) => (
+            <i key={i} className="ceremony-confetti" style={{ "--i": i } as CSSProperties} />
+          ))}
+        </div>
+      ) : null}
       <p className="ceremony-title" data-testid="ceremony-title">
         {PHASE_TITLE[ceremony.phase]}
       </p>
@@ -98,9 +116,18 @@ export function CeremonyStage({
           ) : null}
         </div>
       ) : (
-        <div className="ceremony-lot">
+        <div className="ceremony-lot ceremony-waiting">
+          <span className="ceremony-waiting-dot" aria-hidden />
+          <p className="ceremony-waiting-title">
+            {snapshot.lotsResolved === 0 ? "Ready" : "Between lots"}
+          </p>
           <p className="ceremony-meta" data-testid="ceremony-progress">
             {snapshot.lotsResolved}/{snapshot.lotsTotal} lots resolved
+          </p>
+          <p className="ceremony-waiting-hint">
+            {snapshot.lotsResolved === 0
+              ? `${String(snapshot.queue.length)} players in the queue — waiting for the auctioneer to open the first lot`
+              : "The next lot is coming up"}
           </p>
         </div>
       )}

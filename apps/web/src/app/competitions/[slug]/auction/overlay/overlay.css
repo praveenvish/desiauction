@@ -1,0 +1,285 @@
+/* OBS / stream overlay — a transparent, chrome-free broadcast composite.
+   Rendered "bare" (nav.ts). The page body is made transparent so the whole
+   surface can be an OBS browser source over camera/video. FLOODLIGHT tokens
+   only; the confetti burst is reused from auction.css. Presentation only. */
+
+/* Only the overlay route gets a transparent ground — scoped with :has so no
+   other page's body is affected. */
+html:has(.obs-overlay),
+body:has(.obs-overlay) {
+  background: transparent !important;
+}
+
+.obs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+
+/* --- top ticker: the running results crawl --------------------------------- */
+.obs-ticker {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: center;
+  height: 46px;
+  background: color-mix(in srgb, var(--surface-sunken) 82%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.obs-ticker-live {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--live);
+  background: color-mix(in srgb, var(--live) 12%, transparent);
+  border-right: 1px solid var(--border-subtle);
+}
+.obs-ticker-live::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--live);
+  box-shadow: 0 0 12px var(--live);
+}
+.obs-ticker-track {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+}
+.obs-ticker-move {
+  display: inline-block;
+  padding-left: 100%;
+  animation: obs-ticker 32s linear infinite;
+}
+.obs-ticker-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 28px;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+.obs-ticker-item b {
+  color: var(--text-heading);
+  font-weight: 700;
+}
+.obs-ticker-tag {
+  color: var(--live);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.obs-ticker-price {
+  color: var(--ceremony-gold);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes obs-ticker {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* --- reconnect chip -------------------------------------------------------- */
+.obs-conn {
+  position: absolute;
+  top: 58px;
+  left: 28px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full, 999px);
+  background: color-mix(in srgb, var(--warning-base) 22%, var(--surface-sunken));
+  border: 1px solid var(--warning-base);
+  color: var(--warning-strong);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* --- lower third: the anchor ----------------------------------------------- */
+.obs-lowerthird {
+  position: absolute;
+  left: 28px;
+  bottom: 28px;
+  max-width: min(72vw, 880px);
+  display: flex;
+  align-items: stretch;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 20px 60px -22px rgb(0 0 0 / 0.7);
+  overflow: hidden;
+}
+.obs-accent {
+  flex: none;
+  width: 6px;
+  background: var(--live);
+}
+.obs-lowerthird[data-tone="sold"] .obs-accent {
+  background: var(--ceremony-gold);
+}
+.obs-lowerthird[data-tone="unsold"] .obs-accent,
+.obs-lowerthird[data-tone="withdrawn"] .obs-accent {
+  background: var(--text-muted);
+}
+.obs-lt-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 26px;
+}
+.obs-lt-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.obs-lowerthird[data-tone="sold"] .obs-lt-eyebrow {
+  color: var(--ceremony-gold-deep);
+}
+.obs-lt-name {
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.8rem, 3.4vw, 3rem);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+.obs-lt-meta {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+.obs-lt-bid {
+  flex: none;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 18px 26px;
+  background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
+  border-left: 1px solid var(--border-subtle);
+}
+.obs-lt-bid-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.obs-lt-bid-amount {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--money-value);
+}
+.obs-lt-leader {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ceremony-gold);
+}
+.obs-lt-timer {
+  margin-top: 6px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.obs-lt-timer[data-hot="true"] {
+  color: var(--danger-strong);
+}
+
+/* --- brand / watch cluster (bottom-right) ---------------------------------- */
+.obs-brand {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  text-align: right;
+}
+.obs-sponsor {
+  padding: 9px 16px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full, 999px);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+.obs-sponsor span {
+  margin-right: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.obs-watch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--surface-sunken) 82%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg, 14px);
+}
+.obs-watch-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--live);
+}
+.obs-watch-url {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The reused confetti cascades the full frame on a sale. */
+.obs-celebration {
+  --fall: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obs-ticker-move {
+    animation: none;
+    padding-left: 18px;
+  }
+  .obs-ticker-live::before {
+    box-shadow: none;
+  }
+}

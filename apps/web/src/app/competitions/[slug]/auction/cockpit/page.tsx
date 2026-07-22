@@ -34,13 +34,13 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
                 <ButtonLink href={`/competitions/${slug}/auction/spectate`} variant="secondary">
                   Spectate
                 </ButtonLink>
-                <ButtonLink href={`/competitions/${slug}/auction`} variant="ghost">
+                <ButtonLink href={`/competitions/${slug}/auction`} variant="secondary">
                   Setup
                 </ButtonLink>
               </span>
             </div>
             <p className="competitions-hint">
-              Auction cockpit — every control is a command; the engine decides
+              Open lots, take bids, and call the gavel — every screen stays in sync.
             </p>
           </header>
           <CockpitPanel slug={slug} view={view} />
