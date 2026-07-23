@@ -1,0 +1,133 @@
+/* Shared styling for the cross-competition workspace indexes
+   (Auctions, Teams, Players, Registrations, Fixtures). */
+
+.ws {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ws-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ws-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.ws-row + .ws-row,
+.ws-list li + li .ws-row {
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+}
+
+.ws-row:hover {
+  background: var(--surface-sunken);
+}
+
+.ws-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.ws-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(140deg, var(--accent), var(--accent-pressed));
+  color: var(--text-on-accent);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-sm-size);
+}
+
+.ws-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ws-text strong {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-text span {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-meta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.ws-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.ws-stat b {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.ws-stat span {
+  font-family: var(--font-text);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ws-tags {
+  display: flex;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.ws-empty {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .ws-meta {
+    gap: var(--space-3);
+  }
+}

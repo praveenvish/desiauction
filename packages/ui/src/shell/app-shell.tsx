@@ -22,8 +22,8 @@ export interface ShellNavItem {
 
 export interface AppShellProps {
   nav: ShellNavItem[];
-  /** Secondary utility group rendered under the primary rail. */
-  navSecondary?: ShellNavItem[];
+  /** Extra groups rendered under the primary rail, each divided from the last. */
+  navGroups?: { key: string; label?: string; items: ShellNavItem[] }[];
   /** Injected link renderer (e.g. next/link). Defaults to <a>. */
   linkComponent?: ElementType;
   wordmark: ReactNode;
@@ -45,7 +45,7 @@ export interface AppShellProps {
 
 export function AppShell({
   nav,
-  navSecondary,
+  navGroups,
   linkComponent: Link = "a",
   wordmark,
   wordmarkHref = "/",
@@ -81,13 +81,13 @@ export function AppShell({
             <NavigationItem key={item.key} item={item} linkComponent={Link} />
           ))}
         </NavigationGroup>
-        {navSecondary !== undefined && navSecondary.length > 0 ? (
-          <NavigationGroup>
-            {navSecondary.map((item) => (
+        {(navGroups ?? []).map((group) => (
+          <NavigationGroup key={group.key} {...(group.label !== undefined ? { label: group.label } : {})}>
+            {group.items.map((item) => (
               <NavigationItem key={item.key} item={item} linkComponent={Link} />
             ))}
           </NavigationGroup>
-        ) : null}
+        ))}
         {railFooter !== undefined ? (
           <div className={styles["rail-footer"]}>{railFooter}</div>
         ) : null}

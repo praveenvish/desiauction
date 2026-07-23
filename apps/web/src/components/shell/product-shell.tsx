@@ -127,6 +127,70 @@ const RAIL_TITLES: Record<string, string> = {
   help: "Help",
 };
 
+/** Titles for surfaces outside the five-item rail. Longest prefix wins. */
+const SURFACE_TITLES: [string, string][] = [
+  ["/auctions", "Auctions"],
+  ["/teams", "Teams"],
+  ["/players", "Players"],
+  ["/registrations", "Registrations"],
+  ["/fixtures", "Fixtures"],
+  ["/inbox", "Notifications"],
+  ["/account", "Settings"],
+];
+
+const box = { viewBox: "0 0 24 24", fill: "none", width: 20, height: 20, "aria-hidden": true };
+
+function IconGavel() {
+  return (
+    <svg {...box}>
+      <path
+        d="M4 20 13 11M16 8l-3-3 4-1 3 3-1 4-3-3zM13 11l-3-3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconPerson() {
+  return (
+    <svg {...box}>
+      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M5 21a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconChecklist() {
+  return (
+    <svg {...box}>
+      <path
+        d="m9 11 3 3L22 4M21 12v7H3V5h12"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconCalendar() {
+  return (
+    <svg {...box}>
+      <path
+        d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** The design system has no gear glyph; the utility group needs one. */
 function IconSettings() {
   return (
@@ -533,7 +597,9 @@ export function ProductShell({
   }
 
   const activeKey = activeRailKey(pathname);
-  const railTitle = activeKey !== null ? RAIL_TITLES[activeKey] : undefined;
+  const railTitle =
+    (activeKey !== null ? RAIL_TITLES[activeKey] : undefined) ??
+    SURFACE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
   const nav: ShellNavItem[] = RAIL.map((item) => ({
     ...item,
     icon: RAIL_ICONS[item.key],
@@ -666,20 +732,66 @@ export function ProductShell({
     <>
       <AppShell
         nav={nav}
-        navSecondary={[
+        navGroups={[
           {
-            key: "inbox",
-            label: "Notifications",
-            href: "/inbox",
-            icon: <IconBell />,
-            active: pathname.startsWith("/inbox"),
+            key: "workspace",
+            label: "Workspace",
+            items: [
+              {
+                key: "auctions",
+                label: "Auctions",
+                href: "/auctions",
+                icon: <IconGavel />,
+                active: pathname.startsWith("/auctions"),
+              },
+              {
+                key: "teams",
+                label: "Teams",
+                href: "/teams",
+                icon: <IconUsers />,
+                active: pathname.startsWith("/teams"),
+              },
+              {
+                key: "players",
+                label: "Players",
+                href: "/players",
+                icon: <IconPerson />,
+                active: pathname.startsWith("/players"),
+              },
+              {
+                key: "registrations",
+                label: "Registrations",
+                href: "/registrations",
+                icon: <IconChecklist />,
+                active: pathname.startsWith("/registrations"),
+              },
+              {
+                key: "fixtures",
+                label: "Fixtures",
+                href: "/fixtures",
+                icon: <IconCalendar />,
+                active: pathname.startsWith("/fixtures"),
+              },
+            ],
           },
           {
-            key: "account",
-            label: "Settings",
-            href: "/account",
-            icon: <IconSettings />,
-            active: pathname.startsWith("/account"),
+            key: "utility",
+            items: [
+              {
+                key: "inbox",
+                label: "Notifications",
+                href: "/inbox",
+                icon: <IconBell />,
+                active: pathname.startsWith("/inbox"),
+              },
+              {
+                key: "account",
+                label: "Settings",
+                href: "/account",
+                icon: <IconSettings />,
+                active: pathname.startsWith("/account"),
+              },
+            ],
           },
         ]}
         linkComponent={Link}
