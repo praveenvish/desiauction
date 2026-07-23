@@ -11,7 +11,7 @@ import {
   newId,
   organizations,
   orgMembers,
-  seasons,
+  tournaments,
   teams,
   type Db,
 } from "@desiauction/db";
@@ -19,46 +19,47 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { storage } from "../media";
 
-// Competition + Season + Team persistence (IP-3 §4). All rules come from core;
+// Competition + Tournament + Team persistence (IP-3 §4). All rules come from core;
 // this module fetches/writes and writes audit. Web actions are the only callers.
 
-export interface SeasonSummary {
+export interface TournamentSummary {
   id: string;
   name: string;
-  year: number;
+  slug: string;
 }
 
-export async function createSeason(
+export async function createTournament(
   db: Db,
   orgId: string,
   personId: string,
   name: string,
-  year: number,
-): Promise<SeasonSummary> {
+): Promise<TournamentSummary> {
   const valid = validateName(name);
   if (!valid.ok) {
-    throw new Error("season name must be at least 3 characters");
+    throw new Error("tournament name must be at least 3 characters");
   }
   const id = newId();
-  await db.insert(seasons).values({ id, orgId, name: valid.value, year, createdBy: personId });
+  // ULID suffix keeps the slug unique without a retry loop (competitions pattern).
+  const slug = `${slugifyName(valid.value)}-${id.slice(-4).toLowerCase()}`;
+  await db.insert(tournaments).values({ id, orgId, name: valid.value, slug, createdBy: personId });
   await db.insert(auditLog).values({
     id: newId(),
     actor: personId,
-    action: "season.created",
+    action: "tournament.created",
     scopeType: "org",
     scopeId: orgId,
     subject: id,
-    meta: { name: valid.value, year: String(year) },
+    meta: { name: valid.value, slug },
   });
-  return { id, name: valid.value, year };
+  return { id, name: valid.value, slug };
 }
 
-export async function seasonsOf(db: Db, orgId: string): Promise<SeasonSummary[]> {
+export async function tournamentsOf(db: Db, orgId: string): Promise<TournamentSummary[]> {
   return db
-    .select({ id: seasons.id, name: seasons.name, year: seasons.year })
-    .from(seasons)
-    .where(eq(seasons.orgId, orgId))
-    .orderBy(desc(seasons.year));
+    .select({ id: tournaments.id, name: tournaments.name, slug: tournaments.slug })
+    .from(tournaments)
+    .where(eq(tournaments.orgId, orgId))
+    .orderBy(tournaments.name);
 }
 
 export interface CompetitionSummary {
@@ -76,7 +77,8 @@ export interface CompetitionSummary {
 
 export interface NewCompetition {
   name: string;
-  seasonId?: string;
+  /** The recurring tournament this edition belongs to. */
+  tournamentId?: string;
   location?: string;
   startsOn?: string;
   endsOn?: string;
@@ -100,7 +102,7 @@ export async function createCompetition(
     orgId,
     name: valid.value,
     slug,
-    ...(input.seasonId !== undefined ? { seasonId: input.seasonId } : {}),
+    ...(input.tournamentId !== undefined ? { tournamentId: input.tournamentId } : {}),
     ...(input.location !== undefined && input.location !== "" ? { location: input.location } : {}),
     ...(input.startsOn !== undefined && input.startsOn !== "" ? { startsOn: input.startsOn } : {}),
     ...(input.endsOn !== undefined && input.endsOn !== "" ? { endsOn: input.endsOn } : {}),

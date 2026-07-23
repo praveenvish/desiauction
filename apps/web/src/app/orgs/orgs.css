@@ -163,3 +163,179 @@
     width: 100%;
   }
 }
+
+/* ---------- org catalogue: tournaments and the seasons under them ---------- */
+.cat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cat-more {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.cat-more:hover {
+  text-decoration: underline;
+}
+
+.cat-group {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.cat-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+a.cat-group-head:hover {
+  background: var(--accent-subtle);
+}
+
+.cat-group-head:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.cat-group-name {
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.cat-group-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.cat-group-empty {
+  margin: 0;
+  padding: var(--space-4);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.cat-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* One row per season: name, its counts, its state. */
+.cat-edition {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.cat-edition:hover {
+  background: var(--surface-sunken);
+}
+
+.cat-edition:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.cat-edition-name {
+  flex: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.cat-edition-meta {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cat-blank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-xl);
+  text-align: center;
+}
+
+.cat-blank p {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.cat-blank-cta {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.cat-blank-cta:hover {
+  text-decoration: underline;
+}
+
+/* Breadcrumb: the way back up the chain, org -> tournament -> season. */
+.cat-crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.cat-crumbs a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.cat-crumbs a:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.cat-crumbs [aria-current="page"] {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}

@@ -22,6 +22,9 @@ export interface PublicShellFooterGroup {
 export interface PublicShellProps {
   wordmark: ReactNode;
   wordmarkHref?: string;
+  /** The mark rendered in the wordmark chip. Defaults to the built-in glyph so
+      packages/ui carries no asset of its own; the app passes the real logo. */
+  glyph?: ReactNode;
   /** Header links (only ones that exist — no dead links, PX-2 ruling). */
   nav?: PublicShellLink[];
   /** Right-side header slot: Sign in / user chip. */

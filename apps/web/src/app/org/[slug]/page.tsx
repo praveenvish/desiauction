@@ -2,8 +2,10 @@ import { ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { orgView } from "../../../server/orgs/actions";
+import { orgCatalogue } from "../../../server/orgs/catalogue";
 import { financeAuthority } from "../../../server/financial-operations/actions";
 import { moneyAuthority } from "../../../server/settlement/actions";
+import { CataloguePanel } from "./catalogue-panel";
 import { FinanceAuthorityPanel } from "./finance-authority";
 import { MembersPanel } from "./members-panel";
 import { MoneyAuthorityPanel } from "./money-authority";
@@ -27,7 +29,11 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   // Never the dashboards: a door must not cost what the room costs (the
   // settlement desk folds every case; the finance board double-derives
   // certification over every stream).
-  const [authority, finance] = await Promise.all([moneyAuthority(slug), financeAuthority(slug)]);
+  const [authority, finance, catalogue] = await Promise.all([
+    moneyAuthority(slug),
+    financeAuthority(slug),
+    orgCatalogue(slug),
+  ]);
   return (
     <ToastProvider>
       <main className="org-home">
@@ -54,6 +60,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
               </ButtonLink>
             </span>
           </div>
+          {catalogue !== null ? <CataloguePanel catalogue={catalogue} /> : null}
           <MembersPanel view={view} slug={slug} />
           {authority !== null ? <MoneyAuthorityPanel slug={slug} authority={authority} /> : null}
           {finance !== null ? <FinanceAuthorityPanel slug={slug} authority={finance} /> : null}

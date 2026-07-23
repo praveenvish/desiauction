@@ -15,7 +15,7 @@ import {
   otpInbox,
   people,
   registrations as registrationsTable,
-  seasons as seasonsTable,
+  tournaments as tournamentsTable,
   sessions,
   teams as teamsTable,
   type DbHandle,
@@ -34,8 +34,8 @@ import {
   createCompetition,
   createTeam,
   resolveCompetition,
-  seasonsOf,
-  createSeason,
+  tournamentsOf,
+  createTournament,
   setTeamCoach,
   teamsOf,
 } from "./competitions";
@@ -99,7 +99,7 @@ afterAll(async () => {
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));
     await db.delete(teamsTable).where(inArray(teamsTable.orgId, orgIds));
     await db.delete(competitionsTable).where(inArray(competitionsTable.orgId, orgIds));
-    await db.delete(seasonsTable).where(inArray(seasonsTable.orgId, orgIds));
+    await db.delete(tournamentsTable).where(inArray(tournamentsTable.orgId, orgIds));
     await db.delete(grantsTable).where(inArray(grantsTable.scopeId, orgIds));
     await db.delete(orgMembers).where(inArray(orgMembers.orgId, orgIds));
     await db.delete(auditLog).where(inArray(auditLog.scopeId, [...orgIds, ...ids]));
@@ -128,12 +128,12 @@ describe("COMPETITION REGRESSION — domain contract", () => {
     ).rejects.toThrow(ForbiddenError);
   });
 
-  it("creates a season and a competition; the competition starts in draft", async () => {
-    const season = await createSeason(db, orgX.id, owner, `Season ${RUN}`, 2026);
-    expect((await seasonsOf(db, orgX.id)).map((s) => s.id)).toContain(season.id);
+  it("creates a tournament and a competition; the competition starts in draft", async () => {
+    const tournament = await createTournament(db, orgX.id, owner, `Tournament ${RUN}`);
+    expect((await tournamentsOf(db, orgX.id)).map((t) => t.id)).toContain(tournament.id);
     const competition = await createCompetition(db, orgX.id, owner, {
       name: `MPL ${RUN}`,
-      seasonId: season.id,
+      tournamentId: tournament.id,
       location: "Malad",
       startsOn: "2026-08-01",
       endsOn: "2026-08-15",
@@ -323,7 +323,7 @@ describe("COMPETITION REGRESSION — domain contract", () => {
     await handle.sql.unsafe(`drop role if exists ${role}`);
     await handle.sql.unsafe(`create role ${role} login password 'probe' nosuperuser nobypassrls`);
     await handle.sql.unsafe(
-      `grant select on seasons, competitions, teams, registrations to ${role}`,
+      `grant select on tournaments, competitions, teams, registrations to ${role}`,
     );
     const url = new URL(env.DATABASE_URL);
     const probeHandle = createDb(

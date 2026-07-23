@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { BrandLockup } from "../../components/shell/brand";
 import { currentSession } from "../../server/auth/actions";
 import { LoginForm } from "./login-form";
 import { PasskeyLogin } from "./passkey-login";
@@ -39,7 +40,9 @@ export default async function LoginPage({
       </aside>
       <div className="login-side">
         <div className="login-panel">
-          <p className="login-eyebrow">DesiAuction</p>
+          <div className="login-lockup">
+            <BrandLockup width={200} />
+          </div>
           <h1>Sign in</h1>
           <p className="login-sub">
             {params.next !== undefined

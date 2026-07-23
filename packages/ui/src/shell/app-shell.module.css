@@ -49,6 +49,8 @@
   background: linear-gradient(150deg, var(--ceremony-gold), var(--ceremony-gold-deep));
   color: var(--identity-field);
   border: 1px solid color-mix(in srgb, var(--ceremony-gold-deep) 55%, transparent);
+  /* A raster mark is clipped to the chip's radius; the inline glyph ignores it. */
+  overflow: hidden;
   box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--ceremony-gold-deep) 60%, transparent);
   transition: transform var(--duration-base) var(--ease-out);
 }

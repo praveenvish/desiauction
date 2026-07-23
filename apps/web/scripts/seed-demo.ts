@@ -63,7 +63,7 @@ import {
   payments as paymentsTable,
   people,
   registrations,
-  seasons,
+  tournaments,
   settlementCases,
   settlementEvents,
   settlementObligations,
@@ -201,7 +201,7 @@ async function resetDemoOrg(): Promise<void> {
   await db.delete(fixtures).where(eq(fixtures.orgId, orgId));
   await db.delete(grounds).where(eq(grounds.orgId, orgId));
   await db.delete(venues).where(eq(venues.orgId, orgId));
-  await db.delete(seasons).where(eq(seasons.orgId, orgId));
+  await db.delete(tournaments).where(eq(tournaments.orgId, orgId));
   await db.delete(teams).where(eq(teams.orgId, orgId));
   await db.delete(competitions).where(eq(competitions.orgId, orgId));
   await db.delete(invites).where(eq(invites.orgId, orgId));

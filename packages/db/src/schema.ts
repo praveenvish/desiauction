@@ -165,17 +165,22 @@ export const auditLog = pgTable(
 // --- Competition domain (IP-3 §4). Every row is org-scoped (C-13, invariant 1);
 // RLS (read USING + write WITH CHECK) is applied in migration 0005 from day one.
 
-export const seasons = pgTable(
-  "seasons",
+/**
+ * The durable name a competition recurs under — "BPL". Each competition
+ * pointing at it is one edition: BPL 1, BPL 2, BPL 3. The tournament carries
+ * no status of its own; the edition is the thing that runs.
+ */
+export const tournaments = pgTable(
+  "tournaments",
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     name: text("name").notNull(),
-    year: integer("year").notNull(),
+    slug: text("slug").notNull().unique(),
     createdBy: char("created_by", { length: 26 }).notNull(),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (table) => [index("seasons_org_idx").on(table.orgId)],
+  (table) => [index("tournaments_org_idx").on(table.orgId)],
 );
 
 export const competitions = pgTable(
@@ -183,7 +188,8 @@ export const competitions = pgTable(
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
-    seasonId: char("season_id", { length: 26 }),
+    /** The recurring tournament this is an edition of; null for a one-off. */
+    tournamentId: char("tournament_id", { length: 26 }),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     status: text("status", {
@@ -202,7 +208,10 @@ export const competitions = pgTable(
     createdBy: char("created_by", { length: 26 }).notNull(),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (table) => [index("competitions_org_idx").on(table.orgId)],
+  (table) => [
+    index("competitions_org_idx").on(table.orgId),
+    index("competitions_tournament_idx").on(table.tournamentId),
+  ],
 );
 
 export const teams = pgTable(

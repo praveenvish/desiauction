@@ -36,6 +36,7 @@ import {
   IconPlay,
 } from "../../components/marketing/icons";
 import { track } from "../../lib/telemetry";
+import { BrandMark } from "./brand";
 import {
   ADMIN_TABS,
   PUBLIC_DESTINATIONS,
@@ -446,6 +447,7 @@ export function ProductShell({
       <PublicShell
         wordmark="DesiAuction"
         wordmarkHref="/"
+        glyph={<BrandMark size={30} />}
         nav={[
           { label: "Features", href: "/features" },
           { label: "Pricing", href: "/pricing" },
@@ -644,6 +646,10 @@ export function ProductShell({
     const slug = orgMatch[1] as string;
     const org = orgs.find((entry) => entry.slug === slug);
     if (org !== undefined) {
+      const onVenues = pathname.includes("/venues");
+      // The tournament's own name is only known to the page (it is an async
+      // read), so the trail carries the level and the page's h1 carries the name.
+      const onTournament = /^\/org\/[^/]+\/t\//.test(pathname);
       contextBarNode = (
         <ContextBar
           breadcrumb={
@@ -653,9 +659,10 @@ export function ProductShell({
                 { label: "Organizations", href: "/orgs" },
                 {
                   label: org.name,
-                  ...(pathname.includes("/venues") ? { href: `/org/${slug}` } : {}),
+                  ...(onVenues || onTournament ? { href: `/org/${slug}` } : {}),
                 },
-                ...(pathname.includes("/venues") ? [{ label: "Venues" }] : []),
+                ...(onVenues ? [{ label: "Venues" }] : []),
+                ...(onTournament ? [{ label: "Tournament" }] : []),
               ]}
             />
           }
@@ -701,6 +708,7 @@ export function ProductShell({
         linkComponent={Link}
         wordmark="DesiAuction"
         wordmarkHref="/home"
+        glyph={<BrandMark size={32} />}
         tagline="Bid · Build · Win"
         {...(contextBarNode === null && railTitle !== undefined ? { pageTitle: railTitle } : {})}
         contextBar={contextBarNode}

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { BrandGlyph, IconChevronDown } from "./icons";
 import { PopoverMenu } from "./popover-menu";
 import { PublicMobileMenu } from "./public-mobile-menu";
@@ -15,10 +17,10 @@ export type {
 
 /** The brand glyph in its chip. Decorative — the shared BrandGlyph is also used
     by the console AppShell so the two headers can never drift. */
-function WordmarkGlyph() {
+function WordmarkGlyph({ glyph }: { glyph: ReactNode }) {
   return (
     <span className={styles["wordmark-glyph"]} aria-hidden>
-      <BrandGlyph />
+      {glyph}
     </span>
   );
 }
@@ -27,6 +29,7 @@ function WordmarkGlyph() {
 export function PublicShell({
   wordmark,
   wordmarkHref = "/",
+  glyph = <BrandGlyph />,
   nav = [],
   headerAction,
   footerLinks = [],
@@ -47,7 +50,7 @@ export function PublicShell({
       <header className={styles["header"]} data-theme="floodlight">
         <div className={styles["header-inner"]}>
           <Link href={wordmarkHref} className={styles["wordmark"]}>
-            <WordmarkGlyph />
+            <WordmarkGlyph glyph={glyph} />
             {wordmark}
           </Link>
           {nav.length > 0 ? (
@@ -94,7 +97,7 @@ export function PublicShell({
             <div className={styles["footer-grid"]}>
               <div className={styles["footer-brand"]}>
                 <span className={styles["wordmark"]}>
-                  <WordmarkGlyph />
+                  <WordmarkGlyph glyph={glyph} />
                   {wordmark}
                 </span>
                 {footerTagline !== undefined ? (

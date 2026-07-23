@@ -57,6 +57,9 @@ grant insert on org_members, grants, audit_log to desiauction_system;
 -- DO NOTHING needs SELECT to detect the conflict target under postgres).
 grant select on org_members to desiauction_system;
 grant select on auction_owner_invites, auctions, competitions, teams to desiauction_system;
+-- Tournaments join the cross-org listings: a competition renders under the
+-- tournament it is an edition of, so the pre-tenant path reads the parent name.
+grant select on tournaments to desiauction_system;
 grant select on fixtures, grounds, venues to desiauction_system;
 
 -- Service writer roles (Go-Live workstream 4): BYPASSRLS but NOT superuser.

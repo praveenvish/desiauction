@@ -16,7 +16,7 @@ import {
   otpInbox,
   people,
   registrations as registrationsTable,
-  seasons as seasonsTable,
+  tournaments as tournamentsTable,
   sessions,
   teams as teamsTable,
   type DbHandle,
@@ -97,7 +97,7 @@ afterAll(async () => {
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));
     await db.delete(teamsTable).where(inArray(teamsTable.orgId, orgIds));
     await db.delete(competitionsTable).where(inArray(competitionsTable.orgId, orgIds));
-    await db.delete(seasonsTable).where(inArray(seasonsTable.orgId, orgIds));
+    await db.delete(tournamentsTable).where(inArray(tournamentsTable.orgId, orgIds));
     await db.delete(grantsTable).where(inArray(grantsTable.scopeId, orgIds));
     await db.delete(orgMembers).where(inArray(orgMembers.orgId, orgIds));
     await db.delete(auditLog).where(inArray(auditLog.scopeId, [...orgIds, ...ids]));

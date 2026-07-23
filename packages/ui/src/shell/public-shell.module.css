@@ -138,6 +138,8 @@ a.wordmark:focus-visible {
   background: var(--identity-field);
   border: 1px solid var(--identity-line);
   color: var(--identity-accent);
+  /* A raster mark is clipped to the chip's radius; the inline glyph ignores it. */
+  overflow: hidden;
   transition:
     transform var(--duration-base) var(--ease-out),
     box-shadow var(--duration-base) var(--ease-out);

@@ -28,6 +28,9 @@ export interface AppShellProps {
   linkComponent?: ElementType;
   wordmark: ReactNode;
   wordmarkHref?: string;
+  /** The mark rendered in the wordmark chip. Defaults to the built-in glyph so
+      packages/ui carries no asset of its own; the app passes the real logo. */
+  glyph?: ReactNode;
   /** Small line under the wordmark in the sidebar (brand tagline). */
   tagline?: ReactNode;
   /** Current surface name, shown at the left of the top bar. */
@@ -49,6 +52,7 @@ export function AppShell({
   linkComponent: Link = "a",
   wordmark,
   wordmarkHref = "/",
+  glyph = <BrandGlyph />,
   tagline,
   pageTitle,
   search,
@@ -60,7 +64,7 @@ export function AppShell({
   const brand = (
     <Link href={wordmarkHref} className={styles["wordmark"]}>
       <span className={styles["wordmark-glyph"]} aria-hidden>
-        <BrandGlyph />
+        {glyph}
       </span>
       <span className={styles["wordmark-text"]}>{wordmark}</span>
     </Link>
