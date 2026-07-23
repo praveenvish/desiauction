@@ -48,6 +48,7 @@ import {
   sectionLabel,
   shellKind,
 } from "./nav";
+import { ThemeToggle } from "./theme-toggle";
 import "./product-shell.css";
 
 export interface ShellSession {
@@ -734,6 +735,7 @@ export function ProductShell({
             >
               <IconSearch />
             </button>
+            <ThemeToggle />
             <BellLink latestEventAt={latestEventAt} pathname={pathname} />
             {orgs.length > 1 ? (
               <span className="shell-desktop-only">

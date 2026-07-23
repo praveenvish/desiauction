@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { ProductShell } from "../components/shell/product-shell";
+import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
 import { adminNavVisible } from "../server/admin/actions";
 import { currentSession, logoutAction } from "../server/auth/actions";
 import { latestSecurityEventAt } from "../server/auth/security-events";
@@ -53,8 +54,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     canSettle: settlementOrgs.has(competition.orgId),
   }));
   return (
-    <html lang="en" data-theme="daylight">
+    // `suppressHydrationWarning`: the bootstrap below rewrites `data-theme`
+    // before React hydrates, which is a deliberate server/client difference.
+    <html lang="en" data-theme="daylight" suppressHydrationWarning>
       <body>
+        {/* Replay the remembered console theme before first paint (no flash). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <ProductShell
           session={session !== null ? { name: session.name, phone: session.phone } : null}
           orgs={orgs.map((org) => ({
