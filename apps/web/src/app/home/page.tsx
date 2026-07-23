@@ -18,6 +18,7 @@ import { competitionsView, registrationDashboard } from "../../server/competitio
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { myRegistrations } from "../../server/competition/public";
 import { homeDashboard } from "../../server/home/dashboard";
+import type { HomeDashboardData, HomeStages } from "../../server/home/dashboard";
 import { HomeShortcuts } from "./home-shortcuts";
 import "./home.css";
 
@@ -281,48 +282,74 @@ const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * The platform in one row. Every tournament walks these four stages, so the
  * strip doubles as an explanation of what DesiAuction does and a read on where
  * this organiser's competitions actually are.
+ *
+ * Each stage carries the number that matters AT that stage. That is deliberate:
+ * a separate grid of stat tiles sat directly under this strip and restated the
+ * same facts in different units — "Auction night 0" over "Active auctions 0",
+ * "Settlement 1" over "Collected", and a "Registrations" tile counting players
+ * beside a "Registration" stage counting competitions. Nine cards, five facts.
+ * The counts belong to the stages that own them.
  */
-const LIFECYCLE: {
-  key: "setup" | "registration" | "auction" | "settlement";
+function lifecycleFor(
+  dash: HomeDashboardData,
+  liveCount: number,
+): {
+  key: keyof HomeStages;
   name: string;
-  blurb: string;
+  detail: string;
   tone: string;
   icon: ReactNode;
   href: string;
-}[] = [
-  {
-    key: "setup",
-    name: "Set up",
-    blurb: "Teams, rules, purse",
-    tone: "info",
-    icon: <Glyph d={G.trophy} />,
-    href: "/competitions",
-  },
-  {
-    key: "registration",
-    name: "Registration",
-    blurb: "Players sign up, you approve",
-    tone: "green",
-    icon: <Glyph d={G.check} />,
-    href: "/competitions",
-  },
-  {
-    key: "auction",
-    name: "Auction night",
-    blurb: "Live bidding for the pool",
-    tone: "gold",
-    icon: <Glyph d={G.gavel} />,
-    href: "/competitions",
-  },
-  {
-    key: "settlement",
-    name: "Settlement",
-    blurb: "Collect and close the books",
-    tone: "violet",
-    icon: <Glyph d={G.rupee} />,
-    href: "/money",
-  },
-];
+}[] {
+  const registered = dash.stats.registrations;
+  return [
+    {
+      key: "setup",
+      name: "Set up",
+      detail: "Teams, rules and purse",
+      tone: "info",
+      icon: <Glyph d={G.trophy} />,
+      href: "/competitions",
+    },
+    {
+      key: "registration",
+      name: "Registration",
+      detail:
+        registered > 0
+          ? `${registered.toLocaleString("en-IN")} registered · ${dash.stats.approvedRegistrations.toLocaleString("en-IN")} approved`
+          : "No entries yet",
+      tone: "green",
+      icon: <Glyph d={G.check} />,
+      href: "/competitions",
+    },
+    {
+      key: "auction",
+      name: "Auction night",
+      detail:
+        liveCount > 0
+          ? `${String(liveCount)} live right now`
+          : dash.stats.bids > 0
+            ? `${dash.stats.bids.toLocaleString("en-IN")} bids placed`
+            : "Nothing live",
+      tone: "gold",
+      icon: <Glyph d={G.gavel} />,
+      href: "/competitions",
+    },
+    {
+      key: "settlement",
+      name: "Settlement",
+      detail:
+        dash.money.outstandingPaise > 0
+          ? `${rupeesShort(dash.money.outstandingPaise)} still outstanding`
+          : dash.stats.collectedPaise > 0
+            ? `${rupeesShort(dash.stats.collectedPaise)} collected · settled`
+            : "Nothing due yet",
+      tone: "violet",
+      icon: <Glyph d={G.rupee} />,
+      href: "/money",
+    },
+  ];
+}
 
 export default async function HomePage() {
   const session = await currentSession();
@@ -380,63 +407,18 @@ export default async function HomePage() {
   ).length;
   const liveCount = dash.auctions.filter((auction) => auction.status === "live").length;
 
-  const stats: {
-    label: string;
-    value: string;
-    hint?: string;
-    tone: string;
-    icon: ReactNode;
-    href: string;
-  }[] = [
-    {
-      label: "Competitions",
-      value: String(dash.stats.competitions),
-      hint: `${String(openCount)} accepting entries`,
-      tone: "accent",
-      icon: <Glyph d={G.trophy} />,
-      href: "/competitions",
-    },
-    {
-      label: "Registrations",
-      value: dash.stats.registrations.toLocaleString("en-IN"),
-      hint: `${dash.stats.approvedRegistrations.toLocaleString("en-IN")} approved`,
-      tone: "green",
-      icon: <Glyph d={G.users} />,
-      href: "/competitions",
-    },
-    {
-      label: "Active auctions",
-      value: String(dash.stats.activeAuctions),
-      hint: liveCount > 0 ? `${String(liveCount)} live now` : "none live",
-      tone: "gold",
-      icon: <Glyph d={G.gavel} />,
-      href: "/competitions",
-    },
-    {
-      label: "Collected",
-      value: rupeesShort(dash.stats.collectedPaise),
-      hint:
-        dash.money.outstandingPaise > 0
-          ? `${rupeesShort(dash.money.outstandingPaise)} outstanding`
-          : "fully settled",
-      tone: "info",
-      icon: <Glyph d={G.rupee} />,
-      href: "/money",
-    },
-    {
-      label: "Bids placed",
-      value: dash.stats.bids.toLocaleString("en-IN"),
-      tone: "violet",
-      icon: <Glyph d={G.chart} />,
-      href: "/competitions",
-    },
-  ];
+  // Portfolio context belongs in the header line, not in a card of its own.
+  const headline = [
+    `${String(dash.stats.competitions)} competition${dash.stats.competitions === 1 ? "" : "s"}`,
+    ...(openCount > 0 ? [`${String(openCount)} accepting entries`] : []),
+    ...(liveCount > 0 ? [`${String(liveCount)} auction live now`] : []),
+  ].join(" · ");
 
   return (
     <main className="home">
       <PageHeader
         title={greeting}
-        subtitle="Here's what's happening across your competitions."
+        subtitle={headline}
         actions={
           view.orgs.length > 0 ? (
             <ButtonLink href="/competitions">Create a competition</ButtonLink>
@@ -457,7 +439,7 @@ export default async function HomePage() {
         <>
           {/* ---- lifecycle: what the platform does, and where your work sits ---- */}
           <section className="home-flow" aria-label="Competition lifecycle">
-            {LIFECYCLE.map((stage, index) => {
+            {lifecycleFor(dash, liveCount).map((stage, index) => {
               const count = dash.stages[stage.key];
               return (
                 <Link
@@ -472,28 +454,12 @@ export default async function HomePage() {
                       <span className="home-step-name">{stage.name}</span>
                       <span className="home-step-count">{count}</span>
                     </span>
-                    <span className="home-step-blurb">{stage.blurb}</span>
+                    <span className="home-step-blurb">{stage.detail}</span>
                   </span>
                 </Link>
               );
             })}
           </section>
-
-          {/* ---- headline stats ---- */}
-          <div className="home-stats" data-testid="home-stats">
-            {stats.map((stat) => (
-              <Link key={stat.label} href={stat.href} className="home-tile">
-                <span className={`home-ic home-ic--${stat.tone}`}>{stat.icon}</span>
-                <span className="home-tile-body">
-                  <span className="home-tile-label">{stat.label}</span>
-                  <span className="home-tile-value">{stat.value}</span>
-                  {stat.hint !== undefined ? (
-                    <span className="home-tile-hint">{stat.hint}</span>
-                  ) : null}
-                </span>
-              </Link>
-            ))}
-          </div>
 
           <div className="home-main">
             {/* ================= LEFT ================= */}

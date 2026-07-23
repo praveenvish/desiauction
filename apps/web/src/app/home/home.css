@@ -82,7 +82,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-1);
-  padding: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   background: var(--surface-raised);
@@ -156,10 +156,11 @@
   white-space: nowrap;
 }
 
+/* Real figures now, not descriptive filler — worth reading, so not muted. */
 .home-step-blurb {
   font-family: var(--font-text);
   font-size: var(--text-xs-size);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -248,67 +249,6 @@
 
 .home-blank-cta:hover {
   text-decoration: underline;
-}
-
-/* ---------- headline stats ---------- */
-.home-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
-  gap: var(--space-3);
-}
-
-.home-tile {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-1);
-  text-decoration: none;
-  color: inherit;
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
-}
-
-.home-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-2);
-  border-color: var(--border-strong);
-}
-
-.home-tile-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.home-tile-label {
-  font-family: var(--font-text);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.01em;
-  color: var(--text-secondary);
-}
-
-.home-tile-value {
-  font-family: var(--font-display);
-  font-size: 28px;
-  line-height: 1.12;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.02em;
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
-}
-
-.home-tile-hint {
-  font-family: var(--font-text);
-  font-size: var(--text-xs-size);
-  color: var(--text-muted);
 }
 
 /* ---------- main two-column body ---------- */
@@ -424,7 +364,6 @@
 .home-attn:focus-visible,
 .home-auction:focus-visible,
 .home-event:focus-visible,
-.home-tile:focus-visible,
 .home-money-cell:focus-visible,
 .home-tcell:focus-visible,
 .home-card-link:focus-visible {
@@ -813,13 +752,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-tile,
   .home-step,
   .home-card-link {
     transition: none;
   }
 
-  .home-tile:hover,
   .home-card-link:hover {
     transform: none;
   }
