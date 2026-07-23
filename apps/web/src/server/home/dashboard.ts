@@ -77,12 +77,17 @@ export interface HomeMoney {
  * Where each competition sits on the platform's one lifecycle. This is the
  * product in a single row: set it up, take registrations, run auction night,
  * settle the money.
+ *
+ * Every figure here is scoped to the competitions actually AT that stage, not
+ * to the whole portfolio. A stage holding no competitions must not report
+ * activity — "0 competitions" beside "15 registered" reads as a contradiction,
+ * because the 15 belong to a competition that has already moved on.
  */
 export interface HomeStages {
-  setup: number;
-  registration: number;
-  auction: number;
-  settlement: number;
+  setup: { competitions: number; teams: number };
+  registration: { competitions: number; registered: number; approved: number };
+  auction: { competitions: number; live: number; bids: number };
+  settlement: { competitions: number; collectedPaise: number; outstandingPaise: number };
 }
 
 export interface HomeDashboardData {
@@ -103,7 +108,12 @@ const EMPTY: HomeDashboardData = {
     approvedRegistrations: 0,
     collectedPaise: 0,
   },
-  stages: { setup: 0, registration: 0, auction: 0, settlement: 0 },
+  stages: {
+    setup: { competitions: 0, teams: 0 },
+    registration: { competitions: 0, registered: 0, approved: 0 },
+    auction: { competitions: 0, live: 0, bids: 0 },
+    settlement: { competitions: 0, collectedPaise: 0, outstandingPaise: 0 },
+  },
   auctions: [],
   top: [],
   activity: [],
@@ -184,12 +194,15 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
           .where(inArray(lots.auctionId, auctionIds))
           .groupBy(lots.auctionId)
       : Promise.resolve([]),
+    // Grouped by auction, not totalled: the lifecycle strip reports bids for
+    // the competitions at auction stage, so the grain has to reach them.
     auctionIds.length > 0
       ? systemDb
-          .select({ count: sql<number>`count(*)::int` })
+          .select({ auctionId: bids.auctionId, count: sql<number>`count(*)::int` })
           .from(bids)
           .where(inArray(bids.auctionId, auctionIds))
-      : Promise.resolve([{ count: 0 }]),
+          .groupBy(bids.auctionId)
+      : Promise.resolve([]),
     caseIds.length > 0
       ? systemDb
           .select({
@@ -223,20 +236,39 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       .limit(6),
   ]);
 
-  // One grouped read gives both the per-competition total and the approved pool.
+  // One grouped read gives the per-competition total, the approved pool per
+  // competition, and the portfolio-wide approved count.
   const registrationsBy = new Map<string, number>();
+  const approvedBy = new Map<string, number>();
   let approvedRegistrations = 0;
   for (const row of registrationRows) {
     registrationsBy.set(row.competitionId, (registrationsBy.get(row.competitionId) ?? 0) + row.count);
     if (row.status === "approved") {
+      approvedBy.set(row.competitionId, (approvedBy.get(row.competitionId) ?? 0) + row.count);
       approvedRegistrations += row.count;
     }
   }
   const teamsBy = new Map(teamRows.map((row) => [row.competitionId, row.count]));
   const lotsBy = new Map(lotRows.map((row) => [row.auctionId, row]));
 
+  // Bids reach the competition through their auction.
+  const auctionCompetition = new Map(auctionRows.map((row) => [row.id, row.competitionId]));
+  const bidsBy = new Map<string, number>();
+  let bidTotal = 0;
+  for (const row of bidCountRows) {
+    bidTotal += row.count;
+    const competitionId = auctionCompetition.get(row.auctionId);
+    if (competitionId !== undefined) {
+      bidsBy.set(competitionId, (bidsBy.get(competitionId) ?? 0) + row.count);
+    }
+  }
+  const liveCompetitions = new Set(
+    auctionRows.filter((row) => row.status === "live").map((row) => row.competitionId),
+  );
+
   // Money, folded per competition then totalled.
   const collectedBy = new Map<string, number>();
+  const outstandingBy = new Map<string, number>();
   let collectedPaise = 0;
   let outstandingPaise = 0;
   let waivedPaise = 0;
@@ -244,12 +276,14 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     const amount = row.amount;
     const discharged = row.discharged;
     const waived = row.waived;
+    const open = Math.max(0, amount - discharged - waived);
     collectedPaise += discharged;
     waivedPaise += waived;
-    outstandingPaise += Math.max(0, amount - discharged - waived);
+    outstandingPaise += open;
     const competitionId = caseCompetition.get(row.caseId);
     if (competitionId !== undefined) {
       collectedBy.set(competitionId, (collectedBy.get(competitionId) ?? 0) + discharged);
+      outstandingBy.set(competitionId, (outstandingBy.get(competitionId) ?? 0) + open);
     }
   }
 
@@ -303,16 +337,31 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
 
   // Lifecycle placement: money in flight wins, then the competition's own status.
   const settling = new Set(caseRows.map((row) => row.competitionId));
-  const stages: HomeStages = { setup: 0, registration: 0, auction: 0, settlement: 0 };
+  const stages: HomeStages = {
+    setup: { competitions: 0, teams: 0 },
+    registration: { competitions: 0, registered: 0, approved: 0 },
+    auction: { competitions: 0, live: 0, bids: 0 },
+    settlement: { competitions: 0, collectedPaise: 0, outstandingPaise: 0 },
+  };
   for (const competition of view.competitions) {
-    if (settling.has(competition.id)) {
-      stages.settlement += 1;
+    const id = competition.id;
+    if (settling.has(id)) {
+      stages.settlement.competitions += 1;
+      stages.settlement.collectedPaise += collectedBy.get(id) ?? 0;
+      stages.settlement.outstandingPaise += outstandingBy.get(id) ?? 0;
     } else if (competition.status === "registration_closed") {
-      stages.auction += 1;
+      stages.auction.competitions += 1;
+      stages.auction.bids += bidsBy.get(id) ?? 0;
+      if (liveCompetitions.has(id)) {
+        stages.auction.live += 1;
+      }
     } else if (competition.status === "registration_open") {
-      stages.registration += 1;
+      stages.registration.competitions += 1;
+      stages.registration.registered += registrationsBy.get(id) ?? 0;
+      stages.registration.approved += approvedBy.get(id) ?? 0;
     } else {
-      stages.setup += 1;
+      stages.setup.competitions += 1;
+      stages.setup.teams += teamsBy.get(id) ?? 0;
     }
   }
 
@@ -322,7 +371,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       competitions: view.competitions.length,
       registrations: [...registrationsBy.values()].reduce((sum, n) => sum + n, 0),
       activeAuctions: auctionRows.filter((row) => ACTIVE_AUCTION_STATES.has(row.status)).length,
-      bids: bidCountRows[0]?.count ?? 0,
+      bids: bidTotal,
       approvedRegistrations,
       collectedPaise,
     },

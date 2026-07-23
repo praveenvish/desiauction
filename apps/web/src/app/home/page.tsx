@@ -290,23 +290,26 @@ const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * beside a "Registration" stage counting competitions. Nine cards, five facts.
  * The counts belong to the stages that own them.
  */
-function lifecycleFor(
-  dash: HomeDashboardData,
-  liveCount: number,
-): {
+function lifecycleFor(dash: HomeDashboardData): {
   key: keyof HomeStages;
   name: string;
+  count: number;
   detail: string;
   tone: string;
   icon: ReactNode;
   href: string;
 }[] {
-  const registered = dash.stats.registrations;
+  const { setup, registration, auction, settlement } = dash.stages;
+  const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
   return [
     {
       key: "setup",
       name: "Set up",
-      detail: "Teams, rules and purse",
+      count: setup.competitions,
+      detail:
+        setup.competitions === 0
+          ? "Nothing in setup"
+          : `${String(setup.teams)} ${plural(setup.teams, "team", "teams")} added`,
       tone: "info",
       icon: <Glyph d={G.trophy} />,
       href: "/competitions",
@@ -314,10 +317,11 @@ function lifecycleFor(
     {
       key: "registration",
       name: "Registration",
+      count: registration.competitions,
       detail:
-        registered > 0
-          ? `${registered.toLocaleString("en-IN")} registered · ${dash.stats.approvedRegistrations.toLocaleString("en-IN")} approved`
-          : "No entries yet",
+        registration.competitions === 0
+          ? "Nobody taking entries"
+          : `${registration.registered.toLocaleString("en-IN")} registered · ${registration.approved.toLocaleString("en-IN")} approved`,
       tone: "green",
       icon: <Glyph d={G.check} />,
       href: "/competitions",
@@ -325,12 +329,15 @@ function lifecycleFor(
     {
       key: "auction",
       name: "Auction night",
+      count: auction.competitions,
       detail:
-        liveCount > 0
-          ? `${String(liveCount)} live right now`
-          : dash.stats.bids > 0
-            ? `${dash.stats.bids.toLocaleString("en-IN")} bids placed`
-            : "Nothing live",
+        auction.live > 0
+          ? `${String(auction.live)} live right now`
+          : auction.competitions === 0
+            ? "Nothing at auction"
+            : auction.bids > 0
+              ? `${auction.bids.toLocaleString("en-IN")} ${plural(auction.bids, "bid", "bids")} placed`
+              : "Ready to run",
       tone: "gold",
       icon: <Glyph d={G.gavel} />,
       href: "/competitions",
@@ -338,12 +345,13 @@ function lifecycleFor(
     {
       key: "settlement",
       name: "Settlement",
+      count: settlement.competitions,
       detail:
-        dash.money.outstandingPaise > 0
-          ? `${rupeesShort(dash.money.outstandingPaise)} still outstanding`
-          : dash.stats.collectedPaise > 0
-            ? `${rupeesShort(dash.stats.collectedPaise)} collected · settled`
-            : "Nothing due yet",
+        settlement.competitions === 0
+          ? "Nothing due yet"
+          : settlement.outstandingPaise > 0
+            ? `${rupeesShort(settlement.outstandingPaise)} still outstanding`
+            : `${rupeesShort(settlement.collectedPaise)} collected · settled`,
       tone: "violet",
       icon: <Glyph d={G.rupee} />,
       href: "/money",
@@ -439,8 +447,8 @@ export default async function HomePage() {
         <>
           {/* ---- lifecycle: what the platform does, and where your work sits ---- */}
           <section className="home-flow" aria-label="Competition lifecycle">
-            {lifecycleFor(dash, liveCount).map((stage, index) => {
-              const count = dash.stages[stage.key];
+            {lifecycleFor(dash).map((stage, index) => {
+              const count = stage.count;
               return (
                 <Link
                   key={stage.key}
