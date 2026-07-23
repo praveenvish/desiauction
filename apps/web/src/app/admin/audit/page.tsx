@@ -6,7 +6,7 @@ import { adminAudit } from "../../../server/admin/actions";
 import { platformAdminGate } from "../../../server/admin/authz";
 import type { AuditFilters } from "../../../server/admin/views";
 import { AuditPanel } from "./audit-panel";
-import "../../competitions/competitions.css";
+import "../../seasons/seasons.css";
 import "../admin.css";
 
 export const metadata = { title: "Audit · Platform admin · DesiAuction" };

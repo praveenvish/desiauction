@@ -44,7 +44,7 @@ export default async function OwnerJoinPage({ params }: { params: Promise<{ toke
                 "use server";
                 const result = await acceptOwnerJoin(token);
                 if (result.ok) {
-                  redirect(`/competitions/${result.competitionSlug}/auction/live`);
+                  redirect(`/seasons/${result.competitionSlug}/auction/live`);
                 }
               }}
             >

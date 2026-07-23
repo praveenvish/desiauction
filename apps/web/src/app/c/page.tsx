@@ -10,19 +10,19 @@ import "../marketing.css";
 import "./directory.css";
 
 export const metadata: Metadata = {
-  title: "Competitions · DesiAuction",
+  title: "Seasons · DesiAuction",
   description:
-    "Community cricket competitions running on DesiAuction — find one near you and register as a player.",
+    "Community cricket tournaments running on DesiAuction — find one near you and register as a player.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/c` },
   openGraph: {
-    title: "Competitions on DesiAuction",
-    description: "Find a community cricket competition and register as a player.",
+    title: "Seasons on DesiAuction",
+    description: "Find a community cricket season and register as a player.",
     url: `${env.PUBLIC_BASE_URL}/c`,
     type: "website",
   },
 };
 
-/** Deterministic art mood per slug — a competition keeps its colors. */
+/** Deterministic art mood per slug — a tournament keeps its colors. */
 function artIndex(slug: string): number {
   let hash = 0;
   for (const char of slug) {
@@ -41,7 +41,7 @@ function monogram(name: string): string {
     .join("");
 }
 
-// PX-5 public discovery: only competitions their organizers PUBLISHED
+// PX-5 public discovery: only tournaments their organizers PUBLISHED
 // (visibility='public') appear here. Search and pagination are URL-backed.
 export default async function DirectoryPage({
   searchParams,
@@ -59,7 +59,7 @@ export default async function DirectoryPage({
       <header className="public-head">
         <div className="mk-container">
           <p className="mk-kicker">Public directory</p>
-          <h1>Competitions</h1>
+          <h1>Seasons</h1>
           <p className="public-sub">
             Community tournaments running on DesiAuction. Found yours? Open it and register.
           </p>
@@ -68,7 +68,7 @@ export default async function DirectoryPage({
               label="Search"
               name="q"
               defaultValue={sp.q ?? ""}
-              placeholder="Competition, club or city"
+              placeholder="Season, club or city"
             />
             <Button type="submit" variant="secondary">
               Search
@@ -85,12 +85,12 @@ export default async function DirectoryPage({
                 title={
                   sp.q !== undefined && sp.q !== ""
                     ? "Nothing matches"
-                    : "No public competitions yet"
+                    : "No public tournaments yet"
                 }
                 description={
                   sp.q !== undefined && sp.q !== ""
                     ? "Try a shorter word, or ask your organizer for their direct link."
-                    : "Organizers publish their competitions here. If you were given a direct link, it still works."
+                    : "Organizers publish their tournaments here. If you were given a direct link, it still works."
                 }
               />
             </Card>

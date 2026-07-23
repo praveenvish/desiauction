@@ -11,7 +11,7 @@
  * whitespace/control characters that some agents strip into a bypass.
  *
  * Every legitimate `next` in this app is a simple local path (`/home`,
- * `/competitions/{slug}/register`, `/join/{ulid}`), so this uses a conservative
+ * `/seasons/{slug}/register`, `/join/{ulid}`), so this uses a conservative
  * ALLOWLIST — a single leading slash NOT followed by another slash or backslash,
  * then only characters that appear in the app's own paths and query strings.
  * Anything else falls back to `/home`.

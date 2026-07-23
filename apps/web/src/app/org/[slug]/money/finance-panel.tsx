@@ -22,7 +22,7 @@ import {
   FINANCE_VIEWS,
   filterRegister,
 } from "../../../../server/financial-operations/register";
-import "../../../competitions/[slug]/money/money.css";
+import "../../../seasons/[slug]/money/money.css";
 import "./finance.css";
 
 /**

@@ -48,7 +48,7 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Ops Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -105,7 +105,7 @@ test("registration operations dashboard: axe zero violations", async ({ page }) 
   await page.getByLabel("Organization name").fill(`Axe Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Axe Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create competition" }).click();
   await page.getByTestId("open-dashboard").click();

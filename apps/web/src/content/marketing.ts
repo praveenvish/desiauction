@@ -67,7 +67,7 @@ export const LANDING = {
   beta: {
     kicker: "Ready when you are",
     title: "Make your auction night unforgettable.",
-    note: "Create a competition, run the live auction, and settle every rupee — all in one place. Free through the beta.",
+    note: "Create a tournament, run the live auction, and settle every rupee — all in one place. Free through the beta.",
     ctaPrimary: { label: "Run your auction now", href: "/login" },
     ctaSecondary: { label: "Explore tournaments", href: "/c" },
   },
@@ -264,7 +264,7 @@ export const FEATURE_GROUPS = [
       "One-link player registration with saved drafts",
       "Approve, waitlist or decline — each with a notification",
       "CSV roster import with row-by-row validation",
-      "Public competition directory when you choose to publish",
+      "Public tournament directory when you choose to publish",
     ],
   },
   {

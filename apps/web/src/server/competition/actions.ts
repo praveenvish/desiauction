@@ -147,7 +147,7 @@ export async function createCompetitionAction(
     }
     return { error: "Give the competition a name of at least 3 characters." };
   }
-  redirect(`/competitions/${slug}`);
+  redirect(`/seasons/${slug}`);
 }
 
 export interface CompetitionView {

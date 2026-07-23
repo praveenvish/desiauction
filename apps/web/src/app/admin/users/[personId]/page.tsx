@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { adminUser } from "../../../../server/admin/actions";
 import { platformAdminGate } from "../../../../server/admin/authz";
 import { UserDetailPanel } from "./user-detail-panel";
-import "../../../competitions/competitions.css";
+import "../../../seasons/seasons.css";
 import "../../admin.css";
 
 export const metadata = { title: "User · Platform admin · DesiAuction" };

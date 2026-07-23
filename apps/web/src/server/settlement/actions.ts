@@ -555,7 +555,7 @@ async function command(
       return resultOf(await run(deps, actor, { db, competition }));
     },
   );
-  revalidatePath(`/competitions/${slug}/money`, "layout");
+  revalidatePath(`/seasons/${slug}/money`, "layout");
   return result;
 }
 

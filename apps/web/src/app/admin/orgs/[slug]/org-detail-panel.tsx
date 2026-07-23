@@ -41,7 +41,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
       <div className="stat-row">
         <div className="stat-tile">
           <span className="stat-value">{competitions.length}</span>
-          <span className="stat-label">Competitions</span>
+          <span className="stat-label">Seasons</span>
         </div>
         <div className="stat-tile">
           <span className="stat-value">{members.length}</span>
@@ -58,10 +58,10 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
       </div>
 
       <Card>
-        <h2 className="admin-section-title">Competitions</h2>
+        <h2 className="admin-section-title">Seasons</h2>
         {competitions.length === 0 ? (
           <EmptyState
-            title="No competitions"
+            title="No seasons"
             description="This organization has not created one yet."
           />
         ) : (
@@ -69,7 +69,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
             <table className="reg-table" data-testid="admin-org-competitions">
               <thead>
                 <tr>
-                  <th scope="col">Competition</th>
+                  <th scope="col">Season</th>
                   <th scope="col">Status</th>
                   <th scope="col">Visibility</th>
                   <th scope="col">Auction</th>
@@ -81,7 +81,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                   <tr key={competition.id} className="reg-row">
                     <td>
                       <Link
-                        href={`/competitions/${competition.slug}`}
+                        href={`/seasons/${competition.slug}`}
                         className="registration-name"
                       >
                         {competition.name}

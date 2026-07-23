@@ -43,7 +43,7 @@ function statusLabel(status: string): string {
 function Edition({ edition }: { edition: EditionRow }) {
   return (
     <li>
-      <Link href={`/competitions/${edition.slug}`} className="cat-edition">
+      <Link href={`/seasons/${edition.slug}`} className="cat-edition">
         <span className="cat-edition-name">{edition.name}</span>
         <span className="cat-edition-meta">
           {edition.teams} {edition.teams === 1 ? "team" : "teams"} · {edition.players}{" "}
@@ -65,16 +65,16 @@ export function CataloguePanel({ catalogue }: { catalogue: OrgCatalogue }) {
       <SectionHeader
         title="Tournaments"
         actions={
-          <Link href="/competitions" className="cat-more">
-            All competitions
+          <Link href="/seasons" className="cat-more">
+            All seasons
           </Link>
         }
       />
 
       {nothing ? (
         <div className="cat-blank">
-          <p>This organization has not run a competition yet.</p>
-          <Link href="/competitions" className="cat-blank-cta">
+          <p>This organization has not run a season yet.</p>
+          <Link href="/seasons" className="cat-blank-cta">
             Create the first one
           </Link>
         </div>
@@ -104,7 +104,7 @@ export function CataloguePanel({ catalogue }: { catalogue: OrgCatalogue }) {
       {standalone.length > 0 ? (
         <article className="cat-group">
           <div className="cat-group-head cat-group-head--plain">
-            <span className="cat-group-name">One-off competitions</span>
+            <span className="cat-group-name">One-off seasons</span>
             <span className="cat-group-count">{standalone.length}</span>
           </div>
           <ul className="cat-list">

@@ -144,8 +144,8 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
       },
     );
     revalidatePath(`/c/${competition.slug}`);
-    revalidatePath(`/competitions/${competition.slug}/teams`);
-    revalidatePath(`/competitions/${competition.slug}/registrations`);
+    revalidatePath(`/seasons/${competition.slug}/teams`);
+    revalidatePath(`/seasons/${competition.slug}/registrations`);
     return { ok: true, url: storage.readUrl(input.key) };
   } catch (error) {
     if (error instanceof ForbiddenError) {
@@ -214,7 +214,7 @@ export async function removePlayerPhoto(
       }
     }
     revalidatePath(`/c/${competition.slug}`);
-    revalidatePath(`/competitions/${competition.slug}/registrations`);
+    revalidatePath(`/seasons/${competition.slug}/registrations`);
     return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) {

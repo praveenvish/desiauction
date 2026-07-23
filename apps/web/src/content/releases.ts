@@ -72,7 +72,7 @@ export const RELEASES: readonly ReleaseNote[] = [
     highlights: [
       "Organizer workspace: teams, a readiness centre, and grant management.",
       "One-link player registration with saved drafts, approvals, waitlists and CSV import.",
-      "A public competition directory for the tournaments you publish.",
+      "A public tournament directory for the tournaments you publish.",
     ],
   },
   {

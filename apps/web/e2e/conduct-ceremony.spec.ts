@@ -71,7 +71,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await organizer.getByRole("button", { name: "Create organization" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
-  await organizer.goto("/competitions");
+  await organizer.goto("/seasons");
   await organizer.getByLabel("Competition name").fill(`Ceremony Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Powai");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
@@ -104,7 +104,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await organizer.getByLabel("Select all on page").check();
   await organizer.getByTestId("bulk-approve").click();
   await expect(organizer.getByTestId("stat-approved")).toContainText("3");
-  await organizer.goto(`/competitions/${slug}`);
+  await organizer.goto(`/seasons/${slug}`);
   await organizer.getByTestId("advance-status").click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("registration closed");
   await organizer.getByTestId("open-auction").click();
@@ -117,7 +117,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   });
 
   // --- Owner workflow: invite → accept → grant → claim, for both teams --------
-  await organizer.goto(`/competitions/${slug}/auction/cockpit`);
+  await organizer.goto(`/seasons/${slug}/auction/cockpit`);
   await expect(organizer.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -172,7 +172,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   const teamOfOwner = ["Arrows", "Blasters"];
   for (let i = 0; i < 2; i++) {
     const page = owners[i] as Page;
-    await page.goto(`/competitions/${slug}/auction/live`);
+    await page.goto(`/seasons/${slug}/auction/live`);
     await expect(page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
       timeout: 30_000,
     });
@@ -197,7 +197,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
 
   // A spectator screen joins mid-night: read-only ceremony, no conduct anywhere.
   const bigScreen = await organizerCtx.newPage();
-  await bigScreen.goto(`/competitions/${slug}/auction/spectate`);
+  await bigScreen.goto(`/seasons/${slug}/auction/spectate`);
   await expect(bigScreen.getByTestId("spectate-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -273,7 +273,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
 
   // --- The ledger: the sale, the undo pair, the re-sale — all visible ----------
   const ledgerPage = await organizerCtx.newPage();
-  await ledgerPage.goto(`/competitions/${slug}/auction/ledger`);
+  await ledgerPage.goto(`/seasons/${slug}/auction/ledger`);
   await expect(ledgerPage.getByTestId("ledger-table")).toBeVisible();
   await expect(ledgerPage.getByTestId("ledger-meta")).toContainText("immutable, append-only");
   const ledgerBody = ledgerPage.getByTestId("ledger-table");
@@ -285,7 +285,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await axeClean(ledgerPage, "ledger");
 
   // --- Replay viewer: scrub history, final frame identical to the engine -------
-  await ledgerPage.goto(`/competitions/${slug}/auction/replay`);
+  await ledgerPage.goto(`/seasons/${slug}/auction/replay`);
   await expect(ledgerPage.getByTestId("replay-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -307,7 +307,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
     data: {},
   });
   expect(reset.ok()).toBe(true);
-  await ledgerPage.goto(`/competitions/${slug}/auction/engine`);
+  await ledgerPage.goto(`/seasons/${slug}/auction/engine`);
   await expect(ledgerPage.getByTestId("engine-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });

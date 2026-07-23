@@ -21,7 +21,7 @@ import {
 } from "../../../../../../server/financial-operations/actions";
 import { DOC_KIND_LABEL } from "../../../../../../server/financial-operations/register";
 import { DELIVERY_LANE_LABEL } from "../../../../../../server/financial-operations/deliveries";
-import "../../../../../competitions/[slug]/money/money.css";
+import "../../../../../seasons/[slug]/money/money.css";
 import "../../finance.css";
 
 /**

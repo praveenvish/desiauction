@@ -42,4 +42,16 @@ export default {
   headers() {
     return Promise.resolve([{ source: "/:path*", headers: securityHeaders }]);
   },
+  redirects() {
+    // A competition is now called a season — the thing that runs, under a
+    // tournament that recurs. The old paths stay permanently redirected because
+    // organizer links live in bookmarks, sent messages and browser history; the
+    // rename is a vocabulary change and must not cost anyone a dead link.
+    // (The public player link /c/[slug] is untouched — that is the one already
+    // printed on QR codes and sent to registrants.)
+    return Promise.resolve([
+      { source: "/competitions", destination: "/seasons", permanent: true },
+      { source: "/competitions/:path*", destination: "/seasons/:path*", permanent: true },
+    ]);
+  },
 };

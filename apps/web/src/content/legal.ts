@@ -102,14 +102,14 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
         kind: "list",
         items: [
           { text: "Your mobile number and name." },
-          { text: "Registration details you submit to a competition." },
+          { text: "Registration details you submit to a season." },
           { text: "Auction and settlement records for tournaments you take part in." },
         ],
       },
       { kind: "heading", level: 2, text: "Why we store it" },
       {
         kind: "paragraph",
-        text: "To run your tournaments: to sign you in, to place you in competitions, to conduct auctions, and to keep an accurate, disputable-free record of the money. We do not sell your data to anyone, ever.",
+        text: "To run your tournaments: to sign you in, to place you in seasons, to conduct auctions, and to keep an accurate, disputable-free record of the money. We do not sell your data to anyone, ever.",
       },
       { kind: "heading", level: 2, text: "Who processes it" },
       {
@@ -286,8 +286,8 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
   },
   {
     slug: "competition-terms",
-    title: "Competition Participation Terms",
-    summary: "The terms for taking part in a competition run on DesiAuction.",
+    title: "Season Participation Terms",
+    summary: "The terms for taking part in a season run on DesiAuction.",
     effective: "16 Jul 2026",
     versions: [BETA_DRAFT],
     blocks: [
@@ -295,7 +295,7 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       { kind: "heading", level: 2, text: "Between you and your organizer" },
       {
         kind: "paragraph",
-        text: "When you register for or take part in a competition, your agreement about eligibility, fees, dues, rules and prizes is with that competition's organizer — not with DesiAuction. The organizer sets those terms; the platform records what happens.",
+        text: "When you register for or take part in a season, your agreement about eligibility, fees, dues, rules and prizes is with that season's organizer — not with DesiAuction. The organizer sets those terms; the platform records what happens.",
       },
       { kind: "heading", level: 2, text: "What you agree to" },
       {
@@ -311,12 +311,12 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       { kind: "heading", level: 2, text: "Money" },
       {
         kind: "paragraph",
-        text: "Payments and refunds for a competition — purses, dues, entry fees — are collected and settled by your organizer, through whatever channels they use (cash, UPI, bank transfer). DesiAuction records these but does not hold or move your money.",
+        text: "Payments and refunds for a season — purses, dues, entry fees — are collected and settled by your organizer, through whatever channels they use (cash, UPI, bank transfer). DesiAuction records these but does not hold or move your money.",
       },
       { kind: "heading", level: 2, text: "Questions" },
       {
         kind: "paragraph",
-        text: "For anything about a specific competition — eligibility, fees, a dispute — contact that competition's organizer directly. For platform issues, contact us.",
+        text: "For anything about a specific season — eligibility, fees, a dispute — contact that season's organizer directly. For platform issues, contact us.",
       },
     ],
   },

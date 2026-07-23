@@ -6,7 +6,7 @@ import { adminOrganizations } from "../../../server/admin/actions";
 import { platformAdminGate } from "../../../server/admin/authz";
 import type { OrgFilter } from "../../../server/admin/views";
 import { OrgsPanel } from "./orgs-panel";
-import "../../competitions/competitions.css";
+import "../../seasons/seasons.css";
 import "../admin.css";
 
 export const metadata = { title: "Organizations · Platform admin · DesiAuction" };

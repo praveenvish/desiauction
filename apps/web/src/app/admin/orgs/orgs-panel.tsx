@@ -17,7 +17,7 @@ const FILTER_LABELS: readonly { key: string; label: string }[] = [
   { key: "all", label: "All" },
   { key: "finance", label: "Finance declared" },
   { key: "settling", label: "Open cases" },
-  { key: "quiet", label: "No competitions" },
+  { key: "quiet", label: "No seasons" },
 ];
 
 export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
@@ -85,7 +85,7 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
               <thead>
                 <tr>
                   <th scope="col">Organization</th>
-                  <th scope="col">Competitions</th>
+                  <th scope="col">Seasons</th>
                   <th scope="col">Members</th>
                   <th scope="col">Auctions</th>
                   <th scope="col">Cases</th>

@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 
 import { documentWorkspace } from "../../../../../../server/financial-operations/actions";
 import { DocumentPanel } from "./document-panel";
-import "../../../../../competitions/competitions.css";
-import "../../../../../competitions/[slug]/money/money.css";
+import "../../../../../seasons/seasons.css";
+import "../../../../../seasons/[slug]/money/money.css";
 import "../../finance.css";
 
 export const metadata = { title: "Document · DesiAuction" };

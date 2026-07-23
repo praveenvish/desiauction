@@ -35,7 +35,7 @@ export function OverviewPanel({
         </h2>
         <div className="stat-row">
           <Tile label="Organizations" value={totals.orgs} href="/admin/orgs" />
-          <Tile label="Competitions" value={totals.competitions} />
+          <Tile label="Seasons" value={totals.competitions} />
           <Tile label="Users" value={totals.people} href="/admin/users" />
           <Tile label="Auctions" value={totals.auctions} />
           <Tile label="Settlement cases" value={totals.cases} />
@@ -48,7 +48,7 @@ export function OverviewPanel({
           Outcomes · last {outcomes.windowDays} days
         </h2>
         <div className="stat-row" data-testid="admin-outcomes">
-          <Tile label="Competitions created" value={outcomes.competitionsCreated} />
+          <Tile label="Seasons created" value={outcomes.competitionsCreated} />
           <Tile label="Cloned (run it again)" value={outcomes.competitionsCloned} />
           <Tile label="Clone share %" value={pct(outcomes.cloneAdoptionRate)} />
           <Tile label="Repeat orgs" value={outcomes.orgsRepeating} />

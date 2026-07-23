@@ -32,7 +32,7 @@ export const HELP_CATEGORIES: readonly HelpCategory[] = [
   {
     slug: "organizer",
     title: "Organizer guide",
-    description: "Set up a competition, open registration, and build fixtures.",
+    description: "Set up a season, open registration, and build fixtures.",
   },
   {
     slug: "player",
@@ -80,12 +80,12 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         kind: "list",
         items: [
           {
-            text: "{0} — your starting point once you sign in: what needs attention, your competitions, and your money.",
+            text: "{0} — your starting point once you sign in: what needs attention, your seasons, and your money.",
             links: [{ text: "Home", href: "/home" }],
           },
           {
             text: "{0} — every tournament you run or take part in.",
-            links: [{ text: "Competitions", href: "/competitions" }],
+            links: [{ text: "Seasons", href: "/seasons" }],
           },
           {
             text: "{0} — the organizations you belong to, their members and grants.",
@@ -112,7 +112,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             text: "Organizing a tournament? Start with {0}.",
-            links: [{ text: "setting up a competition", href: "/help/competition-setup" }],
+            links: [{ text: "setting up a season", href: "/help/competition-setup" }],
           },
           {
             text: "Playing or owning a team? Read {0}.",
@@ -168,7 +168,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
   {
     slug: "auction-night",
     title: "Running your first auction night",
-    summary: "The whole journey, end to end: from creating a competition to closing the books.",
+    summary: "The whole journey, end to end: from creating a season to closing the books.",
     category: "getting-started",
     readMinutes: 8,
     blocks: [
@@ -181,8 +181,8 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         kind: "steps",
         items: [
           {
-            text: "Create an organization, then a competition inside it. See {0}.",
-            links: [{ text: "competition setup", href: "/help/competition-setup" }],
+            text: "Create an organization, then a season inside it. See {0}.",
+            links: [{ text: "season setup", href: "/help/competition-setup" }],
           },
           {
             text: "Open registration and share the link. Players sign up with one tap; you approve, waitlist, or import a roster. See {0}.",
@@ -210,7 +210,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             links: [{ text: "conducting the auction", href: "/help/conducting-the-auction" }],
           },
           {
-            text: "Spectators watch a public stage — no sign-in needed — if you've made the competition public.",
+            text: "Spectators watch a public stage — no sign-in needed — if you've made the season public.",
           },
         ],
       },
@@ -240,28 +240,28 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
   // --- Organizer -----------------------------------------------------------------------
   {
     slug: "competition-setup",
-    title: "Setting up a competition and opening registration",
-    summary: "Create a competition, add teams, and open the registration door.",
+    title: "Setting up a season and opening registration",
+    summary: "Create a season, add teams, and open the registration door.",
     category: "organizer",
     readMinutes: 5,
     blocks: [
-      { kind: "heading", level: 2, text: "Create the competition" },
+      { kind: "heading", level: 2, text: "Create the season" },
       {
         kind: "paragraph",
-        text: "Competitions live inside an organization. From {0}, create one; from its page, create a competition with a name and season. It starts private — only your team can see it.",
+        text: "Seasons live inside an organization. From {0}, create one; from its page, create a season with a name and season. It starts private — only your team can see it.",
         links: [{ text: "Organizations", href: "/orgs" }],
       },
       { kind: "heading", level: 2, text: "Make it public (optional)" },
       {
         kind: "paragraph",
-        text: "Publishing a competition lists it in the public {0} directory and lets anyone watch the auction live. Until you publish, the register and spectate links still work for anyone you send them to — publishing is about discovery, not access.",
-        links: [{ text: "competitions", href: "/c" }],
+        text: "Publishing a season lists it in the public {0} directory and lets anyone watch the auction live. Until you publish, the register and spectate links still work for anyone you send them to — publishing is about discovery, not access.",
+        links: [{ text: "seasons", href: "/c" }],
       },
       { kind: "heading", level: 2, text: "Open registration" },
       {
         kind: "steps",
         items: [
-          { text: "Open registration from the competition's Overview." },
+          { text: "Open registration from the season's Overview." },
           {
             text: "Share the register link with players. They sign up with their phone number and their details.",
           },
@@ -340,7 +340,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             text: "Work through any flagged conflicts on the calendar view until the schedule is clean.",
           },
           {
-            text: "Publish. Published fixtures — dates, venues, match-ups — appear on the public competition page for players and spectators.",
+            text: "Publish. Published fixtures — dates, venues, match-ups — appear on the public season page for players and spectators.",
           },
         ],
       },
@@ -356,7 +356,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
   // --- Player & owner ------------------------------------------------------------------
   {
     slug: "registering-as-a-player",
-    title: "Registering for a competition",
+    title: "Registering for a season",
     summary: "How to sign up as a player, and what happens next.",
     category: "player",
     readMinutes: 3,
@@ -394,7 +394,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       { kind: "heading", level: 2, text: "Joining your team" },
       {
         kind: "paragraph",
-        text: "Owners are invited by link. Accept it and you're taken straight into the auction room for your competition, holding a paddle for your team.",
+        text: "Owners are invited by link. Accept it and you're taken straight into the auction room for your season, holding a paddle for your team.",
       },
       { kind: "heading", level: 2, text: "Bidding on the night" },
       {

@@ -10,11 +10,11 @@ export type ShellKind = "public" | "console" | "live" | "bare";
 const LIVE_SEGMENTS = new Set(["live", "cockpit", "spectate", "replay"]);
 
 /** Chrome-free auction surfaces: the OBS overlay and the public live board. */
-const BARE_AUCTION_RE = /^\/competitions\/[^/]+\/auction\/(overlay|board)(\/|$)/;
+const BARE_AUCTION_RE = /^\/seasons\/[^/]+\/auction\/(overlay|board)(\/|$)/;
 
-/** /competitions/{slug}/auction/{live|cockpit|spectate|replay}[/...] */
+/** /seasons/{slug}/auction/{live|cockpit|spectate|replay}[/...] */
 export function liveMatch(pathname: string): { slug: string; segment: string } | null {
-  const match = /^\/competitions\/([^/]+)\/auction\/([^/]+)/.exec(pathname);
+  const match = /^\/seasons\/([^/]+)\/auction\/([^/]+)/.exec(pathname);
   if (match !== null && LIVE_SEGMENTS.has(match[2] as string)) {
     return { slug: match[1] as string, segment: match[2] as string };
   }
@@ -60,7 +60,7 @@ export function shellKind(pathname: string): ShellKind {
     pathname.startsWith("/careers") ||
     pathname.startsWith("/case-studies") ||
     pathname.startsWith("/api-docs") ||
-    /^\/competitions\/[^/]+\/register/.test(pathname)
+    /^\/seasons\/[^/]+\/register/.test(pathname)
   ) {
     return "public";
   }
@@ -76,7 +76,7 @@ export interface RailTarget {
 /** Exactly five, forever (canon docs/16; PX-1 01 §1). */
 export const RAIL: RailTarget[] = [
   { key: "home", label: "Home", href: "/home" },
-  { key: "competitions", label: "Competitions", href: "/competitions" },
+  { key: "seasons", label: "Seasons", href: "/seasons" },
   { key: "orgs", label: "Organizations", href: "/orgs" },
   { key: "money", label: "Money", href: "/money" },
   { key: "help", label: "Help", href: "/help" },
@@ -87,8 +87,8 @@ export function activeRailKey(pathname: string): string | null {
   if (pathname.startsWith("/org/") || pathname.startsWith("/orgs")) {
     return "orgs";
   }
-  if (pathname.startsWith("/competitions")) {
-    return "competitions";
+  if (pathname.startsWith("/seasons")) {
+    return "seasons";
   }
   if (pathname.startsWith("/money")) {
     return "money";
@@ -211,7 +211,7 @@ export function activeAdminTab(pathname: string): string {
  * itself, which 404s rather than admit the books exist.
  */
 export function competitionTabs(slug: string, canSettle = false): CompetitionTab[] {
-  const base = `/competitions/${slug}`;
+  const base = `/seasons/${slug}`;
   return [
     { key: "overview", label: "Overview", href: base },
     { key: "teams", label: "Teams", href: `${base}/teams` },
@@ -223,7 +223,7 @@ export function competitionTabs(slug: string, canSettle = false): CompetitionTab
 }
 
 export function activeCompetitionTab(pathname: string, slug: string): string {
-  const base = `/competitions/${slug}`;
+  const base = `/seasons/${slug}`;
   if (pathname.startsWith(`${base}/money`)) {
     return "money";
   }
@@ -288,5 +288,5 @@ export function liveExit(pathname: string, hasSession: boolean): { href: string;
   if (match.segment === "spectate" && !hasSession) {
     return { href: "/", label: "Leave auction" };
   }
-  return { href: `/competitions/${match.slug}/auction`, label: "Leave auction" };
+  return { href: `/seasons/${match.slug}/auction`, label: "Leave auction" };
 }

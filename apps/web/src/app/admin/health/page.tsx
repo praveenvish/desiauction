@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { adminHealth } from "../../../server/admin/actions";
 import { platformAdminGate } from "../../../server/admin/authz";
 import { HealthPanel } from "./health-panel";
-import "../../competitions/competitions.css";
+import "../../seasons/seasons.css";
 import "../admin.css";
 
 export const metadata = { title: "Health · Platform admin · DesiAuction" };

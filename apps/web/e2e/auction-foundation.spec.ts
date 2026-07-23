@@ -46,7 +46,7 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
   await page.getByLabel("Organization name").fill(`Auction Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Auction Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -80,7 +80,7 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
   await expect(page.getByTestId("stat-approved")).toContainText("4");
 
   // Close intake, then into the auction page: the ready gate flips to pass.
-  await page.goto(`/competitions/${new URL(page.url()).pathname.split("/")[2] ?? ""}`);
+  await page.goto(`/seasons/${new URL(page.url()).pathname.split("/")[2] ?? ""}`);
   await page.getByTestId("advance-status").click(); // close registration
   await expect(page.getByTestId("competition-status")).toHaveText("registration closed");
   await page.getByTestId("open-auction").click();
@@ -135,7 +135,7 @@ test("auction foundation page: axe zero violations", async ({ page }) => {
   await page.getByLabel("Organization name").fill(`Axe Auction Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Axe Auction Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create competition" }).click();
   await page.getByTestId("open-auction").click();

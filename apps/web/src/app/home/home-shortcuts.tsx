@@ -110,7 +110,7 @@ function ShortcutCard({
 }) {
   return (
     <Card className="home-shortcut-card">
-      <Link href={`/competitions/${competition.slug}`} className="home-card-link">
+      <Link href={`/seasons/${competition.slug}`} className="home-card-link">
         <strong>{competition.name}</strong>
         <span className="home-card-sub">{competition.orgName}</span>
       </Link>

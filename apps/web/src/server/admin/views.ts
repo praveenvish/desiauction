@@ -294,7 +294,7 @@ export async function attentionQueue(
       href:
         row.competitionSlug === null
           ? null
-          : `/competitions/${row.competitionSlug}/money/case/${row.id}`,
+          : `/seasons/${row.competitionSlug}/money/case/${row.id}`,
     });
   }
   // FinOps' own queue, per following org, carried across verbatim.
@@ -975,14 +975,14 @@ export async function adminSearch(db: Db, query: string): Promise<AdminSearchHit
       kind: "competition",
       label: row.name,
       hint: `Competition · ${row.orgName}`,
-      href: `/competitions/${row.slug}`,
+      href: `/seasons/${row.slug}`,
     });
     if (row.auctionStatus !== null) {
       hits.push({
         kind: "auction",
         label: `${row.name} — auction`,
         hint: `Auction · ${row.auctionStatus}`,
-        href: `/competitions/${row.slug}/auction`,
+        href: `/seasons/${row.slug}/auction`,
       });
     }
   }
@@ -991,7 +991,7 @@ export async function adminSearch(db: Db, query: string): Promise<AdminSearchHit
       kind: "case",
       label: `Case ${row.id.slice(-6)}`,
       hint: `${row.competitionName} · ${row.status}`,
-      href: `/competitions/${row.competitionSlug}/money/case/${row.id}`,
+      href: `/seasons/${row.competitionSlug}/money/case/${row.id}`,
     });
   }
   hits.push({

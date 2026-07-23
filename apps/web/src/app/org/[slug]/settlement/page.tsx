@@ -4,8 +4,8 @@ import { Suspense } from "react";
 
 import { settlementDashboard, settlementDeskGate } from "../../../../server/settlement/actions";
 import { SettlementPanel } from "./settlement-panel";
-import "../../../competitions/competitions.css";
-import "../../../competitions/[slug]/money/money.css";
+import "../../../seasons/seasons.css";
+import "../../../seasons/[slug]/money/money.css";
 
 export const metadata = { title: "Settlement · DesiAuction" };
 

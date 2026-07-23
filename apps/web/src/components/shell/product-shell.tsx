@@ -113,7 +113,7 @@ function BellLink({ latestEventAt, pathname }: { latestEventAt: string | null; p
 
 const RAIL_ICONS: Record<string, ReactNode> = {
   home: <IconHome />,
-  competitions: <IconTrophy />,
+  seasons: <IconTrophy />,
   orgs: <IconUsers />,
   money: <IconRupee />,
   help: <IconHelp />,
@@ -122,7 +122,7 @@ const RAIL_ICONS: Record<string, ReactNode> = {
 /** Surface name shown at the left of the top bar for each rail destination. */
 const RAIL_TITLES: Record<string, string> = {
   home: "Dashboard",
-  competitions: "Competitions",
+  seasons: "Seasons",
   orgs: "Organizations",
   money: "Money",
   help: "Help",
@@ -197,7 +197,7 @@ export function ProductShell({
 
   // "Continue working" feed: remember competition visits (device-local only).
   useEffect(() => {
-    const match = /^\/competitions\/([^/]+)/.exec(pathname);
+    const match = /^\/seasons\/([^/]+)/.exec(pathname);
     if (match !== null && session !== null) {
       recordRecentCompetition(match[1] as string);
     }
@@ -213,7 +213,7 @@ export function ProductShell({
           { key: "inbox", label: "Notifications", href: "/inbox" },
           {
             key: "directory",
-            label: "Browse public competitions",
+            label: "Browse public seasons",
             href: "/c",
             keywords: "directory discover register public",
           },
@@ -222,7 +222,7 @@ export function ProductShell({
     ];
     // PX-4 organizer search: inside a competition, its sections are first-class
     // destinations (teams, registrations, fixtures, readiness, auction).
-    const current = /^\/competitions\/([^/]+)/.exec(pathname);
+    const current = /^\/seasons\/([^/]+)/.exec(pathname);
     const currentCompetition =
       current !== null ? competitions.find((entry) => entry.slug === current[1]) : undefined;
     if (currentCompetition !== undefined) {
@@ -244,7 +244,7 @@ export function ProductShell({
             key: "section-readiness",
             label: "Readiness",
             hint: currentCompetition.name,
-            href: `/competitions/${currentCompetition.slug}/readiness`,
+            href: `/seasons/${currentCompetition.slug}/readiness`,
             keywords: "ready auction blockers checklist",
           },
           // PX-6: auction-night destinations (players, lots and history live
@@ -279,7 +279,7 @@ export function ProductShell({
             key: `section-${entry.key}`,
             label: entry.label,
             hint: currentCompetition.name,
-            href: `/competitions/${currentCompetition.slug}/${entry.path}`,
+            href: `/seasons/${currentCompetition.slug}/${entry.path}`,
             keywords: entry.keywords,
           })),
           // PX-7: the settlement destinations. Cases, teams, payment references
@@ -292,21 +292,21 @@ export function ProductShell({
                   key: "section-case-review",
                   label: "Case review",
                   hint: currentCompetition.name,
-                  href: `/competitions/${currentCompetition.slug}/money`,
+                  href: `/seasons/${currentCompetition.slug}/money`,
                   keywords: "settlement case obligations timeline audit verification",
                 },
                 {
                   key: "section-payments",
                   label: "Payments",
                   hint: currentCompetition.name,
-                  href: `/competitions/${currentCompetition.slug}/money`,
+                  href: `/seasons/${currentCompetition.slug}/money`,
                   keywords: "payment reference collect capture attest refund receipt cash upi bank",
                 },
                 {
                   key: "section-evidence",
                   label: "Closure evidence",
                   hint: currentCompetition.name,
-                  href: `/competitions/${currentCompetition.slug}/money`,
+                  href: `/seasons/${currentCompetition.slug}/money`,
                   keywords: "evidence digest replay reconciled closure sealed proof",
                 },
               ]
@@ -316,12 +316,12 @@ export function ProductShell({
     }
     if (competitions.length > 0) {
       groups.push({
-        label: "Competitions",
+        label: "Seasons",
         items: competitions.map((competition) => ({
           key: `competition-${competition.slug}`,
           label: competition.name,
           hint: competition.orgName,
-          href: `/competitions/${competition.slug}`,
+          href: `/seasons/${competition.slug}`,
         })),
       });
     }
@@ -336,7 +336,7 @@ export function ProductShell({
             key: `settlement-${competition.slug}`,
             label: `${competition.name} — settlement`,
             hint: competition.orgName,
-            href: `/competitions/${competition.slug}/money`,
+            href: `/seasons/${competition.slug}/money`,
             keywords: "money case dues obligations collect waive close evidence reconciled",
           })),
           ...[...new Set(settleable.map((competition) => competition.orgSlug))].map((orgSlug) => ({
@@ -451,7 +451,7 @@ export function ProductShell({
         nav={[
           { label: "Features", href: "/features" },
           { label: "Pricing", href: "/pricing" },
-          { label: "Competitions", href: "/c" },
+          { label: "Seasons", href: "/c" },
           {
             label: "Resources",
             href: "/help",
@@ -495,7 +495,7 @@ export function ProductShell({
           {
             label: "Tournaments",
             links: [
-              { label: "All competitions", href: "/c" },
+              { label: "All seasons", href: "/c" },
               { label: "Create tournament", href: "/login" },
               { label: "Rules & guidelines", href: "/rules-guidelines" },
               { label: "Schedule demo", href: "/schedule-demo" },
@@ -557,7 +557,7 @@ export function ProductShell({
   // pages get a breadcrumb. Data comes from the layout's existing reads —
   // an unknown slug (non-member deep link) simply renders no context bar.
   let contextBarNode: ReactNode = null;
-  const competitionMatch = /^\/competitions\/([^/]+)/.exec(pathname);
+  const competitionMatch = /^\/seasons\/([^/]+)/.exec(pathname);
   const orgMatch = /^\/org\/([^/]+)/.exec(pathname);
   if (pathname.startsWith("/admin")) {
     // Administration's own context bar. Rendered on `isAdmin` alone: for anyone
@@ -601,7 +601,7 @@ export function ProductShell({
                 { label: competition.orgName, href: "/orgs" },
                 {
                   label: competition.name,
-                  ...(section !== null ? { href: `/competitions/${slug}` } : {}),
+                  ...(section !== null ? { href: `/seasons/${slug}` } : {}),
                 },
                 ...(section !== null ? [{ label: section }] : []),
               ]}
@@ -610,7 +610,7 @@ export function ProductShell({
           actions={
             competitions.length > 1 ? (
               <PopoverMenu
-                label="Switch competition"
+                label="Switch season"
                 trigger={
                   <>
                     <span className="shell-org-name">Switch</span>
@@ -623,7 +623,7 @@ export function ProductShell({
                     key: entry.slug,
                     label: `${entry.name} — ${entry.orgName}`,
                     onSelect: () => {
-                      router.push(`/competitions/${entry.slug}`);
+                      router.push(`/seasons/${entry.slug}`);
                     },
                   }))}
               />
@@ -631,7 +631,7 @@ export function ProductShell({
           }
           tabs={
             <SubNavTabs
-              label="Competition sections"
+              label="Season sections"
               linkComponent={Link}
               tabs={competitionTabs(slug, competition.canSettle).map((tab) => ({
                 ...tab,
@@ -722,7 +722,7 @@ export function ProductShell({
             }}
           >
             <IconSearch />
-            <span className="shell-search-text">Search competitions, teams, players…</span>
+            <span className="shell-search-text">Search seasons, teams, players…</span>
             <span className="shell-search-kbd">⌘K</span>
           </button>
         }

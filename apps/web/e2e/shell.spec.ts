@@ -51,7 +51,7 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   // Public shell (no rail), so the loop ends there and returns via URL.
   const nav = rail(page).first();
   for (const [label, url] of [
-    ["Competitions", /\/competitions/],
+    ["Seasons", /\/seasons/],
     ["Organizations", /\/orgs/],
     ["Home", /\/home/],
     ["Money", /\/money/],
@@ -85,7 +85,7 @@ test("command palette navigates; breadcrumb + tabs appear inside a competition",
   await page.getByLabel("Organization name").fill(`Shell Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org ${STAMP}`);
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Shell Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -118,7 +118,7 @@ test("command palette navigates; breadcrumb + tabs appear inside a competition",
   await page.getByLabel("Organization name").fill(`Shell Org B ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org B ${STAMP}`);
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Shell Cup B ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-09-01");
@@ -145,7 +145,7 @@ test("mobile chrome: bottom tabs navigate and the drawer opens", async ({ browse
     await otpLogin(page, `85${STAMP}`);
     const tabs = rail(page).last();
     await tabs.getByRole("link", { name: "Competitions" }).click();
-    await expect(page).toHaveURL(/\/competitions/);
+    await expect(page).toHaveURL(/\/seasons/);
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
     await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Account" }).click();

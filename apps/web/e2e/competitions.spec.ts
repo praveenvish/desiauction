@@ -52,7 +52,7 @@ test("the competition journey: create, open, team, register, approve", async ({
   await expect(page.getByTestId("org-name")).toHaveText(`Comp Org ${STAMP}`);
 
   // Create a competition with dates + location (so the lifecycle guard passes).
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`MPL ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -107,7 +107,7 @@ test("registration is refused before intake opens", async ({ browser, page }) =>
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Closed Cup ${stamp}`);
   await page.getByRole("button", { name: "Create competition" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
@@ -124,7 +124,7 @@ test("registration is refused before intake opens", async ({ browser, page }) =>
 
 test("competitions pages: axe zero violations", async ({ page }) => {
   await otpLogin(page, `85${STAMP}`);
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations, JSON.stringify(scan.violations, null, 2)).toEqual([]);
 });

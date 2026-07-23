@@ -37,7 +37,7 @@ export default async function TournamentPage({
         {view.editions.length === 0 ? (
           <div className="cat-blank">
             <p>No season has been run under this name yet.</p>
-            <Link href="/competitions" className="cat-blank-cta">
+            <Link href="/seasons" className="cat-blank-cta">
               Create the first season
             </Link>
           </div>
@@ -46,7 +46,7 @@ export default async function TournamentPage({
             <ul className="cat-list">
               {view.editions.map((edition) => (
                 <li key={edition.id}>
-                  <Link href={`/competitions/${edition.slug}`} className="cat-edition">
+                  <Link href={`/seasons/${edition.slug}`} className="cat-edition">
                     <span className="cat-edition-name">{edition.name}</span>
                     <span className="cat-edition-meta">
                       {edition.teams} {edition.teams === 1 ? "team" : "teams"} · {edition.players}{" "}

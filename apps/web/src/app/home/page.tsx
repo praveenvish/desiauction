@@ -312,7 +312,7 @@ function lifecycleFor(dash: HomeDashboardData): {
           : `${String(setup.teams)} ${plural(setup.teams, "team", "teams")} added`,
       tone: "info",
       icon: <Glyph d={G.trophy} />,
-      href: "/competitions",
+      href: "/seasons",
     },
     {
       key: "registration",
@@ -324,7 +324,7 @@ function lifecycleFor(dash: HomeDashboardData): {
           : `${registration.registered.toLocaleString("en-IN")} registered · ${registration.approved.toLocaleString("en-IN")} approved`,
       tone: "green",
       icon: <Glyph d={G.check} />,
-      href: "/competitions",
+      href: "/seasons",
     },
     {
       key: "auction",
@@ -340,7 +340,7 @@ function lifecycleFor(dash: HomeDashboardData): {
               : "Ready to run",
       tone: "gold",
       icon: <Glyph d={G.gavel} />,
-      href: "/competitions",
+      href: "/seasons",
     },
     {
       key: "settlement",
@@ -383,7 +383,7 @@ export default async function HomePage() {
           key: `reg-${competition.id}`,
           label: `${String(dashboard.stats.submitted)} registration${dashboard.stats.submitted === 1 ? "" : "s"} to review`,
           detail: competition.name,
-          href: `/competitions/${competition.slug}/registrations`,
+          href: `/seasons/${competition.slug}/registrations`,
         });
       }
     } else if (competition.status === "registration_closed") {
@@ -399,8 +399,8 @@ export default async function HomePage() {
           detail: competition.name,
           href:
             blockers > 0
-              ? `/competitions/${competition.slug}/readiness`
-              : `/competitions/${competition.slug}/auction`,
+              ? `/seasons/${competition.slug}/readiness`
+              : `/seasons/${competition.slug}/auction`,
         });
       }
     }
@@ -429,7 +429,7 @@ export default async function HomePage() {
         subtitle={headline}
         actions={
           view.orgs.length > 0 ? (
-            <ButtonLink href="/competitions">Create a competition</ButtonLink>
+            <ButtonLink href="/seasons">Create a season</ButtonLink>
           ) : undefined
         }
       />
@@ -446,7 +446,7 @@ export default async function HomePage() {
       ) : (
         <>
           {/* ---- lifecycle: what the platform does, and where your work sits ---- */}
-          <section className="home-flow" aria-label="Competition lifecycle">
+          <section className="home-flow" aria-label="Season lifecycle">
             {lifecycleFor(dash).map((stage, index) => {
               const count = stage.count;
               return (
@@ -599,8 +599,8 @@ export default async function HomePage() {
 
               <Card className="home-panel home-panel--flush">
                 <div className="home-head home-head--pad">
-                  <SectionHeader title="Top competitions" />
-                  <Link href="/competitions" className="home-more">
+                  <SectionHeader title="Top seasons" />
+                  <Link href="/seasons" className="home-more">
                     View all
                   </Link>
                 </div>
@@ -608,7 +608,7 @@ export default async function HomePage() {
                   <table className="home-table" data-testid="home-competitions">
                     <thead>
                       <tr>
-                        <th>Competition</th>
+                        <th>Season</th>
                         <th className="home-num">Teams</th>
                         <th className="home-num">Players</th>
                         <th className="home-num">Status</th>
@@ -618,7 +618,7 @@ export default async function HomePage() {
                       {dash.top.map((row) => (
                         <tr key={row.slug}>
                           <td>
-                            <Link href={`/competitions/${row.slug}`} className="home-tcell">
+                            <Link href={`/seasons/${row.slug}`} className="home-tcell">
                               <span className="home-crest home-crest--sm" aria-hidden>
                                 {monogram(row.name)}
                               </span>
@@ -646,7 +646,7 @@ export default async function HomePage() {
               <Card className="home-panel">
                 <div className="home-head">
                   <SectionHeader title="Active auctions" />
-                  <Link href="/competitions" className="home-more">
+                  <Link href="/seasons" className="home-more">
                     View all
                   </Link>
                 </div>
@@ -654,7 +654,7 @@ export default async function HomePage() {
                   <PanelEmpty
                     icon={<Glyph d={G.gavel} />}
                     text="No auction running yet."
-                    ctaHref="/competitions"
+                    ctaHref="/seasons"
                     ctaLabel="Set one up"
                   />
                 ) : (
@@ -662,7 +662,7 @@ export default async function HomePage() {
                     {dash.auctions.map((auction) => (
                       <li key={auction.auctionId}>
                         <Link
-                          href={`/competitions/${auction.competitionSlug}/auction`}
+                          href={`/seasons/${auction.competitionSlug}/auction`}
                           className="home-auction"
                         >
                           <span className="home-crest" aria-hidden>
@@ -711,7 +711,7 @@ export default async function HomePage() {
                   <PanelEmpty
                     icon={<Glyph d={G.calendar} />}
                     text="No fixtures scheduled."
-                    ctaHref="/competitions"
+                    ctaHref="/seasons"
                     ctaLabel="Generate a schedule"
                   />
                 ) : (
@@ -721,7 +721,7 @@ export default async function HomePage() {
                       return (
                         <li key={fixture.id}>
                           <Link
-                            href={`/competitions/${fixture.competitionSlug}/fixtures`}
+                            href={`/seasons/${fixture.competitionSlug}/fixtures`}
                             className="home-event"
                           >
                             <span className="home-date">
@@ -793,7 +793,7 @@ export default async function HomePage() {
                   {registrationsMine.map((registration) => (
                     <li key={registration.competitionSlug}>
                       <Link
-                        href={`/competitions/${registration.competitionSlug}/register`}
+                        href={`/seasons/${registration.competitionSlug}/register`}
                         className="home-attn"
                       >
                         <span className="home-crest home-crest--sm" aria-hidden>

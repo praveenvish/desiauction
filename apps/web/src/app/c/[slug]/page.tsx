@@ -24,7 +24,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const view = await publicCompetitionView(slug);
   if (view === null) {
-    return { title: "Competition · DesiAuction" };
+    return { title: "Season · DesiAuction" };
   }
   const description = `${view.orgName}${view.location !== null ? ` · ${view.location}` : ""} · ${formatDateRange(view.startsOn, view.endsOn)}. ${view.open ? "Registration is open — join as a player." : "Run on DesiAuction."}`;
   const url = `${env.PUBLIC_BASE_URL}/c/${view.slug}`;
@@ -101,7 +101,7 @@ export default async function PublicCompetitionPage({
           <div className="public-cta-row">
             {view.auctionStatus === "live" || view.auctionStatus === "paused" ? (
               <ButtonLink
-                href={`/competitions/${view.slug}/auction/spectate`}
+                href={`/seasons/${view.slug}/auction/spectate`}
                 size="lg"
                 data-testid="public-watch-cta"
               >
@@ -110,7 +110,7 @@ export default async function PublicCompetitionPage({
             ) : null}
             {view.open ? (
               <ButtonLink
-                href={`/competitions/${view.slug}/register${refSuffix}`}
+                href={`/seasons/${view.slug}/register${refSuffix}`}
                 size="lg"
                 data-testid="public-register-cta"
               >
@@ -118,7 +118,7 @@ export default async function PublicCompetitionPage({
               </ButtonLink>
             ) : null}
             <ButtonLink href="/c" variant="ghost" size="lg">
-              All competitions
+              All seasons
             </ButtonLink>
           </div>
         </div>

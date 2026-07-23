@@ -200,7 +200,7 @@ test("sessions persist across reloads; a cleared session gates and returns via n
 
   // Session gone (expiry equivalent): console gates, then next returns exactly.
   await page.context().clearCookies();
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByText("Sign in to continue where you were headed.")).toBeVisible();
   await page.getByLabel("Mobile number").fill(phone);
@@ -211,7 +211,7 @@ test("sessions persist across reloads; a cleared session gates and returns via n
   await page.getByLabel(`Code sent to +91${phone}`).fill(await readCode(page, phone));
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   // Named user, next honored — straight back to work, no onboarding detour.
-  await expect(page).toHaveURL(/\/competitions/);
+  await expect(page).toHaveURL(/\/seasons/);
 });
 
 test("accessibility: onboarding, inbox and account scan clean", async ({ page }) => {

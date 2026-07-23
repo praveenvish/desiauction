@@ -102,7 +102,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await expect(page.getByTestId("org-name")).toBeVisible();
   orgSlug = new URL(page.url()).pathname.split("/")[2] ?? "";
 
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Settle Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Thane");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -136,7 +136,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await page.getByTestId("bulk-approve").click();
   await expect(page.getByTestId("stat-approved")).toContainText("3");
 
-  await page.goto(`/competitions/${slug}`);
+  await page.goto(`/seasons/${slug}`);
   await page.getByTestId("advance-status").click();
   await expect(page.getByTestId("competition-status")).toHaveText("registration closed");
   await page.getByTestId("open-auction").click();
@@ -164,10 +164,10 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // The competition's Money TAB is ABSENT, not disabled — and the surface 404s.
   // (Scoped to the tab row: the rail's own "Money" is the personal one, always there.)
   const tabRow = page.getByRole("navigation", { name: "Competition sections" });
-  await page.goto(`/competitions/${slug}`);
+  await page.goto(`/seasons/${slug}`);
   await expect(tabRow).toBeVisible();
   await expect(tabRow.getByRole("link", { name: "Money", exact: true })).toHaveCount(0);
-  const forbidden = await page.request.get(`/competitions/${slug}/money`);
+  const forbidden = await page.request.get(`/seasons/${slug}/money`);
   expect(forbidden.status()).toBe(404);
 
   // --- Money authority: grant the founder a settlement role from the product --
@@ -184,11 +184,11 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   });
 
   // The tab and the surface agree the moment the grant lands.
-  await page.goto(`/competitions/${slug}`);
+  await page.goto(`/seasons/${slug}`);
   await expect(tabRow.getByRole("link", { name: "Money", exact: true })).toBeVisible();
 
   // --- Open the case ----------------------------------------------------------
-  await page.goto(`/competitions/${slug}/money`);
+  await page.goto(`/seasons/${slug}/money`);
   await moneyReady(page);
   await page.getByTestId("basis-select").selectOption("fixed");
   await page.getByLabel("Kings owes (₹)").fill("1,20,000");
@@ -349,7 +349,7 @@ test("settlement dashboard: stats, saved views, search and bulk navigation", asy
   // Bulk navigation: the whole card is the door back into the case.
   // (Scoped to the list — a `case-` prefix also matches the search field.)
   await page.getByTestId("case-list").getByRole("link").first().click();
-  await expect(page).toHaveURL(new RegExp(`/competitions/${slug}/money`));
+  await expect(page).toHaveURL(new RegExp(`/seasons/${slug}/money`));
 });
 
 test("permissions: a member with no settlement grant cannot reach the books", async ({
@@ -358,7 +358,7 @@ test("permissions: a member with no settlement grant cannot reach the books", as
   await inSecondBrowser(browser, async (stranger) => {
     await onboardWithName(stranger, TREASURER, "Curious Stranger");
     // A non-member is indistinguishable from a non-existent competition.
-    const console_ = await stranger.request.get(`/competitions/${slug}/money`);
+    const console_ = await stranger.request.get(`/seasons/${slug}/money`);
     expect(console_.status()).toBe(404);
     const dashboard = await stranger.request.get(`/org/${orgSlug}/settlement`);
     expect(dashboard.status()).toBe(404);
@@ -374,7 +374,7 @@ test("responsive: the settlement console holds at 360px with no horizontal scrol
   const phone = await context.newPage();
   try {
     await otpLogin(phone, OWNER);
-    await phone.goto(`/competitions/${slug}/money`);
+    await phone.goto(`/seasons/${slug}/money`);
     await moneyReady(phone);
     await expect(phone.getByTestId("case-status")).toBeVisible();
 

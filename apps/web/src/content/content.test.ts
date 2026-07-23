@@ -55,7 +55,7 @@ function knownRoutes(): Set<string> {
     // Existing app routes content may link to (PX-2…PX-9)
     "/c",
     "/home",
-    "/competitions",
+    "/seasons",
     "/orgs",
     "/money",
     "/inbox",

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { venuesView } from "../../../../server/competition/fixture-actions";
 import { VenuesPanel } from "./venues-panel";
-import "../../../competitions/competitions.css";
+import "../../../seasons/seasons.css";
 
 export const metadata = { title: "Venues · DesiAuction" };
 

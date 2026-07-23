@@ -63,7 +63,7 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Monsoon Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -95,7 +95,7 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await expect(page.getByTestId("visibility-row")).toContainText("Public page live");
 
   // A second, never-published draft competition stays structurally absent.
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Hidden Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create competition" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");

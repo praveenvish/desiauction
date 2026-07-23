@@ -13,7 +13,7 @@ import {
   SAVED_VIEWS,
   filterCases,
 } from "../../../../server/settlement/worklist";
-import "../../../competitions/[slug]/money/money.css";
+import "../../../seasons/[slug]/money/money.css";
 
 /**
  * PX-7 §5 — the Settlement dashboard.
@@ -100,7 +100,7 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
           <Field
             label="Search cases"
             type="search"
-            placeholder="Competition, case reference or status"
+            placeholder="Season, case reference or status"
             defaultValue={query}
             onChange={(event) => {
               setParam("q", event.target.value);
@@ -181,7 +181,7 @@ function Tile({
 function CaseCard({ row }: { row: DashboardCase }) {
   return (
     <Link
-      href={`/competitions/${row.competitionSlug}/money`}
+      href={`/seasons/${row.competitionSlug}/money`}
       className="case-card"
       data-testid={`case-${row.caseId}`}
       data-status={row.status}

@@ -4,8 +4,8 @@ import { Suspense } from "react";
 
 import { financeGate, financeWorkspace } from "../../../../server/financial-operations/actions";
 import { FinancePanel } from "./finance-panel";
-import "../../../competitions/competitions.css";
-import "../../../competitions/[slug]/money/money.css";
+import "../../../seasons/seasons.css";
+import "../../../seasons/[slug]/money/money.css";
 import "./finance.css";
 
 export const metadata = { title: "Finance · DesiAuction" };

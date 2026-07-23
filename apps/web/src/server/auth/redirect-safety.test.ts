@@ -11,7 +11,7 @@ describe("PX-11 · safeNext (open-redirect guard)", () => {
   it("admits legitimate local paths unchanged", () => {
     for (const path of [
       "/home",
-      "/competitions/malad-premier-league-2026/register",
+      "/seasons/malad-premier-league-2026/register",
       "/join/01JABCDEF0123456789ABCDEFG",
       "/owner-join/01JXYZ",
       "/money",

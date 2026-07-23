@@ -79,7 +79,7 @@ test("founder demo: org → competition → approve → team roster → venue �
   await expect(page.getByRole("cell", { name: "Main Oval" })).toBeVisible();
 
   // Competition with dates (lifecycle guard) → open registration.
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Workspace Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -222,9 +222,9 @@ test("invalid workflows: bad team names are refused; unknown slugs 404", async (
   await page.getByTestId("add-team-workspace").click();
   await expect(page.getByTestId("create-team-panel")).toContainText(/name/i);
 
-  const missing = await page.goto("/competitions/does-not-exist/readiness");
+  const missing = await page.goto("/seasons/does-not-exist/readiness");
   expect(missing?.status()).toBe(404);
-  const missingTeams = await page.goto("/competitions/does-not-exist/teams");
+  const missingTeams = await page.goto("/seasons/does-not-exist/teams");
   expect(missingTeams?.status()).toBe(404);
 });
 

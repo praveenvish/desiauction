@@ -50,7 +50,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await organizer.getByRole("button", { name: "Create organization" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
-  await organizer.goto("/competitions");
+  await organizer.goto("/seasons");
   await organizer.getByLabel("Competition name").fill(`Live Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Malad");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
@@ -83,7 +83,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await organizer.getByLabel("Select all on page").check();
   await organizer.getByTestId("bulk-approve").click();
   await expect(organizer.getByTestId("stat-approved")).toContainText("2");
-  await organizer.goto(`/competitions/${slug}`);
+  await organizer.goto(`/seasons/${slug}`);
   await organizer.getByTestId("advance-status").click(); // close registration
   await expect(organizer.getByTestId("competition-status")).toHaveText("registration closed");
 
@@ -100,7 +100,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   // --- The owner model (M-IP4-3): invitation → acceptance → grant → claim -------
   // The organizer mints one owner invitation per team from the cockpit.
   const teamsByBidder = ["Team Alpha", "Team Bravo", "Team Charlie"];
-  await organizer.goto(`/competitions/${slug}/auction/cockpit`);
+  await organizer.goto(`/seasons/${slug}/auction/cockpit`);
   await expect(organizer.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -137,7 +137,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   }
 
   // The organizer grants each accepted owner a paddle (no claim without one).
-  await organizer.goto(`/competitions/${slug}/auction/cockpit`);
+  await organizer.goto(`/seasons/${slug}/auction/cockpit`);
   await expect(organizer.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -154,7 +154,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   // Granted owners claim their paddles on the live page.
   for (let i = 0; i < 3; i++) {
     const { page } = bidders[i] as { page: Page };
-    await page.goto(`/competitions/${slug}/auction/live`);
+    await page.goto(`/seasons/${slug}/auction/live`);
     await expect(page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
       timeout: 30_000,
     });
@@ -163,7 +163,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     await expect(page.getByTestId("my-paddle")).toBeVisible({ timeout: 20_000 });
   }
   // Back to the setup surface for queueing + opening (the M-IP4-1 journey).
-  await organizer.goto(`/competitions/${slug}/auction`);
+  await organizer.goto(`/seasons/${slug}/auction`);
   await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });

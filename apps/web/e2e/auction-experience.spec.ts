@@ -65,7 +65,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   await organizer.getByRole("button", { name: "Create organization" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
-  await organizer.goto("/competitions");
+  await organizer.goto("/seasons");
   await organizer.getByLabel("Competition name").fill(`Night Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Malad");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
@@ -73,8 +73,8 @@ test("the full night: lobby → owners → bidding with notifications → public
   await organizer.getByRole("button", { name: "Create competition" }).click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("draft");
   slug = new URL(organizer.url()).pathname.split("/")[2] ?? "";
-  liveUrl = `/competitions/${slug}/auction/live`;
-  spectateUrl = `/competitions/${slug}/auction/spectate`;
+  liveUrl = `/seasons/${slug}/auction/live`;
+  spectateUrl = `/seasons/${slug}/auction/spectate`;
   for (const team of ["Team Alpha", "Team Bravo"]) {
     await organizer.getByLabel("Team name").fill(team);
     await organizer.getByTestId("add-team").click();
@@ -109,7 +109,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   await organizer.getByLabel("Select all on page").check();
   await organizer.getByTestId("bulk-approve").click();
   await expect(organizer.getByTestId("stat-approved")).toContainText("2", { timeout: 15_000 });
-  await organizer.goto(`/competitions/${slug}`);
+  await organizer.goto(`/seasons/${slug}`);
   await organizer.getByTestId("advance-status").click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("registration closed");
 
@@ -130,7 +130,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   });
 
   // --- Owner invitations → acceptance → grants → claims ----------------------
-  await organizer.goto(`/competitions/${slug}/auction/cockpit`);
+  await organizer.goto(`/seasons/${slug}/auction/cockpit`);
   await expect(organizer.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -152,7 +152,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   const ownerA = await owner(browser, OWNER_A, joinUrls[0] ?? "", "Team Alpha");
   const ownerB = await owner(browser, OWNER_B, joinUrls[1] ?? "", "Team Bravo");
 
-  await organizer.goto(`/competitions/${slug}/auction/cockpit`);
+  await organizer.goto(`/seasons/${slug}/auction/cockpit`);
   await expect(organizer.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -179,7 +179,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   }
 
   // --- Go live; a PUBLIC (anonymous) spectator joins the stage ----------------
-  await organizer.goto(`/competitions/${slug}/auction`);
+  await organizer.goto(`/seasons/${slug}/auction`);
   await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -276,7 +276,7 @@ test("the full night: lobby → owners → bidding with notifications → public
 test("accessibility and small screens on the night's surfaces", async ({ browser, page }) => {
   // The completed auction from the journey above stays on the record.
   await otpLogin(page, ORGANIZER);
-  await page.goto(`/competitions/${slug}/auction`);
+  await page.goto(`/seasons/${slug}/auction`);
   await expect(page.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });

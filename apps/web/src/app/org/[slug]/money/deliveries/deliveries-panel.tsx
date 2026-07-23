@@ -29,7 +29,7 @@ import {
   filterDeliveries,
 } from "../../../../../server/financial-operations/deliveries";
 import type { DeliveryView } from "../../../../../server/financial-operations/views";
-import "../../../../competitions/[slug]/money/money.css";
+import "../../../../seasons/[slug]/money/money.css";
 import "../finance.css";
 
 /**

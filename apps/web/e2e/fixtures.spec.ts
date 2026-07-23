@@ -54,7 +54,7 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   }
 
   // Competition with dates and four teams.
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Fixture Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -117,7 +117,7 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   await expect(page.getByTestId("timeline-view").getByTestId(/^cal-.*F001$/)).toBeVisible();
 
   // Export produces the fixtures CSV.
-  await page.goto(`/competitions/${new URL(page.url()).pathname.split("/")[2] ?? ""}/fixtures`);
+  await page.goto(`/seasons/${new URL(page.url()).pathname.split("/")[2] ?? ""}/fixtures`);
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -139,7 +139,7 @@ test("fixtures dashboard and venues page: axe zero violations", async ({ page })
   const venuesScan = await new AxeBuilder({ page }).analyze();
   expect(venuesScan.violations, JSON.stringify(venuesScan.violations, null, 2)).toEqual([]);
 
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Axe Fix Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create competition" }).click();
   await page.getByTestId("open-fixtures").click();

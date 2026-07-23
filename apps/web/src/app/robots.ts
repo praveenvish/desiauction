@@ -28,7 +28,7 @@ export default function robots(): MetadataRoute.Robots {
           "/onboarding",
           "/orgs",
           "/org/",
-          "/competitions/",
+          "/seasons/",
           "/join/",
           "/owner-join/",
           "/admin",

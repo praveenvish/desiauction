@@ -10,7 +10,7 @@ import {
   type FinopsResult,
   type ReconciliationWorkspace,
 } from "../../../../../server/financial-operations/actions";
-import "../../../../competitions/[slug]/money/money.css";
+import "../../../../seasons/[slug]/money/money.css";
 import "../finance.css";
 
 /**

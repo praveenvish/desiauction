@@ -118,7 +118,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await axeClean(page, "finance · declared");
 
   // --- Conduct an auction -----------------------------------------------------
-  await page.goto("/competitions");
+  await page.goto("/seasons");
   await page.getByLabel("Competition name").fill(`Issue Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Nagpur");
   await page.getByLabel("Starts on").fill("2026-08-01");
@@ -152,7 +152,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await page.getByTestId("bulk-approve").click();
   await expect(page.getByTestId("stat-approved")).toContainText("3");
 
-  await page.goto(`/competitions/${slug}`);
+  await page.goto(`/seasons/${slug}`);
   await page.getByTestId("advance-status").click();
   await expect(page.getByTestId("competition-status")).toHaveText("registration closed");
   await page.getByTestId("open-auction").click();
@@ -174,7 +174,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await expect(page.getByTestId("auction-status")).toHaveText("completed", { timeout: 20_000 });
 
   // --- Complete settlement, and CAPTURE a payment -----------------------------
-  await page.goto(`/competitions/${slug}/money`);
+  await page.goto(`/seasons/${slug}/money`);
   await expect(page.getByTestId("money-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
