@@ -6,7 +6,7 @@ import { BrandGlyph } from "./icons";
 /**
  * The Console shell (PX-1 01 §1 S2, 04 §6). Pure presentational: navigation
  * state (active flags) and the link implementation are injected by the app —
- * this package never imports a router. Layout: sticky top bar, left rail
+ * this package never imports a router. Layout: full-height brand sidebar
  * ≥720px, bottom tab bar <720px, single content container.
  */
 
@@ -16,16 +16,28 @@ export interface ShellNavItem {
   href: string;
   icon?: ReactNode;
   active?: boolean;
+  /** Optional count chip (e.g. unread notifications). */
+  badge?: number;
 }
 
 export interface AppShellProps {
   nav: ShellNavItem[];
+  /** Secondary utility group rendered under the primary rail. */
+  navSecondary?: ShellNavItem[];
   /** Injected link renderer (e.g. next/link). Defaults to <a>. */
   linkComponent?: ElementType;
   wordmark: ReactNode;
   wordmarkHref?: string;
-  /** Right side of the top bar: search trigger, bell, user menu. */
+  /** Small line under the wordmark in the sidebar (brand tagline). */
+  tagline?: ReactNode;
+  /** Current surface name, shown at the left of the top bar. */
+  pageTitle?: ReactNode;
+  /** Search affordance rendered in the middle of the top bar. */
+  search?: ReactNode;
+  /** Right side of the top bar: bell, user menu. */
   topActions?: ReactNode;
+  /** Pinned to the bottom of the sidebar (upgrade card, signed-in user). */
+  railFooter?: ReactNode;
   /** Rendered under the top bar — the competition ContextBar slot. */
   contextBar?: ReactNode;
   children: ReactNode;
@@ -33,10 +45,15 @@ export interface AppShellProps {
 
 export function AppShell({
   nav,
+  navSecondary,
   linkComponent: Link = "a",
   wordmark,
   wordmarkHref = "/",
+  tagline,
+  pageTitle,
+  search,
   topActions,
+  railFooter,
   contextBar,
   children,
 }: AppShellProps) {
@@ -53,19 +70,36 @@ export function AppShell({
       <a className={styles["skip"]} href="#main-content">
         Skip to content
       </a>
-      {/* Full-height brand sidebar (≥720px): logo atop the navigation rail. */}
+      {/* Full-height brand sidebar (≥720px): logo atop the navigation. */}
       <NavigationRail label="Primary">
-        <div className={styles["rail-brand"]}>{brand}</div>
+        <div className={styles["rail-brand"]}>
+          {brand}
+          {tagline !== undefined ? <span className={styles["rail-tagline"]}>{tagline}</span> : null}
+        </div>
         <NavigationGroup>
           {nav.map((item) => (
             <NavigationItem key={item.key} item={item} linkComponent={Link} />
           ))}
         </NavigationGroup>
+        {navSecondary !== undefined && navSecondary.length > 0 ? (
+          <NavigationGroup>
+            {navSecondary.map((item) => (
+              <NavigationItem key={item.key} item={item} linkComponent={Link} />
+            ))}
+          </NavigationGroup>
+        ) : null}
+        {railFooter !== undefined ? (
+          <div className={styles["rail-footer"]}>{railFooter}</div>
+        ) : null}
       </NavigationRail>
       <div className={styles["body"]}>
         <header className={styles["topbar"]}>
           {/* The brand rides the top bar only on mobile, where the rail is hidden. */}
           <div className={styles["topbar-brand"]}>{brand}</div>
+          {pageTitle !== undefined ? (
+            <h1 className={styles["page-title"]}>{pageTitle}</h1>
+          ) : null}
+          {search !== undefined ? <div className={styles["topbar-search"]}>{search}</div> : null}
           <div className={styles["top-actions"]}>{topActions}</div>
         </header>
         {contextBar}
@@ -137,7 +171,10 @@ export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationIt
         aria-current={item.active === true ? "page" : undefined}
       >
         <span className={styles["rail-icon"]}>{item.icon}</span>
-        <span>{item.label}</span>
+        <span className={styles["rail-label"]}>{item.label}</span>
+        {item.badge !== undefined && item.badge > 0 ? (
+          <span className={styles["rail-badge"]}>{item.badge}</span>
+        ) : null}
       </Link>
     </li>
   );

@@ -117,6 +117,30 @@ const RAIL_ICONS: Record<string, ReactNode> = {
   help: <IconHelp />,
 };
 
+/** Surface name shown at the left of the top bar for each rail destination. */
+const RAIL_TITLES: Record<string, string> = {
+  home: "Dashboard",
+  competitions: "Competitions",
+  orgs: "Organizations",
+  money: "Money",
+  help: "Help",
+};
+
+/** The design system has no gear glyph; the utility group needs one. */
+function IconSettings() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" width={20} height={20} aria-hidden>
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.6-2-3.5-2.4 1a7.9 7.9 0 0 0-1.7-1L15 3H9l-.4 2.9a7.9 7.9 0 0 0-1.7 1l-2.4-1-2 3.5L4.6 11a7.9 7.9 0 0 0 0 2l-2 1.6 2 3.5 2.4-1a7.9 7.9 0 0 0 1.7 1L9 21h6l.4-2.9a7.9 7.9 0 0 0 1.7-1l2.4 1 2-3.5z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /**
  * The shell router (PX-2): one client component picks Public/Console/Live/bare
  * chrome from the pathname via the shared nav model. No page opts in or out —
@@ -508,6 +532,7 @@ export function ProductShell({
   }
 
   const activeKey = activeRailKey(pathname);
+  const railTitle = activeKey !== null ? RAIL_TITLES[activeKey] : undefined;
   const nav: ShellNavItem[] = RAIL.map((item) => ({
     ...item,
     icon: RAIL_ICONS[item.key],
@@ -640,15 +665,68 @@ export function ProductShell({
     <>
       <AppShell
         nav={nav}
+        navSecondary={[
+          {
+            key: "inbox",
+            label: "Notifications",
+            href: "/inbox",
+            icon: <IconBell />,
+            active: pathname.startsWith("/inbox"),
+          },
+          {
+            key: "account",
+            label: "Settings",
+            href: "/account",
+            icon: <IconSettings />,
+            active: pathname.startsWith("/account"),
+          },
+        ]}
         linkComponent={Link}
         wordmark="DesiAuction"
         wordmarkHref="/home"
+        tagline="Bid · Build · Win"
+        {...(contextBarNode === null && railTitle !== undefined ? { pageTitle: railTitle } : {})}
         contextBar={contextBarNode}
+        search={
+          <button
+            type="button"
+            className="shell-search"
+            aria-label="Go to anything (⌘K)"
+            onClick={() => {
+              setPaletteOpen(true);
+            }}
+          >
+            <IconSearch />
+            <span className="shell-search-text">Search competitions, teams, players…</span>
+            <span className="shell-search-kbd">⌘K</span>
+          </button>
+        }
+        railFooter={
+          <>
+            <div className="shell-pro">
+              <span className="shell-pro-cup" aria-hidden>
+                <IconTrophy />
+              </span>
+              <strong>Upgrade to Pro</strong>
+              <p>Unlock advanced features and detailed analytics.</p>
+              <Link className="shell-pro-cta" href="/pricing">
+                See plans
+              </Link>
+            </div>
+            <Link className="shell-railuser" href="/account">
+              <span className="shell-railuser-avatar">{initials}</span>
+              <span className="shell-railuser-text">
+                <strong>{session.name ?? session.phone}</strong>
+                <span>Organizer</span>
+              </span>
+            </Link>
+          </>
+        }
         topActions={
           <>
             <button
               type="button"
-              className="shell-icon-button"
+              className="shell-icon-button shell-mobile-only"
               aria-label="Go to anything (⌘K)"
               onClick={() => {
                 setPaletteOpen(true);

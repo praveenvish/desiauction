@@ -183,3 +183,149 @@
 .shell-drawer-danger {
   color: var(--danger-strong);
 }
+
+/* ---- top bar search field ---- */
+.shell-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+  text-align: left;
+}
+
+.shell-search:hover {
+  border-color: var(--border-strong);
+}
+
+.shell-search:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.shell-search-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-search-kbd {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  padding: 1px var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+/* ---- sidebar footer: upgrade card + signed-in user (on navy chrome) ---- */
+.shell-pro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(155deg, var(--accent), var(--accent-pressed));
+  color: #ffffff;
+}
+
+.shell-pro-cup {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(150deg, var(--ceremony-gold), var(--ceremony-gold-deep));
+  color: var(--identity-field);
+}
+
+.shell-pro strong {
+  font-family: var(--font-display);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.shell-pro p {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: 1.4;
+  color: color-mix(in srgb, #ffffff 78%, transparent);
+}
+
+.shell-pro-cta {
+  margin-top: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: linear-gradient(150deg, var(--ceremony-gold), var(--ceremony-gold-deep));
+  color: var(--identity-field);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 45%, transparent);
+}
+
+.shell-pro-cta:hover {
+  filter: brightness(1.05);
+}
+
+.shell-railuser {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  border-top: 1px solid var(--identity-line-soft);
+}
+
+.shell-railuser:hover {
+  background: color-mix(in srgb, var(--identity-glyph) 10%, transparent);
+}
+
+.shell-railuser-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(140deg, var(--accent), var(--accent-pressed));
+  color: var(--text-on-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.shell-railuser-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-family: var(--font-text);
+}
+
+.shell-railuser-text strong {
+  font-size: var(--text-sm-size);
+  color: var(--identity-glyph);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-railuser-text span {
+  font-size: var(--text-xs-size);
+  color: color-mix(in srgb, var(--identity-glyph) 55%, transparent);
+}
