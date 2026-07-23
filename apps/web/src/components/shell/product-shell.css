@@ -251,7 +251,8 @@
 }
 
 .shell-pro strong {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
   font-size: var(--text-base-size);
   font-weight: var(--font-weight-semibold);
 }

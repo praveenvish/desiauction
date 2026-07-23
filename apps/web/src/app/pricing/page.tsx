@@ -52,7 +52,14 @@ export default function PricingPage() {
                   ) : null}
                   <h2 id={tierId}>{tier.name}</h2>
                   <p className="mk-tier-price">
-                    <span className="mk-tier-amount">{tier.price}</span>
+                    {/* The figure slot is set for a numeral. A tier with no
+                        published price puts a sentence there, which at display
+                        scale dwarfs the tiers that do quote a number. */}
+                    <span
+                      className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
+                    >
+                      {tier.price}
+                    </span>
                     <span className="mk-tier-cadence">{tier.cadence}</span>
                   </p>
                   <p className="mk-tier-limits">{tier.limits}</p>

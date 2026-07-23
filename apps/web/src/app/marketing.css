@@ -65,6 +65,7 @@
   font-size: clamp(2.375rem, 6.5vw, var(--display-xl-size));
   line-height: 1.02;
   letter-spacing: -0.02em;
+  word-spacing: 0.08em;
   color: var(--text-heading);
   margin: 0 0 var(--space-5);
   overflow-wrap: break-word;
@@ -77,12 +78,17 @@
   line-height: 1.05;
 }
 
+/* A band heading sits BETWEEN the page h1 and the content h2s (.mk-show h2,
+   30px). At display-md it rendered 60% larger than the headings it introduces,
+   which inverts the hierarchy — a supporting band shouting over the content.
+   display-sm keeps the step legible: 64 -> 38 -> 30. */
 .mk-h2 {
   font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
-  font-size: clamp(1.75rem, 4vw, var(--display-md-size));
-  line-height: 1.06;
+  font-size: clamp(1.75rem, 3.4vw, var(--display-sm-size));
+  line-height: 1.08;
   letter-spacing: -0.015em;
+  word-spacing: 0.07em;
   color: var(--text-heading);
   margin: 0 0 var(--space-3);
   overflow-wrap: break-word;
@@ -1314,7 +1320,8 @@ body:has(.landing.mk) .mk-hero {
 }
 
 .mk-card h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
   font-weight: var(--font-weight-semibold);
   font-size: var(--text-xl-size);
   line-height: var(--text-xl-line);
@@ -1344,6 +1351,11 @@ body:has(.landing.mk) .mk-hero {
 .mk-icon-tile svg {
   width: 22px;
   height: 22px;
+}
+
+/* Title and body belong together; the icon is a separate beat above them. */
+.mk-card .mk-icon-tile {
+  margin-bottom: var(--space-2);
 }
 
 /* A small, consistent "pop" on every icon tile whenever its containing card
@@ -1457,7 +1469,8 @@ body:has(.landing.mk) .mk-hero {
 }
 
 .mk-steps h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
   font-weight: var(--font-weight-medium);
   font-size: var(--text-sm-size);
   line-height: 1.3;
@@ -2097,7 +2110,7 @@ body:has(.landing.mk) .mk-hero {
 
 .mk-cta-title {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-weight: var(--font-weight-semibold);
   font-size: clamp(var(--text-xl-size), 2.2vw, var(--text-2xl-size));
   line-height: 1.1;
@@ -2190,7 +2203,8 @@ body:has(.landing.mk) .mk-hero {
 
 .mk-tier h2,
 .mk-tier h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
   font-weight: var(--font-weight-semibold);
   font-size: var(--text-xl-size);
   line-height: var(--text-xl-line);
@@ -2214,6 +2228,17 @@ body:has(.landing.mk) .mk-hero {
   letter-spacing: -0.01em;
   color: var(--money-value);
   font-variant-numeric: tabular-nums;
+}
+
+/* Not a number, so not set as one: text face at body scale reads as the
+   promise it is instead of shouting over the tiers that quote a real figure.
+   Must follow the base rule — same specificity, so source order decides. */
+.mk-tier-amount--note {
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  color: var(--text-secondary);
+  font-variant-numeric: normal;
 }
 
 .mk-tier-cadence {
@@ -2336,7 +2361,8 @@ body:has(.landing.mk) .mk-hero {
   cursor: pointer;
   list-style: none;
   padding: var(--space-4) var(--space-5);
-  font-family: var(--font-display);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
   font-weight: var(--font-weight-medium);
   font-size: var(--text-md-size);
   line-height: var(--text-md-line);
@@ -2430,6 +2456,7 @@ body:has(.landing.mk) .mk-hero {
   font-size: clamp(var(--text-2xl-size), 3vw, var(--text-3xl-size));
   line-height: 1.15;
   letter-spacing: -0.01em;
+  word-spacing: 0.05em;
   color: var(--text-heading);
   margin: 0 0 var(--space-4);
 }

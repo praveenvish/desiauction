@@ -83,7 +83,7 @@
 }
 
 .ceremony-title {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: var(--text-sm-size);
   letter-spacing: 0.14em;
   color: var(--text-muted);

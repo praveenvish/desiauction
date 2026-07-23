@@ -175,7 +175,8 @@
 }
 
 .public-card-name {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
   font-weight: var(--font-weight-semibold);
   font-size: var(--text-xl-size);
   line-height: var(--text-xl-line);
@@ -315,7 +316,8 @@
 }
 
 .public-section h2 {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
   font-size: var(--text-xl-size);
   line-height: var(--text-xl-line);
   font-weight: var(--font-weight-semibold);
