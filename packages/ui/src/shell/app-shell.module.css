@@ -324,7 +324,7 @@ a.wordmark:hover .wordmark-glyph {
 }
 
 .rail-item-active .rail-badge {
-  background: color-mix(in srgb, #ffffff 28%, transparent);
+  background: color-mix(in srgb, var(--text-on-accent) 28%, transparent);
   color: var(--text-on-accent);
 }
 

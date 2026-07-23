@@ -73,8 +73,21 @@ export interface HomeMoney {
   lastWeek: number[];
 }
 
+/**
+ * Where each competition sits on the platform's one lifecycle. This is the
+ * product in a single row: set it up, take registrations, run auction night,
+ * settle the money.
+ */
+export interface HomeStages {
+  setup: number;
+  registration: number;
+  auction: number;
+  settlement: number;
+}
+
 export interface HomeDashboardData {
   stats: HomeStats;
+  stages: HomeStages;
   auctions: HomeAuctionRow[];
   top: HomeTopCompetition[];
   activity: HomeActivityRow[];
@@ -90,6 +103,7 @@ const EMPTY: HomeDashboardData = {
     approvedRegistrations: 0,
     collectedPaise: 0,
   },
+  stages: { setup: 0, registration: 0, auction: 0, settlement: 0 },
   auctions: [],
   top: [],
   activity: [],
@@ -206,7 +220,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
         inArray(auditLog.scopeId, [...competitionIds, ...view.orgs.map((org) => org.id)]),
       )
       .orderBy(desc(auditLog.at))
-      .limit(8),
+      .limit(6),
   ]);
 
   // One grouped read gives both the per-competition total and the approved pool.
@@ -287,7 +301,23 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     .sort((a, b) => b.registrations - a.registrations)
     .slice(0, 5);
 
+  // Lifecycle placement: money in flight wins, then the competition's own status.
+  const settling = new Set(caseRows.map((row) => row.competitionId));
+  const stages: HomeStages = { setup: 0, registration: 0, auction: 0, settlement: 0 };
+  for (const competition of view.competitions) {
+    if (settling.has(competition.id)) {
+      stages.settlement += 1;
+    } else if (competition.status === "registration_closed") {
+      stages.auction += 1;
+    } else if (competition.status === "registration_open") {
+      stages.registration += 1;
+    } else {
+      stages.setup += 1;
+    }
+  }
+
   return {
+    stages,
     stats: {
       competitions: view.competitions.length,
       registrations: [...registrationsBy.values()].reduce((sum, n) => sum + n, 0),

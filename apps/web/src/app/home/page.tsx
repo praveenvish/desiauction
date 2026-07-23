@@ -145,6 +145,15 @@ const G = {
       strokeLinejoin="round"
     />
   ),
+  calendar: (
+    <path
+      d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
 } as const;
 
 function Glyph({ d }: { d: ReactNode }) {
@@ -152,6 +161,33 @@ function Glyph({ d }: { d: ReactNode }) {
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
       {d}
     </svg>
+  );
+}
+
+/** An empty panel should still sell the next move, not just report nothing. */
+function PanelEmpty({
+  icon,
+  text,
+  ctaHref,
+  ctaLabel,
+}: {
+  icon: ReactNode;
+  text: string;
+  ctaHref?: string;
+  ctaLabel?: string;
+}) {
+  return (
+    <div className="home-blank">
+      <span className="home-blank-ic" aria-hidden>
+        {icon}
+      </span>
+      <p>{text}</p>
+      {ctaHref !== undefined && ctaLabel !== undefined ? (
+        <Link href={ctaHref} className="home-blank-cta">
+          {ctaLabel}
+        </Link>
+      ) : null}
+    </div>
   );
 }
 
@@ -241,13 +277,51 @@ function points(series: number[], max: number): string {
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const QUICK_ACTIONS: { href: string; label: string; tone: string; icon: ReactNode }[] = [
-  { href: "/competitions", label: "New competition", tone: "accent", icon: <Glyph d={G.trophy} /> },
-  { href: "/competitions", label: "Review players", tone: "green", icon: <Glyph d={G.check} /> },
-  { href: "/competitions", label: "Run an auction", tone: "gold", icon: <Glyph d={G.gavel} /> },
-  { href: "/orgs", label: "Organizations", tone: "info", icon: <Glyph d={G.users} /> },
-  { href: "/money", label: "Money", tone: "violet", icon: <Glyph d={G.rupee} /> },
-  { href: "/help", label: "Help centre", tone: "teal", icon: <Glyph d={G.doc} /> },
+/**
+ * The platform in one row. Every tournament walks these four stages, so the
+ * strip doubles as an explanation of what DesiAuction does and a read on where
+ * this organiser's competitions actually are.
+ */
+const LIFECYCLE: {
+  key: "setup" | "registration" | "auction" | "settlement";
+  name: string;
+  blurb: string;
+  tone: string;
+  icon: ReactNode;
+  href: string;
+}[] = [
+  {
+    key: "setup",
+    name: "Set up",
+    blurb: "Teams, rules, purse",
+    tone: "info",
+    icon: <Glyph d={G.trophy} />,
+    href: "/competitions",
+  },
+  {
+    key: "registration",
+    name: "Registration",
+    blurb: "Players sign up, you approve",
+    tone: "green",
+    icon: <Glyph d={G.check} />,
+    href: "/competitions",
+  },
+  {
+    key: "auction",
+    name: "Auction night",
+    blurb: "Live bidding for the pool",
+    tone: "gold",
+    icon: <Glyph d={G.gavel} />,
+    href: "/competitions",
+  },
+  {
+    key: "settlement",
+    name: "Settlement",
+    blurb: "Collect and close the books",
+    tone: "violet",
+    icon: <Glyph d={G.rupee} />,
+    href: "/money",
+  },
 ];
 
 export default async function HomePage() {
@@ -381,15 +455,29 @@ export default async function HomePage() {
         </Card>
       ) : (
         <>
-          {/* ---- quick actions strip ---- */}
-          <nav className="home-qa" aria-label="Quick actions">
-            {QUICK_ACTIONS.map((action) => (
-              <Link key={action.label} href={action.href} className="home-qa-item">
-                <span className={`home-ic home-ic--${action.tone}`}>{action.icon}</span>
-                <span className="home-qa-label">{action.label}</span>
-              </Link>
-            ))}
-          </nav>
+          {/* ---- lifecycle: what the platform does, and where your work sits ---- */}
+          <section className="home-flow" aria-label="Competition lifecycle">
+            {LIFECYCLE.map((stage, index) => {
+              const count = dash.stages[stage.key];
+              return (
+                <Link
+                  key={stage.key}
+                  href={stage.href}
+                  className={`home-step${count > 0 ? " home-step--on" : ""}`}
+                  style={{ ["--step" as string]: String(index + 1) }}
+                >
+                  <span className={`home-ic home-ic--${stage.tone} home-ic--sm`}>{stage.icon}</span>
+                  <span className="home-step-text">
+                    <span className="home-step-head">
+                      <span className="home-step-name">{stage.name}</span>
+                      <span className="home-step-count">{count}</span>
+                    </span>
+                    <span className="home-step-blurb">{stage.blurb}</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </section>
 
           {/* ---- headline stats ---- */}
           <div className="home-stats" data-testid="home-stats">
@@ -421,7 +509,7 @@ export default async function HomePage() {
                   ) : null}
                 </div>
                 {attention.length === 0 ? (
-                  <p className="home-empty">All clear — nothing is waiting on you.</p>
+                  <PanelEmpty icon={<Glyph d={G.check} />} text="All clear — nothing is waiting on you." />
                 ) : (
                   <ul className="home-list">
                     {attention.map((row) => (
@@ -589,7 +677,12 @@ export default async function HomePage() {
                   </Link>
                 </div>
                 {dash.auctions.length === 0 ? (
-                  <p className="home-empty">No auction is live or scheduled right now.</p>
+                  <PanelEmpty
+                    icon={<Glyph d={G.gavel} />}
+                    text="No auction running yet."
+                    ctaHref="/competitions"
+                    ctaLabel="Set one up"
+                  />
                 ) : (
                   <ul className="home-list">
                     {dash.auctions.map((auction) => (
@@ -641,7 +734,12 @@ export default async function HomePage() {
                   <SectionHeader title="Upcoming events" />
                 </div>
                 {schedule.length === 0 ? (
-                  <p className="home-empty">Nothing scheduled yet.</p>
+                  <PanelEmpty
+                    icon={<Glyph d={G.calendar} />}
+                    text="No fixtures scheduled."
+                    ctaHref="/competitions"
+                    ctaLabel="Generate a schedule"
+                  />
                 ) : (
                   <ul className="home-list">
                     {schedule.slice(0, 5).map((fixture) => {
@@ -682,7 +780,7 @@ export default async function HomePage() {
                   </Link>
                 </div>
                 {dash.activity.length === 0 ? (
-                  <p className="home-empty">Nothing has happened yet.</p>
+                  <PanelEmpty icon={<Glyph d={G.bolt} />} text="No activity recorded yet." />
                 ) : (
                   <ul className="home-list">
                     {dash.activity.map((row) => {
@@ -745,23 +843,6 @@ export default async function HomePage() {
             </>
           ) : null}
 
-          <SectionHeader title="Your organizations" />
-          <div className="home-orgs" data-testid="home-orgs">
-            {view.orgs.map((org) => (
-              <span key={org.id} className="home-org">
-                <span className="home-crest home-crest--sm" aria-hidden>
-                  {monogram(org.name)}
-                </span>
-                <strong>{org.name}</strong>
-              </span>
-            ))}
-            <Link href="/orgs" className="home-org home-org--ghost">
-              <span className="home-org-plus" aria-hidden>
-                +
-              </span>
-              <strong>Manage organizations</strong>
-            </Link>
-          </div>
         </>
       )}
     </main>

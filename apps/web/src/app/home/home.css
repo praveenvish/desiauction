@@ -77,68 +77,177 @@
   font-size: var(--text-xs-size);
 }
 
-/* ---------- quick actions strip ---------- */
-.home-qa {
+/* ---------- lifecycle strip: the platform in one row ---------- */
+.home-flow {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
 }
 
-.home-qa-item {
+.home-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.home-step:hover {
+  background: var(--surface-sunken);
+}
+
+.home-step:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Chevron connector: the stages are a sequence, so say so. */
+.home-step + .home-step::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--space-2) * -1);
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translateY(-50%) rotate(45deg);
+  border-top: 2px solid var(--border-strong);
+  border-right: 2px solid var(--border-strong);
+}
+
+/* Stages holding no work read as dimmed steps on the path. */
+.home-step:not(.home-step--on) .home-ic {
+  opacity: 0.4;
+}
+
+.home-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* The count sits beside its own label — right-aligning it puts the number next
+   to the following stage's icon, where it reads as that stage's number. */
+.home-step-head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  text-decoration: none;
-  color: var(--text-primary);
   min-width: 0;
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
 }
 
-.home-qa-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-2);
-  border-color: var(--border-strong);
-}
-
-.home-qa-item .home-ic {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  box-shadow: none;
-}
-
-.home-qa-item .home-ic svg {
-  width: 17px;
-  height: 17px;
-}
-
-.home-qa-label {
+.home-step-name {
   font-family: var(--font-text);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
-  line-height: 1.2;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-@media (max-width: 1180px) {
-  .home-qa {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+.home-step-blurb {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-step-count {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-step--on .home-step-count {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+@media (max-width: 1024px) {
+  .home-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-step + .home-step::before {
+    display: none;
   }
 }
 
-@media (max-width: 640px) {
-  .home-qa {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 560px) {
+  .home-flow {
+    grid-template-columns: 1fr;
   }
+}
+
+/* ---------- designed empty states ---------- */
+.home-blank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+}
+
+.home-blank-ic {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.home-blank-ic svg {
+  width: 19px;
+  height: 19px;
+}
+
+.home-blank p {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.home-blank-cta {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.home-blank-cta:hover {
+  text-decoration: underline;
 }
 
 /* ---------- headline stats ---------- */
@@ -282,14 +391,6 @@
   text-decoration: underline;
 }
 
-.home-empty {
-  margin: 0;
-  padding: var(--space-2) 0;
-  font-family: var(--font-text);
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
 /* ---------- lists ---------- */
 .home-list {
   list-style: none;
@@ -324,11 +425,9 @@
 .home-auction:focus-visible,
 .home-event:focus-visible,
 .home-tile:focus-visible,
-.home-qa-item:focus-visible,
 .home-money-cell:focus-visible,
 .home-tcell:focus-visible,
-.home-card-link:focus-visible,
-.home-org--ghost:focus-visible {
+.home-card-link:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -664,54 +763,6 @@
   color: var(--text-secondary);
 }
 
-/* ---------- organizations ---------- */
-.home-orgs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: var(--space-3);
-}
-
-.home-org {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  font-family: var(--font-text);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  text-decoration: none;
-  min-width: 0;
-}
-
-.home-org--ghost {
-  border-style: dashed;
-  color: var(--text-accent);
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
-}
-
-.home-org--ghost:hover {
-  border-color: var(--accent);
-  background: var(--accent-subtle);
-}
-
-.home-org-plus {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--accent-subtle);
-  color: var(--text-accent);
-  font-size: var(--text-lg-size);
-  line-height: 1;
-}
-
 /* ---------- shortcut cards (HomeShortcuts) ---------- */
 .home-grid {
   display: grid;
@@ -763,13 +814,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .home-tile,
-  .home-qa-item,
+  .home-step,
   .home-card-link {
     transition: none;
   }
 
   .home-tile:hover,
-  .home-qa-item:hover,
   .home-card-link:hover {
     transform: none;
   }
