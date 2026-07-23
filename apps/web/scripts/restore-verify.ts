@@ -5,7 +5,7 @@
 // skew the comparison. Scratch database and dump file are destroyed after.
 //
 // Run: pnpm db:restore-verify
-// Env: RESTORE_VERIFY_CONTAINER (default desiauction-next-db-1) — docker
+// Env: RESTORE_VERIFY_CONTAINER (default desiauction-postgres) — docker
 //      container with version-matched pg tools; set to "" to use host tools
 //      against DATABASE_URL's host (production form).
 import { execFileSync } from "node:child_process";
@@ -17,7 +17,7 @@ if (url === undefined) {
   console.error("db:restore-verify needs DATABASE_URL");
   process.exit(2);
 }
-const container = process.env["RESTORE_VERIFY_CONTAINER"] ?? "desiauction-next-db-1";
+const container = process.env["RESTORE_VERIFY_CONTAINER"] ?? "desiauction-postgres";
 const parsed = new URL(url);
 const dbName = parsed.pathname.slice(1);
 const pgUser = decodeURIComponent(parsed.username);

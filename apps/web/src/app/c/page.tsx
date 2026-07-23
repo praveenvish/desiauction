@@ -10,12 +10,12 @@ import "../marketing.css";
 import "./directory.css";
 
 export const metadata: Metadata = {
-  title: "Seasons · DesiAuction",
+  title: "Tournaments · DesiAuction",
   description:
     "Community cricket tournaments running on DesiAuction — find one near you and register as a player.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/c` },
   openGraph: {
-    title: "Seasons on DesiAuction",
+    title: "Tournaments on DesiAuction",
     description: "Find a community cricket season and register as a player.",
     url: `${env.PUBLIC_BASE_URL}/c`,
     type: "website",
@@ -59,7 +59,7 @@ export default async function DirectoryPage({
       <header className="public-head">
         <div className="mk-container">
           <p className="mk-kicker">Public directory</p>
-          <h1>Seasons</h1>
+          <h1>Tournaments</h1>
           <p className="public-sub">
             Community tournaments running on DesiAuction. Found yours? Open it and register.
           </p>
@@ -68,7 +68,7 @@ export default async function DirectoryPage({
               label="Search"
               name="q"
               defaultValue={sp.q ?? ""}
-              placeholder="Season, club or city"
+              placeholder="Tournament, club or city"
             />
             <Button type="submit" variant="secondary">
               Search

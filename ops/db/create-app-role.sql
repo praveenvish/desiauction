@@ -18,7 +18,7 @@
 -- migrations run as the owner and the schema is frozen).
 --
 -- Local drill:
---   docker exec -i desiauction-next-db-1 psql -U desiauction -d desiauction \
+--   docker compose exec -T db psql -U desiauction -d desiauction \
 --     -v app_password='<app-pw>' -v system_password='<system-pw>' \
 --     < ops/db/create-app-role.sql
 

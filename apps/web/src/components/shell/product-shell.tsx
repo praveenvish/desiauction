@@ -213,7 +213,7 @@ export function ProductShell({
           { key: "inbox", label: "Notifications", href: "/inbox" },
           {
             key: "directory",
-            label: "Browse public seasons",
+            label: "Browse public tournaments",
             href: "/c",
             keywords: "directory discover register public",
           },
@@ -451,7 +451,7 @@ export function ProductShell({
         nav={[
           { label: "Features", href: "/features" },
           { label: "Pricing", href: "/pricing" },
-          { label: "Seasons", href: "/c" },
+          { label: "Tournaments", href: "/c" },
           {
             label: "Resources",
             href: "/help",
@@ -495,7 +495,7 @@ export function ProductShell({
           {
             label: "Tournaments",
             links: [
-              { label: "All seasons", href: "/c" },
+              { label: "All tournaments", href: "/c" },
               { label: "Create tournament", href: "/login" },
               { label: "Rules & guidelines", href: "/rules-guidelines" },
               { label: "Schedule demo", href: "/schedule-demo" },

@@ -1,8 +1,18 @@
 # Local infrastructure (IP-0_DESIGN §10). Credentials are local-only and
 # deliberately non-secret; every deployed environment uses platform secrets.
+
+# Named explicitly rather than inherited from the directory. Compose otherwise
+# derives the project (and every container name) from whatever the checkout
+# happens to be called, so a second clone, a rename, or a worktree silently
+# produces a DIFFERENT set of containers and volumes against the same ports —
+# and two checkouts fight over 5433. Pinning the name makes the containers
+# belong to the project, not to the folder.
+name: desiauction
+
 services:
   db:
     image: postgres:17-alpine
+    container_name: desiauction-postgres
     ports:
       - "5433:5432"
     environment:
@@ -19,6 +29,7 @@ services:
 
   storage:
     image: minio/minio:latest
+    container_name: desiauction-minio
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"

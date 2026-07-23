@@ -83,7 +83,7 @@ if (compose.code !== 0) {
 process.stdout.write("waiting for postgres ");
 let dbUp = false;
 for (let i = 0; i < 60; i++) {
-  if (capture("docker exec desiauction-next-db-1 pg_isready -U desiauction").code === 0) {
+  if (capture("docker compose exec -T db pg_isready -U desiauction").code === 0) {
     dbUp = true;
     break;
   }
@@ -106,7 +106,7 @@ step("5/7 migrations + RLS roles");
 run("pnpm --filter @desiauction/db db:migrate");
 run("pnpm --filter @desiauction/engine db:migrate");
 const roles = capture(
-  "docker exec -i desiauction-next-db-1 psql -U desiauction -d desiauction " +
+  "docker compose exec -T db psql -U desiauction -d desiauction " +
     "-v app_password='local-app' -v system_password='local-system' " +
     "-v engine_password='local-engine' -v runner_password='local-runner' " +
     "< ops/db/create-app-role.sql",

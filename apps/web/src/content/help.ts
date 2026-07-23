@@ -255,7 +255,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: "Publishing a season lists it in the public {0} directory and lets anyone watch the auction live. Until you publish, the register and spectate links still work for anyone you send them to — publishing is about discovery, not access.",
-        links: [{ text: "seasons", href: "/c" }],
+        links: [{ text: "tournaments", href: "/c" }],
       },
       { kind: "heading", level: 2, text: "Open registration" },
       {

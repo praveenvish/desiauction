@@ -10,7 +10,7 @@ const http = (url) => sh(`curl -sf --max-time 3 ${url} > /dev/null`);
 const checks = [
   [
     "database (postgres:5433)",
-    () => sh("docker exec desiauction-next-db-1 pg_isready -U desiauction"),
+    () => sh("docker compose exec -T db pg_isready -U desiauction"),
   ],
   ["storage  (minio:9000)", () => http("http://localhost:9000/minio/health/live")],
   ...(noApps

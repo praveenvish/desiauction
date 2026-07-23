@@ -23,7 +23,7 @@ Database recovery drill (part of scenario 6, run from repo root; uses the
 Postgres 17 tools inside the container — host `pg_dump` may be older):
 
 ```sh
-docker exec desiauction-next-db-1 sh -c '
+docker exec desiauction-postgres sh -c '
   pg_dump -U desiauction -Fc desiauction -f /tmp/drill.dump &&
   psql -U desiauction -d postgres -c "DROP DATABASE IF EXISTS drill_verify" -c "CREATE DATABASE drill_verify" &&
   pg_restore -U desiauction -d drill_verify --no-owner /tmp/drill.dump &&
