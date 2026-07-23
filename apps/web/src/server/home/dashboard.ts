@@ -32,6 +32,8 @@ export interface HomeStats {
   registrations: number;
   activeAuctions: number;
   bids: number;
+  /** Registrations already approved into the auction pool. */
+  approvedRegistrations: number;
   /** Money collected, in paise. */
   collectedPaise: number;
 }
@@ -80,7 +82,14 @@ export interface HomeDashboardData {
 }
 
 const EMPTY: HomeDashboardData = {
-  stats: { competitions: 0, registrations: 0, activeAuctions: 0, bids: 0, collectedPaise: 0 },
+  stats: {
+    competitions: 0,
+    registrations: 0,
+    activeAuctions: 0,
+    bids: 0,
+    approvedRegistrations: 0,
+    collectedPaise: 0,
+  },
   auctions: [],
   top: [],
   activity: [],
@@ -138,11 +147,12 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     systemDb
       .select({
         competitionId: registrations.competitionId,
+        status: registrations.status,
         count: sql<number>`count(*)::int`,
       })
       .from(registrations)
       .where(inArray(registrations.competitionId, competitionIds))
-      .groupBy(registrations.competitionId),
+      .groupBy(registrations.competitionId, registrations.status),
     systemDb
       .select({ competitionId: teams.competitionId, count: sql<number>`count(*)::int` })
       .from(teams)
@@ -199,7 +209,15 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       .limit(8),
   ]);
 
-  const registrationsBy = new Map(registrationRows.map((row) => [row.competitionId, row.count]));
+  // One grouped read gives both the per-competition total and the approved pool.
+  const registrationsBy = new Map<string, number>();
+  let approvedRegistrations = 0;
+  for (const row of registrationRows) {
+    registrationsBy.set(row.competitionId, (registrationsBy.get(row.competitionId) ?? 0) + row.count);
+    if (row.status === "approved") {
+      approvedRegistrations += row.count;
+    }
+  }
   const teamsBy = new Map(teamRows.map((row) => [row.competitionId, row.count]));
   const lotsBy = new Map(lotRows.map((row) => [row.auctionId, row]));
 
@@ -275,6 +293,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       registrations: [...registrationsBy.values()].reduce((sum, n) => sum + n, 0),
       activeAuctions: auctionRows.filter((row) => ACTIVE_AUCTION_STATES.has(row.status)).length,
       bids: bidCountRows[0]?.count ?? 0,
+      approvedRegistrations,
       collectedPaise,
     },
     auctions: auctionList,

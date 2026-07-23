@@ -1,5 +1,13 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Badge, ButtonLink, Card, EmptyState, Money, PageHeader, SectionHeader } from "@desiauction/ui";
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  EmptyState,
+  Money,
+  PageHeader,
+  SectionHeader,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -15,7 +23,9 @@ import "./home.css";
 
 export const metadata = { title: "Home · DesiAuction" };
 
-const REG_TONE: Record<string, "info" | "success" | "warning" | "danger" | "neutral"> = {
+type Tone = "info" | "success" | "warning" | "danger" | "neutral";
+
+const REG_TONE: Record<string, Tone> = {
   submitted: "info",
   approved: "success",
   waitlisted: "warning",
@@ -23,8 +33,6 @@ const REG_TONE: Record<string, "info" | "success" | "warning" | "danger" | "neut
   withdrawn: "neutral",
   draft: "neutral",
 };
-
-type Tone = "info" | "success" | "warning" | "danger" | "neutral";
 
 function statusTone(status: string): Tone {
   switch (status) {
@@ -110,15 +118,6 @@ const G = {
       strokeLinejoin="round"
     />
   ),
-  calendar: (
-    <path
-      d="M7 3v4M17 3v4M4 9h16M5 5h14v16H5z"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
   check: (
     <path
       d="m9 11 3 3L22 4M21 12v7H3V5h12"
@@ -137,6 +136,15 @@ const G = {
       strokeLinejoin="round"
     />
   ),
+  bolt: (
+    <path
+      d="M13 3 5 14h6l-1 7 8-11h-6z"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
 } as const;
 
 function Glyph({ d }: { d: ReactNode }) {
@@ -144,33 +152,6 @@ function Glyph({ d }: { d: ReactNode }) {
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
       {d}
     </svg>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  tone,
-  icon,
-  href,
-  hint,
-}: {
-  label: string;
-  value: string;
-  tone: string;
-  icon: ReactNode;
-  href: string;
-  hint?: string;
-}) {
-  return (
-    <Link href={href} className="home-tile">
-      <span className={`home-tile-ic home-tile-ic--${tone}`}>{icon}</span>
-      <span className="home-tile-body">
-        <span className="home-tile-label">{label}</span>
-        <span className="home-tile-value">{value}</span>
-        {hint !== undefined ? <span className="home-tile-hint">{hint}</span> : null}
-      </span>
-    </Link>
   );
 }
 
@@ -198,31 +179,56 @@ function rupeesShort(value: number): string {
   return `₹${String(Math.round(r))}`;
 }
 
-function humanizeAction(action: string): string {
-  const tail = action.split(".").pop() ?? action;
+/** "grant.Issued" -> "Grant issued"; "auction.BidAccepted" -> "Auction bid accepted". */
+function activityLabel(action: string): string {
+  const parts = action.split(".");
+  const domain = parts[0] ?? action;
+  const tail = parts.slice(1).join(" ");
+  const head = domain.charAt(0).toUpperCase() + domain.slice(1);
+  if (tail === "") return head;
   const words = tail
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]/g, " ")
+    .replace(/[_.-]/g, " ")
     .toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return `${head} ${words}`;
+}
+
+const ACTIVITY_STYLE: Record<string, { tone: string; icon: ReactNode }> = {
+  auction: { tone: "gold", icon: <Glyph d={G.gavel} /> },
+  registration: { tone: "green", icon: <Glyph d={G.check} /> },
+  competition: { tone: "accent", icon: <Glyph d={G.trophy} /> },
+  team: { tone: "info", icon: <Glyph d={G.users} /> },
+  org: { tone: "info", icon: <Glyph d={G.users} /> },
+  grant: { tone: "violet", icon: <Glyph d={G.users} /> },
+  auth: { tone: "violet", icon: <Glyph d={G.users} /> },
+  profile: { tone: "violet", icon: <Glyph d={G.users} /> },
+  settlement: { tone: "info", icon: <Glyph d={G.rupee} /> },
+  payment: { tone: "info", icon: <Glyph d={G.rupee} /> },
+  finops: { tone: "teal", icon: <Glyph d={G.doc} /> },
+};
+
+function activityStyle(action: string): { tone: string; icon: ReactNode } {
+  return (
+    ACTIVITY_STYLE[action.split(".")[0] ?? ""] ?? { tone: "accent", icon: <Glyph d={G.bolt} /> }
+  );
 }
 
 function ago(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${String(minutes)}m ago`;
+  if (minutes < 60) return `${String(minutes)}m`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${String(hours)}h ago`;
-  return `${String(Math.floor(hours / 24))}d ago`;
+  if (hours < 24) return `${String(hours)}h`;
+  return `${String(Math.floor(hours / 24))}d`;
 }
 
 /** Build a polyline `points` string for a 7-value series. */
 function points(series: number[], max: number): string {
-  const x0 = 42;
-  const x1 = 448;
-  const yTop = 18;
-  const yBase = 150;
+  const x0 = 44;
+  const x1 = 452;
+  const yTop = 16;
+  const yBase = 132;
   const step = (x1 - x0) / 6;
   return series
     .map((value, index) => {
@@ -234,6 +240,15 @@ function points(series: number[], max: number): string {
 }
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const QUICK_ACTIONS: { href: string; label: string; tone: string; icon: ReactNode }[] = [
+  { href: "/competitions", label: "New competition", tone: "accent", icon: <Glyph d={G.trophy} /> },
+  { href: "/competitions", label: "Review players", tone: "green", icon: <Glyph d={G.check} /> },
+  { href: "/competitions", label: "Run an auction", tone: "gold", icon: <Glyph d={G.gavel} /> },
+  { href: "/orgs", label: "Organizations", tone: "info", icon: <Glyph d={G.users} /> },
+  { href: "/money", label: "Money", tone: "violet", icon: <Glyph d={G.rupee} /> },
+  { href: "/help", label: "Help centre", tone: "teal", icon: <Glyph d={G.doc} /> },
+];
 
 export default async function HomePage() {
   const session = await currentSession();
@@ -285,7 +300,63 @@ export default async function HomePage() {
   const greeting = greetingFor(new Date(), session.name);
   const isEmpty =
     view.orgs.length === 0 && view.competitions.length === 0 && registrationsMine.length === 0;
-  const chartMax = Math.max(...dash.money.thisWeek, ...dash.money.lastWeek, 1);
+  const chartMax = Math.max(...dash.money.thisWeek, ...dash.money.lastWeek, 0);
+  const openCount = view.competitions.filter(
+    (competition) => competition.status === "registration_open",
+  ).length;
+  const liveCount = dash.auctions.filter((auction) => auction.status === "live").length;
+
+  const stats: {
+    label: string;
+    value: string;
+    hint?: string;
+    tone: string;
+    icon: ReactNode;
+    href: string;
+  }[] = [
+    {
+      label: "Competitions",
+      value: String(dash.stats.competitions),
+      hint: `${String(openCount)} accepting entries`,
+      tone: "accent",
+      icon: <Glyph d={G.trophy} />,
+      href: "/competitions",
+    },
+    {
+      label: "Registrations",
+      value: dash.stats.registrations.toLocaleString("en-IN"),
+      hint: `${dash.stats.approvedRegistrations.toLocaleString("en-IN")} approved`,
+      tone: "green",
+      icon: <Glyph d={G.users} />,
+      href: "/competitions",
+    },
+    {
+      label: "Active auctions",
+      value: String(dash.stats.activeAuctions),
+      hint: liveCount > 0 ? `${String(liveCount)} live now` : "none live",
+      tone: "gold",
+      icon: <Glyph d={G.gavel} />,
+      href: "/competitions",
+    },
+    {
+      label: "Collected",
+      value: rupeesShort(dash.stats.collectedPaise),
+      hint:
+        dash.money.outstandingPaise > 0
+          ? `${rupeesShort(dash.money.outstandingPaise)} outstanding`
+          : "fully settled",
+      tone: "info",
+      icon: <Glyph d={G.rupee} />,
+      href: "/money",
+    },
+    {
+      label: "Bids placed",
+      value: dash.stats.bids.toLocaleString("en-IN"),
+      tone: "violet",
+      icon: <Glyph d={G.chart} />,
+      href: "/competitions",
+    },
+  ];
 
   return (
     <main className="home">
@@ -310,362 +381,328 @@ export default async function HomePage() {
         </Card>
       ) : (
         <>
-          {attention.length > 0 ? (
-            <Card data-testid="attention-queue" className="home-attention-card">
-              <SectionHeader title="Needs attention" />
-              <ul className="home-attention-list">
-                {attention.map((row) => (
-                  <li key={row.key}>
-                    <Link href={row.href} className="home-attention-row">
-                      <span className="home-attention-label">{row.label}</span>
-                      <span className="home-attention-detail">{row.detail} →</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : (
-            <Card data-testid="attention-queue">
-              <SectionHeader title="Needs attention" />
-              <p className="home-hint">All clear — nothing is waiting on you.</p>
-            </Card>
-          )}
+          {/* ---- quick actions strip ---- */}
+          <nav className="home-qa" aria-label="Quick actions">
+            {QUICK_ACTIONS.map((action) => (
+              <Link key={action.label} href={action.href} className="home-qa-item">
+                <span className={`home-ic home-ic--${action.tone}`}>{action.icon}</span>
+                <span className="home-qa-label">{action.label}</span>
+              </Link>
+            ))}
+          </nav>
 
+          {/* ---- headline stats ---- */}
           <div className="home-stats" data-testid="home-stats">
-            <StatCard
-              label="Total Competitions"
-              value={String(dash.stats.competitions)}
-              tone="accent"
-              icon={<Glyph d={G.trophy} />}
-              href="/competitions"
-            />
-            <StatCard
-              label="Total Registrations"
-              value={dash.stats.registrations.toLocaleString("en-IN")}
-              tone="green"
-              icon={<Glyph d={G.users} />}
-              href="/competitions"
-            />
-            <StatCard
-              label="Active Auctions"
-              value={String(dash.stats.activeAuctions)}
-              tone="gold"
-              icon={<Glyph d={G.gavel} />}
-              href="/competitions"
-            />
-            <StatCard
-              label="Collected"
-              value={rupeesShort(dash.stats.collectedPaise)}
-              tone="info"
-              icon={<Glyph d={G.rupee} />}
-              href="/money"
-            />
-            <StatCard
-              label="Total Bids"
-              value={dash.stats.bids.toLocaleString("en-IN")}
-              tone="violet"
-              icon={<Glyph d={G.chart} />}
-              href="/competitions"
-            />
+            {stats.map((stat) => (
+              <Link key={stat.label} href={stat.href} className="home-tile">
+                <span className={`home-ic home-ic--${stat.tone}`}>{stat.icon}</span>
+                <span className="home-tile-body">
+                  <span className="home-tile-label">{stat.label}</span>
+                  <span className="home-tile-value">{stat.value}</span>
+                  {stat.hint !== undefined ? (
+                    <span className="home-tile-hint">{stat.hint}</span>
+                  ) : null}
+                </span>
+              </Link>
+            ))}
           </div>
 
-          <div className="home-row home-row--a">
-            {/* ---- money overview ---- */}
-            <Card className="home-panel">
-              <div className="home-panel-head">
-                <SectionHeader title="Money overview" />
-                <span className="home-legend">
-                  <span>
-                    <i className="home-dot home-dot--accent" />
-                    This week
-                  </span>
-                  <span>
-                    <i className="home-dot home-dot--muted" />
-                    Last week
-                  </span>
-                </span>
-              </div>
-              <svg className="home-chart" viewBox="0 0 470 178" role="img" aria-label="Collected per day">
-                <defs>
-                  <linearGradient id="home-area" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor="var(--accent)" stopOpacity="0.26" />
-                    <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {[18, 51, 84, 117, 150].map((y) => (
-                  <line
-                    key={y}
-                    x1="42"
-                    y1={y}
-                    x2="448"
-                    y2={y}
-                    stroke="var(--border-subtle)"
-                    strokeWidth="1"
-                  />
-                ))}
-                <polygon
-                  fill="url(#home-area)"
-                  points={`42,150 ${points(dash.money.thisWeek, chartMax)} 448,150`}
-                />
-                <polyline
-                  fill="none"
-                  stroke="var(--text-muted)"
-                  strokeWidth="2"
-                  strokeDasharray="4 4"
-                  strokeLinecap="round"
-                  points={points(dash.money.lastWeek, chartMax)}
-                />
-                <polyline
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  points={points(dash.money.thisWeek, chartMax)}
-                />
-                {DAY_LABELS.map((label, index) => (
-                  <text
-                    key={label}
-                    x={42 + index * ((448 - 42) / 6)}
-                    y="170"
-                    fill="var(--text-muted)"
-                    fontSize="10"
-                    textAnchor="middle"
-                  >
-                    {label}
-                  </text>
-                ))}
-              </svg>
-              <div className="home-money-foot">
-                <Link href="/money" className="home-money-cell">
-                  <span className="home-money-label">Collected</span>
-                  <Money tone="remaining">{rupees(dash.money.collectedPaise)}</Money>
-                </Link>
-                <Link href="/money" className="home-money-cell">
-                  <span className="home-money-label">Outstanding</span>
-                  <Money tone="frozen">{rupees(dash.money.outstandingPaise)}</Money>
-                </Link>
-                <Link href="/money" className="home-money-cell">
-                  <span className="home-money-label">Waived</span>
-                  <Money tone="spent">{rupees(dash.money.waivedPaise)}</Money>
-                </Link>
-              </div>
-            </Card>
-
-            {/* ---- active auctions ---- */}
-            <Card className="home-panel">
-              <div className="home-panel-head">
-                <SectionHeader title="Active auctions" />
-                <Link href="/competitions" className="home-more">
-                  View all
-                </Link>
-              </div>
-              {dash.auctions.length === 0 ? (
-                <p className="home-hint">No auction is live or scheduled right now.</p>
-              ) : (
-                <ul className="home-auctions">
-                  {dash.auctions.map((auction) => (
-                    <li key={auction.auctionId}>
-                      <Link
-                        href={`/competitions/${auction.competitionSlug}/auction`}
-                        className="home-auction"
-                      >
-                        <span className="home-crest" aria-hidden>
-                          {monogram(auction.competitionName)}
-                        </span>
-                        <span className="home-auction-main">
-                          <span className="home-auction-top">
-                            <strong>{auction.competitionName}</strong>
-                            <span
-                              className={`home-chip home-chip--${auction.status === "live" ? "live" : "soon"}`}
-                            >
-                              {auction.status === "live" ? "LIVE" : "SCHEDULED"}
-                            </span>
+          <div className="home-main">
+            {/* ================= LEFT ================= */}
+            <div className="home-col">
+              <Card
+                data-testid="attention-queue"
+                className={attention.length > 0 ? "home-panel home-panel--alert" : "home-panel"}
+              >
+                <div className="home-head">
+                  <SectionHeader title="Needs attention" />
+                  {attention.length > 0 ? (
+                    <span className="home-count">{attention.length}</span>
+                  ) : null}
+                </div>
+                {attention.length === 0 ? (
+                  <p className="home-empty">All clear — nothing is waiting on you.</p>
+                ) : (
+                  <ul className="home-list">
+                    {attention.map((row) => (
+                      <li key={row.key}>
+                        <Link href={row.href} className="home-attn">
+                          <span className="home-ic home-ic--warn home-ic--sm">
+                            <Glyph d={G.bolt} />
                           </span>
-                          <span className="home-auction-meta">
-                            <span>
-                              Spend <b>{rupeesShort(auction.spendPaise)}</b>
-                            </span>
-                            <span>
-                              Lots{" "}
-                              <b>
-                                {auction.lotsSold}/{auction.lotsTotal}
-                              </b>
-                            </span>
+                          <span className="home-attn-text">
+                            <strong>{row.label}</strong>
+                            <span>{row.detail}</span>
                           </span>
-                          <span className="home-progress" aria-hidden>
-                            <i
-                              style={{
-                                width: `${String(auction.lotsTotal === 0 ? 0 : Math.round((auction.lotsSold / auction.lotsTotal) * 100))}%`,
-                              }}
-                            />
-                          </span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-
-            {/* ---- upcoming events ---- */}
-            <Card className="home-panel">
-              <div className="home-panel-head">
-                <SectionHeader title="Upcoming events" />
-              </div>
-              {schedule.length === 0 ? (
-                <p className="home-hint">Nothing scheduled yet.</p>
-              ) : (
-                <ul className="home-events">
-                  {schedule.slice(0, 4).map((fixture) => {
-                    const when =
-                      fixture.kickoffAt !== null ? new Date(fixture.kickoffAt) : null;
-                    return (
-                      <li key={fixture.id}>
-                        <Link
-                          href={`/competitions/${fixture.competitionSlug}/fixtures`}
-                          className="home-event"
-                        >
-                          <span className="home-event-date">
-                            <b>{when !== null ? String(when.getDate()).padStart(2, "0") : "--"}</b>
-                            <span>
-                              {when !== null
-                                ? when.toLocaleString("en-IN", { month: "short" }).toUpperCase()
-                                : "TBD"}
-                            </span>
-                          </span>
-                          <span className="home-event-text">
-                            <strong>
-                              {fixture.homeTeamName} vs {fixture.awayTeamName}
-                            </strong>
-                            <span>{fixture.competitionName}</span>
+                          <span className="home-go" aria-hidden>
+                            →
                           </span>
                         </Link>
                       </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
-          </div>
+                    ))}
+                  </ul>
+                )}
+              </Card>
 
-          <div className="home-row home-row--b">
-            {/* ---- top competitions ---- */}
-            <Card className="home-panel home-panel--flush">
-              <div className="home-panel-head home-panel-head--pad">
-                <SectionHeader title="Top competitions" />
-                <Link href="/competitions" className="home-more">
-                  View all
-                </Link>
-              </div>
-              <div className="home-table-wrap">
-                <table className="home-table" data-testid="home-competitions">
-                  <thead>
-                    <tr>
-                      <th>Competition</th>
-                      <th>Teams</th>
-                      <th>Players</th>
-                      <th className="home-num">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dash.top.map((row) => (
-                      <tr key={row.slug}>
-                        <td>
-                          <Link href={`/competitions/${row.slug}`} className="home-tcell">
-                            <span className="home-crest home-crest--sm" aria-hidden>
-                              {monogram(row.name)}
+              <Card className="home-panel">
+                <div className="home-head">
+                  <SectionHeader title="Money overview" />
+                  <span className="home-legend">
+                    <span>
+                      <i className="home-dot home-dot--accent" />
+                      This week
+                    </span>
+                    <span>
+                      <i className="home-dot home-dot--muted" />
+                      Last week
+                    </span>
+                  </span>
+                </div>
+                <div className="home-chart-wrap">
+                  {chartMax > 0 ? (
+                    <span className="home-chart-peak">Peak {rupeesShort(chartMax)}/day</span>
+                  ) : null}
+                  <svg
+                    className="home-chart"
+                    viewBox="0 0 470 156"
+                    role="img"
+                    aria-label="Money collected per day, this week versus last week"
+                  >
+                    <defs>
+                      <linearGradient id="home-area" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="var(--accent)" stopOpacity="0.24" />
+                        <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    {[16, 45, 74, 103, 132].map((y) => (
+                      <line
+                        key={y}
+                        x1="44"
+                        y1={y}
+                        x2="452"
+                        y2={y}
+                        stroke="var(--border-subtle)"
+                        strokeWidth="1"
+                      />
+                    ))}
+                    <polygon
+                      fill="url(#home-area)"
+                      points={`44,132 ${points(dash.money.thisWeek, chartMax)} 452,132`}
+                    />
+                    <polyline
+                      fill="none"
+                      stroke="var(--text-muted)"
+                      strokeWidth="2"
+                      strokeDasharray="4 5"
+                      strokeLinecap="round"
+                      points={points(dash.money.lastWeek, chartMax)}
+                    />
+                    <polyline
+                      fill="none"
+                      stroke="var(--accent)"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      points={points(dash.money.thisWeek, chartMax)}
+                    />
+                    {DAY_LABELS.map((label, index) => (
+                      <text
+                        key={label}
+                        x={44 + index * ((452 - 44) / 6)}
+                        y="150"
+                        fill="var(--text-muted)"
+                        fontSize="10"
+                        textAnchor="middle"
+                      >
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+                <div className="home-money">
+                  <Link href="/money" className="home-money-cell">
+                    <span className="home-money-label">Collected</span>
+                    <Money tone="remaining">{rupees(dash.money.collectedPaise)}</Money>
+                  </Link>
+                  <Link href="/money" className="home-money-cell">
+                    <span className="home-money-label">Outstanding</span>
+                    <Money tone="frozen">{rupees(dash.money.outstandingPaise)}</Money>
+                  </Link>
+                  <Link href="/money" className="home-money-cell">
+                    <span className="home-money-label">Waived</span>
+                    <Money tone="spent">{rupees(dash.money.waivedPaise)}</Money>
+                  </Link>
+                </div>
+              </Card>
+
+              <Card className="home-panel home-panel--flush">
+                <div className="home-head home-head--pad">
+                  <SectionHeader title="Top competitions" />
+                  <Link href="/competitions" className="home-more">
+                    View all
+                  </Link>
+                </div>
+                <div className="home-table-wrap">
+                  <table className="home-table" data-testid="home-competitions">
+                    <thead>
+                      <tr>
+                        <th>Competition</th>
+                        <th className="home-num">Teams</th>
+                        <th className="home-num">Players</th>
+                        <th className="home-num">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dash.top.map((row) => (
+                        <tr key={row.slug}>
+                          <td>
+                            <Link href={`/competitions/${row.slug}`} className="home-tcell">
+                              <span className="home-crest home-crest--sm" aria-hidden>
+                                {monogram(row.name)}
+                              </span>
+                              <span className="home-tcell-text">
+                                <strong>{row.name}</strong>
+                                <span>{rupeesShort(row.collectedPaise)} collected</span>
+                              </span>
+                            </Link>
+                          </td>
+                          <td className="home-num home-mono">{row.teams}</td>
+                          <td className="home-num home-mono">{row.registrations}</td>
+                          <td className="home-num">
+                            <Badge tone={statusTone(row.status)}>{statusLabel(row.status)}</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </div>
+
+            {/* ================= RIGHT ================= */}
+            <div className="home-col">
+              <Card className="home-panel">
+                <div className="home-head">
+                  <SectionHeader title="Active auctions" />
+                  <Link href="/competitions" className="home-more">
+                    View all
+                  </Link>
+                </div>
+                {dash.auctions.length === 0 ? (
+                  <p className="home-empty">No auction is live or scheduled right now.</p>
+                ) : (
+                  <ul className="home-list">
+                    {dash.auctions.map((auction) => (
+                      <li key={auction.auctionId}>
+                        <Link
+                          href={`/competitions/${auction.competitionSlug}/auction`}
+                          className="home-auction"
+                        >
+                          <span className="home-crest" aria-hidden>
+                            {monogram(auction.competitionName)}
+                          </span>
+                          <span className="home-auction-main">
+                            <span className="home-auction-top">
+                              <strong>{auction.competitionName}</strong>
+                              <span
+                                className={`home-chip home-chip--${auction.status === "live" ? "live" : "soon"}`}
+                              >
+                                {auction.status === "live" ? "LIVE" : "SCHEDULED"}
+                              </span>
                             </span>
-                            <span className="home-tcell-text">
-                              <strong>{row.name}</strong>
-                              <span>{rupeesShort(row.collectedPaise)} collected</span>
+                            <span className="home-auction-meta">
+                              <span>
+                                Spend <b>{rupeesShort(auction.spendPaise)}</b>
+                              </span>
+                              <span>
+                                Lots{" "}
+                                <b>
+                                  {auction.lotsSold}/{auction.lotsTotal}
+                                </b>
+                              </span>
+                            </span>
+                            <span className="home-progress" aria-hidden>
+                              <i
+                                style={{
+                                  width: `${String(auction.lotsTotal === 0 ? 0 : Math.round((auction.lotsSold / auction.lotsTotal) * 100))}%`,
+                                }}
+                              />
+                            </span>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+
+              <Card className="home-panel">
+                <div className="home-head">
+                  <SectionHeader title="Upcoming events" />
+                </div>
+                {schedule.length === 0 ? (
+                  <p className="home-empty">Nothing scheduled yet.</p>
+                ) : (
+                  <ul className="home-list">
+                    {schedule.slice(0, 5).map((fixture) => {
+                      const when = fixture.kickoffAt !== null ? new Date(fixture.kickoffAt) : null;
+                      return (
+                        <li key={fixture.id}>
+                          <Link
+                            href={`/competitions/${fixture.competitionSlug}/fixtures`}
+                            className="home-event"
+                          >
+                            <span className="home-date">
+                              <b>{when !== null ? String(when.getDate()).padStart(2, "0") : "--"}</b>
+                              <span>
+                                {when !== null
+                                  ? when.toLocaleString("en-IN", { month: "short" }).toUpperCase()
+                                  : "TBD"}
+                              </span>
+                            </span>
+                            <span className="home-event-text">
+                              <strong>
+                                {fixture.homeTeamName} vs {fixture.awayTeamName}
+                              </strong>
+                              <span>{fixture.competitionName}</span>
                             </span>
                           </Link>
-                        </td>
-                        <td className="home-mono">{row.teams}</td>
-                        <td className="home-mono">{row.registrations}</td>
-                        <td className="home-num">
-                          <Badge tone={statusTone(row.status)}>{statusLabel(row.status)}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Card>
 
-            {/* ---- quick actions ---- */}
-            <Card className="home-panel">
-              <div className="home-panel-head">
-                <SectionHeader title="Quick actions" />
-              </div>
-              <div className="home-actions">
-                <Link href="/competitions" className="home-action">
-                  <span className="home-action-ic home-tile-ic--accent">
-                    <Glyph d={G.trophy} />
-                  </span>
-                  <b>New competition</b>
-                </Link>
-                <Link href="/orgs" className="home-action">
-                  <span className="home-action-ic home-tile-ic--info">
-                    <Glyph d={G.users} />
-                  </span>
-                  <b>Organizations</b>
-                </Link>
-                <Link href="/competitions" className="home-action">
-                  <span className="home-action-ic home-tile-ic--gold">
-                    <Glyph d={G.gavel} />
-                  </span>
-                  <b>Run an auction</b>
-                </Link>
-                <Link href="/competitions" className="home-action">
-                  <span className="home-action-ic home-tile-ic--green">
-                    <Glyph d={G.check} />
-                  </span>
-                  <b>Review players</b>
-                </Link>
-                <Link href="/money" className="home-action">
-                  <span className="home-action-ic home-tile-ic--violet">
-                    <Glyph d={G.rupee} />
-                  </span>
-                  <b>Money</b>
-                </Link>
-                <Link href="/help" className="home-action">
-                  <span className="home-action-ic home-tile-ic--teal">
-                    <Glyph d={G.doc} />
-                  </span>
-                  <b>Help centre</b>
-                </Link>
-              </div>
-            </Card>
-
-            {/* ---- recent activity ---- */}
-            <Card className="home-panel">
-              <div className="home-panel-head">
-                <SectionHeader title="Recent activity" />
-                <Link href="/inbox" className="home-more">
-                  View all
-                </Link>
-              </div>
-              {dash.activity.length === 0 ? (
-                <p className="home-hint">Nothing has happened yet.</p>
-              ) : (
-                <ul className="home-feed">
-                  {dash.activity.map((row) => (
-                    <li key={row.id} className="home-feed-row">
-                      <span className="home-feed-ic" aria-hidden>
-                        <Glyph d={G.check} />
-                      </span>
-                      <span className="home-feed-text">
-                        <strong>{humanizeAction(row.action)}</strong>
-                        <span>{row.action.split(".")[0]}</span>
-                      </span>
-                      <span className="home-feed-time">{ago(row.at)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
+              <Card className="home-panel">
+                <div className="home-head">
+                  <SectionHeader title="Recent activity" />
+                  <Link href="/inbox" className="home-more">
+                    View all
+                  </Link>
+                </div>
+                {dash.activity.length === 0 ? (
+                  <p className="home-empty">Nothing has happened yet.</p>
+                ) : (
+                  <ul className="home-list">
+                    {dash.activity.map((row) => {
+                      const style = activityStyle(row.action);
+                      return (
+                        <li key={row.id} className="home-feed">
+                          <span className={`home-ic home-ic--${style.tone} home-ic--sm`}>
+                            {style.icon}
+                          </span>
+                          <span className="home-feed-text">
+                            <strong>{activityLabel(row.action)}</strong>
+                          </span>
+                          <span className="home-time">{ago(row.at)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Card>
+            </div>
           </div>
 
           <HomeShortcuts
@@ -680,23 +717,26 @@ export default async function HomePage() {
             <>
               <SectionHeader title="My registrations" />
               <Card data-testid="home-registrations">
-                <ul className="home-attention-list">
+                <ul className="home-list">
                   {registrationsMine.map((registration) => (
                     <li key={registration.competitionSlug}>
                       <Link
                         href={`/competitions/${registration.competitionSlug}/register`}
-                        className="home-attention-row"
+                        className="home-attn"
                       >
-                        <span className="home-attention-label">
-                          {registration.competitionName}
-                          <Badge tone={REG_TONE[registration.status] ?? "neutral"}>
-                            {registration.status}
-                          </Badge>
+                        <span className="home-crest home-crest--sm" aria-hidden>
+                          {monogram(registration.competitionName)}
                         </span>
-                        <span className="home-attention-detail">
-                          {registration.orgName} · {registration.role.replace(/_/g, " ")} ·{" "}
-                          {registration.number}
+                        <span className="home-attn-text">
+                          <strong>{registration.competitionName}</strong>
+                          <span>
+                            {registration.orgName} · {registration.role.replace(/_/g, " ")} ·{" "}
+                            {registration.number}
+                          </span>
                         </span>
+                        <Badge tone={REG_TONE[registration.status] ?? "neutral"}>
+                          {registration.status}
+                        </Badge>
                       </Link>
                     </li>
                   ))}
