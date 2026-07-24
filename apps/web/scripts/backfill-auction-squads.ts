@@ -26,7 +26,7 @@ interface Row {
   playerName: string | null;
   lotNumber: string;
   teamId: string;
-  teamName: string;
+  teamName: string | null;
   currentTeamId: string | null;
 }
 
@@ -41,14 +41,18 @@ async function divergentRows(db: Db): Promise<Row[]> {
       playerName: sql<string | null>`people.name`,
       lotNumber: lots.lotNumber,
       teamId: paddles.teamId,
-      teamName: sql<string>`teams.name`,
+      teamName: sql<string | null>`teams.name`,
       currentTeamId: registrations.teamId,
     })
     .from(lots)
     .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
     .innerJoin(registrations, eq(registrations.id, lots.registrationId))
-    .innerJoin(sql`teams`, sql`teams.id = ${paddles.teamId}`)
-    .innerJoin(sql`people`, sql`people.id = ${registrations.personId}`)
+    // LEFT, not INNER: a sold lot whose person or team row has gone missing is
+    // exactly the corruption this script exists to surface. Inner joins made it
+    // invisible — the run reported "nothing to repair" while 840 divergent rows
+    // sat in the database, because it could not print their names.
+    .leftJoin(sql`teams`, sql`teams.id = ${paddles.teamId}`)
+    .leftJoin(sql`people`, sql`people.id = ${registrations.personId}`)
     .where(
       and(
         eq(lots.status, "sold"),
@@ -69,7 +73,7 @@ async function main(): Promise<void> {
   for (const row of rows) {
     const from = row.currentTeamId === null ? "(unassigned)" : row.currentTeamId;
     console.log(
-      `  ${row.lotNumber}  ${(row.playerName ?? "—").padEnd(24)}  ${from} → ${row.teamName}`,
+      `  ${row.lotNumber}  ${(row.playerName ?? "(no person row)").padEnd(24)}  ${from} → ${row.teamName ?? row.teamId}`,
     );
   }
 
