@@ -6,8 +6,12 @@
     "incremental": true,
     "allowJs": false,
     "types": ["node"],
-    "plugins": [{ "name": "next" }]
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
-  "include": ["next-env.d.ts", "src", "scripts", ".next/types/**/*.ts"],
+  "include": [".next/types/**/*.ts", "next-env.d.ts", "scripts", "src", ".next-e2e/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

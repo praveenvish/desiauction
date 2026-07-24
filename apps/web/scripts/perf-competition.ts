@@ -80,6 +80,7 @@ async function main(): Promise<void> {
   const fixComp: CompetitionSummary = {
     id: newId(),
     orgId,
+    tournamentId: null,
     name: `Perf Fixtures ${RUN}`,
     slug: `perf-fix-${RUN}`,
     status: "draft",

@@ -38,8 +38,10 @@ import {
 } from "./registration-aggregate";
 import { commitRegistrationImport } from "./registration-import";
 import {
+  addPlayerByPhone,
   duplicateNameKeys,
   exportRegistrationsCsv,
+  photoTargetsOf,
   queryRegistrations,
   registrationStats,
   timelineOf,
@@ -241,6 +243,68 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const parsed = parseRegistrationCsv(csv);
     const result = await commitRegistrationImport(db, compId, org.id, owner, parsed.rows);
     expect(result).toEqual({ imported: 0, duplicates: 1 });
+  });
+
+  // Manual add = the import's semantics one row at a time (same stub, same gate).
+  const MANUAL_PHONE = `+9197${RUN}2`;
+
+  it("manual add creates a person stub + submitted registration with its own timeline", async () => {
+    const result = await addPlayerByPhone(db, compId, org.id, owner, {
+      name: "Manual Player",
+      phone: MANUAL_PHONE,
+      role: "bowler",
+      basePriceBand: "A",
+    });
+    if (!result.ok) {
+      throw new Error("expected ok");
+    }
+    seededPersonIds.push(result.personId);
+    expect(result.personExisted).toBe(false);
+    expect(result.number).toBe(registrationNumber(result.registrationId));
+    const page = await queryRegistrations(db, compId, {
+      search: "Manual Player",
+      page: 1,
+      pageSize: 25,
+    });
+    expect(page.rows.map((r) => r.id)).toContain(result.registrationId);
+    expect(page.rows.find((r) => r.id === result.registrationId)?.status).toBe("submitted");
+    // The DA-27 lesson: the timeline starts where the player entered.
+    const actions = (await timelineOf(db, result.registrationId)).map((t) => t.action);
+    expect(actions).toContain("registration.added");
+  });
+
+  it("manual re-add of the same phone reuses the person and refuses the duplicate", async () => {
+    const result = await addPlayerByPhone(db, compId, org.id, owner, {
+      name: "Manual Player Again",
+      phone: MANUAL_PHONE,
+      role: "batter",
+      basePriceBand: null,
+    });
+    expect(result).toEqual({ ok: false, reason: "duplicate" });
+    // The person's name was NOT overwritten by the retry (it is not ours to correct).
+    const [person] = await db.select().from(people).where(eq(people.phone, MANUAL_PHONE)).limit(1);
+    expect(person?.name).toBe("Manual Player");
+  });
+
+  it("photo targets cover the whole competition and flag who already has a photo", async () => {
+    const withPhoto = await seed(compId, org.id, "Pictured Player", "ph1", "approved");
+    const [seeded] = await db
+      .select({ personId: registrationsTable.personId })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, withPhoto))
+      .limit(1);
+    await db
+      .update(people)
+      .set({ photoUrl: "orgs/x/player/p/photo.webp", photoConsentAt: new Date() })
+      .where(eq(people.id, seeded?.personId ?? ""));
+    const targets = await photoTargetsOf(db, compId);
+    const total = (await registrationStats(db, compId)).total;
+    expect(targets).toHaveLength(total);
+    const pictured = targets.find((t) => t.registrationId === withPhoto);
+    expect(pictured?.hasPhoto).toBe(true);
+    expect(targets.filter((t) => t.registrationId !== withPhoto).every((t) => !t.hasPhoto)).toBe(
+      true,
+    );
   });
 
   it("deterministic search / filter / sort / pagination", async () => {

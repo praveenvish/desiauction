@@ -37,6 +37,79 @@ export interface CsvParseResult {
 
 const REQUIRED_HEADER = ["name", "phone", "role"] as const;
 
+/** The four fields every player needs, however they arrive (CSV row or form). */
+export interface NewPlayerInput {
+  name: string;
+  phone: string;
+  role: string;
+  basePriceBand?: string | null;
+}
+
+export type PlayerField = "name" | "phone" | "role" | "basePriceBand";
+
+export interface PlayerFieldError {
+  field: PlayerField;
+  message: string;
+}
+
+export type NewPlayerCheck =
+  | {
+      ok: true;
+      value: { name: string; phone: string; role: RegistrationRole; basePriceBand: string | null };
+    }
+  | { ok: false; errors: PlayerFieldError[] };
+
+/**
+ * The one validation truth for "a player joins this competition" — used per line
+ * by the CSV parser AND by the organizer's manual add form, so a name/phone/role
+ * that a file would reject cannot slip in through the dialog (or vice versa).
+ * Field-keyed so a form can render each message under its own input; the CSV
+ * path joins them into its one-line-per-row message.
+ */
+export function validateNewPlayer(
+  input: NewPlayerInput,
+  knownBands?: readonly string[],
+): NewPlayerCheck {
+  const name = input.name.trim();
+  const rawPhone = input.phone.trim();
+  const role = input.role.trim().toLowerCase();
+  const band = (input.basePriceBand ?? "").trim();
+
+  const errors: PlayerFieldError[] = [];
+  if (name.length < 3) {
+    errors.push({ field: "name", message: "name must be at least 3 characters" });
+  }
+  const phone = normalizePhone(rawPhone);
+  if (!phone.ok) {
+    errors.push({ field: "phone", message: `invalid phone "${rawPhone}"` });
+  }
+  if (!isRegistrationRole(role)) {
+    errors.push({ field: "role", message: `invalid role "${role}"` });
+  }
+  if (
+    band !== "" &&
+    knownBands !== undefined &&
+    !knownBands.some((known) => known.toUpperCase() === band.toUpperCase())
+  ) {
+    errors.push({
+      field: "basePriceBand",
+      message: `unknown base price band "${band}" (expected ${knownBands.join(", ")})`,
+    });
+  }
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+  return {
+    ok: true,
+    value: {
+      name,
+      phone: phone.ok ? phone.phone : rawPhone,
+      role: role as RegistrationRole,
+      basePriceBand: band === "" ? null : band,
+    },
+  };
+}
+
 /** Tokenize CSV text into records of fields. Deterministic; no locale. */
 export function tokenizeCsv(text: string): string[][] {
   const records: string[][] = [];
@@ -128,24 +201,15 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
     const battingStyle = optional("batting_style");
     const bowlingStyle = optional("bowling_style");
 
-    const rowErrors: string[] = [];
-    if (rawName.length < 3) {
-      rowErrors.push("name must be at least 3 characters");
-    }
+    const check = validateNewPlayer(
+      { name: rawName, phone: rawPhone, role: rawRole, basePriceBand: band },
+      knownBands,
+    );
+    const rowErrors = check.ok ? [] : check.errors.map((error) => error.message);
+    // The in-file duplicate check is the parser's alone (a form has no "file"),
+    // and it needs the normalized phone even when another field failed — so a
+    // repeat is still reported against the line that repeats it.
     const phone = normalizePhone(rawPhone);
-    if (!phone.ok) {
-      rowErrors.push(`invalid phone "${rawPhone}"`);
-    }
-    if (!isRegistrationRole(rawRole)) {
-      rowErrors.push(`invalid role "${rawRole}"`);
-    }
-    if (
-      band !== "" &&
-      knownBands !== undefined &&
-      !knownBands.some((known) => known.toUpperCase() === band.toUpperCase())
-    ) {
-      rowErrors.push(`unknown base price band "${band}" (expected ${knownBands.join(", ")})`);
-    }
     if (phone.ok) {
       const prior = seenPhones.get(phone.phone);
       if (prior !== undefined) {

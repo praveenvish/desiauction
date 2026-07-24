@@ -43,7 +43,6 @@ export default async function AdminAuditPage({
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
         <header className="dash-head">
-          <h1>Audit</h1>
           <p className="dash-hint">
             Every audited action on the platform, newest first. Search matches the actor, the scope,
             the subject and the action — the whole correlation chain, from one box.

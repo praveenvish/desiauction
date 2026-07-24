@@ -3,8 +3,6 @@
 import {
   AppShell,
   Breadcrumb,
-  CommandPalette,
-  ContextBar,
   Drawer,
   IconBell,
   IconChevronDown,
@@ -12,19 +10,20 @@ import {
   IconHome,
   IconMenu,
   IconRupee,
-  IconSearch,
   IconTrophy,
   IconUsers,
+  InlineSearch,
   LiveShell,
   PopoverMenu,
   PublicShell,
   SubNavTabs,
+  type InlineSearchHandle,
   type PaletteGroup,
   type ShellNavItem,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { INBOX_SEEN_KEY } from "../../app/inbox/inbox-list";
@@ -43,12 +42,16 @@ import {
   RAIL,
   activeAdminTab,
   activeCompetitionTab,
+  activeOrgMoneyTab,
   activeRailKey,
   competitionTabs,
   liveExit,
-  sectionLabel,
+  orgMoneyTabs,
+  pageIdentity,
   shellKind,
 } from "./nav";
+import { ShellActionContext } from "./page-action";
+import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
 import { ThemeToggle } from "./theme-toggle";
 import "./product-shell.css";
 
@@ -113,29 +116,11 @@ function BellLink({ latestEventAt, pathname }: { latestEventAt: string | null; p
 
 const RAIL_ICONS: Record<string, ReactNode> = {
   home: <IconHome />,
-  seasons: <IconTrophy />,
+  tournaments: <IconTrophy />,
   orgs: <IconUsers />,
   money: <IconRupee />,
   help: <IconHelp />,
 };
-
-/** Surface name shown at the left of the top bar for each rail destination. */
-const RAIL_TITLES: Record<string, string> = {
-  home: "Dashboard",
-  seasons: "Seasons",
-  orgs: "Organizations",
-  money: "Money",
-  help: "Help",
-};
-
-/**
- * Titles for the two surfaces that sit outside the five-item rail. Everything
- * else is a competition/org child and is titled by its own ContextBar.
- */
-const SURFACE_TITLES: [string, string][] = [
-  ["/inbox", "Notifications"],
-  ["/account", "Settings"],
-];
 
 /** The design system has no gear glyph; the utility group needs one. */
 function IconSettings() {
@@ -168,11 +153,13 @@ export function ProductShell({
 }: ProductShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
+  const [pageAction, setPageAction] = useState<ReactNode | null>(null);
+  const searchRef = useRef<InlineSearchHandle | null>(null);
   const kind = shellKind(pathname);
 
-  // ⌘K / Ctrl-K opens the palette anywhere in the Console shell.
+  // ⌘K / Ctrl-K reaches the same field the icon opens — one search, two doors.
   useEffect(() => {
     if (kind !== "console" || session === null) {
       return;
@@ -180,7 +167,7 @@ export function ProductShell({
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setPaletteOpen((value) => !value);
+        searchRef.current?.toggle();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -191,9 +178,30 @@ export function ProductShell({
 
   // Close transient chrome on navigation.
   useEffect(() => {
-    setPaletteOpen(false);
     setDrawerOpen(false);
   }, [pathname]);
+
+  // Stable identities, so a page's effect fires once. `retract` clears only
+  // what the retracting instance itself published, which keeps a Suspense
+  // re-reveal (or a route change) from wiping the live page's header.
+  const titleChannel = useMemo(
+    () => ({
+      publish: setTitleOverride,
+      retract: (token: ShellTitleOverride) => {
+        setTitleOverride((current) => (current === token ? null : current));
+      },
+    }),
+    [],
+  );
+  const actionChannel = useMemo(
+    () => ({
+      publish: setPageAction,
+      retract: (token: ReactNode) => {
+        setPageAction((current) => (current === token ? null : current));
+      },
+    }),
+    [],
+  );
 
   // "Continue working" feed: remember competition visits (device-local only).
   useEffect(() => {
@@ -436,7 +444,12 @@ export function ProductShell({
   if (kind === "live") {
     const exit = liveExit(pathname, session !== null);
     return (
-      <LiveShell exitHref={exit.href} exitLabel={exit.label} linkComponent={Link}>
+      <LiveShell
+        exitHref={exit.href}
+        exitLabel={exit.label}
+        linkComponent={Link}
+        brand={<BrandMark size={26} />}
+      >
         {children}
       </LiveShell>
     );
@@ -544,128 +557,64 @@ export function ProductShell({
   }
 
   const activeKey = activeRailKey(pathname);
-  const railTitle =
-    (activeKey !== null ? RAIL_TITLES[activeKey] : undefined) ??
-    SURFACE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
   const nav: ShellNavItem[] = RAIL.map((item) => ({
     ...item,
     icon: RAIL_ICONS[item.key],
     active: item.key === activeKey,
   }));
 
-  // Context header: competition pages get breadcrumb + tabs + switcher; org
-  // pages get a breadcrumb. Data comes from the layout's existing reads —
-  // an unknown slug (non-member deep link) simply renders no context bar.
-  let contextBarNode: ReactNode = null;
+  // Identity: one derivation for every console route (nav.ts), overridden only
+  // where the name is page data the shell cannot hold.
+  const identity = pageIdentity(pathname, { competitions, orgs, isAdmin });
+  const title = titleOverride === null ? identity.title : titleOverride.title;
+  const titleTestId = titleOverride?.testId;
+  const subtitle = titleOverride?.subtitle ?? identity.subtitle;
+
+  // Section tabs: seasons, the org's money desks, administration. A surface
+  // without sections renders no strip rather than an empty one.
+  let tabsNode: ReactNode = null;
   const competitionMatch = /^\/seasons\/([^/]+)/.exec(pathname);
   const orgMatch = /^\/org\/([^/]+)/.exec(pathname);
+  let seasonSwitcherFor: string | null = null;
   if (pathname.startsWith("/admin")) {
-    // Administration's own context bar. Rendered on `isAdmin` alone: for anyone
-    // else the page underneath is a 404, so chrome would frame nothing.
-    const section = sectionLabel(pathname);
-    contextBarNode = isAdmin ? (
-      <ContextBar
-        breadcrumb={
-          <Breadcrumb
-            linkComponent={Link}
-            items={[
-              { label: "Platform admin", ...(section !== null ? { href: "/admin" } : {}) },
-              ...(section !== null ? [{ label: section }] : []),
-            ]}
-          />
-        }
-        tabs={
-          <SubNavTabs
-            label="Administration sections"
-            linkComponent={Link}
-            tabs={ADMIN_TABS.map((tab) => ({
-              ...tab,
-              active: tab.key === activeAdminTab(pathname),
-            }))}
-          />
-        }
+    // Rendered on `isAdmin` alone: for anyone else the page underneath is a
+    // 404, so chrome would frame nothing.
+    tabsNode = isAdmin ? (
+      <SubNavTabs
+        label="Administration sections"
+        linkComponent={Link}
+        tabs={ADMIN_TABS.map((tab) => ({
+          ...tab,
+          active: tab.key === activeAdminTab(pathname),
+        }))}
       />
     ) : null;
   } else if (competitionMatch !== null) {
     const slug = competitionMatch[1] as string;
     const competition = competitions.find((entry) => entry.slug === slug);
     if (competition !== undefined) {
-      const section = sectionLabel(pathname);
+      seasonSwitcherFor = slug;
       const activeTab = activeCompetitionTab(pathname, slug);
-      contextBarNode = (
-        <ContextBar
-          breadcrumb={
-            <Breadcrumb
-              linkComponent={Link}
-              items={[
-                { label: competition.orgName, href: "/orgs" },
-                {
-                  label: competition.name,
-                  ...(section !== null ? { href: `/seasons/${slug}` } : {}),
-                },
-                ...(section !== null ? [{ label: section }] : []),
-              ]}
-            />
-          }
-          actions={
-            competitions.length > 1 ? (
-              <PopoverMenu
-                label="Switch season"
-                trigger={
-                  <>
-                    <span className="shell-org-name">Switch</span>
-                    <IconChevronDown width={16} height={16} />
-                  </>
-                }
-                items={competitions
-                  .filter((entry) => entry.slug !== slug)
-                  .map((entry) => ({
-                    key: entry.slug,
-                    label: `${entry.name} — ${entry.orgName}`,
-                    onSelect: () => {
-                      router.push(`/seasons/${entry.slug}`);
-                    },
-                  }))}
-              />
-            ) : undefined
-          }
-          tabs={
-            <SubNavTabs
-              label="Season sections"
-              linkComponent={Link}
-              tabs={competitionTabs(slug, competition.canSettle).map((tab) => ({
-                ...tab,
-                active: tab.key === activeTab,
-              }))}
-            />
-          }
+      tabsNode = (
+        <SubNavTabs
+          label="Season sections"
+          linkComponent={Link}
+          tabs={competitionTabs(slug, competition.canSettle).map((tab) => ({
+            ...tab,
+            active: tab.key === activeTab,
+          }))}
         />
       );
     }
   } else if (orgMatch !== null) {
     const slug = orgMatch[1] as string;
-    const org = orgs.find((entry) => entry.slug === slug);
-    if (org !== undefined) {
-      const onVenues = pathname.includes("/venues");
-      // The tournament's own name is only known to the page (it is an async
-      // read), so the trail carries the level and the page's h1 carries the name.
-      const onTournament = /^\/org\/[^/]+\/t\//.test(pathname);
-      contextBarNode = (
-        <ContextBar
-          breadcrumb={
-            <Breadcrumb
-              linkComponent={Link}
-              items={[
-                { label: "Organizations", href: "/orgs" },
-                {
-                  label: org.name,
-                  ...(onVenues || onTournament ? { href: `/org/${slug}` } : {}),
-                },
-                ...(onVenues ? [{ label: "Venues" }] : []),
-                ...(onTournament ? [{ label: "Tournament" }] : []),
-              ]}
-            />
-          }
+    const activeDesk = activeOrgMoneyTab(pathname, slug);
+    if (activeDesk !== null && orgs.some((entry) => entry.slug === slug)) {
+      tabsNode = (
+        <SubNavTabs
+          label="Money operations"
+          linkComponent={Link}
+          tabs={orgMoneyTabs(slug).map((tab) => ({ ...tab, active: tab.key === activeDesk }))}
         />
       );
     }
@@ -681,63 +630,48 @@ export function ProductShell({
       : "•";
 
   return (
-    <>
-      <AppShell
-        nav={nav}
-        navGroups={[
-          {
-            key: "utility",
-            items: [
-              {
-                key: "inbox",
-                label: "Notifications",
-                href: "/inbox",
-                icon: <IconBell />,
-                active: pathname.startsWith("/inbox"),
-              },
-              {
-                key: "account",
-                label: "Settings",
-                href: "/account",
-                icon: <IconSettings />,
-                active: pathname.startsWith("/account"),
-              },
-            ],
-          },
-        ]}
-        linkComponent={Link}
-        wordmark="DesiAuction"
-        wordmarkHref="/home"
-        glyph={<BrandMark size={32} />}
-        tagline="Bid · Build · Win"
-        {...(contextBarNode === null && railTitle !== undefined ? { pageTitle: railTitle } : {})}
-        contextBar={contextBarNode}
-        search={
-          <button
-            type="button"
-            className="shell-search"
-            aria-label="Go to anything (⌘K)"
-            onClick={() => {
-              setPaletteOpen(true);
-            }}
-          >
-            <IconSearch />
-            <span className="shell-search-text">Search seasons, teams, players…</span>
-            <span className="shell-search-kbd">⌘K</span>
-          </button>
-        }
-        railFooter={
-          <>
-            <div className="shell-pro">
-              <span className="shell-pro-cup" aria-hidden>
-                <IconTrophy />
-              </span>
-              <strong>Upgrade to Pro</strong>
-              <p>Unlock advanced features and detailed analytics.</p>
-              <Link className="shell-pro-cta" href="/pricing">
-                See plans
-              </Link>
-            </div>
+    <ShellTitleContext.Provider value={titleChannel}>
+      <ShellActionContext.Provider value={actionChannel}>
+        <AppShell
+          nav={nav}
+          navGroups={[
+            {
+              key: "utility",
+              items: [
+                {
+                  key: "inbox",
+                  label: "Notifications",
+                  href: "/inbox",
+                  icon: <IconBell />,
+                  active: pathname.startsWith("/inbox"),
+                },
+                {
+                  key: "account",
+                  label: "Account",
+                  href: "/account",
+                  icon: <IconSettings />,
+                  active: pathname.startsWith("/account"),
+                },
+              ],
+            },
+          ]}
+          linkComponent={Link}
+          wordmark="DesiAuction"
+          wordmarkHref="/home"
+          glyph={<BrandMark size={32} />}
+          tagline="Bid · Build · Win"
+          {...(title !== null ? { pageTitle: title } : {})}
+          {...(titleTestId !== undefined ? { pageTitleAttrs: { "data-testid": titleTestId } } : {})}
+          {...(identity.crumbs.length > 0
+            ? {
+                breadcrumb: <Breadcrumb trail linkComponent={Link} items={identity.crumbs} />,
+              }
+            : subtitle !== undefined
+              ? { subtitle }
+              : {})}
+          {...(tabsNode !== null ? { tabs: tabsNode } : {})}
+          {...(pageAction !== null ? { pageAction } : {})}
+          railFooter={
             <Link className="shell-railuser" href="/account">
               <span className="shell-railuser-avatar">{initials}</span>
               <span className="shell-railuser-text">
@@ -745,158 +679,177 @@ export function ProductShell({
                 <span>Organizer</span>
               </span>
             </Link>
-          </>
-        }
-        topActions={
-          <>
-            <button
-              type="button"
-              className="shell-icon-button shell-mobile-only"
-              aria-label="Go to anything (⌘K)"
-              onClick={() => {
-                setPaletteOpen(true);
-              }}
-            >
-              <IconSearch />
-            </button>
-            <ThemeToggle />
-            <BellLink latestEventAt={latestEventAt} pathname={pathname} />
-            {orgs.length > 1 ? (
+          }
+          topActions={
+            <>
+              <InlineSearch
+                handleRef={searchRef}
+                groups={paletteGroups}
+                onNavigate={(href) => {
+                  router.push(href);
+                }}
+              />
+              <span className="shell-desktop-only">
+                <ThemeToggle />
+              </span>
+              <BellLink latestEventAt={latestEventAt} pathname={pathname} />
+              {/* Switchers live with the other controls now — one cluster, in the
+                same place, whether you are switching season or organization. */}
+              {seasonSwitcherFor !== null && competitions.length > 1 ? (
+                <span className="shell-desktop-only">
+                  <PopoverMenu
+                    label="Switch season"
+                    trigger={
+                      <>
+                        <span className="shell-org-name">Switch</span>
+                        <IconChevronDown width={16} height={16} />
+                      </>
+                    }
+                    items={competitions
+                      .filter((entry) => entry.slug !== seasonSwitcherFor)
+                      .map((entry) => ({
+                        key: entry.slug,
+                        label: `${entry.name} — ${entry.orgName}`,
+                        onSelect: () => {
+                          router.push(`/seasons/${entry.slug}`);
+                        },
+                      }))}
+                  />
+                </span>
+              ) : null}
+              {seasonSwitcherFor === null && orgs.length > 1 ? (
+                <span className="shell-desktop-only">
+                  <PopoverMenu
+                    label="Switch organization"
+                    trigger={
+                      <>
+                        <span className="shell-org-name">{orgs[0]?.name ?? "Organizations"}</span>
+                        <IconChevronDown width={16} height={16} />
+                      </>
+                    }
+                    items={orgs.map((org) => ({
+                      key: org.slug,
+                      label: org.name,
+                      onSelect: () => {
+                        track("org.switched");
+                        router.push(`/org/${org.slug}`);
+                      },
+                    }))}
+                  />
+                </span>
+              ) : null}
               <span className="shell-desktop-only">
                 <PopoverMenu
-                  label="Switch organization"
-                  trigger={
-                    <>
-                      <span className="shell-org-name">{orgs[0]?.name ?? "Organizations"}</span>
-                      <IconChevronDown width={16} height={16} />
-                    </>
-                  }
-                  items={orgs.map((org) => ({
-                    key: org.slug,
-                    label: org.name,
-                    onSelect: () => {
-                      track("org.switched");
-                      router.push(`/org/${org.slug}`);
+                  label="Account menu"
+                  trigger={<span className="shell-avatar">{initials}</span>}
+                  header={<span data-testid="shell-session-phone">{session.phone}</span>}
+                  items={[
+                    {
+                      key: "account",
+                      label: "Account",
+                      onSelect: () => {
+                        router.push("/account");
+                      },
                     },
-                  }))}
+                    {
+                      key: "help",
+                      label: "Help",
+                      onSelect: () => {
+                        router.push("/help");
+                      },
+                    },
+                    // PX-1 01 §3: "(Admin: + Platform admin.)" — absent, not
+                    // disabled, for everyone else. The surface 404s regardless;
+                    // this only spares admins from typing the URL.
+                    ...(isAdmin
+                      ? [
+                          {
+                            key: "admin",
+                            label: "Platform admin",
+                            onSelect: () => {
+                              router.push("/admin");
+                            },
+                          },
+                        ]
+                      : []),
+                    {
+                      key: "logout",
+                      label: "Sign out",
+                      danger: true,
+                      onSelect: () => {
+                        track("auth.logout");
+                        void logout();
+                      },
+                    },
+                  ]}
                 />
               </span>
-            ) : null}
-            <span className="shell-desktop-only">
-              <PopoverMenu
-                label="Account menu"
-                trigger={<span className="shell-avatar">{initials}</span>}
-                header={<span data-testid="shell-session-phone">{session.phone}</span>}
-                items={[
-                  {
-                    key: "account",
-                    label: "Account",
-                    onSelect: () => {
-                      router.push("/account");
-                    },
-                  },
-                  {
-                    key: "help",
-                    label: "Help",
-                    onSelect: () => {
-                      router.push("/help");
-                    },
-                  },
-                  // PX-1 01 §3: "(Admin: + Platform admin.)" — absent, not
-                  // disabled, for everyone else. The surface 404s regardless;
-                  // this only spares admins from typing the URL.
-                  ...(isAdmin
-                    ? [
-                        {
-                          key: "admin",
-                          label: "Platform admin",
-                          onSelect: () => {
-                            router.push("/admin");
-                          },
-                        },
-                      ]
-                    : []),
-                  {
-                    key: "logout",
-                    label: "Sign out",
-                    danger: true,
-                    onSelect: () => {
-                      track("auth.logout");
-                      void logout();
-                    },
-                  },
-                ]}
-              />
-            </span>
-            <button
-              type="button"
-              className="shell-icon-button shell-mobile-only"
-              aria-label="Menu"
-              onClick={() => {
-                setDrawerOpen(true);
-              }}
-            >
-              <IconMenu />
-            </button>
-          </>
-        }
-      >
-        {children}
-      </AppShell>
-      <Drawer
-        open={drawerOpen}
-        onClose={() => {
-          setDrawerOpen(false);
-        }}
-        title="Menu"
-      >
-        <div className="shell-drawer-session">{session.phone}</div>
-        <ul className="shell-drawer-list">
-          {orgs.map((org) => (
-            <li key={org.slug}>
-              <Link href={`/org/${org.slug}`} className="shell-drawer-link">
-                {org.name}
-              </Link>
-            </li>
-          ))}
-          <li>
-            <Link href="/account" className="shell-drawer-link">
-              Account
-            </Link>
-          </li>
-          <li>
-            <Link href="/help" className="shell-drawer-link">
-              Help
-            </Link>
-          </li>
-          {isAdmin ? (
+              <button
+                type="button"
+                className="shell-icon-button shell-mobile-only"
+                aria-label="Menu"
+                onClick={() => {
+                  setDrawerOpen(true);
+                }}
+              >
+                <IconMenu />
+              </button>
+            </>
+          }
+        >
+          {children}
+        </AppShell>
+        <Drawer
+          open={drawerOpen}
+          onClose={() => {
+            setDrawerOpen(false);
+          }}
+          title="Menu"
+        >
+          <div className="shell-drawer-session">{session.phone}</div>
+          <ul className="shell-drawer-list">
+            {orgs.map((org) => (
+              <li key={org.slug}>
+                <Link href={`/org/${org.slug}`} className="shell-drawer-link">
+                  {org.name}
+                </Link>
+              </li>
+            ))}
             <li>
-              <Link href="/admin" className="shell-drawer-link">
-                Platform admin
+              <Link href="/account" className="shell-drawer-link">
+                Account
               </Link>
             </li>
-          ) : null}
-          <li>
-            <button
-              type="button"
-              className="shell-drawer-link shell-drawer-danger"
-              onClick={() => void logout()}
-            >
-              Sign out
-            </button>
-          </li>
-        </ul>
-      </Drawer>
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => {
-          setPaletteOpen(false);
-        }}
-        groups={paletteGroups}
-        onNavigate={(href) => {
-          router.push(href);
-        }}
-      />
-    </>
+            <li>
+              <Link href="/help" className="shell-drawer-link">
+                Help
+              </Link>
+            </li>
+            {isAdmin ? (
+              <li>
+                <Link href="/admin" className="shell-drawer-link">
+                  Platform admin
+                </Link>
+              </li>
+            ) : null}
+            {/* The theme switch rides here under 720px: the bar has room for the
+              title or a fourth icon, and the title is what people navigate by. */}
+            <li className="shell-drawer-row">
+              <span>Theme</span>
+              <ThemeToggle />
+            </li>
+            <li>
+              <button
+                type="button"
+                className="shell-drawer-link shell-drawer-danger"
+                onClick={() => void logout()}
+              >
+                Sign out
+              </button>
+            </li>
+          </ul>
+        </Drawer>
+      </ShellActionContext.Provider>
+    </ShellTitleContext.Provider>
   );
 }

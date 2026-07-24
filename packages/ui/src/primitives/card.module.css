@@ -1,4 +1,9 @@
 .card {
+  /* There is no global border-box reset in this app, so a padded full-width
+     box must opt in itself: at 100% width the default content-box added the
+     two paddings on top and pushed the card past its container, giving narrow
+     viewports a horizontal scrollbar (seen first on /account at 390px). */
+  box-sizing: border-box;
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);

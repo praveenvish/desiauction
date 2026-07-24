@@ -40,9 +40,7 @@ export default {
   // pack cache — the e2e server on :3050 and a developer's own server on :3000
   // produce phantom 404s and ChunkLoadErrors in whichever one loses the race.
   // The harness sets NEXT_DIST_DIR so the two never share a build directory.
-  ...(process.env["NEXT_DIST_DIR"] !== undefined
-    ? { distDir: process.env["NEXT_DIST_DIR"] }
-    : {}),
+  ...(process.env["NEXT_DIST_DIR"] !== undefined ? { distDir: process.env["NEXT_DIST_DIR"] } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],

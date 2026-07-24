@@ -12,13 +12,15 @@ export interface DialogProps {
   children: ReactNode;
   /** Action row — usually Buttons; the last one should be the primary. */
   footer?: ReactNode;
+  /** "wide" gives review flows (CSV import, previews) room; default is a form. */
+  size?: "default" | "wide";
 }
 
 /**
  * Built on native <dialog>: browser-managed focus trap, Escape, ::backdrop,
  * top-layer stacking — the simplest correct modal (IP-1_DESIGN §13 spirit).
  */
-export function Dialog({ open, onClose, title, children, footer }: DialogProps) {
+export function Dialog({ open, onClose, title, children, footer, size = "default" }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -37,12 +39,28 @@ export function Dialog({ open, onClose, title, children, footer }: DialogProps) 
   return (
     <dialog
       ref={ref}
-      className={styles["dialog"]}
+      className={[styles["dialog"], size === "wide" ? styles["wide"] : ""]
+        .filter(Boolean)
+        .join(" ")}
       aria-labelledby={titleId}
       onClose={onClose}
       onClick={(event) => {
-        // A click on the backdrop targets the dialog element itself.
-        if (event.target === ref.current) {
+        // A click on the backdrop targets the dialog element itself — but so
+        // does a click on the dialog's own padding or the gap beside a footer
+        // button. Only treat it as a backdrop click when the point is actually
+        // outside the dialog's box, so a near-miss on a button cannot dismiss
+        // the form under the user's cursor.
+        const node = ref.current;
+        if (node === null || event.target !== node) {
+          return;
+        }
+        const rect = node.getBoundingClientRect();
+        const inside =
+          event.clientX >= rect.left &&
+          event.clientX <= rect.right &&
+          event.clientY >= rect.top &&
+          event.clientY <= rect.bottom;
+        if (!inside) {
           onClose();
         }
       }}

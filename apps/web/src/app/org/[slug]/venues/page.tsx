@@ -19,8 +19,9 @@ export default async function VenuesPage({ params }: { params: Promise<{ slug: s
       <main className="competitions">
         <div className="competitions-stack">
           <header className="dash-head">
-            <h1 data-testid="venues-heading">Venues</h1>
-            <p className="competitions-hint">{view.org.name} · grounds and availability</p>
+            <p className="competitions-hint" data-testid="venues-heading">
+              {view.org.name} · grounds and availability
+            </p>
           </header>
           <VenuesPanel slug={slug} venues={view.venues} canManage={view.viewer.canManage} />
         </div>

@@ -1,4 +1,4 @@
-import { ButtonLink, LoadingState } from "@desiauction/ui";
+import { LoadingState } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -23,22 +23,15 @@ export const metadata = { title: "Settlement · DesiAuction" };
  */
 export default async function OrgSettlementPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const org = await settlementDeskGate(slug);
-  if (org === null) {
+  if ((await settlementDeskGate(slug)) === null) {
     notFound();
   }
   return (
     <main className="registrations-dash">
       <div className="dash-stack money-stack">
+        {/* Title, trail and desk tabs are the shell's — the page opens with
+            what it is for. */}
         <header className="dash-head">
-          <div className="competition-title-row">
-            <h1>Settlement</h1>
-            <span className="date-row">
-              <ButtonLink href={`/org/${slug}`} variant="secondary">
-                {org.name}
-              </ButtonLink>
-            </span>
-          </div>
           <p className="competitions-hint">
             Every case this organization has opened — what is owed, what came in, what closed
           </p>

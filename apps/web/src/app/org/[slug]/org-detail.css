@@ -1,0 +1,636 @@
+/* Org Detail Overview (Org Detail.dc.html). */
+
+.od-stack {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* --- hero ----------------------------------------------------------------- */
+.od-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.od-monogram {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, var(--accent-lift), var(--accent));
+  color: var(--text-on-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.od-hero-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.od-hero-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* The name moved to the shell's identity bar; what is left is the role badge,
+   so the row no longer needs a heading's leading. */
+.od-hero-title:empty {
+  display: none;
+}
+
+.od-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.od-hero-slug {
+  font-family: var(--font-mono);
+}
+
+.od-hero-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* --- overview panels ------------------------------------------------------ */
+.od-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* --- about banner --------------------------------------------------------- */
+/* The gold left border is the design's marker for "the club's own words".
+   Uses the identity accent so it reads as the org speaking, not the platform. */
+.od-about {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.od-about-body {
+  min-width: 0;
+}
+
+.od-about-kicker {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: var(--font-weight-semibold);
+}
+
+.od-about-text {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.od-about-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.od-about-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.od-about-field > span:first-child {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.od-about-field textarea {
+  width: 100%;
+  resize: vertical;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.od-about-field textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--border-interactive);
+}
+
+.od-about-count {
+  align-self: flex-end;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .od-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.od-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.od-panel-head h2,
+.od-panel > h2 {
+  margin: 0;
+}
+
+.od-live-list,
+.od-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.od-live-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+  text-decoration: none;
+  color: inherit;
+}
+
+.od-live-list li:first-child .od-live-row {
+  border-top: none;
+}
+
+.od-live-row:hover {
+  background: var(--surface-sunken);
+}
+
+.od-live-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.od-live-go {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.od-live-row:hover .od-live-go {
+  color: var(--text-accent);
+}
+
+/* --- recent activity ------------------------------------------------------ */
+.od-activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.od-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  margin-top: 6px;
+}
+
+.od-dot--green {
+  background: var(--success-base);
+}
+.od-dot--accent {
+  background: var(--accent);
+}
+.od-dot--info {
+  background: var(--info-base);
+}
+.od-dot--violet {
+  background: #b48cff;
+}
+.od-dot--muted {
+  background: var(--text-muted);
+}
+
+.od-activity-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.od-activity-text strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.od-activity-text span {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.od-money {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* One door to the whole money operation (design). A full-width navigation row
+   with a leading rupee glyph and a trailing arrow — reads as a place to go, not
+   as the in-place Grant/Revoke buttons in the panels below. */
+.od-moneydoor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-interactive);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(140deg, var(--surface-overlay), var(--surface-raised));
+  text-decoration: none;
+  color: inherit;
+}
+
+.od-moneydoor:hover {
+  box-shadow: var(--shadow-2);
+}
+
+.od-moneydoor:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.od-moneydoor-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.od-moneydoor-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.od-moneydoor-text strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.od-moneydoor-text span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.od-moneydoor-go {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-lg-size);
+}
+
+.od-moneydoor:hover .od-moneydoor-go {
+  color: var(--text-accent);
+}
+
+/* The two acts of trust, side by side (design). */
+.od-authority-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .od-authority-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Holder rows: avatar + name + role pill + revoke, matching the members grid. */
+.od-authority-holders {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+.od-authority-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.od-authority-holders .od-authority-row:first-child {
+  border-top: none;
+}
+
+.od-authority-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.od-authority-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+/* --- invite a member ------------------------------------------------------ */
+.od-invite-lead {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+.od-invite-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+}
+
+.od-invite-url {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-accent);
+  overflow-wrap: anywhere;
+}
+
+.od-invite-note {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* --- members table -------------------------------------------------------- */
+.od-member-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.od-member-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.od-member-title h2 {
+  margin: 0;
+}
+
+.od-member-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.od-member-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.od-member-search {
+  width: 220px;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+}
+
+.od-member-search:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--border-interactive);
+}
+
+/* Column widths are shared by the header and every row so they line up. */
+.od-member-cols,
+.od-member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.od-member-cols {
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.od-member-person {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.od-member-roles {
+  flex: none;
+  width: 260px;
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.od-member-joined {
+  flex: none;
+  width: 90px;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-member-action {
+  flex: none;
+  width: 120px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.od-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.od-member-row {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.od-member-list .od-member-row:first-child {
+  border-top: none;
+}
+
+.od-member-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.od-member-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.od-member-id strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-member-phone {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.od-member-empty {
+  padding: var(--space-4) 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* Role pills: uppercase mono, one colour per grant family (design). */
+.od-role-pill {
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+  color: var(--text-secondary);
+}
+
+.od-role-pill[data-role="owner"] {
+  background: color-mix(in srgb, var(--info-base) 18%, transparent);
+  color: var(--info-base);
+}
+
+.od-role-pill[data-role="staff"] {
+  background: color-mix(in srgb, var(--warning-base) 18%, transparent);
+  color: var(--warning-base);
+}
+
+.od-role-pill[data-role="settlement"] {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text-accent);
+}
+
+.od-role-pill[data-role="finops"] {
+  background: color-mix(in srgb, var(--success-base) 18%, transparent);
+  color: var(--success-base);
+}
+
+/* The roles and joined columns fold away first on a narrow viewport; the
+   person and the action never do. */
+@media (max-width: 720px) {
+  .od-member-roles,
+  .od-member-cols .od-member-roles,
+  .od-member-joined,
+  .od-member-cols .od-member-joined {
+    display: none;
+  }
+}

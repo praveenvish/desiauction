@@ -1320,6 +1320,35 @@ p + .date-row {
   gap: var(--space-3);
 }
 
+/* Add-a-player dialog: two columns where the dialog is wide enough, stacking
+   on phones — mirrors the fixtures-manual-form idiom. */
+.add-player-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.add-player-photo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Photo import review table: filenames are user data — keep them from
+   blowing the layout, and render match failures in the muted danger voice. */
+.photo-match-file {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+  max-width: 22ch;
+}
+
+.photo-match-reason {
+  color: var(--danger-strong);
+  font-size: var(--text-sm-size);
+}
+
 /* Add-a-fixture dialog: the four inputs as a grid that stays legible at dialog width. */
 .fixtures-manual-form {
   display: grid;

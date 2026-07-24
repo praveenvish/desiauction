@@ -1,4 +1,4 @@
-import { Badge, Button, Card, ToastProvider } from "@desiauction/ui";
+import { Badge, Button, Card, PageIntro, ToastProvider } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { accountSecurity, currentSession, logoutAction } from "../../server/auth/actions";
@@ -19,11 +19,8 @@ export default async function AccountPage() {
     <ToastProvider>
       <main className="account">
         <div className="account-stack">
+          <PageIntro actions={<Badge tone="success">Active session</Badge>} />
           <Card className="account-card">
-            <div className="account-head">
-              <h1>Account</h1>
-              <Badge tone="success">Active session</Badge>
-            </div>
             <dl>
               <dt>Phone</dt>
               <dd data-testid="account-phone">{session.phone}</dd>

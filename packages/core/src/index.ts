@@ -46,8 +46,18 @@ export type {
   TransitionResult,
   NameResult,
 } from "./competition";
-export { parseRegistrationCsv, tokenizeCsv } from "./registration-csv";
-export type { CsvRegistrationRow, CsvRowError, CsvParseResult } from "./registration-csv";
+export { parseRegistrationCsv, tokenizeCsv, validateNewPlayer } from "./registration-csv";
+export type {
+  CsvRegistrationRow,
+  CsvRowError,
+  CsvParseResult,
+  NewPlayerCheck,
+  NewPlayerInput,
+  PlayerField,
+  PlayerFieldError,
+} from "./registration-csv";
+export { fileStem, matchPhotoFiles } from "./photo-match";
+export type { PhotoMatch, PhotoMatchRule, PhotoTarget } from "./photo-match";
 export {
   fixtureTransition,
   canEditFixture,

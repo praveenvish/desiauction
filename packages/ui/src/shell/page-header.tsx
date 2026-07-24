@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 import styles from "./page-header.module.css";
 
@@ -16,20 +16,60 @@ export interface PageHeaderProps {
   actions?: ReactNode;
   /** Breadcrumb slot, rendered above the title. */
   breadcrumb?: ReactNode;
+  /**
+   * Extra attributes for the h1 — an id to point `aria-labelledby` at, or a
+   * test hook. The heading stays a plain string so pages cannot smuggle a
+   * second heading into the document outline.
+   */
+  titleAttrs?: Omit<HTMLAttributes<HTMLHeadingElement>, "children" | "className"> & {
+    // React accepts data-* on any element, but HTMLAttributes does not declare
+    // them; the index signature lets callers hang an id or a test hook here.
+    [dataAttribute: `data-${string}`]: string | undefined;
+  };
 }
 
-export function PageHeader({ title, subtitle, actions, breadcrumb }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, breadcrumb, titleAttrs }: PageHeaderProps) {
   return (
     <header className={styles["header"]}>
       {breadcrumb}
       <div className={styles["row"]}>
         <div className={styles["titles"]}>
-          <h1 className={styles["title"]}>{title}</h1>
+          <h1 className={styles["title"]} {...titleAttrs}>
+            {title}
+          </h1>
           {subtitle !== undefined ? <p className={styles["subtitle"]}>{subtitle}</p> : null}
         </div>
         {actions !== undefined ? <div className={styles["actions"]}>{actions}</div> : null}
       </div>
     </header>
+  );
+}
+
+export interface PageIntroProps {
+  /** The line under the title — what this surface is for. */
+  subtitle?: ReactNode;
+  /** Usually Buttons/ButtonLinks — the page's primary actions. */
+  actions?: ReactNode;
+}
+
+/**
+ * A console page's opening row, minus the title: inside AppShell the `<h1>` is
+ * the shell's, up in the identity bar, and a page that printed its own would be
+ * saying the same words twice a few pixels apart. Subtitle and actions still
+ * belong to the page, so they stay here.
+ *
+ * `PageHeader` (with its h1) remains correct for the public, live and bare
+ * shells, which have no identity bar to inherit a title from.
+ */
+export function PageIntro({ subtitle, actions }: PageIntroProps) {
+  if (subtitle === undefined && actions === undefined) {
+    return null;
+  }
+  return (
+    <div className={styles["intro"]}>
+      {subtitle !== undefined ? <p className={styles["subtitle"]}>{subtitle}</p> : null}
+      {actions !== undefined ? <div className={styles["actions"]}>{actions}</div> : null}
+    </div>
   );
 }
 

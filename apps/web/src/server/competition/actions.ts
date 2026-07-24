@@ -5,7 +5,10 @@ import {
   DEFAULT_AUCTION_CONFIG,
   isRejectionReason,
   parseRegistrationCsv,
+  validateNewPlayer,
   type CsvRowError,
+  type PhotoTarget,
+  type PlayerField,
   type RegistrationEvent,
   type RegistrationStatus,
 } from "@desiauction/core";
@@ -46,8 +49,10 @@ import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, type TeamsWorkspace } from "./team-workspace";
 export type { TeamCard, TeamRosterRow } from "./team-workspace";
 import {
+  addPlayerByPhone,
   exportRegistrationsCsv,
   myRegistration,
+  photoTargetsOf,
   queryRegistrations,
   registrationStats,
   registrationsOf,
@@ -767,6 +772,92 @@ export async function setTeamCoachAction(
     setTeamCoach(db, competition.orgId, competition.id, teamId, coachName, session.personId),
   );
   return { ok: true };
+}
+
+// --- Organizer adds one player (manual form; same act as one CSV row) --------
+
+export interface AddPlayerInput {
+  name: string;
+  phone: string;
+  role: string;
+  basePriceBand: string;
+  dateOfBirth: string;
+  battingStyle: string;
+  bowlingStyle: string;
+}
+
+export type AddPlayerActionResult =
+  | { ok: true; registrationId: string; number: string; personExisted: boolean }
+  | { ok: false; error: string; fieldErrors?: Partial<Record<PlayerField, string>> };
+
+/**
+ * Same gate as the CSV import (registration.review), same validation truth
+ * (validateNewPlayer — a row a file would reject cannot arrive via the form),
+ * same person-stub semantics (addPlayerByPhone mirrors commitRegistrationImport
+ * one row at a time). The registration lands in `submitted`; approval stays a
+ * separate human act.
+ */
+export async function addPlayerAction(
+  slug: string,
+  input: AddPlayerInput,
+): Promise<AddPlayerActionResult> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const check = validateNewPlayer(
+    { name: input.name, phone: input.phone, role: input.role, basePriceBand: input.basePriceBand },
+    await bandsFor(gate.competition.id),
+  );
+  if (!check.ok) {
+    const fieldErrors: Partial<Record<PlayerField, string>> = {};
+    for (const fieldError of check.errors) {
+      fieldErrors[fieldError.field] = fieldError.message;
+    }
+    return { ok: false, error: "Fix the highlighted fields.", fieldErrors };
+  }
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    addPlayerByPhone(db, gate.competition.id, gate.competition.orgId, gate.personId, {
+      ...check.value,
+      profile: {
+        ...(input.dateOfBirth !== "" ? { dateOfBirth: input.dateOfBirth } : {}),
+        ...(input.battingStyle !== "" ? { battingStyle: input.battingStyle } : {}),
+        ...(input.bowlingStyle !== "" ? { bowlingStyle: input.bowlingStyle } : {}),
+      },
+    }),
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: "This phone number is already registered in this competition.",
+      fieldErrors: { phone: "already registered here" },
+    };
+  }
+  return {
+    ok: true,
+    registrationId: result.registrationId,
+    number: result.number,
+    personExisted: result.personExisted,
+  };
+}
+
+/** The bands the Add-player form may offer — same source of truth as the CSV path. */
+export async function competitionBandsAction(slug: string): Promise<readonly string[]> {
+  const gate = await reviewGate(slug);
+  return gate.ok ? bandsFor(gate.competition.id) : [];
+}
+
+// --- Bulk photo import: the match targets (files are matched client-side) ----
+
+/** Review-gated list of who a photo filename may resolve to (whole competition). */
+export async function photoTargetsAction(slug: string): Promise<PhotoTarget[]> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return [];
+  }
+  return inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    photoTargetsOf(db, gate.competition.id),
+  );
 }
 
 // --- CSV import (validate → preview → commit) + export -----------------------

@@ -1,4 +1,4 @@
-import { ButtonLink, ToastProvider } from "@desiauction/ui";
+import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { documentWorkspace } from "../../../../../../server/financial-operations/actions";
@@ -32,14 +32,6 @@ export default async function DocumentPage({
       <main className="registrations-dash">
         <div className="dash-stack finance-stack">
           <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>Document</h1>
-              <span className="date-row">
-                <ButtonLink href={`/org/${slug}/money`} variant="secondary">
-                  Finance
-                </ButtonLink>
-              </span>
-            </div>
             <p className="competitions-hint">
               What it says, what it was made from, and everywhere it went
             </p>

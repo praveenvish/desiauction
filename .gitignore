@@ -6,6 +6,9 @@ node_modules/
 dist/
 .next/
 .next-e2e/
+
+# Local media storage root (storage-port LOCAL_ROOT) — uploaded files, not source.
+apps/web/public/_media/
 coverage/
 .turbo/
 playwright-report/

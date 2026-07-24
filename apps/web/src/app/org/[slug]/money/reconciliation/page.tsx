@@ -1,4 +1,4 @@
-import { ButtonLink, LoadingState, ToastProvider } from "@desiauction/ui";
+import { LoadingState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -26,8 +26,7 @@ export default async function ReconciliationPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const org = await financeGate(slug);
-  if (org === null) {
+  if ((await financeGate(slug)) === null) {
     notFound();
   }
   return (
@@ -35,14 +34,6 @@ export default async function ReconciliationPage({
       <main className="registrations-dash">
         <div className="dash-stack finance-stack">
           <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>Reconciliation</h1>
-              <span className="date-row">
-                <ButtonLink href={`/org/${slug}/money`} variant="secondary">
-                  Finance
-                </ButtonLink>
-              </span>
-            </div>
             <p className="competitions-hint">
               Does finance still agree with settlement — proved from the log, not asserted
             </p>

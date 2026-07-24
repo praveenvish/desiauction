@@ -1,0 +1,202 @@
+/* The widget keeps a fixed 36px footprint whether open or closed: the field is
+   absolutely positioned and grows LEFT out of the icon, so opening it never
+   reflows the utility cluster it sits in. */
+.root {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.trigger:focus-visible,
+.field:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Right-anchored: `right: 0` is the growth anchor, `width` is the animation. */
+.field {
+  --inline-search-w: min(380px, calc(100vw - 132px));
+
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: var(--inline-search-w);
+  height: 36px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  animation: inline-search-open var(--duration-base) var(--ease-out);
+}
+
+@keyframes inline-search-open {
+  from {
+    width: 36px;
+  }
+
+  to {
+    width: var(--inline-search-w);
+  }
+}
+
+.field-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  outline: none;
+}
+
+.kbd {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-1);
+}
+
+/* Results hang under the field and share its right edge and width. */
+.results {
+  --inline-search-w: min(380px, calc(100vw - 132px));
+
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  width: var(--inline-search-w);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-3);
+  /* Transform-only entrance: an opacity fade on text trips contrast scans
+     mid-frame (they sample the animated state). */
+  animation: inline-search-drop var(--duration-fast) var(--ease-out);
+}
+
+@keyframes inline-search-drop {
+  from {
+    transform: translateY(-6px);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field,
+  .results {
+    animation: none;
+  }
+}
+
+.scroll {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.group + .group {
+  margin-top: var(--space-2);
+}
+
+.group-label {
+  display: block;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  cursor: pointer;
+  font-family: var(--font-text);
+}
+
+.item-active {
+  background: var(--accent-subtle);
+}
+
+.item-label {
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.item-hint {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+/* Under 720px the bar is narrow and the brand sits at its left, so the field
+   takes the row and the results become a full-width sheet beneath it. */
+@media (max-width: 719px) {
+  .field,
+  .results {
+    --inline-search-w: calc(100vw - var(--space-6));
+  }
+}

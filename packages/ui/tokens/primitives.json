@@ -47,7 +47,10 @@
     "gold": {
       "300": { "$value": "#F3D078", "$type": "color" },
       "500": { "$value": "#E6B24A", "$type": "color" },
-      "700": { "$value": "#B57F14", "$type": "color" }
+      "600": { "$value": "#CE9A2E", "$type": "color" },
+      "700": { "$value": "#B57F14", "$type": "color" },
+      "800": { "$value": "#865D12", "$type": "color" },
+      "900": { "$value": "#5E410B", "$type": "color" }
     },
     "green": {
       "dark": { "$value": "#3DD68C", "$type": "color" },
@@ -142,8 +145,8 @@
   },
   "display": {
     "sm": {
-      "size": { "$value": "38px", "$type": "dimension" },
-      "line": { "$value": "44px", "$type": "dimension" }
+      "size": { "$value": "40px", "$type": "dimension" },
+      "line": { "$value": "46px", "$type": "dimension" }
     },
     "md": {
       "size": { "$value": "48px", "$type": "dimension" },

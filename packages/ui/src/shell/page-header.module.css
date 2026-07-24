@@ -33,6 +33,22 @@
   color: var(--text-secondary);
 }
 
+/* Title-less opening row: the shell's identity bar already said the name. */
+.intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.intro .subtitle {
+  margin: 0;
+  min-width: 0;
+  max-width: 72ch;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

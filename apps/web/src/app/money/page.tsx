@@ -1,4 +1,4 @@
-import { Card, EmptyState, PageHeader } from "@desiauction/ui";
+import { Card, EmptyState } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../server/auth/actions";
@@ -15,10 +15,6 @@ export default async function MoneyPage() {
   }
   return (
     <main>
-      <PageHeader
-        title="My money"
-        subtitle="Your purses, dues and receipts across every season."
-      />
       <Card>
         <EmptyState
           headingLevel={2}

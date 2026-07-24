@@ -9,6 +9,11 @@
   width: 100%;
 }
 
+/* Review flows (CSV import + preview) need room the 480px form width can't give. */
+.wide {
+  max-width: min(720px, calc(100vw - var(--space-8)));
+}
+
 .dialog::backdrop {
   /* ::backdrop custom-property inheritance is not universal — literal fallback sanctioned. */
   background: var(--scrim, rgb(7 10 15 / 0.6));

@@ -102,6 +102,58 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   expect(download.suggestedFilename()).toMatch(/registrations\.csv$/);
 });
 
+// A real 1×1 PNG — the media path validates the content type, not the pixels.
+const PNG_1PX = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+test("an organizer adds one player by hand, then imports their photo by filename", async ({
+  page,
+}) => {
+  await otpLogin(page, `82${STAMP}`);
+  await page.goto("/orgs");
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Hand Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page.getByTestId("org-name")).toBeVisible();
+
+  await page.goto("/seasons");
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Hand Cup ${STAMP}`);
+  await page.getByRole("button", { name: "Create season" }).click();
+  await page.getByTestId("open-dashboard").click();
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+
+  // Add one player through the dialog (no CSV, no self-registration).
+  await page.getByTestId("open-add-player").click();
+  const addDialog = page.getByRole("dialog");
+  await addDialog.getByLabel("Full name").fill("Hand Added Player");
+  await addDialog.getByLabel("Mobile number").fill(`97${STAMP}`);
+  await page.getByTestId("add-player-submit").click();
+  // Step two only exists because the row does — the number proves it was written.
+  const number = (await page.getByTestId("added-number").textContent({ timeout: 20_000 })) ?? "";
+  expect(number).toMatch(/^R[A-Z0-9]{6}$/);
+  await page.getByTestId("add-player-done").click();
+  await expect(page.getByTestId("stat-total")).toContainText("1");
+  await expect(page.getByTestId("stat-submitted")).toContainText("1");
+  await expect(page.getByTestId("reg-table")).toContainText("Hand Added Player");
+
+  // Import a photo for them by naming the file after their registration number.
+  await page.getByTestId("open-import").click();
+  await page.getByRole("tab", { name: "Photos" }).click();
+  await page
+    .getByTestId("photo-files")
+    .setInputFiles([{ name: `${number}.png`, mimeType: "image/png", buffer: PNG_1PX }]);
+  await expect(page.getByTestId("photo-match-table")).toContainText("Hand Added Player");
+  await expect(page.getByTestId("photo-match-table")).toContainText("by reg. number");
+  await page.getByTestId("photo-upload-all").click();
+  // A clean batch closes the dialog itself, and the row swaps initials for the
+  // uploaded image — which only renders once consent was recorded (DPDP §5).
+  await expect(page.getByTestId("photo-match-table")).toBeHidden({ timeout: 20_000 });
+  await expect(page.getByTestId("reg-table").locator("img").first()).toBeVisible();
+});
+
 test("registration operations dashboard: axe zero violations", async ({ page }) => {
   await otpLogin(page, `83${STAMP}`);
   await page.goto("/orgs");

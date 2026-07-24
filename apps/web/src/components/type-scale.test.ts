@@ -33,6 +33,8 @@ const ALLOW = [
   // Brand lockups and monograms — a mark, not a sentence.
   ".wordmark",
   ".onboarding-brand",
+  // The live shell's wordmark beside the mark — a lockup, not a sentence.
+  ".live-brand",
   ".home-crest",
   ".public-card-mark",
   ".mk-stage-mark",
@@ -43,6 +45,15 @@ const ALLOW = [
   ".mk-stat-value",
   ".mk-tier-amount",
   ".ceremony-bid",
+  // The raise button's amount: a money figure on the owner's one live control,
+  // set in the display face so it reads as a number to hit, not a label.
+  ".paddle-raise-amount",
+  // Pool counters — sold / unsold / remaining. Numerals set for figure impact,
+  // the same case as .home-tile-value above.
+  ".pool-stats dd",
+  // The console summary row's figure. Same case again: a count, compacted to
+  // 24px so a row of five tiles fits above the fold.
+  ".stat-value",
   // Ceremony graphics: a stamp and the name it lands on.
   ".mk-stage-sold",
   ".mk-stage-name",

@@ -3,6 +3,31 @@
   font-size: var(--text-sm-size);
 }
 
+/* Header trail: one quiet line above the title, never wrapping the bar taller. */
+.as-trail {
+  font-size: var(--text-xs-size);
+  min-width: 0;
+}
+
+.as-trail .list {
+  flex-wrap: nowrap;
+}
+
+/* Ancestors read as the links they are — accent, at the pinned AA-safe step. */
+.as-trail .link,
+.as-trail .current {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 28ch;
+}
+
+.as-trail .separator {
+  color: var(--text-muted);
+}
+
 .list {
   list-style: none;
   margin: 0;

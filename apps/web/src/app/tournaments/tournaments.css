@@ -1,0 +1,684 @@
+/* The tournaments accordion (Tournaments & Orgs.dc.html). */
+
+/* --- toolbar -------------------------------------------------------------- */
+.tg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.tg-search {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.tg-search:focus-within {
+  border-color: var(--focus-ring);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.tg-search-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.tg-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: var(--space-2) 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+/* The wrapper already draws the focus ring for the whole control; a second
+   ring on the bare input would sit inside the first. */
+.tg-search-input:focus {
+  outline: none;
+}
+
+.tg-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.tg-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tg-pill:focus-within {
+  border-color: var(--focus-ring);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.tg-pill-label {
+  flex: none;
+  color: var(--text-muted);
+}
+
+/* A native <select> keeps the platform's own dropdown — on a phone that is the
+   OS picker, which no custom listbox matches for reach or reliability. */
+.tg-pill-select {
+  border: none;
+  background: none;
+  padding: var(--space-2) var(--space-1) var(--space-2) 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.tg-pill-select:focus {
+  outline: none;
+}
+
+.tg-view {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.tg-view-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tg-view-btn:hover {
+  color: var(--text-primary);
+}
+
+.tg-view-btn[aria-pressed="true"] {
+  background: var(--surface-raised);
+  color: var(--text-accent);
+  box-shadow: var(--shadow-1);
+}
+
+.tg-view-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.tg-noresults {
+  margin: 0;
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.tg-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tg {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.tg-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-4);
+}
+
+/* A real button, per the design's own audit: the prototype used a div with
+   onClick, which no keyboard could reach and no screen reader announced.
+   Enter/Space, focus and role come free here. */
+.tg-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  border-radius: var(--radius-lg);
+}
+
+.tg-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.tg-caret {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.tg-caret[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tg-caret {
+    transition: none;
+  }
+}
+
+.tg-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+}
+
+.tg-glyph--tournament {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.tg-glyph--standalone {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+/* Name over org, so the tournament reads as one object rather than two
+   columns that happen to share a row. */
+.tg-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tg-id-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* The comp sets tournament names in the display face, but this is an 18px list
+   label and the type-scale guardrail reserves that face for >=30px, brand marks
+   and numerals — a rule the repo enforces in a test, so it outranks prototype
+   pixels (HANDOFF precedence: repo canon > design system > prototype). Weight
+   and colour carry the hierarchy instead. */
+.tg-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.tg-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+/* --- header figures ------------------------------------------------------- */
+.tg-stats {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding-right: var(--space-2);
+}
+
+.tg-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tg-stat-icon {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.tg-stat-body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+/* Tabular figures so the three columns stay aligned as counts change; the
+   text face, not display — these are 14px labels, well under the 30px floor
+   the display face is reserved for. */
+.tg-stat-value {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.tg-stat-label {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* --- overflow menu -------------------------------------------------------- */
+.tg-kebab {
+  flex: none;
+  color: var(--text-muted);
+  padding: var(--space-2);
+}
+
+.tg-kebab:hover {
+  color: var(--text-primary);
+}
+
+/* Quiet on purpose: the page spends its one gold on "New tournament". A button
+   now (opens the modal), so it carries its own reset. */
+.tg-add {
+  flex: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-accent);
+  text-decoration: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.tg-add:hover {
+  background: var(--accent-subtle);
+}
+
+.tg-add:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.tg-body {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tg-empty {
+  margin: 0;
+  padding: var(--space-4);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+/* --- season rows ---------------------------------------------------------- */
+.tg-season {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  text-decoration: none;
+  color: inherit;
+}
+
+.tg-season:first-child {
+  border-top: none;
+}
+
+.tg-season:hover {
+  background: var(--surface-sunken);
+}
+
+.tg-season:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.tg-season-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+.tg-season:hover .tg-season-glyph {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.tg-season-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tg-season-id strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.tg-season-id span {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.tg-season-when,
+.tg-season-where {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tg-season-when svg,
+.tg-season-where svg {
+  color: var(--text-muted);
+}
+
+/* A boxed target, not a bare chevron: the row is one big link, and the box
+   tells you where the click lands. Decorative — never a nested button. */
+.tg-season-go {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.tg-season:hover .tg-season-go {
+  border-color: var(--text-accent);
+  color: var(--text-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tg-season-go {
+    transition: none;
+  }
+}
+
+/* --- fold control --------------------------------------------------------- */
+.tg-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.tg-more:hover {
+  color: var(--text-accent);
+}
+
+.tg-more:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.tg-more-caret {
+  font-size: 11px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.tg-more-caret[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tg-more-caret {
+    transition: none;
+  }
+}
+
+/* --- grid view ------------------------------------------------------------ */
+.tg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+/* A two-line season name must not leave its neighbour's card short: the height
+   runs down through link → card → article, none of which stretch on their own. */
+.tg-grid > .competition-link,
+.tg-grid > .competition-link > *,
+.tg-grid > .competition-link .season-card {
+  height: 100%;
+}
+
+/* --- footnote ------------------------------------------------------------- */
+.tg-footnote {
+  margin: 0;
+  padding-top: var(--space-2);
+  text-align: center;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.tg-footnote a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.tg-footnote a:hover {
+  text-decoration: underline;
+}
+
+/* Things leave in the order an organizer can spare them. The header figures go
+   first (the panel below repeats them per season), then dates and locations.
+   The name, status and target never wrap and never leave. `.tg-meta` now
+   carries the org name under the title, so it stays. */
+@media (max-width: 1100px) {
+  .tg-stats {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .tg-season-when,
+  .tg-season-where {
+    display: none;
+  }
+}
+
+/* On a phone the toolbar stops being a row: the search box takes the full
+   width and the controls sit under it rather than each collapsing to nothing. */
+@media (max-width: 620px) {
+  .tg-search {
+    flex-basis: 100%;
+  }
+
+  .tg-pill {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tg-pill-select {
+    min-width: 0;
+  }
+}
+
+/* --- first run ------------------------------------------------------------ */
+.tg-firstrun {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-12) var(--space-6);
+}
+
+.tg-firstrun-glyph {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  font-size: 24px;
+}
+
+/* A first-run headline earns the display face at its real size — 30px clears
+   the floor honestly rather than by exemption, and the comp sets this large. */
+.tg-firstrun h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.tg-firstrun p {
+  margin: 0;
+  max-width: 48ch;
+  color: var(--text-secondary);
+}
+
+.tg-firstrun-alt {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm-size);
+  color: var(--text-accent);
+}
+
+.tg-firstrun-alt:hover {
+  text-decoration: underline;
+}
+
+.tg-add:focus-visible,
+.tg-firstrun-alt:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- loading skeleton ----------------------------------------------------- */
+.tg-skel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.tg-skel-glyph,
+.tg-skel-bar {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken),
+    color-mix(in srgb, var(--text-muted) 18%, var(--surface-sunken)),
+    var(--surface-sunken)
+  );
+  background-size: 200% 100%;
+  animation: tg-shimmer 1.4s linear infinite;
+}
+
+.tg-skel-glyph {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  flex: none;
+}
+
+.tg-skel-bar {
+  width: 96px;
+}
+
+.tg-skel-bar--wide {
+  width: 190px;
+}
+
+@keyframes tg-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Shimmer is decoration; a still placeholder says the same thing. */
+@media (prefers-reduced-motion: reduce) {
+  .tg-skel-glyph,
+  .tg-skel-bar {
+    animation: none;
+  }
+}

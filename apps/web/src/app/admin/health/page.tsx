@@ -29,7 +29,6 @@ export default async function AdminHealthPage() {
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
         <header className="dash-head">
-          <h1>Platform health</h1>
           <p className="dash-hint">
             Workers, queues, ingest, dispatch, exports and certification — as the platforms
             themselves report them.

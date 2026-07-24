@@ -31,7 +31,6 @@ export default async function AdminOrgsPage({
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
         <header className="dash-head">
-          <h1>Organizations</h1>
           <p className="dash-hint">
             Every organization on the platform, with what it has done. Follow a link to work in the
             organization&rsquo;s own console.

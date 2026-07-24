@@ -1,4 +1,10 @@
 .shell {
+  /* One source for the sticky stack: the tab strip parks exactly under the top
+     bar off this, instead of guessing a height it then disagreed with. Kept as
+     tight as two lines of type allow — the bar is on every screen of every
+     session, so every pixel of it is charged to the work below. */
+  --shell-topbar-h: 56px;
+
   min-height: 100dvh;
   background: var(--surface);
 }
@@ -72,43 +78,148 @@ a.wordmark:hover .wordmark-glyph {
   display: none;
 }
 
-/* ---- top bar ---- */
+/* ---- top bar: the identity bar ---- */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 64px;
+  height: var(--shell-topbar-h);
   padding: 0 var(--space-4);
   background: var(--surface-raised);
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* Shares the content container's measure, so the title starts on the same
+   vertical line as the page beneath it on a wide screen. */
+.topbar-inner,
+.tabbar-inner {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(1400px - 2 * var(--space-4));
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .topbar-brand {
   display: inline-flex;
+  min-width: 0;
+}
+
+/* Under 720px the rail is gone, so the brand rides the top bar. Brand wordmark
+   + title + actions do not fit 390px, so the wordmark keeps only its glyph —
+   still the tap target home, minus the eight characters nobody navigates by. */
+.topbar-brand .wordmark-text {
+  display: none;
+}
+
+/* Breadcrumb over title, as one block: the pair moves together, so the title
+   sits in the same place whether or not the surface has ancestors. */
+.identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+}
+
+.identity-trail {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.identity-lede {
+  margin: 0;
+  line-height: 1.35;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.identity-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .page-title {
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-text);
-  font-size: var(--text-xl-size);
+  font-size: var(--text-lg-size);
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.02em;
+  line-height: 1.2;
   color: var(--text-heading);
   white-space: nowrap;
 }
 
-.topbar-search {
-  display: none;
+/* The page's primary action, at the head of the utility cluster — so the tab
+   order runs title → action → search → account, and every page's main button
+   is in the same place. */
+.page-action {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+/* Under 720px the bar cannot hold brand + title + a labelled button + icons, so
+   the action wraps to a full-width row of its own instead of being dropped. */
+@media (max-width: 719px) {
+  .topbar {
+    height: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  .topbar-inner {
+    height: auto;
+    min-height: var(--shell-topbar-h);
+    flex-wrap: wrap;
+  }
+
+  .page-action {
+    flex-basis: 100%;
+  }
+
+  .page-action > button,
+  .page-action > a {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .top-actions {
   margin-left: auto;
+  /* Never absorb the overflow of a long neighbour: the icons are hit targets,
+     not filler, so they hold their size and the flexible siblings give way. */
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* ---- section tabs: its own strip, parked flush under the identity bar ---- */
+.tabbar {
+  position: sticky;
+  top: var(--shell-topbar-h);
+  z-index: 15;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 var(--space-4);
+}
+
+.tabbar-inner {
+  height: auto;
 }
 
 .body {
@@ -175,6 +286,8 @@ a.wordmark:hover .wordmark-glyph {
 
 @media (min-width: 720px) {
   .shell {
+    --shell-topbar-h: 64px;
+
     display: grid;
     grid-template-columns: 248px 1fr;
     grid-template-areas: "rail body";
@@ -198,20 +311,35 @@ a.wordmark:hover .wordmark-glyph {
 
   .rail-brand {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
+    align-items: flex-start;
     padding: 0 var(--space-2) var(--space-5);
   }
 
   .rail-brand .wordmark {
     color: var(--identity-glyph);
+    align-items: center;
   }
 
+  /* The wordmark and its tagline are one column beside the glyph, so the column
+     is as wide as the longer of the two — and with the tagline set small enough
+     to be the shorter, that is the wordmark. */
+  .wordmark-stack {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* Justified to the last line, the tagline spreads to exactly the wordmark's
+     width: both edges line up with the word above, at any wordmark length. */
   .rail-tagline {
+    display: block;
+    text-align-last: justify;
     font-family: var(--font-text);
-    font-size: 9px;
-    letter-spacing: 0.3em;
+    /* Tracked as far as it can go while staying NARROWER than the wordmark —
+       past that the column would size to the tagline and the edges would part.
+       What is left for the justification to spread lands in the word gaps. */
+    font-size: 8px;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     font-weight: var(--font-weight-semibold);
     color: color-mix(in srgb, var(--identity-glyph) 45%, transparent);
@@ -221,19 +349,22 @@ a.wordmark:hover .wordmark-glyph {
     grid-area: body;
   }
 
-  .topbar {
+  .topbar,
+  .tabbar {
     padding: 0 var(--space-6);
+  }
+
+  .topbar-inner,
+  .tabbar-inner {
+    max-width: calc(1400px - 2 * var(--space-6));
   }
 
   .topbar-brand {
     display: none;
   }
 
-  .topbar-search {
-    display: block;
-    flex: 1;
-    max-width: 420px;
-    margin: 0 auto;
+  .page-title {
+    font-size: var(--text-xl-size);
   }
 
   .content {
@@ -304,11 +435,22 @@ a.wordmark:hover .wordmark-glyph {
   outline-offset: -2px;
 }
 
+/* The active pill is struck metal: a top sheen, a gold body, and a shadow the
+   colour of the gold itself so the item reads as lit rather than merely filled. */
 .rail-item-active,
 .rail-item-active:hover {
-  background: linear-gradient(100deg, var(--accent), var(--accent-pressed));
+  background-color: var(--accent);
+  background-image: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--accent-sheen) 14%, var(--accent-lift)),
+    var(--accent) 58%,
+    color-mix(in srgb, var(--accent-pressed) 45%, var(--accent))
+  );
   color: var(--text-on-accent);
-  box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--accent) 70%, transparent);
+  font-weight: var(--font-weight-semibold);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 45%, transparent),
+    0 10px 22px -10px color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
 .rail-badge {
@@ -325,9 +467,11 @@ a.wordmark:hover .wordmark-glyph {
   font-variant-numeric: tabular-nums;
 }
 
+/* On the gold pill the badge inverts — an ink chip with gold numerals — rather
+   than a translucent wash that would sit at the same value as its host. */
 .rail-item-active .rail-badge {
-  background: color-mix(in srgb, var(--text-on-accent) 28%, transparent);
-  color: var(--text-on-accent);
+  background: var(--identity-field-deep);
+  color: var(--identity-accent-soft);
 }
 
 /* ---- rail footer (upgrade card + signed-in user) ---- */

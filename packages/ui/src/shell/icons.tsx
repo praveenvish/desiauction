@@ -127,6 +127,82 @@ export function IconAlert(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** A season runs between two dates — the calendar is its mark throughout. */
+export function IconCalendar(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+/** Matches: the cricket ball and its seam. */
+export function IconMatch(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M5.6 5.6c3.5 3.5 9.3 9.3 12.8 12.8" />
+      <path d="M15 3.8c-1.4 2.4-1.9 5.6.4 7.9s5.5 1.8 7.9.4M.7 11.9c2.4-1.4 5.6-1.9 7.9.4s1.8 5.5.4 7.9" />
+    </svg>
+  );
+}
+
+export function IconPin(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+export function IconArrowRight(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+export function IconList(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+    </svg>
+  );
+}
+
+export function IconGrid(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
+    </svg>
+  );
+}
+
+/** The row overflow trigger. Dots are drawn as zero-length round caps. */
+export function IconKebab(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)} strokeWidth={2}>
+      <path d="M12 5.5h.01M12 12h.01M12 18.5h.01" />
+    </svg>
+  );
+}
+
+/** Marks a link that leaves the app (help centre, docs). */
+export function IconExternal(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 4h6v6M20 4l-8.5 8.5" />
+      <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+    </svg>
+  );
+}
+
 /**
  * The brand glyph: rising bids-as-stumps and the gavel mid-strike, with a gold
  * spark. Decorative — always wrap it in an aria-hidden chip. Filled (not the

@@ -9,6 +9,7 @@ import {
   Field,
   PlayerImage,
   Select,
+  Tabs,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -29,6 +30,8 @@ import {
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
+import { AddPlayerDialog } from "./add-player-dialog";
+import { PhotoImportPanel } from "./photo-import";
 import { PlayerPhotoUploader } from "./player-photo-uploader";
 import { formatDateTime } from "../../../../lib/format-date";
 import type { TimelineEntry } from "../../../../server/competition/registrations";
@@ -304,13 +307,15 @@ export function RegistrationDashboardPanel({
         </Button>
         <Button
           size="sm"
+          variant="secondary"
           data-testid="open-import"
           onClick={() => {
             setIoOpen(true);
           }}
         >
-          + Import players
+          Import (CSV / photos)
         </Button>
+        <AddPlayerDialog slug={slug} />
       </div>
       <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
         <StatTile
@@ -675,7 +680,7 @@ export function RegistrationDashboardPanel({
         onClose={() => {
           setIoOpen(false);
         }}
-        title="Import players"
+        title="Import players & photos"
         size="wide"
         footer={
           <Button
@@ -688,71 +693,94 @@ export function RegistrationDashboardPanel({
           </Button>
         }
       >
-        <div className="io-panel" data-testid="io-panel">
-          <label className="io-file" htmlFor="csv-input">
-            <span>
-              Paste or choose a CSV — columns: name, phone, role, base_price_band · optional:
-              date_of_birth, batting_style, bowling_style
-            </span>
-          </label>
-          <textarea
-            id="csv-input"
-            ref={csvRef}
-            className="csv-input"
-            data-testid="import-textarea"
-            rows={5}
-            placeholder="Paste CSV rows here, or choose a file"
-            defaultValue=""
-          />
-          <div className="io-row">
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              aria-label="Choose a CSV file"
-              data-testid="import-file"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  readCsvFile(file);
-                }
-              }}
-            />
-            <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
-              Preview
-            </Button>
-          </div>
-          {preview !== null ? (
-            <div className="import-preview" data-testid="import-preview">
-              <p>
-                {preview.validCount} valid row(s) · {preview.errors.length} error(s)
-              </p>
-              {preview.errors.length > 0 ? (
-                <ul className="import-errors">
-                  {preview.errors.slice(0, 8).map((error, index) => (
-                    <li key={index}>
-                      Line {error.line}: {error.message}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <Button
-                onClick={() => void commitImport()}
-                loading={busy}
-                disabled={preview.errors.length > 0 || preview.validCount === 0}
-                data-testid="import-commit"
-              >
-                {/* DA-26: the button read "Import 2 player(s)" while disabled
-                    because four OTHER rows had errors, so it named the wrong
-                    number and never said what was blocking it. */}
-                {preview.errors.length > 0
-                  ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import`
-                  : preview.validCount === 0
-                    ? "Nothing to import"
-                    : `Import ${String(preview.validCount)} player${preview.validCount === 1 ? "" : "s"}`}
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        <Tabs
+          label="Import kind"
+          tabs={[
+            {
+              id: "csv",
+              label: "Players (CSV)",
+              content: (
+                <div className="io-panel" data-testid="io-panel">
+                  <label className="io-file" htmlFor="csv-input">
+                    <span>
+                      Paste or choose a CSV — columns: name, phone, role, base_price_band ·
+                      optional: date_of_birth, batting_style, bowling_style
+                    </span>
+                  </label>
+                  <textarea
+                    id="csv-input"
+                    ref={csvRef}
+                    className="csv-input"
+                    data-testid="import-textarea"
+                    rows={5}
+                    placeholder="Paste CSV rows here, or choose a file"
+                    defaultValue=""
+                  />
+                  <div className="io-row">
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      aria-label="Choose a CSV file"
+                      data-testid="import-file"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          readCsvFile(file);
+                        }
+                      }}
+                    />
+                    <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
+                      Preview
+                    </Button>
+                  </div>
+                  {preview !== null ? (
+                    <div className="import-preview" data-testid="import-preview">
+                      <p>
+                        {preview.validCount} valid row(s) · {preview.errors.length} error(s)
+                      </p>
+                      {preview.errors.length > 0 ? (
+                        <ul className="import-errors">
+                          {preview.errors.slice(0, 8).map((error, index) => (
+                            <li key={index}>
+                              Line {error.line}: {error.message}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      <Button
+                        onClick={() => void commitImport()}
+                        loading={busy}
+                        disabled={preview.errors.length > 0 || preview.validCount === 0}
+                        data-testid="import-commit"
+                      >
+                        {/* DA-26: the button read "Import 2 player(s)" while disabled
+                            because four OTHER rows had errors, so it named the wrong
+                            number and never said what was blocking it. */}
+                        {preview.errors.length > 0
+                          ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import`
+                          : preview.validCount === 0
+                            ? "Nothing to import"
+                            : `Import ${String(preview.validCount)} player${preview.validCount === 1 ? "" : "s"}`}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              ),
+            },
+            {
+              id: "photos",
+              label: "Photos",
+              content: (
+                <PhotoImportPanel
+                  slug={slug}
+                  onDone={() => {
+                    setIoOpen(false);
+                  }}
+                />
+              ),
+            },
+          ]}
+        />
       </Dialog>
     </>
   );

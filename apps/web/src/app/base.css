@@ -1,0 +1,83 @@
+/**
+ * Element-level defaults, loaded once in the root layout after the tokens.
+ *
+ * The design system ships CSS modules and tokens but no element styling, so an
+ * anchor nobody remembered to class rendered as browser-default blue —
+ * `#0000EE` on a navy-and-gold console, off the palette entirely and failing
+ * contrast in floodlight.
+ *
+ * The `:not([class])` guard is the whole point: this dresses only the anchors
+ * the design system has NOT already styled. Anything carrying a class — every
+ * ButtonLink, nav item, breadcrumb, marketing and content link — keeps its own
+ * treatment untouched, so this cannot regress a surface that was already right.
+ */
+
+/**
+ * Base inherited colour. Nothing set `color` on the document, so every element
+ * whose page root forgot to declare one inherited the UA default — pure black.
+ * In daylight that passes unnoticed; in floodlight it is #000 on navy (1.16:1,
+ * invisible). /home's season table was doing exactly that. Setting it once here
+ * means a new page is readable in both themes before anyone styles it.
+ */
+body {
+  /* The UA's default 8px body margin was never reset, so every surface floated
+     on a pale 8px gutter: the console rail never reached the window edge, and a
+     full-bleed marketing band was framed on all four sides. Shells decide their
+     own insets — the document contributes none. */
+  margin: 0;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+/**
+ * Card and panel headings. Same gap as the anchors above: with no element
+ * styling anywhere, an unclassed `<h2>` fell back to the UA default — 1.5em
+ * bold, i.e. 24px — so the cockpit's "Owners & paddles" and "Lot queue" wrapped
+ * to two lines inside their columns and every panel head shouted at page-title
+ * volume. The system's section heads are 16px (DESIGN-SYSTEM §5).
+ *
+ * The `:not([class])` guard is doing the same work it does for anchors: every
+ * heading that already carries a class — SectionHeader, PageHeader, .mk-h2,
+ * .prose-h2, the content surfaces — keeps its own treatment untouched.
+ */
+h2:not([class]) {
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+h3:not([class]) {
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+a:not([class]) {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--text-accent) 40%, transparent);
+  border-radius: var(--radius-sm);
+  transition: text-decoration-color var(--duration-fast) var(--ease-out);
+}
+
+a:not([class]):hover {
+  text-decoration-color: currentcolor;
+}
+
+a:not([class]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a:not([class]) {
+    transition: none;
+  }
+}

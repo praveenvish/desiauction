@@ -1,4 +1,4 @@
-import { ButtonLink, LoadingState, ToastProvider } from "@desiauction/ui";
+import { LoadingState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -25,8 +25,7 @@ export const metadata = { title: "Finance · DesiAuction" };
  */
 export default async function OrgMoneyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const org = await financeGate(slug);
-  if (org === null) {
+  if ((await financeGate(slug)) === null) {
     notFound();
   }
   return (
@@ -34,28 +33,6 @@ export default async function OrgMoneyPage({ params }: { params: Promise<{ slug:
       <main className="registrations-dash">
         <div className="dash-stack finance-stack">
           <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>Finance</h1>
-              <span className="date-row">
-                <ButtonLink
-                  href={`/org/${slug}/money/deliveries`}
-                  variant="secondary"
-                  data-testid="open-deliveries"
-                >
-                  Deliveries
-                </ButtonLink>
-                <ButtonLink
-                  href={`/org/${slug}/money/reconciliation`}
-                  variant="secondary"
-                  data-testid="open-reconciliation"
-                >
-                  Reconciliation
-                </ButtonLink>
-                <ButtonLink href={`/org/${slug}`} variant="secondary">
-                  {org.name}
-                </ButtonLink>
-              </span>
-            </div>
             <p className="competitions-hint">
               Financial operations — what the platform did after settlement, and what still needs a
               human

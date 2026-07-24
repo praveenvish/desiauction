@@ -1,6 +1,7 @@
 import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
+import { PageTitle } from "../../../../components/shell/page-title";
 import type { OrgDetail } from "../../../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, statusTone } from "../../admin-ui";
 
@@ -19,9 +20,9 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
   const active = grants.filter((grant) => grant.revokedAt === null);
   return (
     <>
+      <PageTitle title={org.name} />
       <header className="dash-head">
-        <div className="competition-title-row">
-          <h1>{org.name}</h1>
+        <div className="competition-title-row title-row-actions">
           <span className="date-row">
             <ButtonLink href={`/org/${org.slug}`} variant="secondary" data-testid="admin-open-org">
               Open console
@@ -60,10 +61,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
       <Card>
         <h2 className="admin-section-title">Seasons</h2>
         {competitions.length === 0 ? (
-          <EmptyState
-            title="No seasons"
-            description="This organization has not created one yet."
-          />
+          <EmptyState title="No seasons" description="This organization has not created one yet." />
         ) : (
           <div className="table-scroll">
             <table className="reg-table" data-testid="admin-org-competitions">
@@ -80,10 +78,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                 {competitions.map((competition) => (
                   <tr key={competition.id} className="reg-row">
                     <td>
-                      <Link
-                        href={`/seasons/${competition.slug}`}
-                        className="registration-name"
-                      >
+                      <Link href={`/seasons/${competition.slug}`} className="registration-name">
                         {competition.name}
                       </Link>
                     </td>

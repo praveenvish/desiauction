@@ -1,4 +1,4 @@
-import { ButtonLink, LoadingState, ToastProvider } from "@desiauction/ui";
+import { LoadingState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -18,8 +18,7 @@ export const metadata = { title: "Deliveries · DesiAuction" };
  */
 export default async function DeliveriesPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const org = await financeGate(slug);
-  if (org === null) {
+  if ((await financeGate(slug)) === null) {
     notFound();
   }
   return (
@@ -27,14 +26,6 @@ export default async function DeliveriesPage({ params }: { params: Promise<{ slu
       <main className="registrations-dash">
         <div className="dash-stack finance-stack">
           <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>Deliveries</h1>
-              <span className="date-row">
-                <ButtonLink href={`/org/${slug}/money`} variant="secondary">
-                  Finance
-                </ButtonLink>
-              </span>
-            </div>
             <p className="competitions-hint">
               Every receipt and notice the platform tried to deliver — and what happened to it
             </p>

@@ -1,12 +1,16 @@
-import type { ElementType, ReactNode } from "react";
+import type { ElementType } from "react";
 
 import styles from "./sub-nav-tabs.module.css";
 
 /**
- * ContextBar + SubNavTabs (PX-1 04 §6): the competition context header. Unlike
- * the ARIA `Tabs` primitive (in-page panels), these are NAVIGATION links styled
- * as tabs — each tab is a route. Attention dots are counts or booleans from the
- * phase engine, passed in as data.
+ * SubNavTabs (PX-1 04 §6): a surface's section navigation. Unlike the ARIA
+ * `Tabs` primitive (in-page panels), these are NAVIGATION links styled as tabs —
+ * each tab is a route. Attention dots are counts or booleans from the phase
+ * engine, passed in as data.
+ *
+ * It renders into AppShell's `tabs` slot. The ContextBar that used to wrap it —
+ * a second bar carrying breadcrumb and switchers — is gone: both moved up into
+ * the identity bar, where every surface has them, not just this one.
  */
 
 export interface SubNavTab {
@@ -16,6 +20,8 @@ export interface SubNavTab {
   active?: boolean;
   /** Attention dot: true for a plain dot, a number for a count pill. */
   attention?: boolean | number;
+  /** Test hook, for when a tab IS the navigation affordance a suite drives. */
+  testId?: string;
 }
 
 export interface SubNavTabsProps {
@@ -36,6 +42,7 @@ export function SubNavTabs({ label, tabs, linkComponent: Link = "a" }: SubNavTab
                 .filter(Boolean)
                 .join(" ")}
               aria-current={tab.active === true ? "page" : undefined}
+              {...(tab.testId !== undefined ? { "data-testid": tab.testId } : {})}
             >
               {tab.label}
               {tab.attention !== undefined && tab.attention !== false && tab.attention !== 0 ? (
@@ -48,26 +55,5 @@ export function SubNavTabs({ label, tabs, linkComponent: Link = "a" }: SubNavTab
         ))}
       </ul>
     </nav>
-  );
-}
-
-export interface ContextBarProps {
-  /** Breadcrumb slot. */
-  breadcrumb?: ReactNode;
-  /** Right side: switchers, context actions. */
-  actions?: ReactNode;
-  /** SubNavTabs slot. */
-  tabs?: ReactNode;
-}
-
-export function ContextBar({ breadcrumb, actions, tabs }: ContextBarProps) {
-  return (
-    <div className={styles["context-bar"]}>
-      <div className={styles["context-row"]}>
-        {breadcrumb}
-        {actions !== undefined ? <div className={styles["context-actions"]}>{actions}</div> : null}
-      </div>
-      {tabs}
-    </div>
   );
 }

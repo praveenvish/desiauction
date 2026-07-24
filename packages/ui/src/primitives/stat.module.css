@@ -1,0 +1,131 @@
+.row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.stat {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+/* The row answers "how much of this is there" at a glance, so a tile lifts
+   under the pointer to confirm which figure is being read. */
+.stat:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat,
+  .stat:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* The figure leads and the label explains it — reading order matches the
+   scanning order, so the DOM keeps value-then-label rather than reversing it
+   visually with `order` and stranding screen readers with a bare number. */
+.stat-value {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-muted);
+}
+
+.hint {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-muted);
+}
+
+/* A filled chip, not an outline in a pale box: at 32px the glyph needs the
+   contrast of a tinted ground to register as a mark rather than a smudge. */
+.icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+}
+
+/* The glyphs are drawn on a 24 grid at 1.7 stroke; at 19px that renders as a
+   1.3px hairline and the mark greys out. `stroke-width` set as an SVG
+   presentation attribute loses to CSS, so the weight is recovered here rather
+   than by forking every icon. */
+.icon svg {
+  width: 19px;
+  height: 19px;
+  stroke-width: 2;
+}
+
+/* Tones tint the glyph and the figure, never the card: a row of six coloured
+   panels is a christmas tree, and the figures stop being comparable. The chip
+   carries a hairline of its own tone so it has an edge on a white card. */
+.accent .icon {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  border-color: color-mix(in srgb, var(--text-accent) 22%, transparent);
+}
+
+.success .icon {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+  border-color: color-mix(in srgb, var(--success-strong) 22%, transparent);
+}
+
+.warning .icon {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+  border-color: color-mix(in srgb, var(--warning-strong) 22%, transparent);
+}
+
+.danger .icon {
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+  border-color: color-mix(in srgb, var(--danger-strong) 22%, transparent);
+}
+
+.info .icon {
+  background: var(--info-subtle);
+  color: var(--info-strong);
+  border-color: color-mix(in srgb, var(--info-strong) 22%, transparent);
+}

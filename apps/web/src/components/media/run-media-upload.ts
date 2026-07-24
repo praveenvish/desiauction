@@ -6,8 +6,7 @@ import type { UploadOutcome } from "@desiauction/ui";
 // the request→PUT→attach dance lives here ONCE and is unit-tested.
 
 export type PresignOutcome =
-  | { ok: true; uploadUrl: string; key: string }
-  | { ok: false; error: string };
+  { ok: true; uploadUrl: string; key: string } | { ok: false; error: string };
 
 export type AttachOutcome = { ok: true; url: string } | { ok: false; error: string };
 

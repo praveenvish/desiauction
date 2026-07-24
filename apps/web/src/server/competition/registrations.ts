@@ -7,6 +7,8 @@ import {
   normalizeShareSource,
   registrationNumber,
   toCsv,
+  type PhotoTarget,
+  type RegistrationRole,
   type RegistrationStatus,
 } from "@desiauction/core";
 import {
@@ -116,6 +118,97 @@ export async function submitRegistration(
     meta: { competitionId, role, source: normalizeShareSource(source) },
   });
   return { ok: true, registrationId: id };
+}
+
+export type AddPlayerResult =
+  | { ok: true; registrationId: string; number: string; personId: string; personExisted: boolean }
+  | { ok: false; reason: "duplicate" };
+
+/**
+ * An organizer enters a player who did not sign up themselves (parity §3.3).
+ * Identity is still the phone (C-24): an existing person is reused, an unknown
+ * one becomes an unverified STUB — exactly what the CSV import creates, because
+ * this is the same act performed one row at a time. The player lands in
+ * `submitted` and passes the same human approval gate (invariant 5); status is
+ * only ever moved afterwards by the aggregate, never written here.
+ */
+export async function addPlayerByPhone(
+  db: Db,
+  competitionId: string,
+  orgId: string,
+  actorId: string,
+  player: {
+    name: string;
+    phone: string;
+    role: RegistrationRole;
+    basePriceBand: string | null;
+    profile?: PlayerProfileInput;
+  },
+): Promise<AddPlayerResult> {
+  const [found] = await db
+    .select({ id: people.id, name: people.name })
+    .from(people)
+    .where(eq(people.phone, player.phone))
+    .limit(1);
+  let personId = found?.id;
+  const personExisted = personId !== undefined;
+  if (personId === undefined) {
+    const fresh = newId();
+    // onConflictDoNothing, not try/catch: a raised unique violation would abort
+    // the surrounding tenant transaction (the savepoint trap).
+    const inserted = await db
+      .insert(people)
+      .values({ id: fresh, phone: player.phone, name: player.name })
+      .onConflictDoNothing({ target: people.phone })
+      .returning({ id: people.id });
+    personId =
+      inserted[0]?.id ??
+      (
+        await db
+          .select({ id: people.id })
+          .from(people)
+          .where(eq(people.phone, player.phone))
+          .limit(1)
+      )[0]?.id;
+    if (personId === undefined) {
+      return { ok: false, reason: "duplicate" };
+    }
+  } else if (found?.name === null) {
+    // A stub someone else created has no name yet; the organizer just supplied
+    // one. An existing name is never overwritten — it is not ours to correct.
+    await db.update(people).set({ name: player.name }).where(eq(people.id, personId));
+  }
+
+  const id = newId();
+  const number = registrationNumber(id);
+  const created = await writeSurvivingConstraint(db, (tx) =>
+    tx.insert(registrations).values({
+      id,
+      orgId,
+      competitionId,
+      personId,
+      role: player.role,
+      status: "submitted",
+      registrationNumber: number,
+      ...(player.basePriceBand !== null ? { basePriceBand: player.basePriceBand } : {}),
+      ...validProfile(player.profile),
+    }),
+  );
+  if (!created) {
+    return { ok: false, reason: "duplicate" };
+  }
+  // Subject = the registration, so the player's timeline begins where they
+  // entered the competition (the DA-27 lesson from the import path).
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: actorId,
+    action: "registration.added",
+    scopeType: "org",
+    scopeId: orgId,
+    subject: id,
+    meta: { competitionId, role: player.role, source: "organizer_manual" },
+  });
+  return { ok: true, registrationId: id, number, personId, personExisted };
 }
 
 export interface RegistrationRow {
@@ -316,6 +409,33 @@ export async function queryRegistrations(
     age: deriveAge(dateOfBirth, now),
   }));
   return { rows, total, page, pageSize };
+}
+
+/**
+ * Every registration as a photo-match target (bulk photo import). The full,
+ * unpaged set on purpose: filename matching must see the whole competition or
+ * "matches more than one player" would depend on which page was open. Name,
+ * number and phone only — the matcher runs client-side and none of this leaves
+ * the review-gated dashboard.
+ */
+export async function photoTargetsOf(db: Db, competitionId: string): Promise<PhotoTarget[]> {
+  const rows = await db
+    .select({
+      registrationId: registrations.id,
+      number: registrations.registrationNumber,
+      name: people.name,
+      phone: people.phone,
+      photoUrl: people.photoUrl,
+      photoConsentAt: people.photoConsentAt,
+    })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(eq(registrations.competitionId, competitionId))
+    .orderBy(asc(registrations.registrationNumber));
+  return rows.map(({ photoUrl, photoConsentAt, ...row }) => ({
+    ...row,
+    hasPhoto: photoUrl !== null && photoConsentAt !== null,
+  }));
 }
 
 /** Name keys that appear on >1 registration in this competition (dup/conflict flag). */

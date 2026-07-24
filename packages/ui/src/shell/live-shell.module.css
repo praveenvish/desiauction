@@ -60,11 +60,41 @@
   outline-offset: 2px;
 }
 
+/* Centred between the exit door and the status: the mark reads as the room's
+   identity on a projector or a stream frame, not as another control. */
+.live-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md-size);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.live-brand-mark {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex: none;
+}
+
 .status {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
+}
+
+@media (max-width: 640px) {
+  /* On a phone the door and the status matter; the wordmark can go. */
+  .live-brand-text {
+    display: none;
+  }
 }
 
 .content {

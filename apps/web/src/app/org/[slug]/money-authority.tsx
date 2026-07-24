@@ -41,6 +41,20 @@ const ROLE_LABEL: Record<string, string> = {
   "settlement:controller": "Settlement controller",
 };
 
+/** Initials for the holder avatar — matches the members grid. */
+function authorityInitials(name: string | null, phone: string): string {
+  const parts = (name ?? phone).trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  return (
+    parts
+      .map((word) => {
+        const cp = word.codePointAt(0);
+        return cp === undefined ? "" : String.fromCodePoint(cp);
+      })
+      .join("")
+      .toUpperCase() || "—"
+  );
+}
+
 export function MoneyAuthorityPanel({
   slug,
   authority,
@@ -72,9 +86,9 @@ export function MoneyAuthorityPanel({
     <Card data-testid="money-authority">
       <h2>Money authority</h2>
       <p className="authority-hint">
-        Settlement is a separate trust from running the season. Being an owner here does not
-        let someone touch the books, and a settlement role does not let them run an auction — each
-        is granted on purpose, to a named person.
+        Settlement is a separate trust from running the season. Being an owner here does not let
+        someone touch the books, and a settlement role does not let them run an auction — each is
+        granted on purpose, to a named person.
       </p>
 
       {authority.grants.length === 0 ? (
@@ -84,10 +98,17 @@ export function MoneyAuthorityPanel({
           description="Until someone holds a settlement role, no case can be opened and no money can be recorded for this organization."
         />
       ) : (
-        <ul className="member-list" data-testid="authority-list">
+        <ul className="od-authority-holders" data-testid="authority-list">
           {authority.grants.map((grant) => (
-            <li key={grant.grantId} data-testid={`authority-${grant.personId}`}>
-              <span className="member-name">{grant.name ?? grant.phone}</span>
+            <li
+              key={grant.grantId}
+              className="od-authority-row"
+              data-testid={`authority-${grant.personId}`}
+            >
+              <span className="od-authority-avatar" aria-hidden>
+                {authorityInitials(grant.name, grant.phone)}
+              </span>
+              <span className="od-authority-name">{grant.name ?? grant.phone}</span>
               <Badge tone="info">{ROLE_LABEL[grant.capabilitySet] ?? grant.capabilitySet}</Badge>
               {authority.canIssue ? (
                 <Button

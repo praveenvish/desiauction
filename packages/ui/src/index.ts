@@ -14,6 +14,8 @@ export { Skeleton } from "./primitives/skeleton";
 export type { SkeletonProps } from "./primitives/skeleton";
 export { EmptyState } from "./primitives/empty-state";
 export type { EmptyStateProps } from "./primitives/empty-state";
+export { Stat, StatRow } from "./primitives/stat";
+export type { StatProps, StatRowProps } from "./primitives/stat";
 export { Field, Select } from "./primitives/field";
 export type { FieldProps, SelectProps } from "./primitives/field";
 export { Tabs } from "./primitives/tabs";
@@ -29,6 +31,8 @@ export { AnnouncerProvider, useAnnouncer } from "./live/announcer";
 export type { Announce, AnnounceChannel } from "./live/announcer";
 export { VisuallyHidden } from "./live/visually-hidden";
 
+export { paintOnFill, relativeLuminance, textOnFill } from "./identity/fill-contrast";
+export type { FillPaint, FillTextToken } from "./identity/fill-contrast";
 export { placeholderIdentity, initialsFor } from "./identity/placeholder";
 export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
 export { PlayerImage } from "./identity/player-image";
@@ -47,16 +51,23 @@ export { LiveShell } from "./shell/live-shell";
 export type { LiveShellProps } from "./shell/live-shell";
 export { Breadcrumb } from "./shell/breadcrumb";
 export type { BreadcrumbProps, BreadcrumbItem } from "./shell/breadcrumb";
-export { PageHeader, SectionHeader, QuickActionBar } from "./shell/page-header";
-export type { PageHeaderProps, SectionHeaderProps, QuickActionBarProps } from "./shell/page-header";
-export { SubNavTabs, ContextBar } from "./shell/sub-nav-tabs";
-export type { SubNavTabsProps, SubNavTab, ContextBarProps } from "./shell/sub-nav-tabs";
+export { PageHeader, PageIntro, SectionHeader, QuickActionBar } from "./shell/page-header";
+export type {
+  PageHeaderProps,
+  PageIntroProps,
+  SectionHeaderProps,
+  QuickActionBarProps,
+} from "./shell/page-header";
+export { SubNavTabs } from "./shell/sub-nav-tabs";
+export type { SubNavTabsProps, SubNavTab } from "./shell/sub-nav-tabs";
 export { PopoverMenu } from "./shell/popover-menu";
 export type { PopoverMenuProps, PopoverMenuItem } from "./shell/popover-menu";
 export { Drawer } from "./shell/drawer";
 export type { DrawerProps } from "./shell/drawer";
-export { CommandPalette } from "./shell/command-palette";
-export type { CommandPaletteProps, PaletteGroup, PaletteItem } from "./shell/command-palette";
+export { InlineSearch } from "./shell/inline-search";
+export type { InlineSearchProps, InlineSearchHandle } from "./shell/inline-search";
+export { filterGroups } from "./shell/search-filter";
+export type { PaletteGroup, PaletteItem } from "./shell/search-filter";
 export { LoadingState } from "./shell/loading-state";
 export type { LoadingStateProps } from "./shell/loading-state";
 export { ErrorState } from "./primitives/error-state";
@@ -74,5 +85,13 @@ export {
   IconChevronDown,
   IconArrowLeft,
   IconAlert,
+  IconCalendar,
+  IconMatch,
+  IconPin,
+  IconArrowRight,
+  IconList,
+  IconGrid,
+  IconKebab,
+  IconExternal,
   BrandGlyph,
 } from "./shell/icons";

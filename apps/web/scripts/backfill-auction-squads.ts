@@ -35,31 +35,33 @@ interface Row {
  * team — the exact set the old writer skipped, plus anything that has drifted.
  */
 async function divergentRows(db: Db): Promise<Row[]> {
-  return db
-    .select({
-      registrationId: registrations.id,
-      playerName: sql<string | null>`people.name`,
-      lotNumber: lots.lotNumber,
-      teamId: paddles.teamId,
-      teamName: sql<string | null>`teams.name`,
-      currentTeamId: registrations.teamId,
-    })
-    .from(lots)
-    .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
-    .innerJoin(registrations, eq(registrations.id, lots.registrationId))
-    // LEFT, not INNER: a sold lot whose person or team row has gone missing is
-    // exactly the corruption this script exists to surface. Inner joins made it
-    // invisible — the run reported "nothing to repair" while 840 divergent rows
-    // sat in the database, because it could not print their names.
-    .leftJoin(sql`teams`, sql`teams.id = ${paddles.teamId}`)
-    .leftJoin(sql`people`, sql`people.id = ${registrations.personId}`)
-    .where(
-      and(
-        eq(lots.status, "sold"),
-        or(isNull(registrations.teamId), ne(registrations.teamId, paddles.teamId)),
-      ),
-    )
-    .orderBy(lots.lotNumber);
+  return (
+    db
+      .select({
+        registrationId: registrations.id,
+        playerName: sql<string | null>`people.name`,
+        lotNumber: lots.lotNumber,
+        teamId: paddles.teamId,
+        teamName: sql<string | null>`teams.name`,
+        currentTeamId: registrations.teamId,
+      })
+      .from(lots)
+      .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+      .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+      // LEFT, not INNER: a sold lot whose person or team row has gone missing is
+      // exactly the corruption this script exists to surface. Inner joins made it
+      // invisible — the run reported "nothing to repair" while 840 divergent rows
+      // sat in the database, because it could not print their names.
+      .leftJoin(sql`teams`, sql`teams.id = ${paddles.teamId}`)
+      .leftJoin(sql`people`, sql`people.id = ${registrations.personId}`)
+      .where(
+        and(
+          eq(lots.status, "sold"),
+          or(isNull(registrations.teamId), ne(registrations.teamId, paddles.teamId)),
+        ),
+      )
+      .orderBy(lots.lotNumber)
+  );
 }
 
 async function main(): Promise<void> {

@@ -1,6 +1,7 @@
 import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
+import { PageTitle } from "../../../../components/shell/page-title";
 import type { UserDetail } from "../../../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime } from "../../admin-ui";
 
@@ -19,9 +20,9 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
   const active = grants.filter((grant) => grant.revokedAt === null);
   return (
     <>
+      <PageTitle title={person.name ?? "Unnamed"} />
       <header className="dash-head">
-        <div className="competition-title-row">
-          <h1>{person.name ?? "Unnamed"}</h1>
+        <div className="competition-title-row title-row-actions">
           <span className="date-row">
             <ButtonLink href="/admin/users" variant="secondary">
               All users

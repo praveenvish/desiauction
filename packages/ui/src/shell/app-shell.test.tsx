@@ -40,6 +40,28 @@ describe("AppShell", () => {
     }
   });
 
+  it("owns the page's one h1, with the trail above it and tabs below", () => {
+    render(
+      <AppShell
+        nav={NAV}
+        wordmark="DesiAuction"
+        breadcrumb={<nav aria-label="Breadcrumb">Malad CC</nav>}
+        pageTitle="Auction"
+        pageTitleAttrs={{ "data-testid": "shell-title" }}
+        titleStatus={<span>LIVE</span>}
+        tabs={<nav aria-label="Season sections">Overview</nav>}
+      >
+        <p>Content</p>
+      </AppShell>,
+    );
+    const heading = screen.getByRole("heading", { level: 1, name: "Auction" });
+    expect(heading).toHaveAttribute("data-testid", "shell-title");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Season sections" })).toBeInTheDocument();
+    expect(screen.getByText("LIVE")).toBeInTheDocument();
+  });
+
   it("injects the link component", () => {
     const Fake = ({ href, children, ...rest }: { href: string; children?: React.ReactNode }) => (
       <a data-injected href={href} {...rest}>

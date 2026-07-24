@@ -12,44 +12,48 @@
     "muted": { "$value": "{color.chalk.600}", "$type": "color" },
     "disabled": { "$value": "{color.chalk.400}", "$type": "color" },
     "inverse": { "$value": "{color.ink.100}", "$type": "color" },
-    "on-accent": { "$value": "{color.white}", "$type": "color" },
+    "on-accent": { "$value": "{color.ink.950}", "$type": "color" },
+    "on-dark": { "$value": "{color.ink.50}", "$type": "color" },
     "on-danger": { "$value": "{color.white}", "$type": "color" },
-    "accent": { "$value": "{color.indigo.700}", "$type": "color" },
+    "accent": { "$value": "{color.gold.800}", "$type": "color" },
     "heading": { "$value": "{color.chalk.800}", "$type": "color" }
   },
   "border": {
     "subtle": { "$value": "{color.chalk.200}", "$type": "color" },
     "strong": { "$value": "{color.chalk.300}", "$type": "color" },
-    "interactive": { "$value": "{color.indigo.500}", "$type": "color" }
+    "interactive": { "$value": "{color.gold.700}", "$type": "color" }
   },
-  "focus-ring": { "$value": "{color.indigo.500}", "$type": "color" },
+  "focus-ring": { "$value": "{color.gold.800}", "$type": "color" },
   "scrim": { "$value": "#070A0F99", "$type": "color" },
   "accent": {
-    "default": { "$value": "{color.indigo.500}", "$type": "color" },
-    "hover": { "$value": "{color.indigo.600}", "$type": "color" },
-    "pressed": { "$value": "{color.indigo.700}", "$type": "color" },
-    "subtle": { "$value": "#6A5CF014", "$type": "color" }
+    "default": { "$value": "{color.gold.700}", "$type": "color" },
+    "hover": { "$value": "{color.gold.600}", "$type": "color" },
+    "pressed": { "$value": "{color.gold.800}", "$type": "color" },
+    "subtle": { "$value": "#B57F1414", "$type": "color" },
+    "sheen": { "$value": "{color.white}", "$type": "color" },
+    "lift": { "$value": "{color.gold.600}", "$type": "color" }
   },
   "live": { "$value": "{color.green.light}", "$type": "color" },
+  "//strong": "The `strong` ramp is the text colour on its own `subtle` bed (badges), not on bare surface. Each value clears 4.5:1 against subtle-over-{surface, raised, sunken} — the composite is darker than the surface, so tuning against `surface` alone lands ~4.25 and fails axe.",
   "success": {
     "subtle": { "$value": "#1D9E5F1A", "$type": "color" },
     "base": { "$value": "{color.green.light}", "$type": "color" },
-    "strong": { "$value": "#15794A", "$type": "color" }
+    "strong": { "$value": "#12643D", "$type": "color" }
   },
   "danger": {
     "subtle": { "$value": "#D938431A", "$type": "color" },
     "base": { "$value": "{color.red.light}", "$type": "color" },
-    "strong": { "$value": "#C22F39", "$type": "color" }
+    "strong": { "$value": "#B02730", "$type": "color" }
   },
   "warning": {
     "subtle": { "$value": "#B87D081A", "$type": "color" },
     "base": { "$value": "{color.amber.light}", "$type": "color" },
-    "strong": { "$value": "#8F6106", "$type": "color" }
+    "strong": { "$value": "#805705", "$type": "color" }
   },
   "info": {
     "subtle": { "$value": "#2673D61A", "$type": "color" },
     "base": { "$value": "{color.blue.light}", "$type": "color" },
-    "strong": { "$value": "#2266C4", "$type": "color" }
+    "strong": { "$value": "#1E5AAC", "$type": "color" }
   },
   "money": {
     "value": { "$value": "{color.chalk.900}", "$type": "color" },

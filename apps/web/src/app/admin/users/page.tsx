@@ -24,7 +24,6 @@ export default async function AdminUsersPage({
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
         <header className="dash-head">
-          <h1>Users</h1>
           <p className="dash-hint">
             Everyone on the platform, and what they hold. Grants are shown as the capability sets
             they actually are.

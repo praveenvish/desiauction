@@ -140,6 +140,7 @@ async function main(): Promise<void> {
   await db.insert(competitions).values({
     id: compId,
     orgId,
+    tournamentId: null,
     name: `Perf Season ${RUN}`,
     slug: `perf-finops-season-${RUN}`,
     status: "registration_closed",
@@ -180,6 +181,7 @@ async function main(): Promise<void> {
   const comp = {
     id: compId,
     orgId,
+    tournamentId: null,
     name: `Perf Season ${RUN}`,
     slug: `perf-finops-season-${RUN}`,
     status: "registration_closed" as const,

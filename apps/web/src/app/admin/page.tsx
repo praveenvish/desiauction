@@ -32,7 +32,6 @@ export default async function AdminPage() {
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
         <header className="dash-head">
-          <h1>Platform</h1>
           <p className="dash-hint">
             Everything the platform is doing right now. Administration observes — every fix happens
             in the console that owns it.

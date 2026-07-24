@@ -1,5 +1,6 @@
 import { ButtonLink, ErrorState } from "@desiauction/ui";
 
+import { PageTitleHidden } from "../components/shell/page-title";
 import "./marketing.css";
 
 // PX-2: branded 404 (PX-1 P-07). Copy per the content guide (05 §5); the
@@ -8,6 +9,9 @@ import "./marketing.css";
 export default function NotFound() {
   return (
     <main className="mk">
+      {/* A dead end owns its heading: the console shell stands its title down
+          rather than framing a page that isn't there. */}
+      <PageTitleHidden />
       <div className="mk-band">
         <div className="mk-container mk-center" style={{ maxWidth: 560 }}>
           <p className="mk-kicker" style={{ justifyContent: "center" }}>

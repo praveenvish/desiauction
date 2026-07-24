@@ -79,9 +79,10 @@
 
 /* ---------- lifecycle strip: the platform in one row ---------- */
 .home-flow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
@@ -90,7 +91,7 @@
 }
 
 .home-step {
-  position: relative;
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -112,16 +113,13 @@
 }
 
 /* Chevron connector: the stages are a sequence, so say so. */
-.home-step + .home-step::before {
-  content: "";
-  position: absolute;
-  left: calc(var(--space-2) * -1);
-  top: 50%;
-  width: 6px;
-  height: 6px;
-  transform: translateY(-50%) rotate(45deg);
-  border-top: 2px solid var(--border-strong);
-  border-right: 2px solid var(--border-strong);
+.home-step-sep {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border-top: 2px solid var(--text-muted);
+  border-right: 2px solid var(--text-muted);
 }
 
 /* Stages holding no work read as dimmed steps on the path. */
@@ -192,17 +190,20 @@
 
 @media (max-width: 1024px) {
   .home-flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--space-2) var(--space-4);
   }
 
-  .home-step + .home-step::before {
+  .home-step-sep {
     display: none;
   }
 }
 
 @media (max-width: 560px) {
   .home-flow {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
@@ -759,5 +760,153 @@
 
   .home-card-link:hover {
     transform: none;
+  }
+}
+
+/* ---------- the live hero ----------------------------------------------------
+   A night in progress outranks everything else on this page, so it is not a row
+   in a right-hand list: it is the first thing under the header, full width, and
+   it says what the list row could not — who is on the block, what the top bid is
+   and who holds it. Absent when nothing is live; the page then opens on the
+   lifecycle rail exactly as before. */
+.home-live {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(
+      120% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-2);
+}
+
+.home-live-body {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.home-live-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+}
+
+.home-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--success-subtle);
+  color: var(--success-strong);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+}
+
+.home-live-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: currentcolor;
+}
+
+/* The dot is the only thing that moves: a pulse on the panel itself would make
+   the figures beside it hard to read, and text must not animate at all. */
+@media (prefers-reduced-motion: no-preference) {
+  .home-live-badge i {
+    animation: home-live-pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes home-live-pulse {
+  50% {
+    transform: scale(0.6);
+  }
+}
+
+/* The display face has a 30px floor (it reads cramped below that) and the comp
+   wants this title big, so the two agree: this is the page's largest words
+   after the header's own. */
+.home-live-name {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+/* Labelled columns, not a sentence: each figure is scannable on its own. */
+.home-live-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-3);
+}
+
+.home-live-facts div {
+  min-width: 0;
+}
+
+.home-live-facts dt {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.home-live-facts dd {
+  margin: 2px 0 0;
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.home-live-role,
+.home-live-team {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.home-live-bid {
+  color: var(--text-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-live-bar {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.home-live-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent), var(--accent-pressed));
+}
+
+@media (max-width: 719px) {
+  .home-live {
+    padding: var(--space-4);
+  }
+
+  .home-live-facts {
+    gap: var(--space-3) var(--space-4);
   }
 }

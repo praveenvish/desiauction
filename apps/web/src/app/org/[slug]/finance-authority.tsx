@@ -49,6 +49,20 @@ const ROLE_LABEL: Record<string, string> = {
   "finops:controller": "Finance controller",
 };
 
+/** Initials for the holder avatar — matches the members grid. */
+function authorityInitials(name: string | null, phone: string): string {
+  const parts = (name ?? phone).trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  return (
+    parts
+      .map((word) => {
+        const cp = word.codePointAt(0);
+        return cp === undefined ? "" : String.fromCodePoint(cp);
+      })
+      .join("")
+      .toUpperCase() || "—"
+  );
+}
+
 export function FinanceAuthorityPanel({
   slug,
   authority,
@@ -92,10 +106,17 @@ export function FinanceAuthorityPanel({
           description="Until someone holds a finance role, the workspace is invisible and no delivery can be retried or investigated by hand."
         />
       ) : (
-        <ul className="member-list" data-testid="finance-authority-list">
+        <ul className="od-authority-holders" data-testid="finance-authority-list">
           {authority.grants.map((grant) => (
-            <li key={grant.grantId} data-testid={`finance-authority-${grant.personId}`}>
-              <span className="member-name">{grant.name ?? grant.phone}</span>
+            <li
+              key={grant.grantId}
+              className="od-authority-row"
+              data-testid={`finance-authority-${grant.personId}`}
+            >
+              <span className="od-authority-avatar" aria-hidden>
+                {authorityInitials(grant.name, grant.phone)}
+              </span>
+              <span className="od-authority-name">{grant.name ?? grant.phone}</span>
               <Badge tone="info">{ROLE_LABEL[grant.capabilitySet] ?? grant.capabilitySet}</Badge>
               {authority.canIssue ? (
                 <Button

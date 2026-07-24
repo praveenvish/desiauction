@@ -1,17 +1,12 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
-import {
-  Badge,
-  ButtonLink,
-  Card,
-  EmptyState,
-  Money,
-  PageHeader,
-  SectionHeader,
-} from "@desiauction/ui";
+import { Badge, ButtonLink, Card, EmptyState, Money, SectionHeader } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
+import { FormDialog } from "../../components/form-dialog";
+import { PageAction } from "../../components/shell/page-action";
+import { PageTitle } from "../../components/shell/page-title";
 import { auctionDashboard } from "../../server/auction/actions";
 import { currentSession } from "../../server/auth/actions";
 import { competitionsView, registrationDashboard } from "../../server/competition/actions";
@@ -19,6 +14,7 @@ import { organizerScheduleView } from "../../server/competition/fixture-actions"
 import { myRegistrations } from "../../server/competition/public";
 import { homeDashboard } from "../../server/home/dashboard";
 import type { HomeDashboardData, HomeStages } from "../../server/home/dashboard";
+import { CreateTournamentForm } from "../tournaments/create-tournament-form";
 import { HomeShortcuts } from "./home-shortcuts";
 import "./home.css";
 
@@ -216,18 +212,63 @@ function rupeesShort(value: number): string {
   return `₹${String(Math.round(r))}`;
 }
 
-/** "grant.Issued" -> "Grant issued"; "auction.BidAccepted" -> "Auction bid accepted". */
+/**
+ * The feed is read by organizers, not operators, so the raw event name is the
+ * wrong thing to print: "finops.PeriodClosed" is a fact about our ledger
+ * machinery, not about their night. Known events get the sentence a human would
+ * say; anything unmapped falls back to the mechanical transform below, with the
+ * internal domain word translated so "Finops" never reaches a screen.
+ */
+const ACTIVITY_PHRASE: Record<string, string> = {
+  "auction.BidAccepted": "Bid accepted",
+  "auction.AuctionAborted": "Auction stopped",
+  "auction.conduct": "Auction conducted",
+  "competition.created": "Season created",
+  "competition.cloned": "Season cloned",
+  "finops.PeriodOpened": "Books opened",
+  "finops.PeriodClosed": "Books closed",
+  "finops.PeriodReopened": "Books reopened",
+  "finops.DayAttested": "Day's books attested",
+  "finops.ProfileDeclared": "Finance profile declared",
+  "finops.dispatch": "Receipt delivered",
+  "finops.document": "Document issued",
+  "grant.issued": "Paddle granted",
+  "grant.revoked": "Paddle revoked",
+  "org.created": "Organization created",
+  "payment.captured": "Payment received",
+  "payment.failed": "Payment failed",
+  "registration.submitted": "New registration",
+  "registration.approve": "Registration approved",
+  "registration.waitlist": "Registration waitlisted",
+  "settlement.PaymentCaptured": "Payment received",
+  "settlement.ObligationWaived": "Amount waived",
+  "settlement.CaseClosed": "Settlement closed",
+  "team.created": "Team added",
+};
+
+/** Internal domain words → what the organizer calls the same thing. */
+const ACTIVITY_DOMAIN: Record<string, string> = {
+  finops: "Finance",
+  competition: "Season",
+  grant: "Access",
+  auth: "Sign-in",
+  org: "Organization",
+};
+
+/** "grant.issued" -> "Paddle granted"; unmapped "x.YDone" -> "X y done". */
 function activityLabel(action: string): string {
+  const phrase = ACTIVITY_PHRASE[action];
+  if (phrase !== undefined) return phrase;
   const parts = action.split(".");
   const domain = parts[0] ?? action;
   const tail = parts.slice(1).join(" ");
-  const head = domain.charAt(0).toUpperCase() + domain.slice(1);
-  if (tail === "") return head;
+  const named = ACTIVITY_DOMAIN[domain] ?? domain.charAt(0).toUpperCase() + domain.slice(1);
+  if (tail === "") return named;
   const words = tail
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_.-]/g, " ")
     .toLowerCase();
-  return `${head} ${words}`;
+  return `${named} ${words}`;
 }
 
 const ACTIVITY_STYLE: Record<string, { tone: string; icon: ReactNode }> = {
@@ -374,6 +415,17 @@ export default async function HomePage() {
     homeDashboard(),
   ]);
 
+  // The night in progress leads the page. One extra read, and only when there
+  // IS one: the hero needs what the list row could not say — who is on the
+  // block, what the top bid is, and who is holding it.
+  const liveRow = dash.auctions.find((auction) => auction.status === "live") ?? null;
+  const liveBoard =
+    liveRow === null ? null : ((await auctionDashboard(liveRow.competitionSlug))?.overview ?? null);
+
+  // The hero owns the live auction, so the panel below lists only what the hero
+  // is not already showing — the design's "no duplication" rule.
+  const otherAuctions = dash.auctions.filter((auction) => auction.auctionId !== liveRow?.auctionId);
+
   const attention: AttentionRow[] = [];
   for (const competition of view.competitions.slice(0, ATTENTION_SCAN_LIMIT)) {
     if (competition.status === "registration_open") {
@@ -417,22 +469,29 @@ export default async function HomePage() {
 
   // Portfolio context belongs in the header line, not in a card of its own.
   const headline = [
-    `${String(dash.stats.competitions)} competition${dash.stats.competitions === 1 ? "" : "s"}`,
+    `${String(dash.stats.competitions)} season${dash.stats.competitions === 1 ? "" : "s"}`,
     ...(openCount > 0 ? [`${String(openCount)} accepting entries`] : []),
     ...(liveCount > 0 ? [`${String(liveCount)} auction live now`] : []),
   ].join(" · ");
 
   return (
     <main className="home">
-      <PageHeader
-        title={greeting}
-        subtitle={headline}
-        actions={
-          view.orgs.length > 0 ? (
-            <ButtonLink href="/seasons">Create a season</ButtonLink>
-          ) : undefined
-        }
-      />
+      {/* The greeting IS this surface's title — the shell's derived "Home"
+          gives way to it — and the portfolio line is its lede, so both ride the
+          identity bar and the page opens on the work. */}
+      <PageTitle title={greeting} subtitle={headline} />
+      {view.orgs.length > 0 ? (
+        <PageAction>
+          <FormDialog
+            title="New tournament"
+            triggerLabel="+ New tournament"
+            size="sm"
+            triggerTestId="home-new-tournament"
+          >
+            <CreateTournamentForm orgs={view.orgs} />
+          </FormDialog>
+        </PageAction>
+      ) : null}
 
       {isEmpty ? (
         <Card>
@@ -445,26 +504,108 @@ export default async function HomePage() {
         </Card>
       ) : (
         <>
+          {/* ---- the night in progress: nothing outranks a live auction ---- */}
+          {liveRow !== null ? (
+            <section className="home-live" aria-labelledby="home-live-name" data-testid="home-live">
+              <div className="home-live-body">
+                <p className="home-live-kicker">
+                  <span className="home-live-badge">
+                    <i aria-hidden />
+                    LIVE NOW
+                  </span>
+                </p>
+                <h2 id="home-live-name" className="home-live-name">
+                  {liveRow.competitionName}
+                </h2>
+                <dl className="home-live-facts">
+                  {liveBoard?.onBlock !== null && liveBoard?.onBlock !== undefined ? (
+                    <div>
+                      <dt>On the block</dt>
+                      <dd>
+                        {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
+                        <span className="home-live-role">
+                          {" · "}
+                          {liveBoard.onBlock.role.replace(/_/g, " ")}
+                        </span>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {liveBoard?.onBlock?.currentBid != null ? (
+                    <div>
+                      <dt>Top bid</dt>
+                      <dd className="home-live-bid">
+                        {rupees(liveBoard.onBlock.currentBid)}
+                        {liveBoard.onBlock.leadingTeamName !== null ? (
+                          <span className="home-live-team">
+                            {" · "}
+                            {liveBoard.onBlock.leadingTeamName}
+                          </span>
+                        ) : null}
+                      </dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt>Spend</dt>
+                    <dd>{rupeesShort(liveRow.spendPaise)}</dd>
+                  </div>
+                  <div>
+                    <dt>Lots sold</dt>
+                    <dd className="home-mono">
+                      {liveRow.lotsSold} / {liveRow.lotsTotal}
+                    </dd>
+                  </div>
+                </dl>
+                <span
+                  className="home-live-bar"
+                  aria-hidden
+                  data-sold={liveRow.lotsSold}
+                  data-total={liveRow.lotsTotal}
+                >
+                  <i
+                    style={{
+                      width: `${String(liveRow.lotsTotal === 0 ? 0 : Math.round((liveRow.lotsSold / liveRow.lotsTotal) * 100))}%`,
+                    }}
+                  />
+                </span>
+              </div>
+              <ButtonLink
+                href={`/seasons/${liveRow.competitionSlug}/auction/live`}
+                data-testid="home-enter-room"
+              >
+                Enter auction room →
+              </ButtonLink>
+            </section>
+          ) : null}
+
           {/* ---- lifecycle: what the platform does, and where your work sits ---- */}
+          {/* The chevrons are ITEMS in this row, not decoration pinned to a
+              step's edge. Pinned, they sat on the column boundary — which is
+              flush against the next stage's icon and nowhere near the middle of
+              the whitespace. As items they take an equal share of the free
+              space, so each one lands midway between the stages it joins. */}
           <section className="home-flow" aria-label="Season lifecycle">
             {lifecycleFor(dash).map((stage, index) => {
               const count = stage.count;
               return (
-                <Link
-                  key={stage.key}
-                  href={stage.href}
-                  className={`home-step${count > 0 ? " home-step--on" : ""}`}
-                  style={{ ["--step" as string]: String(index + 1) }}
-                >
-                  <span className={`home-ic home-ic--${stage.tone} home-ic--sm`}>{stage.icon}</span>
-                  <span className="home-step-text">
-                    <span className="home-step-head">
-                      <span className="home-step-name">{stage.name}</span>
-                      <span className="home-step-count">{count}</span>
+                <Fragment key={stage.key}>
+                  {index > 0 ? <span className="home-step-sep" aria-hidden /> : null}
+                  <Link
+                    href={stage.href}
+                    className={`home-step${count > 0 ? " home-step--on" : ""}`}
+                    style={{ ["--step" as string]: String(index + 1) }}
+                  >
+                    <span className={`home-ic home-ic--${stage.tone} home-ic--sm`}>
+                      {stage.icon}
                     </span>
-                    <span className="home-step-blurb">{stage.detail}</span>
-                  </span>
-                </Link>
+                    <span className="home-step-text">
+                      <span className="home-step-head">
+                        <span className="home-step-name">{stage.name}</span>
+                        <span className="home-step-count">{count}</span>
+                      </span>
+                      <span className="home-step-blurb">{stage.detail}</span>
+                    </span>
+                  </Link>
+                </Fragment>
               );
             })}
           </section>
@@ -483,7 +624,10 @@ export default async function HomePage() {
                   ) : null}
                 </div>
                 {attention.length === 0 ? (
-                  <PanelEmpty icon={<Glyph d={G.check} />} text="All clear — nothing is waiting on you." />
+                  <PanelEmpty
+                    icon={<Glyph d={G.check} />}
+                    text="All clear — nothing is waiting on you."
+                  />
                 ) : (
                   <ul className="home-list">
                     {attention.map((row) => (
@@ -650,16 +794,20 @@ export default async function HomePage() {
                     View all
                   </Link>
                 </div>
-                {dash.auctions.length === 0 ? (
+                {otherAuctions.length === 0 ? (
                   <PanelEmpty
                     icon={<Glyph d={G.gavel} />}
-                    text="No auction running yet."
+                    text={
+                      liveRow === null
+                        ? "No auction running yet."
+                        : "Nothing else scheduled right now."
+                    }
                     ctaHref="/seasons"
-                    ctaLabel="Set one up"
+                    ctaLabel={liveRow === null ? "Set one up" : "Plan the next one"}
                   />
                 ) : (
                   <ul className="home-list">
-                    {dash.auctions.map((auction) => (
+                    {otherAuctions.map((auction) => (
                       <li key={auction.auctionId}>
                         <Link
                           href={`/seasons/${auction.competitionSlug}/auction`}
@@ -725,7 +873,9 @@ export default async function HomePage() {
                             className="home-event"
                           >
                             <span className="home-date">
-                              <b>{when !== null ? String(when.getDate()).padStart(2, "0") : "--"}</b>
+                              <b>
+                                {when !== null ? String(when.getDate()).padStart(2, "0") : "--"}
+                              </b>
                               <span>
                                 {when !== null
                                   ? when.toLocaleString("en-IN", { month: "short" }).toUpperCase()
@@ -816,7 +966,6 @@ export default async function HomePage() {
               </Card>
             </>
           ) : null}
-
         </>
       )}
     </main>

@@ -2,6 +2,7 @@ import { Badge } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageTitle } from "../../../../../components/shell/page-title";
 import { tournamentView } from "../../../../../server/orgs/catalogue";
 import "../../../../orgs/orgs.css";
 
@@ -26,9 +27,11 @@ export default async function TournamentPage({
 
   return (
     <main className="org-home">
+      {/* The tournament's name is page data, so the shell's derived "Tournament"
+          gives way to the real one here. */}
+      <PageTitle title={view.tournament.name} testId="tournament-name" />
       <div className="org-stack">
         <div className="org-title-row">
-          <h1 data-testid="tournament-name">{view.tournament.name}</h1>
           <span className="cat-group-count">
             {view.editions.length} {view.editions.length === 1 ? "season" : "seasons"}
           </span>
