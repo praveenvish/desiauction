@@ -345,6 +345,43 @@ describe("LIVE ENGINE — the single writer under fire", () => {
     expect(new Set(seqs).size).toBe(seqs.length);
   });
 
+  it("RACE: simultaneous bids at the same amount resolve to exactly ONE winner", async () => {
+    // The certification could not test this: one browser profile carries one
+    // session, so four owners bidding at once was unreachable from the UI. It
+    // is the failure that would matter most on auction night — two owners
+    // tapping the same rung in the same instant — so it is asserted here,
+    // against the real queue, where true concurrency is expressible.
+    const state = engine.snapshotOf(auctionId);
+    const amount = state?.snapshot?.currentLot?.nextMinimumBid ?? 0;
+    const contenders = [bidderIds[5], bidderIds[6], bidderIds[7]] as string[];
+
+    const acks = await Promise.all(
+      contenders.map((bidder) =>
+        command("PlaceBid", bidder, {
+          lotId: lot1,
+          paddleId: paddleByBidder.get(bidder) ?? "",
+          amountRaw: amount,
+        }),
+      ),
+    );
+
+    // Exactly one may win at a given rung; the losers are refused BELOW_CURRENT
+    // (someone got there first), never silently dropped.
+    const accepted = acks.filter((ack) => ack.accepted);
+    expect(accepted).toHaveLength(1);
+    for (const refusal of acks.filter((ack) => !ack.accepted)) {
+      expect(refusal.reason).toBe("BELOW_CURRENT");
+    }
+
+    // And the money agrees: one accepted row at that amount, one leader.
+    const rows = await db
+      .select({ id: bidsTable.id, status: bidsTable.status })
+      .from(bidsTable)
+      .where(and(eq(bidsTable.lotId, lot1), eq(bidsTable.amount, amount)));
+    expect(rows.filter((row) => row.status === "accepted")).toHaveLength(1);
+    expect(engine.snapshotOf(auctionId)?.snapshot?.currentLot?.currentBid?.amount).toBe(amount);
+  });
+
   it("IDEMPOTENCY: a duplicated command id returns the ORIGINAL ack, executing once", async () => {
     const commandId = newId();
     const bidder = bidderIds[3] as string;
