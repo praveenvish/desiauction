@@ -11,7 +11,14 @@ import { canCompetition } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
 import { dbHandle, systemDb } from "../db";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
-import { resolvedLots, rulesOf, type AuctionRules, type ResolvedLot } from "./live-summary";
+import {
+  preSignedPlayers,
+  resolvedLots,
+  rulesOf,
+  type AuctionRules,
+  type PreSignedPlayer,
+  type ResolvedLot,
+} from "./live-summary";
 
 // Live auction actions (M-IP4-2, extended M-IP4-3). The web tier
 // authenticates, resolves the tenant and capabilities, then SUBMITS A COMMAND
@@ -63,18 +70,32 @@ export interface LiveAuctionView {
   competition: { name: string; slug: string };
   auctionId: string;
   wsUrl: string;
-  teams: { id: string; name: string }[];
+  teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
+  /** The default paddle (first issued); the room may switch within myPaddles. */
   myPaddle: { paddleId: string; paddleNumber: string; teamId: string; teamName: string } | null;
+  /** Every paddle this person holds — one per team they were issued for. */
+  myPaddles: { paddleId: string; paddleNumber: string; teamId: string; teamName: string }[];
   /** Teams THIS person holds an active paddle grant for (claim eligibility). */
   myGrantTeamIds: string[];
   viewer: { personId: string; canConduct: boolean };
   // PX-6: the locked rules (display) and the resolved history (late joiners).
   rules: AuctionRules;
   resolved: ResolvedLot[];
+  /** Icons and retained players: on a squad, never in the pool. */
+  preSigned: PreSignedPlayer[];
 }
 
-async function myActivePaddle(dbc: Db, auctionId: string, personId: string) {
-  const [row] = await dbc
+/**
+ * EVERY paddle this person holds, in issue order (DA-02).
+ *
+ * This used to return the first one and stop. A conductor running the night
+ * from one laptop — the small-club case, and what our own seed does — holds
+ * several, and the live room silently bound them to P01 with no way to switch
+ * and no way to hand one back. Three of four teams simply could not bid, and
+ * Abort was the only exit. The room now picks from this list.
+ */
+async function myPaddles(dbc: Db, auctionId: string, personId: string) {
+  const rows = await dbc
     .select({
       paddleId: paddles.id,
       paddleNumber: paddles.paddleNumber,
@@ -90,8 +111,8 @@ async function myActivePaddle(dbc: Db, auctionId: string, personId: string) {
         isNull(paddles.releasedAt),
       ),
     )
-    .limit(1);
-  return row === undefined ? null : { ...row, teamName: row.teamName ?? "Unknown" };
+    .orderBy(asc(paddles.paddleNumber));
+  return rows.map((row) => ({ ...row, teamName: row.teamName ?? "Unknown" }));
 }
 
 export async function liveAuctionView(slug: string): Promise<LiveAuctionView | null> {
@@ -99,17 +120,25 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   if (gate === null) {
     return null;
   }
-  const [teamRows, mine, grantRows, resolved] = await withTenantDb(
+  const [teamRows, mine, grantRows, resolved, preSigned] = await withTenantDb(
     dbHandle,
     { personId: gate.personId, orgId: gate.competition.orgId },
     (db) =>
       Promise.all([
         db
-          .select({ id: teams.id, name: teams.name })
+          // shortName/primaryColor are franchise IDENTITY, not decoration: the
+          // owner room tells four purses apart by colour at a glance, which is
+          // the whole point of a paddle board.
+          .select({
+            id: teams.id,
+            name: teams.name,
+            shortName: teams.shortName,
+            primaryColor: teams.primaryColor,
+          })
           .from(teams)
           .where(eq(teams.competitionId, gate.competition.id))
           .orderBy(asc(teams.name)),
-        myActivePaddle(db, gate.auction.id, gate.personId),
+        myPaddles(db, gate.auction.id, gate.personId),
         db
           .select({ teamId: paddleGrants.teamId })
           .from(paddleGrants)
@@ -121,6 +150,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
             ),
           ),
         resolvedLots(db, gate.auction.id),
+        preSignedPlayers(db, gate.competition.id),
       ]),
   );
   return {
@@ -128,11 +158,13 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     auctionId: gate.auction.id,
     wsUrl: engineWsUrl(gate.auction.id),
     teams: teamRows,
-    myPaddle: mine,
+    myPaddle: mine[0] ?? null,
+    myPaddles: mine,
     myGrantTeamIds: grantRows.map((row) => row.teamId),
     viewer: { personId: gate.personId, canConduct: gate.canConduct },
     rules: rulesOf(gate.auction.config),
     resolved,
+    preSigned,
   };
 }
 

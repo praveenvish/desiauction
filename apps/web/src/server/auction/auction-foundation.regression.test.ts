@@ -281,7 +281,7 @@ describe("AUCTION FOUNDATION — paddles are immutable identity", () => {
     for (const teamId of [teamIds[0], teamIds[1]] as string[]) {
       const result = await issuePaddle(db, auction, owner, teamId, owner);
       if (!result.ok) {
-        throw new Error("paddle issue failed");
+        throw new Error(`paddle issue failed: ${result.reason}`);
       }
       paddleIds.push(result.paddleId);
     }
@@ -298,6 +298,7 @@ describe("AUCTION FOUNDATION — paddles are immutable identity", () => {
       reason: "unknown_team",
     });
   });
+
 });
 
 describe("AUCTION FOUNDATION — auction lifecycle guards", () => {

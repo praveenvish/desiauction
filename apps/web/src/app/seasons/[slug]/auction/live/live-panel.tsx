@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Badge, Button, Card, Field, Select, useToast } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -14,11 +14,14 @@ import {
   AuctionProgress,
   AuctionSummaryCard,
   AuctionTimeline,
-  BidLadder,
   ConnectionQuality,
   MyTeamCard,
   useLiveFeed,
 } from "../live-experience";
+import { LotHero } from "../lot-hero";
+import { PaddleControl } from "../paddle-control";
+import { PurseBoard } from "../purse-board";
+import { PoolSummary, SquadBoard } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 
@@ -50,7 +53,6 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
   const feed = useLiveFeed(view.resolved, snapshot);
   const readOnly = connection !== "open";
   const [claimTeam, setClaimTeam] = useState(view.myPaddle?.teamId ?? "");
-  const [customBid, setCustomBid] = useState("");
   const [busy, setBusy] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
@@ -74,14 +76,34 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     [slug, toast],
   );
 
+  // DA-02: which of my paddles is bidding. A conductor running the night from
+  // one laptop holds several; the room used to bind to the first one for ever.
+  const [activePaddleId, setActivePaddleId] = useState<string | null>(null);
+  const myPaddle =
+    view.myPaddles.find((entry) => entry.paddleId === activePaddleId) ?? view.myPaddle;
+
   const claim = async () => {
     if (await send("ClaimPaddle", { teamId: claimTeam }, "Paddle claimed")) {
       router.refresh();
     }
   };
 
+  // DA-02: a paddle binds its holder to one team for the night, and the command
+  // to hand it back has existed in the aggregate since M-IP4-3 with nobody able
+  // to reach it. Without this, a paddle issued to the wrong person stranded that
+  // team for the whole auction — Abort was the only way out.
+  const release = async () => {
+    const teamId = myPaddle?.teamId;
+    if (teamId === undefined) {
+      return;
+    }
+    if (await send("ReleasePaddle", { teamId }, "Paddle released")) {
+      router.refresh();
+    }
+  };
+
   const bid = async (amount: number) => {
-    if (view.myPaddle === null) {
+    if (myPaddle === null) {
       toast({ title: "Claim a paddle first.", tone: "danger" });
       return;
     }
@@ -89,7 +111,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     if (lotId === undefined) {
       return;
     }
-    await send("PlaceBid", { lotId, paddleId: view.myPaddle.paddleId, amountRaw: amount });
+    await send("PlaceBid", { lotId, paddleId: myPaddle.paddleId, amountRaw: amount });
   };
 
   // PX-6 bidder notifications: outbid (I was leading, now someone else) and
@@ -97,10 +119,10 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
   const prevLeaderRef = useRef<string | null>(null);
   const wonSeqRef = useRef<number>(0);
   useEffect(() => {
-    if (snapshot === null || view.myPaddle === null) {
+    if (snapshot === null || myPaddle === null) {
       return;
     }
-    const mine = view.myPaddle.paddleNumber;
+    const mine = myPaddle.paddleNumber;
     const leader = snapshot.currentLot?.currentBid?.paddleNumber ?? null;
     if (prevLeaderRef.current === mine && leader !== null && leader !== mine) {
       const amount = snapshot.currentLot?.currentBid?.amount;
@@ -123,11 +145,22 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
         tone: "success",
       });
     }
-  }, [snapshot, view.myPaddle, toast]);
+  }, [snapshot, myPaddle, toast]);
 
   const lot = snapshot?.currentLot ?? null;
-  const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const grantedTeams = view.teams.filter((team) => view.myGrantTeamIds.includes(team.id));
+  const myTeam = view.teams.find((team) => team.id === myPaddle?.teamId);
+  // The ring measures against the window the lot is actually running: an
+  // extended lot restarts on the anti-snipe clock, not the opening one.
+  const lotDurationMs =
+    ((lot?.extensions ?? 0) > 0 ? view.rules.extensionSeconds : view.rules.initialSeconds) * 1000;
+  const leadColor =
+    view.teams.find((team) => team.name === lot?.currentBid?.teamName)?.primaryColor ?? null;
+  const mySquadSigned = feed.resolved.filter(
+    (resolvedLot) =>
+      resolvedLot.status === "sold" &&
+      (resolvedLot.teamId === myPaddle?.teamId || resolvedLot.teamName === myPaddle?.teamName),
+  ).length;
 
   return (
     <div
@@ -137,39 +170,39 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     >
       <StatusRibbon snapshot={snapshot} connection={connection} remainingMs={remainingMs} />
 
-      <Card>
-        <div className="competition-head">
-          <h2>{snapshot?.auctionName ?? "Connecting…"}</h2>
-          <span className="date-row">
-            <Badge
-              tone={connection === "open" ? "success" : "warning"}
-              data-testid="connection-state"
-            >
-              {connection}
-            </Badge>
-            {snapshot !== null ? (
-              <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
-                {snapshot.auctionStatus}
-              </Badge>
-            ) : null}
-            <span className="competitions-hint" data-testid="snapshot-version">
-              v{version}
-            </span>
-            <ConnectionQuality connection={connection} drift={drift} />
-          </span>
-        </div>
-        {readOnly && snapshot !== null ? (
-          <p role="alert" className="live-readonly" data-testid="readonly-banner">
-            Reconnecting — you&apos;re seeing the last known state; bidding is disabled until
-            we&apos;re live again.
-          </p>
-        ) : null}
+      {/* The ribbon above already carries status, connection and version. This
+          strip adds only what it does not: progress, clock drift, and the
+          read-only warning. It used to repeat all three in a second card. */}
+      <div className="live-substatus">
         {snapshot !== null ? (
           <AuctionProgress snapshot={snapshot} />
         ) : (
           <p className="competitions-hint">Waiting for the first snapshot…</p>
         )}
-      </Card>
+        <span className="live-substatus-meta">
+          <ConnectionQuality connection={connection} drift={drift} />
+          <span className="competitions-hint" data-testid="snapshot-version">
+            v{version}
+          </span>
+          {snapshot !== null ? (
+            <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
+              {snapshot.auctionStatus}
+            </Badge>
+          ) : null}
+          <Badge
+            tone={connection === "open" ? "success" : "warning"}
+            data-testid="connection-state"
+          >
+            {connection}
+          </Badge>
+        </span>
+      </div>
+      {readOnly && snapshot !== null ? (
+        <p role="alert" className="live-readonly" data-testid="readonly-banner">
+          Reconnecting — you&apos;re seeing the last known state; bidding is disabled until
+          we&apos;re live again.
+        </p>
+      ) : null}
 
       {snapshot !== null && snapshot.auctionStatus === "completed" ? (
         <AuctionSummaryCard
@@ -177,109 +210,139 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           feed={feed}
           slug={slug}
           canConduct={view.viewer.canConduct}
-          viewerTeamName={view.myPaddle?.teamName ?? null}
+          viewerTeamName={myPaddle?.teamName ?? null}
         />
       ) : null}
 
-      {lot !== null ? (
-        <Card data-testid="current-lot">
-          <div className="competition-head">
-            <h2>
-              {lot.lotNumber} · {lot.playerName ?? "Unnamed"}
-            </h2>
-            <span className="date-row">
-              <Badge
-                tone={lot.status === "closing_soon" ? "warning" : "success"}
-                data-testid="lot-status"
-              >
-                {lot.status.replace(/_/g, " ")}
-              </Badge>
-              <strong
-                data-testid="countdown"
-                className={seconds !== null && seconds <= 15 ? "countdown-hot" : ""}
-              >
-                {seconds !== null ? `${String(seconds)}s` : "—"}
-              </strong>
-            </span>
-          </div>
-          <p className="competitions-hint">
-            {lot.role.replace(/_/g, " ")} · base {formatPaiseINR(paise(lot.basePrice))} ·{" "}
-            {lot.extensions} extension(s)
-          </p>
-          <p data-testid="leading-bid" className="registration-name">
-            {lot.currentBid !== null
-              ? `Leading: ${formatPaiseINR(paise(lot.currentBid.amount))} — ${lot.currentBid.teamName} (${lot.currentBid.paddleNumber})`
-              : "No bids yet"}
-          </p>
-          <BidLadder lot={lot} slabs={view.rules.slabs} />
-          {view.myPaddle !== null ? (
-            <div className="date-row">
-              <Button
-                onClick={() => void bid(lot.nextMinimumBid)}
-                loading={busy}
-                disabled={readOnly}
-                data-testid="bid-next"
-              >
-                Bid {formatPaiseINR(paise(lot.nextMinimumBid))}
-              </Button>
-              <Field
-                label="Custom amount (paise)"
-                name="customBid"
-                value={customBid}
-                onChange={(event) => {
-                  setCustomBid(event.target.value);
-                }}
-                placeholder={String(lot.nextMinimumBid)}
+      {/* Two columns, as the Owner Room comp has it: the lot and the paddle on
+          the left where the eye lives, the board on the right. */}
+      <div className="live-grid">
+        <div className="live-col">
+          {lot !== null ? (
+            <>
+              <LotHero
+                lot={lot}
+                remainingMs={remainingMs}
+                lotDurationMs={lotDurationMs}
+                leadColor={leadColor}
               />
-              <Button
-                variant="secondary"
-                onClick={() => void bid(Number.parseInt(customBid, 10))}
-                loading={busy}
-                disabled={customBid === "" || readOnly}
-                data-testid="bid-custom"
-              >
-                Bid custom
-              </Button>
+              {myPaddle !== null ? (
+                <PaddleControl
+                  lot={lot}
+                  rules={view.rules}
+                  snapshot={snapshot}
+                  myPaddleNumber={myPaddle.paddleNumber}
+                  myTeam={myTeam}
+                  squadSigned={mySquadSigned}
+                  disabled={readOnly || busy}
+                  onBid={(amount) => {
+                    void bid(amount);
+                  }}
+                />
+              ) : null}
+            </>
+          ) : (
+            /* Between lots the owner sees exactly what the room sees. */
+            <CeremonyStage snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
+          )}
+
+          <Card data-testid="bid-feed">
+            <div className="competition-head">
+              <h2>Bid feed</h2>
+              {connection === "open" ? <span className="live-pulse" aria-hidden /> : null}
             </div>
+            {lot === null || lot.bidHistory.length === 0 ? (
+              <p className="competitions-hint" data-testid="bid-feed-empty">
+                {lot === null
+                  ? "Bids appear here once a lot opens."
+                  : "Bids will appear here the moment they land."}
+              </p>
+            ) : (
+              <ol className="timeline" data-testid="bid-history">
+                {[...lot.bidHistory].reverse().map((entry) => (
+                  <li key={entry.bidId}>
+                    <Badge tone="neutral">{entry.paddleNumber}</Badge>
+                    <span>{entry.teamName}</span>
+                    <span className="timeline-at">{formatPaiseINR(paise(entry.amount))}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
+
+          <AuctionTimeline feed={feed} />
+        </div>
+
+        <div className="live-col">
+          {/* The owner workspace exists from the moment the paddle is claimed —
+              lot or no lot. Bidding (PaddleControl, left) comes and goes with
+              the lot; "what have I got and what can I spend" does not. */}
+          {myPaddle !== null ? (
+            <MyTeamCard
+              snapshot={snapshot}
+              myTeamId={myPaddle.teamId}
+              myTeamName={myPaddle.teamName}
+              myPaddleNumber={myPaddle.paddleNumber}
+              rules={view.rules}
+              feed={feed}
+            />
           ) : null}
-          <ol className="timeline" data-testid="bid-history">
-            {[...lot.bidHistory].reverse().map((entry) => (
-              <li key={entry.bidId}>
-                <Badge tone="neutral">{entry.paddleNumber}</Badge>
-                <span>{entry.teamName}</span>
-                <span className="timeline-at">{formatPaiseINR(paise(entry.amount))}</span>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      ) : (
-        <Card>
-          <CeremonyStage snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
-          <p className="competitions-hint" data-testid="no-lot">
-            No lot on the block.
-          </p>
-        </Card>
-      )}
+          <PurseBoard
+            snapshot={snapshot}
+            teams={view.teams}
+            myPaddleNumber={myPaddle?.paddleNumber ?? null}
+          />
+          <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={view.preSigned} />
+        </div>
+      </div>
 
-      {view.myPaddle !== null ? (
-        <MyTeamCard
-          snapshot={snapshot}
-          myTeamId={view.myPaddle.teamId}
-          myTeamName={view.myPaddle.teamName}
-          myPaddleNumber={view.myPaddle.paddleNumber}
-          rules={view.rules}
-          feed={feed}
-        />
-      ) : null}
+      <SquadBoard
+        teams={view.teams}
+        preSigned={view.preSigned}
+        resolved={feed.resolved}
+        snapshot={snapshot}
+        squadMax={view.rules.squadMax}
+      />
 
-      <AuctionTimeline feed={feed} />
-
+      {/* The claim door. Once a paddle is held, PaddleControl above owns the
+          "Your paddle" heading and states the same fact in its header, so this
+          card would be a second panel of the same name saying the same thing. */}
       <Card data-testid="paddle-panel">
-        <h2>Your paddle</h2>
-        {view.myPaddle !== null ? (
-          <p data-testid="my-paddle" className="registration-name">
-            {view.myPaddle.paddleNumber} · bidding for {view.myPaddle.teamName}
-          </p>
+        <h2>{myPaddle !== null ? "Paddle status" : "Claim your paddle"}</h2>
+        {myPaddle !== null ? (
+          <div className="date-row">
+            <p data-testid="my-paddle" className="registration-name">
+              {myPaddle.paddleNumber} · bidding for {myPaddle.teamName}
+            </p>
+            {/* Holding several paddles is legitimate — one laptop, one
+                auctioneer, a small club. What was missing is the way to say
+                which one is bidding right now. */}
+            {view.myPaddles.length > 1 ? (
+              <Select
+                label="Bidding as"
+                name="activePaddle"
+                value={myPaddle.paddleId}
+                onChange={(event) => {
+                  setActivePaddleId(event.target.value);
+                }}
+                data-testid="paddle-switcher"
+              >
+                {view.myPaddles.map((entry) => (
+                  <option key={entry.paddleId} value={entry.paddleId}>
+                    {entry.paddleNumber} · {entry.teamName}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            <Button
+              variant="ghost"
+              onClick={() => void release()}
+              loading={busy}
+              data-testid="release-paddle"
+            >
+              Hand back paddle
+            </Button>
+          </div>
         ) : grantedTeams.length > 0 ? (
           <div className="date-row">
             <Select
