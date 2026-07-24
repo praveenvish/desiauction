@@ -37,6 +37,9 @@ export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  // The club's own words for the Org Detail "About" banner — nullable, edited
+  // in place by an owner. Never fabricated; empty until someone writes it.
+  description: text("description"),
   createdBy: char("created_by", { length: 26 }).notNull(),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
@@ -295,6 +298,12 @@ export const registrations = pgTable(
     index("registrations_person_idx").on(table.personId),
     index("registrations_number_idx").on(table.registrationNumber),
     index("registrations_team_idx").on(table.teamId),
+    // DA-04: exactly one captain per team. Partial, so the flag stays free for
+    // players not yet on a squad and the invariant cannot be forgotten by the
+    // next caller the way it was by the last one.
+    uniqueIndex("registrations_team_captain_uq")
+      .on(table.teamId)
+      .where(sql`${table.isCaptain} and ${table.teamId} is not null`),
   ],
 );
 

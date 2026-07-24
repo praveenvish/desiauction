@@ -21,16 +21,21 @@ import {
   type Db,
   type DbHandle,
 } from "@desiauction/db";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { canCompetition } from "./authz";
-import { createCompetition } from "./competitions";
+import { createCompetition, createTeam } from "./competitions";
 import { createOrg } from "../orgs/orgs";
-import { addNote, transition, transitionBatch } from "./registration-aggregate";
+import {
+  addNote,
+  setRegistrationMarks,
+  transition,
+  transitionBatch,
+} from "./registration-aggregate";
 import { commitRegistrationImport } from "./registration-import";
 import {
   duplicateNameKeys,
@@ -275,6 +280,44 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       pageSize: 25,
     });
     expect(page.rows.every((r) => r.duplicateName)).toBe(true);
+  });
+
+  it("DA-04: a team has exactly one captain — naming a new one moves the armband", async () => {
+    const team = await createTeam(db, org.id, compId, owner, `Captaincy XI ${RUN}`);
+    expect(team.ok).toBe(true);
+    if (!team.ok) return;
+    const first = await seed(compId, org.id, "First Captain", "cap1");
+    const second = await seed(compId, org.id, "Second Captain", "cap2");
+
+    await setRegistrationMarks(
+      db,
+      org.id,
+      compId,
+      first,
+      { isCaptain: true, teamId: team.team.id },
+      owner,
+    );
+    // The second naming must SUCCEED and demote the first, not collide: an
+    // organiser naming a captain means "this player instead", not "error".
+    await setRegistrationMarks(
+      db,
+      org.id,
+      compId,
+      second,
+      { isCaptain: true, teamId: team.team.id },
+      owner,
+    );
+
+    const captains = await db
+      .select({ id: registrationsTable.id })
+      .from(registrationsTable)
+      .where(
+        and(
+          eq(registrationsTable.teamId, team.team.id),
+          eq(registrationsTable.isCaptain, true),
+        ),
+      );
+    expect(captains.map((row) => row.id)).toEqual([second]);
   });
 
   it("statistics reconcile with the actual rows", async () => {

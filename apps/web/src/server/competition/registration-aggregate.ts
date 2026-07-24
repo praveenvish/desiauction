@@ -6,7 +6,7 @@ import {
   type RegistrationStatus,
 } from "@desiauction/core";
 import { auditLog, newId, registrations, type Db } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 
 // THE COMPETITION REGISTRATION AGGREGATE (M-IP3-2). This module is the ONLY place
 // registration state mutates. Routes/services call it; nothing else writes the
@@ -215,6 +215,33 @@ export async function setRegistrationMarks(
     return { ok: true };
   }
   await db.transaction(async (tx) => {
+    // DA-04: a team has exactly one captain. `registrations_team_captain_uq`
+    // makes two unrepresentable, so the armband has to CHANGE HANDS rather
+    // than collide — an organiser naming a new captain means "this player
+    // instead", not "error". The demote is scoped to the team the registration
+    // is landing on, which is the one in this update when the caller moves it
+    // and the stored one otherwise.
+    const [current] = await tx
+      .select({ teamId: registrations.teamId })
+      .from(registrations)
+      .where(
+        and(eq(registrations.id, registrationId), eq(registrations.competitionId, competitionId)),
+      )
+      .limit(1);
+    const landingTeamId = set.teamId !== undefined ? set.teamId : (current?.teamId ?? null);
+    if (set.isCaptain === true && landingTeamId !== null) {
+      await tx
+        .update(registrations)
+        .set({ isCaptain: false })
+        .where(
+          and(
+            eq(registrations.competitionId, competitionId),
+            eq(registrations.teamId, landingTeamId),
+            eq(registrations.isCaptain, true),
+            ne(registrations.id, registrationId),
+          ),
+        );
+    }
     await tx
       .update(registrations)
       .set(set)
