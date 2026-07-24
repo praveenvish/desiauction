@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast, Dialog, Field } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -100,6 +100,34 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     if (await send("ReleasePaddle", { teamId }, "Paddle released")) {
       router.refresh();
     }
+  };
+
+  // DA-06/DA-16: the live room conducts too, so closing the night here follows
+  // the same rule as the cockpit — confirm, and if squads are short, take a
+  // reason that lands in the ledger. Not window.confirm: native dialogs ignore
+  // the theme and are auto-dismissed by automation, which made the path
+  // untestable.
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [shortSquads, setShortSquads] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
+
+  const confirmComplete = async () => {
+    const payload = shortSquads
+      ? { overrideSquadMinimum: true, reason: overrideReason.trim() }
+      : {};
+    const ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
+    if (ack.accepted) {
+      setCompleteOpen(false);
+      setShortSquads(false);
+      toast({ title: "Auction completed", tone: "success" });
+      router.refresh();
+      return;
+    }
+    if (ack.reason === "squad_below_minimum") {
+      setShortSquads(true);
+      return;
+    }
+    toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
   };
 
   const bid = async (amount: number) => {
@@ -447,7 +475,9 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             ) : null}
             <Button
               variant="ghost"
-              onClick={() => void send("CompleteAuction", {}, "Auction completed")}
+              onClick={() => {
+                setCompleteOpen(true);
+              }}
               loading={busy}
               data-testid="conduct-complete"
             >
@@ -464,6 +494,58 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           </div>
         </Card>
       ) : null}
+      <Dialog
+        open={completeOpen}
+        onClose={() => {
+          setCompleteOpen(false);
+          setShortSquads(false);
+        }}
+        title={shortSquads ? "Close the auction short?" : "Complete the auction?"}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCompleteOpen(false);
+                setShortSquads(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void confirmComplete()}
+              loading={busy}
+              disabled={shortSquads && overrideReason.trim() === ""}
+              data-testid="confirm-complete"
+            >
+              {shortSquads ? "Close short — on the record" : "Complete auction"}
+            </Button>
+          </>
+        }
+      >
+        {shortSquads ? (
+          <>
+            <p data-testid="complete-short-warning">
+              Some teams are below the minimum squad size of {view.rules.squadMin}. Closing anyway
+              is recorded against your name and stays on the ledger for ever.
+            </p>
+            <Field
+              label="Why are you closing short?"
+              name="overrideReason"
+              value={overrideReason}
+              onChange={(event) => {
+                setOverrideReason(event.target.value);
+              }}
+              data-testid="override-reason"
+            />
+          </>
+        ) : (
+          <p data-testid="complete-summary">
+            {snapshot?.lotsResolved ?? 0} of {snapshot?.lotsTotal ?? 0} lots resolved. This cannot
+            be undone.
+          </p>
+        )}
+      </Dialog>
     </div>
   );
 }

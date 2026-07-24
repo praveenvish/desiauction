@@ -341,6 +341,19 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
     await expect(organizer.getByTestId(`queue-${lot}`)).toHaveCount(0, { timeout: 20_000 });
   }
   await organizer.getByTestId("cockpit-complete").click();
+  // DA-16: completing is irreversible, so it confirms. These fixtures run
+  // deliberately small squads, which DA-06 refuses without a reason on the
+  // record — the dialog asks for one and the run continues.
+  await organizer.getByTestId("confirm-complete").click();
+  if (
+    await organizer
+      .getByTestId("override-reason")
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await organizer.getByTestId("override-reason").fill("test fixture: minimal squads");
+    await organizer.getByTestId("confirm-complete").click();
+  }
   await expect(organizer.getByTestId("ribbon-status")).toHaveText("completed", {
     timeout: 20_000,
   });

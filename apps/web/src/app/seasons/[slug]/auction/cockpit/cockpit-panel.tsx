@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast, Dialog, Field } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -61,37 +61,32 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
    * DA-16: completing an auction is irreversible and was one unguarded click.
    * DA-06 makes short squads refuse; the conductor may still close the night,
    * but only deliberately and only with a reason that lands in the ledger.
+   *
+   * Deliberately the repo's Dialog, not window.confirm/prompt: native dialogs
+   * are unstyleable, ignore the theme, and are auto-dismissed by automation —
+   * which silently made the completion path untestable and broke the ceremony
+   * e2e journey.
    */
-  const completeAuction = async () => {
-    const resolved = snapshot?.lotsResolved ?? 0;
-    const total = snapshot?.lotsTotal ?? 0;
-    if (
-      !window.confirm(
-        `Complete the auction? ${String(resolved)} of ${String(total)} lots resolved. This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
-    setBusy(true);
-    const ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", {});
-    setBusy(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [shortSquads, setShortSquads] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
+
+  const confirmComplete = async () => {
+    const payload = shortSquads
+      ? { overrideSquadMinimum: true, reason: overrideReason.trim() }
+      : {};
+    const ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
     if (ack.accepted) {
+      setCompleteOpen(false);
+      setShortSquads(false);
+      setOverrideReason("");
       toast({ title: "Auction completed", tone: "success" });
       router.refresh();
       return;
     }
     if (ack.reason === "squad_below_minimum") {
-      const reason = window.prompt(
-        "Some teams are below the minimum squad size. Closing short is recorded against your name — why?",
-      );
-      if (reason === null || reason.trim() === "") {
-        return;
-      }
-      await send(
-        "CompleteAuction",
-        { overrideSquadMinimum: true, reason: reason.trim() },
-        "Auction completed",
-      );
+      // Second act, same dialog: name the problem and ask for a reason.
+      setShortSquads(true);
       return;
     }
     toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
@@ -296,7 +291,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => void completeAuction()}
+                onClick={() => {
+                  setCompleteOpen(true);
+                }}
                 loading={busy}
                 data-testid="cockpit-complete"
               >
@@ -542,6 +539,59 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         snapshot={snapshot}
         squadMax={view.rules.squadMax}
       />
+
+      <Dialog
+        open={completeOpen}
+        onClose={() => {
+          setCompleteOpen(false);
+          setShortSquads(false);
+        }}
+        title={shortSquads ? "Close the auction short?" : "Complete the auction?"}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCompleteOpen(false);
+                setShortSquads(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void confirmComplete()}
+              loading={busy}
+              disabled={shortSquads && overrideReason.trim() === ""}
+              data-testid="confirm-complete"
+            >
+              {shortSquads ? "Close short — on the record" : "Complete auction"}
+            </Button>
+          </>
+        }
+      >
+        {shortSquads ? (
+          <>
+            <p data-testid="complete-short-warning">
+              Some teams are below the minimum squad size of {view.rules.squadMin}. Closing anyway
+              is recorded against your name and stays on the ledger for ever.
+            </p>
+            <Field
+              label="Why are you closing short?"
+              name="overrideReason"
+              value={overrideReason}
+              onChange={(event) => {
+                setOverrideReason(event.target.value);
+              }}
+              data-testid="override-reason"
+            />
+          </>
+        ) : (
+          <p data-testid="complete-summary">
+            {snapshot?.lotsResolved ?? 0} of {snapshot?.lotsTotal ?? 0} lots resolved. This cannot
+            be undone.
+          </p>
+        )}
+      </Dialog>
     </div>
   );
 }
