@@ -201,6 +201,10 @@ export interface LedgerView {
   competition: { name: string; slug: string };
   auctionName: string;
   rows: readonly AuctionLedgerRow[];
+  /** Every row the fold produced; `rows` is the current page (DA-30). */
+  totalRows: number;
+  page: number;
+  totalPages: number;
   generationMs: number;
 }
 
@@ -209,17 +213,29 @@ export interface LedgerView {
  * immutable event log on every read (a projection can never diverge from
  * history). Conduct-gated: the ledger is the audit/dispute surface.
  */
-export async function ledgerView(slug: string): Promise<LedgerView | null> {
+/** DA-30: 214 rows served 900 KB of HTML, and it grows with the auction. */
+export const LEDGER_PAGE_SIZE = 100;
+
+export async function ledgerView(slug: string, page = 1): Promise<LedgerView | null> {
   const gate = await liveGate(slug);
   if (gate === null || !gate.canConduct) {
     return null;
   }
   const start = performance.now();
-  const rows = await inGateOrg(gate, (db) => ledgerOf(db, gate.auction));
+  const all = await inGateOrg(gate, (db) => ledgerOf(db, gate.auction));
+  // The fold stays whole — the ledger's guarantee is that it regenerates from
+  // the event log — and only the RENDER is bounded. A 500-lot auction would
+  // otherwise ship several megabytes to a browser that shows thirty rows.
+  const totalPages = Math.max(1, Math.ceil(all.length / LEDGER_PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), totalPages);
+  const offset = (current - 1) * LEDGER_PAGE_SIZE;
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionName: gate.auction.name,
-    rows,
+    rows: all.slice(offset, offset + LEDGER_PAGE_SIZE),
+    totalRows: all.length,
+    page: current,
+    totalPages,
     generationMs: performance.now() - start,
   };
 }

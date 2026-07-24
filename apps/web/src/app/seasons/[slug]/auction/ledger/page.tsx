@@ -27,9 +27,16 @@ function resultClass(result: string): string {
   return "";
 }
 
-export default async function LedgerPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function LedgerPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ page?: string }>;
+}) {
   const { slug } = await params;
-  const view = await ledgerView(slug);
+  const { page } = await searchParams;
+  const view = await ledgerView(slug, Number(page ?? "1") || 1);
   if (view === null) {
     notFound();
   }
@@ -43,7 +50,7 @@ export default async function LedgerPage({ params }: { params: Promise<{ slug: s
             </ButtonLink>
           </div>
           <p className="competitions-hint" data-testid="ledger-meta">
-            {view.auctionName} · {view.rows.length} rows · regenerated from the event log in{" "}
+            {view.auctionName} · {view.totalRows} rows · regenerated from the event log in{" "}
             {view.generationMs.toFixed(1)} ms · immutable, append-only
           </p>
         </header>
@@ -83,6 +90,37 @@ export default async function LedgerPage({ params }: { params: Promise<{ slug: s
             </tbody>
           </table>
         </div>
+        {/* DA-30: the whole fold used to render at once — 900 KB of HTML for a
+            44-lot auction, and it grows with the auction. The ledger's
+            guarantee is that it regenerates from the log; only the render is
+            bounded. */}
+        {view.totalPages > 1 ? (
+          <nav className="pager" aria-label="Ledger pages">
+            {view.page > 1 ? (
+              <ButtonLink
+                href={`/seasons/${slug}/auction/ledger?page=${String(view.page - 1)}`}
+                variant="ghost"
+              >
+                Previous
+              </ButtonLink>
+            ) : (
+              <span />
+            )}
+            <span data-testid="ledger-page-indicator">
+              Page {view.page} of {view.totalPages}
+            </span>
+            {view.page < view.totalPages ? (
+              <ButtonLink
+                href={`/seasons/${slug}/auction/ledger?page=${String(view.page + 1)}`}
+                variant="ghost"
+              >
+                Next
+              </ButtonLink>
+            ) : (
+              <span />
+            )}
+          </nav>
+        ) : null}
       </div>
     </main>
   );
