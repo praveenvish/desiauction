@@ -104,15 +104,40 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
     const result = parseRegistrationCsv(csv);
     expect(result.errors).toEqual([]);
     expect(result.rows).toEqual([
-      { line: 2, name: "Rohit Sharma", phone: "+919876543210", role: "batter", basePriceBand: "A" },
+      {
+        line: 2,
+        name: "Rohit Sharma",
+        phone: "+919876543210",
+        role: "batter",
+        basePriceBand: "A",
+        // DA-28: optional profile columns, absent from this file.
+        dateOfBirth: null,
+        battingStyle: null,
+        bowlingStyle: null,
+      },
       {
         line: 3,
         name: "Jasprit Bumrah",
         phone: "+919876543211",
         role: "bowler",
         basePriceBand: null,
+        dateOfBirth: null,
+        battingStyle: null,
+        bowlingStyle: null,
       },
     ]);
+  });
+
+  it("DA-28: optional profile columns ride along when the file supplies them", () => {
+    const csv =
+      "name,phone,role,base_price_band,date_of_birth,batting_style,bowling_style\n" +
+      "Rohit Sharma,9876543210,batter,A,1995-08-15,right_hand_opener,off_break";
+    const [row] = parseRegistrationCsv(csv).rows;
+    expect(row).toMatchObject({
+      dateOfBirth: "1995-08-15",
+      battingStyle: "right_hand_opener",
+      bowlingStyle: "off_break",
+    });
   });
 
   it("DA-14: an unknown base price band is a line error, not a silent default", () => {

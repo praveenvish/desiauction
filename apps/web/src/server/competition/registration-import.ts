@@ -1,4 +1,9 @@
-import { registrationNumber, type CsvRegistrationRow } from "@desiauction/core";
+import {
+  isBattingStyle,
+  isBowlingStyle,
+  registrationNumber,
+  type CsvRegistrationRow,
+} from "@desiauction/core";
 import { auditLog, newId, people, registrations, type Db } from "@desiauction/db";
 import { inArray } from "drizzle-orm";
 
@@ -61,6 +66,11 @@ export async function commitRegistrationImport(
           status: "submitted",
           registrationNumber: registrationNumber(id),
           ...(row.basePriceBand !== null ? { basePriceBand: row.basePriceBand } : {}),
+          // DA-28: whatever the file supplied, so an imported player is not
+          // permanently thinner than one who self-registered.
+          ...(row.dateOfBirth !== null ? { dateOfBirth: row.dateOfBirth } : {}),
+          ...(isBattingStyle(row.battingStyle ?? "") ? { battingStyle: row.battingStyle } : {}),
+          ...(isBowlingStyle(row.bowlingStyle ?? "") ? { bowlingStyle: row.bowlingStyle } : {}),
         })
         // Already registered here → skip, don't corrupt the batch.
         .onConflictDoNothing({
@@ -69,6 +79,19 @@ export async function commitRegistrationImport(
         .returning({ id: registrations.id });
       if (inserted.length > 0) {
         imported++;
+        // DA-27: the batch row below is subject=competition, so a timeline
+        // keyed on the REGISTRATION found nothing and an imported player's
+        // history began at their first approval — as if they had appeared
+        // from nowhere. Self-registration has always written its own row.
+        await tx.insert(auditLog).values({
+          id: newId(),
+          actor: actorId,
+          action: "registration.imported",
+          scopeType: "org",
+          scopeId: orgId,
+          subject: id,
+          meta: { source: "csv_import" },
+        });
       } else {
         duplicates++;
       }

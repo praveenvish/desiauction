@@ -690,7 +690,10 @@ export function RegistrationDashboardPanel({
       >
         <div className="io-panel" data-testid="io-panel">
           <label className="io-file" htmlFor="csv-input">
-            <span>Paste or choose a CSV — columns: name, phone, role, base_price_band</span>
+            <span>
+              Paste or choose a CSV — columns: name, phone, role, base_price_band · optional:
+              date_of_birth, batting_style, bowling_style
+            </span>
           </label>
           <textarea
             id="csv-input"

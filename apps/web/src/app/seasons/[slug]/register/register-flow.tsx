@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  isBattingStyle,
+  isBowlingStyle,
   BATTING_STYLES,
   BOWLING_STYLES,
   REGISTRATION_ROLES,
@@ -126,7 +128,18 @@ export function RegisterFlow({
   if (done) {
     return (
       <Card>
-        <p data-testid="registration-submitted">
+        {/* DA-31: the page kept its scroll position on submit, so the
+            confirmation landed above the fold and a player could not tell
+            whether anything had happened. Focus moves here, which scrolls it
+            into view and announces it to a screen reader in one act. */}
+        <p
+          data-testid="registration-submitted"
+          ref={(node) => {
+            node?.focus();
+          }}
+          tabIndex={-1}
+          role="status"
+        >
           You&apos;re in — status <Badge tone="info">submitted</Badge>. The organizer reviews every
           registration; your status updates on this page and on Home.
         </p>
@@ -272,6 +285,28 @@ export function RegisterFlow({
             <dd>{phone}</dd>
             <dt>Playing role</dt>
             <dd>{ROLE_LABEL[role] ?? role}</dd>
+            {/* DA-21: step 2 collects date of birth and both styles, and the
+                review showed none of them — you could not check what you were
+                about to submit. Omitted rows stay omitted rather than printing
+                "Not specified" three times for someone who skipped them. */}
+            {dob !== "" ? (
+              <>
+                <dt>Date of birth</dt>
+                <dd>{dob}</dd>
+              </>
+            ) : null}
+            {isBattingStyle(batting) ? (
+              <>
+                <dt>Batting style</dt>
+                <dd>{battingStyleLabel(batting)}</dd>
+              </>
+            ) : null}
+            {isBowlingStyle(bowling) ? (
+              <>
+                <dt>Bowling style</dt>
+                <dd>{bowlingStyleLabel(bowling)}</dd>
+              </>
+            ) : null}
           </dl>
           <div className="register-photo">
             <SelfPhotoUploader slug={slug} name={name} />

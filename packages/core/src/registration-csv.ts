@@ -15,6 +15,14 @@ export interface CsvRegistrationRow {
   phone: string; // normalized E.164
   role: RegistrationRole;
   basePriceBand: string | null;
+  /**
+   * DA-28: the optional profile a player supplies when they self-register.
+   * Without these an imported player stayed permanently thinner than one who
+   * signed up, with no organiser surface to fill the gap.
+   */
+  dateOfBirth: string | null;
+  battingStyle: string | null;
+  bowlingStyle: string | null;
 }
 
 export interface CsvRowError {
@@ -114,6 +122,11 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
     const rawRole = (fields[index["role"] ?? -1] ?? "").trim().toLowerCase();
     const band =
       index["base_price_band"] !== undefined ? (fields[index["base_price_band"]] ?? "").trim() : "";
+    const optional = (column: string): string =>
+      index[column] !== undefined ? (fields[index[column]] ?? "").trim() : "";
+    const dateOfBirth = optional("date_of_birth");
+    const battingStyle = optional("batting_style");
+    const bowlingStyle = optional("bowling_style");
 
     const rowErrors: string[] = [];
     if (rawName.length < 3) {
@@ -152,6 +165,9 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
       phone: phone.ok ? phone.phone : rawPhone,
       role: rawRole as RegistrationRole,
       basePriceBand: band === "" ? null : band,
+      dateOfBirth: dateOfBirth === "" ? null : dateOfBirth,
+      battingStyle: battingStyle === "" ? null : battingStyle,
+      bowlingStyle: bowlingStyle === "" ? null : bowlingStyle,
     });
   }
 
