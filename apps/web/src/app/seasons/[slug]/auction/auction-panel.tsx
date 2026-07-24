@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast, Field } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -54,10 +54,30 @@ const AUCTION_NEXT: Partial<Record<string, { command: string; label: string }[]>
   ],
 };
 
+/** Omit the field entirely when it is blank or nonsense, so the server default wins. */
+function numberOf<K extends string>(raw: string, key: K): Partial<Record<K, number>> {
+  const value = Number(raw);
+  return raw.trim() !== "" && Number.isFinite(value) && value > 0
+    ? ({ [key]: value } as Record<K, number>)
+    : {};
+}
+
 export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: AuctionDashboard }) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  // DA-05: pre-filled with the values every auction used to get unconditionally.
+  const [purse, setPurse] = useState("20000000");
+  const [squadMin, setSquadMin] = useState("8");
+  const [squadMax, setSquadMax] = useState("15");
+  const [timer, setTimer] = useState("30");
+  const [extension, setExtension] = useState("15");
+  const [baseDefault, setBaseDefault] = useState("10000");
+  const [bands, setBands] = useState<Record<string, string>>({
+    A: "50000",
+    B: "25000",
+    C: "10000",
+  });
   const [paddleTeam, setPaddleTeam] = useState("");
   const [report, setReport] = useState<ReplayVerifyReport | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -124,14 +144,114 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
           </li>
         </ul>
         {view === null && viewer.canConduct ? (
-          <Button
-            onClick={() => void act(() => createAuctionAction(slug), "Auction created")}
-            loading={busy}
-            disabled={!ready.ok}
-            data-testid="create-auction"
-          >
-            Create auction
-          </Button>
+          <div className="auction-setup" data-testid="auction-setup">
+            {/* DA-05: these are the numbers a league negotiates, and until now
+                every auction took ₹2 Cr purses, 8–15 squads and three fixed
+                bands because the config was a constant. Pre-filled with those
+                same defaults, so an organiser who does not care still clicks
+                one button. */}
+            <p className="competitions-hint">
+              Rules of the night — these lock when the auction is created.
+            </p>
+            <div className="date-row">
+              <Field
+                label="Purse per team (₹)"
+                name="pursePerTeam"
+                inputMode="numeric"
+                value={purse}
+                onChange={(event) => {
+                  setPurse(event.target.value);
+                }}
+              />
+              <Field
+                label="Squad minimum"
+                name="squadMin"
+                inputMode="numeric"
+                value={squadMin}
+                onChange={(event) => {
+                  setSquadMin(event.target.value);
+                }}
+              />
+              <Field
+                label="Squad maximum"
+                name="squadMax"
+                inputMode="numeric"
+                value={squadMax}
+                onChange={(event) => {
+                  setSquadMax(event.target.value);
+                }}
+              />
+            </div>
+            <div className="date-row">
+              <Field
+                label="Lot timer (seconds)"
+                name="timerSeconds"
+                inputMode="numeric"
+                value={timer}
+                onChange={(event) => {
+                  setTimer(event.target.value);
+                }}
+              />
+              <Field
+                label="Anti-snipe extension (seconds)"
+                name="extensionSeconds"
+                inputMode="numeric"
+                value={extension}
+                onChange={(event) => {
+                  setExtension(event.target.value);
+                }}
+              />
+              <Field
+                label="Default base price (₹)"
+                name="basePriceDefault"
+                inputMode="numeric"
+                value={baseDefault}
+                onChange={(event) => {
+                  setBaseDefault(event.target.value);
+                }}
+              />
+            </div>
+            <div className="date-row">
+              {(["A", "B", "C"] as const).map((label) => (
+                <Field
+                  key={label}
+                  label={`Band ${label} base price (₹)`}
+                  name={`band${label}`}
+                  inputMode="numeric"
+                  value={bands[label]}
+                  onChange={(event) => {
+                    setBands({ ...bands, [label]: event.target.value });
+                  }}
+                />
+              ))}
+            </div>
+            <Button
+              onClick={() =>
+                void act(
+                  () =>
+                    createAuctionAction(slug, {
+                      ...numberOf(purse, "pursePerTeamRupees"),
+                      ...numberOf(squadMin, "squadMin"),
+                      ...numberOf(squadMax, "squadMax"),
+                      ...numberOf(timer, "timerSeconds"),
+                      ...numberOf(extension, "extensionSeconds"),
+                      ...numberOf(baseDefault, "basePriceDefaultRupees"),
+                      bands: Object.fromEntries(
+                        Object.entries(bands)
+                          .map(([label, value]) => [label, Number(value)] as const)
+                          .filter(([, value]) => Number.isFinite(value) && value > 0),
+                      ),
+                    }),
+                  "Auction created",
+                )
+              }
+              loading={busy}
+              disabled={!ready.ok}
+              data-testid="create-auction"
+            >
+              Create auction
+            </Button>
+          </div>
         ) : null}
       </Card>
 

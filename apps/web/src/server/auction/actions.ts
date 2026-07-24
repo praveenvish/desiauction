@@ -1,6 +1,10 @@
 "use server";
 
 import {
+  validateAuctionConfig,
+  paise,
+  type AuctionConfig,
+  type Paise,
   AUCTION_MACHINE,
   BID_MACHINE,
   DEFAULT_AUCTION_CONFIG,
@@ -173,14 +177,78 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
 
 // --- Aggregate operations (thin, gated pass-throughs) ------------------------------
 
-export async function createAuctionAction(slug: string): Promise<{ ok: boolean; error?: string }> {
+/**
+ * The numbers a league negotiates (DA-05). `AuctionConfig` and
+ * `validateAuctionConfig` have been first-class since M-IP4-1; only the input
+ * was missing, so every auction ever created took ₹2 Cr purses, 8–15 squads
+ * and three fixed price bands. Every field is optional and falls back to the
+ * default, so an organiser who does not care still clicks one button.
+ */
+export interface AuctionSetup {
+  pursePerTeamRupees?: number;
+  squadMin?: number;
+  squadMax?: number;
+  timerSeconds?: number;
+  extensionSeconds?: number;
+  /** Band label → base price in RUPEES, e.g. { A: 50000, B: 25000 }. */
+  bands?: Record<string, number>;
+  basePriceDefaultRupees?: number;
+}
+
+function configFrom(setup: AuctionSetup | undefined): AuctionConfig {
+  if (setup === undefined) {
+    return DEFAULT_AUCTION_CONFIG;
+  }
+  const rupees = (value: number | undefined, fallback: Paise): Paise =>
+    value === undefined || !Number.isFinite(value) ? fallback : paise(Math.round(value * 100));
+  const bands =
+    setup.bands === undefined || Object.keys(setup.bands).length === 0
+      ? DEFAULT_AUCTION_CONFIG.basePriceBands
+      : Object.fromEntries(
+          Object.entries(setup.bands).map(([label, amount]) => [
+            label.trim().toUpperCase(),
+            paise(Math.round(amount * 100)),
+          ]),
+        );
+  return {
+    ...DEFAULT_AUCTION_CONFIG,
+    pursePerTeam: rupees(setup.pursePerTeamRupees, DEFAULT_AUCTION_CONFIG.pursePerTeam),
+    squadMin: setup.squadMin ?? DEFAULT_AUCTION_CONFIG.squadMin,
+    squadMax: setup.squadMax ?? DEFAULT_AUCTION_CONFIG.squadMax,
+    timer: {
+      initialSeconds: setup.timerSeconds ?? DEFAULT_AUCTION_CONFIG.timer.initialSeconds,
+      extensionSeconds: setup.extensionSeconds ?? DEFAULT_AUCTION_CONFIG.timer.extensionSeconds,
+    },
+    basePriceBands: bands,
+    basePriceDefault: rupees(setup.basePriceDefaultRupees, DEFAULT_AUCTION_CONFIG.basePriceDefault),
+  };
+}
+
+export async function createAuctionAction(
+  slug: string,
+  setup?: AuctionSetup,
+): Promise<{ ok: boolean; error?: string }> {
   const gate = await conductGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
+  const config = configFrom(setup);
+  // Surface the validator's own verdict rather than a generic refusal — it
+  // already names which rule failed.
+  const valid = validateAuctionConfig(config);
+  if (!valid.ok) {
+    const detail: Record<string, string> = {
+      "squad bounds": "Squad minimum must be at least 1 and no more than the maximum.",
+      "increment slabs": "The bid increment steps are invalid.",
+      "timer policy": "The lot timer and anti-snipe extension must both be positive.",
+      "unsold rounds": "Unsold players must be re-offered at least once.",
+      "base price vs purse": "The purse must cover at least one player at the default base price.",
+    };
+    return { ok: false, error: detail[valid.reason] ?? "The auction configuration is invalid." };
+  }
   const result = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
     const ready = await auctionReady(db, gate.competition);
-    return createAuction(db, gate.competition, ready, gate.personId, DEFAULT_AUCTION_CONFIG);
+    return createAuction(db, gate.competition, ready, gate.personId, config);
   });
   if (!result.ok) {
     const message = {

@@ -28,6 +28,7 @@ import {
   requeueAllowed,
   resumeLotTimer,
   validateAuctionConfig,
+  type AuctionConfig,
   type AuctionEventEnvelope,
   type BidInput,
   type IncrementSlab,
@@ -69,6 +70,41 @@ describe("auction lifecycle machine", () => {
       ok: true,
       next: "completed",
     });
+  });
+
+  it("DA-05: the certification's own test data is expressible", () => {
+    // ₹100,000 purse and a 12-player cap — the numbers the QA report asked for
+    // and could not enter, because createAuction always got the constant.
+    const config: AuctionConfig = {
+      ...DEFAULT_AUCTION_CONFIG,
+      pursePerTeam: paise(100_000 * 100),
+      squadMin: 8,
+      squadMax: 12,
+      basePriceBands: {
+        A: paise(30_000 * 100),
+        B: paise(15_000 * 100),
+        C: paise(5_000 * 100),
+      },
+      basePriceDefault: paise(1_000 * 100),
+    };
+    expect(validateAuctionConfig(config)).toEqual({ ok: true });
+    expect(basePriceFor(config, "B")).toBe(paise(15_000 * 100));
+    // An unknown band still falls back — the CSV layer is where a typo is
+    // caught (DA-14); the domain stays total.
+    expect(basePriceFor(config, "Z")).toBe(paise(1_000 * 100));
+  });
+
+  it("DA-05: a purse that cannot cover one player at base is refused", () => {
+    expect(
+      validateAuctionConfig({
+        ...DEFAULT_AUCTION_CONFIG,
+        pursePerTeam: paise(500 * 100),
+        basePriceDefault: paise(1_000 * 100),
+      }),
+    ).toEqual({ ok: false, reason: "base price vs purse" });
+    expect(validateAuctionConfig({ ...DEFAULT_AUCTION_CONFIG, squadMin: 15, squadMax: 8 })).toEqual(
+      { ok: false, reason: "squad bounds" },
+    );
   });
 
   it("abort (abandoned) is available from every non-terminal state and only those", () => {
