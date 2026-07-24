@@ -593,6 +593,23 @@ export async function transitionLot(
 
   await db.transaction(async (tx) => {
     await tx.update(lots).set(fields).where(eq(lots.id, lot.id));
+    // The road back into Competition (M-IP4-1 left this half unbuilt): the sale
+    // is the authority on where a POOL player ends up, so it stamps the
+    // registration the whole product reads — Teams, the roster export and the
+    // public page all key on registrations.team_id. Icons never have a lot, so
+    // their pre-signed assignment is structurally out of reach here.
+    if (command === "sell" && leading !== null) {
+      await tx
+        .update(registrations)
+        .set({ teamId: leading.teamId })
+        .where(eq(registrations.id, lot.registrationId));
+    }
+    if (command === "requeue" || command === "withdraw") {
+      await tx
+        .update(registrations)
+        .set({ teamId: null })
+        .where(eq(registrations.id, lot.registrationId));
+    }
     if (command === "requeue" && leading !== null) {
       // Frozen-lot override: prior leading money is voided-but-visible.
       const bidDecision = bidTransition("accepted", "invalidate");
@@ -1682,6 +1699,13 @@ export async function undoLastAction(
         timerExtensions: 0,
       })
       .where(eq(lots.id, target.lotId));
+    // Undoing a sale must also undo the squad placement, or the roster keeps a
+    // player the ledger says was never signed — the failure mode that looks
+    // correct and so never gets reported.
+    await tx
+      .update(registrations)
+      .set({ teamId: null })
+      .where(eq(registrations.id, lot.registrationId));
     await appendEvent(
       tx,
       auction,

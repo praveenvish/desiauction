@@ -52,6 +52,7 @@ import {
   recoverAuction,
   transitionAuction,
   transitionLot,
+  undoLastAction,
   type AuctionRecord,
 } from "@desiauction/auction";
 import { auctionOf, auctionView, bidsOf } from "@desiauction/auction";
@@ -135,6 +136,18 @@ async function freshAuction(): Promise<AuctionRecord> {
  * registration-number order, which derives from ULIDs — deterministic for a
  * given pool but not predictable across runs, so tests address lots by player.
  */
+/** The squad placement the WHOLE product reads (Teams, export, public page). */
+async function registrationTeamOf(auctionId: string, playerName: string) {
+  const [row] = await db
+    .select({ teamId: registrationsTable.teamId })
+    .from(lotsTable)
+    .innerJoin(registrationsTable, eq(registrationsTable.id, lotsTable.registrationId))
+    .innerJoin(people, eq(people.id, registrationsTable.personId))
+    .where(and(eq(lotsTable.auctionId, auctionId), eq(people.name, playerName)))
+    .limit(1);
+  return must(row, `registration for ${playerName}`).teamId;
+}
+
 async function lotByPlayer(auctionId: string, playerName: string) {
   const [row] = await db
     .select({ lot: lotsTable })
@@ -407,6 +420,10 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
     const after = await lotByPlayer(auction.id, "Kohli Local");
     expect(after.soldPrice).toBe(5_500_000);
     expect(after.soldToPaddleId).toBe(paddleIds[1]);
+    // DA-01: the sale reaches the competition read model, not just the lot.
+    // Without this the Teams tab, the roster export and the public page all
+    // report that nobody was bought.
+    expect(await registrationTeamOf(auction.id, "Kohli Local")).toBe(teamIds[1]);
     for (const command of ["open", "sell", "pass", "withdraw", "hold"] as const) {
       expect((await transitionLot(db, auction, lot1.id, owner, command)).ok).toBe(false);
     }
@@ -419,6 +436,30 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
         bidderAuthorized: true,
       }),
     ).toEqual({ ok: false, code: "LOT_NOT_OPEN" });
+  });
+
+  it("DA-01: undoing a sale withdraws the squad placement too, then re-selling restores it", async () => {
+    const lot1 = await lotByPlayer(auction.id, "Kohli Local");
+    expect(await registrationTeamOf(auction.id, "Kohli Local")).toBe(teamIds[1]);
+    const undone = await undoLastAction(db, auction, owner, "wrong paddle");
+    expect(undone).toMatchObject({ ok: true, lotId: lot1.id, kind: "sold" });
+    // A roster that keeps a player the ledger says was never signed is the
+    // failure mode that looks correct, so it never gets reported.
+    expect(await registrationTeamOf(auction.id, "Kohli Local")).toBeNull();
+    // Re-run the sale so the rest of the suite sees the state it expects.
+    expect(
+      await placeBid(db, auction, owner, {
+        lotId: lot1.id,
+        paddleId: paddleIds[1] as string,
+        amountRaw: 5_500_000,
+        bidderAuthorized: true,
+      }),
+    ).toMatchObject({ ok: true });
+    expect(await transitionLot(db, auction, lot1.id, owner, "sell")).toEqual({
+      ok: true,
+      status: "sold",
+    });
+    expect(await registrationTeamOf(auction.id, "Kohli Local")).toBe(teamIds[1]);
   });
 
   it("pass requires NO leading bid; unsold requeues per policy until exhausted", async () => {
@@ -535,7 +576,9 @@ describe("AUCTION FOUNDATION — events, audit, replay, recovery", () => {
       status: "sold",
       soldAmount: 5_500_000,
       soldPaddleId: paddleIds[1],
-      bidCount: 2,
+      // Two on the way up, plus the re-bid after the DA-01 undo test voided
+      // the first sale — invalidated bids stay in the log as evidence.
+      bidCount: 3,
     });
     // Determinism: replaying twice gives the identical projection.
     expect(replayAuction(events)).toEqual(replay);
