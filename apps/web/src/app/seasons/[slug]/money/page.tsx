@@ -27,8 +27,7 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
       <main className="registrations-dash">
         <div className="dash-stack money-stack">
           <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>{view.competition.name}</h1>
+            <div className="competition-title-row title-row-actions">
               <span className="date-row">
                 {view.case !== null ? (
                   <ButtonLink
@@ -39,9 +38,6 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
                     Case review
                   </ButtonLink>
                 ) : null}
-                <ButtonLink href={`/seasons/${slug}`} variant="secondary">
-                  Season
-                </ButtonLink>
               </span>
             </div>
             <p className="competitions-hint">

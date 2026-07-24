@@ -65,13 +65,11 @@ export default async function CalendarPage({
     <main className="registrations-dash">
       <div className="dash-stack">
         <header className="dash-head">
-          <div className="competition-title-row">
-            <h1>{view.competition.name}</h1>
+          <div className="competition-title-row title-row-actions">
             <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary">
               Fixtures
             </ButtonLink>
           </div>
-          <p className="competitions-hint">Calendar</p>
         </header>
 
         <Card>

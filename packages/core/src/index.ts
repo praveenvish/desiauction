@@ -23,6 +23,8 @@ export {
   isRejectionReason,
   isRegistrationRole,
   validateName,
+  monogramFor,
+  NAME_MAX_LENGTH,
   slugifyName,
   isValidSeasonYear,
   nextSeasonName,

@@ -28,7 +28,9 @@ export async function resolveMediaSubject(
   subjectId: string,
 ): Promise<ResolvedMediaSubject | null> {
   if (subject === "competition") {
-    return subjectId === competition.id ? { storageSubjectId: competition.id, ownerPersonId: null } : null;
+    return subjectId === competition.id
+      ? { storageSubjectId: competition.id, ownerPersonId: null }
+      : null;
   }
   if (subject === "team") {
     const [row] = await db

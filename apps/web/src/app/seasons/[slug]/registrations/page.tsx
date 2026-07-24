@@ -31,7 +31,6 @@ export default async function RegistrationsPage({
     return (
       <main className="registrations-dash">
         <div className="competitions-stack">
-          <h1>{dashboard.competition.name}</h1>
           <p role="alert" className="competitions-hint">
             You don&apos;t have permission to review registrations for this season.
           </p>
@@ -43,10 +42,6 @@ export default async function RegistrationsPage({
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <header className="dash-head">
-            <h1>{dashboard.competition.name}</h1>
-            <p className="competitions-hint">Registration operations</p>
-          </header>
           <ShareRegistration slug={slug} />
           <RegistrationDashboardPanel
             slug={slug}

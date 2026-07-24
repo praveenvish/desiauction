@@ -229,9 +229,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
         at: auditLog.at,
       })
       .from(auditLog)
-      .where(
-        inArray(auditLog.scopeId, [...competitionIds, ...view.orgs.map((org) => org.id)]),
-      )
+      .where(inArray(auditLog.scopeId, [...competitionIds, ...view.orgs.map((org) => org.id)]))
       .orderBy(desc(auditLog.at))
       .limit(6),
   ]);
@@ -242,7 +240,10 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
   const approvedBy = new Map<string, number>();
   let approvedRegistrations = 0;
   for (const row of registrationRows) {
-    registrationsBy.set(row.competitionId, (registrationsBy.get(row.competitionId) ?? 0) + row.count);
+    registrationsBy.set(
+      row.competitionId,
+      (registrationsBy.get(row.competitionId) ?? 0) + row.count,
+    );
     if (row.status === "approved") {
       approvedBy.set(row.competitionId, (approvedBy.get(row.competitionId) ?? 0) + row.count);
       approvedRegistrations += row.count;

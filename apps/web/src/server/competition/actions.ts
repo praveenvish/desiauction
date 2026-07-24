@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  NAME_MAX_LENGTH,
   DEFAULT_AUCTION_CONFIG,
   isRejectionReason,
   parseRegistrationCsv,
@@ -399,7 +400,7 @@ export async function createTeamAction(
       error:
         result.reason === "duplicate_name"
           ? "A team with that name already exists in this competition."
-          : "Give the team a name of at least 3 characters.",
+          : `Team names run from 3 to ${String(NAME_MAX_LENGTH)} characters.`,
     };
   }
   return { ok: true };

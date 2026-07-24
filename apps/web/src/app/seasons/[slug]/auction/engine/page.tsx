@@ -19,8 +19,7 @@ export default async function EnginePage({ params }: { params: Promise<{ slug: s
       <main className="registrations-dash">
         <div className="dash-stack">
           <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>Recovery dashboard</h1>
+            <div className="competition-title-row title-row-actions">
               <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
                 Cockpit
               </ButtonLink>

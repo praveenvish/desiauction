@@ -1,9 +1,18 @@
 "use client";
 
 import { FIXTURE_CSV_HEADER } from "@desiauction/core";
-import { Badge, Button, Card, Field, Select, useToast, VisuallyHidden } from "@desiauction/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  Field,
+  Select,
+  useToast,
+  VisuallyHidden,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createFixtureAction,
@@ -103,8 +112,22 @@ export function FixturesPanel({
   const [manAway, setManAway] = useState("");
   const [manGround, setManGround] = useState("");
   const [manKickoff, setManKickoff] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
+
+  // The schedule reads by round, the way a fixture list is actually published.
+  // Map preserves insertion order, so rounds appear in the server's sort order.
+  const rounds = useMemo(() => {
+    const groups = new Map<number | null, Snapshot[]>();
+    for (const row of page.rows) {
+      const list = groups.get(row.round) ?? [];
+      list.push(row);
+      groups.set(row.round, list);
+    }
+    return [...groups.entries()];
+  }, [page.rows]);
 
   const pushQuery = useCallback(
     (patch: Record<string, string>) => {
@@ -171,6 +194,7 @@ export function FixturesPanel({
         setManAway("");
         setManGround("");
         setManKickoff("");
+        setManualOpen(false);
       }
       return result;
     }, "Fixture created");
@@ -232,6 +256,7 @@ export function FixturesPanel({
         if (csvRef.current) {
           csvRef.current.value = "";
         }
+        setImportOpen(false);
       }
       return result;
     }, "Fixtures imported");
@@ -264,10 +289,24 @@ export function FixturesPanel({
 
       {canManage ? (
         <Card data-testid="generate-panel">
-          <h2>Generate fixtures</h2>
+          <div className="teams-head">
+            <div className="teams-head-title">
+              <h2>Generate fixtures</h2>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="open-add-fixture"
+              onClick={() => {
+                setManualOpen(true);
+              }}
+            >
+              + Add one fixture
+            </Button>
+          </div>
           <p className="competitions-hint">
-            Deterministic round robin over this season&apos;s teams — same inputs, same
-            schedule, every time. Generated fixtures land as drafts.
+            Deterministic round robin over this season&apos;s teams — same inputs, same schedule,
+            every time. Generated fixtures land as drafts.
           </p>
           <div className="date-row">
             <Select
@@ -367,9 +406,25 @@ export function FixturesPanel({
       ) : null}
 
       {canManage ? (
-        <Card data-testid="manual-panel">
-          <h2>Add a fixture</h2>
-          <div className="date-row">
+        <Dialog
+          open={manualOpen}
+          onClose={() => {
+            setManualOpen(false);
+          }}
+          title="Add a fixture"
+          size="wide"
+          footer={
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setManualOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+          }
+        >
+          <div className="fixtures-manual-form" data-testid="manual-panel">
             <Select
               label="Home team"
               name="homeTeam"
@@ -433,7 +488,7 @@ export function FixturesPanel({
               Add fixture
             </Button>
           </div>
-        </Card>
+        </Dialog>
       ) : null}
 
       <Card>
@@ -518,12 +573,37 @@ export function FixturesPanel({
       </Card>
 
       <Card>
+        <div className="teams-head">
+          <div className="teams-head-title">
+            <h2>Schedule</h2>
+          </div>
+          {canManage ? (
+            <div className="teams-head-tools">
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="export-csv"
+                onClick={() => void doExport()}
+              >
+                Export CSV
+              </Button>
+              <Button
+                size="sm"
+                data-testid="open-import"
+                onClick={() => {
+                  setImportOpen(true);
+                }}
+              >
+                + Import fixtures
+              </Button>
+            </div>
+          ) : null}
+        </div>
         <div className="table-scroll">
           <table className="reg-table" data-testid="fixtures-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>Round</th>
                 <th>Fixture</th>
                 <th>Kickoff</th>
                 <th>Ground</th>
@@ -536,31 +616,45 @@ export function FixturesPanel({
               </tr>
             </thead>
             <tbody>
-              {page.rows.map((fixture) => (
-                <FixtureRow
-                  key={fixture.id}
-                  fixture={fixture}
-                  canManage={canManage}
-                  busy={busy}
-                  moving={moving === fixture.id}
-                  grounds={grounds}
-                  moveKickoff={moveKickoff}
-                  moveGround={moveGround}
-                  onMoveKickoff={setMoveKickoff}
-                  onMoveGround={setMoveGround}
-                  onLifecycle={(action) => void lifecycle(fixture.id, action)}
-                  onOpenMove={() => {
-                    setMoving(moving === fixture.id ? null : fixture.id);
-                    setMoveKickoff(fixture.kickoffAt ?? "");
-                    setMoveGround(fixture.groundId ?? "");
-                  }}
-                  onConfirmMove={() => void move(fixture.id)}
-                  onDetails={() => void openDetails(fixture.id)}
-                />
+              {rounds.map(([round, rows]) => (
+                <Fragment key={String(round)}>
+                  <tr className="round-head">
+                    <td colSpan={canManage ? 6 : 5}>
+                      <span className="round-head-label">
+                        {round !== null ? `Round ${String(round)}` : "Unscheduled"}
+                      </span>
+                      {round !== null ? (
+                        <span className="round-head-week">Week {String(round)}</span>
+                      ) : null}
+                    </td>
+                  </tr>
+                  {rows.map((fixture) => (
+                    <FixtureRow
+                      key={fixture.id}
+                      fixture={fixture}
+                      canManage={canManage}
+                      busy={busy}
+                      moving={moving === fixture.id}
+                      grounds={grounds}
+                      moveKickoff={moveKickoff}
+                      moveGround={moveGround}
+                      onMoveKickoff={setMoveKickoff}
+                      onMoveGround={setMoveGround}
+                      onLifecycle={(action) => void lifecycle(fixture.id, action)}
+                      onOpenMove={() => {
+                        setMoving(moving === fixture.id ? null : fixture.id);
+                        setMoveKickoff(fixture.kickoffAt ?? "");
+                        setMoveGround(fixture.groundId ?? "");
+                      }}
+                      onConfirmMove={() => void move(fixture.id)}
+                      onDetails={() => void openDetails(fixture.id)}
+                    />
+                  ))}
+                </Fragment>
               ))}
               {page.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 7 : 6} className="dash-hint">
+                  <td colSpan={canManage ? 6 : 5} className="dash-hint">
                     No fixtures match these filters.
                   </td>
                 </tr>
@@ -618,53 +712,68 @@ export function FixturesPanel({
       ) : null}
 
       {canManage ? (
-        <Card data-testid="io-panel">
-          <h2>Import / export</h2>
-          <label className="io-file" htmlFor="fixture-csv-input">
-            <span>Import CSV — columns: {FIXTURE_CSV_HEADER}</span>
-          </label>
-          <textarea
-            id="fixture-csv-input"
-            ref={csvRef}
-            className="csv-input"
-            data-testid="import-textarea"
-            rows={4}
-            placeholder="Paste CSV rows here"
-            defaultValue=""
-          />
-          <div className="io-row">
-            <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
-              Preview
+        <Dialog
+          open={importOpen}
+          onClose={() => {
+            setImportOpen(false);
+          }}
+          title="Import fixtures"
+          size="wide"
+          footer={
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setImportOpen(false);
+              }}
+            >
+              Close
             </Button>
-            <Button variant="ghost" onClick={() => void doExport()} data-testid="export-csv">
-              Export CSV
-            </Button>
-          </div>
-          {preview !== null ? (
-            <div className="import-preview" data-testid="import-preview">
-              <p>
-                {preview.validCount} valid row(s) · {preview.errors.length} error(s)
-              </p>
-              {preview.errors.length > 0 ? (
-                <ul className="import-errors">
-                  {preview.errors.slice(0, 8).map((error, index) => (
-                    <li key={index}>
-                      Line {error.line}: {error.message}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <Button
-                onClick={() => void commitImport()}
-                loading={busy}
-                disabled={preview.errors.length > 0 || preview.validCount === 0}
-                data-testid="import-commit"
-              >
-                Import {preview.validCount} fixture(s)
+          }
+        >
+          <div className="io-panel" data-testid="io-panel">
+            <label className="io-file" htmlFor="fixture-csv-input">
+              <span>Paste a CSV — columns: {FIXTURE_CSV_HEADER}</span>
+            </label>
+            <textarea
+              id="fixture-csv-input"
+              ref={csvRef}
+              className="csv-input"
+              data-testid="import-textarea"
+              rows={5}
+              placeholder="Paste CSV rows here"
+              defaultValue=""
+            />
+            <div className="io-row">
+              <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
+                Preview
               </Button>
             </div>
-          ) : null}
-        </Card>
+            {preview !== null ? (
+              <div className="import-preview" data-testid="import-preview">
+                <p>
+                  {preview.validCount} valid row(s) · {preview.errors.length} error(s)
+                </p>
+                {preview.errors.length > 0 ? (
+                  <ul className="import-errors">
+                    {preview.errors.slice(0, 8).map((error, index) => (
+                      <li key={index}>
+                        Line {error.line}: {error.message}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <Button
+                  onClick={() => void commitImport()}
+                  loading={busy}
+                  disabled={preview.errors.length > 0 || preview.validCount === 0}
+                  data-testid="import-commit"
+                >
+                  Import {preview.validCount} fixture(s)
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </Dialog>
       ) : null}
     </>
   );
@@ -724,10 +833,25 @@ function FixtureRow({
     <>
       <tr data-testid={`fixture-${fixture.number}`}>
         <td className="reg-number">{fixture.number}</td>
-        <td>{fixture.round ?? "—"}</td>
         <td>
           <span className="registration-name">
-            {fixture.homeTeamName} vs {fixture.awayTeamName}
+            <span className="fx-team">
+              <span
+                className="fx-dot"
+                style={{ background: fixture.homeTeamColor ?? "var(--accent)" }}
+                aria-hidden
+              />
+              {fixture.homeTeamShort ?? fixture.homeTeamName}
+            </span>
+            <span className="fx-vs">vs</span>
+            <span className="fx-team">
+              <span
+                className="fx-dot"
+                style={{ background: fixture.awayTeamColor ?? "var(--accent)" }}
+                aria-hidden
+              />
+              {fixture.awayTeamShort ?? fixture.awayTeamName}
+            </span>
           </span>
         </td>
         <td>{fixture.kickoffAt !== null ? fixture.kickoffAt.replace("T", " ") : "—"}</td>

@@ -37,8 +37,7 @@ export default async function LedgerPage({ params }: { params: Promise<{ slug: s
     <main className="registrations-dash">
       <div className="dash-stack">
         <header className="dash-head">
-          <div className="competition-title-row">
-            <h1>Auction ledger</h1>
+          <div className="competition-title-row title-row-actions">
             <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
               Cockpit
             </ButtonLink>

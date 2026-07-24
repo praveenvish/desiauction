@@ -1,16 +1,15 @@
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
-import { competitionView, registrationDashboard } from "../../../../server/competition/actions";
+import { teamsWorkspaceView } from "../../../../server/competition/actions";
 import { TeamsPanel } from "./teams-panel";
 import "../../seasons.css";
 
 export const metadata = { title: "Teams · DesiAuction" };
 
-// PX-4 Team Workspace: teams + rosters over EXISTING reads. The roster is the
-// registration query with a team filter, addressed by URL (?team=…) — server
-// rendered, shareable, refresh-proof. Owner assignment remains the
-// auction-scoped invite flow (linked, never duplicated).
+// PX-4 Team Workspace: the franchise grid and, for a URL-selected team (?team=…),
+// the roster detail with buy prices. All derived from EXISTING reads (teams, the
+// resolved auction lots, the approved roster) — server rendered, shareable.
 export default async function TeamsPage({
   params,
   searchParams,
@@ -19,31 +18,16 @@ export default async function TeamsPage({
   searchParams: Promise<{ team?: string }>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  const view = await competitionView(slug);
+  const view = await teamsWorkspaceView(slug);
   if (view === null) {
     notFound();
   }
   const selectedTeam = view.teams.find((team) => team.id === sp.team) ?? null;
-  const rosterDashboard =
-    selectedTeam !== null ? await registrationDashboard(slug, { teamId: selectedTeam.id }) : null;
-  const roster =
-    rosterDashboard?.page.rows.filter((row) => row.teamId === selectedTeam?.id) ?? null;
   return (
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <header className="dash-head">
-            <h1>{view.competition.name}</h1>
-            <p className="competitions-hint">Teams &amp; rosters</p>
-          </header>
-          <TeamsPanel
-            slug={slug}
-            teams={view.teams}
-            canManage={view.viewer.canManage}
-            approvedCount={view.registrations.filter((row) => row.status === "approved").length}
-            selectedTeamId={selectedTeam?.id ?? null}
-            roster={roster}
-          />
+          <TeamsPanel view={view} slug={slug} selected={selectedTeam} />
         </div>
       </main>
     </ToastProvider>

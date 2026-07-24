@@ -1,5 +1,6 @@
 "use client";
 
+import { monogramFor } from "@desiauction/core";
 import {
   Badge,
   Button,
@@ -46,7 +47,8 @@ function compactINR(paise: number): string {
 }
 
 function monogram(team: { shortName: string | null; name: string }): string {
-  return (team.shortName ?? team.name).slice(0, 3).toUpperCase();
+  // DA-29: derived from the raw name, `<img src=x …>` became the chip "<IM".
+  return monogramFor(team.shortName ?? team.name);
 }
 
 /** Distinguishable on a projector, and legible under the board's dark theme. */

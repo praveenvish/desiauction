@@ -17,9 +17,9 @@ import {
 import { formatTime } from "../../../../lib/format-date";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 
-// The M-IP4-1 founder demonstration: AuctionReady, creation, the lot queue,
-// the three frozen state machines, the replay/recovery proof, and the timer
-// model — all server-computed, nothing animated, no bidding.
+// The auction desk: readiness gates, creation, lifecycle, paddles, the lot
+// queue and the replay proof. The operational dashboard above it is rendered by
+// AuctionOverviewPanel; the live bidding surfaces are /live and /cockpit.
 
 const AUCTION_TONE = {
   scheduled: "info",
@@ -65,7 +65,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
     setHydrated(true);
   }, []);
 
-  const { ready, view, machines, timerDemo, viewer } = dashboard;
+  const { ready, view, viewer } = dashboard;
 
   const act = async (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
     setBusy(true);
@@ -103,10 +103,9 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
       {dashboard.wsUrl !== null ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
 
       <Card data-testid="ready-panel">
-        <h2>AuctionReady</h2>
+        <h2>Ready to open</h2>
         <p className="competitions-hint">
-          The sole gateway into Auction — built from the ScheduleSnapshot and the
-          approved-registration projection, never mutable Season entities.
+          Every gate that has to be green before the auction can open.
         </p>
         <ul className="conflict-list">
           {ready.checks.map((check) => (
@@ -188,9 +187,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
 
           <Card data-testid="paddles-panel">
             <h2>Paddles</h2>
-            <p className="competitions-hint">
-              Immutable identity: one paddle per team, issued once, never reused, never mutated.
-            </p>
+            <p className="competitions-hint">One paddle per team — issued once, never reused.</p>
             {view.paddles.length === 0 ? (
               <p className="competitions-hint">No paddles issued yet.</p>
             ) : (
@@ -242,7 +239,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             <div className="competition-head">
               <h2>Lot queue</h2>
               <span className="competitions-hint">
-                {view.lots.length} lots · deterministic registration-number order
+                {view.lots.length} lots · registration-number order
               </span>
             </div>
             {viewer.canConduct ? (
@@ -304,7 +301,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             <div className="competition-head">
               <h2>Event log &amp; replay</h2>
               <span className="competitions-hint">
-                {view.eventCount} immutable events · single-writer seq order
+                {view.eventCount} immutable events · single-writer order
               </span>
             </div>
             {viewer.canConduct ? (
@@ -338,79 +335,6 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
           </Card>
         </>
       ) : null}
-
-      <Card data-testid="machines-panel">
-        <h2>The frozen state machines</h2>
-        <p className="competitions-hint">
-          Rendered from the machine descriptors in core — the single source of truth for code,
-          tests, docs and this page.
-        </p>
-        {(
-          [
-            ["Auction", machines.auction],
-            ["Lot", machines.lot],
-            ["Bid record", machines.bid],
-          ] as const
-        ).map(([name, edges]) => (
-          <div key={name} className="table-scroll">
-            <h3 className="dash-hint">{name}</h3>
-            <table
-              className="reg-table"
-              data-testid={`machine-${name.toLowerCase().replace(" ", "-")}`}
-            >
-              <thead>
-                <tr>
-                  <th>From</th>
-                  <th>Command</th>
-                  <th>To</th>
-                  <th>Guard</th>
-                </tr>
-              </thead>
-              <tbody>
-                {edges.map((edge) => (
-                  <tr key={`${edge.from}-${edge.command}`}>
-                    <td>{edge.from.replace(/_/g, " ")}</td>
-                    <td className="reg-number">{edge.command}</td>
-                    <td>{edge.to.replace(/_/g, " ")}</td>
-                    <td className="dash-hint">{edge.guard ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
-      </Card>
-
-      <Card data-testid="timer-panel">
-        <h2>Timer model</h2>
-        <p className="competitions-hint">
-          Deterministic, server-time only: endsAt := max(endsAt, now + {timerDemo.extensionSeconds}
-          s), capped at now + {timerDemo.initialSeconds}s — the timer never shrinks (invariant 14).
-          A worked example, computed by the same pure functions the engine uses:
-        </p>
-        <div className="table-scroll">
-          <table className="reg-table" data-testid="timer-table">
-            <thead>
-              <tr>
-                <th>Moment</th>
-                <th>At</th>
-                <th>Ends at</th>
-                <th>Extended?</th>
-              </tr>
-            </thead>
-            <tbody>
-              {timerDemo.steps.map((step, index) => (
-                <tr key={index}>
-                  <td>{step.label}</td>
-                  <td className="reg-number">{step.atSecond}s</td>
-                  <td className="reg-number">{step.endsAtSecond}s</td>
-                  <td>{step.extended ? "yes — anti-snipe" : "no"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   );
 }

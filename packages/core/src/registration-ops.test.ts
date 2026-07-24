@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  monogramFor,
+  validateName,
   nameKey,
   planRegistrationBatch,
   registrationNumber,
@@ -73,6 +75,24 @@ describe("registrationNumber + nameKey", () => {
     expect(nameKey("  Rohit   Sharma ")).toBe("rohit sharma");
     expect(nameKey("ROHIT SHARMA")).toBe(nameKey("rohit sharma"));
     expect(nameKey(null)).toBe("");
+  });
+});
+
+describe("validateName + monogramFor — bounded, and safe to render", () => {
+  it("DA-29: names are bounded at both ends", () => {
+    expect(validateName("ab")).toEqual({ ok: false, reason: "too_short" });
+    expect(validateName("Warriors")).toEqual({ ok: true, value: "Warriors" });
+    expect(validateName("W".repeat(61))).toEqual({ ok: false, reason: "too_long" });
+    // Trimmed before measuring, so whitespace cannot smuggle a name past either end.
+    expect(validateName("   Warriors   ")).toEqual({ ok: true, value: "Warriors" });
+  });
+
+  it("DA-29: the monogram comes from alphanumerics, never from markup", () => {
+    // Escaped and harmless, but "<IM" on every chip and board is still wrong.
+    expect(monogramFor('<img src=x onerror="x">Zed')).toBe("IMG");
+    expect(monogramFor("Warriors")).toBe("WAR");
+    // Three GRAPHEMES, not three code units — मुं is one cluster, matra intact.
+    expect(monogramFor("मुंबई")).toBe("मुंबई");
   });
 });
 

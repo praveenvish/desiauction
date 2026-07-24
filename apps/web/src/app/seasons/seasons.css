@@ -1,5 +1,16 @@
 .competitions,
-.competition-home,
+.competition-home {
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  /* Console surfaces open under the shell's identity bar, which already names
+     the page — the old top pad was room for a title that is no longer here. */
+  padding: var(--space-2) var(--space-6) var(--space-10);
+}
+
+/* /register is a PUBLIC surface with no identity bar above it, so it keeps the
+   full opening measure. */
 .register {
   min-height: 100vh;
   background: var(--surface);
@@ -8,8 +19,26 @@
   padding: var(--space-10) var(--space-6);
 }
 
+/* Working surfaces get the console's full width. A 720px column inside a
+   1400px content area left ~340px of dead canvas either side, which is what
+   made these pages read as unfinished next to the design comps. Forms are the
+   exception below — a name field has no business being 1240px wide. */
+/* `width: 100%` is load-bearing, not belt-and-braces. These stacks are nested
+   inside `.dash-stack`, itself a flex column, and auto side margins on a flex
+   child DISABLE the default stretch — so the stack shrank to its content's
+   intrinsic width and centred itself under a left-aligned page header. The
+   cockpit escaped it only because its two-column grid is intrinsically wide;
+   /live and /spectate, being stacks of ordinary cards, collapsed to ~580px. */
 .competitions-stack,
-.competition-stack,
+.competition-stack {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
 .register-panel {
   max-width: 720px;
   margin: 0 auto;
@@ -38,28 +67,117 @@
   margin: 0 0 var(--space-3);
 }
 
+/* The seasons index is a directory, not a form page: it gets the full console
+   width so the card grid can breathe. The 720px column above still governs the
+   single-competition and register surfaces that share this stylesheet. */
+.competitions .competitions-stack {
+  max-width: 1280px;
+  gap: var(--space-6);
+}
+
+.seasons-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .competitions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
 }
 
 .competition-link {
   text-decoration: none;
   color: inherit;
+  border-radius: var(--radius-lg);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.competition-link:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+
+.competition-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The gold hairline appears on hover only: at rest the grid is calm, and the
+   accent marks the one card the pointer is on. */
+.competition-link:hover .season-card {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.season-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  height: 100%;
+  padding: var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.season-card-top {
+  margin-bottom: var(--space-3);
 }
 
 .competition-link strong {
   display: block;
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  letter-spacing: -0.01em;
   color: var(--text-heading);
-  margin-bottom: var(--space-1);
 }
 
 .competition-org {
   display: block;
   color: var(--text-muted);
   font-size: var(--text-sm-size);
-  margin-bottom: var(--space-2);
+}
+
+.season-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.season-card-meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.season-card-meta dt {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.season-card-meta dd {
+  margin: 0;
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+  color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .competition-link,
+  .competition-link:hover {
+    transition: none;
+    transform: none;
+  }
 }
 
 .competitions-hint {
@@ -75,10 +193,21 @@
   max-width: 420px;
 }
 
+/* Baseline the row on its controls. The default `stretch` made a Button sitting
+   beside a labelled Field grow to the field's full height — label included — so
+   the cockpit's "Invite owner" rendered as a tall gold slab floating above its
+   Select. Bottom alignment lands the button on the input, where it belongs. */
 .date-row {
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+/* A control row directly under explanatory copy needs air; the paragraph's own
+   margin collapses against a flex container. */
+p + .date-row {
+  margin-top: var(--space-3);
 }
 
 .competition-head {
@@ -128,7 +257,7 @@
   height: var(--space-4);
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
 }
 
 .team-name,
@@ -190,25 +319,29 @@
   background: var(--surface);
   color: var(--text-primary);
   font-family: var(--font-text);
-  padding: var(--space-10) var(--space-6);
+  /* The generous top pad was breathing room above a page-level title. The title
+     is the shell's now, so the content starts where the chrome ends. */
+  padding: var(--space-2) var(--space-6) var(--space-10);
 }
 
 .dash-stack {
-  max-width: 960px;
+  max-width: 1240px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
-.dash-head h1 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--text-3xl-size);
-  line-height: var(--text-3xl-line);
-  color: var(--text-heading);
-  margin: 0;
+/* A flex item defaults to min-width:auto, so a card wrapping a wide table grew
+   to the table's min-content width and the PAGE scrolled sideways instead of
+   the table's own .table-scroll. Letting the items shrink puts the scrollbar
+   back where it belongs — inside the table. */
+.dash-stack > * {
+  min-width: 0;
 }
+
+/* No console page draws its own title any more — the shell's identity bar does.
+   What is left in a `dash-head` is the hint line and the page's actions. */
 
 .competition-title-row {
   display: flex;
@@ -216,6 +349,12 @@
   justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+/* The same row after the shell took the title: only actions are left, and they
+   keep the right edge they have always sat on. */
+.title-row-actions {
+  justify-content: flex-end;
 }
 
 .dash-hint {
@@ -236,7 +375,7 @@
   gap: var(--space-1);
   padding: var(--space-4);
   background: var(--surface-raised);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
 
@@ -269,6 +408,11 @@
 
 .table-scroll {
   overflow-x: auto;
+  /* Establishes the containing block for the table's absolutely-positioned
+     <VisuallyHidden> labels. Without it they resolve against the viewport, land
+     at their static x inside the 858px-wide table, and stretch the DOCUMENT to
+     that width — a sideways scroll on mobile caused by a 1px invisible span. */
+  position: relative;
 }
 
 .reg-table {
@@ -280,14 +424,24 @@
 .reg-table th,
 .reg-table td {
   text-align: left;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-4) var(--space-3);
   vertical-align: middle;
 }
 
-.reg-table th {
+/* Rows are separated by a hairline on the row, not on every cell — a per-cell
+   border double-draws at the seams and reads heavier than the design's. */
+.reg-table tbody tr {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* The header is a label strip, not a row: small, tracked-out and quiet. */
+.reg-table thead th {
+  padding: 0 var(--space-3) var(--space-3);
   color: var(--text-muted);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .reg-row.active td {
@@ -388,7 +542,7 @@
   padding: var(--space-3);
   background: var(--surface-sunken);
   color: var(--text-primary);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   resize: vertical;
   margin-bottom: var(--space-3);
@@ -478,25 +632,168 @@
 
 .teams-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .teams-head h2 {
   margin: 0;
 }
 
+.teams-head-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.teams-head-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.teams-search {
+  height: 34px;
+  min-width: 180px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+}
+
+.teams-search::placeholder {
+  color: var(--text-muted);
+}
+
+.teams-search:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* --- Team cards ---------------------------------------------------------- */
+
+.team-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+/* The li is the grid item; it stretches to the row and the card fills it. Using
+   `height: 100%` on the card instead resolved against a non-definite height and
+   let tall cards overflow into the row below. */
+.team-grid > li {
+  display: flex;
+  min-width: 0;
+}
+
+.team-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+/* A coloured monogram tile when a team has no crest yet. The fill is organizer
+   data, so the label colour is decided per team by `textOnFill` and arrives as
+   an inline style; this is the resting value, matching the accent fallback the
+   tile wears when a team has picked no colour at all. */
+.team-card-mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  color: var(--text-on-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.team-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.team-card-name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.team-card-link {
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.team-card-link:hover {
+  text-decoration: underline;
+}
+
+.teams-empty {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  padding: var(--space-2) 0;
+}
+
+/* --- Add-team dialog ----------------------------------------------------- */
+
+.teams-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.teams-dialog-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+/* Two columns once there's room. On a full-width console a single stack put
+   the team's name and its "View roster" link a thousand pixels apart, with the
+   eye travelling empty space between them — the row got wider, not better. */
 .teams-list,
 .teams-roster {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-2) var(--space-5);
 }
 
 .teams-row {
@@ -665,4 +962,939 @@
   gap: var(--space-2);
   padding: var(--space-4) 0;
   border-top: 1px solid var(--border-subtle);
+}
+
+/* --- Season Workspace (PX design "Season Workspace") ---------------------------
+ * The overview is a dashboard: a breadcrumb and six tabs for chrome, a hero that
+ * states what this season is and whether it is live, the lifecycle drawn whole,
+ * four figures, and two summary cards. Tokens only. Numerals are set in the mono
+ * face — they are tabular figures in the design, and it keeps them off the
+ * display face, which is reserved for >=30px (see type-scale.test.ts).
+ */
+
+.season-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.season-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.season-crumbs a {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.season-crumbs a:hover {
+  text-decoration: underline;
+}
+
+.season-crumb-current {
+  color: var(--text-primary);
+}
+
+/* --- Hero ---------------------------------------------------------------- */
+
+.season-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.season-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.season-hero-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* The name moved to the shell's identity bar; the row now carries state only. */
+.season-hero-title:empty {
+  display: none;
+}
+
+.season-hero-meta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-md-size);
+}
+
+.season-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--success-subtle);
+  color: var(--success-strong);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.season-live-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.season-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* --- Lifecycle stepper ---------------------------------------------------- */
+
+.season-stepper-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.season-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.season-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* The rail between steps: an arrow, drawn rather than typed. */
+.season-step + .season-step::before {
+  content: "→";
+  margin-inline-end: var(--space-2);
+  color: var(--text-muted);
+}
+
+.season-step-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+}
+
+.season-step[data-state="done"] .season-step-mark {
+  background: var(--success-subtle);
+  border-color: transparent;
+  color: var(--success-strong);
+}
+
+.season-step[data-state="now"] {
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.season-step[data-state="now"] .season-step-mark {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.season-stepper-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+/* --- The four figures ----------------------------------------------------- */
+
+.season-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.season-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.season-tile-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.season-tile-accent {
+  color: var(--success-strong);
+}
+
+.season-tile-of {
+  color: var(--text-muted);
+  font-size: var(--text-lg-size);
+}
+
+.season-tile-label {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+/* --- The two summary cards ------------------------------------------------ */
+
+.season-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.season-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.season-card-head h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+}
+
+.season-card-head a {
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.season-spend-list,
+.season-pool-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.season-spend-row,
+.season-pool-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.season-spend-top,
+.season-pool-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+}
+
+.season-spend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  flex: none;
+}
+
+.season-spend-name,
+.season-pool-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Push the figures to the right edge, where the design aligns them. */
+.season-spend-squad {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.season-spend-amount,
+.season-pool-count {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.season-pool-count {
+  margin-inline-start: auto;
+}
+
+.season-bar {
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.season-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+.season-bar-accent {
+  background: var(--accent);
+}
+
+.season-public-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.season-public-label {
+  color: var(--text-secondary);
+}
+
+.season-public-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Registrations toolbar: export + the import trigger, aligned right above the
+   figures. Import itself is a wide review dialog (paste → preview → commit). */
+.reg-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.io-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Add-a-fixture dialog: the four inputs as a grid that stays legible at dialog width. */
+.fixtures-manual-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+/* --- Team Workspace: page head + rich cards + roster detail -------------------
+ * Matches the "Season Workspace → Teams" mockup: a franchise grid where each
+ * card is a purse-burndown at a glance, and a roster detail with stat tiles,
+ * role-tally chips and the squad table sorted by buy price. Tokens only. */
+
+.teams-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.teams-page-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
+  color: var(--text-heading);
+}
+
+.teams-page-sub {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.teams-toolbar {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Card: header row (crest + id + squad badge). */
+.team-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.team-card-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.team-card-owner {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-card-squad {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--success-subtle);
+  color: var(--success-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.team-card-mono.lg {
+  width: 52px;
+  height: 52px;
+  font-size: var(--text-sm-size);
+}
+
+.teams-crest.lg {
+  width: 52px;
+  height: 52px;
+}
+
+/* Card: purse-used bar. */
+.team-card-purse {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.team-card-purse-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* Card: spent / remaining. */
+.team-card-money {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.team-card-money > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.team-card-money-lbl {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.team-card-money-val {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.team-card-money-val.is-positive {
+  color: var(--success-strong);
+}
+
+/* Card: footer (top buy + prepare roster). */
+.team-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.team-card-topbuy {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-card-topbuy-empty {
+  color: var(--text-muted);
+}
+
+/* --- Roster detail -------------------------------------------------------- */
+
+.teams-back {
+  display: inline-block;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+}
+
+.teams-back:hover {
+  color: var(--text-primary);
+}
+
+.team-detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.team-detail-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.team-detail-id h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
+  color: var(--text-heading);
+}
+
+.team-detail-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.team-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.team-detail-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+/* The "top buy" tile holds a name, not a numeral — keep it in the text face. */
+.team-tile-name {
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.team-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.team-tally-chip {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.team-tally-chip b {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  margin-inline-start: var(--space-1);
+}
+
+/* Squad table. */
+.roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.roster-table thead th {
+  text-align: left;
+  padding: 0 var(--space-3) var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.roster-table tbody tr {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.roster-table td {
+  padding: var(--space-3);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.roster-num {
+  width: 44px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.roster-price {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.roster-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.roster-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.roster-person {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.roster-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.roster-phone {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.team-settings-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg-size);
+}
+
+/* --- Fixtures: schedule grouped by round ------------------------------------
+ * The design publishes a schedule round by round, with each fixture reading as
+ * two colour-chipped team codes. The round header is a full-width table row. */
+
+.round-head td {
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  background: var(--surface-sunken);
+}
+
+.round-head-label {
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.round-head-week {
+  margin-inline-start: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.fx-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.fx-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.fx-vs {
+  margin: 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* --- Auction tab: operational dashboard -------------------------------------
+ * Progress, the block, per-paddle burndown, the queue and the event-log tail. */
+
+.auc-title-pill {
+  margin-inline-start: var(--space-3);
+  vertical-align: middle;
+}
+
+.auc-progress {
+  display: flex;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.auc-progress-seg {
+  display: block;
+  height: 100%;
+}
+
+.auc-progress-seg.is-sold {
+  background: var(--success-base);
+}
+
+.auc-progress-seg.is-block {
+  background: var(--accent);
+}
+
+.auc-progress-seg.is-unsold {
+  background: var(--danger-base);
+}
+
+.auc-progress-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.auc-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.auc-key {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  margin-inline-start: var(--space-3);
+}
+
+.auc-legend .auc-key:first-child {
+  margin-inline-start: 0;
+}
+
+.auc-key.is-sold {
+  background: var(--success-base);
+}
+
+.auc-key.is-block {
+  background: var(--accent);
+}
+
+.auc-key.is-unsold {
+  background: var(--danger-base);
+}
+
+.auc-money {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.auc-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.auc-block-title {
+  color: var(--text-accent);
+}
+
+.auc-block-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.auc-bid {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.auc-bid > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.auc-bid-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.auc-bid-leader {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.auc-paddles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.auc-paddle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.auc-paddle-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.auc-paddle-no {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.auc-paddle-left {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* The queue is long by design — scroll it, don't grow the page forever. */
+.auc-queue-scroll {
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.auc-result-paddle {
+  color: var(--text-muted);
+}
+
+.auc-log-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.auc-log {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+.auc-log-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.auc-log-seq {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  min-width: 56px;
+}
+
+.auc-log-type {
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.auc-log-at {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
 }

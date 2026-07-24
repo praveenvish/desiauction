@@ -10,6 +10,16 @@
   max-width: 1040px;
 }
 
+/* --- The one sub-nav shared by the org's four money desks ----------------------
+ * Settlement · Finance · Deliveries · Reconciliation read as tabs of a single
+ * workspace. The primitive draws the tabs; this wrapper supplies the underline
+ * rail they sit on (the primitive parks that rail on ContextBar, which these
+ * standalone desks don't render). */
+.money-desk-nav {
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-1);
+}
+
 /* --- The case lifecycle stepper ------------------------------------------------- */
 
 .case-stepper {

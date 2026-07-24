@@ -27,13 +27,17 @@ export default async function FixturesPage({
   if (dashboard === null) {
     notFound();
   }
+  // How many rounds this schedule spans — the design's "N fixtures across M rounds".
+  const rounds = dashboard.page.rows.reduce(
+    (max, row) => (row.round !== null && row.round > max ? row.round : max),
+    0,
+  );
   return (
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
           <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>{dashboard.competition.name}</h1>
+            <div className="competition-title-row title-row-actions">
               <span className="date-row">
                 <ButtonLink
                   href={`/seasons/${slug}/fixtures/calendar`}
@@ -51,7 +55,12 @@ export default async function FixturesPage({
                 </ButtonLink>
               </span>
             </div>
-            <p className="competitions-hint">Fixtures &amp; scheduling</p>
+            {dashboard.stats.total > 0 ? (
+              <p className="competitions-hint">
+                {dashboard.stats.total} fixture{dashboard.stats.total === 1 ? "" : "s"}
+                {rounds > 0 ? ` across ${String(rounds)} round${rounds === 1 ? "" : "s"}` : ""}
+              </p>
+            ) : null}
           </header>
           <FixturesPanel
             slug={slug}

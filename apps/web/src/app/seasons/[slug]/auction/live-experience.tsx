@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  formatPaiseINR,
-  paise,
-  snapshotNextMinimumBid,
-  type AuctionSnapshot,
-} from "@desiauction/core";
+import { formatPaiseINR, paise, type AuctionSnapshot } from "@desiauction/core";
 import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import { useEffect, useRef, useState } from "react";
 
@@ -72,6 +67,9 @@ export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | 
             ...rest,
             {
               lotId: outcome.lotId,
+              // The snapshot outcome is spectator-safe and carries no
+              // registration id; the next server read fills it in.
+              registrationId: null,
               lotNumber: outcome.lotNumber,
               seq: Number.MAX_SAFE_INTEGER - outcome.atSeq,
               playerName: outcome.playerName,
@@ -210,38 +208,11 @@ export function AuctionProgress({ snapshot }: { snapshot: AuctionSnapshot | null
   );
 }
 
-/** The next legal steps on the block — the canonical helper, display-only. */
-export function BidLadder({
-  lot,
-  slabs,
-}: {
-  lot: NonNullable<AuctionSnapshot["currentLot"]>;
-  slabs: AuctionRules["slabs"];
-}) {
-  // Rebrand the display slabs as Paise for the canonical helper (display-only).
-  const paiseSlabs = slabs.map((slab) => ({
-    upTo: slab.upTo === null ? null : paise(slab.upTo),
-    step: paise(slab.step),
-  }));
-  const rungs: number[] = [];
-  let leading = lot.currentBid?.amount ?? null;
-  for (let i = 0; i < 3; i += 1) {
-    const next = Number(snapshotNextMinimumBid(lot.basePrice, paiseSlabs, leading));
-    rungs.push(next);
-    leading = next;
-  }
-  return (
-    <p className="live-ladder" data-testid="bid-ladder">
-      Ladder:{" "}
-      {rungs.map((amount, index) => (
-        <span key={amount} className={index === 0 ? "live-ladder-next" : ""}>
-          {formatPaiseINR(paise(amount))}
-          {index < rungs.length - 1 ? " → " : ""}
-        </span>
-      ))}
-    </p>
-  );
-}
+/* BidLadder lived here: the next three legal steps rendered as the prose
+   "Ladder: ₹20L → ₹25L → ₹30L". PaddleControl now renders the same rungs as
+   pressable chips and carries the `bid-ladder` handle, so this had no callers
+   left — and two elements sharing that testid would fail Playwright's strict
+   mode the moment both were on screen. */
 
 /** The owner workspace: purse, spend, squad and slots — all server truth. */
 export function MyTeamCard({
@@ -468,10 +439,6 @@ export function ConnectionCheck({ wsUrl }: { wsUrl: string }) {
       socket.close();
     };
   }, [wsUrl]);
-  const device =
-    typeof window !== "undefined"
-      ? `${String(window.innerWidth)}×${String(window.innerHeight)}${"ontouchstart" in window ? " · touch" : ""}`
-      : "";
   return (
     <Card data-testid="connection-check">
       <h2>Your connection</h2>
@@ -481,7 +448,7 @@ export function ConnectionCheck({ wsUrl }: { wsUrl: string }) {
         ) : state === "ok" ? (
           <>
             <Badge tone="success">Ready</Badge> Engine reachable in {rttMs ?? 0}ms — this device can
-            join the room. {device}
+            join the room.
           </>
         ) : (
           <>

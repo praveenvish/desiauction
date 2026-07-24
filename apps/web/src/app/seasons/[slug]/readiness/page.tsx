@@ -1,4 +1,4 @@
-import { Badge, ButtonLink, Card } from "@desiauction/ui";
+import { Badge, ButtonLink, Card, PageIntro } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -38,10 +38,10 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <header className="dash-head">
-          <div className="competition-title-row">
-            <h1>Readiness — {view.competition.name}</h1>
-            {auction !== null && blockers === 0 ? (
+        <PageIntro
+          subtitle="Every row links to the screen that changes it. Pass/fail comes from the platform's own auction-readiness checks."
+          actions={
+            auction !== null && blockers === 0 ? (
               <Badge tone="success" data-testid="readiness-verdict">
                 Ready for auction
               </Badge>
@@ -51,13 +51,9 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                   ? `${String(blockers)} blocker${blockers === 1 ? "" : "s"}`
                   : "In preparation"}
               </Badge>
-            )}
-          </div>
-          <p className="competitions-hint">
-            Every row links to the screen that changes it. Pass/fail comes from the platform&apos;s
-            own auction-readiness checks.
-          </p>
-        </header>
+            )
+          }
+        />
 
         <Card data-testid="readiness-auction">
           <h2>Auction gates</h2>

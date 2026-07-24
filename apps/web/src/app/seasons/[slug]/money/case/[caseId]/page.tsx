@@ -33,11 +33,9 @@ export default async function CaseReviewPage({
       <main className="registrations-dash">
         <div className="dash-stack money-stack">
           <header className="dash-head">
-            {/* The shell's ContextBar already renders the breadcrumb (nav.ts
-                labels this segment "Case review") — a second Breadcrumb here
+            {/* Title and trail are the shell's — a second copy of either here
                 would be a duplicate landmark, which axe rightly refuses. */}
-            <div className="competition-title-row">
-              <h1>Case review</h1>
+            <div className="competition-title-row title-row-actions">
               <span className="date-row">
                 <ButtonLink href={`/seasons/${slug}/money`} variant="secondary">
                   Back to settlement

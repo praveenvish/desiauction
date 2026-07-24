@@ -341,6 +341,693 @@
   align-items: start;
 }
 
+/* A grid cell, not a page: the columns stack their cards and take the width the
+   grid gives them. Using the page-level stack class here re-applied its own
+   max-width inside each cell. */
+.cockpit-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* --- the owner room grid -------------------------------------------------- */
+.live-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .live-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.live-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.live-substatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.live-substatus > :first-child {
+  flex: 1;
+  min-width: 200px;
+}
+
+.live-substatus-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* --- the lot on the block ------------------------------------------------- */
+.lot-hero {
+  border: 1px solid var(--border-interactive);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(150deg, var(--surface-overlay), var(--surface-sunken));
+  box-shadow: var(--shadow-2);
+  /* The scale has no --space-7; an undefined var voids the whole shorthand and
+     the hero renders with zero padding. Only real steps here. */
+  padding: var(--space-6) var(--space-8);
+}
+
+.lot-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.lot-hero-id {
+  min-width: 0;
+  flex: 1;
+}
+
+.lot-hero-kicker {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--live);
+  font-weight: var(--font-weight-semibold);
+}
+
+.lot-hero-name {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.lot-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin: var(--space-3) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-base-size);
+}
+
+.lot-hero-role {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  text-transform: capitalize;
+}
+
+.lot-hero-money {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-strong);
+}
+
+.lot-hero-label {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.lot-hero-bid {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1;
+  font-weight: 600;
+  color: var(--money-value);
+  font-variant-numeric: tabular-nums;
+}
+
+.lot-hero-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-base-size);
+}
+
+.lot-hero-bid--none {
+  color: var(--text-muted);
+}
+
+.lot-hero-lead--none {
+  color: var(--text-muted);
+}
+
+.lot-hero-lead strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.lot-hero-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--identity-accent);
+  flex: none;
+}
+
+.lot-hero-ext {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--warning-base) 16%, transparent);
+  color: var(--warning-base);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- the countdown ring --------------------------------------------------- */
+.lot-ring {
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 132px;
+}
+
+.lot-ring-track {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 8;
+}
+
+.lot-ring-value {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset var(--duration-base) linear,
+    stroke var(--duration-fast) var(--ease-out);
+}
+
+.lot-ring[data-hot="true"] .lot-ring-value {
+  stroke: var(--danger-base);
+}
+
+.lot-ring-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.lot-ring-num {
+  font-family: var(--font-display);
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.lot-ring[data-hot="true"] .lot-ring-num {
+  color: var(--danger-base);
+}
+
+.lot-ring-unit {
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lot-ring-value {
+    transition: none;
+  }
+}
+
+/* --- your paddle ---------------------------------------------------------- */
+.paddle-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.paddle-leading {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--success-base) 14%, transparent);
+  color: var(--success-base);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.paddle-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+/* The raise is the loudest thing on the page for a reason: it is the only
+   control an owner uses, under time pressure, without looking away from the
+   room. Pressed-metal gold, per the system's primary. */
+.paddle-raise {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 168px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--accent-pressed) 60%, var(--accent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-sheen) 14%, var(--accent-lift)),
+    var(--accent) 62%
+  );
+  color: var(--text-on-accent);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.paddle-raise:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.paddle-raise:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.paddle-raise:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.paddle-raise-label {
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.paddle-raise-amount {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.paddle-jump-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.paddle-jump-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.paddle-jump-chip {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.paddle-jump-chip:hover:not(:disabled) {
+  border-color: var(--border-interactive);
+  background: var(--accent-subtle);
+}
+
+.paddle-jump-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.paddle-jump-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.paddle-stats {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+}
+
+.paddle-stats div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.paddle-stats dt {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.paddle-stats dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.paddle-stat-remaining {
+  color: var(--money-remaining);
+}
+
+/* --- the live pulse ------------------------------------------------------- */
+.live-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--live);
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--live) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-pulse {
+    animation: none;
+  }
+}
+
+/* --- squads: who is actually in each franchise ---------------------------- */
+.squad-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+  margin-top: var(--space-3);
+}
+
+.squad-team {
+  min-width: 0;
+}
+
+.squad-team-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.squad-team-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.squad-team-count {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.squad-team-purse {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm-size);
+  color: var(--money-remaining);
+}
+
+.squad-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Wraps rather than truncates. Ellipsising the name was the wrong trade: with
+   two badges beside it "Arjun Sharma" became "Arjun S…", and a squad board
+   whose whole job is naming players must never eat a name to fit a badge. */
+.squad-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.squad-name {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.squad-role {
+  margin-left: auto;
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  text-transform: capitalize;
+}
+
+.squad-price {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--money-value);
+}
+
+/* Pre-signed reads as a state, not a price: an icon cost this franchise no
+   purse at all, and a blank or a ₹0 would both be read as "free transfer". */
+.squad-presigned {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.squad-tag {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.squad-tag--icon {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text-accent);
+}
+
+.squad-tag--retained {
+  background: color-mix(in srgb, var(--info-base) 18%, transparent);
+  color: var(--info-base);
+}
+
+.squad-tag--captain {
+  background: color-mix(in srgb, var(--success-base) 18%, transparent);
+  color: var(--success-base);
+}
+
+/* --- the pool: sold, unsold, still to come -------------------------------- */
+.pool-stats {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  margin: var(--space-3) 0 0;
+}
+
+.pool-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pool-stats dt {
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pool-stats dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl-size);
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.pool-sold {
+  color: var(--success-base);
+}
+
+.pool-unsold {
+  color: var(--text-muted);
+}
+
+.pool-money {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.pool-money strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- purses: a spend bar, not a number ------------------------------------ */
+/* Four teams' remaining purses as bare figures forced the auctioneer to do
+   mental arithmetic mid-lot. The bar answers "who can still play?" at a
+   glance; the figure stays for the exact number. */
+.purse-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.purse-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+/* The franchise crest: identity colour with ink on top, never white-on-pastel. */
+.purse-chip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--surface-sunken);
+}
+
+.purse-row[data-mine="true"] .purse-team {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.purse-leading {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.purse-team {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.purse-left {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm-size);
+  color: var(--money-remaining);
+}
+
+.purse-bar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.purse-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .purse-bar-fill {
+    transition: none;
+  }
+}
+
 @media (max-width: 900px) {
   .cockpit-grid {
     grid-template-columns: minmax(0, 1fr);

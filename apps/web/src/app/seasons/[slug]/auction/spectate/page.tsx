@@ -25,7 +25,14 @@ export default async function SpectatePage({ params }: { params: Promise<{ slug:
           <h1>{view.auctionName}</h1>
           <p className="competitions-hint">{view.competitionName} — spectator view</p>
         </header>
-        <SpectatePanel wsUrl={view.wsUrl} slug={slug} resolved={view.resolved} />
+        <SpectatePanel
+          wsUrl={view.wsUrl}
+          slug={slug}
+          resolved={view.resolved}
+          teams={view.teams}
+          rules={view.rules}
+          preSigned={view.preSigned}
+        />
       </div>
     </main>
   );

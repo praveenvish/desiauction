@@ -207,12 +207,38 @@ export function nameKey(name: string | null): string {
 
 // --- Naming (shared with the orgs slug discipline) ----------------------------
 
-export type NameResult = { ok: true; value: string } | { ok: false; reason: "too_short" };
+export type NameResult =
+  { ok: true; value: string } | { ok: false; reason: "too_short" | "too_long" };
 
 /** Upholds: competition/team/season names are trimmed and at least 3 chars. */
+/** DA-29: names were unbounded — a 45-character string of markup was accepted. */
+export const NAME_MAX_LENGTH = 60;
+
 export function validateName(input: string): NameResult {
   const trimmed = input.trim();
-  return trimmed.length >= 3 ? { ok: true, value: trimmed } : { ok: false, reason: "too_short" };
+  if (trimmed.length < 3) {
+    return { ok: false, reason: "too_short" };
+  }
+  if (trimmed.length > NAME_MAX_LENGTH) {
+    return { ok: false, reason: "too_long" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+/**
+ * A monogram from the ALPHANUMERICS only (DA-29). Deriving it from raw input
+ * turned `<img src=x …>` into the short name "<IM" — escaped and harmless, but
+ * nonsense on every team chip and board.
+ */
+export function monogramFor(name: string): string {
+  // \p{M} keeps combining marks attached: without it "मुंबई" loses its matras
+  // and renders as "मबई". Slicing by GRAPHEME for the same reason — three code
+  // units can cut a Devanagari cluster in half.
+  const letters = name.replace(/[^\p{L}\p{N}\p{M}]+/gu, "");
+  const source = letters === "" ? name : letters;
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const graphemes = [...segmenter.segment(source)].map((entry) => entry.segment);
+  return graphemes.slice(0, 3).join("").toUpperCase();
 }
 
 /** Deterministic slug base (caller appends a ULID suffix for uniqueness, as orgs do). */

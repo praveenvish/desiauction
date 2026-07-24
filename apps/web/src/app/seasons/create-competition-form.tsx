@@ -5,10 +5,24 @@ import { useActionState } from "react";
 
 import { createCompetitionAction } from "../../server/competition/actions";
 
-export function CreateCompetitionForm({ orgs }: { orgs: { id: string; name: string }[] }) {
+export function CreateCompetitionForm({
+  orgs,
+  tournamentId,
+}: {
+  orgs: { id: string; name: string }[];
+  /**
+   * Set when the form is rendered inside a tournament: the new season becomes
+   * an edition of it. Left undefined on /seasons, where a season is a one-off —
+   * `competitions.tournament_id` is nullable precisely so that stays possible.
+   */
+  tournamentId?: string;
+}) {
   const [state, formAction, pending] = useActionState(createCompetitionAction, {});
   return (
     <form action={formAction} className="create-competition" data-testid="create-competition">
+      {tournamentId !== undefined ? (
+        <input type="hidden" name="tournamentId" value={tournamentId} />
+      ) : null}
       {orgs.length === 1 ? (
         <input type="hidden" name="orgId" value={orgs[0]?.id ?? ""} />
       ) : (
