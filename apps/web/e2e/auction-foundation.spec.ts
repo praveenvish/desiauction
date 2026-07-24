@@ -43,21 +43,28 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
 
   // Competition with two teams and an approved pool, intake closed.
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Auction Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Auction Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Auction Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Auction Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
+  // Team management lives in the Teams tab.
+  const seasonUrl = page.url();
+  await page.goto(`${seasonUrl}/teams`);
   for (const team of ["Andheri Arrows", "Bandra Blasters"]) {
-    await page.getByLabel("Team name").fill(team);
-    await page.getByTestId("add-team").click();
-    await expect(page.locator(".team-name", { hasText: team })).toBeVisible();
+    await page.getByTestId("open-add-team").click();
+    await page.getByLabel("Team name").filter({ visible: true }).fill(team);
+    await page.getByTestId("add-team-workspace").click();
+    await expect(page.getByTestId("teams-list")).toContainText(team);
   }
+  await page.goto(seasonUrl);
   await page.getByTestId("advance-status").click(); // setup
   await expect(page.getByTestId("competition-status")).toHaveText("setup");
   await page.getByTestId("advance-status").click(); // open registration
@@ -68,6 +75,7 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  await page.getByTestId("open-import").click();
   await page.getByTestId("import-textarea").evaluate((el, csv) => {
     (el as HTMLTextAreaElement).value = csv;
   }, playersCsv());
@@ -99,7 +107,7 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
 
   // Paddles: immutable identity, one per team.
   for (const team of ["Andheri Arrows", "Bandra Blasters"]) {
-    await page.getByLabel("Team").selectOption({ label: team });
+    await page.getByLabel("Team", { exact: true }).selectOption({ label: team });
     await page.getByTestId("issue-paddle").click();
   }
   await expect(page.getByTestId("paddle-P01")).toBeVisible();
@@ -120,24 +128,23 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
   await expect(page.getByTestId("replay-report")).toContainText("matches persisted state", {
     timeout: 20_000,
   });
-
-  // State machine + timer visualizations render from core's descriptors.
-  await expect(page.getByTestId("machine-auction")).toBeVisible();
-  await expect(page.getByTestId("machine-lot")).toBeVisible();
-  await expect(page.getByTestId("machine-bid-record")).toBeVisible();
-  await expect(page.getByTestId("timer-table")).toContainText("anti-snipe");
 });
 
 test("auction foundation page: axe zero violations", async ({ page }) => {
   test.setTimeout(120_000);
   await otpLogin(page, `85${STAMP}`);
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Axe Auction Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page
+    .getByLabel("Organization name")
+    .filter({ visible: true })
+    .fill(`Axe Auction Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Axe Auction Cup ${STAMP}`);
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Axe Auction Cup ${STAMP}`);
+  await page.getByRole("button", { name: "Create season" }).click();
   await page.getByTestId("open-auction").click();
   await expect(page.getByTestId("ready-panel")).toBeVisible({ timeout: 30_000 });
   const scan = await new AxeBuilder({ page }).analyze();

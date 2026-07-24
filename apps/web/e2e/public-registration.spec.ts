@@ -59,16 +59,17 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Public Organizer");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Organization name").fill(`Public CC ${STAMP}`);
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Public CC ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Monsoon Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Monsoon Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   competitionUrl = page.url();
   const slug = new URL(competitionUrl).pathname.split("/").pop() ?? "";
@@ -92,12 +93,13 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   // Publish the public page from the Overview.
   await page.goto(competitionUrl);
   await page.getByTestId("toggle-visibility").click();
-  await expect(page.getByTestId("visibility-row")).toContainText("Public page live");
+  await expect(page.getByTestId("visibility-row")).toContainText("LIVE");
 
   // A second, never-published draft competition stays structurally absent.
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Hidden Cup ${STAMP}`);
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Hidden Cup ${STAMP}`);
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   privateSlugUrl = `/c/${new URL(page.url()).pathname.split("/").pop() ?? ""}`;
 

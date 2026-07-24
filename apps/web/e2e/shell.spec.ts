@@ -51,7 +51,7 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   // Public shell (no rail), so the loop ends there and returns via URL.
   const nav = rail(page).first();
   for (const [label, url] of [
-    ["Seasons", /\/seasons/],
+    ["Tournaments", /\/tournaments/],
     ["Organizations", /\/orgs/],
     ["Home", /\/home/],
     ["Money", /\/money/],
@@ -70,37 +70,43 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
 });
 
-test("command palette navigates; breadcrumb + tabs appear inside a competition", async ({
-  page,
-}) => {
+test("search navigates; the identity bar names every surface consistently", async ({ page }) => {
   await otpLogin(page, PHONE_PALETTE);
 
-  // Palette: keyboard-first navigation to Organizations.
+  // Search: ⌘K opens the top bar's field — keyboard-first, no modal.
   await page.keyboard.press("ControlOrMeta+k");
   await page.getByRole("combobox").fill("organiz");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/orgs/);
 
   // Create an org + competition to earn a context bar.
-  await page.getByLabel("Organization name").fill(`Shell Org ${STAMP}`);
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Shell Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org ${STAMP}`);
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Shell Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Shell Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-08-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
-  await expect(page).toHaveURL(/\/competitions\/shell-cup/);
+  await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page).toHaveURL(/\/seasons\/shell-cup/);
 
-  // Context bar: breadcrumb (org / competition) + section tabs.
+  // Identity bar: the season IS the h1 on its overview, and its ancestor — the
+  // org — is the trail above. The name is never printed twice.
+  const heading = page.getByRole("heading", { level: 1 });
   const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(heading).toHaveText(`Shell Cup ${STAMP}`);
   await expect(breadcrumb).toContainText(`Shell Org ${STAMP}`);
-  await expect(breadcrumb).toContainText(`Shell Cup ${STAMP}`);
-  const tabs = page.getByRole("navigation", { name: "Competition sections" });
+  await expect(breadcrumb).not.toContainText(`Shell Cup ${STAMP}`);
+
+  // A section below it: the section becomes the title, the season joins the trail.
+  const tabs = page.getByRole("navigation", { name: "Season sections" });
   await tabs.getByRole("link", { name: "Registrations" }).click();
   await expect(page).toHaveURL(/\/registrations$/);
-  await expect(breadcrumb).toContainText("Registrations");
+  await expect(heading).toHaveText("Registrations");
+  await expect(breadcrumb).toContainText(`Shell Cup ${STAMP}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await expect(tabs.getByRole("link", { name: "Registrations" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -115,21 +121,23 @@ test("command palette navigates; breadcrumb + tabs appear inside a competition",
 
   // A second org + competition light the switchers.
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Shell Org B ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Shell Org B ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org B ${STAMP}`);
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Shell Cup B ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Shell Cup B ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-09-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
-  await expect(page).toHaveURL(/\/competitions\/shell-cup-b/);
+  await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page).toHaveURL(/\/seasons\/shell-cup-b/);
 
-  // Competition switcher: jump from Cup B back to the first cup.
-  await page.getByRole("button", { name: "Switch competition" }).click();
+  // Season switcher: jump from Cup B back to the first cup.
+  await page.getByRole("button", { name: "Switch season" }).click();
   await page.getByRole("menuitem", { name: new RegExp(`^Shell Cup ${STAMP}`) }).click();
-  await expect(page).toHaveURL(/\/competitions\/shell-cup-(?!b)/);
+  await expect(page).toHaveURL(/\/seasons\/shell-cup-(?!b)/);
 
   // Org switcher: multi-org users can jump straight to an org home.
   await page.getByRole("button", { name: "Switch organization" }).click();
@@ -144,8 +152,8 @@ test("mobile chrome: bottom tabs navigate and the drawer opens", async ({ browse
   try {
     await otpLogin(page, `85${STAMP}`);
     const tabs = rail(page).last();
-    await tabs.getByRole("link", { name: "Competitions" }).click();
-    await expect(page).toHaveURL(/\/seasons/);
+    await tabs.getByRole("link", { name: "Tournaments" }).click();
+    await expect(page).toHaveURL(/\/tournaments/);
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
     await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Account" }).click();

@@ -41,7 +41,8 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
   // Founder A creates an organization.
   await otpLogin(page, PHONE_A);
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`MPL ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`MPL ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`MPL ${STAMP}`);
   const orgUrl = page.url();
@@ -60,7 +61,7 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
     await pageB.getByTestId("accept-invite").click();
     await expect(pageB.getByTestId("org-name")).toHaveText(`MPL ${STAMP}`);
     // B is staff: no invite panel, no grant buttons.
-    await expect(pageB.getByTestId("invite-panel")).not.toBeVisible();
+    await expect(pageB.getByTestId("open-invite")).not.toBeVisible();
   });
 
   // A sees B as a member with the staff set and can revoke it.
@@ -83,7 +84,8 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
   await inSecondBrowser(browser, async (pageB) => {
     await otpLogin(pageB, PHONE_B);
     await pageB.goto("/orgs");
-    await pageB.getByLabel("Organization name").fill(`Rivals ${STAMP}`);
+    await pageB.getByTestId("new-org").click();
+    await pageB.getByLabel("Organization name").filter({ visible: true }).fill(`Rivals ${STAMP}`);
     await pageB.getByRole("button", { name: "Create organization" }).click();
     await expect(pageB.getByTestId("org-name")).toHaveText(`Rivals ${STAMP}`);
     bOrgUrl = pageB.url();

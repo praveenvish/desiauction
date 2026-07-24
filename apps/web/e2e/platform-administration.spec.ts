@@ -67,7 +67,7 @@ test("founder demo: sign in → platform health → find an org → inspect → 
   await expect(page).toHaveURL(/\/admin$/);
 
   // --- Views overall platform health ----------------------------------------
-  await expect(page.getByRole("heading", { name: "Platform", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Platform admin", level: 1 })).toBeVisible();
   // Administration says what it is, before anything else.
   await expect(page.getByTestId("admin-readonly")).toBeVisible();
   // The seed guarantees at least the demo org, its people and a settled auction.
@@ -78,7 +78,7 @@ test("founder demo: sign in → platform health → find an org → inspect → 
   // --- Finds an organization -------------------------------------------------
   await page.goto("/admin/orgs");
   await page.getByLabel("Search organizations").fill("Demo Cricket Club");
-  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByTestId("admin-org-search").getByRole("button", { name: "Search" }).click();
   await expect(page.getByTestId("admin-org-table")).toBeVisible();
   const orgLink = page.getByRole("link", { name: "Demo Cricket Club" });
   await expect(orgLink).toBeVisible();
@@ -187,7 +187,7 @@ test("the FOURTH partition: an org owner is not a platform admin", async ({ page
 
   // The 404 is a real one the browser renders, not a soft empty state.
   await page.goto("/admin");
-  await expect(page.getByRole("heading", { name: "Platform", level: 1 })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Platform admin", level: 1 })).toHaveCount(0);
   await expect(page.getByTestId("admin-org-table")).toHaveCount(0);
 });
 

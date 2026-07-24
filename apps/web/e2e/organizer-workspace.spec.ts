@@ -59,7 +59,10 @@ test("founder demo: org → competition → approve → team roster → venue �
 }) => {
   test.setTimeout(120_000);
   await onboardWithName(page, ORGANIZER, "Priya Organizer");
-  await page.getByLabel("Organization name").fill(`Workspace CC ${STAMP}`);
+  await page
+    .getByLabel("Organization name")
+    .filter({ visible: true })
+    .fill(`Workspace CC ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Workspace CC ${STAMP}`);
   orgUrl = page.url();
@@ -80,11 +83,12 @@ test("founder demo: org → competition → approve → team roster → venue �
 
   // Competition with dates (lifecycle guard) → open registration.
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Workspace Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Workspace Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   competitionUrl = page.url();
   await page.getByTestId("advance-status").click();
@@ -100,7 +104,7 @@ test("founder demo: org → competition → approve → team roster → venue �
 
   // Team workspace: create two teams via the new tab.
   await page
-    .getByRole("navigation", { name: "Competition sections" })
+    .getByRole("navigation", { name: "Season sections" })
     .getByRole("link", { name: "Teams" })
     .click();
   await expect(page).toHaveURL(/\/teams$/);
@@ -108,7 +112,8 @@ test("founder demo: org → competition → approve → team roster → venue �
     ["Malad Mavericks", "MAV"],
     ["Kandivali Kings", "KK"],
   ] as const) {
-    await page.getByLabel("Team name").fill(name);
+    await page.getByTestId("open-add-team").click();
+    await page.getByLabel("Team name").filter({ visible: true }).fill(name);
     await page.getByLabel("Short name").fill(short);
     await page.getByTestId("add-team-workspace").click();
     await expect(page.getByTestId("teams-list")).toContainText(name);
@@ -150,8 +155,8 @@ test("founder demo: org → competition → approve → team roster → venue �
   // the roster of the team we assigned to, not whichever sorts first.
   await page.goto(`${competitionUrl}/teams`);
   await page
-    .locator(".teams-row", { hasText: "Malad Mavericks" })
-    .getByRole("link", { name: "View roster" })
+    .locator(".team-card", { hasText: "Malad Mavericks" })
+    .getByRole("link", { name: "Prepare roster" })
     .click();
   // PX-5: registration captures names — the roster shows the person, not a number.
   await expect(page.getByTestId("roster-list")).toContainText("Player Two");
@@ -207,7 +212,7 @@ test("permissions attack: a viewer sees, but cannot act", async ({ browser, page
     // Teams: list visible, creation absent.
     await viewerPage.goto(`${base}/teams`);
     await expect(viewerPage.getByTestId("teams-list")).toBeVisible();
-    await expect(viewerPage.getByTestId("create-team-panel")).not.toBeVisible();
+    await expect(viewerPage.getByTestId("open-add-team")).not.toBeVisible();
     // Overview: lifecycle button absent for viewers.
     await viewerPage.goto(base);
     await expect(viewerPage.getByTestId("advance-status")).not.toBeVisible();
@@ -218,9 +223,10 @@ test("invalid workflows: bad team names are refused; unknown slugs 404", async (
   await otpLogin(page, ORGANIZER);
   const base = new URL(competitionUrl).pathname;
   await page.goto(`${base}/teams`);
-  await page.getByLabel("Team name").fill("ab");
+  await page.getByTestId("open-add-team").click();
+  await page.getByLabel("Team name").filter({ visible: true }).fill("ab");
   await page.getByTestId("add-team-workspace").click();
-  await expect(page.getByTestId("create-team-panel")).toContainText(/name/i);
+  await expect(page.getByRole("dialog")).toContainText(/name/i);
 
   const missing = await page.goto("/seasons/does-not-exist/readiness");
   expect(missing?.status()).toBe(404);
@@ -245,7 +251,7 @@ test("accessibility: teams and readiness scan clean", async ({ page }) => {
   await otpLogin(page, ORGANIZER);
   const base = new URL(competitionUrl).pathname;
   await page.goto(`${base}/teams`);
-  await expect(page.getByTestId("teams-workspace")).toBeVisible();
+  await expect(page.getByTestId("teams-count")).toBeVisible();
   const teamsScan = await new AxeBuilder({ page }).analyze();
   expect(teamsScan.violations, JSON.stringify(teamsScan.violations, null, 2)).toEqual([]);
   await page.goto(`${base}/readiness`);

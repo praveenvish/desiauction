@@ -35,7 +35,8 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
 
   // Organization with a venue and two grounds.
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Fixture Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Fixture Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.getByTestId("open-venues").click();
@@ -55,16 +56,19 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
 
   // Competition with dates and four teams.
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Fixture Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Fixture Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
+  await page.goto(`${page.url()}/teams`);
   for (const team of ["Andheri Arrows", "Bandra Blasters", "Colaba Kings", "Dadar Daredevils"]) {
-    await page.getByLabel("Team name").fill(team);
-    await page.getByTestId("add-team").click();
-    await expect(page.locator(".team-name", { hasText: team })).toBeVisible();
+    await page.getByTestId("open-add-team").click();
+    await page.getByLabel("Team name").filter({ visible: true }).fill(team);
+    await page.getByTestId("add-team-workspace").click();
+    await expect(page.getByTestId("teams-list")).toContainText(team);
   }
 
   // Generate the round robin onto both grounds.
@@ -131,7 +135,8 @@ test("fixtures dashboard and venues page: axe zero violations", async ({ page })
   test.setTimeout(120_000);
   await otpLogin(page, `81${STAMP}`);
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Axe Fix Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Axe Fix Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.getByTestId("open-venues").click();
@@ -140,8 +145,9 @@ test("fixtures dashboard and venues page: axe zero violations", async ({ page })
   expect(venuesScan.violations, JSON.stringify(venuesScan.violations, null, 2)).toEqual([]);
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Axe Fix Cup ${STAMP}`);
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Axe Fix Cup ${STAMP}`);
+  await page.getByRole("button", { name: "Create season" }).click();
   await page.getByTestId("open-fixtures").click();
   await expect(page.getByTestId("stat-row")).toBeVisible({ timeout: 30_000 });
   const fixturesScan = await new AxeBuilder({ page }).analyze();

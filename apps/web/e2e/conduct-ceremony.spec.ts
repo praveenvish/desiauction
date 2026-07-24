@@ -67,23 +67,31 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   const organizer = await organizerCtx.newPage();
   await otpLogin(organizer, `86${STAMP}`);
   await organizer.goto("/orgs");
-  await organizer.getByLabel("Organization name").fill(`Ceremony Org ${STAMP}`);
+  await organizer.getByTestId("new-org").click();
+  await organizer
+    .getByLabel("Organization name")
+    .filter({ visible: true })
+    .fill(`Ceremony Org ${STAMP}`);
   await organizer.getByRole("button", { name: "Create organization" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");
-  await organizer.getByLabel("Competition name").fill(`Ceremony Cup ${STAMP}`);
+  await organizer.getByTestId("new-season").click();
+  await organizer.getByLabel("Season name").filter({ visible: true }).fill(`Ceremony Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Powai");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
   await organizer.getByLabel("Ends on").fill("2026-09-15");
-  await organizer.getByRole("button", { name: "Create competition" }).click();
+  await organizer.getByRole("button", { name: "Create season" }).click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("draft");
   const slug = new URL(organizer.url()).pathname.split("/")[2] ?? "";
+  await organizer.goto(`/seasons/${slug}/teams`);
   for (const team of ["Arrows", "Blasters"]) {
-    await organizer.getByLabel("Team name").fill(team);
-    await organizer.getByTestId("add-team").click();
-    await expect(organizer.locator(".team-name", { hasText: team })).toBeVisible();
+    await organizer.getByTestId("open-add-team").click();
+    await organizer.getByLabel("Team name").filter({ visible: true }).fill(team);
+    await organizer.getByTestId("add-team-workspace").click();
+    await expect(organizer.getByTestId("teams-list")).toContainText(team);
   }
+  await organizer.goto(`/seasons/${slug}`);
   await organizer.getByTestId("advance-status").click(); // setup
   await expect(organizer.getByTestId("competition-status")).toHaveText("setup");
   await organizer.getByTestId("advance-status").click(); // open registration
@@ -92,6 +100,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(organizer.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  await organizer.getByTestId("open-import").click();
   await organizer.getByTestId("import-textarea").evaluate((el, csv) => {
     (el as HTMLTextAreaElement).value = csv;
   }, playersCsv(STAMP));
@@ -125,7 +134,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
 
   const joinUrls: string[] = [];
   for (const team of ["Arrows", "Blasters"]) {
-    await organizer.getByLabel("Team").selectOption({ label: team });
+    await organizer.getByLabel("Team", { exact: true }).selectOption({ label: team });
     await organizer.getByTestId("invite-owner").click();
     await expect
       .poll(
@@ -176,7 +185,9 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
     await expect(page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
       timeout: 30_000,
     });
-    await page.getByLabel("Team").selectOption({ label: teamOfOwner[i] as string });
+    await page
+      .getByLabel("Team", { exact: true })
+      .selectOption({ label: teamOfOwner[i] as string });
     await page.getByTestId("claim-paddle").click();
     await expect(page.getByTestId("my-paddle")).toBeVisible({ timeout: 20_000 });
   }

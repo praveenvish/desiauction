@@ -46,23 +46,33 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   const organizer = await organizerCtx.newPage();
   await otpLogin(organizer, `88${STAMP}`);
   await organizer.goto("/orgs");
-  await organizer.getByLabel("Organization name").fill(`Live Org ${STAMP}`);
+  await organizer.getByTestId("new-org").click();
+  await organizer
+    .getByLabel("Organization name")
+    .filter({ visible: true })
+    .fill(`Live Org ${STAMP}`);
   await organizer.getByRole("button", { name: "Create organization" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");
-  await organizer.getByLabel("Competition name").fill(`Live Cup ${STAMP}`);
+  await organizer.getByTestId("new-season").click();
+  await organizer.getByLabel("Season name").filter({ visible: true }).fill(`Live Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Malad");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
   await organizer.getByLabel("Ends on").fill("2026-09-15");
-  await organizer.getByRole("button", { name: "Create competition" }).click();
+  await organizer.getByRole("button", { name: "Create season" }).click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("draft");
   const slug = new URL(organizer.url()).pathname.split("/")[2] ?? "";
+  // Team management lives in the Teams tab.
+  const seasonUrl = organizer.url();
+  await organizer.goto(`${seasonUrl}/teams`);
   for (const team of ["Team Alpha", "Team Bravo", "Team Charlie"]) {
-    await organizer.getByLabel("Team name").fill(team);
-    await organizer.getByTestId("add-team").click();
-    await expect(organizer.locator(".team-name", { hasText: team })).toBeVisible();
+    await organizer.getByTestId("open-add-team").click();
+    await organizer.getByLabel("Team name").filter({ visible: true }).fill(team);
+    await organizer.getByTestId("add-team-workspace").click();
+    await expect(organizer.getByTestId("teams-list")).toContainText(team);
   }
+  await organizer.goto(seasonUrl);
   await organizer.getByTestId("advance-status").click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("setup");
   await organizer.getByTestId("advance-status").click();
@@ -71,6 +81,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await expect(organizer.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  await organizer.getByTestId("open-import").click();
   await organizer.getByTestId("import-textarea").evaluate((el, csv) => {
     (el as HTMLTextAreaElement).value = csv;
   }, playersCsv());
@@ -106,7 +117,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   });
   const ownerJoinUrls: string[] = [];
   for (const team of teamsByBidder) {
-    await organizer.getByLabel("Team").selectOption({ label: team });
+    await organizer.getByLabel("Team", { exact: true }).selectOption({ label: team });
     await organizer.getByTestId("invite-owner").click();
     await expect
       .poll(
@@ -158,7 +169,9 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     await expect(page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
       timeout: 30_000,
     });
-    await page.getByLabel("Team").selectOption({ label: teamsByBidder[i] as string });
+    await page
+      .getByLabel("Team", { exact: true })
+      .selectOption({ label: teamsByBidder[i] as string });
     await page.getByTestId("claim-paddle").click();
     await expect(page.getByTestId("my-paddle")).toBeVisible({ timeout: 20_000 });
   }
@@ -233,7 +246,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   // Organizer gavels the lot: sold to Team Charlie everywhere.
   await organizer.getByTestId("conduct-close-lot").click();
   for (const page of everyone) {
-    await expect(page.getByTestId("no-lot")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("ceremony")).toBeVisible({ timeout: 20_000 });
   }
 
   // --- Engine restart: state survives, clients reconnect, windows converge ------
@@ -270,7 +283,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
 
   // Close it out: pass the lot (no bids), auction completes cleanly.
   await organizer.getByTestId("conduct-close-lot").click();
-  await expect(organizer.getByTestId("no-lot")).toBeVisible({ timeout: 20_000 });
+  await expect(organizer.getByTestId("ceremony")).toBeVisible({ timeout: 20_000 });
   await organizer.getByTestId("conduct-complete").click();
   for (const page of everyone) {
     await expect(page.getByTestId("live-status")).toHaveText("completed", { timeout: 20_000 });

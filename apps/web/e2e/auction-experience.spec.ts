@@ -61,32 +61,39 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(organizer).toHaveURL(/\/onboarding/);
   await organizer.getByLabel("What should we call you?").fill("Night Organizer");
   await organizer.getByRole("button", { name: "Continue" }).click();
-  await organizer.getByLabel("Organization name").fill(`Night CC ${STAMP}`);
+  await organizer
+    .getByLabel("Organization name")
+    .filter({ visible: true })
+    .fill(`Night CC ${STAMP}`);
   await organizer.getByRole("button", { name: "Create organization" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");
-  await organizer.getByLabel("Competition name").fill(`Night Cup ${STAMP}`);
+  await organizer.getByTestId("new-season").click();
+  await organizer.getByLabel("Season name").filter({ visible: true }).fill(`Night Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Malad");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
   await organizer.getByLabel("Ends on").fill("2026-09-15");
-  await organizer.getByRole("button", { name: "Create competition" }).click();
+  await organizer.getByRole("button", { name: "Create season" }).click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("draft");
   slug = new URL(organizer.url()).pathname.split("/")[2] ?? "";
   liveUrl = `/seasons/${slug}/auction/live`;
   spectateUrl = `/seasons/${slug}/auction/spectate`;
+  await organizer.goto(`/seasons/${slug}/teams`);
   for (const team of ["Team Alpha", "Team Bravo"]) {
-    await organizer.getByLabel("Team name").fill(team);
-    await organizer.getByTestId("add-team").click();
-    await expect(organizer.locator(".team-name", { hasText: team })).toBeVisible();
+    await organizer.getByTestId("open-add-team").click();
+    await organizer.getByLabel("Team name").filter({ visible: true }).fill(team);
+    await organizer.getByTestId("add-team-workspace").click();
+    await expect(organizer.getByTestId("teams-list")).toContainText(team);
   }
+  await organizer.goto(`/seasons/${slug}`);
   await organizer.getByTestId("advance-status").click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("setup");
   await organizer.getByTestId("advance-status").click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("registration open");
   // Publish: the public page AND public spectating hang off this switch.
   await organizer.getByTestId("toggle-visibility").click();
-  await expect(organizer.getByTestId("visibility-row")).toContainText("Public page live");
+  await expect(organizer.getByTestId("visibility-row")).toContainText("LIVE");
 
   await organizer.getByTestId("open-dashboard").click();
   await expect(organizer.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
@@ -97,6 +104,7 @@ test("the full night: lobby → owners → bidding with notifications → public
     `Star Batter,9${STAMP}0,batter,C`,
     `Star Bowler,9${STAMP}1,bowler,C`,
   ].join("\n");
+  await organizer.getByTestId("open-import").click();
   await organizer.getByTestId("import-textarea").evaluate((el, value) => {
     (el as HTMLTextAreaElement).value = value;
   }, csv);
@@ -136,7 +144,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   });
   const joinUrls: string[] = [];
   for (const team of ["Team Alpha", "Team Bravo"]) {
-    await organizer.getByLabel("Team").selectOption({ label: team });
+    await organizer.getByLabel("Team", { exact: true }).selectOption({ label: team });
     await organizer.getByTestId("invite-owner").click();
     await expect
       .poll(
@@ -170,7 +178,7 @@ test("the full night: lobby → owners → bidding with notifications → public
     await expect(entry.page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
       timeout: 30_000,
     });
-    await entry.page.getByLabel("Team").selectOption({ label: entry.team });
+    await entry.page.getByLabel("Team", { exact: true }).selectOption({ label: entry.team });
     await entry.page.getByTestId("claim-paddle").click();
     await expect(entry.page.getByTestId("my-paddle")).toBeVisible({ timeout: 20_000 });
     // The OWNER WORKSPACE exists the moment the paddle is claimed.

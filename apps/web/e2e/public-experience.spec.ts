@@ -70,9 +70,9 @@ test("founder demo: landing → discover → help → legal → register → sig
   await axeClean(page, "/features");
 
   // --- Discovers competitions ------------------------------------------------
-  await page.getByRole("link", { name: "Competitions" }).first().click();
+  await page.getByRole("link", { name: "Tournaments" }).first().click();
   await expect(page).toHaveURL(/\/c$/);
-  await expect(page.getByRole("heading", { name: "Competitions", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tournaments", level: 1 })).toBeVisible();
 
   // --- Reads Help documentation ---------------------------------------------
   await page.getByRole("link", { name: "Help" }).first().click();
@@ -108,7 +108,8 @@ test("founder demo: landing → discover → help → legal → register → sig
 
   // --- Finds Financial Operations documentation ------------------------------
   await page.getByLabel("Search help").fill("financial operations receipts");
-  await page.getByRole("button", { name: "Search" }).click();
+  // The public shell also carries a search trigger; mean the help form.
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page).toHaveURL(/\/search\?q=/);
   await expect(page.getByTestId("search-results")).toBeVisible();
   await page.getByRole("link", { name: /Receipts, invoices and exports/ }).click();

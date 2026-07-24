@@ -97,25 +97,32 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // --- Stage: org → competition → 2 teams → 3 players → completed auction -----
   await onboardWithName(page, OWNER, "Settlement Founder");
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Settle Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Settle Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   orgSlug = new URL(page.url()).pathname.split("/")[2] ?? "";
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Settle Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Settle Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Thane");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   slug = new URL(page.url()).pathname.split("/")[2] ?? "";
 
+  // Team management lives in the Teams tab.
+  const seasonUrl = page.url();
+  await page.goto(`${seasonUrl}/teams`);
   for (const team of ["Kings", "Chargers"]) {
-    await page.getByLabel("Team name").fill(team);
-    await page.getByTestId("add-team").click();
-    await expect(page.locator(".team-name", { hasText: team })).toBeVisible();
+    await page.getByTestId("open-add-team").click();
+    await page.getByLabel("Team name").filter({ visible: true }).fill(team);
+    await page.getByTestId("add-team-workspace").click();
+    await expect(page.getByTestId("teams-list")).toContainText(team);
   }
+  await page.goto(seasonUrl);
   await page.getByTestId("advance-status").click();
   await expect(page.getByTestId("competition-status")).toHaveText("setup");
   await page.getByTestId("advance-status").click();
@@ -125,6 +132,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  await page.getByTestId("open-import").click();
   await page.getByTestId("import-textarea").evaluate((el, csv) => {
     (el as HTMLTextAreaElement).value = csv;
   }, playersCsv(STAMP));
@@ -149,7 +157,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // Opening needs ≥2 paddles and ≥1 queued lot; completing needs zero
   // unresolved lots. Nothing is sold: the dues are declared, not bid.
   for (const team of ["Kings", "Chargers"]) {
-    await page.getByLabel("Team").selectOption({ label: team });
+    await page.getByLabel("Team", { exact: true }).selectOption({ label: team });
     await page.getByTestId("issue-paddle").click();
     await expect(page.getByTestId("paddles-panel")).toContainText(team, { timeout: 20_000 });
   }
@@ -163,7 +171,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // --- The partition: an org OWNER has no money power until it is granted -----
   // The competition's Money TAB is ABSENT, not disabled — and the surface 404s.
   // (Scoped to the tab row: the rail's own "Money" is the personal one, always there.)
-  const tabRow = page.getByRole("navigation", { name: "Competition sections" });
+  const tabRow = page.getByRole("navigation", { name: "Season sections" });
   await page.goto(`/seasons/${slug}`);
   await expect(tabRow).toBeVisible();
   await expect(tabRow.getByRole("link", { name: "Money", exact: true })).toHaveCount(0);

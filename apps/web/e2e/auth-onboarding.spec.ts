@@ -55,7 +55,7 @@ test("founder journey: OTP → name → create org → personalized home; every 
   await page.reload();
   await expect(page.getByTestId("onboarding-org")).toBeVisible();
 
-  await page.getByLabel("Organization name").fill(`Asha CC ${STAMP}`);
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Asha CC ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Asha CC ${STAMP}`);
 
@@ -146,7 +146,7 @@ test("token flows are never hijacked by onboarding, and telemetry captures the f
   await otpLogin(page, organizer);
   await page.getByLabel("What should we call you?").fill("Meera Organizer");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Organization name").fill(`Meera CC ${STAMP}`);
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Meera CC ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Meera CC ${STAMP}`);
   await page.getByTestId("create-invite").click();
@@ -245,7 +245,7 @@ test("mobile 360px: the full entry journey works one-handed", async ({ browser }
     await expect(page).toHaveURL(/\/onboarding/);
     await page.getByLabel("What should we call you?").fill("Mobile Mira");
     await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByLabel("Organization name").fill(`Mira XI ${STAMP}`);
+    await page.getByLabel("Organization name").filter({ visible: true }).fill(`Mira XI ${STAMP}`);
     await page.getByRole("button", { name: "Create organization" }).click();
     await expect(page.getByTestId("org-name")).toHaveText(`Mira XI ${STAMP}`);
     // No horizontal scroll on the journey's surfaces; name offenders on failure.

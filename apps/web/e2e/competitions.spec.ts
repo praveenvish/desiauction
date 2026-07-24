@@ -47,17 +47,19 @@ test("the competition journey: create, open, team, register, approve", async ({
   // Organizer signs in and creates an organization (IP-2 surface).
   await otpLogin(page, PHONE_ORG);
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Comp Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Comp Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Comp Org ${STAMP}`);
 
   // Create a competition with dates + location (so the lifecycle guard passes).
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`MPL ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`MPL ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-08-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-name")).toHaveText(`MPL ${STAMP}`);
   const competitionUrl = page.url();
 
@@ -68,10 +70,12 @@ test("the competition journey: create, open, team, register, approve", async ({
   await page.getByTestId("advance-status").click(); // Open registration
   await expect(page.getByTestId("competition-status")).toHaveText("registration open");
 
-  // Add a team.
-  await page.getByLabel("Team name").fill("Malad Mavericks");
-  await page.getByTestId("add-team").click();
-  await expect(page.getByTestId("teams-panel")).toContainText("Malad Mavericks");
+  // Add a team — team management lives in the Teams tab.
+  await page.goto(`${competitionUrl}/teams`);
+  await page.getByTestId("open-add-team").click();
+  await page.getByLabel("Team name").filter({ visible: true }).fill("Malad Mavericks");
+  await page.getByTestId("add-team-workspace").click();
+  await expect(page.getByTestId("teams-list")).toContainText("Malad Mavericks");
 
   // The registration link is live; a second person registers as a player.
   const registerUrl = `${competitionUrl}/register`;
@@ -90,9 +94,13 @@ test("the competition journey: create, open, team, register, approve", async ({
     await expect(playerPage.getByTestId("registration-submitted")).toBeVisible();
   });
 
-  // The organizer sees the registration in triage and approves it.
-  await page.reload();
-  const triage = page.getByTestId("triage-panel");
+  // The organizer sees the registration in triage and approves it — triage
+  // lives in the Registrations tab.
+  await page.goto(`${competitionUrl}/registrations`);
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  const triage = page.getByTestId("reg-table");
   await expect(triage).toContainText(`+91${PHONE_PLAYER}`);
   await expect(triage).toContainText("submitted");
   await triage.getByRole("button", { name: "Approve" }).first().click();
@@ -103,13 +111,15 @@ test("registration is refused before intake opens", async ({ browser, page }) =>
   const stamp = String(Date.now()).slice(-8);
   await otpLogin(page, `88${stamp}`);
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Closed Org ${stamp}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Closed Org ${stamp}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Closed Cup ${stamp}`);
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Closed Cup ${stamp}`);
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   const registerUrl = `${page.url()}/register`;
 

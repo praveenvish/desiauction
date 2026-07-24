@@ -154,7 +154,7 @@ test("founder demo: settle an auction → open Financial Operations → observe,
 
   // --- Review the delivery lifecycle -----------------------------------------
   await page.goto(`/org/${orgSlug}/money`);
-  await page.getByTestId("open-deliveries").click();
+  await page.getByRole("link", { name: "Deliveries" }).click();
   await expect(page.getByTestId("deliveries-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });

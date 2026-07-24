@@ -44,16 +44,18 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
 
   // Org + competition, open for registration.
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Ops Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Ops Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Ops Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Ops Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-08-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   await page.getByTestId("advance-status").click(); // Begin setup
   await expect(page.getByTestId("competition-status")).toHaveText("setup");
@@ -67,6 +69,7 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
 
   // Import 8 players by CSV (set the file input's content directly).
   // The textarea is uncontrolled (read via ref) — set its DOM value directly.
+  await page.getByTestId("open-import").click();
   await page.getByTestId("import-textarea").evaluate((el, csv) => {
     (el as HTMLTextAreaElement).value = csv;
   }, playersCsv());
@@ -102,12 +105,14 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
 test("registration operations dashboard: axe zero violations", async ({ page }) => {
   await otpLogin(page, `83${STAMP}`);
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Axe Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Axe Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Axe Cup ${STAMP}`);
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Axe Cup ${STAMP}`);
+  await page.getByRole("button", { name: "Create season" }).click();
   await page.getByTestId("open-dashboard").click();
   await expect(page.getByTestId("stat-row")).toBeVisible();
   const scan = await new AxeBuilder({ page }).analyze();

@@ -63,7 +63,8 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await expect(page.getByTestId("onboarding-org")).toBeVisible();
 
   await page.goto("/orgs");
-  await page.getByLabel("Organization name").fill(`Issue Org ${STAMP}`);
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Issue Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await expect(page).toHaveURL(/\/org\/[^/]+$/);
@@ -119,19 +120,25 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
 
   // --- Conduct an auction -----------------------------------------------------
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Issue Cup ${STAMP}`);
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Issue Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Nagpur");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   const slug = new URL(page.url()).pathname.split("/")[2] ?? "";
 
+  // Team management lives in the Teams tab.
+  const seasonUrl = page.url();
+  await page.goto(`${seasonUrl}/teams`);
   for (const team of ["Risers", "Royals"]) {
-    await page.getByLabel("Team name").fill(team);
-    await page.getByTestId("add-team").click();
-    await expect(page.locator(".team-name", { hasText: team })).toBeVisible();
+    await page.getByTestId("open-add-team").click();
+    await page.getByLabel("Team name").filter({ visible: true }).fill(team);
+    await page.getByTestId("add-team-workspace").click();
+    await expect(page.getByTestId("teams-list")).toContainText(team);
   }
+  await page.goto(seasonUrl);
   await page.getByTestId("advance-status").click();
   await expect(page.getByTestId("competition-status")).toHaveText("setup");
   await page.getByTestId("advance-status").click();
@@ -141,6 +148,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  await page.getByTestId("open-import").click();
   await page.getByTestId("import-textarea").evaluate((el, csv) => {
     (el as HTMLTextAreaElement).value = csv;
   }, playersCsv(STAMP));
@@ -162,7 +170,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await page.getByTestId("create-auction").click();
   await expect(page.getByTestId("auction-status")).toHaveText("scheduled", { timeout: 20_000 });
   for (const team of ["Risers", "Royals"]) {
-    await page.getByLabel("Team").selectOption({ label: team });
+    await page.getByLabel("Team", { exact: true }).selectOption({ label: team });
     await page.getByTestId("issue-paddle").click();
     await expect(page.getByTestId("paddles-panel")).toContainText(team, { timeout: 20_000 });
   }
