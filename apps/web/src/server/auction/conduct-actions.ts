@@ -213,8 +213,9 @@ export interface LedgerView {
  * immutable event log on every read (a projection can never diverge from
  * history). Conduct-gated: the ledger is the audit/dispute surface.
  */
-/** DA-30: 214 rows served 900 KB of HTML, and it grows with the auction. */
-export const LEDGER_PAGE_SIZE = 100;
+/** DA-30: 214 rows served 900 KB of HTML, and it grows with the auction.
+ * Not exported: a "use server" module may only export async functions. */
+const LEDGER_PAGE_SIZE = 100;
 
 export async function ledgerView(slug: string, page = 1): Promise<LedgerView | null> {
   const gate = await liveGate(slug);
