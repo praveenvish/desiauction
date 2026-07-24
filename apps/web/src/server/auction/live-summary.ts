@@ -1,6 +1,6 @@
 import { DEFAULT_AUCTION_CONFIG, type AuctionConfig, type IncrementSlab } from "@desiauction/core";
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 
 // PX-6 live-experience reads (thin, additive, spectator-safe). The snapshot
 // stream carries live state but only the LAST lot outcome — late joiners need
@@ -11,6 +11,13 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 
 export interface ResolvedLot {
   lotId: string;
+  /**
+   * The registration behind the lot — the exact key for de-duping a squad.
+   * Null on rows the client synthesises from the snapshot's `lastOutcome`
+   * mid-auction: that payload is spectator-safe and carries no registration.
+   * Those rows reconcile to the server's on the next read.
+   */
+  registrationId: string | null;
   lotNumber: string;
   seq: number;
   playerName: string | null;
@@ -25,6 +32,7 @@ export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedL
   const rows = await db
     .select({
       lotId: lots.id,
+      registrationId: lots.registrationId,
       lotNumber: lots.lotNumber,
       seq: lots.seq,
       playerName: people.name,
@@ -47,6 +55,57 @@ export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedL
     ...row,
     status: row.status as ResolvedLot["status"],
   }));
+}
+
+/**
+ * Players who are on a squad WITHOUT ever going under the hammer: icons
+ * (marquee, pre-signed) and retained players (kept from a prior season). The
+ * auction pool projection filters both out (auction-ready.ts), so they appear
+ * in no lot, no bid and no resolved-lot row — which meant every live surface
+ * showed a franchise's squad as smaller than it actually is.
+ *
+ * Spectator-safe by the same rule as ResolvedLot: the player's name, role and
+ * squad markers. Never a phone, never a person id.
+ */
+export interface PreSignedPlayer {
+  registrationId: string;
+  playerName: string | null;
+  role: string;
+  teamId: string;
+  isIcon: boolean;
+  isRetained: boolean;
+  isCaptain: boolean;
+  isViceCaptain: boolean;
+}
+
+export async function preSignedPlayers(db: Db, competitionId: string): Promise<PreSignedPlayer[]> {
+  const rows = await db
+    .select({
+      registrationId: registrations.id,
+      playerName: people.name,
+      role: registrations.role,
+      teamId: registrations.teamId,
+      isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
+      isCaptain: registrations.isCaptain,
+      isViceCaptain: registrations.isViceCaptain,
+    })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(
+      and(
+        eq(registrations.competitionId, competitionId),
+        eq(registrations.status, "approved"),
+        // teamId is the pre-signed assignment for these two, per the schema note.
+        or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
+      ),
+    )
+    .orderBy(asc(people.name));
+  return rows.flatMap((row) =>
+    // A pre-signed marker without a team is an organizer mid-edit, not a squad
+    // member: drop it rather than invent a franchise for them.
+    row.teamId === null ? [] : [{ ...row, teamId: row.teamId }],
+  );
 }
 
 /** The display slice of the locked AuctionConfig (doc 41) — rules, verbatim. */

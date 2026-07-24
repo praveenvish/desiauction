@@ -312,10 +312,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       .select({ id: registrationsTable.id })
       .from(registrationsTable)
       .where(
-        and(
-          eq(registrationsTable.teamId, team.team.id),
-          eq(registrationsTable.isCaptain, true),
-        ),
+        and(eq(registrationsTable.teamId, team.team.id), eq(registrationsTable.isCaptain, true)),
       );
     expect(captains.map((row) => row.id)).toEqual([second]);
   });

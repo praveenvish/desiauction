@@ -26,9 +26,11 @@ export interface FixtureSnapshot {
   readonly round: number | null;
   readonly homeTeamId: string;
   readonly homeTeamName: string;
+  readonly homeTeamShort: string | null;
   readonly homeTeamColor: string | null;
   readonly awayTeamId: string;
   readonly awayTeamName: string;
+  readonly awayTeamShort: string | null;
   readonly awayTeamColor: string | null;
   readonly groundId: string | null;
   readonly groundName: string | null;
@@ -50,9 +52,11 @@ const SNAPSHOT_COLUMNS = {
   round: fixtures.round,
   homeTeamId: fixtures.homeTeamId,
   homeTeamName: homeTeams.name,
+  homeTeamShort: homeTeams.shortName,
   homeTeamColor: homeTeams.primaryColor,
   awayTeamId: fixtures.awayTeamId,
   awayTeamName: awayTeams.name,
+  awayTeamShort: awayTeams.shortName,
   awayTeamColor: awayTeams.primaryColor,
   groundId: fixtures.groundId,
   groundName: grounds.name,
@@ -71,9 +75,11 @@ interface SnapshotRow {
   round: number | null;
   homeTeamId: string;
   homeTeamName: string | null;
+  homeTeamShort: string | null;
   homeTeamColor: string | null;
   awayTeamId: string;
   awayTeamName: string | null;
+  awayTeamShort: string | null;
   awayTeamColor: string | null;
   groundId: string | null;
   groundName: string | null;

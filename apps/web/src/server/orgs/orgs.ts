@@ -7,7 +7,7 @@ import {
   people,
   type Db,
 } from "@desiauction/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 
 // Organizations + membership (IP-2_DESIGN §4). Membership records belonging;
 // grants carry permission — the two are deliberately separate (C-8).
@@ -95,20 +95,34 @@ export interface MemberRow {
   name: string | null;
   phone: string;
   capabilitySets: string[];
+  /** When they joined the org (ISO) — the members grid's "Joined" column. */
+  joinedAt: string;
 }
 
 export async function membersOf(db: Db, orgId: string): Promise<MemberRow[]> {
   const rows = await db
-    .select({ personId: orgMembers.personId, name: people.name, phone: people.phone })
+    .select({
+      personId: orgMembers.personId,
+      name: people.name,
+      phone: people.phone,
+      joinedAt: orgMembers.joinedAt,
+    })
     .from(orgMembers)
     .innerJoin(people, eq(people.id, orgMembers.personId))
-    .where(eq(orgMembers.orgId, orgId));
+    .where(eq(orgMembers.orgId, orgId))
+    .orderBy(asc(orgMembers.joinedAt));
   const activeGrants = await db
     .select({ personId: grants.personId, capabilitySet: grants.capabilitySet })
     .from(grants)
     .where(and(eq(grants.scopeType, "org"), eq(grants.scopeId, orgId), isNull(grants.revokedAt)));
   return rows.map((row) => ({
-    ...row,
+    personId: row.personId,
+    name: row.name,
+    phone: row.phone,
+    joinedAt: (row.joinedAt instanceof Date
+      ? row.joinedAt
+      : new Date(String(row.joinedAt))
+    ).toISOString(),
     capabilitySets: activeGrants
       .filter((grant) => grant.personId === row.personId)
       .map((grant) => grant.capabilitySet),

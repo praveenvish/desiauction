@@ -179,7 +179,19 @@ async function conductAuctionNight(): Promise<void> {
     if (!(await transitionLot(db, auction, lot.id, owner, "sell")).ok)
       throw new Error(`sell ${sale.player}`);
   }
-  if (!(await transitionAuction(db, auction, owner, "complete")).ok) throw new Error("complete");
+  if (
+    !(
+      await transitionAuction(
+        db,
+        auction,
+        owner,
+        "complete",
+        undefined,
+        /* squads are deliberately tiny in this fixture — override DA-06 */ true,
+      )
+    ).ok
+  )
+    throw new Error("complete");
 }
 
 beforeAll(async () => {

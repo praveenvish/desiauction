@@ -298,7 +298,6 @@ describe("AUCTION FOUNDATION — paddles are immutable identity", () => {
       reason: "unknown_team",
     });
   });
-
 });
 
 describe("AUCTION FOUNDATION — auction lifecycle guards", () => {
@@ -517,7 +516,14 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
 
   it("withdraw is legal only pre-block; close is guard-blocked until all resolve", async () => {
     // Everything is resolved (sold / unsold / unsold) → complete works.
-    const before = await transitionAuction(db, auction, owner, "complete");
+    const before = await transitionAuction(
+      db,
+      auction,
+      owner,
+      "complete",
+      undefined,
+      /* squads are deliberately tiny in this fixture — override DA-06 */ true,
+    );
     expect(before.ok).toBe(true);
     auction = await freshAuction();
     expect(auction.status).toBe("completed");

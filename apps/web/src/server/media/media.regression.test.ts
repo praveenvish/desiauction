@@ -26,7 +26,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
-import { createCompetition, createTeam, type CompetitionSummary } from "../competition/competitions";
+import {
+  createCompetition,
+  createTeam,
+  type CompetitionSummary,
+} from "../competition/competitions";
 import { ForbiddenError } from "../orgs/authz";
 import { createOrg } from "../orgs/orgs";
 import { env } from "../../env";
@@ -167,7 +171,14 @@ describe("MEDIA REGRESSION — write authorization contract", () => {
 
   it("persists keys and captures photo consent on attach", async () => {
     const now = new Date();
-    await persistMediaKey(db, "team", { storageSubjectId: teamId, ownerPersonId: null }, "k/team", now, "organizer_upload_attestation");
+    await persistMediaKey(
+      db,
+      "team",
+      { storageSubjectId: teamId, ownerPersonId: null },
+      "k/team",
+      now,
+      "organizer_upload_attestation",
+    );
     const [team] = await db
       .select({ logoUrl: teamsTable.logoUrl })
       .from(teamsTable)
@@ -175,9 +186,20 @@ describe("MEDIA REGRESSION — write authorization contract", () => {
       .limit(1);
     expect(team?.logoUrl).toBe("k/team");
 
-    await persistMediaKey(db, "player", { storageSubjectId: player, ownerPersonId: player }, "k/photo", now, "self_upload");
+    await persistMediaKey(
+      db,
+      "player",
+      { storageSubjectId: player, ownerPersonId: player },
+      "k/photo",
+      now,
+      "self_upload",
+    );
     const [row] = await db
-      .select({ photoUrl: people.photoUrl, consentAt: people.photoConsentAt, via: people.photoConsentVia })
+      .select({
+        photoUrl: people.photoUrl,
+        consentAt: people.photoConsentAt,
+        via: people.photoConsentVia,
+      })
       .from(people)
       .where(eq(people.id, player))
       .limit(1);

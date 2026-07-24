@@ -11,7 +11,14 @@ import { asc, eq } from "drizzle-orm";
 import { dbHandle, systemDb } from "../db";
 import { engineWsUrl, fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-client";
 import { liveGate } from "./live-actions";
-import { resolvedLots, type ResolvedLot } from "./live-summary";
+import {
+  preSignedPlayers,
+  resolvedLots,
+  rulesOf,
+  type AuctionRules,
+  type PreSignedPlayer,
+  type ResolvedLot,
+} from "./live-summary";
 
 function inGateOrg<T>(
   gate: { personId: string; competition: { orgId: string } },
@@ -25,6 +32,14 @@ function inGateOrg<T>(
 // engine diagnostics proxy. Spectators get spectatorView and NOTHING else —
 // no diagnostics, no audit, no owner data, no events.
 
+/** The franchise identity columns, selected identically on every live surface. */
+const TEAM_IDENTITY = {
+  id: teams.id,
+  name: teams.name,
+  shortName: teams.shortName,
+  primaryColor: teams.primaryColor,
+};
+
 export interface CockpitView {
   competition: { name: string; slug: string };
   auctionId: string;
@@ -32,8 +47,12 @@ export interface CockpitView {
   wsUrl: string;
   view: AuctionView;
   owners: OwnerBoard;
-  teams: { id: string; name: string }[];
+  teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
   viewer: { personId: string; canConduct: boolean; canOverride: boolean };
+  /** Icons and retained players: on a squad, never in the pool. */
+  preSigned: PreSignedPlayer[];
+  resolved: ResolvedLot[];
+  rules: AuctionRules;
 }
 
 /** The cockpit seed — conductors only (the organizer's control room). */
@@ -42,15 +61,17 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
   if (gate === null || !gate.canConduct) {
     return null;
   }
-  const [view, owners, teamRows] = await inGateOrg(gate, (db) =>
+  const [view, owners, teamRows, preSigned, resolved] = await inGateOrg(gate, (db) =>
     Promise.all([
       auctionView(db, gate.auction),
       ownerBoard(db, gate.auction),
       db
-        .select({ id: teams.id, name: teams.name })
+        .select(TEAM_IDENTITY)
         .from(teams)
         .where(eq(teams.competitionId, gate.competition.id))
         .orderBy(asc(teams.name)),
+      preSignedPlayers(db, gate.competition.id),
+      resolvedLots(db, gate.auction.id),
     ]),
   );
   return {
@@ -66,6 +87,9 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
       canConduct: gate.canConduct,
       canOverride: gate.canOverride,
     },
+    preSigned,
+    resolved,
+    rules: rulesOf(gate.auction.config),
   };
 }
 
@@ -76,6 +100,21 @@ export interface SpectatorView {
   wsUrl: string;
   /** PX-6: resolved history for late joiners (spectator-safe by construction). */
   resolved: ResolvedLot[];
+  /**
+   * Franchise identity for the purse board — name, crest letters, colour.
+   * Spectator-safe by the same argument as the snapshot: team names are already
+   * broadcast on every lot, and a short name and a hex are published branding.
+   * No person, no contact, no grant is reachable from here.
+   */
+  teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
+  /**
+   * The locked rules. Already public — the auction lobby prints them as "Rules
+   * of the night" — and the spectator needs the lot window to draw a countdown
+   * that means anything.
+   */
+  rules: AuctionRules;
+  /** Icons and retained players: on a squad, never in the pool. */
+  preSigned: PreSignedPlayer[];
 }
 
 /**
@@ -88,13 +127,26 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
   if (gate === null) {
     return null;
   }
-  const resolved = await inGateOrg(gate, (db) => resolvedLots(db, gate.auction.id));
+  const [resolved, teamRows, preSigned] = await inGateOrg(gate, (db) =>
+    Promise.all([
+      resolvedLots(db, gate.auction.id),
+      db
+        .select(TEAM_IDENTITY)
+        .from(teams)
+        .where(eq(teams.competitionId, gate.competition.id))
+        .orderBy(asc(teams.name)),
+      preSignedPlayers(db, gate.competition.id),
+    ]),
+  );
   return {
     competitionName: gate.competition.name,
     competitionSlug: gate.competition.slug,
     auctionName: gate.auction.name,
     wsUrl: engineWsUrl(gate.auction.id),
     resolved,
+    teams: teamRows,
+    rules: rulesOf(gate.auction.config),
+    preSigned,
   };
 }
 
@@ -124,13 +176,24 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
   if (auction === null) {
     return null;
   }
-  const resolved = await resolvedLots(systemDb, auction.id);
+  const [resolved, teamRows, preSigned] = await Promise.all([
+    resolvedLots(systemDb, auction.id),
+    systemDb
+      .select(TEAM_IDENTITY)
+      .from(teams)
+      .where(eq(teams.competitionId, competition.id))
+      .orderBy(asc(teams.name)),
+    preSignedPlayers(systemDb, competition.id),
+  ]);
   return {
     competitionName: competition.name,
     competitionSlug: competition.slug,
     auctionName: auction.name,
     wsUrl: engineWsUrl(auction.id),
+    teams: teamRows,
     resolved,
+    rules: rulesOf(auction.config),
+    preSigned,
   };
 }
 

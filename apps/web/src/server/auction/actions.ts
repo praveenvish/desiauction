@@ -22,6 +22,7 @@ import { auctionOf, auctionView, type AuctionView } from "@desiauction/auction";
 import { auctionReady, type AuctionReadyProjection } from "./auction-ready";
 import { rulesOf, type AuctionRules } from "./live-summary";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
+import { auctionOverview, type AuctionOverview } from "./auction-overview";
 
 // Auction internal RPC (M-IP4-1, rewired M-IP4-3). One gate: session → tenant
 // → auction.conduct. Creation is the aggregate's birth (no live state exists
@@ -97,6 +98,8 @@ export interface AuctionDashboard {
   rules: AuctionRules | null;
   /** PX-6 lobby: snapshot stream address for the connection check. */
   wsUrl: string | null;
+  /** The operational dashboard: progress, block, burndown, queue, log. */
+  overview: AuctionOverview | null;
 }
 
 /** A deterministic worked example of the timer model — computed, not animated. */
@@ -136,7 +139,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const { ready, view, canConduct, rules, wsUrl } = await inCompetitionOrg(
+  const { ready, view, canConduct, rules, wsUrl, overview } = await inCompetitionOrg(
     session.personId,
     competition,
     async (db) => {
@@ -151,6 +154,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
         canConduct: conduct,
         rules: auction === null ? null : rulesOf(auction.config),
         wsUrl: auction === null ? null : engineWsUrl(auction.id),
+        overview: auction === null ? null : await auctionOverview(db, auction.id, auction.config),
       };
     },
   );
@@ -163,6 +167,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     viewer: { canConduct },
     rules,
     wsUrl,
+    overview,
   };
 }
 

@@ -1,7 +1,14 @@
 "use server";
 
-import { competitions, registrations, teams, tournaments, withTenantDb } from "@desiauction/db";
-import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  competitions,
+  fixtures,
+  registrations,
+  teams,
+  tournaments,
+  withTenantDb,
+} from "@desiauction/db";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
@@ -33,6 +40,11 @@ export interface EditionRow {
   location: string | null;
   teams: number;
   players: number;
+  /** Fixtures scheduled for this edition. */
+  matches: number;
+  /** Registrations still awaiting an organizer decision — the subset of
+      `players` that is a to-do rather than a total. */
+  pending: number;
 }
 
 export interface TournamentGroup {
@@ -71,7 +83,7 @@ async function editionsFor(
     .orderBy(desc(competitions.createdAt));
 
   const ids = rows.map((row) => row.id);
-  const [teamRows, playerRows] = await Promise.all([
+  const [teamRows, playerRows, matchRows, pendingRows] = await Promise.all([
     ids.length > 0
       ? db
           .select({ competitionId: teams.competitionId, count: sql<number>`count(*)::int` })
@@ -86,9 +98,31 @@ async function editionsFor(
           .where(inArray(registrations.competitionId, ids))
           .groupBy(registrations.competitionId)
       : Promise.resolve([]),
+    ids.length > 0
+      ? db
+          .select({ competitionId: fixtures.competitionId, count: sql<number>`count(*)::int` })
+          .from(fixtures)
+          .where(inArray(fixtures.competitionId, ids))
+          .groupBy(fixtures.competitionId)
+      : Promise.resolve([]),
+    ids.length > 0
+      ? db
+          .select({ competitionId: registrations.competitionId, count: sql<number>`count(*)::int` })
+          .from(registrations)
+          .where(
+            and(
+              inArray(registrations.competitionId, ids),
+              // "Submitted" is the only status waiting on a human.
+              eq(registrations.status, "submitted"),
+            ),
+          )
+          .groupBy(registrations.competitionId)
+      : Promise.resolve([]),
   ]);
   const teamsBy = new Map(teamRows.map((row) => [row.competitionId, row.count]));
   const playersBy = new Map(playerRows.map((row) => [row.competitionId, row.count]));
+  const matchesBy = new Map(matchRows.map((row) => [row.competitionId, row.count]));
+  const pendingBy = new Map(pendingRows.map((row) => [row.competitionId, row.count]));
 
   // Keyed by tournament id; "" collects the one-offs.
   const grouped = new Map<string, EditionRow[]>();
@@ -106,6 +140,8 @@ async function editionsFor(
       location: row.location,
       teams: teamsBy.get(row.id) ?? 0,
       players: playersBy.get(row.id) ?? 0,
+      matches: matchesBy.get(row.id) ?? 0,
+      pending: pendingBy.get(row.id) ?? 0,
     });
     grouped.set(key, list);
   }

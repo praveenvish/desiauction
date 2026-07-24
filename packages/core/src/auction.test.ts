@@ -45,6 +45,32 @@ describe("auction lifecycle machine", () => {
     expect(auctionTransition("completed", "reconcile")).toEqual({ ok: true, next: "reconciled" });
   });
 
+  it("DA-06: completing refuses while a squad is under the minimum, unless overridden", () => {
+    const short = { ...READY, teamsBelowSquadMin: 2 };
+    // "Squad 8–15" is printed on every auction screen; it was enforced only as
+    // a ceiling, so an auction could seal with three teams on one player each.
+    expect(auctionTransition("live", "complete", short)).toEqual({
+      ok: false,
+      reason: "squad_below_minimum",
+    });
+    // Overridable, on the record: an auction that genuinely ends short at 11pm
+    // must still be closeable, or the workaround becomes a database edit.
+    expect(auctionTransition("live", "complete", short, true)).toEqual({
+      ok: true,
+      next: "completed",
+    });
+    // The hard guard still outranks the override — a lot mid-flight blocks both.
+    expect(auctionTransition("live", "complete", { ...short, unresolvedLots: 1 }, true)).toEqual({
+      ok: false,
+      reason: "guard_failed",
+    });
+    // Full squads need no override.
+    expect(auctionTransition("live", "complete", { ...READY, teamsBelowSquadMin: 0 })).toEqual({
+      ok: true,
+      next: "completed",
+    });
+  });
+
   it("abort (abandoned) is available from every non-terminal state and only those", () => {
     for (const from of ["scheduled", "live", "paused"] as const) {
       expect(auctionTransition(from, "abort")).toEqual({ ok: true, next: "abandoned" });

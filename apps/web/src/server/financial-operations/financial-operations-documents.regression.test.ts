@@ -249,7 +249,14 @@ async function conductAuctionNight(): Promise<void> {
       throw new Error(`sell ${sale.player}`);
     }
   }
-  const completed = await transitionAuction(db, auction, owner, "complete");
+  const completed = await transitionAuction(
+    db,
+    auction,
+    owner,
+    "complete",
+    undefined,
+    /* squads are deliberately tiny in this fixture — override DA-06 */ true,
+  );
   if (!completed.ok) {
     throw new Error("complete");
   }

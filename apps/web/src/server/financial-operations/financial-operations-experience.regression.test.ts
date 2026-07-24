@@ -267,7 +267,18 @@ async function conductAuctionNight(): Promise<void> {
       throw new Error("sell");
     }
   }
-  if (!(await transitionAuction(db, auction, owner, "complete")).ok) {
+  if (
+    !(
+      await transitionAuction(
+        db,
+        auction,
+        owner,
+        "complete",
+        undefined,
+        /* squads are deliberately tiny in this fixture — override DA-06 */ true,
+      )
+    ).ok
+  ) {
     throw new Error("complete");
   }
 }

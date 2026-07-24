@@ -11,6 +11,8 @@ import { competitions, withTenantDb, type Db } from "@desiauction/db";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
+import { auctionOf } from "@desiauction/auction";
+
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
@@ -25,6 +27,7 @@ import {
   createTeam,
   resolveCompetition,
   setTeamCoach,
+  tournamentsOf,
   teamsOf,
   type CompetitionSummary,
   type TeamSummary,
@@ -37,6 +40,9 @@ import {
   transitionBatch,
 } from "./registration-aggregate";
 import { commitRegistrationImport } from "./registration-import";
+import { seasonOverview, type SeasonOverview } from "./season-overview";
+import { teamsWorkspace, type TeamsWorkspace } from "./team-workspace";
+export type { TeamCard, TeamRosterRow } from "./team-workspace";
 import {
   exportRegistrationsCsv,
   myRegistration,
@@ -118,12 +124,24 @@ export async function createCompetitionAction(
   const location = formString(formData, "location");
   const startsOn = formString(formData, "startsOn");
   const endsOn = formString(formData, "endsOn");
+  const tournamentId = formString(formData, "tournamentId");
   // Membership + capability: only an owner/staff of THIS org may create in it.
   const memberships = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
     orgsFor(db, session.personId),
   );
   if (!memberships.some((o) => o.id === orgId)) {
     return { error: "Choose one of your organizations." };
+  }
+  // The tournament arrives from a hidden field, so it is caller input like any
+  // other: prove it belongs to the SAME org before letting a season claim it,
+  // or a forged id would file an edition under someone else's tournament.
+  if (tournamentId !== "") {
+    const owned = await withTenantDb(dbHandle, { personId: session.personId, orgId }, (db) =>
+      tournamentsOf(db, orgId),
+    );
+    if (!owned.some((tournament) => tournament.id === tournamentId)) {
+      return { error: "That tournament isn't in this organization." };
+    }
   }
   let slug: string;
   try {
@@ -137,6 +155,7 @@ export async function createCompetitionAction(
           location,
           startsOn,
           endsOn,
+          ...(tournamentId !== "" ? { tournamentId } : {}),
         });
       },
     );
@@ -157,6 +176,10 @@ export interface CompetitionView {
   viewer: { canManage: boolean; canReview: boolean };
 }
 
+export interface SeasonOverviewView extends SeasonOverview {
+  viewer: { canManage: boolean; canReview: boolean };
+}
+
 export async function competitionView(slug: string): Promise<CompetitionView | null> {
   const session = await requireSession();
   const competition = await resolveCompetitionScoped(session.personId, slug);
@@ -172,6 +195,50 @@ export async function competitionView(slug: string): Promise<CompetitionView | n
       canCompetition(db, session.personId, scope, "registration.review"),
     ]);
     return { competition, teams, registrations, viewer: { canManage, canReview } };
+  });
+}
+
+/**
+ * The Season Workspace overview: the same gate as `competitionView`, but it
+ * returns the derived tiles and summary cards instead of the raw lists. Kept
+ * separate so the dashboard's aggregation never slows the tabs that don't need
+ * it.
+ */
+export async function seasonOverviewView(slug: string): Promise<SeasonOverviewView | null> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return null;
+  }
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [overview, canManage, canReview] = await Promise.all([
+      seasonOverview(db, competition),
+      canCompetition(db, session.personId, scope, "competition.manage"),
+      canCompetition(db, session.personId, scope, "registration.review"),
+    ]);
+    return { ...overview, viewer: { canManage, canReview } };
+  });
+}
+
+export interface TeamsWorkspaceView extends TeamsWorkspace {
+  viewer: { canManage: boolean };
+}
+
+/** The Teams tab: franchise cards + rosters with buy prices. Same membership gate. */
+export async function teamsWorkspaceView(slug: string): Promise<TeamsWorkspaceView | null> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return null;
+  }
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [workspace, canManage] = await Promise.all([
+      teamsWorkspace(db, competition),
+      canCompetition(db, session.personId, scope, "competition.manage"),
+    ]);
+    return { ...workspace, viewer: { canManage } };
   });
 }
 
@@ -296,6 +363,17 @@ export async function createTeamAction(
     );
   } catch {
     return { ok: false, error: "You can't manage teams here." };
+  }
+  // DA-07: the team set is what the auction issued paddles against and what
+  // settlement sealed. A fifth team appearing after the hammer fell left the
+  // season permanently inconsistent — five teams against a four-team auction
+  // and a four-team reconciled case — and with no delete, unfixable.
+  const auction = await auctionOf(systemDb, competition.id);
+  if (auction !== null && auction.status !== "scheduled") {
+    return {
+      ok: false,
+      error: "The auction has started — the teams are locked for this season.",
+    };
   }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
     createTeam(

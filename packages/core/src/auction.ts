@@ -61,10 +61,20 @@ export interface AuctionReadiness {
   paddleCount: number; // ≥2 teams with issued paddles
   queuedLots: number; // ≥1 lot in the queue
   unresolvedLots: number; // on_block + closing_soon + frozen (blocks complete)
+  /**
+   * Teams whose squad is under `squadMin`. "Squad 8–15" is printed on every
+   * auction screen; until now it was enforced only as a ceiling, so an auction
+   * could seal with three teams holding one player each and no objection.
+   * Blocks complete — overridably, because an auction that genuinely ends
+   * short at 11pm must still be closeable, and a rule with no exit gets worked
+   * around with database edits, which is worse.
+   */
+  teamsBelowSquadMin?: number;
 }
 
 export type AuctionTransition =
-  { ok: true; next: AuctionStatus } | { ok: false; reason: "illegal_transition" | "guard_failed" };
+  | { ok: true; next: AuctionStatus }
+  | { ok: false; reason: "illegal_transition" | "guard_failed" | "squad_below_minimum" };
 
 /**
  * Upholds: only declared edges are legal; opening needs ≥2 paddles and ≥1
@@ -77,6 +87,8 @@ export function auctionTransition(
   from: AuctionStatus,
   command: AuctionCommand,
   readiness?: AuctionReadiness,
+  /** Conductor's explicit, reasoned override of a soft guard (short squads). */
+  override = false,
 ): AuctionTransition {
   if (!AUCTION_EDGES[from].has(command)) {
     return { ok: false, reason: "illegal_transition" };
@@ -91,6 +103,11 @@ export function auctionTransition(
   if (command === "complete") {
     if (readiness === undefined || readiness.unresolvedLots > 0) {
       return { ok: false, reason: "guard_failed" };
+    }
+    // Hard: no lot may be mid-flight. Soft: short squads refuse unless the
+    // conductor overrides on the record.
+    if ((readiness.teamsBelowSquadMin ?? 0) > 0 && !override) {
+      return { ok: false, reason: "squad_below_minimum" };
     }
   }
   return { ok: true, next: AUCTION_TARGET[command] };

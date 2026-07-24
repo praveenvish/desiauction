@@ -481,7 +481,11 @@ export class AuctionEngine {
           AbortAuction: "abort",
         }[envelope.type] as "open" | "pause" | "resume" | "complete" | "abort";
         const reasonText = this.str(envelope.payload, "reason") ?? undefined;
-        const result = await transitionAuction(db, auction, actor, command, reasonText);
+        // DA-06: completing with squads under the minimum refuses unless the
+        // conductor says so on the record — the override rides in the payload
+        // and its reason lands in the event, where it stays for ever.
+        const override = envelope.payload["overrideSquadMinimum"] === true;
+        const result = await transitionAuction(db, auction, actor, command, reasonText, override);
         return result.ok ? accept() : rejected(result.reason);
       }
       // Manual conduct (M-IP4-3): withdraw / freeze / requeue — the same

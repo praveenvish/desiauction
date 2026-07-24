@@ -317,7 +317,7 @@ export async function issuePaddle(
 
 export type AuctionMutationResult =
   | { ok: true; status: AuctionStatus }
-  | { ok: false; reason: "illegal_transition" | "guard_failed" };
+  | { ok: false; reason: "illegal_transition" | "guard_failed" | "squad_below_minimum" };
 
 const AUCTION_EVENT_OF: Record<AuctionCommand, string> = {
   open: "AuctionOpened",
@@ -328,7 +328,7 @@ const AUCTION_EVENT_OF: Record<AuctionCommand, string> = {
   abort: "AuctionAborted",
 };
 
-async function auctionReadiness(db: Db, auctionId: string) {
+async function auctionReadiness(db: Db, auctionId: string, auction?: AuctionRecord) {
   const [paddleRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(paddles)
@@ -346,10 +346,28 @@ async function auctionReadiness(db: Db, auctionId: string) {
         inArray(lots.status, ["on_block", "closing_soon", "frozen"]),
       ),
     );
+  // DA-06: "squad 8–15" is printed on every auction screen. Counting it here
+  // makes the floor real — the ceiling was already enforced by the bid gauntlet.
+  // Every team counts, including one that never bid: no squad is the shortest.
+  let below = 0;
+  if (auction !== undefined) {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(teams)
+      .where(
+        and(
+          eq(teams.competitionId, auction.competitionId),
+          sql`(select count(*) from ${registrations} where ${registrations.teamId} = ${teams.id})
+              < ${auction.config.squadMin}`,
+        ),
+      );
+    below = row?.count ?? 0;
+  }
   return {
     paddleCount: paddleRow?.count ?? 0,
     queuedLots: queuedRow?.count ?? 0,
     unresolvedLots: unresolvedRow?.count ?? 0,
+    teamsBelowSquadMin: below,
   };
 }
 
@@ -360,9 +378,11 @@ export async function transitionAuction(
   actorId: string,
   command: Exclude<AuctionCommand, "reconcile">,
   reason?: string,
+  /** Conductor's explicit override of the soft squad-minimum guard (DA-06). */
+  override = false,
 ): Promise<AuctionMutationResult> {
-  const readiness = await auctionReadiness(db, auction.id);
-  const decision = auctionTransition(auction.status, command, readiness);
+  const readiness = await auctionReadiness(db, auction.id, auction);
+  const decision = auctionTransition(auction.status, command, readiness, override);
   if (!decision.ok) {
     return decision;
   }
@@ -718,7 +738,21 @@ export async function placeBid(
     .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
     .where(and(eq(lots.auctionId, auction.id), eq(paddles.teamId, paddle.teamId)));
   const committed = Number(purseRow?.committed ?? "0");
-  const squadSize = purseRow?.squad ?? 0;
+  // DA-09: pre-signed players occupy a place in the XI, so they count against
+  // squadMax like anyone else. Counting only auction wins let a team with an
+  // icon finish on squadMax + 1 and every board render "16/15" — a fraction
+  // above its own denominator, which is how you know the cap was not real.
+  const [preSignedRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(registrations)
+    .where(
+      and(
+        eq(registrations.competitionId, auction.competitionId),
+        eq(registrations.teamId, paddle.teamId),
+        eq(registrations.isIcon, true),
+      ),
+    );
+  const squadSize = (purseRow?.squad ?? 0) + (preSignedRow?.count ?? 0);
   const [roleRow] = await db
     .select({ role: registrations.role })
     .from(registrations)
