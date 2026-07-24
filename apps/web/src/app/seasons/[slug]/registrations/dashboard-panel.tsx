@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  Dialog,
   Field,
   PlayerImage,
   Select,
@@ -46,6 +47,17 @@ const REG_TONE = {
 const STATUS_FILTERS = ["", "submitted", "approved", "rejected", "waitlisted", "withdrawn"];
 const SORTS = ["recent", "oldest", "name", "number", "status"];
 
+/**
+ * DA-22: the toast built its verb as `${action}d`, which spelled "rejectd" and
+ * "waitlistd". Approve was correct by luck.
+ */
+const PAST_TENSE: Record<string, string> = {
+  approve: "approved",
+  reject: "rejected",
+  waitlist: "waitlisted",
+  restore: "restored",
+};
+
 export function RegistrationDashboardPanel({
   slug,
   stats,
@@ -70,6 +82,7 @@ export function RegistrationDashboardPanel({
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [noteText, setNoteText] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [ioOpen, setIoOpen] = useState(false);
   const csvRef = useRef<HTMLTextAreaElement>(null);
   const [search, setSearch] = useState(filters.search);
   // Interactivity marker: this effect runs only after client hydration, so the
@@ -128,7 +141,7 @@ export function RegistrationDashboardPanel({
     setBusy(false);
     if (result.ok) {
       toast({
-        title: `${String(result.applied ?? 0)} ${action}d · ${String(result.skipped ?? 0)} skipped`,
+        title: `${String(result.applied ?? 0)} ${PAST_TENSE[action] ?? action} · ${String(result.skipped ?? 0)} skipped`,
         tone: "success",
       });
       setSelected(new Set());
@@ -160,6 +173,14 @@ export function RegistrationDashboardPanel({
       return;
     }
     setExpanded(id);
+    // DA-13: the panel renders AFTER the table, so on a 25-row page it opened
+    // ~2,400px below the row that was clicked. Clicking Details looked like
+    // nothing had happened at all.
+    requestAnimationFrame(() => {
+      document
+        .querySelector('[data-testid="timeline-panel"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
     setNoteText("");
     setTimeline(await registrationTimelineAction(slug, id));
   };
@@ -222,6 +243,7 @@ export function RegistrationDashboardPanel({
       if (csvRef.current) {
         csvRef.current.value = "";
       }
+      setIoOpen(false);
       router.refresh();
     } else {
       toast({ title: result.error ?? "Import failed.", tone: "danger" });
@@ -271,6 +293,25 @@ export function RegistrationDashboardPanel({
 
   return (
     <>
+      <div className="reg-toolbar">
+        <Button
+          size="sm"
+          variant="secondary"
+          data-testid="export-csv"
+          onClick={() => void doExport()}
+        >
+          Export CSV
+        </Button>
+        <Button
+          size="sm"
+          data-testid="open-import"
+          onClick={() => {
+            setIoOpen(true);
+          }}
+        >
+          + Import players
+        </Button>
+      </div>
       <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
         <StatTile
           label="Total"
@@ -541,17 +582,25 @@ export function RegistrationDashboardPanel({
           {(() => {
             const detail = rows.find((r) => r.id === expanded);
             return detail !== undefined ? (
-              <div className="reg-photo-manage">
-                <PlayerPhotoUploader
-                  slug={slug}
-                  registrationId={detail.id}
-                  playerName={detail.name ?? "Player"}
-                  {...(detail.photoUrl !== null ? { currentUrl: detail.photoUrl } : {})}
-                />
-              </div>
+              <>
+                {/* DA-13: the panel had no heading, so once you found it you
+                    still could not tell whose record you were looking at. */}
+                <h2 data-testid="details-subject">
+                  {detail.name ?? "Player"}{" "}
+                  <span className="registration-phone">{detail.number}</span>
+                </h2>
+                <div className="reg-photo-manage">
+                  <PlayerPhotoUploader
+                    slug={slug}
+                    registrationId={detail.id}
+                    playerName={detail.name ?? "Player"}
+                    {...(detail.photoUrl !== null ? { currentUrl: detail.photoUrl } : {})}
+                  />
+                </div>
+              </>
             ) : null;
           })()}
-          <h2>Timeline</h2>
+          <h3>Timeline</h3>
           <ol className="timeline">
             {timeline.map((entry, index) => (
               <li key={index}>
@@ -621,65 +670,87 @@ export function RegistrationDashboardPanel({
         </Card>
       ) : null}
 
-      <Card data-testid="io-panel">
-        <h2>Import / export</h2>
-        <label className="io-file" htmlFor="csv-input">
-          <span>Import CSV — columns: name, phone, role, base_price_band</span>
-        </label>
-        <textarea
-          id="csv-input"
-          ref={csvRef}
-          className="csv-input"
-          data-testid="import-textarea"
-          rows={4}
-          placeholder="Paste CSV rows here, or choose a file"
-          defaultValue=""
-        />
-        <div className="io-row">
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            aria-label="Choose a CSV file"
-            data-testid="import-file"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                readCsvFile(file);
-              }
+      <Dialog
+        open={ioOpen}
+        onClose={() => {
+          setIoOpen(false);
+        }}
+        title="Import players"
+        size="wide"
+        footer={
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setIoOpen(false);
             }}
+          >
+            Close
+          </Button>
+        }
+      >
+        <div className="io-panel" data-testid="io-panel">
+          <label className="io-file" htmlFor="csv-input">
+            <span>Paste or choose a CSV — columns: name, phone, role, base_price_band</span>
+          </label>
+          <textarea
+            id="csv-input"
+            ref={csvRef}
+            className="csv-input"
+            data-testid="import-textarea"
+            rows={5}
+            placeholder="Paste CSV rows here, or choose a file"
+            defaultValue=""
           />
-          <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
-            Preview
-          </Button>
-          <Button variant="ghost" onClick={() => void doExport()} data-testid="export-csv">
-            Export CSV
-          </Button>
-        </div>
-        {preview !== null ? (
-          <div className="import-preview" data-testid="import-preview">
-            <p>
-              {preview.validCount} valid row(s) · {preview.errors.length} error(s)
-            </p>
-            {preview.errors.length > 0 ? (
-              <ul className="import-errors">
-                {preview.errors.slice(0, 8).map((error, index) => (
-                  <li key={index}>
-                    Line {error.line}: {error.message}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <Button
-              onClick={() => void commitImport()}
-              loading={busy}
-              disabled={preview.errors.length > 0 || preview.validCount === 0}
-              data-testid="import-commit"
-            >
-              Import {preview.validCount} player(s)
+          <div className="io-row">
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              aria-label="Choose a CSV file"
+              data-testid="import-file"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  readCsvFile(file);
+                }
+              }}
+            />
+            <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
+              Preview
             </Button>
           </div>
-        ) : null}
-      </Card>
+          {preview !== null ? (
+            <div className="import-preview" data-testid="import-preview">
+              <p>
+                {preview.validCount} valid row(s) · {preview.errors.length} error(s)
+              </p>
+              {preview.errors.length > 0 ? (
+                <ul className="import-errors">
+                  {preview.errors.slice(0, 8).map((error, index) => (
+                    <li key={index}>
+                      Line {error.line}: {error.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <Button
+                onClick={() => void commitImport()}
+                loading={busy}
+                disabled={preview.errors.length > 0 || preview.validCount === 0}
+                data-testid="import-commit"
+              >
+                {/* DA-26: the button read "Import 2 player(s)" while disabled
+                    because four OTHER rows had errors, so it named the wrong
+                    number and never said what was blocking it. */}
+                {preview.errors.length > 0
+                  ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import`
+                  : preview.validCount === 0
+                    ? "Nothing to import"
+                    : `Import ${String(preview.validCount)} player${preview.validCount === 1 ? "" : "s"}`}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </Dialog>
     </>
   );
 }

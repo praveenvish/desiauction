@@ -17,7 +17,7 @@ import { currentSession } from "../auth/actions";
 import { canCompetition, requireCompetitionCapability } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
 import { dbHandle, systemDb } from "../db";
-import { createAuction, type AuctionRecord } from "@desiauction/auction";
+import { auctionReadiness, createAuction, type AuctionRecord } from "@desiauction/auction";
 import { auctionOf, auctionView, type AuctionView } from "@desiauction/auction";
 import { auctionReady, type AuctionReadyProjection } from "./auction-ready";
 import { rulesOf, type AuctionRules } from "./live-summary";
@@ -256,6 +256,31 @@ const AUCTION_COMMAND_OF: Record<string, string> = {
   abort: "AbortAuction",
 };
 
+/** Name the gate that is red, rather than listing every gate there is. */
+async function guardFailureDetail(slug: string, command: string): Promise<string> {
+  const gate = await conductGate(slug);
+  if (!gate.ok) {
+    return "The auction isn't ready for that yet.";
+  }
+  const auction = await auctionOf(systemDb, gate.competition.id);
+  if (auction === null) {
+    return "The auction isn't ready for that yet.";
+  }
+  const readiness = await auctionReadiness(systemDb, auction.id, auction);
+  if (command === "open") {
+    if (readiness.paddleCount < 2) {
+      return `Only ${String(readiness.paddleCount)} paddle(s) issued — an auction needs at least two teams ready to bid.`;
+    }
+    if (readiness.queuedLots < 1) {
+      return "No lots are queued yet — queue the prepared lots first.";
+    }
+  }
+  if (command === "complete" && readiness.unresolvedLots > 0) {
+    return `${String(readiness.unresolvedLots)} lot(s) are still on the block or frozen — resolve them first.`;
+  }
+  return "The auction isn't ready for that yet.";
+}
+
 export async function auctionLifecycleAction(
   slug: string,
   command: string,
@@ -267,9 +292,15 @@ export async function auctionLifecycleAction(
   }
   const result = await conductCommand(slug, type, reason === undefined ? {} : { reason });
   if (!result.ok) {
+    // DA-25: "check paddles, the queue, and unresolved lots" named all three
+    // possibilities and none of the actual cause. The readiness numbers are
+    // already loaded, so the refusal can say which gate is red.
+    if (result.reason === "guard_failed") {
+      return { ok: false, error: await guardFailureDetail(slug, command) };
+    }
     const message: Record<string, string> = {
-      guard_failed: "The guard refused: check paddles, the queue, and unresolved lots.",
       illegal_transition: "That step isn't available from this state.",
+      squad_below_minimum: "Some teams are still below the minimum squad size.",
       engine_unreachable: "The auction engine is offline.",
       engine_halted: "The engine halted fail-closed — run recovery from the cockpit.",
     };

@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   RAIL,
   activeCompetitionTab,
+  activeOrgMoneyTab,
   activeRailKey,
   competitionTabs,
   liveExit,
+  orgMoneyTabs,
+  pageIdentity,
   sectionLabel,
   shellKind,
 } from "./nav";
@@ -36,14 +39,19 @@ describe("shellKind", () => {
 });
 
 describe("rail", () => {
-  it("has exactly five items, forever", () => {
-    expect(RAIL).toHaveLength(5);
-    expect(RAIL.map((item) => item.key)).toEqual(["home", "seasons", "orgs", "money", "help"]);
+  it("has exactly four items, forever", () => {
+    // Four since DA-18 retired the /money placeholder from the rail. A primary
+    // nav item is a promise; that one led to "being built during the beta".
+    expect(RAIL).toHaveLength(4);
+    expect(RAIL.map((item) => item.key)).toEqual(["home", "tournaments", "orgs", "help"]);
   });
 
   it("maps paths to the owning rail item", () => {
     expect(activeRailKey("/home")).toBe("home");
-    expect(activeRailKey("/seasons/mpl/fixtures")).toBe("seasons");
+    expect(activeRailKey("/tournaments")).toBe("tournaments");
+    // A season is an edition OF a tournament: working inside one must not leave
+    // the rail blank.
+    expect(activeRailKey("/seasons/mpl/fixtures")).toBe("tournaments");
     expect(activeRailKey("/org/malad-cc/venues")).toBe("orgs");
     expect(activeRailKey("/orgs")).toBe("orgs");
     expect(activeRailKey("/money")).toBe("money");
@@ -115,14 +123,121 @@ describe("competition tabs", () => {
   });
 });
 
+describe("org money desks", () => {
+  it("navigates the four desks as one workspace", () => {
+    expect(orgMoneyTabs("malad-cc").map((tab) => tab.key)).toEqual([
+      "settlement",
+      "finance",
+      "deliveries",
+      "reconciliation",
+    ]);
+    expect(activeOrgMoneyTab("/org/malad-cc/settlement", "malad-cc")).toBe("settlement");
+    expect(activeOrgMoneyTab("/org/malad-cc/money", "malad-cc")).toBe("finance");
+    // Longest-first: the sub-desks must not all read as Finance.
+    expect(activeOrgMoneyTab("/org/malad-cc/money/deliveries", "malad-cc")).toBe("deliveries");
+    expect(activeOrgMoneyTab("/org/malad-cc/money/reconciliation", "malad-cc")).toBe(
+      "reconciliation",
+    );
+    expect(activeOrgMoneyTab("/org/malad-cc/venues", "malad-cc")).toBeNull();
+  });
+});
+
+// The header's consistency guarantee: one function answers "where am I" for
+// every console route, so no surface can invent its own answer.
+describe("pageIdentity", () => {
+  const ctx = {
+    competitions: [{ slug: "mpl", name: "MPL 2026", orgName: "Malad CC", orgSlug: "malad-cc" }],
+    orgs: [{ slug: "malad-cc", name: "Malad CC" }],
+    isAdmin: true,
+  };
+  const trail = (pathname: string) =>
+    pageIdentity(pathname, ctx).crumbs.map((crumb) => crumb.label);
+
+  it("titles every rail destination and the two surfaces outside the rail", () => {
+    for (const [pathname, title] of [
+      ["/home", "Home"],
+      ["/tournaments", "Tournaments"],
+      ["/orgs", "Organizations"],
+      ["/money", "Money"],
+      ["/inbox", "Notifications"],
+      ["/account", "Account"],
+    ] as const) {
+      const identity = pageIdentity(pathname, ctx);
+      expect(identity.title).toBe(title);
+      expect(identity.crumbs).toEqual([]);
+    }
+  });
+
+  // A root has no ancestors, so line two of the header carries its lede instead.
+  it("gives every ancestor-less surface a lede, and none to a page with a trail", () => {
+    expect(pageIdentity("/tournaments", ctx).subtitle).toMatch(/recurring competitions/);
+    expect(pageIdentity("/orgs", ctx).subtitle).toMatch(/clubs and academies/);
+    expect(pageIdentity("/account", ctx).subtitle).toMatch(/sign-in/);
+    // /home's lede is data (the portfolio line), published by the page itself.
+    expect(pageIdentity("/home", ctx).subtitle).toBeUndefined();
+    expect(pageIdentity("/seasons/mpl/teams", ctx).subtitle).toBeUndefined();
+  });
+
+  it("names the season itself on its overview and the section everywhere below", () => {
+    expect(pageIdentity("/seasons/mpl", ctx)).toEqual({
+      crumbs: [{ label: "Malad CC", href: "/org/malad-cc" }],
+      title: "MPL 2026",
+    });
+    expect(pageIdentity("/seasons/mpl/teams", ctx)).toEqual({
+      crumbs: [
+        { label: "Malad CC", href: "/org/malad-cc" },
+        { label: "MPL 2026", href: "/seasons/mpl" },
+      ],
+      title: "Teams",
+    });
+    expect(pageIdentity("/seasons/mpl/money/case/01ABC", ctx).title).toBe("Case review");
+  });
+
+  it("falls back to what the URL alone can prove for a non-member deep link", () => {
+    expect(pageIdentity("/seasons/unknown-cup/teams", ctx)).toEqual({
+      crumbs: [{ label: "Tournaments", href: "/tournaments" }],
+      title: "Teams",
+    });
+  });
+
+  it("names the org on its home and the desk on each money surface", () => {
+    expect(pageIdentity("/org/malad-cc", ctx)).toEqual({
+      crumbs: [{ label: "Organizations", href: "/orgs" }],
+      title: "Malad CC",
+    });
+    expect(trail("/org/malad-cc/money/deliveries")).toEqual(["Organizations", "Malad CC"]);
+    expect(pageIdentity("/org/malad-cc/money/deliveries", ctx).title).toBe("Deliveries");
+    expect(pageIdentity("/org/malad-cc/venues", ctx).title).toBe("Venues");
+    // Page data the shell does not hold — a true label the page then overrides.
+    expect(pageIdentity("/org/malad-cc/t/bpl", ctx).title).toBe("Tournament");
+  });
+
+  it("puts administration under one root", () => {
+    expect(pageIdentity("/admin", ctx)).toEqual({ crumbs: [], title: "Platform admin" });
+    expect(pageIdentity("/admin/users", ctx)).toEqual({
+      crumbs: [{ label: "Platform admin", href: "/admin" }],
+      title: "Users",
+    });
+    expect(pageIdentity("/admin/users/01ABC", ctx).title).toBe("User");
+  });
+
+  // The 404 underneath must be the whole answer: no title, no trail, nothing
+  // for the shell to confirm from.
+  it("says nothing about administration to anyone without the grant", () => {
+    const stranger = { ...ctx, isAdmin: false };
+    expect(pageIdentity("/admin", stranger)).toEqual({ crumbs: [], title: null });
+    expect(pageIdentity("/admin/audit", stranger)).toEqual({ crumbs: [], title: null });
+  });
+
+  it("frames no title for a route it cannot name", () => {
+    expect(pageIdentity("/nowhere", ctx)).toEqual({ crumbs: [], title: null });
+  });
+});
+
 describe("liveExit", () => {
   it("exits to the auction hub for members and to the front door for anonymous spectators", () => {
-    expect(liveExit("/seasons/mpl/auction/cockpit", true).href).toBe(
-      "/seasons/mpl/auction",
-    );
+    expect(liveExit("/seasons/mpl/auction/cockpit", true).href).toBe("/seasons/mpl/auction");
     expect(liveExit("/seasons/mpl/auction/spectate", false).href).toBe("/");
-    expect(liveExit("/seasons/mpl/auction/spectate", true).href).toBe(
-      "/seasons/mpl/auction",
-    );
+    expect(liveExit("/seasons/mpl/auction/spectate", true).href).toBe("/seasons/mpl/auction");
   });
 });

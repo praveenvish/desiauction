@@ -73,12 +73,25 @@ export interface RailTarget {
   href: string;
 }
 
-/** Exactly five, forever (canon docs/16; PX-1 01 §1). */
+/**
+ * Exactly five, forever (canon docs/16; PX-1 01 §1) — the COUNT is the canon,
+ * and it still holds.
+ *
+ * Slot 2 was "Seasons". It is now "Tournaments", by an explicit product ruling:
+ * the recurring tournament is how organizers name their calendar ("BPL", then
+ * "BPL 1", "BPL 2"), the schema has modelled it since IP-3, and the layer was
+ * unreachable — no route, no create flow, every UI-made season a one-off.
+ * Seasons have not moved: they live under their tournament, and /seasons still
+ * answers, so the rail's active key claims both.
+ */
 export const RAIL: RailTarget[] = [
   { key: "home", label: "Home", href: "/home" },
-  { key: "seasons", label: "Seasons", href: "/seasons" },
+  { key: "tournaments", label: "Tournaments", href: "/tournaments" },
   { key: "orgs", label: "Organizations", href: "/orgs" },
-  { key: "money", label: "Money", href: "/money" },
+  // DA-18: /money is a placeholder that tells the user so ("being built during
+  // the beta"). A primary navigation item is a promise; this one led to an
+  // apology. It comes back when the surface behind it does — the season's own
+  // Money tab, which IS built, is unaffected.
   { key: "help", label: "Help", href: "/help" },
 ];
 
@@ -87,8 +100,11 @@ export function activeRailKey(pathname: string): string | null {
   if (pathname.startsWith("/org/") || pathname.startsWith("/orgs")) {
     return "orgs";
   }
-  if (pathname.startsWith("/seasons")) {
-    return "seasons";
+  // A season IS an edition of a tournament, so every /seasons/* surface lights
+  // the Tournaments rail item rather than leaving the rail blank while an
+  // organizer does the bulk of their work.
+  if (pathname.startsWith("/tournaments") || pathname.startsWith("/seasons")) {
+    return "tournaments";
   }
   if (pathname.startsWith("/money")) {
     return "money";
@@ -110,6 +126,8 @@ export interface CompetitionTab {
   key: string;
   label: string;
   href: string;
+  /** Test hook, for when the tab IS the navigation affordance a suite drives. */
+  testId?: string;
 }
 
 /**
@@ -212,14 +230,54 @@ export function activeAdminTab(pathname: string): string {
  */
 export function competitionTabs(slug: string, canSettle = false): CompetitionTab[] {
   const base = `/seasons/${slug}`;
+  // These tabs ARE the season workspace's navigation, so they carry the
+  // navigation test hooks. They used to hang off buttons on the overview, which
+  // is now a read-only dashboard.
   return [
     { key: "overview", label: "Overview", href: base },
-    { key: "teams", label: "Teams", href: `${base}/teams` },
-    { key: "registrations", label: "Registrations", href: `${base}/registrations` },
-    { key: "fixtures", label: "Fixtures", href: `${base}/fixtures` },
-    { key: "auction", label: "Auction", href: `${base}/auction` },
+    { key: "teams", label: "Teams", href: `${base}/teams`, testId: "open-teams" },
+    {
+      key: "registrations",
+      label: "Registrations",
+      href: `${base}/registrations`,
+      testId: "open-dashboard",
+    },
+    { key: "fixtures", label: "Fixtures", href: `${base}/fixtures`, testId: "open-fixtures" },
+    { key: "auction", label: "Auction", href: `${base}/auction`, testId: "open-auction" },
     ...(canSettle ? [{ key: "money", label: "Money", href: `${base}/money` }] : []),
   ];
+}
+
+/**
+ * The org's money desks read as one workspace with four sections, so they
+ * navigate like every other sectioned surface — through the shell's tab strip,
+ * not a bar each page draws for itself.
+ */
+export function orgMoneyTabs(slug: string): CompetitionTab[] {
+  return [
+    { key: "settlement", label: "Settlement", href: `/org/${slug}/settlement` },
+    { key: "finance", label: "Finance", href: `/org/${slug}/money` },
+    { key: "deliveries", label: "Deliveries", href: `/org/${slug}/money/deliveries` },
+    { key: "reconciliation", label: "Reconciliation", href: `/org/${slug}/money/reconciliation` },
+  ];
+}
+
+/** null when the path is not one of the money desks. */
+export function activeOrgMoneyTab(pathname: string, slug: string): string | null {
+  const base = `/org/${slug}`;
+  if (pathname.startsWith(`${base}/settlement`)) {
+    return "settlement";
+  }
+  if (pathname.startsWith(`${base}/money/deliveries`)) {
+    return "deliveries";
+  }
+  if (pathname.startsWith(`${base}/money/reconciliation`)) {
+    return "reconciliation";
+  }
+  if (pathname.startsWith(`${base}/money`)) {
+    return "finance";
+  }
+  return null;
 }
 
 export function activeCompetitionTab(pathname: string, slug: string): string {
@@ -268,6 +326,10 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/auction\/engine$/, "Engine"],
   [/\/auction$/, "Auction"],
   [/\/register$/, "Register"],
+  [/^\/org\/[^/]+\/t\/[^/]+$/, "Tournament"],
+  [/^\/org\/[^/]+\/venues$/, "Venues"],
+  [/^\/tournaments\/[^/]+$/, "Tournament"],
+  [/^\/tournaments$/, "Tournaments"],
 ];
 
 export function sectionLabel(pathname: string): string | null {
@@ -277,6 +339,159 @@ export function sectionLabel(pathname: string): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Where the identity bar's title comes from on a rail destination. The rail
+ * label names a place in the navigation; these name the surface you land on.
+ */
+const RAIL_TITLES: Record<string, string> = {
+  home: "Home",
+  tournaments: "Tournaments",
+  orgs: "Organizations",
+  money: "Money",
+  help: "Help",
+};
+
+/** The two console surfaces that sit outside the five-item rail. */
+const OUTSIDE_RAIL: [string, string][] = [
+  ["/inbox", "Notifications"],
+  ["/account", "Account"],
+];
+
+/**
+ * The one line that says what a surface is for. It rides the identity bar under
+ * the title, in the slot a breadcrumb takes on a nested page — so line two of
+ * the header always answers "and what is this?", by trail or by sentence, and
+ * the page below opens with content instead of a lede.
+ *
+ * Only surfaces with no ancestors need one; inside a season the trail is the
+ * better answer. Pages whose lede is data (the /home headline) publish it
+ * through `<PageTitle subtitle=…>` instead.
+ */
+const SURFACE_SUBTITLES: [string, string][] = [
+  ["/tournaments", "Your recurring competitions, and the seasons that run under them."],
+  ["/orgs", "The clubs and academies you run tournaments under."],
+  ["/money", "Your purses, dues and receipts across every season."],
+  ["/inbox", "Account activity now; approvals, receipts and auction updates join during the beta."],
+  ["/account", "Your sign-in, profile and security."],
+];
+
+export interface IdentityCrumb {
+  label: string;
+  href?: string;
+}
+
+export interface PageIdentity {
+  /** The current page's ANCESTORS. Empty on a rail destination. */
+  crumbs: IdentityCrumb[];
+  /**
+   * The page's name — rendered as the document's one h1, in the shell header.
+   * null where the URL proves nothing (the route 404s underneath), so the shell
+   * frames no title rather than announcing a surface that is not there.
+   */
+  title: string | null;
+  /** What the surface is for, when it has no trail to show instead. */
+  subtitle?: string;
+}
+
+export interface IdentityContext {
+  competitions: { slug: string; name: string; orgName: string; orgSlug: string }[];
+  orgs: { slug: string; name: string }[];
+  /** Administration exists for its grant holders only — for everyone else /admin 404s. */
+  isAdmin?: boolean;
+}
+
+/**
+ * Every console route's breadcrumb + title, decided in ONE place.
+ *
+ * This is what makes the header consistent: no page chooses where its name is
+ * drawn or what shape it takes, so no page can drift. Names the shell already
+ * holds (the viewer's orgs and seasons) resolve here; the handful of titles that
+ * are page data — a tournament, an admin record, a finance document — get a
+ * generic-but-true label here and are overridden by `<PageTitle>` on the page.
+ */
+export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdentity {
+  const section = sectionLabel(pathname);
+
+  // Administration: a flat surface with its own tabs, reached from the avatar.
+  // Titled only for grant holders — for anyone else the page underneath is a
+  // 404, and naming the surface would be the shell admitting it exists.
+  if (pathname.startsWith("/admin")) {
+    if (ctx.isAdmin !== true) {
+      return { crumbs: [], title: null };
+    }
+    return pathname === "/admin"
+      ? { crumbs: [], title: "Platform admin" }
+      : {
+          crumbs: [{ label: "Platform admin", href: "/admin" }],
+          title: section ?? "Platform admin",
+        };
+  }
+
+  // Inside a season: org / season / section.
+  const seasonMatch = /^\/seasons\/([^/]+)/.exec(pathname);
+  if (seasonMatch !== null) {
+    const slug = seasonMatch[1] as string;
+    const season = ctx.competitions.find((entry) => entry.slug === slug);
+    if (season === undefined) {
+      // A non-member deep link: the page underneath 404s, so the trail says only
+      // what is true from the URL.
+      return {
+        crumbs: [{ label: "Tournaments", href: "/tournaments" }],
+        title: section ?? "Season",
+      };
+    }
+    return {
+      crumbs: [
+        { label: season.orgName, href: `/org/${season.orgSlug}` },
+        ...(section !== null ? [{ label: season.name, href: `/seasons/${slug}` }] : []),
+      ],
+      title: section ?? season.name,
+    };
+  }
+
+  // Inside an org: Organizations / org / section.
+  const orgMatch = /^\/org\/([^/]+)/.exec(pathname);
+  if (orgMatch !== null) {
+    const slug = orgMatch[1] as string;
+    const org = ctx.orgs.find((entry) => entry.slug === slug);
+    const label = org?.name ?? "Organization";
+    return {
+      crumbs: [
+        { label: "Organizations", href: "/orgs" },
+        ...(section !== null ? [{ label, href: `/org/${slug}` }] : []),
+      ],
+      title: section ?? label,
+    };
+  }
+
+  // The season list and a single tournament both hang off the Tournaments rail.
+  if (pathname.startsWith("/seasons")) {
+    return { crumbs: [{ label: "Tournaments", href: "/tournaments" }], title: "Seasons" };
+  }
+  if (/^\/tournaments\/[^/]+/.test(pathname)) {
+    return { crumbs: [{ label: "Tournaments", href: "/tournaments" }], title: "Tournament" };
+  }
+
+  // A root surface has no ancestors, so line two of the header carries its lede.
+  const subtitle = SURFACE_SUBTITLES.find(([prefix]) => pathname === prefix)?.[1];
+  const withLede = (title: string): PageIdentity => ({
+    crumbs: [],
+    title,
+    ...(subtitle !== undefined ? { subtitle } : {}),
+  });
+
+  const railKey = activeRailKey(pathname);
+  const railTitle = railKey !== null ? RAIL_TITLES[railKey] : undefined;
+  if (railTitle !== undefined) {
+    return withLede(railTitle);
+  }
+  const outside = OUTSIDE_RAIL.find(([prefix]) => pathname.startsWith(prefix));
+  if (outside !== undefined) {
+    return withLede(outside[1]);
+  }
+  return { crumbs: [], title: section };
 }
 
 /** The one labeled door out of a live surface (canon docs/16). */

@@ -328,7 +328,9 @@ const AUCTION_EVENT_OF: Record<AuctionCommand, string> = {
   abort: "AuctionAborted",
 };
 
-async function auctionReadiness(db: Db, auctionId: string, auction?: AuctionRecord) {
+/** The readiness numbers behind every lifecycle guard — exported so the web
+ * layer can say WHICH gate is red instead of listing them all (DA-25). */
+export async function auctionReadiness(db: Db, auctionId: string, auction?: AuctionRecord) {
   const [paddleRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(paddles)
