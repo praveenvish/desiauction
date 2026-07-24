@@ -588,7 +588,14 @@ describe("SPECTATOR ISOLATION + CEREMONY DETERMINISM", () => {
   });
 
   it("the auction completes; every unresolved path was conducted through commands", async () => {
-    const completed = await command("CompleteAuction", organizerId, {}, { conduct: true });
+    const completed = await command(
+      "CompleteAuction",
+      organizerId,
+      // Squads are deliberately tiny in this fixture — DA-06 refuses a
+      // completion below squadMin unless the conductor overrides on the record.
+      { overrideSquadMinimum: true },
+      { conduct: true },
+    );
     expect(completed.accepted).toBe(true);
     expect(snapshot().auctionStatus).toBe("completed");
     expect(deriveCeremony(null, snapshot()).phase).toBe("completed");

@@ -587,7 +587,14 @@ describe("LIVE ENGINE — restart, recovery, fail-closed", () => {
     // Withdraw the final lot ON the command path, then the auction completes.
     const withdrawn = await command("WithdrawLot", ownerId, { lotId: lot3 }, { conduct: true });
     expect(withdrawn.accepted).toBe(true);
-    const completed = await command("CompleteAuction", ownerId, {}, { conduct: true });
+    const completed = await command(
+      "CompleteAuction",
+      ownerId,
+      // Squads are deliberately tiny in this fixture — DA-06 refuses a
+      // completion below squadMin unless the conductor overrides on the record.
+      { overrideSquadMinimum: true },
+      { conduct: true },
+    );
     expect(completed.accepted).toBe(true);
     expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("completed");
   });
