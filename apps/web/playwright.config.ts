@@ -37,7 +37,13 @@ export default defineConfig({
       // memory threshold, restarting"), which ECONNRESETs in-flight requests and
       // cascades into failures/flakes. A larger heap keeps one stable server for
       // the whole run. (CI uses a pre-compiled server and is unaffected.)
-      env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=4096" },
+      env: {
+        ...process.env,
+        NODE_OPTIONS: "--max-old-space-size=4096",
+        // Its OWN build directory: sharing .next with a developer's server on
+        // :3000 corrupts the webpack pack cache for both.
+        NEXT_DIST_DIR: ".next-e2e",
+      },
     },
     {
       // The live auction engine (M-IP4-2): the same process `pnpm dev` runs.
