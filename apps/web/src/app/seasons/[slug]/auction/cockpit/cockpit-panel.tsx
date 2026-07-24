@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
 import { Badge, Button, Card, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +15,8 @@ import type { CockpitView } from "../../../../../server/auction/conduct-actions"
 import { grantPaddleAction, inviteOwnerAction } from "../../../../../server/auction/owner-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
 import { CeremonyStage } from "../ceremony-stage";
+import { PurseBoard } from "../purse-board";
+import { PoolSummary, SquadBoard } from "../squad-board";
 import { AuctionProgress } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
@@ -51,8 +53,48 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       router.refresh();
       return true;
     }
-    toast({ title: `Rejected: ${ack.reason ?? "unknown"}`, tone: "danger" });
+    toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
     return false;
+  };
+
+  /**
+   * DA-16: completing an auction is irreversible and was one unguarded click.
+   * DA-06 makes short squads refuse; the conductor may still close the night,
+   * but only deliberately and only with a reason that lands in the ledger.
+   */
+  const completeAuction = async () => {
+    const resolved = snapshot?.lotsResolved ?? 0;
+    const total = snapshot?.lotsTotal ?? 0;
+    if (
+      !window.confirm(
+        `Complete the auction? ${String(resolved)} of ${String(total)} lots resolved. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    const ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", {});
+    setBusy(false);
+    if (ack.accepted) {
+      toast({ title: "Auction completed", tone: "success" });
+      router.refresh();
+      return;
+    }
+    if (ack.reason === "squad_below_minimum") {
+      const reason = window.prompt(
+        "Some teams are below the minimum squad size. Closing short is recorded against your name — why?",
+      );
+      if (reason === null || reason.trim() === "") {
+        return;
+      }
+      await send(
+        "CompleteAuction",
+        { overrideSquadMinimum: true, reason: reason.trim() },
+        "Auction completed",
+      );
+      return;
+    }
+    toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
   };
 
   const invite = async () => {
@@ -170,7 +212,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       <AuctionProgress snapshot={snapshot} />
 
       <div className="cockpit-grid">
-        <div className="competitions-stack">
+        <div className="cockpit-col">
           <CeremonyStage snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
 
           <Card data-testid="conduct-card">
@@ -234,7 +276,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               ) : null}
               {view.viewer.canOverride ? (
                 <Button
-                  variant="danger"
+                  variant="ghost"
                   onClick={() =>
                     void send("UndoLastAction", {}, "Undone — compensating event appended")
                   }
@@ -254,7 +296,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => void send("CompleteAuction", {}, "Auction completed")}
+                onClick={() => void completeAuction()}
                 loading={busy}
                 data-testid="cockpit-complete"
               >
@@ -271,12 +313,38 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             </p>
           </Card>
 
+          {/* The auctioneer was the only surface without a running record of
+              the bidding — owner, spectate and replay all had one. */}
+          <Card data-testid="cockpit-bid-feed">
+            <div className="competition-head">
+              <h2>Bid feed</h2>
+              {lot !== null ? (
+                <span className="competitions-hint">{lot.lotNumber} on the block</span>
+              ) : null}
+            </div>
+            {lot === null || lot.bidHistory.length === 0 ? (
+              <p className="competitions-hint" data-testid="cockpit-bid-feed-empty">
+                {lot === null
+                  ? "Open a lot and the bidding shows up here."
+                  : "Awaiting the first paddle…"}
+              </p>
+            ) : (
+              <ol className="timeline">
+                {[...lot.bidHistory].reverse().map((entry) => (
+                  <li key={entry.bidId}>
+                    <Badge tone="neutral">{entry.paddleNumber}</Badge>
+                    <span>{entry.teamName}</span>
+                    <span className="timeline-at">{formatPaiseINR(paise(entry.amount))}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
+
           <Card data-testid="queue-card">
             <div className="competition-head">
               <h2>Lot queue</h2>
-              <span className="competitions-hint">
-                open any lot — order control is skip &amp; bring-forward (doc 41)
-              </span>
+              <span className="competitions-hint">skip &amp; bring-forward</span>
             </div>
             {queue.length === 0 ? (
               <p className="competitions-hint" data-testid="queue-empty">
@@ -363,7 +431,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
           </Card>
         </div>
 
-        <div className="competitions-stack">
+        <div className="cockpit-col">
           <Card data-testid="owners-card">
             <h2>Owners &amp; paddles</h2>
             <p className="competitions-hint">
@@ -459,22 +527,21 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             ) : null}
           </Card>
 
-          <Card data-testid="purse-card">
-            <h2>Purses</h2>
-            <ul className="conflict-list">
-              {(snapshot?.paddles ?? []).map((paddle) => (
-                <li key={paddle.paddleId} data-testid={`purse-${paddle.paddleNumber}`}>
-                  <Badge tone={paddle.released ? "neutral" : "info"}>{paddle.paddleNumber}</Badge>
-                  <span>{paddle.teamName}</span>
-                  <span className="registration-phone">
-                    {formatPaiseINR(paise(paddle.purseRemaining))} left
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          {/* The one purse treatment, shared with the owner room and the
+              spectator board. */}
+          <PurseBoard snapshot={snapshot} teams={view.teams} />
+
+          <PoolSummary snapshot={snapshot} resolved={view.resolved} preSigned={view.preSigned} />
         </div>
       </div>
+
+      <SquadBoard
+        teams={view.teams}
+        preSigned={view.preSigned}
+        resolved={view.resolved}
+        snapshot={snapshot}
+        squadMax={view.rules.squadMax}
+      />
     </div>
   );
 }

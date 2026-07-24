@@ -123,7 +123,7 @@ export interface PlayerShareCardInput {
   /** Raw enum keys from the DB (labeled here via the core label functions). */
   battingStyle: string | null;
   bowlingStyle: string | null;
-  status: "available" | "sold";
+  status: "available" | "sold" | "retained";
   teamName: string | null;
   competitionName: string;
 }

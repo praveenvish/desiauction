@@ -14,7 +14,10 @@ import "../../../directory.css";
 // addressable. Same consent + visibility gates as the showcase. Individual
 // pages are `noindex` (link-shared, not SEO-farmed); the photo is consent-gated.
 
-function statusText(player: { status: "available" | "sold"; teamName: string | null }): string {
+function statusText(player: {
+  status: "available" | "sold" | "retained";
+  teamName: string | null;
+}): string {
   if (player.status !== "sold") {
     return "Available";
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
 import { Badge, Button, Card, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -70,7 +70,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
         }
         return true;
       }
-      toast({ title: `Rejected: ${ack.reason ?? "unknown"}`, tone: "danger" });
+      toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
       return false;
     },
     [slug, toast],

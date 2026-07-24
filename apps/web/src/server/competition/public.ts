@@ -125,7 +125,12 @@ export interface ShowcasePlayer {
   bowlingStyle: string | null;
   /** Consent-gated (null unless photo_consent_at is set — DPDP §5). */
   photoUrl: string | null;
-  status: "available" | "sold";
+  /**
+   * DA-17: "retained" is a third outcome, not a flavour of sold. Pre-signed
+   * icons were counted as SOLD before a single lot opened, so a public page
+   * announced "4 sold" on a competition whose auction had not started.
+   */
+  status: "available" | "sold" | "retained";
   teamName: string | null;
 }
 
@@ -140,6 +145,7 @@ interface ShowcaseRow {
   photoConsentAt: Date | null;
   teamId: string | null;
   teamName: string | null;
+  isIcon: boolean;
 }
 
 /** Row → public player: consent-gates the photo, derives age, maps squad→status. */
@@ -152,7 +158,7 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
     battingStyle: r.battingStyle,
     bowlingStyle: r.bowlingStyle,
     photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
-    status: r.teamId !== null ? "sold" : "available",
+    status: r.teamId === null ? "available" : r.isIcon ? "retained" : "sold",
     teamName: r.teamName,
   };
 }
@@ -194,6 +200,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePlayer[] | n
       photoConsentAt: people.photoConsentAt,
       teamId: registrations.teamId,
       teamName: teams.name,
+      isIcon: registrations.isIcon,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -246,6 +253,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
       photoConsentAt: people.photoConsentAt,
       teamId: registrations.teamId,
       teamName: teams.name,
+      isIcon: registrations.isIcon,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))

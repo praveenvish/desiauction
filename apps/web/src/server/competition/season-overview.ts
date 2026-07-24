@@ -49,6 +49,8 @@ export interface SeasonOverview {
   lotsSold: number;
   lotsTotal: number;
   auctionLive: boolean;
+  /** The auction's own lifecycle — the season's CTA depends on it (DA-10). */
+  auctionStatus: string | null;
   topTeams: SeasonTeamSpend[];
   poolByRole: SeasonRoleCount[];
 }
@@ -100,6 +102,7 @@ export async function seasonOverview(
       lotsSold: 0,
       lotsTotal: 0,
       auctionLive: false,
+      auctionStatus: null,
       topTeams: teams.map((team) => ({
         teamId: team.id,
         name: team.name,
@@ -151,6 +154,7 @@ export async function seasonOverview(
     lotsSold: lots.filter((lot) => lot.status === "sold").length,
     lotsTotal: lots.length,
     auctionLive: auction.status === "live",
+    auctionStatus: auction.status,
     topTeams: teams
       .map((team) => {
         const entry = spendByTeam.get(team.id);

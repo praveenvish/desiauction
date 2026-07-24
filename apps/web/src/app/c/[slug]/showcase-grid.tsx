@@ -52,6 +52,9 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
       all: players.length,
       available: players.filter((p) => p.status === "available").length,
       sold: players.filter((p) => p.status === "sold").length,
+      // DA-17: retained players were counted as sold, so a page announced
+      // "4 sold" before a single lot had opened.
+      retained: players.filter((p) => p.status === "retained").length,
     }),
     [players],
   );
@@ -130,7 +133,7 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
           </div>
 
           <div className="showcase-filters" role="tablist" aria-label="Filter players">
-            {(["all", "available", "sold"] as const).map((key) => (
+            {(["all", "available", "sold", "retained"] as const).map((key) => (
               <button
                 key={key}
                 type="button"
@@ -142,7 +145,13 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
                   setFilter(key);
                 }}
               >
-                {key === "all" ? "All" : key === "available" ? "Available" : "Sold"}
+                {key === "all"
+                  ? "All"
+                  : key === "available"
+                    ? "Available"
+                    : key === "sold"
+                      ? "Sold"
+                      : "Retained"}
                 <span className="showcase-filter-count">{counts[key]}</span>
               </button>
             ))}
@@ -188,7 +197,7 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
                         </span>
                       ) : null}
                       <span className="showcase-card-status" data-status={p.status}>
-                        {p.status === "sold" ? (p.teamName ?? "Sold") : "Available"}
+                        {p.status === "available" ? "Available" : (p.teamName ?? "Signed")}
                       </span>
                     </span>
                   </button>
@@ -238,7 +247,11 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
                 </>
               ) : null}
               <dt>Status</dt>
-              <dd>{selected.status === "sold" ? (selected.teamName ?? "Sold") : "Available"}</dd>
+              <dd>
+                {selected.status === "available"
+                  ? "Available"
+                  : `${selected.teamName ?? "Signed"}${selected.status === "retained" ? " · retained" : ""}`}
+              </dd>
             </dl>
             <ButtonLink
               href={`/c/${slug}/p/${selected.number}`}

@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  DEFAULT_AUCTION_CONFIG,
   isRejectionReason,
   parseRegistrationCsv,
   type CsvRowError,
@@ -131,6 +132,12 @@ export async function createCompetitionAction(
   );
   if (!memberships.some((o) => o.id === orgId)) {
     return { error: "Choose one of your organizations." };
+  }
+  // DA-08: a reversed range was accepted, then printed publicly as
+  // "1 Oct – 1 Aug 2026" and emitted in JSON-LD as an invalid SportsEvent —
+  // and the season overview never showed the dates, so nobody could see it.
+  if (startsOn !== "" && endsOn !== "" && endsOn < startsOn) {
+    return { error: "The end date falls before the start date." };
   }
   // The tournament arrives from a hidden field, so it is caller input like any
   // other: prove it belongs to the SAME org before letting a season claim it,
@@ -768,13 +775,23 @@ export interface ImportPreview {
   errors: CsvRowError[];
 }
 
+/**
+ * The base-price bands this competition actually accepts (DA-14). Before the
+ * auction exists the config is not yet locked, so the defaults are the honest
+ * answer; afterwards the auction's own bands are.
+ */
+async function bandsFor(competitionId: string): Promise<readonly string[]> {
+  const auction = await auctionOf(systemDb, competitionId);
+  return Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands);
+}
+
 /** Validate only — no writes. The organizer previews errors before committing. */
 export async function importPreviewAction(slug: string, csv: string): Promise<ImportPreview> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
   }
-  const result = parseRegistrationCsv(csv);
+  const result = parseRegistrationCsv(csv, await bandsFor(gate.competition.id));
   return { validCount: result.rows.length, errors: result.errors };
 }
 
@@ -787,7 +804,7 @@ export async function importCommitAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const parsed = parseRegistrationCsv(csv);
+  const parsed = parseRegistrationCsv(csv, await bandsFor(gate.competition.id));
   if (parsed.errors.length > 0) {
     return {
       ok: false,

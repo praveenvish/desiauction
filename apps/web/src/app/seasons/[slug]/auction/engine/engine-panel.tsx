@@ -1,6 +1,7 @@
 "use client";
 
 import type { EngineDiagnostics } from "@desiauction/contracts";
+import { commandRefusalMessage } from "@desiauction/core";
 import { Badge, Button, Card, useToast } from "@desiauction/ui";
 import { useCallback, useEffect, useState } from "react";
 
@@ -57,7 +58,7 @@ export function EnginePanel({ slug }: { slug: string }) {
     if (ack.accepted) {
       toast({ title: `Recovered: ${ack.reason ?? "verified"}`, tone: "success" });
     } else {
-      toast({ title: `Rejected: ${ack.reason ?? "unknown"}`, tone: "danger" });
+      toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
     }
     await refresh();
   };

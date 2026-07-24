@@ -75,7 +75,13 @@ export function tokenizeCsv(text: string): string[][] {
   return sawAny ? records : [];
 }
 
-export function parseRegistrationCsv(text: string): CsvParseResult {
+/**
+ * DA-14: an unknown band used to pass validation and fall back to the default
+ * price, so a typo silently repriced a marquee player. Bands are declared by
+ * the auction config; callers that know them pass them in, and every other
+ * column already errors per line — this one now does too.
+ */
+export function parseRegistrationCsv(text: string, knownBands?: readonly string[]): CsvParseResult {
   const records = tokenizeCsv(text).filter(
     (fields) => !(fields.length === 1 && fields[0]?.trim() === ""),
   );
@@ -119,6 +125,13 @@ export function parseRegistrationCsv(text: string): CsvParseResult {
     }
     if (!isRegistrationRole(rawRole)) {
       rowErrors.push(`invalid role "${rawRole}"`);
+    }
+    if (
+      band !== "" &&
+      knownBands !== undefined &&
+      !knownBands.some((known) => known.toUpperCase() === band.toUpperCase())
+    ) {
+      rowErrors.push(`unknown base price band "${band}" (expected ${knownBands.join(", ")})`);
     }
     if (phone.ok) {
       const prior = seenPhones.get(phone.phone);

@@ -131,6 +131,8 @@ export {
   isAuctionCommandType,
   AUCTION_COMMAND_TYPES,
 } from "./auction-snapshot";
+
+export { bidRejectionMessage, commandRefusalMessage } from "./auction-copy";
 export type {
   AuctionSnapshot,
   SnapshotRefs,

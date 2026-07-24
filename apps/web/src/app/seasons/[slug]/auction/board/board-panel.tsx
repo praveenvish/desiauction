@@ -17,6 +17,15 @@ function money(amount: number): string {
   return formatPaiseINR(paise(amount));
 }
 
+const BOARD_KICKER: Record<string, string> = {
+  scheduled: "Auction starting soon",
+  live: "Live auction",
+  paused: "Auction paused",
+  completed: "Auction complete",
+  reconciled: "Auction settled",
+  abandoned: "Auction abandoned",
+};
+
 export function BoardPanel({
   wsUrl,
   resolved,
@@ -56,9 +65,13 @@ export function BoardPanel({
     <div className="board" data-theme="floodlight" data-testid="board">
       <header className="board-head">
         <div className="board-head-main">
+          {/* DA-15: this said "Live auction" whatever the auction was doing —
+              including on a board projected after the night had finished. */}
           <p className="board-kicker">
-            <i className="board-live-dot" aria-hidden="true" />
-            Live auction
+            {snapshot === null || snapshot.auctionStatus === "live" ? (
+              <i className="board-live-dot" aria-hidden="true" />
+            ) : null}
+            {BOARD_KICKER[snapshot?.auctionStatus ?? "live"]}
           </p>
           <h1 className="board-title">{auctionName}</h1>
           <p className="board-sub">{competitionName}</p>

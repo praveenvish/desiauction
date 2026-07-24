@@ -1,7 +1,9 @@
 // Pure showcase filtering/sorting (parity §3.3). No IO, no React — the client
 // grid drives its UI from this so the logic is unit-testable without a DB.
 
-export type ShowcaseStatus = "available" | "sold";
+// DA-17: retained (pre-signed icon) is its own outcome. Folding it into "sold"
+// made a public page announce "4 sold" before a single lot had opened.
+export type ShowcaseStatus = "available" | "sold" | "retained";
 export type ShowcaseFilter = "all" | ShowcaseStatus;
 export type ShowcaseSort = "number" | "name" | "status";
 
@@ -32,7 +34,8 @@ export function groupSquads<T extends ShowcaseItem & { teamName: string | null }
 ): Squad<T>[] {
   const byTeam = new Map<string, T[]>();
   for (const it of items) {
-    if (it.status !== "sold" || it.teamName === null || it.teamName === "") {
+    // A squad is everyone on the team sheet — bought at auction or retained.
+    if (it.status === "available" || it.teamName === null || it.teamName === "") {
       continue;
     }
     const bucket = byTeam.get(it.teamName);
@@ -59,7 +62,7 @@ function matches(item: ShowcaseItem, needle: string): boolean {
   return item.name.toLowerCase().includes(q) || item.number.toLowerCase().includes(q);
 }
 
-const STATUS_RANK: Record<ShowcaseStatus, number> = { available: 0, sold: 1 };
+const STATUS_RANK: Record<ShowcaseStatus, number> = { available: 0, retained: 1, sold: 2 };
 
 /** Numeric-aware compare so "2" sorts before "10". */
 function byNumber(a: string, b: string): number {
@@ -75,7 +78,10 @@ function byNumber(a: string, b: string): number {
  * Filter by status + free-text, then sort. Stable, deterministic, and total:
  * unknown inputs fall back to number order. Returns a new array.
  */
-export function filterSortPlayers<T extends ShowcaseItem>(items: readonly T[], q: ShowcaseQuery): T[] {
+export function filterSortPlayers<T extends ShowcaseItem>(
+  items: readonly T[],
+  q: ShowcaseQuery,
+): T[] {
   const filtered = items.filter(
     (it) => (q.filter === "all" || it.status === q.filter) && matches(it, q.query.trim()),
   );

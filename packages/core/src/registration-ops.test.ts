@@ -95,6 +95,24 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
     ]);
   });
 
+  it("DA-14: an unknown base price band is a line error, not a silent default", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,Z\nOk Player,9876543211,bowler,B`;
+    // Without the known bands the parser cannot judge, so it stays permissive.
+    expect(parseRegistrationCsv(csv).errors).toEqual([]);
+    // Given them, a typo stops being a silent reprice to the default band.
+    const checked = parseRegistrationCsv(csv, ["A", "B", "C"]);
+    expect(checked.errors).toEqual([
+      { line: 2, message: 'unknown base price band "Z" (expected A, B, C)' },
+    ]);
+    // The bad line is dropped and the good one survives — the COMMIT path is
+    // what refuses the whole file, so the preview can show both halves.
+    expect(checked.rows.map((row) => row.line)).toEqual([3]);
+    // Case is not the point of failure.
+    expect(
+      parseRegistrationCsv(`${HEADER}\nRohit Sharma,9876543210,batter,a`, ["A"]).errors,
+    ).toEqual([]);
+  });
+
   it("reports per-row errors and yields NO rows to import when any row is bad", () => {
     const csv = `${HEADER}\nOk Player,9876543210,batter,\nX,not-a-phone,striker,\n`;
     const result = parseRegistrationCsv(csv);
