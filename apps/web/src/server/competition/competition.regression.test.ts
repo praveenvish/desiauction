@@ -18,6 +18,7 @@ import {
   tournaments as tournamentsTable,
   sessions,
   teams as teamsTable,
+  withTenantDb,
   type DbHandle,
 } from "@desiauction/db";
 import { desc, eq, inArray } from "drizzle-orm";
@@ -273,6 +274,25 @@ describe("COMPETITION REGRESSION — domain contract", () => {
     const dup = await createTeam(db, orgX.id, compId, owner, "Malad Mavericks");
     expect(dup).toEqual({ ok: false, reason: "duplicate_name" });
     expect((await teamsOf(db, compId)).length).toBe(1);
+  });
+
+  it("DA-03: a refused duplicate leaves the TENANT TRANSACTION usable", async () => {
+    // The bug this encodes: every serving path runs inside withTenantDb, and a
+    // failed statement aborts the whole Postgres transaction. Catching the JS
+    // error returned a clean refusal and then the COMMIT threw a raw
+    // PostgresError past every handler into the error boundary — the duplicate
+    // team name took the entire grid down. Calling createTeam on a bare handle
+    // (as the test above does) never crosses that boundary, which is exactly
+    // why the suite stayed green while production crashed.
+    const outcome = await withTenantDb(handle, { personId: owner, orgId: orgX.id }, async (tx) => {
+      const refused = await createTeam(tx, orgX.id, compId, owner, "Malad Mavericks");
+      // The transaction must still be alive after the refusal.
+      const stillWorks = await createTeam(tx, orgX.id, compId, owner, "Malad Mavericks II");
+      return { refused, stillWorks };
+    });
+    expect(outcome.refused).toEqual({ ok: false, reason: "duplicate_name" });
+    expect(outcome.stillWorks.ok).toBe(true);
+    expect((await teamsOf(db, compId)).length).toBe(2);
   });
 
   it("a player registers once; a second attempt is a duplicate", async () => {

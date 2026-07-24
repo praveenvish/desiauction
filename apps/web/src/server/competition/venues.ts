@@ -5,7 +5,14 @@ import {
   type GroundStatus,
   type GroundSurface,
 } from "@desiauction/core";
-import { auditLog, grounds, newId, venues, type Db } from "@desiauction/db";
+import {
+  auditLog,
+  grounds,
+  newId,
+  venues,
+  writeSurvivingConstraint,
+  type Db,
+} from "@desiauction/db";
 import { and, asc, eq } from "drizzle-orm";
 
 // The Venue aggregate (M-IP3-3): physical locations, org-owned. Venue → Ground
@@ -49,17 +56,18 @@ export async function createVenue(
     return { ok: false, reason: "invalid_name" };
   }
   const id = newId();
-  try {
-    await db.insert(venues).values({
+  // Unique (org_id, name) — venue information exists exactly once per org.
+  const inserted = await writeSurvivingConstraint(db, (tx) =>
+    tx.insert(venues).values({
       id,
       orgId,
       name: valid.value,
       ...(address !== undefined && address !== "" ? { address } : {}),
       ...(city !== undefined && city !== "" ? { city } : {}),
       createdBy: personId,
-    });
-  } catch {
-    // Unique (org_id, name) — venue information exists exactly once per org.
+    }),
+  );
+  if (!inserted) {
     return { ok: false, reason: "duplicate_name" };
   }
   await db.insert(auditLog).values({
@@ -114,8 +122,9 @@ export async function createGround(
     return { ok: false, reason: "venue_not_found" };
   }
   const id = newId();
-  try {
-    await db.insert(grounds).values({
+  // Unique (venue_id, name) — ground names are unique within a venue.
+  const inserted = await writeSurvivingConstraint(db, (tx) =>
+    tx.insert(grounds).values({
       id,
       orgId,
       venueId,
@@ -125,9 +134,9 @@ export async function createGround(
       floodlights: input.floodlights ?? false,
       indoor: input.indoor ?? false,
       createdBy: personId,
-    });
-  } catch {
-    // Unique (venue_id, name) — ground names are unique within a venue.
+    }),
+  );
+  if (!inserted) {
     return { ok: false, reason: "duplicate_name" };
   }
   await db.insert(auditLog).values({

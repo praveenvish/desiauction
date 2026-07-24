@@ -13,6 +13,7 @@ import {
   orgMembers,
   tournaments,
   teams,
+  writeSurvivingConstraint,
   type Db,
 } from "@desiauction/db";
 import { and, desc, eq } from "drizzle-orm";
@@ -65,6 +66,8 @@ export async function tournamentsOf(db: Db, orgId: string): Promise<TournamentSu
 export interface CompetitionSummary {
   id: string;
   orgId: string;
+  /** The recurring tournament this is an edition of; null for a one-off. */
+  tournamentId: string | null;
   name: string;
   slug: string;
   status: CompetitionStatus;
@@ -120,6 +123,7 @@ export async function createCompetition(
   return {
     id,
     orgId,
+    tournamentId: input.tournamentId ?? null,
     name: valid.value,
     slug,
     status: "draft",
@@ -139,6 +143,7 @@ export async function competitionsForPerson(
     .select({
       id: competitions.id,
       orgId: competitions.orgId,
+      tournamentId: competitions.tournamentId,
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
@@ -165,6 +170,7 @@ export async function resolveCompetition(
     .select({
       id: competitions.id,
       orgId: competitions.orgId,
+      tournamentId: competitions.tournamentId,
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
@@ -263,8 +269,9 @@ export async function createTeam(
     return { ok: false, reason: "invalid_name" };
   }
   const id = newId();
-  try {
-    await db.insert(teams).values({
+  // Unique (competition_id, name) — team names are unique within a competition.
+  const inserted = await writeSurvivingConstraint(db, (tx) =>
+    tx.insert(teams).values({
       id,
       orgId,
       competitionId,
@@ -272,9 +279,9 @@ export async function createTeam(
       ...(shortName !== undefined && shortName !== "" ? { shortName } : {}),
       ...(primaryColor !== undefined && primaryColor !== "" ? { primaryColor } : {}),
       createdBy: personId,
-    });
-  } catch {
-    // Unique (competition_id, name) — team names are unique within a competition.
+    }),
+  );
+  if (!inserted) {
     return { ok: false, reason: "duplicate_name" };
   }
   await db.insert(auditLog).values({

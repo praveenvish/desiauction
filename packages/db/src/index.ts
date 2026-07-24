@@ -74,6 +74,34 @@ export async function withTenant<T>(
  * load-bearing inside this boundary and fail closed outside it. Only set an
  * orgId the caller has already verified membership for (resolveTenant).
  */
+/**
+ * Run a write that may hit a unique constraint, and report the refusal without
+ * poisoning the caller's transaction.
+ *
+ * Postgres aborts the ENTIRE transaction on a failed statement, so a bare
+ * `try { await db.insert(...) } catch` looks correct and is not: the handler
+ * returns a clean refusal, and then the COMMIT throws a raw PostgresError past
+ * every handler. Every serving path here runs inside `withTenantDb`, so that
+ * mistake reached users as a full-page error boundary on something as ordinary
+ * as a duplicate team name (DA-03). A nested drizzle transaction is a
+ * SAVEPOINT: rolling back to it leaves the enclosing transaction healthy.
+ *
+ * Returns true when the write landed, false when a constraint refused it.
+ */
+export async function writeSurvivingConstraint(
+  db: Db,
+  write: (tx: Db) => Promise<unknown>,
+): Promise<boolean> {
+  try {
+    await db.transaction(async (tx) => {
+      await write(tx);
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function withTenantDb<T>(
   handle: DbHandle,
   context: TenantContext,

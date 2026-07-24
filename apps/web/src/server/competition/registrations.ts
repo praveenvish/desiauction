@@ -16,6 +16,7 @@ import {
   people,
   registrations,
   teams,
+  writeSurvivingConstraint,
   type Db,
 } from "@desiauction/db";
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
@@ -88,8 +89,9 @@ export async function submitRegistration(
     return { ok: false, reason: "not_open" };
   }
   const id = newId();
-  try {
-    await db.insert(registrations).values({
+  // Unique (competition_id, person_id) — one registration per player per season.
+  const inserted = await writeSurvivingConstraint(db, (tx) =>
+    tx.insert(registrations).values({
       id,
       orgId,
       competitionId,
@@ -99,8 +101,9 @@ export async function submitRegistration(
       registrationNumber: registrationNumber(id),
       ...(basePriceBand !== undefined && basePriceBand !== "" ? { basePriceBand } : {}),
       ...validProfile(profile),
-    });
-  } catch {
+    }),
+  );
+  if (!inserted) {
     return { ok: false, reason: "duplicate" };
   }
   await db.insert(auditLog).values({
