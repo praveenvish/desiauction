@@ -8,6 +8,8 @@ import {
 import { auditLog, newId, registrations, type Db } from "@desiauction/db";
 import { and, eq, inArray, ne } from "drizzle-orm";
 
+import { logSecurityEvent, type SecurityAction } from "../auth/security-events";
+
 // THE COMPETITION REGISTRATION AGGREGATE (M-IP3-2). This module is the ONLY place
 // registration state mutates. Routes/services call it; nothing else writes the
 // `status` column. Every transition is decided by core's pure machine, applied in
@@ -48,6 +50,44 @@ function mutationFields(
 
 function auditMeta(event: RegistrationEvent): Record<string, string> {
   return event.type === "reject" ? { reason: event.reason } : {};
+}
+
+/**
+ * DA-19: tell the PLAYER what was decided. The organiser's audit row is scoped
+ * to the org and invisible to them; this is the same append-only substrate,
+ * scoped to the person, which is exactly what /inbox reads.
+ *
+ * Best-effort by design: a notification must never fail an approval. The
+ * decision and its org-scoped evidence have already committed by the time we
+ * get here.
+ */
+const PLAYER_NOTICE: Partial<Record<RegistrationEvent["type"], SecurityAction>> = {
+  approve: "registration.approved",
+  reject: "registration.rejected",
+  waitlist: "registration.waitlisted",
+};
+
+async function notifyPlayer(
+  db: Db,
+  registrationIds: readonly string[],
+  event: RegistrationEvent,
+): Promise<void> {
+  const action = PLAYER_NOTICE[event.type];
+  if (action === undefined || registrationIds.length === 0) {
+    return;
+  }
+  const rows = await db
+    .select({ personId: registrations.personId, competitionId: registrations.competitionId })
+    .from(registrations)
+    .where(inArray(registrations.id, registrationIds as string[]));
+  for (const row of rows) {
+    try {
+      await logSecurityEvent(row.personId, action, { competitionId: row.competitionId });
+    } catch {
+      // A player who misses a notification still has the decision; a player
+      // whose approval was rolled back by a failed notification does not.
+    }
+  }
 }
 
 export type TransitionResult =
@@ -92,6 +132,7 @@ export async function transition(
       meta: auditMeta(event),
     });
   });
+  await notifyPlayer(db, [registrationId], event);
   return { ok: true, status: decision.next };
 }
 
@@ -156,7 +197,9 @@ export async function transitionBatch(
       }
     });
   }
-  return { applied: plan.apply.map((e) => e.id), skipped };
+  const applied = plan.apply.map((entry) => entry.id);
+  await notifyPlayer(db, applied, event);
+  return { applied, skipped };
 }
 
 /** Assign (or clear) a pre-auction team grouping — an audited registration mutation. */

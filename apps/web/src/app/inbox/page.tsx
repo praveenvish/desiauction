@@ -1,4 +1,4 @@
-import { Card, EmptyState, PageHeader } from "@desiauction/ui";
+import { Card, EmptyState } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../server/auth/actions";
@@ -20,16 +20,12 @@ export default async function InboxPage() {
   const events = await listSecurityEvents(session.personId);
   return (
     <main>
-      <PageHeader
-        title="Notifications"
-        subtitle="Account activity now; approvals, receipts and auction updates join during the beta."
-      />
       <Card>
         {events.length === 0 ? (
           <EmptyState
             headingLevel={2}
             title="Nothing yet"
-            description="Approvals, receipts and auction updates will land here."
+            description="Registration decisions and account activity land here."
           />
         ) : (
           <InboxList

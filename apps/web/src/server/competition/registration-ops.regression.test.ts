@@ -282,6 +282,24 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(page.rows.every((r) => r.duplicateName)).toBe(true);
   });
 
+  it("DA-19: an approved player is told, on their own person-scoped ledger", async () => {
+    const id = await seed(compId, org.id, "Told Player", "n01", "submitted");
+    const [before] = await db
+      .select({ personId: registrationsTable.personId })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, id))
+      .limit(1);
+    const personId = before?.personId ?? "";
+    await transition(db, org.id, compId, id, owner, { type: "approve" });
+    // 48 players were approved during certification and not one was told: the
+    // organiser's audit row is org-scoped and invisible to them.
+    const notices = await db
+      .select({ action: auditLog.action })
+      .from(auditLog)
+      .where(and(eq(auditLog.scopeId, personId), eq(auditLog.action, "registration.approved")));
+    expect(notices).toHaveLength(1);
+  });
+
   it("DA-04: a team has exactly one captain — naming a new one moves the armband", async () => {
     const team = await createTeam(db, org.id, compId, owner, `Captaincy XI ${RUN}`);
     expect(team.ok).toBe(true);

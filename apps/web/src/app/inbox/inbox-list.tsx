@@ -11,6 +11,10 @@ export const INBOX_SEEN_KEY = "da:inbox-seen-at";
 
 const LABELS: Record<string, string> = {
   "auth.login.otp": "Signed in with a one-time code",
+  // DA-19: the events a PLAYER cares about, not just the ones about their login.
+  "registration.approved": "Your registration was approved — you're in the player pool",
+  "registration.rejected": "Your registration wasn't approved this time",
+  "registration.waitlisted": "You've been added to the waitlist",
   "auth.login.passkey": "Signed in with a passkey",
   "auth.otp.lockout": "Too many wrong codes — sign-in was locked briefly",
   "auth.passkey.enrolled": "Passkey added",

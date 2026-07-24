@@ -18,7 +18,14 @@ export type SecurityAction =
   | "auth.passkey.removed"
   | "auth.session.revoked"
   // PX-3: profile changes are person-scoped evidence on the same ledger.
-  | "profile.name.updated";
+  | "profile.name.updated"
+  // DA-19: the decisions a PLAYER cares about. 48 people were approved and one
+  // rejected during certification and not one of them was told — the inbox
+  // carried sign-in events only, and its own empty state admitted it. These
+  // ride the same person-scoped ledger; no notification store was invented.
+  | "registration.approved"
+  | "registration.rejected"
+  | "registration.waitlisted";
 
 export async function logSecurityEvent(
   personId: string,
