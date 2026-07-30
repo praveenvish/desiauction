@@ -84,8 +84,8 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             links: [{ text: "Home", href: "/home" }],
           },
           {
-            text: "{0} — every tournament you run or take part in.",
-            links: [{ text: "Seasons", href: "/seasons" }],
+            text: "{0} — every recurring competition you run or take part in, and every season under them.",
+            links: [{ text: "Tournaments", href: "/tournaments" }],
           },
           {
             text: "{0} — the organizations you belong to, their members and grants.",

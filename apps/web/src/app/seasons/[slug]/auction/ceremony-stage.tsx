@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type CeremonyState } from "@desiauction/core";
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 // The FLOODLIGHT ceremony stage (M-IP4-3). Presentation ONLY: renders the
 // deterministic ceremony phase derived from consecutive AuctionSnapshots.
@@ -33,6 +33,9 @@ const PHASE_TITLE: Record<CeremonyState["phase"], string> = {
 // marker, so nothing about the announced outcome depends on animation.
 const CONFETTI = Array.from({ length: 30 }, (_, i) => i);
 
+/** How long a blank stage stays hopeful before it admits it cannot get through. */
+const PATIENCE_MS = 8_000;
+
 export function CeremonyStage({
   snapshot,
   ceremony,
@@ -42,16 +45,48 @@ export function CeremonyStage({
   ceremony: CeremonyState;
   remainingMs: number | null;
 }) {
+  // "Waiting for the first snapshot…" told a guest, in the product's own
+  // internals, that something they have no name for has not happened. Eight
+  // seconds in it stops being a wait and becomes information: the room may not
+  // have opened yet, and we are still trying.
+  const [patienceSpent, setPatienceSpent] = useState(false);
+  useEffect(() => {
+    if (snapshot !== null) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setPatienceSpent(true);
+    }, PATIENCE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [snapshot]);
+
   if (snapshot === null) {
     return (
-      <section className="ceremony ceremony-idle" data-testid="ceremony">
-        <p className="ceremony-title">Waiting for the first snapshot…</p>
+      <section className="ceremony ceremony-idle" data-testid="ceremony" data-phase="connecting">
+        <p className="ceremony-title">
+          {patienceSpent ? "Not connected" : "Connecting to the auction room…"}
+        </p>
+        {patienceSpent ? (
+          <p className="ceremony-waiting-hint" data-testid="ceremony-unreachable">
+            Can&apos;t reach the auction room. It may not have started yet — we&apos;ll keep trying.
+          </p>
+        ) : null}
       </section>
     );
   }
   const lot = snapshot.currentLot;
   const outcome = snapshot.lastOutcome;
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
+  // The auction is OVER. Everything below this line — "Between lots", "The next
+  // lot is coming up" — describes an interval before a next lot that will never
+  // come, and it used to render directly beneath a ribbon reading COMPLETED and
+  // a title reading AUCTION COMPLETE, in 44px display type.
+  const finished =
+    snapshot.auctionStatus === "completed" ||
+    snapshot.auctionStatus === "reconciled" ||
+    snapshot.auctionStatus === "abandoned";
 
   return (
     <section
@@ -71,7 +106,14 @@ export function CeremonyStage({
       <p className="ceremony-title" data-testid="ceremony-title">
         {PHASE_TITLE[ceremony.phase]}
       </p>
-      {lot !== null ? (
+      {finished ? (
+        <div className="ceremony-lot ceremony-waiting" data-testid="ceremony-finished">
+          <p className="ceremony-waiting-title" data-testid="ceremony-progress">
+            {snapshot.lotsResolved}/{snapshot.lotsTotal} lots resolved
+          </p>
+          <p className="ceremony-waiting-hint">Every lot is settled. Final squads below.</p>
+        </div>
+      ) : lot !== null ? (
         <div className="ceremony-lot">
           <h2 className="ceremony-player" data-testid="ceremony-player">
             {lot.playerName ?? "Unnamed"}
@@ -92,7 +134,11 @@ export function CeremonyStage({
               Opening at {formatPaiseINR(paise(lot.nextMinimumBid))}
             </p>
           )}
-          {seconds !== null && ceremony.phase !== "paused" ? (
+          {ceremony.phase === "paused" ? (
+            <p className="ceremony-frozen" data-testid="ceremony-frozen">
+              The clock is stopped. Bidding resumes when the auctioneer restarts it.
+            </p>
+          ) : seconds !== null ? (
             <p
               className={`ceremony-timer${seconds <= 15 ? " ceremony-timer-hot" : ""}`}
               data-testid="ceremony-timer"

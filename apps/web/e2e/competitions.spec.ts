@@ -23,11 +23,19 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   // Signed-in landing is never the login page itself (avoid matching /competitions
   // that appears inside a ?next= query string on a still-unauthenticated /login).
   await expect(page).not.toHaveURL(/\/login/);
+  // PX-3: the name gate now guards every console route, not just /home — a
+  // fresh account that stops here never reaches the org/competition screens
+  // this helper is used to reach.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 async function inSecondBrowser(browser: Browser, fn: (page: Page) => Promise<void>): Promise<void> {

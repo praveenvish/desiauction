@@ -9,6 +9,7 @@ import {
 } from "@desiauction/settlement";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { currentSession } from "../auth/actions";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
@@ -204,7 +205,18 @@ export async function canViewSettlement(slug: string): Promise<boolean> {
  * capability engine, so the tab and the surface can never disagree about who
  * may see the books.
  */
-export async function settlementOrgIds(): Promise<string[]> {
+/**
+ * Memoised per request, for the same reason `competitionsView` is: the shell
+ * calls this on every console render (`app/layout.tsx`) to decide which Money
+ * destinations exist, and `/home`'s dashboard calls it again to decide whether
+ * a money figure may link anywhere. That is a session lookup plus a full grants
+ * read, twice, for one page.
+ *
+ * The cached function is internal because this module is `"use server"`: every
+ * export must itself be an async function, and `cache()` returns a plain one.
+ * The exported wrapper stays async and the memoisation happens behind it.
+ */
+const settlementOrgIdsOnce = cache(async (): Promise<string[]> => {
   const session = await currentSession();
   if (session === null) {
     return [];
@@ -221,6 +233,10 @@ export async function settlementOrgIds(): Promise<string[]> {
     )
     .map((grant) => grant.scopeId);
   return [...new Set(orgIds)];
+});
+
+export async function settlementOrgIds(): Promise<string[]> {
+  return settlementOrgIdsOnce();
 }
 
 // --- Console (PX-1 E1) -------------------------------------------------------------
@@ -453,15 +469,22 @@ export async function moneyAuthority(orgSlug: string): Promise<MoneyAuthorityVie
   return withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => {
     // Everything the org page needs about money in ONE pass: the page must not
     // resolve the tenant or re-read grants a second time to decide a link.
-    const [granted, members, canIssue, canView] = await Promise.all([
+    const [granted, canIssue, canView] = await Promise.all([
       settlementGrantsOf(db, org.id),
-      membersOf(db, org.id),
       can(db, session.personId, { scopeType: "org", scopeId: org.id }, "grant.issue"),
       canSettlement(db, session.personId, org.id, "settlement.view"),
     ]);
+    // The "Choose a member" list IS the org directory — every name and every
+    // phone. It exists to fill the Grant control, so it ships only to someone
+    // who has that control. A viewer used to receive the whole book.
+    const members = canIssue ? await membersOf(db, org.id) : [];
     return {
       org,
-      grants: granted,
+      // Who holds the keys is a fact every member is entitled to — a phone is
+      // not. The holder rows render `name ?? phone`, so redacting the number
+      // for anyone who cannot issue costs the panel nothing and keeps the
+      // directory out of a payload it has no business being in.
+      grants: granted.map((grant) => (canIssue ? grant : { ...grant, phone: "" })),
       members: members.map((member) => ({
         personId: member.personId,
         name: member.name,
@@ -506,6 +529,16 @@ export async function issueMoneyAuthorityAction(
     : { ok: false, error: GRANT_ERRORS[result.reason] ?? result.reason };
 }
 
+/**
+ * The refusal that keeps an organization able to record a rupee.
+ *
+ * The panel's own empty state already says what happens when nobody holds a
+ * settlement role — "no case can be opened and no money can be recorded". That
+ * was reachable in one unconfirmed click, so it is refused at the action.
+ */
+const LAST_CONTROLLER_REFUSAL =
+  "This is the last settlement controller. Without one, nobody can waive, reopen or void a case for this organization — grant the role to someone else first.";
+
 export async function revokeMoneyAuthorityAction(
   orgSlug: string,
   grantId: string,
@@ -516,6 +549,13 @@ export async function revokeMoneyAuthorityAction(
   );
   if (org === null) {
     return { ok: false, error: messageFor("not_authorized") };
+  }
+  const held = await withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, (db) =>
+    settlementGrantsOf(db, org.id),
+  );
+  const controllers = held.filter((row) => row.capabilitySet === "settlement:controller");
+  if (controllers.length <= 1 && controllers.some((row) => row.grantId === grantId)) {
+    return { ok: false, error: LAST_CONTROLLER_REFUSAL };
   }
   const result = await withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, (db) =>
     revokeSettlementGrant(db, session.personId, org.id, grantId),

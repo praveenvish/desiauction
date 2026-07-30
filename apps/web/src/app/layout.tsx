@@ -5,6 +5,7 @@ import "@desiauction/ui/styles/daylight.css";
 import "./base.css";
 
 import type { Metadata } from "next";
+import { unstable_rethrow } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { ProductShell } from "../components/shell/product-shell";
@@ -27,7 +28,29 @@ export const metadata: Metadata = {
 // reads (orgs, competitions) feed the rail, switchers, context bar and
 // command palette. All reads are existing actions; anonymous renders skip them.
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const session = await currentSession();
+  // The session read is the ONE database call every page in the product makes,
+  // including the marketing pages that need no database at all. Unguarded, a
+  // Postgres blip turned `GET /` into a 500 — a landing page taken out by an
+  // outage it does not depend on. A failed lookup now degrades to exactly what
+  // an expired cookie already produces: the signed-out header. It is logged,
+  // not swallowed, so a real outage still shows up in the server logs; and
+  // `unstable_rethrow` lets Next's own control-flow signals (redirect,
+  // notFound, the dynamic-rendering bailout) through untouched, so this can
+  // never silently freeze a dynamic render into a static, permanently
+  // signed-out shell.
+  let session: Awaited<ReturnType<typeof currentSession>> = null;
+  try {
+    session = await currentSession();
+  } catch (error) {
+    unstable_rethrow(error);
+    // `no-console` is on for apps/web because the app has no logger of its own
+    // and stray logs are noise. This one is the exact opposite: the degraded
+    // render is deliberately invisible to the visitor, so stderr is the only
+    // place a database outage can still announce itself. Silence here would
+    // turn a production incident into a mystery.
+    // eslint-disable-next-line no-console
+    console.error("[shell] session lookup failed; rendering the signed-out header", error);
+  }
   // PX-7: the Money tab is gated by `settlement.view`, so the shell needs the
   // person's settlement orgs. It is ONE grants read, expanded by settlement's
   // own capability engine — the nav and the surface share one answer.

@@ -30,6 +30,22 @@ describe("showcase URL params", () => {
     ).toBe("view=squads&filter=sold&sort=name&q=raj");
   });
 
+  // The grid renders a Retained chip, but this allow-list did not accept the
+  // value it produces — so `?filter=retained` parsed back as "all" and the URL
+  // sync then dropped it. The filter applied, then silently reset on reload,
+  // and the link was unshareable. Every value the UI can set must survive.
+  it("keeps ?filter=retained, the chip the grid actually renders", () => {
+    expect(parseShowcaseParams(new URLSearchParams("filter=retained")).filter).toBe("retained");
+    expect(
+      serializeShowcaseParams({
+        view: "players",
+        filter: "retained",
+        sort: "number",
+        query: "",
+      }),
+    ).toBe("filter=retained");
+  });
+
   it("round-trips (parse ∘ serialize is identity on valid state)", () => {
     const state = {
       view: "squads" as const,

@@ -15,7 +15,10 @@ export default async function globalSetup(): Promise<void> {
     "/orgs",
     "/org/warmup",
     "/join/warmup",
-    "/seasons",
+    // /seasons is a redirect now, so warming it compiles nothing: the index it
+    // forwards to is the route that has to be warm.
+    "/tournaments",
+    "/tournaments/warmup",
     "/seasons/warmup",
     "/seasons/warmup/register",
     "/seasons/warmup/registrations",

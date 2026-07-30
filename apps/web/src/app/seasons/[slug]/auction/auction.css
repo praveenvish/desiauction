@@ -1,6 +1,31 @@
 /* Conduct & Ceremony surfaces (M-IP4-3). FLOODLIGHT tokens only — no raw
    color. Motion is opt-in and collapses under prefers-reduced-motion (IP-1). */
 
+/* Announced, never drawn. The ceremony — SOLD, UNSOLD, WITHDRAWN, UNDONE,
+   PAUSED, COMPLETE — was in NO live region on either conduct surface, so a
+   blind auctioneer was never told a player sold. These regions carry it.
+   `clip-path` over `clip`, and no `display:none`/`visibility:hidden`, which
+   would take the text back out of the accessibility tree. */
+.auction-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The dark floodlight shell used to sit on a light <body>: any element that
+   escaped the shell (the queue rows did, at right: 502) resolved its backdrop
+   to #f3f5fb and axe reported gold-on-white. The overflow is fixed above; this
+   removes the trap under it. */
+[data-theme="floodlight"] {
+  background: var(--surface);
+}
+
 /* --- Live status ribbon: persistent, sticky, never blocks interaction ------ */
 
 .status-ribbon {
@@ -19,12 +44,23 @@
   font-size: var(--text-sm-size);
 }
 
+/* `min-width: 0` is load-bearing at 320px: a nowrap cell holding a long Indian
+   team name beside a crore-scale figure refused to shrink and pushed 42px of
+   the page off the right edge (WCAG 1.4.10 Reflow). The cell may now shrink;
+   the name inside it ellipsises rather than the page scrolling sideways. */
 .ribbon-cell {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.ribbon-cell > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ribbon-cell strong {
@@ -35,6 +71,93 @@
 .ribbon-name {
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
+}
+
+/* The stream's own heartbeat: transform only, so the dot never fades text and
+   contrast holds at every frame (doc 13 AA). */
+.ribbon-network-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  /* Green on the neutral chip: the reassurance without a second green BADGE. */
+  background: var(--live);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ribbon-network-dot {
+    animation: ribbon-dot-pulse 2s var(--ease-out, ease-in-out) infinite;
+  }
+}
+
+@keyframes ribbon-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.5);
+  }
+}
+
+/* --- The ribbon promoted into the Live shell's header strip ---------------- */
+/* Same component, no card: in the shell it IS the chrome, so it drops the
+   raised surface, the border and its own sticky positioning (the header is
+   what sticks now). */
+.status-ribbon--shell {
+  position: static;
+  gap: var(--space-3);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.status-ribbon--shell .ribbon-name {
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-ribbon--shell .ribbon-right {
+  gap: var(--space-2);
+}
+
+/* The Live shell's header carries the status now, so it has to behave like a
+   status bar: it stays put while the page scrolls, and it wraps to a second
+   row rather than shoving the ribbon off a 320px screen. Scoped to the Live
+   shell's own root (`data-theme="floodlight"` is set on that element; the
+   theme toggle writes the same attribute on <html>, whose children are <head>
+   and <body>, so this can never match there). */
+[data-theme="floodlight"] > header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+[data-theme="floodlight"] > header:has(.status-ribbon--shell) > *:last-child {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  [data-theme="floodlight"] > header:has(.status-ribbon--shell) > *:last-child {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* 44px targets on the shell's two links (WCAG 2.5.8): they measured 123x28 and
+   122x24 on a phone, and one of them is the only way out of this page. */
+[data-theme="floodlight"] > header > a,
+[data-theme="floodlight"] > a[href="#live-content"] {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .ribbon-timer {
@@ -384,6 +507,31 @@
   min-width: 200px;
 }
 
+/* The transport, stated ONCE, at the foot of the page. It used to be a strip
+   above the lot restating what the ribbon says in the room's own words — four
+   statements of transport state on one phone screen. */
+.live-diagnostics {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.live-diagnostics-label {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* Leaving is not what a bidder came here to do, so the doors are at the foot. */
+.live-exits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+}
+
 .live-substatus-meta {
   display: inline-flex;
   align-items: center;
@@ -427,6 +575,8 @@
 .lot-hero-name {
   margin: var(--space-1) 0 0;
   font-family: var(--font-display);
+  /* Real Indian names run past a 320px column as a single word. */
+  overflow-wrap: anywhere;
   font-size: clamp(28px, 4vw, 44px);
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -533,6 +683,30 @@
   height: 132px;
 }
 
+/* On a phone the ring was taking half the hero's width — 132px of a 263px
+   content box at 375 — which left a 107px column for the one thing the hero is
+   for, the player's name. It stays inline (stacking it pushed the current bid
+   back under the fold) and gives the name the room instead. */
+@media (max-width: 560px) {
+  .lot-hero {
+    padding: var(--space-4);
+  }
+
+  .lot-hero-top {
+    gap: var(--space-4);
+  }
+
+  .lot-ring,
+  .lot-ring > svg {
+    width: 96px;
+    height: 96px;
+  }
+
+  .lot-ring-num {
+    font-size: 30px;
+  }
+}
+
 .lot-ring-track {
   fill: none;
   stroke: var(--border-strong);
@@ -605,6 +779,27 @@
   color: var(--success-base);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
+}
+
+/* The stopped clock is not good news, so it does not wear the success green
+   that "you're leading this lot" earns. */
+.paddle-leading[data-reason="paused"],
+.paddle-frozen {
+  background: color-mix(in srgb, var(--warning-base, var(--text-secondary)) 14%, transparent);
+  color: var(--text-primary);
+}
+
+/* The hero's countdown ring is replaced by this while the clock is stopped —
+   the ring used to draw a giant em dash over the word SECONDS. */
+.lot-hero-paused {
+  flex: none;
+  max-width: 22ch;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
 }
 
 .paddle-actions {
@@ -767,9 +962,13 @@
 }
 
 /* --- squads: who is actually in each franchise ---------------------------- */
+/* `minmax(280px, …)` is a hard floor: on a 320px screen the card's own padding
+   leaves ~272px of track, so every squad column ran 5–8px past the right edge
+   and the PAGE scrolled sideways (WCAG 1.4.10). `min(280px, 100%)` keeps the
+   280px comfort where there is room and yields where there is not. */
 .squad-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: var(--space-5);
   margin-top: var(--space-3);
 }
@@ -815,6 +1014,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  min-width: 0;
 }
 
 /* Wraps rather than truncates. Ellipsising the name was the wrong trade: with
@@ -831,6 +1031,10 @@
 }
 
 .squad-name {
+  min-width: 0;
+  /* A name is never ellipsised here (the board's whole job is naming players),
+     so a long one has to be allowed to break rather than widen the column. */
+  overflow-wrap: anywhere;
   color: var(--text-primary);
   font-weight: var(--font-weight-medium);
 }
@@ -959,7 +1163,11 @@
   margin-bottom: var(--space-1);
 }
 
-/* The franchise crest: identity colour with ink on top, never white-on-pastel. */
+/* The franchise crest. The label colour is NOT set here: it is organizer data
+   underneath, so `paintOnFill` picks ink or paper from the fill's luminance and
+   ships both as inline style. Pinning the near-black here is what put 11px text
+   at 3.22:1 on the seeded `#1f6f43`, and on every mid-tone club colour after
+   it. */
 .purse-chip {
   flex: none;
   display: grid;
@@ -970,7 +1178,6 @@
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: var(--font-weight-semibold);
-  color: var(--surface-sunken);
 }
 
 .purse-row[data-mine="true"] .purse-team {
@@ -998,6 +1205,23 @@
   white-space: nowrap;
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
+}
+
+/* One row per TEAM now, so the paddle numbers it holds become an attribute of
+   the row rather than the thing that multiplies it. A team holding three
+   paddles reads "P01 · P03 · P05" on one line with one purse. */
+.purse-paddles {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.purse-paddles--none {
+  font-family: inherit;
+  font-style: italic;
+  letter-spacing: 0;
 }
 
 .purse-left {
@@ -1041,6 +1265,62 @@
   align-items: center;
 }
 
+/* The primary tier: the acts of the night proper, at full weight. */
+.cockpit-actions--primary {
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cockpit-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The Conduct card used to put Pause, Queue lots, Undo, Recover engine and
+   Complete in ONE flat row at equal weight. These titles are the difference
+   between "set the night up" and "change what the ledger already says". */
+.cockpit-group-title {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.cockpit-group-title--grave {
+  color: var(--text-warning, var(--text-secondary));
+}
+
+.cockpit-warn {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-warning, var(--border-subtle));
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+}
+
+/* The lot and the controls that act on it travel together: at the moment the
+   gavel was pressed, the ceremony was entirely off-screen. */
+.cockpit-dock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (min-width: 901px) {
+  .cockpit-dock {
+    position: sticky;
+    /* Clears the ribbon, which sticks at the top of the same scroll box. */
+    top: 84px;
+    z-index: 1;
+  }
+}
+
 .cockpit-queue {
   list-style: none;
   margin: 0;
@@ -1050,8 +1330,18 @@
   gap: 8px;
 }
 
+/* THE 112px BREAK, and the seven contrast failures it caused.
+ *
+ * `display: flex` with no `flex-wrap` on a row holding a badge, a player name,
+ * a base price and two buttons cannot fit 390px, so the Withdraw button was
+ * laid out at `right: 502` — outside the dark card AND outside the dark shell.
+ * axe then resolved its backdrop to the light <body> behind everything and
+ * reported 7 × color-contrast at 1.36 (#f3d078 on #f3f5fb). ONE missing
+ * property produced both the horizontal overflow and the only axe violation on
+ * the surface. The row wraps now, and the page does not. */
 .cockpit-queue li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
@@ -1060,10 +1350,40 @@
   background: var(--surface);
 }
 
+/* The name is what yields: it may shrink and ellipsise so the row wraps at the
+   ACTION boundary rather than mid-word. */
+.cockpit-queue li > .registration-name {
+  flex: 1 1 8ch;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .cockpit-queue .queue-actions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+/* WCAG 2.5.8. The 14 queue buttons measured 32px — 22 sub-44px targets on the
+   cockpit at 390 — and they are the controls an auctioneer hits fastest, under
+   the most pressure, on the smallest screen. `size="sm"` is right for the
+   density; the TARGET is what has to be 44. */
+.cockpit-queue .queue-actions button,
+.owner-row button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* The rest of the conduct controls came in at 40px — under WCAG 2.5.8 by four
+   pixels, on the surface where a mis-tap costs a player. These are the buttons
+   an auctioneer and an owner actually press during a live lot. */
+.cockpit-actions button,
+[data-testid="conduct-panel"] button,
+[data-testid="paddle-panel"] button,
+[data-testid="owners-card"] button {
+  min-height: 44px;
 }
 
 .owner-row {
@@ -1265,6 +1585,9 @@
 }
 
 .stage-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   background: transparent;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
@@ -1289,17 +1612,56 @@
   display: none;
 }
 
-/* Big screen: the stage becomes a projected show — fills the viewport, no box,
-   huge type, centred. clamp() sizes are absolute (rem/vw) so they scale with
-   the screen, not the container. Benefits the live current-lot hero and the
-   waiting state alike. */
+/* BIG SCREEN IS THE CEREMONY AND NOTHING ELSE.
+ *
+ * It used to be a very tall panel inside an ordinary page: the shell strip, the
+ * page <h1>, the status ribbon and the page padding all survived above it —
+ * 275px of chrome — and `min-height: calc(100dvh - var(--space-10))` then asked
+ * for a full viewport BELOW that. At exactly 1920x1080 the document came out
+ * 1439px tall: the current bid was clipped and the countdown sat at y=1207,
+ * entirely off the wall. A hall cannot see the clock.
+ *
+ * The stage is a fixed layer over the viewport instead, and the document behind
+ * it stands down (see the `[data-stage="true"]` rules below), so the projected
+ * frame is the viewport by construction and can never scroll. */
+.stage-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: none;
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface);
+}
+
 .stage-mode .ceremony {
-  min-height: calc(100dvh - var(--space-10));
+  flex: 1;
+  min-height: 0;
   justify-content: center;
-  gap: var(--space-4);
+  gap: clamp(var(--space-2), 1.6vh, var(--space-5));
   border: none;
   background: transparent;
-  padding: var(--space-8) var(--space-6);
+  padding: clamp(var(--space-4), 4vh, var(--space-10)) var(--space-6);
+}
+
+/* The page behind the projected stage: no min-height, no padding, no chrome —
+   so `document.scrollHeight` is the viewport and the frame is exactly 1080px on
+   a 1080p wall. */
+[data-stage="true"],
+[data-stage="true"] body {
+  overflow: hidden;
+}
+
+[data-stage="true"] .registrations-dash {
+  min-height: 0;
+  padding: 0;
+}
+
+[data-stage="true"] [data-theme="floodlight"] > header {
+  display: none;
 }
 
 /* Fullscreen broadcast: the confetti cascades the height of the stage. */
@@ -1311,36 +1673,259 @@
   height: 17px;
 }
 
+/* Every size is bounded by the SHORT edge as well as the long one. Sizing a
+   projected frame on vw alone is what put the clock past the bottom of a 16:9
+   wall: 11vw of 1920 is 211px of name, and the frame only has 1080px in total
+   to spend on title, name, meta, bid, leader and clock together. */
 .stage-mode .ceremony-title {
-  font-size: clamp(1rem, 2.4vw, 1.75rem);
+  font-size: clamp(1rem, min(2.4vw, 2.6vh), 1.75rem);
   letter-spacing: 0.24em;
 }
 
 .stage-mode .ceremony-player {
-  font-size: clamp(3rem, 11vw, 8.5rem);
+  font-size: clamp(2.5rem, min(11vw, 12vh), 8.5rem);
   line-height: 1.02;
   letter-spacing: -0.02em;
 }
 
 .stage-mode .ceremony-bid {
-  font-size: clamp(2.5rem, 8vw, 6rem);
+  font-size: clamp(2rem, min(8vw, 8.5vh), 6rem);
 }
 
 .stage-mode .ceremony-timer {
-  font-size: clamp(1.5rem, 4vw, 3rem);
+  font-size: clamp(1.5rem, min(4vw, 5vh), 3rem);
 }
 
 .stage-mode .ceremony-waiting-title {
-  font-size: clamp(2.5rem, 9vw, 6rem);
+  font-size: clamp(2rem, min(9vw, 10vh), 6rem);
 }
 
 .stage-mode .ceremony-waiting-hint,
-.stage-mode .ceremony-meta {
-  font-size: clamp(1rem, 2vw, 1.5rem);
+.stage-mode .ceremony-meta,
+.stage-mode .ceremony-frozen {
+  font-size: clamp(1rem, min(2vw, 2.2vh), 1.5rem);
 }
 
+.stage-mode .ceremony-leader {
+  font-size: clamp(0.95rem, min(2vw, 2.4vh), 1.75rem);
+}
+
+/* The one control the projected stage keeps: the way back out, floated over the
+   frame rather than taking a row of it. */
 .stage-mode .stage-toggle-row {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 1;
   display: flex;
+  opacity: 0.5;
+}
+
+.stage-mode .stage-toggle-row:hover,
+.stage-mode .stage-toggle-row:focus-within {
+  opacity: 1;
+}
+
+/* --- The public stage: identity, sharing, honesty, the way in -------------- */
+
+.spectate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* "<name> — spectator view" named a mode of our software. This names the night:
+   whose it is and where. */
+.spectate-identity {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+/* The one assertive live region — visually hidden, permanently mounted (screen
+   readers only track regions that existed at load). */
+.spectate-announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The page is showing a memory, and says so. */
+.spectate-stale {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+  font-size: var(--text-sm-size);
+}
+
+.share-auction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.share-auction-lede {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.share-auction-sub {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-regular, 400);
+}
+
+.share-auction-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.share-auction-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.share-auction-button:hover {
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+}
+
+.share-auction-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* WhatsApp is the distribution channel for this market, so it is the primary
+   of the two — accent fill, ink label (doc 13: text on the gold accent is ink). */
+.share-auction-button--whatsapp {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.share-auction-button--whatsapp:hover {
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
+}
+
+.spectate-footer {
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  text-align: center;
+}
+
+.spectate-footer a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- Up next: the queue that was always on the wire ------------------------ */
+.up-next-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.up-next-list li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.up-next-list li:first-child {
+  border-top: 0;
+}
+
+.up-next-pos {
+  flex: none;
+  min-width: 1.5em;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.up-next-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.up-next-role {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  text-transform: capitalize;
+}
+
+.up-next-base {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+/* The lot that just resolved, collapsed to one line above its own bid ladder —
+   so the four bids that made the price survive the gavel. */
+.feed-resolved {
+  margin: 0 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-heading);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The clock is STOPPED. The ring would have said "plenty of time". */
+.ceremony-frozen {
+  color: var(--warning-strong);
+  font-size: var(--text-sm-size);
 }
 
 /* --- v1.1 · cockpit operator controls (Tier 1) ------------------------------ */

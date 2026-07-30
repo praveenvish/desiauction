@@ -77,6 +77,139 @@
   font-size: var(--text-xs-size);
 }
 
+/* ---------- setup ladder: the five rungs to a first auction ---------- */
+.home-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.home-ladder-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.home-ladder-head h2 {
+  margin: 0;
+  /* Text face, not display: the display face is reserved for >=30px, brand
+     lockups and numerals (enforced by src/components/type-scale.test.ts). */
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.home-ladder-head p {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.home-ladder-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-rung {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.home-rung:first-child {
+  border-top: 0;
+}
+
+.home-rung-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.home-rung--done .home-rung-mark {
+  border-color: transparent;
+  background: var(--success-base);
+  color: var(--text-on-accent);
+}
+
+.home-rung--now .home-rung-mark {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+.home-rung-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  /* basis 0, not auto: on a phone the row wraps to give the CTA its own line,
+     and an auto basis let the title's min-content width push itself below the
+     step number instead of shrinking beside it. */
+  flex: 1 1 0;
+}
+
+.home-rung-text strong {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.home-rung-text span {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+/* Done and not-yet both step back so the ONE live rung is unmistakable. */
+.home-rung--done .home-rung-text strong,
+.home-rung--todo .home-rung-text strong {
+  color: var(--text-secondary);
+}
+
+.home-rung--todo .home-rung-text span {
+  color: var(--text-muted);
+}
+
+.home-rung-cta {
+  flex: none;
+}
+
+@media (max-width: 559px) {
+  .home-rung {
+    flex-wrap: wrap;
+  }
+
+  .home-rung-cta {
+    /* border-box, or the 100% basis and the indent add up past the viewport. */
+    box-sizing: border-box;
+    flex: 1 0 100%;
+    padding-left: calc(28px + var(--space-3));
+  }
+}
+
 /* ---------- lifecycle strip: the platform in one row ---------- */
 .home-flow {
   display: flex;
@@ -125,6 +258,20 @@
 /* Stages holding no work read as dimmed steps on the path. */
 .home-step:not(.home-step--on) .home-ic {
   opacity: 0.4;
+}
+
+/*
+ * In the setup state the strip is a MAP, not a report — nothing has reached any
+ * of these stages yet, so it teaches the four steps that come after the ladder
+ * rather than reporting four zeroes. The counts recede; the names do not, so
+ * the text keeps its contrast and the labelling stays legible.
+ */
+.home-flow--map {
+  background: var(--surface-sunken);
+}
+
+.home-flow--map .home-step-count {
+  opacity: 0.55;
 }
 
 .home-step-text {
@@ -240,12 +387,21 @@
   color: var(--text-secondary);
 }
 
+/* 16px tall as plain inline text. The box is padded out to the 44px touch rung
+   the product standardised on, and the negative inline margin keeps the visual
+   position unchanged — the target grows, the layout does not move. */
 .home-blank-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  margin: 0 calc(var(--space-2) * -1);
   font-family: var(--font-text);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-accent);
   text-decoration: none;
+  border-radius: var(--radius-sm);
 }
 
 .home-blank-cta:hover {
@@ -258,6 +414,13 @@
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
+}
+
+/* Panels are suppressed when they have nothing to say, so a column can empty
+   out entirely. When one does, the survivor takes the full width instead of
+   sitting in a 1.45fr slot beside a blank one. */
+.home-main--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .home-col {
@@ -321,15 +484,42 @@
 
 .home-more {
   margin-left: auto;
+  margin-right: calc(var(--space-2) * -1);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
   font-family: var(--font-text);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-accent);
   text-decoration: none;
+  border-radius: var(--radius-sm);
 }
 
 .home-more:hover {
   text-decoration: underline;
+}
+
+/* These two were the only interactive classes on the page missing from the
+   focus-visible group below, so they fell back to the UA's 1px auto outline
+   while everything beside them drew a 2px token ring. */
+.home-more:focus-visible,
+.home-blank-cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The scan is capped; say so where the cap bites. */
+.home-scan-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
 }
 
 /* ---------- lists ---------- */
@@ -498,6 +688,12 @@
   background: var(--surface-raised);
 }
 
+/* The same cell with nowhere honest to go: no hover, no pointer, no promise. */
+.home-money-cell--flat:hover {
+  border-color: var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
 .home-money-label {
   font-family: var(--font-text);
   font-size: var(--text-xs-size);
@@ -607,6 +803,14 @@
 }
 
 /* ---------- table ---------- */
+/*
+ * `overflow-x: auto` here was decoration that could never fire: the table below
+ * is `width: 100%` with `table-layout: fixed`, so it is incapable of exceeding
+ * this wrapper. Fixed layout then handed columns 2/3/4 their pinned widths
+ * (62 + 62 + 78 = 202px) plus padding and the crest, and the season NAME —
+ * the only column anyone reads — was left 0px wide on every phone. It is kept
+ * for the tablet band, where the table is real and can want it.
+ */
 .home-table-wrap {
   overflow-x: auto;
 }
@@ -615,6 +819,69 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+}
+
+/* The phone rendering: one card per season, name first and full width. */
+.home-season-cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-season-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-season-card:hover {
+  background: var(--surface-sunken);
+}
+
+.home-season-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.home-season-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.home-season-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.home-season-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding-left: calc(32px + var(--space-3));
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 639px) {
+  .home-table {
+    display: none;
+  }
+
+  .home-season-cards {
+    display: block;
+  }
 }
 
 .home-table th:nth-child(2),
@@ -678,6 +945,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  /* 33px measured in the tablet band, where the table is still the rendering
+     and the device is still a touchscreen. */
+  min-height: 44px;
   text-decoration: none;
   color: inherit;
   min-width: 0;
@@ -713,7 +983,10 @@
 .home-card-link {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--space-1);
+  min-height: 44px;
+  padding-right: 44px;
   text-decoration: none;
   color: var(--text-primary);
   min-width: 0;
@@ -734,10 +1007,17 @@
   position: relative;
 }
 
+/* Measured 22x22 — the smallest target on the page, and the only one that is
+   pure icon. Padded to the 44px rung; it is absolutely positioned, so growing
+   it costs the card no layout. */
 .home-pin-button {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  top: var(--space-05);
+  right: var(--space-05);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   background: transparent;
   border: none;
   color: var(--text-accent);
@@ -745,7 +1025,6 @@
   line-height: 1;
   cursor: pointer;
   border-radius: var(--radius-sm);
-  padding: var(--space-05);
 }
 
 .home-pin-button:focus-visible {
@@ -818,6 +1097,22 @@
   height: 6px;
   border-radius: var(--radius-full);
   background: currentcolor;
+}
+
+/*
+ * Every lot sold. The hero kept its urgent accent border and pulsing "LIVE NOW"
+ * over a bar at 100%, which is the one moment the word is wrong — the bidding
+ * is finished. The panel cools to a neutral, settled surface and the badge
+ * loses its pulsing dot entirely (it is not rendered in this state).
+ */
+.home-live--done {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.home-live--done .home-live-badge {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
 }
 
 /* The dot is the only thing that moves: a pulse on the panel itself would make

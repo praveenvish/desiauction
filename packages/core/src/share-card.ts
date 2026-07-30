@@ -140,10 +140,30 @@ export interface PlayerShareCard {
   statusTone: ShareCardTone;
 }
 
+/** The player's outcome as a label + tone. Being on a team sheet is the
+ *  celebratory case and carries the accent (live) tone, whether the place was
+ *  won at auction or signed before it opened. The retained branch used to be
+ *  absent: anything that was not "sold" fell through to "Available", so the
+ *  card for a player who already had a squad advertised them as up for grabs —
+ *  on the one artefact of this product that gets forwarded to a group chat. */
+function derivePlayerStatus(input: PlayerShareCardInput): {
+  statusLabel: string;
+  statusTone: ShareCardTone;
+} {
+  if (input.status === "available") {
+    return { statusLabel: "Available", statusTone: "open" };
+  }
+  const verb = input.status === "retained" ? "Retained by" : "Sold to";
+  const bare = input.status === "retained" ? "Retained" : "Sold";
+  return {
+    statusLabel: input.teamName !== null ? `${verb} ${input.teamName}` : bare,
+    statusTone: "live",
+  };
+}
+
 /**
  * Normalize a single approved player into the card model rendered by the
- * per-player OG/Twitter image routes (`/c/[slug]/p/[number]`). A "sold" player
- * is a celebratory outcome — it carries the accent (live) tone. Never throws.
+ * per-player OG/Twitter image routes (`/c/[slug]/p/[number]`). Never throws.
  */
 export function buildPlayerShareCard(input: PlayerShareCardInput): PlayerShareCard {
   const name = truncate(input.name, MAX_TITLE) || "Player";
@@ -153,12 +173,6 @@ export function buildPlayerShareCard(input: PlayerShareCardInput): PlayerShareCa
       ? `${roleLabel(input.role)} · ${String(input.age)} yrs`
       : roleLabel(input.role);
   const styleLine = buildMeta(styleLabel(input.battingStyle), styleLabel(input.bowlingStyle));
-  const { statusLabel, statusTone }: { statusLabel: string; statusTone: ShareCardTone } =
-    input.status === "sold"
-      ? {
-          statusLabel: input.teamName !== null ? `Sold to ${input.teamName}` : "Sold",
-          statusTone: "live",
-        }
-      : { statusLabel: "Available", statusTone: "open" };
+  const { statusLabel, statusTone } = derivePlayerStatus(input);
   return { name, subtitle, roleLine, styleLine, statusLabel, statusTone };
 }

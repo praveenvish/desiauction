@@ -31,8 +31,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
 
@@ -41,7 +41,7 @@ async function onboardWithName(page: Page, phone: string, name: string): Promise
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill(name);
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByTestId("onboarding-org")).toBeVisible();
+  await expect(page).toHaveURL(/\/home/);
 }
 
 /** A click before React attaches is a no-op — wait for the panel to say it is live. */
@@ -151,6 +151,10 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await expect(page.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  // Feasibility: these fixtures run a handful of players against squads of 8,
+  // which the setup screen now refuses until the shortfall is accepted on the
+  // record (it is the state that used to become an unclosable auction).
+  await page.getByTestId("accept-short-squads").check();
   await page.getByTestId("create-auction").click();
   await expect(page.getByTestId("auction-status")).toHaveText("scheduled", { timeout: 20_000 });
 
@@ -163,6 +167,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   }
   await page.getByTestId("queue-all").click();
   await expect(page.getByTestId("lots-table")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("accept-short-open").check();
   await page.getByTestId("auction-open").click();
   await expect(page.getByTestId("auction-status")).toHaveText("live", { timeout: 20_000 });
   await page.getByTestId("auction-complete").click();

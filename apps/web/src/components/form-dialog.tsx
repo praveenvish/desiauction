@@ -57,6 +57,7 @@ export function FormDialog({
         <Button
           variant={variant}
           {...(size !== undefined ? { size } : {})}
+          {...(triggerClassName !== undefined ? { className: triggerClassName } : {})}
           onClick={() => {
             setOpen(true);
           }}

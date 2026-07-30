@@ -1,200 +1,84 @@
 "use client";
 
-import { Button, ButtonLink, Field } from "@desiauction/ui";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { Button, Field } from "@desiauction/ui";
+import { useActionState, useEffect, useRef } from "react";
 
+import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
-import { updateProfileAction } from "../../server/auth/actions";
-import { createOrgAction } from "../../server/orgs/actions";
+import { logoutAction, updateProfileAction } from "../../server/auth/actions";
 
-export interface OnboardingPanelProps {
-  step: "name" | "org" | "done";
-  phone: string;
-  name: string;
-}
+/**
+ * The collapsed onboarding panel (2026-07-24 council): one question, no
+ * progress bar, no org wizard, no skip link — there is nothing left to skip.
+ *
+ * The exit is now the server's: `updateProfileAction` redirects to /home when
+ * the hidden `onboarding` marker is present. It used to be a client effect that
+ * waited for `saved`, then pushed the route — ~1.9s of a finished form doing
+ * nothing, at the end of the funnel. Telemetry fires at submit for the same
+ * reason: there is no render after the save to fire it in.
+ */
+export function OnboardingPanel({ phone }: { phone: string }) {
+  const [state, formAction, pending] = useActionState(updateProfileAction, {});
+  const inputRef = useRef<HTMLInputElement>(null);
 
-const STEPS = [
-  { key: "name", label: "Your name" },
-  { key: "org", label: "Your organization" },
-] as const;
-
-export function OnboardingPanel({ step, phone, name }: OnboardingPanelProps) {
   useEffect(() => {
-    track("onboarding.step_viewed", { step });
-  }, [step]);
+    track("onboarding.step_viewed", { step: "name" });
+  }, []);
+
+  // A rejected submit left focus on <body> and the caret nowhere. Login had the
+  // same defect; both screens now hand the field back. Guarded on <body> like
+  // the Field primitive's own restore, so a caret placed elsewhere is safe.
+  useEffect(() => {
+    if (state.error !== undefined && document.activeElement === document.body) {
+      inputRef.current?.focus();
+    }
+  }, [state]);
 
   return (
     <>
-      <h1>
-        {step === "name"
-          ? "Welcome to DesiAuction"
-          : step === "org"
-            ? `Welcome, ${name}`
-            : "You're all set"}
-      </h1>
-      {step !== "done" ? (
-        <>
-          <p className="onboarding-sub">
-            {step === "name"
-              ? "Two quick steps and you're in."
-              : "One more step — where will you run tournaments?"}
-          </p>
-          <ol className="onboarding-progress" aria-label="Onboarding progress">
-            {STEPS.map((entry, index) => {
-              const stateOf =
-                entry.key === step
-                  ? "current"
-                  : STEPS.findIndex((s) => s.key === step) > index
-                    ? "done"
-                    : "todo";
-              return (
-                <li
-                  key={entry.key}
-                  className={`onboarding-step onboarding-step-${stateOf}`}
-                  aria-current={stateOf === "current" ? "step" : undefined}
-                >
-                  <span className="onboarding-step-number">{index + 1}</span>
-                  {entry.label}
-                </li>
-              );
-            })}
-          </ol>
-        </>
-      ) : null}
-      {step === "name" ? <NameStep phone={phone} /> : null}
-      {step === "org" ? <OrgStep /> : null}
-      {step === "done" ? <DoneStep /> : null}
-    </>
-  );
-}
-
-function NameStep({ phone }: { phone: string }) {
-  const router = useRouter();
-  const [state, formAction, pending] = useActionState(updateProfileAction, {});
-
-  useEffect(() => {
-    if (state.saved === true) {
-      track("profile.completed");
-      // Server state now carries the name; re-derive the step.
-      router.refresh();
-    }
-  }, [state.saved, router]);
-
-  return (
-    <form action={formAction} className="onboarding-form" data-testid="onboarding-name">
-      <p className="onboarding-hint">
-        Signed in as <strong>{phone}</strong> — verified.
-      </p>
-      <Field
-        label="What should we call you?"
-        name="name"
-        required
-        autoFocus
-        autoComplete="name"
-        placeholder="Rohan Kulkarni"
-        help="Appears on team sheets and the auction stage."
-        {...(state.error !== undefined ? { error: state.error } : {})}
-      />
-      <Button type="submit" loading={pending || state.saved === true}>
-        Continue
-      </Button>
-    </form>
-  );
-}
-
-function OrgStep() {
-  const router = useRouter();
-  const [state, formAction, pending] = useActionState(createOrgAction, {});
-  const [inviteUrl, setInviteUrl] = useState("");
-  const [inviteError, setInviteError] = useState<string | null>(null);
-
-  const followInvite = () => {
-    const match = /\/join\/([A-Za-z0-9_-]+)/.exec(inviteUrl.trim());
-    const token =
-      match?.[1] ?? (/^[A-Za-z0-9_-]{10,}$/.test(inviteUrl.trim()) ? inviteUrl.trim() : null);
-    if (token === null) {
-      setInviteError("That doesn't look like an invite link — it contains /join/…");
-      return;
-    }
-    router.push(`/join/${token}`);
-  };
-
-  return (
-    <div className="onboarding-org" data-testid="onboarding-org">
+      <h1>Welcome to DesiAuction</h1>
+      <p className="onboarding-sub">One question and you&rsquo;re in.</p>
       <form
         action={formAction}
         className="onboarding-form"
+        data-testid="onboarding-name"
         onSubmit={() => {
-          track("org.created", { via: "onboarding" });
+          track("profile.completed");
+          track("onboarding.completed", { via: "name" });
         }}
       >
-        <h2>Run your own tournaments</h2>
+        {/* Tells the shared action which of its two forms this is: the one with
+            somewhere to go afterwards. */}
+        <input type="hidden" name="onboarding" value="1" />
+        <p className="onboarding-hint">
+          Signed in as <strong>{formatPhone(phone)}</strong> — verified. ·{" "}
+          <button
+            type="button"
+            className="onboarding-signout"
+            data-testid="onboarding-signout"
+            onClick={() => void logoutAction()}
+          >
+            Not you? Sign out
+          </button>
+        </p>
         <Field
-          label="Organization name"
+          ref={inputRef}
+          label="What should we call you?"
           name="name"
-          placeholder="Malad Premier League"
           required
-          help="Your club, league or association. You can invite co-organizers later."
+          autoFocus
+          autoComplete="name"
+          placeholder="Rohan Kulkarni"
+          // Login has always preserved the phone across a rejected submit; this
+          // field threw the typed name away and made the person start again.
+          defaultValue={state.name ?? ""}
+          help="Appears publicly on team sheets, receipts and the auction stage. You can change it later in Account."
           {...(state.error !== undefined ? { error: state.error } : {})}
         />
-        <Button type="submit" loading={pending}>
-          Create organization
+        <Button type="submit" size="touch" loading={pending}>
+          Continue
         </Button>
       </form>
-      <div className="onboarding-divider" role="presentation">
-        or
-      </div>
-      <div className="onboarding-form">
-        <h2>Join with an invite</h2>
-        <Field
-          label="Paste your invite link"
-          name="invite"
-          placeholder="https://…/join/…"
-          value={inviteUrl}
-          onChange={(event) => {
-            setInviteUrl(event.target.value);
-            setInviteError(null);
-          }}
-          {...(inviteError !== null ? { error: inviteError } : {})}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={followInvite}
-          data-testid="follow-invite"
-        >
-          Continue with invite
-        </Button>
-      </div>
-      <p className="onboarding-skip">
-        Just here to register as a player or watch an auction?{" "}
-        <Link
-          href="/home"
-          data-testid="onboarding-skip"
-          onClick={() => {
-            track("onboarding.completed", { via: "skip" });
-          }}
-        >
-          Skip for now
-        </Link>
-      </p>
-    </div>
-  );
-}
-
-function DoneStep() {
-  useEffect(() => {
-    track("onboarding.completed", { via: "done" });
-  }, []);
-  return (
-    <div className="onboarding-form" data-testid="onboarding-done">
-      <p className="onboarding-sub">
-        Your profile and organization are ready. The next stop is your home — seasons, registrations
-        and auction night all start there.
-      </p>
-      <ButtonLink href="/home">Go to Home</ButtonLink>
-    </div>
+    </>
   );
 }

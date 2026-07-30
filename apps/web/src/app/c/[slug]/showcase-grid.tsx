@@ -17,7 +17,7 @@ import {
 } from "../../../components/showcase/showcase-params";
 import { showcaseToCsv } from "../../../components/showcase/showcase-csv";
 import { track } from "../../../lib/telemetry";
-import type { ShowcasePlayer } from "../../../server/competition/public";
+import type { ShowcasePlayer, ShowcasePool } from "../../../server/competition/public";
 import { SquadsView } from "./squads-view";
 
 /**
@@ -26,8 +26,17 @@ import { SquadsView } from "./squads-view";
  * and it degrades to the full list without JS. Photos fall back to the branded
  * mark (PlayerImage / C-25); no phones are ever in the data. Role labels come
  * from the shared core `roleLabel` (one formatter across the product).
+ *
+ * Takes the POOL rather than an array of players. Everything this component
+ * computes — the four filter counts, the "N players" line, the squad rollup and
+ * the CSV — is derived from rows that are now page-limited on the server, so
+ * every one of those numbers is a statement about this page and not about the
+ * tournament. `pool.total` is the only number here that describes the
+ * tournament, and when the two disagree the component has to say so before it
+ * shows a single count.
  */
-export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slug: string }) {
+export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string }) {
+  const { players, total, truncated } = pool;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -76,13 +85,34 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
 
   return (
     <div className="showcase">
-      <div className="showcase-viewtoggle" role="tablist" aria-label="Showcase view">
+      {/* Said BEFORE the view toggle, the counts and the grid, because every
+          one of those is scoped to the loaded rows and this is the sentence
+          that makes them readable. Deliberately names the CSV and the search:
+          a visitor who searches for a player in the untruncated tail gets "no
+          players match", and without this line that reads as "that player is
+          not in this tournament" — a slow page traded for a false one, which
+          is exactly the trade a bare LIMIT makes. */}
+      {truncated ? (
+        <p className="showcase-truncated" data-testid="showcase-truncated">
+          This page shows the first {players.length} of {total} approved players. The search,
+          filters, squads and CSV below all cover these {players.length} — the rest of the pool is
+          not loaded on this page.
+        </p>
+      ) : null}
+
+      {/* Not a tablist. These claimed `role="tab"`/`aria-selected` with no
+          tabpanel, no `aria-controls` and no arrow-key handling, so a screen
+          reader announced "tab 1 of 2" and then ArrowRight did nothing — the
+          exact contract the role promises, broken. They are toggle buttons over
+          one region, and `aria-pressed` says that truthfully with the keyboard
+          behaviour buttons already have. Same treatment the directory's facet
+          chips use one level up (`role="group"`). */}
+      <div className="showcase-viewtoggle" role="group" aria-label="Showcase view">
         {(["players", "squads"] as const).map((v) => (
           <button
             key={v}
             type="button"
-            role="tab"
-            aria-selected={view === v}
+            aria-pressed={view === v}
             className="showcase-view"
             data-active={view === v}
             onClick={() => {
@@ -122,9 +152,14 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
                 <option value="status">Sort: status</option>
               </select>
             </label>
+            {/* `touch`, not `sm`: this sits in a row with .showcase-search and
+                .showcase-sort select, both of which hand-set min-height 44px.
+                At sm the button rendered 32px — 12px shorter than the controls
+                either side of it, and under the platform's touch convention on
+                the one public surface most likely to be opened on a phone. */}
             <Button
               variant="secondary"
-              size="sm"
+              size="touch"
               onClick={downloadCsv}
               disabled={shown.length === 0}
             >
@@ -132,13 +167,12 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
             </Button>
           </div>
 
-          <div className="showcase-filters" role="tablist" aria-label="Filter players">
+          <div className="showcase-filters" role="group" aria-label="Filter players">
             {(["all", "available", "sold", "retained"] as const).map((key) => (
               <button
                 key={key}
                 type="button"
-                role="tab"
-                aria-selected={filter === key}
+                aria-pressed={filter === key}
                 className="showcase-filter"
                 data-active={filter === key}
                 onClick={() => {
@@ -162,7 +196,11 @@ export function ShowcaseGrid({ players, slug }: { players: ShowcasePlayer[]; slu
           </p>
 
           {shown.length === 0 ? (
-            <p className="showcase-empty">No players match your search.</p>
+            <p className="showcase-empty">
+              {truncated
+                ? `No players match your search among the ${String(players.length)} loaded on this page.`
+                : "No players match your search."}
+            </p>
           ) : (
             <ul className="showcase-grid" data-testid="showcase-grid">
               {shown.map((p) => (

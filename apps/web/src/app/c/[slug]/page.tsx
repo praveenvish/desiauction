@@ -1,4 +1,4 @@
-import { Badge, ButtonLink } from "@desiauction/ui";
+import { Badge, ButtonLink, EmptyState } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,6 +11,7 @@ import { formatDateRange } from "../format";
 import { ShowcaseGrid } from "./showcase-grid";
 import "../../marketing.css";
 import "../directory.css";
+import "./competition.css";
 
 // PX-5 public competition landing (PX-1 P-06). Renders only what is true and
 // public-safe: identity, dates, organizer, teams, the published schedule, and
@@ -52,10 +53,18 @@ export default async function PublicCompetitionPage({
   const { ref } = await searchParams;
   // Carry a shared link's `?ref` through to registration for attribution.
   const refSuffix = typeof ref === "string" && ref !== "" ? `?ref=${encodeURIComponent(ref)}` : "";
-  const [view, players] = await Promise.all([publicCompetitionView(slug), publicShowcase(slug)]);
+  const [view, pool] = await Promise.all([publicCompetitionView(slug), publicShowcase(slug)]);
   if (view === null) {
     notFound();
   }
+  // The directory (`/c`) badges a mid-auction tournament "Live now", promises
+  // "No account needed" and links straight to the spectate stage. This page knew
+  // only open/closed, so a guest who clicked one of those cards through to here
+  // was told "REGISTRATION CLOSED" — the opposite of what they had just read,
+  // one click earlier, about the same tournament. Same test the directory uses
+  // (`isLive` in server/competition/public.ts): paused is mid-lot, not over, and
+  // still watchable.
+  const live = view.auctionStatus === "live" || view.auctionStatus === "paused";
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
@@ -78,9 +87,12 @@ export default async function PublicCompetitionPage({
       />
       <header className="public-hero" data-theme="floodlight">
         <div className="mk-container public-hero-inner">
-          <Badge tone={view.open ? "success" : "neutral"} data-testid="public-reg-status">
-            {view.open ? "Registration open" : "Registration closed"}
-          </Badge>
+          <span className="public-hero-badges">
+            {live ? <Badge tone="live">Live now</Badge> : null}
+            <Badge tone={view.open ? "success" : "neutral"} data-testid="public-reg-status">
+              {view.open ? "Registration open" : "Registration closed"}
+            </Badge>
+          </span>
           <h1>{view.name}</h1>
           <div className="public-hero-meta">
             <span data-testid="public-org">
@@ -99,7 +111,7 @@ export default async function PublicCompetitionPage({
             </span>
           </div>
           <div className="public-cta-row">
-            {view.auctionStatus === "live" || view.auctionStatus === "paused" ? (
+            {live ? (
               <ButtonLink
                 href={`/seasons/${view.slug}/auction/spectate`}
                 size="lg"
@@ -121,26 +133,68 @@ export default async function PublicCompetitionPage({
               All seasons
             </ButtonLink>
           </div>
+          {live ? (
+            <p className="public-live-note" data-testid="public-watch-note">
+              No account needed — watching is open to anyone.
+            </p>
+          ) : null}
         </div>
       </header>
 
       <div className="mk-container public-sections">
-        <section className="public-section" aria-labelledby="how-it-works">
-          <h2 id="how-it-works">How registration works</h2>
-          <p className="public-hint">
-            Sign in with your mobile number, tell us your name and playing role, and submit. The
-            organizer reviews every registration — you can check your status here any time. Approved
-            players enter the player pool for the auction, where team owners bid to build their
-            squads.
-          </p>
-        </section>
-
-        {players !== null && players.length > 0 ? (
-          <section className="public-section" aria-labelledby="players-heading">
-            <h2 id="players-heading">Players</h2>
-            <ShowcaseGrid players={players} slug={view.slug} />
+        {/* Instructions for a door that is shut are not instructions, they are a
+            trap: this block was unconditional, so a guest on a closed
+            tournament was walked through signing in and submitting a
+            registration that the page has no way to accept. It renders only
+            while registration is actually open. */}
+        {view.open ? (
+          <section className="public-section" aria-labelledby="how-it-works">
+            <h2 id="how-it-works">How registration works</h2>
+            <p className="public-hint">
+              Sign in with your mobile number, tell us your name and playing role, and submit. The
+              organizer reviews every registration — you can check your status here any time.
+              Approved players enter the player pool for the auction, where team owners bid to build
+              their squads.
+            </p>
           </section>
         ) : null}
+
+        {/* An empty pool is the DEFAULT state of every tournament on its first
+            day, and the section used to vanish entirely for it — so the page
+            read as though this tournament had no player pool at all, rather
+            than one nobody has been approved into yet. The section stays; the
+            emptiness gets explained. */}
+        {pool === null ? null : (
+          <section className="public-section" aria-labelledby="players-heading">
+            <h2 id="players-heading">Players</h2>
+            {pool.total === 0 ? (
+              <EmptyState
+                data-testid="public-players-empty"
+                title="No players in the pool yet"
+                description={
+                  view.open
+                    ? "Every registration is reviewed by the organizer before the player appears here. Register now and you could be the first."
+                    : "Registration is closed for this tournament, and the organizer has not approved any players into the pool."
+                }
+                {...(view.open
+                  ? {
+                      action: (
+                        <ButtonLink href={`/seasons/${view.slug}/register${refSuffix}`}>
+                          Register as a player
+                        </ButtonLink>
+                      ),
+                    }
+                  : {})}
+              />
+            ) : (
+              // The whole pool object, not just the rows: the grid's counts,
+              // filters and CSV are all computed over what was LOADED, and
+              // `total`/`truncated` are what stop those numbers being read as
+              // claims about the tournament.
+              <ShowcaseGrid pool={pool} slug={view.slug} />
+            )}
+          </section>
+        )}
 
         {view.teams.length > 0 ? (
           <section className="public-section" aria-labelledby="teams-heading">

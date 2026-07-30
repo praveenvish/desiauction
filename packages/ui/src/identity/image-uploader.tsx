@@ -98,8 +98,16 @@ export function ImageUploader({
         >
           {busy ? "Uploading…" : url !== undefined ? "Replace image" : "Upload image"}
         </button>
+        {/* The visible button above proxies the click, so this input is a
+            mechanism, not a control: hidden from the accessibility tree and
+            out of the tab order together (aria-hidden on a focusable node is
+            itself a violation). That removes the unlabelled-input `label`
+            failure without inventing a second, redundant name for the same
+            affordance. */}
         <input
           ref={inputRef}
+          aria-hidden="true"
+          tabIndex={-1}
           type="file"
           accept={ALLOWED.join(",")}
           className={styles["input"]}

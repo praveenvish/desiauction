@@ -69,6 +69,16 @@
   text-decoration: underline;
 }
 
+/* Without this the link fell back to the UA's default focus ring — a blue
+   1px outline, invisible against the floodlit header its sibling CTA is
+   already ringed in gold on. Same token, same offset as
+   `.shell-header-cta:focus-visible` below: one focus language for the header. */
+.shell-header-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 /* The public header's primary door: a compact accent button. */
 .shell-header-cta {
   display: inline-flex;

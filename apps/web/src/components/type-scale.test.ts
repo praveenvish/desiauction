@@ -32,7 +32,10 @@ const DISPLAY_FLOOR_PX = 30;
 const ALLOW = [
   // Brand lockups and monograms — a mark, not a sentence.
   ".wordmark",
-  ".onboarding-brand",
+  // Onboarding's lockup, which is now a LINK home — the page's only escape —
+  // rather than the decorative `.onboarding-brand` it replaced. Same case: a
+  // mark, not a sentence.
+  ".onboarding-mark",
   // The live shell's wordmark beside the mark — a lockup, not a sentence.
   ".live-brand",
   ".home-crest",

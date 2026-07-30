@@ -10,16 +10,7 @@ import { describe, expect, it } from "vitest";
 import { plainTextOf } from "./blocks";
 import { FAQS, HELP_ARTICLES, HELP_CATEGORIES, helpArticle, helpCategory } from "./help";
 import { LEGAL_DOCUMENTS, legalDocument } from "./legal";
-import {
-  CAPABILITY_CARDS,
-  FEATURE_GROUPS,
-  LANDING,
-  LIVE_EXPERIENCE,
-  PRICING,
-  TESTIMONIALS,
-  TRUST_BAR,
-  TRUST_MARKS,
-} from "./marketing";
+import { FEATURE_GROUPS, LANDING, PRICING } from "./marketing";
 import { RELEASES } from "./releases";
 import { SEARCH_INDEX, allContentLinks, searchContent } from "./search";
 import { SUPPORT } from "./support";
@@ -55,7 +46,10 @@ function knownRoutes(): Set<string> {
     // Existing app routes content may link to (PX-2…PX-9)
     "/c",
     "/home",
+    // /seasons still answers — as a redirect to the merged index — so a link
+    // to it is not dead; /tournaments is where content should point now.
     "/seasons",
+    "/tournaments",
     "/orgs",
     "/money",
     "/inbox",
@@ -97,10 +91,21 @@ describe("PX-10 · Broken-link detection", () => {
   it("every marketing CTA and support channel link resolves", () => {
     const internal = [
       LANDING.hero.ctaPrimary.href,
+      // Was exempt while hero.ctaSecondary was an in-page anchor (#demo). It is
+      // a real route now, so it is held to the same no-dead-links rule as every
+      // other CTA rather than being trusted to the e2e DOM check alone.
       LANDING.hero.ctaSecondary.href,
       LANDING.beta.ctaPrimary.href,
       LANDING.beta.ctaSecondary.href,
-      LIVE_EXPERIENCE.cta.href,
+      // /pricing carries links this suite never saw: three tier CTAs, the
+      // procurement route out, the closing band, and the FAQ's link to the
+      // policy it paraphrases. A pricing page is where a dead link costs the
+      // most, so it is held to the same rule as everything else.
+      ...PRICING.tiers.map((tier) => tier.cta.href),
+      ...PRICING.faqs.flatMap((faq) => (faq.link === undefined ? [] : [faq.link.href])),
+      PRICING.procurement.cta.href,
+      PRICING.closing.ctaPrimary.href,
+      PRICING.closing.ctaSecondary.href,
       ...SUPPORT.issueCategories.map((issue) => issue.link.href),
     ].filter((href) => href.startsWith("/"));
     const broken = internal.filter((href) => !isKnown(href, routes));
@@ -190,25 +195,58 @@ describe("PX-10 · Content integrity", () => {
     }
   });
 
+  it("the comparison table has one cell per tier and quotes no price of its own", () => {
+    // A row with the wrong cell count silently shifts every answer one tier to
+    // the left — the most expensive off-by-one this page could ship. The price
+    // row is rendered from `tiers`, so no row here may carry a currency figure.
+    for (const row of PRICING.comparison.rows) {
+      expect(row.cells.length, `row "${row.label}"`).toBe(PRICING.tiers.length);
+      for (const cell of row.cells) {
+        expect(typeof cell === "string" ? cell : "", `row "${row.label}"`).not.toMatch(/[₹$]/);
+      }
+    }
+  });
+
+  it("pricing keeps the platform-fault refund clause verbatim from the policy", () => {
+    // The FAQ paraphrases /legal/refunds. Paraphrasing away the clause most in
+    // the reader's favour is how a summary becomes a misrepresentation, so the
+    // sentence is pinned to the policy's own words.
+    const clause = plainTextOf(legalDocument("refunds")?.blocks ?? []);
+    const sentence =
+      "If an auction has to be abandoned because of a fault on our side, we refund the pass — always, regardless of timing.";
+    expect(clause).toContain(sentence);
+    const refundFaq = PRICING.faqs.find((faq) => faq.question === "Refunds?");
+    expect(refundFaq?.answer).toContain(sentence);
+    expect(refundFaq?.link?.href).toBe("/legal/refunds");
+  });
+
   it("marketing capability content is present", () => {
     expect(FEATURE_GROUPS.length).toBeGreaterThan(0);
-    expect(CAPABILITY_CARDS.length).toBe(5);
     expect(RELEASES.length).toBeGreaterThan(0);
     expect(FAQS.length).toBeGreaterThan(0);
   });
 
-  it("home page testimonials and trust bar are each fully populated", () => {
-    // 2026-07-18: an explicit, narrower exception to the no-fabrication rule
-    // above — these are illustrative reviewer quotes, not real customers, and
-    // avatars are initials only (never a photo of a real or implied person).
-    expect(TESTIMONIALS.length).toBe(3);
-    for (const testimonial of TESTIMONIALS) {
-      expect(testimonial.quote.length).toBeGreaterThan(0);
-      expect(testimonial.name.length).toBeGreaterThan(0);
-      expect(testimonial.role.length).toBeGreaterThan(0);
+  it("the landing page is uniformly no-fabrication (2026-07-24 council ruling)", () => {
+    // The former testimonials' "explicit exception" is retired. The landing
+    // may not carry invented customers, unverifiable superlatives or
+    // operational stats we cannot evidence, nor any real person's name.
+    const landingText = JSON.stringify(LANDING).toLowerCase();
+    for (const banned of [
+      "most trusted",
+      "bank-grade",
+      "99.9",
+      "24×7",
+      "rohit sharma",
+      "rpsg",
+      "testimonial",
+    ]) {
+      expect(landingText, `banned fabrication marker: ${banned}`).not.toContain(banned);
     }
-    expect(TRUST_BAR.stats.length).toBe(4);
-    expect(TRUST_MARKS.length).toBe(5);
+    // Candor is load-bearing: the beta truth stays at the CTA, and the
+    // simulated stage must say it is simulated, with fictional players only.
+    expect(LANDING.hero.ctaNote.toLowerCase()).toContain("free during beta");
+    expect(LANDING.hero.demoLabel.toLowerCase()).toContain("simulated");
+    expect(LANDING.hero.script.length).toBeGreaterThan(0);
   });
 });
 

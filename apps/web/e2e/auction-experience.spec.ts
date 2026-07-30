@@ -1,6 +1,18 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
+/**
+ * v1.1 (G2): the gavel is a HOLD, not a click — on /live's conduct panel now as
+ * well as the cockpit's. A plain click is deliberately inert (that IS the
+ * safety property), so the suite holds past the 600ms gate.
+ */
+async function holdCloseLot(page: Page): Promise<void> {
+  await page.getByTestId("conduct-close-lot").hover();
+  await page.mouse.down();
+  await page.waitForTimeout(900);
+  await page.mouse.up();
+}
+
 // PX-6 Live Auction Experience: lobby (rules + connection check), the owner
 // workspace (purse/squad/slots), outbid + winning notifications, the bid
 // ladder, PUBLIC spectating with the auction timeline and big-screen mode,
@@ -32,8 +44,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
 
@@ -91,8 +103,10 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(organizer.getByTestId("competition-status")).toHaveText("setup");
   await organizer.getByTestId("advance-status").click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("registration open");
-  // Publish: the public page AND public spectating hang off this switch.
+  // Publish: the public page AND public spectating hang off this switch. It is
+  // a two-step act now — putting a season on the public internet is confirmed.
   await organizer.getByTestId("toggle-visibility").click();
+  await organizer.getByTestId("confirm-publish").click();
   await expect(organizer.getByTestId("visibility-row")).toContainText("LIVE");
 
   await organizer.getByTestId("open-dashboard").click();
@@ -126,6 +140,10 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  // Feasibility: these fixtures run a handful of players against squads of 8,
+  // which the setup screen now refuses until the shortfall is accepted on the
+  // record (it is the state that used to become an unclosable auction).
+  await organizer.getByTestId("accept-short-squads").check();
   await organizer.getByTestId("create-auction").click();
   await expect(organizer.getByTestId("auction-status")).toHaveText("scheduled", {
     timeout: 20_000,
@@ -193,6 +211,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   });
   await organizer.getByTestId("queue-all").click();
   await expect(organizer.getByTestId("lot-L001")).toContainText("queued");
+  await organizer.getByTestId("accept-short-open").check();
   await organizer.getByTestId("auction-open").click();
   await expect(organizer.getByTestId("auction-status")).toHaveText("live");
 
@@ -231,7 +250,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   // Winner hears it; the squad and the money move on the owner workspace.
   await Promise.all([
     expect(ownerA.page.getByText(/You signed Star Batter/)).toBeVisible({ timeout: 45_000 }),
-    organizer.getByTestId("conduct-close-lot").click(),
+    holdCloseLot(organizer),
   ]);
   await expect(ownerA.page.getByTestId("my-squad")).toContainText("Star Batter", {
     timeout: 20_000,
@@ -256,7 +275,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(ownerB.page.getByTestId("current-lot")).toBeVisible({ timeout: 20_000 });
   await ownerB.page.getByTestId("bid-next").click();
   await expect(ownerB.page.getByTestId("my-team-leading")).toBeVisible({ timeout: 20_000 });
-  await organizer.getByTestId("conduct-close-lot").click();
+  await holdCloseLot(organizer);
   await expect(ownerB.page.getByTestId("my-slots")).toContainText("1/", { timeout: 20_000 });
 
   await organizer.getByTestId("conduct-complete").click();

@@ -22,9 +22,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
+  // PX-3: the name gate now guards every console route, not just /home — a
+  // fresh account that stops here never reaches the org/tournament screens
+  // this helper is used to reach.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 test("the scheduling journey: venue, grounds, generate, publish, conflict, resolve, calendar, export", async ({
@@ -39,6 +47,7 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   await page.getByLabel("Organization name").filter({ visible: true }).fill(`Fixture Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
+  await page.getByRole("tab", { name: "Tournaments" }).click();
   await page.getByTestId("open-venues").click();
   await expect(page.getByTestId("venues-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
@@ -139,6 +148,7 @@ test("fixtures dashboard and venues page: axe zero violations", async ({ page })
   await page.getByLabel("Organization name").filter({ visible: true }).fill(`Axe Fix Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
+  await page.getByRole("tab", { name: "Tournaments" }).click();
   await page.getByTestId("open-venues").click();
   await expect(page.getByTestId("venues-heading")).toBeVisible({ timeout: 20_000 });
   const venuesScan = await new AxeBuilder({ page }).analyze();

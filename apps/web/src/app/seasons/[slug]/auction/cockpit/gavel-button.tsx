@@ -28,8 +28,24 @@ export interface GavelHandle {
 
 export const GavelButton = forwardRef<
   GavelHandle,
-  { onConfirm: () => void; disabled?: boolean; holdMs?: number }
->(function GavelButton({ onConfirm, disabled = false, holdMs = 600 }, ref) {
+  {
+    onConfirm: () => void;
+    disabled?: boolean;
+    holdMs?: number;
+    testId?: string;
+    /** Id of the element explaining the hold. Must EXIST on the page. */
+    describedBy?: string;
+  }
+>(function GavelButton(
+  {
+    onConfirm,
+    disabled = false,
+    holdMs = 600,
+    testId = "cockpit-gavel",
+    describedBy = "cockpit-gavel-hint",
+  },
+  ref,
+) {
   const gate = useHoldGate({ durationMs: holdMs, onConfirm, disabled });
   const { onPointerDown, onPointerUp } = gate.bind;
 
@@ -44,10 +60,10 @@ export const GavelButton = forwardRef<
     <button
       type="button"
       className="cockpit-gavel"
-      data-testid="cockpit-gavel"
+      data-testid={testId}
       data-holding={gate.holding ? "true" : "false"}
       disabled={disabled}
-      aria-describedby="cockpit-gavel-hint"
+      aria-describedby={describedBy}
       {...gate.bind}
     >
       {/* Presentation only — the gate is the clock, not this bar. */}

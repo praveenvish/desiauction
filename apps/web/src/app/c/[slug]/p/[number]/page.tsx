@@ -14,12 +14,24 @@ import "../../../directory.css";
 // addressable. Same consent + visibility gates as the showcase. Individual
 // pages are `noindex` (link-shared, not SEO-farmed); the photo is consent-gated.
 
+/**
+ * The three outcomes, said in one place. "retained" is a squad place signed
+ * BEFORE the auction opens (an icon pick) — the old test was `status !==
+ * "sold"`, which folded retained in with available and advertised a player who
+ * already has a team as up for grabs: on this page, in the page title and
+ * description, and on the OG card someone forwards to a WhatsApp group. The
+ * showcase dialog already told the three apart; this is that same split, used
+ * by the metadata, the hero badge and the status row so they cannot drift.
+ */
 function statusText(player: {
   status: "available" | "sold" | "retained";
   teamName: string | null;
 }): string {
-  if (player.status !== "sold") {
+  if (player.status === "available") {
     return "Available";
+  }
+  if (player.status === "retained") {
+    return player.teamName !== null ? `Retained by ${player.teamName}` : "Retained";
   }
   return player.teamName !== null ? `Sold to ${player.teamName}` : "Sold";
 }
@@ -58,7 +70,10 @@ export default async function PlayerProfilePage({
   if (player === null) {
     notFound();
   }
-  const sold = player.status === "sold";
+  // Signed, not sold: a retained player is on a team sheet too, so the neutral
+  // "already has a squad" treatment has to cover both.
+  const signed = player.status !== "available";
+  const status = statusText(player);
   const batting = styleLabel(player.battingStyle);
   const bowling = styleLabel(player.bowlingStyle);
   const roleAge =
@@ -69,8 +84,8 @@ export default async function PlayerProfilePage({
     <main className="public-page mk">
       <header className="public-hero" data-theme="floodlight">
         <div className="mk-container public-hero-inner">
-          <Badge tone={sold ? "neutral" : "success"} data-testid="player-status">
-            {sold ? (player.teamName ?? "Sold") : "Available"}
+          <Badge tone={signed ? "neutral" : "success"} data-testid="player-status">
+            {status}
           </Badge>
           <h1>{player.name}</h1>
           <div className="public-hero-meta">
@@ -119,7 +134,7 @@ export default async function PlayerProfilePage({
                 </>
               ) : null}
               <dt>Status</dt>
-              <dd>{sold ? (player.teamName ?? "Sold") : "Available"}</dd>
+              <dd>{status}</dd>
             </dl>
           </div>
         </section>

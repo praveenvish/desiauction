@@ -8,11 +8,13 @@ import {
   settlementCases,
   settlementObligations,
   teams,
+  tournaments,
 } from "@desiauction/db";
 import { and, desc, gte, inArray, sql } from "drizzle-orm";
 
 import { competitionsView } from "../competition/actions";
 import { systemDb } from "../db";
+import { settlementOrgIds } from "../settlement/actions";
 
 /**
  * The console dashboard's read model.
@@ -62,6 +64,11 @@ export interface HomeActivityRow {
   action: string;
   subject: string | null;
   at: string;
+  /**
+   * How many raw events this row stands for. 1 for a real event; greater for
+   * the single folded finance row (see `foldActivity`).
+   */
+  count: number;
 }
 
 export interface HomeMoney {
@@ -90,6 +97,12 @@ export interface HomeStages {
   settlement: { competitions: number; collectedPaise: number; outstandingPaise: number };
 }
 
+/** Per-competition counts the console already paid for, keyed by competition id. */
+export interface HomeCompetitionCounts {
+  teams: number;
+  registrations: number;
+}
+
 export interface HomeDashboardData {
   stats: HomeStats;
   stages: HomeStages;
@@ -97,47 +110,176 @@ export interface HomeDashboardData {
   top: HomeTopCompetition[];
   activity: HomeActivityRow[];
   money: HomeMoney;
+  /**
+   * Recurring tournaments this person's orgs own. The setup ladder needs to
+   * tell "no tournament yet" apart from "a tournament with no season yet", and
+   * the season list alone cannot: a tournament carries no season until one is
+   * created.
+   */
+  tournaments: number;
+  /** Teams/registrations per competition — no extra query, already grouped. */
+  counts: Record<string, HomeCompetitionCounts>;
+  /**
+   * Where the money figures on this page actually lead.
+   *
+   * `/money` is a beta placeholder and was pulled from the rail for it, so the
+   * console must not send anyone there. The season's own Money tab IS built, so
+   * it is the destination — but only when ONE settling season owns the totals
+   * (otherwise the link would silently pick a season) and only when this person
+   * holds `settlement.view` on its org (otherwise the tab answers 404). When
+   * neither holds, this is null and the caller renders no link at all.
+   */
+  moneyHref: string | null;
 }
-
-const EMPTY: HomeDashboardData = {
-  stats: {
-    competitions: 0,
-    registrations: 0,
-    activeAuctions: 0,
-    bids: 0,
-    approvedRegistrations: 0,
-    collectedPaise: 0,
-  },
-  stages: {
-    setup: { competitions: 0, teams: 0 },
-    registration: { competitions: 0, registered: 0, approved: 0 },
-    auction: { competitions: 0, live: 0, bids: 0 },
-    settlement: { competitions: 0, collectedPaise: 0, outstandingPaise: 0 },
-  },
-  auctions: [],
-  top: [],
-  activity: [],
-  money: {
-    collectedPaise: 0,
-    outstandingPaise: 0,
-    waivedPaise: 0,
-    thisWeek: [0, 0, 0, 0, 0, 0, 0],
-    lastWeek: [0, 0, 0, 0, 0, 0, 0],
-  },
-};
 
 /** Auction states that are "in flight" for the operator. */
 const ACTIVE_AUCTION_STATES = new Set(["live", "scheduled"]);
 
 const DAY_MS = 86_400_000;
 
+/** How many raw audit rows to consider before ranking. */
+const ACTIVITY_POOL = 60;
+/** How many rows the feed shows. */
+const ACTIVITY_ROWS = 6;
+
+/**
+ * Machine chatter: true events, but written for the engine's benefit rather
+ * than the organizer's. A lot being prepared, queued or marked closing-soon is
+ * a step the platform took on its own; six of them crowd out the twelve
+ * registrations and the auction that the organizer actually did.
+ */
+const ACTIVITY_MACHINE = new Set([
+  "auction.LotPrepared",
+  "auction.LotQueued",
+  "auction.LotClosingSoon",
+  "auction.TimerExtended",
+  "auction.PaddleIssued",
+  "auction.PaddleGranted",
+  "auction.OwnerInvited",
+  "auction.OwnerAccepted",
+  "settlement.ObligationsComputed",
+  "settlement.ObligationDischarged",
+  "settlement.PaymentInitiated",
+  "settlement.JournalPosted",
+  "settlement.JournalRecovered",
+  "settlement.CaseRecovered",
+]);
+
+/** Domains whose events are about this person's account, not their tournament. */
+const ACTIVITY_PERSONAL = new Set(["auth", "profile"]);
+
+/**
+ * Rank the feed for the person reading it.
+ *
+ * The raw table is dominated by finance: the finops follower emits far more
+ * events than an organizer ever does, so an unranked `limit(6)` returned six
+ * finance rows and buried twelve registrations, two seasons, an auction and a
+ * settlement. Organizer-facing events take the rows; everything finance folds
+ * into ONE summarised row so the work is still visible without owning the
+ * panel.
+ */
+function foldActivity(
+  rows: { id: string; action: string; subject: string | null; at: Date | string }[],
+): HomeActivityRow[] {
+  const iso = (at: Date | string) => (at instanceof Date ? at : new Date(at)).toISOString();
+  const finance: typeof rows = [];
+  const organizer: typeof rows = [];
+  for (const row of rows) {
+    const domain = row.action.split(".")[0] ?? "";
+    if (ACTIVITY_MACHINE.has(row.action) || ACTIVITY_PERSONAL.has(domain)) {
+      continue;
+    }
+    (domain === "finops" ? finance : organizer).push(row);
+  }
+  const kept: HomeActivityRow[] = organizer
+    .slice(0, finance.length > 0 ? ACTIVITY_ROWS - 1 : ACTIVITY_ROWS)
+    .map((row) => ({
+      id: row.id,
+      action: row.action,
+      subject: row.subject,
+      at: iso(row.at),
+      count: 1,
+    }));
+  const newest = finance[0];
+  if (newest !== undefined) {
+    kept.push({
+      id: `finance-${newest.id}`,
+      action: "finops.summary",
+      subject: null,
+      at: iso(newest.at),
+      count: finance.length,
+    });
+  }
+  return kept.sort((a, b) => b.at.localeCompare(a.at));
+}
+
 export async function homeDashboard(): Promise<HomeDashboardData> {
   const view = await competitionsView();
   const competitionIds = view.competitions.map((competition) => competition.id);
-  if (competitionIds.length === 0) {
-    return EMPTY;
-  }
+  const orgIds = view.orgs.map((org) => org.id);
   const bySlug = new Map(view.competitions.map((competition) => [competition.id, competition]));
+
+  // The feed and the tournament count are scoped by ORG, not by competition, so
+  // they answer for an organizer who has a club and nothing else yet. Returning
+  // early on "no competitions" threw both away and told a person who had just
+  // created their organization that nothing had ever happened — seconds after
+  // the event that says otherwise was written.
+  const scopeIds = [...competitionIds, ...orgIds];
+  const [activityRaw, tournamentRows] = await Promise.all([
+    scopeIds.length > 0
+      ? systemDb
+          .select({
+            id: auditLog.id,
+            action: auditLog.action,
+            subject: auditLog.subject,
+            at: auditLog.at,
+          })
+          .from(auditLog)
+          .where(inArray(auditLog.scopeId, scopeIds))
+          .orderBy(desc(auditLog.at))
+          .limit(ACTIVITY_POOL)
+      : Promise.resolve([]),
+    orgIds.length > 0
+      ? systemDb
+          .select({ count: sql<number>`count(*)::int` })
+          .from(tournaments)
+          .where(inArray(tournaments.orgId, orgIds))
+      : Promise.resolve([]),
+  ]);
+  const activity = foldActivity(activityRaw);
+  const tournamentCount = tournamentRows[0]?.count ?? 0;
+
+  if (competitionIds.length === 0) {
+    return {
+      stats: {
+        competitions: 0,
+        registrations: 0,
+        activeAuctions: 0,
+        bids: 0,
+        approvedRegistrations: 0,
+        collectedPaise: 0,
+      },
+      stages: {
+        setup: { competitions: 0, teams: 0 },
+        registration: { competitions: 0, registered: 0, approved: 0 },
+        auction: { competitions: 0, live: 0, bids: 0 },
+        settlement: { competitions: 0, collectedPaise: 0, outstandingPaise: 0 },
+      },
+      auctions: [],
+      top: [],
+      activity,
+      money: {
+        collectedPaise: 0,
+        outstandingPaise: 0,
+        waivedPaise: 0,
+        thisWeek: [0, 0, 0, 0, 0, 0, 0],
+        lastWeek: [0, 0, 0, 0, 0, 0, 0],
+      },
+      tournaments: tournamentCount,
+      counts: {},
+      moneyHref: null,
+    };
+  }
 
   // --- auctions for these competitions -------------------------------------
   const auctionRows = await systemDb
@@ -166,7 +308,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     bidCountRows,
     obligationRows,
     paymentRows,
-    activityRows,
+    settleableOrgIds,
   ] = await Promise.all([
     systemDb
       .select({
@@ -217,22 +359,22 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       : Promise.resolve([]),
     caseIds.length > 0
       ? systemDb
-          .select({ at: payments.createdAt, captured: payments.captured })
+          // caseId travels so the weekly series can be filtered by whose books
+          // the viewer may open (DA-30) — the totals above already are.
+          .select({
+            caseId: payments.caseId,
+            at: payments.createdAt,
+            captured: payments.captured,
+          })
           .from(payments)
           .where(and(inArray(payments.caseId, caseIds), gte(payments.createdAt, since)))
       : Promise.resolve([]),
-    systemDb
-      .select({
-        id: auditLog.id,
-        action: auditLog.action,
-        subject: auditLog.subject,
-        at: auditLog.at,
-      })
-      .from(auditLog)
-      .where(inArray(auditLog.scopeId, [...competitionIds, ...view.orgs.map((org) => org.id)]))
-      .orderBy(desc(auditLog.at))
-      .limit(6),
+    // One grants read, expanded by settlement's own capability engine — the
+    // same answer the shell's Money tab is gated on, so the console can never
+    // offer a link the destination will 404.
+    settlementOrgIds(),
   ]);
+  const settleable = new Set(settleableOrgIds);
 
   // One grouped read gives the per-competition total, the approved pool per
   // competition, and the portfolio-wide approved count.
@@ -267,13 +409,29 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     auctionRows.filter((row) => row.status === "live").map((row) => row.competitionId),
   );
 
-  // Money, folded per competition then totalled.
+  // Money, folded per competition then totalled — but ONLY from the orgs whose
+  // books this person may open.
+  //
+  // DA-30: `settleableOrgIds` was resolved and then used for exactly one thing —
+  // deciding whether the money tile was a LINK. The figures themselves (total
+  // collected, outstanding, waived, and the two weekly series) were folded from
+  // every settlement case in every org the person merely belongs to, and shipped
+  // to them. A team owner, whom `acceptOwnerJoin` enrols as a viewer-level
+  // member, was handed the club's collections on their own home page.
+  const settleableCase = (caseId: string): boolean => {
+    const competitionId = caseCompetition.get(caseId);
+    const competition = competitionId === undefined ? undefined : bySlug.get(competitionId);
+    return competition !== undefined && settleable.has(competition.orgId);
+  };
   const collectedBy = new Map<string, number>();
   const outstandingBy = new Map<string, number>();
   let collectedPaise = 0;
   let outstandingPaise = 0;
   let waivedPaise = 0;
   for (const row of obligationRows) {
+    if (!settleableCase(row.caseId)) {
+      continue;
+    }
     const amount = row.amount;
     const discharged = row.discharged;
     const waived = row.waived;
@@ -294,6 +452,9 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   for (const payment of paymentRows) {
+    if (!settleableCase(payment.caseId)) {
+      continue;
+    }
     const at = payment.at instanceof Date ? payment.at : new Date(String(payment.at));
     const daysAgo = Math.floor((startOfToday.getTime() - at.getTime()) / DAY_MS);
     const captured = payment.captured;
@@ -366,6 +527,23 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     }
   }
 
+  // The money figures belong to the settlement cases; a link is only honest
+  // when exactly ONE season owns them and this person may open its books.
+  const settlingIds = [...settling];
+  const onlySettling = settlingIds.length === 1 ? bySlug.get(settlingIds[0] ?? "") : undefined;
+  const moneyHref =
+    onlySettling !== undefined && settleable.has(onlySettling.orgId)
+      ? `/seasons/${onlySettling.slug}/money`
+      : null;
+
+  const counts: Record<string, HomeCompetitionCounts> = {};
+  for (const competition of view.competitions) {
+    counts[competition.id] = {
+      teams: teamsBy.get(competition.id) ?? 0,
+      registrations: registrationsBy.get(competition.id) ?? 0,
+    };
+  }
+
   return {
     stages,
     stats: {
@@ -378,12 +556,10 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     },
     auctions: auctionList,
     top,
-    activity: activityRows.map((row) => ({
-      id: row.id,
-      action: row.action,
-      subject: row.subject,
-      at: (row.at instanceof Date ? row.at : new Date(String(row.at))).toISOString(),
-    })),
+    activity,
     money: { collectedPaise, outstandingPaise, waivedPaise, thisWeek, lastWeek },
+    tournaments: tournamentCount,
+    counts,
+    moneyHref,
   };
 }

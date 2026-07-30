@@ -4,6 +4,7 @@ import {
   Badge,
   IconArrowRight,
   IconCalendar,
+  IconChevronDown,
   IconKebab,
   IconMatch,
   IconPin,
@@ -57,7 +58,12 @@ const STATUS_LABEL = {
 /**
  * The group's own state, derived only from its seasons — nothing here is a
  * claim the data cannot back. A tournament with no editions yet is "Upcoming";
- * one whose editions have all closed registration is "Closed".
+ * one whose editions have all closed registration is "Between seasons".
+ *
+ * NOT "Closed": this badge describes a LEAGUE, and a league whose single
+ * edition has stopped taking entries has not finished — it is waiting for its
+ * next one. "Closed" on the parent read as an obituary for a competition that
+ * runs again next year.
  */
 function groupStatus(group: AccordionGroup): {
   label: string;
@@ -75,7 +81,7 @@ function groupStatus(group: AccordionGroup): {
   if (group.seasons.every((season) => season.status === "draft" || season.status === "setup")) {
     return { label: "In setup", tone: "info" };
   }
-  return { label: "Closed", tone: "warning" };
+  return { label: "Between seasons", tone: "neutral" };
 }
 
 function HeadStat({ icon, value, label }: { icon: ReactNode; value: number; label: string }) {
@@ -102,8 +108,20 @@ function SeasonRow({ season }: { season: Season }) {
       <span className="tg-season-id">
         <strong>{season.name}</strong>
         {season.orgName !== "" ? <span>{season.orgName}</span> : null}
+        {/* The dates again, in the sub-line. `.tg-season-when` leaves the row
+            under 860px, and what was left was name + org + badge + arrow: an
+            organizer could not tell the 2026 edition from the 2029 one on a
+            phone. Shown only where the full-width column is gone. */}
+        {when !== null ? <span className="tg-season-compact">{when}</span> : null}
       </span>
-      <Badge tone={STATUS_TONE[season.status]}>{STATUS_LABEL[season.status]}</Badge>
+      {season.running ? (
+        <Badge tone="live" className="tg-badge">
+          Now running
+        </Badge>
+      ) : null}
+      <Badge tone={STATUS_TONE[season.status]} className="tg-badge">
+        {STATUS_LABEL[season.status]}
+      </Badge>
       {when !== null ? (
         <span className="tg-season-when">
           <IconCalendar width={15} height={15} />
@@ -145,6 +163,12 @@ export interface AccordionGroup {
   seasonForm: ReactNode;
   /** Absent for the one-off bucket, which has no page of its own. */
   href?: string;
+  /**
+   * Whether this person may actually create a season here — resolved from
+   * their grants, not from membership. "+ Season" used to render for everyone
+   * and the server refused staff and viewers after they had filled the form.
+   */
+  canCreateSeason: boolean;
 }
 
 export function TournamentAccordion({
@@ -203,15 +227,17 @@ export function TournamentAccordion({
           }}
         >
           <span className="tg-caret" data-open={isOpen} aria-hidden>
-            ▸
+            <IconChevronDown width={16} height={16} />
           </span>
           <span className={`tg-glyph tg-glyph--${group.kind}`} aria-hidden>
-            {group.kind === "tournament" ? <IconTrophy /> : "◎"}
+            {group.kind === "tournament" ? <IconTrophy /> : <IconCalendar />}
           </span>
           <span className="tg-id">
             <span className="tg-id-top">
               <span className="tg-name">{group.name}</span>
-              <Badge tone={status.tone}>{status.label}</Badge>
+              <Badge tone={status.tone} className="tg-badge">
+                {status.label}
+              </Badge>
             </span>
             <span className="tg-meta">{meta}</span>
           </span>
@@ -231,18 +257,25 @@ export function TournamentAccordion({
             </span>
           ) : null}
         </button>
-        {/* Secondary by design: the audit flagged "+ New tournament" and
-            "+ Season" reading as equals. The page keeps ONE gold action, and
-            "+ Season" opens the create modal in place. */}
-        <FormDialog
-          title={group.seasonDialogTitle}
-          triggerLabel="+ Season"
-          triggerAsLink
-          triggerClassName="tg-add"
-          triggerTestId={`add-season-${group.key}`}
-        >
-          {group.seasonForm}
-        </FormDialog>
+        {/* A real button, sized to the platform's 44px rung.
+            It was a 73x24 low-contrast text link, on the reasoning that the
+            page should spend its one gold on "+ New tournament". That reasoning
+            is sound about COLOUR and wrong about WEIGHT: /home sends people
+            here with the instruction "Add a season", so the control that does
+            the thing they were sent to do cannot be the quietest thing on the
+            screen. Secondary keeps the single gold action intact. */}
+        {group.canCreateSeason ? (
+          <FormDialog
+            title={group.seasonDialogTitle}
+            triggerLabel="+ Season"
+            variant="secondary"
+            size="touch"
+            triggerClassName="tg-add"
+            triggerTestId={`add-season-${group.key}`}
+          >
+            {group.seasonForm}
+          </FormDialog>
+        ) : null}
         {menuItems.length > 0 ? (
           <PopoverMenu
             label={`${group.name} actions`}
@@ -254,7 +287,11 @@ export function TournamentAccordion({
       </div>
       <div id={panelId} className="tg-body" hidden={!isOpen}>
         {group.seasons.length === 0 ? (
-          <p className="tg-empty">No seasons yet — use “+ Season” above to add the first one.</p>
+          <p className="tg-empty">
+            {group.canCreateSeason
+              ? "No seasons yet — use “+ Season” above to add the first one."
+              : "No seasons yet. Ask an owner to add a season."}
+          </p>
         ) : view === "grid" ? (
           <div className="tg-grid">
             {group.seasons.map((season) => (
@@ -276,7 +313,7 @@ export function TournamentAccordion({
               >
                 {folded ? `View all seasons (${String(group.seasons.length)})` : "Show fewer"}
                 <span className="tg-more-caret" data-open={!folded} aria-hidden>
-                  ▾
+                  <IconChevronDown width={16} height={16} />
                 </span>
               </button>
             ) : null}

@@ -1,4 +1,5 @@
-import type { Db } from "@desiauction/db";
+import { registrations, type Db } from "@desiauction/db";
+import { eq, sql } from "drizzle-orm";
 
 import type { CompetitionSummary } from "../competition/competitions";
 import { queryRegistrations } from "../competition/registrations";
@@ -18,6 +19,8 @@ export interface AuctionPoolEntry {
   readonly role: string;
   readonly basePriceBand: string | null;
   readonly registrationNumber: string;
+  /** Already on a team sheet (retained, or sold in this auction) — not "left to place". */
+  readonly teamId: string | null;
 }
 
 export interface AuctionReadyCheck {
@@ -35,6 +38,12 @@ export interface AuctionReadyProjection {
   /** The locked pool: approved registrations in registration-number order. */
   readonly pool: readonly AuctionPoolEntry[];
   readonly teams: readonly { id: string; name: string; shortName: string | null }[];
+  /**
+   * Players already on each team's sheet, in `teams` order — icons, retained
+   * players and anyone already sold. The engine's below-minimum guard counts
+   * exactly these rows, so the feasibility arithmetic can agree with it.
+   */
+  readonly squadSizes: readonly number[];
   readonly scheduledFixtures: number;
 }
 
@@ -77,6 +86,7 @@ export async function auctionReady(
           role: row.role,
           basePriceBand: row.basePriceBand,
           registrationNumber: row.number,
+          teamId: row.teamId,
         })),
     );
     if (page * result.pageSize >= result.total) {
@@ -84,6 +94,19 @@ export async function auctionReady(
     }
     page += 1;
   }
+
+  // Team sheets as they stand. Counted the way the engine's below-minimum
+  // guard counts them (every registration carrying the team id), so the
+  // feasibility arithmetic on the setup screen and the refusal at closing time
+  // are the same sum.
+  const sizeRows = await db
+    .select({ teamId: registrations.teamId, count: sql<number>`count(*)::int` })
+    .from(registrations)
+    .where(eq(registrations.competitionId, competition.id))
+    .groupBy(registrations.teamId);
+  const sizeByTeam = new Map(
+    sizeRows.flatMap((row) => (row.teamId === null ? [] : [[row.teamId, row.count] as const])),
+  );
 
   const checks: AuctionReadyCheck[] = [
     {
@@ -94,9 +117,11 @@ export async function auctionReady(
     },
     {
       id: "pool_present",
-      label: "The approved pool is non-empty",
+      // Registrations calls this the auction pool, and it is not the same
+      // number as "approved" — icons are approved and never enter it.
+      label: "The auction pool is non-empty",
       pass: pool.length >= 1,
-      detail: `${String(pool.length)} approved player(s)`,
+      detail: `${String(pool.length)} player(s) in the auction pool`,
     },
     {
       id: "teams_present",
@@ -117,6 +142,7 @@ export async function auctionReady(
       name: team.name,
       shortName: team.shortName,
     })),
+    squadSizes: snapshot.teams.map((team) => sizeByTeam.get(team.id) ?? 0),
     scheduledFixtures: snapshot.stats.total,
   });
 }

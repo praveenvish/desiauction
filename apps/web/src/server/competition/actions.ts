@@ -5,6 +5,7 @@ import {
   DEFAULT_AUCTION_CONFIG,
   isRejectionReason,
   parseRegistrationCsv,
+  slugifyName,
   validateNewPlayer,
   type CsvRowError,
   type PhotoTarget,
@@ -12,15 +13,17 @@ import {
   type RegistrationEvent,
   type RegistrationStatus,
 } from "@desiauction/core";
-import { competitions, withTenantDb, type Db } from "@desiauction/db";
-import { eq } from "drizzle-orm";
+import { withTenantDb, type Db } from "@desiauction/db";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { auctionOf } from "@desiauction/auction";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
+import { canSettlement } from "../settlement/authz";
 import { orgsFor } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
@@ -30,11 +33,16 @@ import {
   competitionsForPerson,
   createCompetition,
   createTeam,
+  publishBlockers,
   resolveCompetition,
+  setCompetitionVisibility,
   setTeamCoach,
+  updateTeamDetails,
   tournamentsOf,
   teamsOf,
+  updateCompetitionDetails,
   type CompetitionSummary,
+  type PublishBlocker,
   type TeamSummary,
 } from "./competitions";
 import {
@@ -45,6 +53,7 @@ import {
   transitionBatch,
 } from "./registration-aggregate";
 import { commitRegistrationImport } from "./registration-import";
+import { notifyDecision } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, type TeamsWorkspace } from "./team-workspace";
 export type { TeamCard, TeamRosterRow } from "./team-workspace";
@@ -52,12 +61,16 @@ import {
   addPlayerByPhone,
   exportRegistrationsCsv,
   myRegistration,
+  orphanIcons,
   photoTargetsOf,
+  publicRegistrationFacts,
   queryRegistrations,
+  recordRegistrationExport,
   registrationStats,
   registrationsOf,
   submitRegistration,
   timelineOf,
+  type OrphanIcon,
   type RegistrationPage,
   type RegistrationRow,
   type RegistrationSort,
@@ -111,7 +124,17 @@ export interface CompetitionsView {
   competitions: (CompetitionSummary & { orgName: string })[];
 }
 
-export async function competitionsView(): Promise<CompetitionsView> {
+/**
+ * Deduped per request. This is the console's most-called read — the shell
+ * (app/layout.tsx), /home's page body and /home's dashboard all need the same
+ * org+season list, so ONE render was issuing it three times: three membership
+ * reads and three cross-org unions for one screen.
+ *
+ * The cached function is internal because this module is `"use server"`: every
+ * export must itself be an async function, and `cache()` returns a plain one.
+ * The exported wrapper stays async and the memoisation happens behind it.
+ */
+const competitionsViewOnce = cache(async (): Promise<CompetitionsView> => {
   const session = await requireSession();
   const [orgs, competitions] = await Promise.all([
     withTenantDb(dbHandle, { personId: session.personId }, (db) => orgsFor(db, session.personId)),
@@ -119,12 +142,33 @@ export async function competitionsView(): Promise<CompetitionsView> {
     competitionsForPerson(systemDb, session.personId),
   ]);
   return { orgs: orgs.map((o) => ({ id: o.id, name: o.name })), competitions };
+});
+
+export async function competitionsView(): Promise<CompetitionsView> {
+  return competitionsViewOnce();
+}
+
+/**
+ * Which control a rejection belongs under.
+ *
+ * The form bound its single `error` string to the Season name field whatever
+ * the error was, so "The end date falls before the start date." was printed
+ * under a text input two fields above the dates that caused it — and the
+ * authorisation refusal, which belongs to no field at all, landed there too.
+ * Naming the field is the server's job: only the server knows which rule fired.
+ */
+export type CompetitionFormField = "name" | "orgId" | "endsOn" | "form";
+
+export interface CreateCompetitionState {
+  error?: string;
+  /** Absent only when `error` is. "form" means: not any one control's fault. */
+  field?: CompetitionFormField;
 }
 
 export async function createCompetitionAction(
-  _previous: { error?: string },
+  _previous: CreateCompetitionState,
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<CreateCompetitionState> {
   const session = await requireSession();
   const orgId = formString(formData, "orgId");
   const name = formString(formData, "name");
@@ -137,13 +181,13 @@ export async function createCompetitionAction(
     orgsFor(db, session.personId),
   );
   if (!memberships.some((o) => o.id === orgId)) {
-    return { error: "Choose one of your organizations." };
+    return { error: "Choose one of your organizations.", field: "orgId" };
   }
   // DA-08: a reversed range was accepted, then printed publicly as
   // "1 Oct – 1 Aug 2026" and emitted in JSON-LD as an invalid SportsEvent —
   // and the season overview never showed the dates, so nobody could see it.
   if (startsOn !== "" && endsOn !== "" && endsOn < startsOn) {
-    return { error: "The end date falls before the start date." };
+    return { error: "The end date falls before the start date.", field: "endsOn" };
   }
   // The tournament arrives from a hidden field, so it is caller input like any
   // other: prove it belongs to the SAME org before letting a season claim it,
@@ -153,10 +197,11 @@ export async function createCompetitionAction(
       tournamentsOf(db, orgId),
     );
     if (!owned.some((tournament) => tournament.id === tournamentId)) {
-      return { error: "That tournament isn't in this organization." };
+      return { error: "That tournament isn't in this organization.", field: "form" };
     }
   }
   let slug: string;
+  let valid = "";
   try {
     const competition = await withTenantDb(
       dbHandle,
@@ -173,24 +218,48 @@ export async function createCompetitionAction(
       },
     );
     slug = competition.slug;
+    valid = competition.name;
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return { error: "You can't create competitions in this organization." };
+      return {
+        error: "You can't create seasons in this organization. Ask an owner to add one.",
+        field: "form",
+      };
     }
-    return { error: "Give the competition a name of at least 3 characters." };
+    return { error: "Give the season a name of at least 3 characters.", field: "name" };
   }
+  // A season was created and the person was simply teleported onto a page they
+  // had never seen, with nothing naming what had just happened. The signal
+  // rides a short-lived cookie rather than a query parameter: the destination
+  // URL is the season's real address, and several tests (and people) capture it
+  // to build sub-paths from — a `?created=1` still hanging off it would corrupt
+  // every one of those. The client reads it once and deletes it.
+  // Next's cookie store percent-encodes the value on the way out; the
+  // client decodes once on the way in.
+  (await cookies()).set("da_created_season", valid, {
+    maxAge: 30,
+    path: "/",
+    sameSite: "lax",
+  });
   redirect(`/seasons/${slug}`);
 }
 
 export interface CompetitionView {
   competition: CompetitionSummary;
   teams: TeamSummary[];
-  registrations: RegistrationRow[];
+  /**
+   * The applicant list — names, phone numbers, ages, photo URLs. DA-30: ABSENT
+   * unless the viewer holds `registration.review`. Its only consumer, the
+   * Readiness Center, never read a row of it; it counted them.
+   */
+  registrations?: RegistrationRow[];
   viewer: { canManage: boolean; canReview: boolean };
 }
 
 export interface SeasonOverviewView extends SeasonOverview {
-  viewer: { canManage: boolean; canReview: boolean };
+  viewer: { canManage: boolean; canReview: boolean; canSeeMoney: boolean };
+  /** What still stands between this season and a public page (DA-12). */
+  publishBlockers: PublishBlocker[];
 }
 
 export async function competitionView(slug: string): Promise<CompetitionView | null> {
@@ -201,13 +270,20 @@ export async function competitionView(slug: string): Promise<CompetitionView | n
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
   return inCompetitionOrg(session.personId, competition, async (db) => {
-    const [teams, registrations, canManage, canReview] = await Promise.all([
+    const [teams, canManage, canReview] = await Promise.all([
       teamsOf(db, competition.id),
-      registrationsOf(db, competition.id),
       canCompetition(db, session.personId, scope, "competition.manage"),
       canCompetition(db, session.personId, scope, "registration.review"),
     ]);
-    return { competition, teams, registrations, viewer: { canManage, canReview } };
+    // Decided before the read, and the read obeys it — the rows are never
+    // fetched, let alone serialized, for someone who may not review them.
+    const registrations = canReview ? await registrationsOf(db, competition.id) : null;
+    return {
+      competition,
+      teams,
+      ...(registrations !== null ? { registrations } : {}),
+      viewer: { canManage, canReview },
+    };
   });
 }
 
@@ -225,20 +301,53 @@ export async function seasonOverviewView(slug: string): Promise<SeasonOverviewVi
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
   return inCompetitionOrg(session.personId, competition, async (db) => {
-    const [overview, canManage, canReview] = await Promise.all([
-      seasonOverview(db, competition),
+    const [canManage, canReview, canSettle] = await Promise.all([
       canCompetition(db, session.personId, scope, "competition.manage"),
       canCompetition(db, session.personId, scope, "registration.review"),
+      canSettlement(db, session.personId, competition.orgId, "settlement.view"),
     ]);
-    return { ...overview, viewer: { canManage, canReview } };
+    // DA-13: money sight is decided BEFORE the read, and the read obeys it.
+    // Running the season is money authority over the season's own auction
+    // (`competition.manage`); the books are `settlement.view`. Neither one is
+    // implied by mere membership, which is what the old payload assumed.
+    const canSeeMoney = canManage || canSettle;
+    const overview = await seasonOverview(db, competition, { money: canSeeMoney });
+    return {
+      ...overview,
+      viewer: { canManage, canReview, canSeeMoney },
+      publishBlockers: publishBlockers(competition),
+    };
   });
 }
 
 export interface TeamsWorkspaceView extends TeamsWorkspace {
-  viewer: { canManage: boolean };
+  viewer: {
+    canManage: boolean;
+    /**
+     * `team.manage` — the capability `createTeamAction` actually enforces.
+     * DA-33: the add-team affordances asked for `competition.manage`, so
+     * `org:staff`, which holds `team.manage` and nothing else, was shown a
+     * read-only screen for a job it is authorized to do.
+     */
+    canManageTeams: boolean;
+    /** `auction.conduct` — may mint an owner invitation from this tab. */
+    canConduct: boolean;
+    canSeeMoney: boolean;
+    canSeeRoster: boolean;
+  };
 }
 
-/** The Teams tab: franchise cards + rosters with buy prices. Same membership gate. */
+/**
+ * The Teams tab: franchise cards and, for a manager, rosters with buy prices.
+ *
+ * DA-30: membership is the gate on the SEASON, never on its money or its
+ * players. `acceptOwnerJoin` enrols every accepted team owner as a viewer-level
+ * member, so "everyone with membership" includes the rival bidders — this view
+ * used to serve each of them every other team's remaining purse, every squad,
+ * every hammer price and every player's raw E.164 phone, and then hide the
+ * `+ Add team` button. Sight is decided HERE, before the read, and the read
+ * obeys it; the keys never reach the wire.
+ */
 export async function teamsWorkspaceView(slug: string): Promise<TeamsWorkspaceView | null> {
   const session = await requireSession();
   const competition = await resolveCompetitionScoped(session.personId, slug);
@@ -247,18 +356,34 @@ export async function teamsWorkspaceView(slug: string): Promise<TeamsWorkspaceVi
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
   return inCompetitionOrg(session.personId, competition, async (db) => {
-    const [workspace, canManage] = await Promise.all([
-      teamsWorkspace(db, competition),
+    const [canManage, canManageTeams, canReview, canConduct, canSettle] = await Promise.all([
       canCompetition(db, session.personId, scope, "competition.manage"),
+      canCompetition(db, session.personId, scope, "team.manage"),
+      canCompetition(db, session.personId, scope, "registration.review"),
+      canCompetition(db, session.personId, scope, "auction.conduct"),
+      canSettlement(db, session.personId, competition.orgId, "settlement.view"),
     ]);
-    return { ...workspace, viewer: { canManage } };
+    // The same two answers the season overview gives, so one season cannot
+    // report its money two ways: running it, or keeping its books.
+    const canSeeMoney = canManage || canSettle;
+    // Squad names and phone numbers are registration data wherever they are
+    // rendered; /registrations is gated on `registration.review`, so is this.
+    const canSeeRoster = canManage || canReview;
+    const workspace = await teamsWorkspace(db, competition, {
+      money: canSeeMoney,
+      roster: canSeeRoster,
+    });
+    return {
+      ...workspace,
+      viewer: { canManage, canManageTeams, canConduct, canSeeMoney, canSeeRoster },
+    };
   });
 }
 
 export async function advanceCompetitionAction(
   slug: string,
   to: CompetitionSummary["status"],
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; needsDetails?: boolean }> {
   const session = await requireSession();
   const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
@@ -280,13 +405,15 @@ export async function advanceCompetitionAction(
     advanceCompetition(db, competition, session.personId, to),
   );
   if (!result.ok) {
-    return {
-      ok: false,
-      error:
-        result.reason === "guard_failed"
-          ? "Set a name, dates and location before opening registration."
-          : "That step isn't available yet.",
-    };
+    // DA-11: `guard_failed` names three fields the product had no way to set.
+    // The flag lets the screen answer with the repair instead of the complaint.
+    return result.reason === "guard_failed"
+      ? {
+          ok: false,
+          error: "Set a name, dates and location before opening registration.",
+          needsDetails: true,
+        }
+      : { ok: false, error: "That step isn't available yet." };
   }
   return { ok: true };
 }
@@ -325,8 +452,13 @@ export async function cloneCompetitionAction(
 
 // PX-5: publish/unpublish the public competition page. A thin write to the
 // EXISTING visibility column (schema-designed, dormant until now), behind the
-// existing competition.manage capability. No new rules: the directory and
-// /c/[slug] read this column; nothing else changes.
+// existing competition.manage capability. The directory and /c/[slug] read this
+// column; nothing else changes.
+//
+// DA-12: publishing is now gated and audited. It was neither: a season in
+// `setup`, with no registrations, published in one click a public page telling
+// the world registration was closed — and left no audit trail of having done
+// it. Unpublishing is never blocked; taking a page DOWN is always allowed.
 export async function setCompetitionVisibilityAction(
   slug: string,
   visibility: "private" | "public",
@@ -348,9 +480,61 @@ export async function setCompetitionVisibilityAction(
   } catch {
     return { ok: false, error: "You can't manage this competition." };
   }
+  if (visibility === "public") {
+    const blockers = publishBlockers(competition);
+    if (blockers.length > 0) {
+      return { ok: false, error: blockers[0]?.message ?? "This season isn't ready to publish." };
+    }
+  }
   await inCompetitionOrg(session.personId, competition, (db) =>
-    db.update(competitions).set({ visibility }).where(eq(competitions.id, competition.id)),
+    setCompetitionVisibility(db, competition, session.personId, visibility),
   );
+  return { ok: true };
+}
+
+export type DetailsField = "name" | "startsOn" | "endsOn" | "location" | "form";
+
+/**
+ * DA-11: give a season's name, dates and location a way to change.
+ *
+ * Capability-gated exactly like the lifecycle advance (`competition.manage`),
+ * because it edits the same row that gate protects — and because a season whose
+ * dates cannot be set is a season whose lifecycle cannot advance.
+ */
+export async function updateCompetitionDetailsAction(
+  slug: string,
+  input: { name: string; location: string; startsOn: string; endsOn: string },
+): Promise<{ ok: boolean; error?: string; field?: DetailsField }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available.", field: "form" };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage this season.", field: "form" };
+  }
+  const result = await inCompetitionOrg(session.personId, competition, (db) =>
+    updateCompetitionDetails(db, competition, session.personId, {
+      name: input.name,
+      location: input.location.trim() === "" ? null : input.location.trim(),
+      startsOn: input.startsOn === "" ? null : input.startsOn,
+      endsOn: input.endsOn === "" ? null : input.endsOn,
+    }),
+  );
+  if (!result.ok) {
+    return result.reason === "invalid_name"
+      ? { ok: false, error: "Give the season a name of at least 3 characters.", field: "name" }
+      : { ok: false, error: "The end date falls before the start date.", field: "endsOn" };
+  }
   return { ok: true };
 }
 
@@ -458,7 +642,7 @@ export async function triageRegistrationAction(
   registrationId: string,
   action: TriageAction,
   reason?: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; notified?: number; notifyFailed?: number }> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
@@ -480,7 +664,40 @@ export async function triageRegistrationAction(
   if (!result.ok) {
     return { ok: false, error: "That action isn't available for this registration." };
   }
-  return { ok: true };
+  const notice = await notifyAffected(gate, [registrationId], event);
+  return { ok: true, ...notice };
+}
+
+/**
+ * DA-35: tell the people it happened to. Best effort — the transition has
+ * already committed, so a provider outage costs a text message, never a
+ * decision. The counts come back so the organizer's toast can say plainly
+ * whether anyone went untold instead of implying everyone was reached.
+ */
+async function notifyAffected(
+  gate: { personId: string; competition: CompetitionSummary },
+  registrationIds: readonly string[],
+  event: RegistrationEvent,
+): Promise<{ notified?: number; notifyFailed?: number }> {
+  if (registrationIds.length === 0 || event.type === "submit") {
+    return {};
+  }
+  try {
+    const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+      notifyDecision(db, {
+        orgId: gate.competition.orgId,
+        competitionSlug: gate.competition.slug,
+        competitionName: gate.competition.name,
+        registrationIds,
+        event: event.type,
+        ...(event.type === "reject" ? { reason: event.reason } : {}),
+        actorId: gate.personId,
+      }),
+    );
+    return { notified: result.sent, notifyFailed: result.failed };
+  } catch {
+    return { notifyFailed: registrationIds.length };
+  }
 }
 
 /** Bulk triage — same review gate, same core event, applied atomically (identical to N singles). */
@@ -489,7 +706,14 @@ export async function bulkTriageAction(
   registrationIds: string[],
   action: TriageAction,
   reason?: string,
-): Promise<{ ok: boolean; applied?: number; skipped?: number; error?: string }> {
+): Promise<{
+  ok: boolean;
+  applied?: number;
+  skipped?: number;
+  notified?: number;
+  notifyFailed?: number;
+  error?: string;
+}> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
@@ -508,7 +732,8 @@ export async function bulkTriageAction(
       event,
     ),
   );
-  return { ok: true, applied: result.applied.length, skipped: result.skipped.length };
+  const notice = await notifyAffected(gate, result.applied, event);
+  return { ok: true, applied: result.applied.length, skipped: result.skipped.length, ...notice };
 }
 
 // --- Player-facing registration (any authenticated person) -------------------
@@ -517,7 +742,13 @@ export interface RegistrationLanding {
   competitionName: string;
   open: boolean;
   // PX-5: the number is the player's human-quotable reference on the status view.
-  mine: { status: string; role: string; number: string } | null;
+  mine: {
+    id: string;
+    status: string;
+    role: string;
+    number: string;
+    rejectionReason: string | null;
+  } | null;
 }
 
 export async function registrationLanding(slug: string): Promise<RegistrationLanding | null> {
@@ -536,6 +767,75 @@ export async function registrationLanding(slug: string): Promise<RegistrationLan
     open: competition.status === "registration_open",
     mine,
   };
+}
+
+export interface RegistrationPreview {
+  competitionName: string;
+  open: boolean;
+  location: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+}
+
+/**
+ * DA-35: the signed-out view of a registration link. Anonymous, so it carries
+ * NOTHING about who else registered — the season's own public facts only, the
+ * same ones the public season page already shows. Returns null for a private
+ * season, which keeps the login redirect as the behaviour for those.
+ */
+export async function registrationPreview(slug: string): Promise<RegistrationPreview | null> {
+  const facts = await publicRegistrationFacts(systemDb, slug);
+  if (facts === null) {
+    return null;
+  }
+  return {
+    competitionName: facts.name,
+    open: facts.status === "registration_open",
+    location: facts.location,
+    startsOn: facts.startsOn,
+    endsOn: facts.endsOn,
+  };
+}
+
+/**
+ * DA-35: a player withdraws their OWN registration. `withdraw` was a declared
+ * TriageAction with no caller anywhere, `withdrawn` sat in the organizer's
+ * status filter unreachable, and a player who pulled out was filed as REJECTED
+ * with reason "withdrew" — told "this wasn't approved this time" for a decision
+ * they made themselves. Under DPDP the inability to withdraw is not a UX gap.
+ *
+ * Authorization is ownership, not capability: the registration must belong to
+ * the caller. The state machine decides whether the transition is legal.
+ */
+export async function withdrawMyRegistrationAction(
+  slug: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const competition = await competitionForRegistration(systemDb, slug);
+  if (competition === null) {
+    return { ok: false, error: "This season is not available." };
+  }
+  const mine = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    myRegistration(db, competition.id, session.personId),
+  );
+  if (mine === null) {
+    return { ok: false, error: "You don't have a registration for this season." };
+  }
+  const result = await withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: competition.orgId },
+    (db) =>
+      transition(db, competition.orgId, competition.id, mine.id, session.personId, {
+        type: "withdraw",
+      }),
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: "This registration can no longer be withdrawn — ask the organizer.",
+    };
+  }
+  return { ok: true };
 }
 
 export async function submitRegistrationAction(
@@ -595,9 +895,24 @@ export interface DashboardParams {
 
 export interface RegistrationDashboard {
   competition: CompetitionSummary;
-  stats: RegistrationStats;
-  page: RegistrationPage;
-  teams: TeamSummary[];
+  /**
+   * Counts only — no applicant is identified by them. DA-35: still ABSENT for a
+   * refused viewer. They are cheap, but a refused screen renders nothing from
+   * them, so computing and shipping them was work done to leak a little.
+   */
+  stats?: RegistrationStats;
+  /**
+   * The applicant rows themselves. DA-30: ABSENT without `registration.review`.
+   * The screen has always REFUSED a non-reviewer in words — "You don't have
+   * permission to review registrations for this season" — while shipping every
+   * applicant's name, phone, age and photo URL in the payload behind it.
+   */
+  page?: RegistrationPage;
+  /** Approved icons with no team, named. Review-gated: these are applicants. */
+  orphanIcons?: OrphanIcon[];
+  teams?: TeamSummary[];
+  /** Drives the closed-intake notice on the share block (DA-35). */
+  registrationOpen: boolean;
   viewer: { canReview: boolean };
 }
 
@@ -635,13 +950,90 @@ export async function registrationDashboard(
     pageSize: PAGE_SIZE,
   };
   return inCompetitionOrg(session.personId, competition, async (db) => {
-    const [canReview, stats, page, teams] = await Promise.all([
-      canCompetition(db, session.personId, scope, "registration.review"),
+    const canReview = await canCompetition(db, session.personId, scope, "registration.review");
+    // The refusal renders one sentence. Everything below the gate is computed
+    // ONLY for someone allowed to see it — the cheapest possible partition.
+    if (!canReview) {
+      return {
+        competition,
+        registrationOpen: competition.status === "registration_open",
+        viewer: { canReview },
+      };
+    }
+    const [stats, page, teams, orphans] = await Promise.all([
       registrationStats(db, competition.id),
       queryRegistrations(db, competition.id, query),
       teamsOf(db, competition.id),
+      orphanIcons(db, competition.id),
     ]);
-    return { competition, stats, page, teams, viewer: { canReview } };
+    return {
+      competition,
+      stats,
+      page,
+      teams,
+      orphanIcons: orphans,
+      registrationOpen: competition.status === "registration_open",
+      viewer: { canReview },
+    };
+  });
+}
+
+/** How many rows one "select all matching" may name. Bulk triage is atomic, so
+ * this is a bound on the CLIENT's ability to hold and show what it selected. */
+const SELECT_ALL_CAP = 1000;
+
+export interface SelectableRow {
+  id: string;
+  number: string;
+  name: string | null;
+  status: RegistrationStatus;
+}
+
+/**
+ * DA-35: "Select all on page" selected 25 of 400 and then survived paging and
+ * filter changes invisibly — the organizer could reject 25 people none of whom
+ * were on screen. Honest bulk needs its opposite: select every row the CURRENT
+ * FILTER matches, named, so the count and the people agree.
+ */
+export async function selectAllMatchingAction(
+  slug: string,
+  params: DashboardParams,
+): Promise<{ ok: true; rows: SelectableRow[]; capped: boolean } | { ok: false; error: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  return inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const collected: SelectableRow[] = [];
+    let page = 1;
+    for (;;) {
+      const result = await queryRegistrations(db, gate.competition.id, {
+        ...(params.search !== undefined && params.search !== "" ? { search: params.search } : {}),
+        ...(params.status !== undefined && VALID_STATUS.has(params.status as RegistrationStatus)
+          ? { status: params.status as RegistrationStatus }
+          : {}),
+        ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
+        sort: "number",
+        page,
+        pageSize: 100,
+      });
+      collected.push(
+        ...result.rows.map((row) => ({
+          id: row.id,
+          number: row.number,
+          name: row.name,
+          status: row.status,
+        })),
+      );
+      if (collected.length >= SELECT_ALL_CAP || page * result.pageSize >= result.total) {
+        return {
+          ok: true as const,
+          rows: collected.slice(0, SELECT_ALL_CAP),
+          capped: collected.length > SELECT_ALL_CAP,
+        };
+      }
+      page += 1;
+    }
   });
 }
 
@@ -732,7 +1124,7 @@ export async function markRegistrationAction(
   } catch {
     return { ok: false, error: "You can't manage players here." };
   }
-  await inCompetitionOrg(session.personId, competition, (db) =>
+  const result = await inCompetitionOrg(session.personId, competition, (db) =>
     setRegistrationMarks(
       db,
       competition.orgId,
@@ -742,10 +1134,68 @@ export async function markRegistrationAction(
       session.personId,
     ),
   );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.reason === "icon_and_captain"
+          ? "A player can't be both an Icon and a Captain. An Icon is pre-signed to their team and never goes to the auction; a Captain leads a squad that plays. Clear one mark before setting the other."
+          : "That registration is not in this season.",
+    };
+  }
   return { ok: true };
 }
 
 /** Set (or clear) a team's coach (organizer, `team.manage`). */
+/**
+ * DA-35: rename a team / correct its short name or colour. Same capability as
+ * creating one (`team.manage`), and the same lock: once the auction has left
+ * `scheduled` the franchise identity the board and the settlement case were
+ * built on is frozen with it.
+ */
+export async function updateTeamAction(
+  slug: string,
+  teamId: string,
+  input: { name: string; shortName: string; primaryColor: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "team.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage teams here." };
+  }
+  const auction = await auctionOf(systemDb, competition.id);
+  if (auction !== null && auction.status !== "scheduled") {
+    return {
+      ok: false,
+      error: "The auction has started — the teams are locked for this season.",
+    };
+  }
+  const result = await inCompetitionOrg(session.personId, competition, (db) =>
+    updateTeamDetails(db, competition.orgId, competition.id, teamId, input, session.personId),
+  );
+  if (!result.ok) {
+    const message: Record<string, string> = {
+      invalid_name: "Give the team a name of at least 3 characters.",
+      duplicate_name: "Another team in this season already has that name.",
+      unknown_team: "That team is not in this season.",
+    };
+    return { ok: false, error: message[result.reason] ?? "That team couldn't be updated." };
+  }
+  return { ok: true };
+}
+
 export async function setTeamCoachAction(
   slug: string,
   teamId: string,
@@ -918,13 +1368,42 @@ export async function importCommitAction(
 /** Export authorization = registration.review; deterministic, competition-scoped CSV. */
 export async function exportRegistrationsAction(
   slug: string,
+  /**
+   * DA-34: optional squad filter. The Teams tab offered "Export" on a single
+   * team and merely NAVIGATED to /registrations with a filter in the URL — a
+   * per-team export did not exist anywhere in the product.
+   */
+  teamId?: string,
 ): Promise<{ ok: true; csv: string; filename: string } | { ok: false; error: string }> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const csv = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
-    exportRegistrationsCsv(db, gate.competition.id),
-  );
-  return { ok: true, csv, filename: `${gate.competition.slug}-registrations.csv` };
+  const { csv, filename } = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const team =
+      teamId === undefined
+        ? undefined
+        : (await teamsOf(db, gate.competition.id)).find((entry) => entry.id === teamId);
+    if (teamId !== undefined && team === undefined) {
+      return { csv: null, filename: null };
+    }
+    const body = await exportRegistrationsCsv(db, gate.competition.id, teamId);
+    const suffix = team === undefined ? "registrations" : `${slugifyName(team.name)}-squad`;
+    const name = `${gate.competition.slug}-${suffix}.csv`;
+    // DA-35: the export read personal data and returned it with no record that
+    // it had happened. The evidence is written before the file reaches the
+    // caller, in the same tenant boundary that authorized the read — a failure
+    // here fails the export rather than releasing an unrecorded copy.
+    await recordRegistrationExport(db, gate.competition.orgId, gate.competition.id, gate.personId, {
+      // The header line is not a person; the row count is what left.
+      rowCount: Math.max(0, body.trim() === "" ? 0 : body.trim().split("\n").length - 1),
+      ...(teamId !== undefined ? { teamId } : {}),
+      filename: name,
+    });
+    return { csv: body, filename: name };
+  });
+  if (csv === null) {
+    return { ok: false, error: "That team is not in this season." };
+  }
+  return { ok: true, csv, filename };
 }

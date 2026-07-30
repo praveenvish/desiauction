@@ -27,6 +27,14 @@ export interface AuctionSocket {
   remainingMs: number | null;
   version: number;
   ceremony: CeremonyState;
+  /**
+   * The snapshot on screen is no longer being confirmed by the engine — the
+   * socket is down, or this device has no network. Everything derived from it
+   * (the countdown above all) is a memory, not a fact.
+   */
+  stale: boolean;
+  /** The DEVICE is offline, which is a stronger claim than "reconnecting". */
+  offline: boolean;
 }
 
 export function useAuctionSocket(wsUrl: string): AuctionSocket {
@@ -35,8 +43,33 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
   const [drift, setDrift] = useState(0);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [ceremony, setCeremony] = useState<CeremonyState>({ phase: "idle", key: "idle" });
+  const [offline, setOffline] = useState(false);
+  /**
+   * The ORDERING key stays a ref — the message handler must compare against the
+   * newest value synchronously, and a state read inside the closure would be a
+   * frame behind. But the hook also RETURNED the ref's value, so `version` never
+   * triggered a render: every surface showing "v58" was showing whatever the
+   * counter happened to be at the last render some other state caused.
+   */
   const versionRef = useRef(0);
+  const [version, setVersion] = useState(0);
   const prevRef = useRef<AuctionSnapshot | null>(null);
+
+  // navigator.onLine is a weak signal on its own — it says the interface is up,
+  // not that the engine is reachable — but a false is definitive, and it lets
+  // the room say "Offline" instead of an optimistic "Reconnecting…".
+  useEffect(() => {
+    const sync = () => {
+      setOffline(!window.navigator.onLine);
+    };
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
 
   useEffect(() => {
     let closed = false;
@@ -58,6 +91,7 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
             // Out-of-order rejection: never apply a frame older than we hold.
             if (frame.version >= versionRef.current) {
               versionRef.current = frame.version;
+              setVersion(frame.version);
               setCeremony(deriveCeremony(prevRef.current, frame.snapshot));
               prevRef.current = frame.snapshot;
               setSnapshot(frame.snapshot);
@@ -91,7 +125,17 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
   }, [wsUrl]);
 
   // Countdown: render-only; endsAt is server truth, drift-corrected.
+  //
+  // It FREEZES the moment the socket goes down. The clock used to tick on
+  // regardless — 37s → 34s → 14s across twenty-three seconds with no connection
+  // — which is the page inventing the one number the room is watching. A frozen
+  // clock beside a "Reconnecting…" badge is honest; a running one is a lie that
+  // looks exactly like the truth.
+  const stale = connection !== "open" || offline;
   useEffect(() => {
+    if (stale) {
+      return;
+    }
     const interval = setInterval(() => {
       const endsAtMs = snapshot?.currentLot?.endsAtMs ?? null;
       if (endsAtMs === null) {
@@ -103,7 +147,16 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
     return () => {
       clearInterval(interval);
     };
-  }, [snapshot, drift]);
+  }, [snapshot, drift, stale]);
 
-  return { snapshot, connection, drift, remainingMs, version: versionRef.current, ceremony };
+  return {
+    snapshot,
+    connection,
+    drift,
+    remainingMs,
+    version,
+    ceremony,
+    stale,
+    offline,
+  };
 }

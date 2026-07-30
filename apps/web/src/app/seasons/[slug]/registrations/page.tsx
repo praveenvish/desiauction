@@ -27,7 +27,17 @@ export default async function RegistrationsPage({
   if (dashboard === null) {
     notFound();
   }
-  if (!dashboard.viewer.canReview) {
+  // DA-30: `page` is ABSENT without `registration.review` — the refusal below is
+  // no longer a caption over a payload that already carried every applicant's
+  // name, phone, age and photo URL. The two conditions are the same condition;
+  // both are tested so the type narrows and the leak cannot come back by
+  // someone rendering the panel above this guard.
+  if (
+    !dashboard.viewer.canReview ||
+    dashboard.page === undefined ||
+    dashboard.stats === undefined ||
+    dashboard.teams === undefined
+  ) {
     return (
       <main className="registrations-dash">
         <div className="competitions-stack">
@@ -42,12 +52,14 @@ export default async function RegistrationsPage({
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <ShareRegistration slug={slug} />
+          <ShareRegistration slug={slug} open={dashboard.registrationOpen} />
           <RegistrationDashboardPanel
             slug={slug}
             stats={dashboard.stats}
             page={dashboard.page}
             teams={dashboard.teams}
+            orphanIcons={dashboard.orphanIcons ?? []}
+            registrationOpen={dashboard.registrationOpen}
             filters={{
               search: sp["q"] ?? "",
               status: sp["status"] ?? "",

@@ -24,7 +24,18 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
-  min-height: 40px;
+  /* 44px, not 40. An input is the primary touch target on every form in a
+     phone-first product, and 40 rendered 42 in practice — comfortably past
+     SC 2.5.8's 24px AA floor, but short of the 44px this platform holds
+     itself to everywhere else (Button's `touch` rung, footer links, the
+     directory's chips).
+     The tell that 40 was simply wrong: pages were already compensating.
+     `/c` hand-sets `min-height: 44px` on its search input and sort select
+     (directory.css) purely to escape this rule, and the auction surfaces do
+     the same in four places. A component whose consumers routinely override
+     one of its values is stating that value incorrectly, so it is corrected
+     here rather than worked around a seventh time. */
+  min-height: 44px;
   /* border-box: width:100% must mean the wrapper's width — without it the
      padding+border overflow the wrapper and slide under adjacent controls
      in flex rows (the /c search bar found this). */

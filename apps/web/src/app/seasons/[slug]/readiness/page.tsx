@@ -72,6 +72,16 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                   <span className="competitions-hint">{check.detail}</span>
                 </li>
               ))}
+              {/* The sum that decides whether the night can end normally.
+                  Deliberately not counted as a blocker: a league may knowingly
+                  run short, but it must not find out at closing time. */}
+              <li className="readiness-row" data-testid="check-squads_fillable">
+                <Badge tone={auction.feasibility.ok ? "success" : "warning"}>
+                  {auction.feasibility.ok ? "Fits" : "Short"}
+                </Badge>
+                <span className="registration-name">Pool against squads</span>
+                <span className="competitions-hint">{auction.feasibility.headline}</span>
+              </li>
               <li className="readiness-row">
                 <Badge tone={auction.view !== null ? "success" : "neutral"}>
                   {auction.view !== null ? "Created" : "Not created"}
@@ -94,16 +104,18 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
             <li className="readiness-row" data-testid="readiness-registrations">
               <Badge
                 tone={
-                  registrations !== null && registrations.stats.submitted > 0
+                  registrations?.stats !== undefined && registrations.stats.submitted > 0
                     ? "warning"
                     : "neutral"
                 }
               >
-                {registrations !== null ? `${String(registrations.stats.submitted)} pending` : "—"}
+                {registrations?.stats !== undefined
+                  ? `${String(registrations.stats.submitted)} pending`
+                  : "—"}
               </Badge>
               <span className="registration-name">
                 Registrations —{" "}
-                {registrations !== null
+                {registrations?.stats !== undefined
                   ? `${String(registrations.stats.approved)} approved of ${String(registrations.stats.total)}`
                   : "no access"}
               </span>
@@ -156,12 +168,12 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
         </Card>
 
         <div className="readiness-actions">
-          <ButtonLink href={`${base}/auction`}>
+          <ButtonLink href={`${base}/auction`} size="touch">
             {auction !== null && auction.view !== null
               ? "Open auction setup"
               : "Create the auction"}
           </ButtonLink>
-          <ButtonLink href={base} variant="secondary">
+          <ButtonLink href={base} variant="secondary" size="touch">
             Back to overview
           </ButtonLink>
         </div>

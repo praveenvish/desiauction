@@ -16,6 +16,12 @@ export interface LiveShellProps {
    * shipping no asset of its own.
    */
   brand?: ReactNode;
+  /**
+   * Where the mark leads. Optional: a conductor's cockpit wants no extra door,
+   * but the public stage is the product's most-forwarded screen and its only
+   * visitor arrives without an account — there, the mark is the way in.
+   */
+  brandHref?: string;
   linkComponent?: ElementType;
   children: ReactNode;
 }
@@ -26,9 +32,11 @@ export function LiveShell({
   exitLabel = "Leave auction",
   statusSlot,
   brand,
+  brandHref,
   linkComponent: Link = "a",
   children,
 }: LiveShellProps) {
+  const BrandBlock = brandHref === undefined ? "div" : Link;
   return (
     // Canon 04 §3: the Live shell is pinned to Floodlight — the show is always
     // dark, projector-honest. This scopes the dark token set to everything the
@@ -43,12 +51,24 @@ export function LiveShell({
           {exitLabel}
         </Link>
         {brand !== undefined ? (
-          <div className={styles["live-brand"]}>
+          <BrandBlock
+            className={[
+              styles["live-brand"],
+              brandHref === undefined ? undefined : styles["live-brand-link"],
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            // The mark itself is decorative and the wordmark is hidden under
+            // 640px, so a bare link would reach a phone with no name at all.
+            {...(brandHref === undefined
+              ? {}
+              : { href: brandHref, "aria-label": "DesiAuction home" })}
+          >
             <span className={styles["live-brand-mark"]} aria-hidden>
               {brand}
             </span>
             <span className={styles["live-brand-text"]}>DesiAuction</span>
-          </div>
+          </BrandBlock>
         ) : null}
         {statusSlot !== undefined ? <div className={styles["status"]}>{statusSlot}</div> : null}
       </header>

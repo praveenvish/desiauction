@@ -580,6 +580,13 @@ a.content-card:focus-visible {
 
 /* --- Visually hidden helper ------------------------------------------------------------ */
 
+/* `.visually-hidden` was defined in directory.css and inbox.css but NOT in any
+   sheet the marketing/content pages load, so the class silently did nothing on
+   /pricing — a "visually hidden" label there would have rendered as visible
+   text mid-table. Declared here, beside the heading variant it has always been
+   a twin of, because content.css is what every content surface imports.
+   Identical to the directory.css copy, so a page that loads both is unaffected. */
+.visually-hidden,
 .visually-hidden-heading {
   position: absolute;
   width: 1px;

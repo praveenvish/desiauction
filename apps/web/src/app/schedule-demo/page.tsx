@@ -36,7 +36,7 @@ export default function ScheduleDemoPage() {
       <p className="prose-p">
         In a hurry?{" "}
         <Link href="/login" className="prose-link">
-          Run your auction
+          Start your auction
         </Link>{" "}
         directly — every tournament gets the full platform, free, during beta.
       </p>

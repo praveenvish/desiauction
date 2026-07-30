@@ -21,7 +21,10 @@
 
 .header {
   display: flex;
-  align-items: baseline;
+  /* Was `baseline` when the title was the only child. A 44px icon button has
+     no meaningful baseline, so baseline alignment would drop it to the bottom
+     of the row; center is the only sane pairing of a text run and a square. */
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-5) var(--space-5) 0;
@@ -33,6 +36,44 @@
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   margin: 0;
+}
+
+/* The touch exit. 44x44 is the platform's target convention, but a 44px box in
+   a header whose title line is only 28px (--text-xl-line) would push every
+   dialog header 16px taller — a visible change to all 17 dialogs for a control
+   that is meant to be additive. The negative block margin buys that back: the
+   button PAINTS and HIT-TESTS at 44x44 while contributing 44 - (2 * 8) = 28px
+   of layout, exactly the title's line box, so no existing dialog moves. The
+   inline-end margin does the same trick horizontally, pulling the button's
+   generous padding back so the icon still sits on the header's optical edge
+   instead of floating 8px inside it. The overhang eats into the header's own
+   padding and never leaves the dialog's padding box, so the UA's
+   `dialog { overflow: auto }` has nothing to clip and no scrollbar to grow. */
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  margin-block: calc(var(--space-2) * -1);
+  margin-inline-end: calc(var(--space-2) * -1);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .body {

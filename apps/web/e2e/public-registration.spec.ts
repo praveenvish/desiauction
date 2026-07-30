@@ -31,8 +31,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
 
@@ -85,14 +85,19 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
     // Open-registration pages render by link even before publishing…
     await anon.goto(publicUrl);
     await expect(anon.getByTestId("public-reg-status")).toHaveText("Registration open");
-    // …but only PUBLISHED competitions are listed in the directory.
+    // …but only PUBLISHED competitions are listed in the directory. The
+    // no-match state now echoes the query back instead of saying "Nothing
+    // matches", so a guest can see WHICH search came up empty.
     await anon.goto(`/c?q=${STAMP}`);
-    await expect(anon.getByText("Nothing matches")).toBeVisible();
+    await expect(anon.getByText(`No tournaments match “${STAMP}”`)).toBeVisible();
   });
 
   // Publish the public page from the Overview.
   await page.goto(competitionUrl);
   await page.getByTestId("toggle-visibility").click();
+  // Publishing is confirmed (DA-12): the readiness check passed, so the dialog
+  // is the only thing between the organizer and the public internet.
+  await page.getByTestId("confirm-publish").click();
   await expect(page.getByTestId("visibility-row")).toContainText("LIVE");
 
   // A second, never-published draft competition stays structurally absent.
@@ -165,6 +170,11 @@ test("player journey: discover → multi-step register with draft recovery → t
     // Discover anonymously, then hit the registration door.
     await player.goto(publicUrl);
     await player.getByTestId("public-register-cta").click();
+    // DA-35: the share link is no longer a login wall that never names the
+    // tournament. A public season shows what it is and what will be asked;
+    // the OTP moves to the point of submission.
+    await expect(player.getByTestId("register-preview")).toContainText(`Monsoon Cup ${STAMP}`);
+    await player.getByTestId("register-verify-cta").click();
     await expect(player).toHaveURL(/\/login\?next=/);
     await otpLogin(player, PLAYER);
 

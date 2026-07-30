@@ -37,8 +37,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
 
@@ -47,7 +47,7 @@ async function onboardWithName(page: Page, phone: string, name: string): Promise
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill(name);
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByTestId("onboarding-org")).toBeVisible();
+  await expect(page).toHaveURL(/\/home/);
 }
 
 async function axeClean(page: Page, surface: string): Promise<void> {
@@ -90,6 +90,9 @@ test("founder demo: settle an auction → open Financial Operations → observe,
   expect(orgSlug).not.toBe("");
 
   // --- The third partition: finance is its own act of trust ------------------
+  // The panel lives on the org detail page's "Money & roles" tab; other tab
+  // panels render in the DOM but display:none until selected.
+  await page.getByRole("tab", { name: "Money & roles" }).click();
   await expect(page.getByTestId("finance-authority")).toBeVisible();
 
   // Start from no finance authority, whatever a previous run left behind — the

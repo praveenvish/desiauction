@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
+import { IconClose } from "../shell/icons";
 import styles from "./dialog.module.css";
 
 export interface DialogProps {
@@ -69,6 +70,27 @@ export function Dialog({ open, onClose, title, children, footer, size = "default
         <h2 className={styles["title"]} id={titleId}>
           {title}
         </h2>
+        {/*
+          Escape and a backdrop click were the only two exits, and neither
+          survives a phone: the dialog is min(480px, 100vw - var(--space-8)),
+          so at 390px the backdrop is a ~16px strip down each side — a target
+          no thumb reliably finds — and Escape does not exist on touch at all.
+          A visible affordance is the only exit a touch user can see.
+
+          `title` is a required prop and every call site passes a real one, so
+          interpolating it is safe. It also earns its keep: closed <dialog>s
+          stay mounted in the DOM (FormDialog keeps its form there), so a bare
+          "Close" would repeat across every dialog on the page and make the
+          name ambiguous the moment a test or a screen reader enumerates them.
+        */}
+        <button
+          type="button"
+          className={styles["close"]}
+          onClick={onClose}
+          aria-label={`Close ${title}`}
+        >
+          <IconClose />
+        </button>
       </div>
       <div className={styles["body"]}>{children}</div>
       {footer !== undefined ? <div className={styles["footer"]}>{footer}</div> : null}

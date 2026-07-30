@@ -58,16 +58,37 @@ export function PaddleControl({
   }
   const [raise, ...jumps] = rungs;
   const paddle = snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null;
-  const iAmLeading = lot.currentBid?.paddleNumber === myPaddleNumber;
+  // DA: the engine decides "am I leading?" by TEAM, not by paddle — a holder
+  // with two paddles for one franchise cannot outbid himself. Comparing paddle
+  // numbers here made the room and the engine answer the same question two
+  // different ways. Team identity is the engine's, so it is ours.
+  const iAmLeading =
+    lot.currentBid !== null &&
+    (paddle === null
+      ? lot.currentBid.paddleNumber === myPaddleNumber
+      : snapshot?.paddles.some(
+          (entry) =>
+            entry.teamId === paddle.teamId && entry.paddleNumber === lot.currentBid?.paddleNumber,
+        ) === true);
   // DA-12: the raise buttons stayed live when the server was certain to refuse
   // — already leading, or a full squad — so the room invited the rejection
   // instead of preventing it, then showed it as an enum (DA-11).
+  //
+  // DA: and the biggest of those refusals was missing. A PAUSED auction left
+  // `RAISE TO ₹15,000` gold and enabled, and the engine answered the tap with
+  // "That lot has already closed." It had not closed — it was paused. The one
+  // state the button never consulted was the auction's own.
+  const paused = snapshot !== null && snapshot.auctionStatus !== "live";
   const squadFull = squadSigned >= rules.squadMax;
-  const blocked = iAmLeading
-    ? "You're already the highest bidder."
-    : squadFull
-      ? "Your squad is full."
-      : null;
+  const blocked = paused
+    ? snapshot.auctionStatus === "paused"
+      ? "The clock is stopped. Bidding resumes when the auctioneer restarts it."
+      : "This auction is not taking bids."
+    : iAmLeading
+      ? "You're already the highest bidder."
+      : squadFull
+        ? "Your squad is full."
+        : null;
   const bidsDisabled = disabled || blocked !== null;
 
   return (
@@ -81,8 +102,14 @@ export function PaddleControl({
       </div>
 
       {blocked !== null ? (
-        <p className="paddle-leading" id="paddle-blocked" data-testid="paddle-leading">
-          {iAmLeading ? "You're leading this lot." : blocked}
+        <p
+          className={paused ? "paddle-leading paddle-frozen" : "paddle-leading"}
+          id="paddle-blocked"
+          data-testid="paddle-leading"
+          data-reason={paused ? "paused" : iAmLeading ? "leading" : "squad-full"}
+          role={paused ? "status" : undefined}
+        >
+          {paused || !iAmLeading ? blocked : "You're leading this lot."}
         </p>
       ) : null}
 

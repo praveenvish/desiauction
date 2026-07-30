@@ -33,6 +33,8 @@ export function PrimitivesDemo() {
         <Button variant="ghost">Ghost</Button>
         <Button variant="danger">Danger</Button>
         <Button size="sm">Small</Button>
+        <Button size="touch">Touch</Button>
+        <Button size="lg">Large</Button>
         <Button loading>Loading</Button>
         <Button disabled>Disabled</Button>
         <ButtonLink href="#primitives-h" variant="secondary">

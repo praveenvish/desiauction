@@ -16,7 +16,10 @@ import {
 describe("shellKind", () => {
   it("routes every surface to its shell", () => {
     expect(shellKind("/")).toBe("public");
+    // Login keeps the public chrome (2026-07-25 founder call); onboarding is
+    // the one focused, chrome-free entry moment (2026-07-24 collapse).
     expect(shellKind("/login")).toBe("public");
+    expect(shellKind("/onboarding")).toBe("bare");
     expect(shellKind("/help")).toBe("public");
     expect(shellKind("/join/tok123")).toBe("public");
     expect(shellKind("/owner-join/tok123")).toBe("public");
@@ -235,9 +238,10 @@ describe("pageIdentity", () => {
 });
 
 describe("liveExit", () => {
-  it("exits to the auction hub for members and to the front door for anonymous spectators", () => {
+  it("exits to the auction hub for members and to the tournament for anonymous spectators", () => {
     expect(liveExit("/seasons/mpl/auction/cockpit", true).href).toBe("/seasons/mpl/auction");
-    expect(liveExit("/seasons/mpl/auction/spectate", false).href).toBe("/");
+    // A guest reached the stage from /c/<slug>; the door back is the same one.
+    expect(liveExit("/seasons/mpl/auction/spectate", false).href).toBe("/c/mpl");
     expect(liveExit("/seasons/mpl/auction/spectate", true).href).toBe("/seasons/mpl/auction");
   });
 });

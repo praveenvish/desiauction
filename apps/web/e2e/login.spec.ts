@@ -18,10 +18,15 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   await inbox.close();
   expect(code).toMatch(/^\d{6}$/);
 
-  await page.getByLabel(`Code sent to +91${PHONE}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  // PX-3: a brand-new (nameless) account is onboarded before the console.
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  // PX-3: a brand-new (nameless) account is onboarded before the console —
+  // and the name gate now guards every console route, /account included, so
+  // the one question has to be cleared before /account will render at all.
   await expect(page).toHaveURL(/\/onboarding/);
+  await page.getByLabel("What should we call you?").fill("Login Tester");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/home/);
   await page.goto("/account");
   await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
 
@@ -29,13 +34,15 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   await expect(page).toHaveURL(/\/login/);
 });
 
-test("a wrong code is rejected with a humane message", async ({ page }) => {
+test("a wrong code is rejected with a humane message that counts the rope left", async ({
+  page,
+}) => {
   await page.goto("/login");
   await page.getByLabel("Mobile number").fill(PHONE.replace(/^98/, "97"));
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel(/Code sent to/).fill("000000");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("That code didn't work. Try again.")).toBeVisible();
+  await page.getByLabel("6-digit code").fill("000000");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(page.getByText("That code isn't right. 4 attempts left.")).toBeVisible();
 });
 
 test("the account page is gated: no session → /login", async ({ page }) => {
@@ -47,7 +54,9 @@ test("an invalid phone is refused before any code is sent", async ({ page }) => 
   await page.goto("/login");
   await page.getByLabel("Mobile number").fill("12345");
   await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByText("Enter a 10-digit Indian mobile number.")).toBeVisible();
+  await expect(
+    page.getByText("That doesn't look like an Indian mobile number — 10 digits starting 6–9."),
+  ).toBeVisible();
 });
 
 test("login page: axe zero violations, phone field focused on load", async ({ page }) => {

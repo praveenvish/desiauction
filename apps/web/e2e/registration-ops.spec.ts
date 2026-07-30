@@ -21,9 +21,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
+  // PX-3: the name gate now guards every console route, not just /home — a
+  // fresh account that stops here never reaches the org/tournament screens
+  // this helper is used to reach.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 // A valid-CSV of 8 players (distinct 10-digit mobiles).

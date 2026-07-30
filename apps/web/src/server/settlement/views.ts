@@ -463,6 +463,10 @@ export interface SettlementGrantRow {
   readonly name: string | null;
   readonly phone: string;
   readonly capabilitySet: string;
+  /** Who handed this role over — provenance the table has always stored. */
+  readonly grantedByName: string | null;
+  /** When they handed it over (ISO). */
+  readonly grantedAt: string | null;
 }
 
 /**
@@ -481,12 +485,40 @@ export async function settlementGrantsOf(db: Db, orgId: string): Promise<Settlem
       name: people.name,
       phone: people.phone,
       capabilitySet: grants.capabilitySet,
+      grantedBy: grants.grantedBy,
+      grantedAt: grants.createdAt,
     })
     .from(grants)
     .innerJoin(people, eq(people.id, grants.personId))
     .where(and(eq(grants.scopeType, "org"), eq(grants.scopeId, orgId), isNull(grants.revokedAt)));
-  return rows
-    .filter((row) => isSettlementCapabilitySet(row.capabilitySet))
+  const mine = rows.filter((row) => isSettlementCapabilitySet(row.capabilitySet));
+  // Granter names in one extra read rather than a second join onto `people`:
+  // the alias would make drizzle infer the row shape away entirely.
+  const granterIds = [...new Set(mine.map((row) => row.grantedBy).filter((id) => id !== ""))];
+  const granterRows =
+    granterIds.length === 0
+      ? []
+      : await db
+          .select({ id: people.id, name: people.name })
+          .from(people)
+          .where(inArray(people.id, granterIds));
+  const granterNames = new Map(granterRows.map((row) => [row.id, row.name]));
+  const iso = (value: Date | string | null): string | null =>
+    value === null
+      ? null
+      : value instanceof Date
+        ? value.toISOString()
+        : new Date(value).toISOString();
+  return mine
+    .map((row) => ({
+      grantId: row.grantId,
+      personId: row.personId,
+      name: row.name,
+      phone: row.phone,
+      capabilitySet: row.capabilitySet,
+      grantedByName: granterNames.get(row.grantedBy) ?? null,
+      grantedAt: iso(row.grantedAt),
+    }))
     .sort((a, b) => (a.name ?? a.phone).localeCompare(b.name ?? b.phone));
 }
 

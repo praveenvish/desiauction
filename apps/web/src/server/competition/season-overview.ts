@@ -1,5 +1,13 @@
-import { auctions, organizations, registrations, type Db } from "@desiauction/db";
-import { and, eq, sql } from "drizzle-orm";
+import {
+  auctions,
+  fixtures,
+  organizations,
+  registrations,
+  settlementCases,
+  settlementObligations,
+  type Db,
+} from "@desiauction/db";
+import { and, eq, ne, sql } from "drizzle-orm";
 
 import { preSignedPlayers, resolvedLots, rulesOf } from "../auction/live-summary";
 import { teamsOf, type CompetitionSummary } from "./competitions";
@@ -24,11 +32,15 @@ export interface SeasonTeamSpend {
   name: string;
   /** The team's own colour, for the dot and the spend bar. */
   color: string | null;
-  /** Paise committed to signed players. */
-  spend: number;
-  /** Squad filled / squad max, e.g. 12 of 15. */
+  /**
+   * Paise committed to signed players. ABSENT — not null, not hidden in CSS —
+   * for a viewer without money sight (DA-13); the key never reaches the wire.
+   */
+  spend?: number;
+  /** Squad filled. */
   squad: number;
-  squadMax: number | null;
+  /** Squad max; money-adjacent auction configuration, gated with the spend. */
+  squadMax?: number | null;
 }
 
 export interface SeasonRoleCount {
@@ -36,30 +48,70 @@ export interface SeasonRoleCount {
   count: number;
 }
 
+/**
+ * The season's settlement, reduced to the two facts the lifecycle needs — and,
+ * for a viewer allowed to see money, the two figures that actually matter once
+ * a season is over. Folded from the obligation projection rows (the same rows
+ * the money desk folds), never from a stored balance.
+ */
+export interface SeasonSettlement {
+  /** The case's own status: opened | verified | discrepant | settling | settled | closed. */
+  status: string;
+  /** Every rupee owed has been collected, waived or reduced away. */
+  discharged: boolean;
+  /** Money — absent without money sight. */
+  totalDues?: number;
+  collected?: number;
+  outstanding?: number;
+}
+
 export interface SeasonOverview {
   competition: CompetitionSummary;
   orgName: string;
   orgSlug: string;
   approvedPlayers: number;
+  /**
+   * Applications waiting on a human. The overview used to report only the
+   * approved count while offering to CLOSE registration, so a season could be
+   * shut with its inbox full and nothing on the page said so. `registrationStats`
+   * already returned this — the overview simply threw it away.
+   */
+  pendingPlayers: number;
   teamCount: number;
-  /** Paise committed across every team; 0 before the auction runs. */
-  purseCommitted: number;
-  /** 0–100, or null when no auction (and so no purse) is configured. */
-  pursePct: number | null;
+  /** Fixtures scheduled for this season — the fifth lifecycle rung, derived. */
+  fixtureCount: number;
+  /** Paise committed across every team; 0 before the auction runs. Money-gated. */
+  purseCommitted?: number;
+  /** 0–100, or null when no auction (and so no purse) is configured. Money-gated. */
+  pursePct?: number | null;
   lotsSold: number;
   lotsTotal: number;
   auctionLive: boolean;
   /** The auction's own lifecycle — the season's CTA depends on it (DA-10). */
   auctionStatus: string | null;
+  /** The settlement case, or null before one is opened — the sixth rung. */
+  settlement: SeasonSettlement | null;
   topTeams: SeasonTeamSpend[];
   poolByRole: SeasonRoleCount[];
+}
+
+export interface SeasonOverviewOptions {
+  /**
+   * Whether this viewer may see money at all. DA-13: the Money TAB was gated
+   * and `/money` 404s correctly, but the overview's read model computed the
+   * viewer's capabilities and then gated nothing — purse, per-team spend and
+   * squad caps were served to a member with zero grants and merely not
+   * rendered. Gating happens HERE, so the figures never leave the database.
+   */
+  money: boolean;
 }
 
 export async function seasonOverview(
   db: Db,
   competition: CompetitionSummary,
+  options: SeasonOverviewOptions,
 ): Promise<SeasonOverview> {
-  const [org, teams, stats, roleRows, auctionRows] = await Promise.all([
+  const [org, teams, stats, roleRows, auctionRows, fixtureRows, settlement] = await Promise.all([
     db
       .select({ name: organizations.name, slug: organizations.slug })
       .from(organizations)
@@ -79,6 +131,11 @@ export async function seasonOverview(
       .from(auctions)
       .where(eq(auctions.competitionId, competition.id))
       .limit(1),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(fixtures)
+      .where(eq(fixtures.competitionId, competition.id)),
+    seasonSettlement(db, competition.id, options.money),
   ]);
 
   const base = {
@@ -86,7 +143,10 @@ export async function seasonOverview(
     orgName: org[0]?.name ?? "",
     orgSlug: org[0]?.slug ?? "",
     approvedPlayers: stats.approved,
+    pendingPlayers: stats.submitted,
     teamCount: teams.length,
+    fixtureCount: fixtureRows[0]?.count ?? 0,
+    settlement,
     poolByRole: roleRows
       .map((row) => ({ role: row.role, count: row.count }))
       .sort((a, b) => b.count - a.count),
@@ -97,8 +157,7 @@ export async function seasonOverview(
     // No auction yet — the tiles that describe one stay honestly empty.
     return {
       ...base,
-      purseCommitted: 0,
-      pursePct: null,
+      ...(options.money ? { purseCommitted: 0, pursePct: null } : {}),
       lotsSold: 0,
       lotsTotal: 0,
       auctionLive: false,
@@ -107,9 +166,8 @@ export async function seasonOverview(
         teamId: team.id,
         name: team.name,
         color: team.primaryColor,
-        spend: 0,
         squad: 0,
-        squadMax: null,
+        ...(options.money ? { spend: 0, squadMax: null } : {}),
       })),
     };
   }
@@ -149,8 +207,12 @@ export async function seasonOverview(
 
   return {
     ...base,
-    purseCommitted,
-    pursePct: purseTotal > 0 ? Math.round((purseCommitted / purseTotal) * 100) : null,
+    ...(options.money
+      ? {
+          purseCommitted,
+          pursePct: purseTotal > 0 ? Math.round((purseCommitted / purseTotal) * 100) : null,
+        }
+      : {}),
     lotsSold: lots.filter((lot) => lot.status === "sold").length,
     lotsTotal: lots.length,
     auctionLive: auction.status === "live",
@@ -162,11 +224,76 @@ export async function seasonOverview(
           teamId: team.id,
           name: team.name,
           color: team.primaryColor,
-          spend: entry?.spend ?? 0,
           squad: entry?.squad ?? 0,
-          squadMax: rules.squadMax,
+          ...(options.money ? { spend: entry?.spend ?? 0, squadMax: rules.squadMax } : {}),
         };
       })
-      .sort((a, b) => b.spend - a.spend),
+      // Without money sight there is no spend to rank by, so the list is
+      // alphabetical — and the card is titled for what it actually shows.
+      .sort((a, b) =>
+        options.money ? (b.spend ?? 0) - (a.spend ?? 0) : a.name.localeCompare(b.name),
+      ),
+  };
+}
+
+/**
+ * The season's settlement case, folded from the obligation projection.
+ *
+ * Rung 6 of the lifecycle used to test `auctionStatus === "reconciled"` — a
+ * value no auction in the product can ever hold, because the aggregate's
+ * command type structurally excludes the `reconcile` transition. Settlement's
+ * completion has always lived in the settlement case, so that is where the rung
+ * now reads it: discharged means nothing is outstanding on a case that had
+ * something to collect, or the case has been settled/closed outright.
+ */
+async function seasonSettlement(
+  db: Db,
+  competitionId: string,
+  money: boolean,
+): Promise<SeasonSettlement | null> {
+  const [row] = await db
+    .select({ id: settlementCases.id, status: settlementCases.status })
+    .from(settlementCases)
+    .where(
+      and(
+        eq(settlementCases.competitionId, competitionId),
+        // A voided case is not this season's settlement; it never happened.
+        ne(settlementCases.status, "voided"),
+      ),
+    )
+    .limit(1);
+  if (row === undefined) {
+    return null;
+  }
+  const obligations = await db
+    .select({
+      amount: settlementObligations.amount,
+      increased: settlementObligations.increased,
+      reinstated: settlementObligations.reinstated,
+      reduced: settlementObligations.reduced,
+      discharged: settlementObligations.discharged,
+      waived: settlementObligations.waived,
+    })
+    .from(settlementObligations)
+    .where(eq(settlementObligations.caseId, row.id));
+
+  let totalDues = 0;
+  let collected = 0;
+  let outstanding = 0;
+  for (const obligation of obligations) {
+    const owed = obligation.amount + obligation.increased + obligation.reinstated;
+    const settled = obligation.reduced + obligation.discharged + obligation.waived;
+    totalDues += owed;
+    collected += obligation.discharged;
+    outstanding += Math.max(owed - settled, 0);
+  }
+  const discharged =
+    row.status === "settled" ||
+    row.status === "closed" ||
+    (obligations.length > 0 && outstanding === 0);
+  return {
+    status: row.status,
+    discharged,
+    ...(money ? { totalDues, collected, outstanding } : {}),
   };
 }

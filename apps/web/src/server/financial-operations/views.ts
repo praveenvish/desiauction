@@ -30,7 +30,7 @@ import {
   type RunnerHealthSnapshot,
   type WatermarkSnapshot,
 } from "@desiauction/financial-operations/server";
-import { and, eq, gte, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 
 import { DELIVERY_LANES } from "./deliveries";
 
@@ -452,6 +452,10 @@ export interface FinanceGrantRow {
   readonly name: string | null;
   readonly phone: string;
   readonly capabilitySet: string;
+  /** Who handed this role over — provenance the table has always stored. */
+  readonly grantedByName: string | null;
+  /** When they handed it over (ISO). */
+  readonly grantedAt: string | null;
 }
 
 /**
@@ -471,11 +475,46 @@ export async function financeGrantsOf(db: Db, orgId: string): Promise<FinanceGra
       name: people.name,
       phone: people.phone,
       capabilitySet: grants.capabilitySet,
+      grantedBy: grants.grantedBy,
+      grantedAt: grants.createdAt,
     })
     .from(grants)
     .innerJoin(people, eq(people.id, grants.personId))
     .where(and(eq(grants.scopeType, "org"), eq(grants.scopeId, orgId), isNull(grants.revokedAt)));
-  return rows
-    .filter((row) => isFinopsCapabilitySet(row.capabilitySet))
+  const mine = rows.filter((row) => isFinopsCapabilitySet(row.capabilitySet));
+  // Granter names in one extra read rather than a second join onto `people`:
+  // the alias would make drizzle infer the row shape away entirely.
+  const granterNames = await namesOf(
+    db,
+    mine.map((row) => row.grantedBy),
+  );
+  return mine
+    .map((row) => ({
+      grantId: row.grantId,
+      personId: row.personId,
+      name: row.name,
+      phone: row.phone,
+      capabilitySet: row.capabilitySet,
+      grantedByName: granterNames.get(row.grantedBy) ?? null,
+      grantedAt: isoOf(row.grantedAt),
+    }))
     .sort((a, b) => (a.name ?? a.phone).localeCompare(b.name ?? b.phone));
+}
+
+/** id -> display name, for the handful of ids a grant list points at. */
+async function namesOf(db: Db, ids: readonly string[]): Promise<Map<string, string | null>> {
+  const unique = [...new Set(ids.filter((id) => id !== ""))];
+  if (unique.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .select({ id: people.id, name: people.name })
+    .from(people)
+    .where(inArray(people.id, unique));
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+function isoOf(value: Date | string | null): string | null {
+  if (value === null) return null;
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }

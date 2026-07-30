@@ -193,6 +193,20 @@
   max-width: 420px;
 }
 
+/* A rejection that belongs to the whole form rather than to one control — an
+   authorisation refusal has no field to sit under, and used to be printed
+   under "Season name" as if the name were the problem. */
+.create-competition-error {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--danger-subtle);
+  border-left: 3px solid var(--danger-base);
+  border-radius: var(--radius-md);
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+  font-size: var(--text-sm-size);
+}
+
 /* Baseline the row on its controls. The default `stretch` made a Button sitting
    beside a labelled Field grow to the field's full height — label included — so
    the cockpit's "Invite owner" rendered as a tall gold slab floating above its
@@ -478,6 +492,208 @@ p + .date-row {
   margin-top: var(--space-3);
   color: var(--text-muted);
   font-size: var(--text-sm-size);
+}
+
+/* --- DA-35 registrations: honesty, reach and target size ------------------- */
+
+/* SC 2.5.8 AA is 24×24 CSS px. These were the browser default 13×13 — and two
+   of the three triage outcomes were reachable only by hitting one. */
+.reg-check {
+  width: var(--space-6);
+  height: var(--space-6);
+  min-width: var(--space-6);
+  min-height: var(--space-6);
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.reg-select-all {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.reg-caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.stat-hint {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-muted);
+}
+
+.reg-warning {
+  color: var(--text-primary);
+  margin: 0 0 var(--space-3);
+}
+
+.reg-warning-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.reg-reason {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  margin: 0 0 var(--space-3);
+}
+
+.reg-sub-warning {
+  color: var(--text-warning, var(--text-secondary));
+}
+
+.reg-empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  padding: var(--space-6) var(--space-3);
+}
+
+.bulk-offpage {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.selection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.selection-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.selection-list li > span:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--accent-text, var(--text-primary));
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.timeline-actor {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* The table needed 862px of a 268px scroller at 390: Approve's box began at
+   x = 612 in a 390px viewport, and Status, Team, Icon, Captain and Details
+   were all off the right edge with no scrollbar, fade or hint that anything
+   was there. Below the width where seven columns can coexist, each row becomes
+   a card and every cell carries its own label. */
+@media (max-width: 1100px) {
+  .reg-table,
+  .reg-table thead,
+  .reg-table tbody,
+  .reg-table tr,
+  .reg-table th,
+  .reg-table td {
+    display: block;
+  }
+
+  .reg-table thead {
+    /* The header strip is meaningless once each cell labels itself, and it
+       must not be read out a second time. */
+    display: none;
+  }
+
+  .table-scroll {
+    overflow-x: visible;
+  }
+
+  .reg-table tbody tr {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .reg-table td {
+    padding: var(--space-2) 0;
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .reg-table caption {
+    /* A block-level table lays its caption out in the first cell's track, which
+       squeezed it into a four-line column. */
+    display: block;
+    width: 100%;
+  }
+
+  /* The labelled value takes the remaining width and wraps inside it, rather
+     than pushing itself off the card's right edge. */
+  .reg-table td > *:not(::before) {
+    min-width: 0;
+  }
+
+  .reg-table td::before {
+    content: attr(data-label);
+    flex: 0 1 auto;
+    max-width: 40%;
+    color: var(--text-muted);
+    font-size: var(--text-xs-size);
+    line-height: var(--text-xs-line);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding-top: var(--space-1);
+  }
+
+  /* A single-cell row (the empty state) is a message, not a field. */
+  .reg-table td.reg-empty {
+    display: block;
+  }
+
+  .reg-table td.reg-empty::before {
+    content: none;
+  }
+
+  .reg-table .reg-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: var(--space-2);
+    padding-top: var(--space-3);
+  }
+
+  .reg-table .reg-actions::before {
+    flex-basis: 100%;
+  }
+
+  .reg-identity {
+    flex-wrap: wrap;
+  }
 }
 
 .timeline {
@@ -792,7 +1008,9 @@ p + .date-row {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* `min(320px, 100%)`: a bare 320px floor is wider than a 320px viewport once
+     the card's own padding is spent, and the page scrolls sideways. */
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: var(--space-2) var(--space-5);
 }
 
@@ -865,10 +1083,18 @@ p + .date-row {
   min-height: 36px;
 }
 
+/* These six links are the page's only actions and they were 16px tall — under
+   the 24x24 of SC 2.5.8. The box is grown around the text rather than the text
+   scaled up, so the row's rhythm is unchanged. */
 .readiness-row a {
   margin-left: auto;
   color: var(--text-accent);
   font-size: var(--text-sm-size);
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  min-width: 24px;
+  padding-block: var(--space-1);
 }
 
 .readiness-actions {
@@ -1074,6 +1300,15 @@ p + .date-row {
   gap: var(--space-4);
 }
 
+/* The one-line reading of the rail. It is the whole rail on a phone, where six
+   pills wrapped into four ragged rows with arrows dangling at the row starts. */
+.season-stepper-summary {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
 .season-stepper {
   display: flex;
   flex-wrap: wrap;
@@ -1094,12 +1329,10 @@ p + .date-row {
   color: var(--text-secondary);
 }
 
-/* The rail between steps: an arrow, drawn rather than typed. */
-.season-step + .season-step::before {
-  content: "→";
-  margin-inline-end: var(--space-2);
-  color: var(--text-muted);
-}
+/* The arrows are gone on purpose. Six independent gates joined by "→" claimed a
+   sequence the data does not keep — it was perfectly possible to read
+   "2 Registration (now) → ✓ Teams". The rail is a checklist of gates in
+   lifecycle order; the summary line above it carries the position. */
 
 .season-step-mark {
   display: inline-flex;
@@ -1133,9 +1366,25 @@ p + .date-row {
 
 .season-stepper-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   font-size: var(--text-sm-size);
+}
+
+/* The rail is the phone's worst case: hide it there and let the summary line
+   and the actions speak. Everything the rail says is in the summary. */
+@media (max-width: 520px) {
+  .season-stepper {
+    display: none;
+  }
+}
+
+@media (min-width: 521px) {
+  .season-stepper-summary {
+    /* Above the rail, the rail itself is the reading. */
+    display: none;
+  }
 }
 
 /* --- The four figures ----------------------------------------------------- */
@@ -1154,6 +1403,20 @@ p + .date-row {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
+}
+
+/* The pending-registrations tile is the one tile that is also a destination. */
+.season-tile-link {
+  text-decoration: none;
+  border-color: var(--border-interactive);
+}
+
+.season-tile-link:hover {
+  background: var(--surface-sunken);
+}
+
+.season-tile-warn {
+  color: var(--warning-strong);
 }
 
 .season-tile-value {
@@ -1179,16 +1442,19 @@ p + .date-row {
 
 /* --- The two summary cards ------------------------------------------------ */
 
+/* The 320px track floor was wider than the content box at a 320px viewport
+   (240px), so every card overhung the page by 40px and the whole document
+   scrolled sideways. `min()` lets the track collapse to the column instead. */
 .season-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: var(--space-3);
   align-items: start;
 }
 
 .season-card-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
@@ -1196,6 +1462,25 @@ p + .date-row {
 .season-card-head h2 {
   margin: 0;
   font-size: var(--text-lg-size);
+}
+
+/* "All teams →" measured 71x16 — under SC 2.5.8's 24x24 floor on height, the
+   smallest target on the page. Every inline link that acts as a control on this
+   screen now carries the house 44px instead. */
+.season-inline-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.season-inline-link:hover {
+  text-decoration: underline;
 }
 
 .season-card-head a {
@@ -1284,25 +1569,128 @@ p + .date-row {
   background: var(--accent);
 }
 
-.season-public-row {
+/* --- Public page block ---------------------------------------------------- */
+
+/* Publishing used to ride in the footer of the pool card. It is a statement
+   about the whole season — and about the public internet — so it gets a block. */
+.season-publish-card {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.season-publish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.season-blockers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.season-blocker {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-subtle);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+  color: var(--text-primary);
   font-size: var(--text-sm-size);
 }
 
-.season-public-label {
+.season-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-md-size);
+}
+
+.season-confirm p {
+  margin: 0;
+}
+
+.season-confirm ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-inline-start: var(--space-5);
   color: var(--text-secondary);
 }
 
-.season-public-state {
+.season-settings-form {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* --- Guard, empty states, retrospective ----------------------------------- */
+
+/* A refusal that carries its own repair (the "Add dates" control sits in it). */
+.season-guard {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+}
+
+.season-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.season-retro {
+  display: flex;
+  flex: 1 1 420px;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.season-retro-line {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-md-size);
+}
+
+.season-retro-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.season-retro-figures dt {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.season-retro-figures dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xl-size);
+  color: var(--text-primary);
 }
 
 /* Registrations toolbar: export + the import trigger, aligned right above the
@@ -1715,9 +2103,93 @@ p + .date-row {
 /* --- Auction tab: operational dashboard -------------------------------------
  * Progress, the block, per-paddle burndown, the queue and the event-log tail. */
 
+/* The header pill states the auction's ACTUAL status. It used to be the live
+   pill unconditionally, on completed and scheduled auctions alike. */
 .auc-title-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-inline-start: var(--space-3);
   vertical-align: middle;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.auc-title-pill.is-live {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.auc-title-pill.is-live::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.auc-title-pill.is-scheduled {
+  background: var(--info-subtle);
+  color: var(--info-strong);
+}
+
+.auc-title-pill.is-paused {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+}
+
+.auc-title-pill.is-abandoned {
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+}
+
+/* The feasibility arithmetic: pool against teams x squadMin, said plainly on
+   the screen where the squad minimum is chosen. */
+.auction-feasibility {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.auction-feasibility.is-short {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+}
+
+.auction-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+  min-height: 24px;
+}
+
+.auction-ack input {
+  width: 20px;
+  height: 20px;
+  margin-block-start: var(--space-05);
+  accent-color: var(--accent);
+  flex: none;
+}
+
+/* Inline links inside a sentence: padding grows the hit box past 24px without
+   disturbing the line it sits in. */
+.auction-inline-link {
+  color: var(--text-accent);
+  text-decoration: underline;
+  padding-block: var(--space-1);
 }
 
 .auc-progress {
@@ -1794,7 +2266,9 @@ p + .date-row {
 
 .auc-split {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* Same hard floor, third occurrence in this stylesheet: 320px against a
+     320px viewport minus padding is 40px of horizontal overflow. */
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: var(--space-3);
   align-items: start;
 }
@@ -1926,4 +2400,94 @@ p + .date-row {
 .auc-log-at {
   font-family: var(--font-mono);
   color: var(--text-muted);
+}
+
+/* --- Teams tab: DA-30..DA-43 -------------------------------------------- */
+
+/* Where the purse and squad rules came from, and whether they are still open. */
+.teams-provenance {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.teams-provenance a {
+  color: var(--text-accent);
+}
+
+/* Season state said as season state — never as a validation error on an input. */
+.teams-notice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.teams-notice a {
+  color: var(--text-accent);
+}
+
+/* The organizer's own short name, kept visible now that the mark is initials. */
+.team-card-short {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-regular);
+}
+
+/* SC 2.5.8: the card IS the target. The link keeps its own accessible name and
+   focus ring; its ::after covers the card, so the pointer target is the whole
+   card rather than a 100x16 strip of text. */
+.team-card {
+  position: relative;
+}
+
+.team-card:has(.team-card-cover:hover) {
+  border-color: var(--border-strong);
+}
+
+.team-card-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+/* Anything the pointer must reach on its own has to sit above that cover. */
+.team-card-cover:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.teams-settings-forms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.teams-form-label {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.teams-invite-url {
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  overflow-wrap: anywhere;
 }

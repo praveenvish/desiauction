@@ -74,6 +74,25 @@
   color: var(--text-heading);
 }
 
+/* When the mark leads somewhere it has to look and behave like a control:
+   undecorated at rest, a 44px target, and focusable to the same ring as the
+   exit door. */
+.live-brand-link {
+  text-decoration: none;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.live-brand-link:hover {
+  background: var(--surface-sunken);
+}
+
+.live-brand-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .live-brand-mark {
   display: block;
   width: 26px;

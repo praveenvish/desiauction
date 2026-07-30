@@ -251,15 +251,19 @@ export async function financeAuthority(orgSlug: string): Promise<FinanceAuthorit
     return null;
   }
   return withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => {
-    const [granted, members, canIssue, canView] = await Promise.all([
+    const [granted, canIssue, canView] = await Promise.all([
       financeGrantsOf(db, org.id),
-      membersOf(db, org.id),
       can(db, session.personId, { scopeType: "org", scopeId: org.id }, "grant.issue"),
       canFinops(db, session.personId, org.id, "finops.view"),
     ]);
+    // Same rule as the settlement panel: the member list is the directory, and
+    // it exists only to fill the Grant control.
+    const members = canIssue ? await membersOf(db, org.id) : [];
     return {
       org,
-      grants: granted,
+      // Same redaction as the settlement panel: the holder's name, not their
+      // number, unless the reader can actually hand the role out.
+      grants: granted.map((grant) => (canIssue ? grant : { ...grant, phone: "" })),
       members: members.map((member) => ({
         personId: member.personId,
         name: member.name,

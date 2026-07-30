@@ -63,7 +63,7 @@ export function AboutBanner({
         {canManage ? (
           <Button
             variant="secondary"
-            size="sm"
+            size="touch"
             onClick={() => {
               setDraft(description ?? "");
               setOpen(true);

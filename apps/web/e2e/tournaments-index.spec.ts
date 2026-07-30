@@ -27,9 +27,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
+  // PX-3: the name gate now guards every console route, not just /home — a
+  // fresh account that stops here never reaches the org/tournament screens
+  // this helper is used to reach.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 /** Slugs carry a random suffix, so group test ids can only come from the URL. */
@@ -185,6 +193,40 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
 
   await toggle.click();
   await expect(alphaGroup.getByTestId("tg-season")).toBeHidden();
+
+  // --- the two views ------------------------------------------------------
+  // /seasons used to be a second index over these same rows. It is a view now,
+  // and the view is in the URL so the flat list can still be linked to.
+  await page.getByTestId("tg-mode-seasons").click();
+  await expect(page).toHaveURL(/\?view=seasons$/);
+  await expect(page.getByTestId("tg-mode-seasons")).toHaveAttribute("aria-pressed", "true");
+  // The band follows the view — a union of the two would describe neither.
+  await expect(page.getByRole("list", { name: "Season summary" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Tournament summary" })).toHaveCount(0);
+  // Flat: the accordion is gone, the seasons are cards, and the layout pair
+  // goes with it (this view IS the grid, so it has only one state to offer).
+  await expect(page.getByTestId(`tg-${alpha}`)).toHaveCount(0);
+  await expect(page.getByTestId("tg-view-grid")).toHaveCount(0);
+  await expect(page.getByTestId("competitions-list")).toContainText(`Alpha One ${STAMP}`);
+
+  // The flat view inherits the toolbar the old /seasons index never had.
+  await page.getByTestId("tg-search").fill("nothing-matches-this");
+  await expect(page.getByTestId("tg-noresults")).toBeVisible();
+  await page.getByTestId("tg-search").fill("");
+
+  await page.getByTestId("tg-mode-grouped").click();
+  await expect(page).toHaveURL(/\/tournaments$/);
+  await expect(page.getByTestId(`tg-${alpha}`)).toBeVisible();
+
+  // Every inbound /seasons link and bookmark lands on that flat view.
+  await page.goto("/seasons");
+  await expect(page).toHaveURL(/\/tournaments\?view=seasons$/);
+  await expect(page.getByTestId("tg-mode-seasons")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("competitions-list")).toContainText(`Alpha One ${STAMP}`);
+
+  // The season WORKSPACE did not move.
+  await page.getByRole("link", { name: new RegExp(`Alpha One ${STAMP}`) }).click();
+  await expect(page).toHaveURL(/\/seasons\/[^/?#]+$/, COLD);
 });
 
 test("tournaments index: axe zero violations", async ({ page }) => {

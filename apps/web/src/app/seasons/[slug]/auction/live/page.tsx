@@ -16,30 +16,35 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
   }
   return (
     <ToastProvider>
-      <main className="registrations-dash">
+      {/* THE FOLD IS THE BUDGET. Measured at 390×844 with a lot on the block,
+          463 of 844 pixels went by before the player's name appeared and the
+          raise button — the primary action of the entire product — rendered 31px
+          BELOW the fold on the device the product was designed for.
+
+          What used to fill that space: an <h1> repeating the competition name
+          (already in the browser tab and one tap away in the nav), a tab pair to
+          two OTHER pages, and the sentence "Live auction — every window
+          converges to the same server snapshot", which is a note to the
+          engineers who built the socket occupying the most valuable pixels the
+          product owns. The links now sit at the FOOT of the page: leaving is not
+          what a bidder came here to do. */}
+      <main className="registrations-dash live-page">
         <div className="dash-stack">
-          <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>{view.competition.name}</h1>
-              <span className="date-row">
-                {view.viewer.canConduct ? (
-                  <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="open-cockpit">
-                    Cockpit
-                  </ButtonLink>
-                ) : null}
-                <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="ghost">
-                  Spectate
-                </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-                  Auction setup
-                </ButtonLink>
-              </span>
-            </div>
-            <p className="competitions-hint">
-              Live auction — every window converges to the same server snapshot
-            </p>
-          </header>
+          <h1 className="auction-sr-only">{view.competition.name} — live auction</h1>
           <LivePanel slug={slug} view={view} />
+          <nav className="live-exits" aria-label="Other auction views">
+            {view.viewer.canConduct ? (
+              <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="open-cockpit">
+                Cockpit
+              </ButtonLink>
+            ) : null}
+            <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="ghost">
+              Spectate
+            </ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
+              Auction setup
+            </ButtonLink>
+          </nav>
         </div>
       </main>
     </ToastProvider>

@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
  * via clipboard + the native share sheet (mobile). No new deps; QR is a separate
  * dependency decision.
  */
-export function ShareRegistration({ slug }: { slug: string }) {
+export function ShareRegistration({ slug, open }: { slug: string; open: boolean }) {
   const toast = useToast();
   const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -41,6 +41,23 @@ export function ShareRegistration({ slug }: { slug: string }) {
       return;
     }
     await copy();
+  }
+
+  // DA-35: the block kept offering a live Copy/Share for a link that lands
+  // every player it recruits on "Registration is not open right now". Closure
+  // is a fact the recruiting control has to know.
+  if (!open) {
+    return (
+      <div className="share-reg" data-testid="share-registration">
+        <p className="share-reg-label" data-testid="share-closed">
+          Registration is closed — the link no longer takes new players
+        </p>
+        <p className="dash-hint">
+          Anyone opening it now is told intake has closed. Reopen registration on the season
+          Overview to start recruiting again; you can still add players yourself or import a CSV.
+        </p>
+      </div>
+    );
   }
 
   return (

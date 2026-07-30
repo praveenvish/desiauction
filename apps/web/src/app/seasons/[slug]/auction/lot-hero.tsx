@@ -58,6 +58,7 @@ export function LotHero({
   remainingMs,
   lotDurationMs,
   leadColor,
+  frozen = false,
   testId = "current-lot",
 }: {
   lot: NonNullable<AuctionSnapshot["currentLot"]>;
@@ -65,6 +66,13 @@ export function LotHero({
   lotDurationMs: number;
   /** The leading franchise's identity colour, when it has one. */
   leadColor: string | null;
+  /**
+   * The auction is paused (or otherwise not taking bids). The hero used to
+   * read "ON THE BLOCK" in gold over a giant em dash where the countdown
+   * should be, while the raise button stayed live — the room inviting a bid it
+   * would then refuse with the wrong reason.
+   */
+  frozen?: boolean;
   /**
    * `current-lot` is the long-standing handle for "the lot on the block", kept
    * as the default so the live-auction suites keep pointing at the thing they
@@ -76,17 +84,25 @@ export function LotHero({
 }) {
   const bid = lot.currentBid;
   return (
-    <section className="lot-hero" data-testid={testId}>
+    <section className="lot-hero" data-testid={testId} data-frozen={frozen ? "true" : undefined}>
       <div className="lot-hero-top">
         <div className="lot-hero-id">
-          <p className="lot-hero-kicker">{lot.lotNumber} · on the block</p>
+          <p className="lot-hero-kicker">
+            {lot.lotNumber} · {frozen ? "clock stopped" : "on the block"}
+          </p>
           <h2 className="lot-hero-name">{lot.playerName ?? "Unnamed"}</h2>
           <p className="lot-hero-meta">
             <span className="lot-hero-role">{lot.role.replace(/_/g, " ")}</span>
             <span>Base {formatPaiseINR(paise(lot.basePrice))}</span>
           </p>
         </div>
-        <CountdownRing remainingMs={remainingMs} totalMs={lotDurationMs} />
+        {frozen ? (
+          <p className="lot-hero-paused" data-testid="lot-paused">
+            The clock is stopped. Bidding resumes when the auctioneer restarts it.
+          </p>
+        ) : (
+          <CountdownRing remainingMs={remainingMs} totalMs={lotDurationMs} />
+        )}
       </div>
 
       <div className="lot-hero-money">

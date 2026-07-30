@@ -10,10 +10,15 @@ import {
   createAuctionAction,
   issuePaddleAction,
   queueAllLotsAction,
+  releasePaddleAction,
   verifyReplayAction,
   type AuctionDashboard,
   type ReplayVerifyReport,
 } from "../../../../server/auction/actions";
+import {
+  squadFeasibility,
+  type AuctionSetupFieldErrors,
+} from "../../../../server/auction/auction-setup";
 import { formatTime } from "../../../../lib/format-date";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 
@@ -54,14 +59,6 @@ const AUCTION_NEXT: Partial<Record<string, { command: string; label: string }[]>
   ],
 };
 
-/** Omit the field entirely when it is blank or nonsense, so the server default wins. */
-function numberOf<K extends string>(raw: string, key: K): Partial<Record<K, number>> {
-  const value = Number(raw);
-  return raw.trim() !== "" && Number.isFinite(value) && value > 0
-    ? ({ [key]: value } as Record<K, number>)
-    : {};
-}
-
 export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: AuctionDashboard }) {
   const router = useRouter();
   const toast = useToast();
@@ -81,11 +78,26 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
   const [paddleTeam, setPaddleTeam] = useState("");
   const [report, setReport] = useState<ReplayVerifyReport | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  // The config locks at creation, so a refusal has to say which field is wrong
+  // rather than quietly substituting a value the organizer never chose.
+  const [fieldErrors, setFieldErrors] = useState<AuctionSetupFieldErrors>({});
+  const [acceptShortSquads, setAcceptShortSquads] = useState(false);
+  const [acceptShortOpen, setAcceptShortOpen] = useState(false);
   useEffect(() => {
     setHydrated(true);
   }, []);
 
   const { ready, view, viewer } = dashboard;
+
+  // The same sum the server will do, run against whatever is typed right now.
+  const unplacedPool = ready.pool.filter((entry) => entry.teamId === null).length;
+  const typedFeasibility = squadFeasibility({
+    poolSize: unplacedPool,
+    squadSizes: ready.squadSizes,
+    squadMin: /^\d+$/.test(squadMin.trim()) ? Number(squadMin) : dashboard.feasibility.squadMin,
+    squadMax: /^\d+$/.test(squadMax.trim()) ? Number(squadMax) : dashboard.feasibility.squadMax,
+  });
+  const liveFeasibility = view === null ? typedFeasibility : dashboard.feasibility;
 
   const act = async (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
     setBusy(true);
@@ -135,10 +147,20 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
               <span className="registration-phone">{check.detail}</span>
             </li>
           ))}
+          {/* Not one of the gates: a shortfall does not stop an auction being
+              created, it stops one being CLOSED. It is stated here because
+              this is where an organizer decides the squad minimum. */}
+          <li data-testid="check-squads_fillable">
+            <Badge tone={liveFeasibility.ok ? "success" : "warning"}>
+              {liveFeasibility.ok ? "fits" : "short"}
+            </Badge>
+            <span>Pool against squads</span>
+            <span className="registration-phone">{liveFeasibility.headline}</span>
+          </li>
           <li>
             <Badge tone="neutral">info</Badge>
             <span>
-              Pool {ready.pool.length} · Teams {ready.teams.length} · Fixtures{" "}
+              Auction pool {ready.pool.length} · Teams {ready.teams.length} · Fixtures{" "}
               {ready.scheduledFixtures} · Code {ready.competitionCode}
             </span>
           </li>
@@ -151,7 +173,8 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 same defaults, so an organiser who does not care still clicks
                 one button. */}
             <p className="competitions-hint">
-              Rules of the night — these lock when the auction is created.
+              Rules of the night — these lock when the auction is created. Nothing here is guessed
+              for you: a value that isn&apos;t a whole number is refused, not replaced.
             </p>
             <div className="date-row">
               <Field
@@ -159,6 +182,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="pursePerTeam"
                 inputMode="numeric"
                 value={purse}
+                error={fieldErrors["pursePerTeam"]}
                 onChange={(event) => {
                   setPurse(event.target.value);
                 }}
@@ -168,6 +192,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="squadMin"
                 inputMode="numeric"
                 value={squadMin}
+                error={fieldErrors["squadMin"]}
                 onChange={(event) => {
                   setSquadMin(event.target.value);
                 }}
@@ -177,6 +202,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="squadMax"
                 inputMode="numeric"
                 value={squadMax}
+                error={fieldErrors["squadMax"]}
                 onChange={(event) => {
                   setSquadMax(event.target.value);
                 }}
@@ -188,6 +214,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="timerSeconds"
                 inputMode="numeric"
                 value={timer}
+                error={fieldErrors["timerSeconds"]}
                 onChange={(event) => {
                   setTimer(event.target.value);
                 }}
@@ -197,6 +224,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="extensionSeconds"
                 inputMode="numeric"
                 value={extension}
+                error={fieldErrors["extensionSeconds"]}
                 onChange={(event) => {
                   setExtension(event.target.value);
                 }}
@@ -206,6 +234,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="basePriceDefault"
                 inputMode="numeric"
                 value={baseDefault}
+                error={fieldErrors["basePriceDefault"]}
                 onChange={(event) => {
                   setBaseDefault(event.target.value);
                 }}
@@ -219,31 +248,56 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                   name={`band${label}`}
                   inputMode="numeric"
                   value={bands[label]}
+                  error={fieldErrors[`band${label}`]}
+                  help="Clear the field to drop this band."
                   onChange={(event) => {
                     setBands({ ...bands, [label]: event.target.value });
                   }}
                 />
               ))}
             </div>
+            {/* The arithmetic, before the room exists. */}
+            <p
+              className={typedFeasibility.ok ? "competitions-hint" : "auction-feasibility is-short"}
+              data-testid="feasibility-preview"
+            >
+              {typedFeasibility.headline}
+              {typedFeasibility.note !== null ? ` ${typedFeasibility.note}` : ""}
+            </p>
+            {!typedFeasibility.ok ? (
+              <label className="auction-ack">
+                <input
+                  type="checkbox"
+                  checked={acceptShortSquads}
+                  data-testid="accept-short-squads"
+                  onChange={(event) => {
+                    setAcceptShortSquads(event.target.checked);
+                  }}
+                />
+                <span>
+                  Create anyway — I accept that {typedFeasibility.shortfall} squad place
+                  {typedFeasibility.shortfall === 1 ? "" : "s"} cannot be filled, and that closing
+                  short needs the conductor&apos;s override on the cockpit.
+                </span>
+              </label>
+            ) : null}
             <Button
+              size="touch"
               onClick={() =>
-                void act(
-                  () =>
-                    createAuctionAction(slug, {
-                      ...numberOf(purse, "pursePerTeamRupees"),
-                      ...numberOf(squadMin, "squadMin"),
-                      ...numberOf(squadMax, "squadMax"),
-                      ...numberOf(timer, "timerSeconds"),
-                      ...numberOf(extension, "extensionSeconds"),
-                      ...numberOf(baseDefault, "basePriceDefaultRupees"),
-                      bands: Object.fromEntries(
-                        Object.entries(bands)
-                          .map(([label, value]) => [label, Number(value)] as const)
-                          .filter(([, value]) => Number.isFinite(value) && value > 0),
-                      ),
-                    }),
-                  "Auction created",
-                )
+                void act(async () => {
+                  const result = await createAuctionAction(slug, {
+                    pursePerTeam: purse,
+                    squadMin,
+                    squadMax,
+                    timerSeconds: timer,
+                    extensionSeconds: extension,
+                    basePriceDefault: baseDefault,
+                    bands,
+                    acceptShortSquads,
+                  });
+                  setFieldErrors(result.fieldErrors ?? {});
+                  return result;
+                }, "Auction created")
               }
               loading={busy}
               disabled={!ready.ok}
@@ -265,18 +319,38 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
               </Badge>
             </div>
             <p className="competitions-hint">
-              Purse {formatPaiseINR(paise(view.auction.config.pursePerTeam))} · squad{" "}
-              {view.auction.config.squadMin}–{view.auction.config.squadMax} · timer{" "}
+              {/* DA-30: purse is money sight. Absent from the payload, not
+                  dimmed in the markup, for anyone without it. */}
+              {view.auction.config.pursePerTeam !== undefined
+                ? `Purse ${formatPaiseINR(paise(view.auction.config.pursePerTeam))} · `
+                : ""}
+              squad {view.auction.config.squadMin}–{view.auction.config.squadMax} · timer{" "}
               {view.auction.config.timer.initialSeconds}s +{" "}
               {view.auction.config.timer.extensionSeconds}s anti-snipe · config locked at creation
             </p>
+            {/* The shortfall follows the auction all the way to its close —
+                stated here every time the page is opened, not discovered at
+                11pm behind a refusal. */}
+            {!liveFeasibility.ok ? (
+              <p className="auction-feasibility is-short" data-testid="feasibility-banner">
+                {liveFeasibility.headline} Closing this auction will need the conductor&apos;s
+                override on the cockpit (Close auction → “Close short — on the record”).
+              </p>
+            ) : null}
             {viewer.canConduct ? (
               <div className="date-row">
                 {(AUCTION_NEXT[view.auction.status] ?? []).map((step) => (
                   <Button
                     key={step.command}
+                    size="touch"
                     onClick={() =>
-                      void act(() => auctionLifecycleAction(slug, step.command), step.label)
+                      void act(
+                        () =>
+                          auctionLifecycleAction(slug, step.command, undefined, {
+                            acceptShortSquads: acceptShortOpen,
+                          }),
+                        step.label,
+                      )
                     }
                     loading={busy}
                     data-testid={`auction-${step.command}`}
@@ -289,6 +363,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 view.auction.status !== "abandoned" ? (
                   <Button
                     variant="ghost"
+                    size="touch"
                     onClick={() =>
                       void act(
                         () => auctionLifecycleAction(slug, "abort", "conductor abort"),
@@ -303,25 +378,87 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 ) : null}
               </div>
             ) : null}
+            {viewer.canConduct && view.auction.status === "scheduled" && !liveFeasibility.ok ? (
+              <label className="auction-ack">
+                <input
+                  type="checkbox"
+                  checked={acceptShortOpen}
+                  data-testid="accept-short-open"
+                  onChange={(event) => {
+                    setAcceptShortOpen(event.target.checked);
+                  }}
+                />
+                <span>
+                  Open anyway — {liveFeasibility.shortfall} squad place
+                  {liveFeasibility.shortfall === 1 ? "" : "s"} cannot be filled from this pool.
+                </span>
+              </label>
+            ) : null}
           </Card>
 
           <Card data-testid="paddles-panel">
             <h2>Paddles</h2>
-            <p className="competitions-hint">One paddle per team — issued once, never reused.</p>
+            {/* THE PADDLE TRAP, stated before auction night instead of
+                discovered in the hall: "Issue paddle" hands the paddle to
+                WHOEVER CLICKS IT, one browser can hold one paddle, and opening
+                needs two teams able to bid. An organizer who clicks twice ends
+                up holding both paddles and cannot run the room. */}
+            <p className="competitions-hint">
+              One paddle per team. Issuing gives the paddle to <strong>you</strong> — the person
+              clicking — so bidding needs each team&apos;s owner on their own device. Invite team
+              owners from the{" "}
+              <a href={`/seasons/${slug}/teams`} className="auction-inline-link">
+                Teams tab
+              </a>{" "}
+              (or the{" "}
+              <a href={`/seasons/${slug}/auction/cockpit`} className="auction-inline-link">
+                cockpit
+              </a>
+              ), and they claim their own paddle. Release hands one back.
+            </p>
             {view.paddles.length === 0 ? (
               <p className="competitions-hint">No paddles issued yet.</p>
             ) : (
               <ul className="conflict-list">
-                {view.paddles.map((paddle) => (
-                  <li key={paddle.id} data-testid={`paddle-${paddle.paddleNumber}`}>
-                    <Badge tone="info">{paddle.paddleNumber}</Badge>
-                    <span className="registration-name">{paddle.teamName}</span>
-                    <span className="registration-phone">
-                      {paddle.holderName ?? "—"} · committed{" "}
-                      {formatPaiseINR(paise(paddle.committed))} · squad {paddle.squadSize}
-                    </span>
-                  </li>
-                ))}
+                {view.paddles.map((paddle) => {
+                  // The overview lists ACTIVE paddles only (released ones are
+                  // filtered at the read), which is how a released paddle is
+                  // told apart from a live one here.
+                  const active =
+                    dashboard.overview === null ||
+                    dashboard.overview.paddles.some(
+                      (row) => row.paddleNumber === paddle.paddleNumber,
+                    );
+                  return (
+                    <li key={paddle.id} data-testid={`paddle-${paddle.paddleNumber}`}>
+                      <Badge tone={active ? "info" : "neutral"}>{paddle.paddleNumber}</Badge>
+                      <span className="registration-name">{paddle.teamName}</span>
+                      <span className="registration-phone">
+                        {active ? (paddle.holderName ?? "—") : "released"}
+                        {paddle.committed !== undefined
+                          ? ` · committed ${formatPaiseINR(paise(paddle.committed))}`
+                          : ""}{" "}
+                        · squad {paddle.squadSize}
+                      </span>
+                      {viewer.canConduct && active ? (
+                        <Button
+                          variant="ghost"
+                          size="touch"
+                          onClick={() =>
+                            void act(
+                              () => releasePaddleAction(slug, paddle.teamId),
+                              "Paddle released",
+                            )
+                          }
+                          loading={busy}
+                          data-testid={`release-paddle-${paddle.paddleNumber}`}
+                        >
+                          Release
+                        </Button>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {viewer.canConduct ? (
@@ -342,6 +479,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                   ))}
                 </Select>
                 <Button
+                  size="touch"
                   onClick={() =>
                     void act(() => issuePaddleAction(slug, paddleTeam), "Paddle issued")
                   }
@@ -366,6 +504,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
               <div className="date-row">
                 <Button
                   variant="secondary"
+                  size="touch"
                   onClick={() => void act(() => queueAllLotsAction(slug), "Lots queued")}
                   loading={busy}
                   data-testid="queue-all"
@@ -427,6 +566,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             {viewer.canConduct ? (
               <Button
                 variant="secondary"
+                size="touch"
                 onClick={() => void verify()}
                 loading={busy}
                 data-testid="verify-replay"

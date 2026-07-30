@@ -1,9 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-// PX-3 Authentication & Onboarding — adversarial suite. Covers the founder
-// journey plus the unhappy paths: cooldowns, lockout, refresh-survival,
-// hijack-free token flows, session persistence, telemetry, a11y, mobile.
+// PX-3 Authentication & Onboarding — adversarial suite, updated for the
+// 2026-07-24 council collapse: onboarding is ONE question (the name), the org
+// wizard is gone (organizations are born on /orgs, where the work is), and
+// /login + /onboarding render bare — no marketing chrome around the
+// checkpoint. Unhappy paths (cooldowns, lockout, hijack-free tokens, session
+// persistence, telemetry, a11y, mobile) all still covered.
 
 const STAMP = String(Date.now()).slice(-8);
 
@@ -26,20 +29,32 @@ async function readCode(page: Page, phone: string): Promise<string> {
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   await requestCode(page, phone);
-  await page.getByLabel(`Code sent to +91${phone}`).fill(await readCode(page, phone));
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
 }
 
-test("founder journey: OTP → name → create org → personalized home; every step survives refresh", async ({
+async function createOrg(page: Page, name: string): Promise<void> {
+  await page.goto("/orgs");
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(name);
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page.getByTestId("org-name")).toHaveText(name);
+}
+
+test("founder journey: OTP → one question → home; orgs are born on /orgs, not at the gate", async ({
   page,
 }) => {
   const phone = `70${STAMP}`;
   await otpLogin(page, phone);
 
-  // A nameless account is onboarded before the console greets it.
+  // A nameless account is onboarded before the console greets it — with the
+  // ONE question the product genuinely needs, and nothing else.
   await expect(page).toHaveURL(/\/onboarding/);
   await expect(page.getByTestId("onboarding-name")).toBeVisible();
-  await expect(page.locator(".onboarding-step-current")).toContainText("Your name");
+
+  // The old wizard furniture is gone: no progress bar, no org step, no skip.
+  await expect(page.locator(".onboarding-step-current")).toHaveCount(0);
+  await expect(page.getByTestId("onboarding-skip")).toHaveCount(0);
 
   // Refresh mid-step: the step is server-derived, not wizard state.
   await page.reload();
@@ -47,26 +62,20 @@ test("founder journey: OTP → name → create org → personalized home; every 
 
   await page.getByLabel("What should we call you?").fill("Asha Rao");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByTestId("onboarding-org")).toBeVisible();
-  await expect(page.locator(".onboarding-step-current")).toContainText("Your organization");
+
+  // Straight home — greeted by name. No org toll at the entrance.
+  await expect(page).toHaveURL(/\/home/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Asha Rao");
 
-  // Refresh mid-step again: still the org step (name persisted server-side).
-  await page.reload();
-  await expect(page.getByTestId("onboarding-org")).toBeVisible();
-
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Asha CC ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
-  await expect(page.getByTestId("org-name")).toHaveText(`Asha CC ${STAMP}`);
-
-  // Home greets by name; onboarding revisit confirms completion.
-  await page.goto("/home");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Asha Rao");
+  // A named account revisiting /onboarding is simply sent home.
   await page.goto("/onboarding");
-  await expect(page.getByTestId("onboarding-done")).toBeVisible();
+  await expect(page).toHaveURL(/\/home/);
+
+  // Organizations are created where the work is.
+  await createOrg(page, `Asha CC ${STAMP}`);
 });
 
-test("skip path: player-shaped users reach home; completion meter and notifications tell the truth", async ({
+test("player-shaped users reach home directly; completion meter and notifications tell the truth", async ({
   page,
 }) => {
   const phone = `71${STAMP}`;
@@ -74,7 +83,6 @@ test("skip path: player-shaped users reach home; completion meter and notificati
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Vikram Iyer");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByTestId("onboarding-skip").click();
   await expect(page).toHaveURL(/\/home/);
   await expect(page.getByText("Welcome to DesiAuction")).toBeVisible();
 
@@ -116,23 +124,93 @@ test("resend is timed, cooldown is enforced by the server, and the number can be
   await expect(page.getByText(/Code already sent — wait 30 seconds/)).toBeVisible();
 });
 
-test("lockout: five wrong codes burn the OTP — even the correct code is then refused", async ({
+test("lockout: five wrong codes burn the OTP, and the screen says so instead of blaming the typist", async ({
   page,
 }) => {
   const phone = `73${STAMP}`;
   await requestCode(page, phone);
   const realCode = await readCode(page, phone);
 
-  for (let i = 0; i < 5; i += 1) {
-    await page.getByLabel(`Code sent to +91${phone}`).fill("000000");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(page.getByText("That code didn't work. Try again.")).toBeVisible();
+  // Four rejections, each counting down the rope that is left.
+  for (const left of [4, 3, 2, 1]) {
+    await page.getByLabel("6-digit code").fill("000000");
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(
+      page.getByText(`That code isn't right. ${left} ${left === 1 ? "attempt" : "attempts"} left.`),
+    ).toBeVisible();
   }
-  // Attempt ceiling reached: the genuine code is dead too (attack cannot brute-force).
-  await page.getByLabel(`Code sent to +91${phone}`).fill(realCode);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("That code didn't work. Try again.")).toBeVisible();
+  // The fifth burns it. The old build said "That code didn't work. Try again."
+  // here and forever after — advice that could never succeed — and left the
+  // user holding the CORRECT code with nothing on screen to tell them why it
+  // was refused. The state is now named, and the way out is pointed at.
+  await page.getByLabel("6-digit code").fill("000000");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(
+    page.getByText("Too many attempts on this code. Tap 'Resend code' to get a new one."),
+  ).toBeVisible();
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-locked", "true");
+
+  // Attempt ceiling reached: the genuine code is dead too (attack cannot
+  // brute-force), and another guess is not even offered.
+  await expect(page.getByRole("button", { name: "Verify and continue" })).toBeDisabled();
+  await page.getByLabel("6-digit code").fill(realCode);
   await expect(page).toHaveURL(/\/login/);
+
+  // The escape is real: a fresh code clears the lockout and signs in. The
+  // resend button may still be inside its 30s countdown — five guesses take a
+  // browser a couple of seconds — and the countdown IS the route, since it
+  // names the action and when it opens. Wait it out rather than asserting a
+  // race.
+  await expect(page.getByTestId("resend-code")).toBeEnabled({ timeout: 35_000 });
+  await page.getByTestId("resend-code").click();
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-locked", "false");
+  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding/);
+});
+
+test("the step lives in the URL: a refresh mid-code-step keeps the number and the field", async ({
+  page,
+}) => {
+  const phone = `79${STAMP}`;
+  await requestCode(page, phone);
+  await expect(page).toHaveURL(/step=code/);
+
+  // Leaving the browser to read the SMS is the mandatory middle step on a
+  // phone, and a backgrounded tab is evicted routinely. A reload used to come
+  // back on the phone step with the number FORGOTTEN, and re-typing it inside
+  // 30s hit the resend cooldown — a user holding a valid code with no field to
+  // type it into.
+  await page.reload();
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
+  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding/);
+});
+
+test("deep links cannot skip onboarding: a nameless account is gated on every console route", async ({
+  page,
+}) => {
+  const phone = `80${STAMP}`;
+  // Signed-out console routes redirect through ?next=, which used to make
+  // BYPASSING the default: verify, land on /orgs, never see onboarding again,
+  // and appear as a raw phone number on team sheets forever after.
+  await page.goto("/orgs");
+  await expect(page).toHaveURL(/\/login\?next=/);
+  await page.getByLabel("Mobile number").fill(phone);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+    timeout: 15_000,
+  });
+  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding/);
+
+  // And typing any console URL by hand comes straight back here.
+  for (const route of ["/orgs", "/tournaments", "/account", "/inbox", "/seasons"]) {
+    await page.goto(route);
+    await expect(page).toHaveURL(/\/onboarding/);
+  }
 });
 
 test("token flows are never hijacked by onboarding, and telemetry captures the funnel", async ({
@@ -142,14 +220,21 @@ test("token flows are never hijacked by onboarding, and telemetry captures the f
   const organizer = `74${STAMP}`;
   const invitee = `75${STAMP}`;
 
-  // Organizer onboards fully and mints an invite.
+  // Organizer onboards (one question), creates the org on /orgs, mints an invite.
   await otpLogin(page, organizer);
   await page.getByLabel("What should we call you?").fill("Meera Organizer");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Meera CC ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
-  await expect(page.getByTestId("org-name")).toHaveText(`Meera CC ${STAMP}`);
-  await page.getByTestId("create-invite").click();
+  await expect(page).toHaveURL(/\/home/);
+  await createOrg(page, `Meera CC ${STAMP}`);
+  // "Invite member" lives on the org detail page's Members tab; the tab panels
+  // for the other sections render in the DOM but display:none until selected,
+  // so the trigger is invisible until the tab itself is active.
+  await page.getByRole("tab", { name: "Members" }).click();
+  // "create-invite" is the dialog's submit, not its trigger. A closed <dialog>
+  // keeps its markup but is display:none, so clicking straight through resolved
+  // the element and then waited 60s for a button that could never be visible.
+  await page.getByTestId("open-invite").click();
+  await page.getByRole("dialog").getByTestId("create-invite").click();
   const inviteUrl = await page.getByTestId("invite-url").textContent();
   expect(inviteUrl).toContain("/join/");
 
@@ -164,8 +249,8 @@ test("token flows are never hijacked by onboarding, and telemetry captures the f
     await expect(pageB.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
       timeout: 15_000,
     });
-    await pageB.getByLabel(`Code sent to +91${invitee}`).fill(await readCode(pageB, invitee));
-    await pageB.getByRole("button", { name: "Sign in", exact: true }).click();
+    await pageB.getByLabel("6-digit code").fill(await readCode(pageB, invitee));
+    await pageB.getByRole("button", { name: "Verify and continue" }).click();
     await expect(pageB).toHaveURL(/\/join\//);
     await pageB.getByTestId("accept-invite").click();
     await expect(pageB.getByTestId("org-name")).toHaveText(`Meera CC ${STAMP}`);
@@ -192,7 +277,6 @@ test("sessions persist across reloads; a cleared session gates and returns via n
   await otpLogin(page, phone);
   await page.getByLabel("What should we call you?").fill("Persistent Pat");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByTestId("onboarding-skip").click();
   await expect(page).toHaveURL(/\/home/);
 
   await page.reload();
@@ -208,8 +292,8 @@ test("sessions persist across reloads; a cleared session gates and returns via n
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 15_000,
   });
-  await page.getByLabel(`Code sent to +91${phone}`).fill(await readCode(page, phone));
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   // Named user, next honored — straight back to work, no onboarding detour.
   await expect(page).toHaveURL(/\/seasons/);
 });
@@ -223,7 +307,7 @@ test("accessibility: onboarding, inbox and account scan clean", async ({ page })
 
   await page.getByLabel("What should we call you?").fill("Axe Auditor");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByTestId("onboarding-skip").click();
+  await expect(page).toHaveURL(/\/home/);
 
   await page.goto("/inbox");
   await expect(page.getByTestId("inbox-list")).toBeVisible();
@@ -245,6 +329,9 @@ test("mobile 360px: the full entry journey works one-handed", async ({ browser }
     await expect(page).toHaveURL(/\/onboarding/);
     await page.getByLabel("What should we call you?").fill("Mobile Mira");
     await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+    await page.goto("/orgs");
+    await page.getByTestId("new-org").click();
     await page.getByLabel("Organization name").filter({ visible: true }).fill(`Mira XI ${STAMP}`);
     await page.getByRole("button", { name: "Create organization" }).click();
     await expect(page.getByTestId("org-name")).toHaveText(`Mira XI ${STAMP}`);

@@ -1,16 +1,31 @@
 "use client";
 
 import { CAPABILITY_SETS } from "@desiauction/core";
-import { Button, ButtonLink, Card, Dialog, Select, useToast } from "@desiauction/ui";
+import {
+  Button,
+  ButtonLink,
+  Card,
+  Dialog,
+  EmptyState,
+  Field,
+  Select,
+  useToast,
+  VisuallyHidden,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { avatarColor } from "../../../components/avatar-color";
+import { formatPhone } from "../../../lib/format-phone";
 import {
   createInviteAction,
   issueGrantAction,
+  removeMemberAction,
   revokeGrantAction,
+  revokeInviteAction,
   type OrgView,
 } from "../../../server/orgs/actions";
+import type { MemberRow } from "../../../server/orgs/orgs";
 
 /** Initials for the avatar — first code points of up to two words. */
 function initials(name: string | null, phone: string): string {
@@ -26,27 +41,26 @@ function initials(name: string | null, phone: string): string {
   );
 }
 
-/** Stable per-person hue so an avatar keeps its colour across renders. */
-function avatarHue(personId: string): number {
-  let hash = 0;
-  for (const char of personId) {
-    hash = (hash * 31 + char.charCodeAt(0)) % 360;
-  }
-  return hash;
-}
-
 /**
- * A capability set → the mono pill the design shows. The label stays technical
- * (ORG:OWNER, SETTLEMENT, FINOPS) because these ARE the grant names an operator
- * reasons about; `key` drives the colour. A member can hold several.
+ * A capability set → the pill the row shows.
+ *
+ * The label is now the PLAIN word. The technical set is what an operator
+ * reasons about in a grants table, not what a club secretary reads down a list
+ * of seven people — and /orgs has always said "Owner"/"Staff"/"Member" in its
+ * role badge while this grid said ORG:OWNER two clicks away. One vocabulary,
+ * the plain one; the technical name stays reachable as the pill's tooltip.
  */
-function rolePill(set: string): { key: string; label: string } {
-  if (set === "org:owner") return { key: "owner", label: "ORG:OWNER" };
-  if (set === "org:staff") return { key: "staff", label: "ORG:STAFF" };
-  if (set === "viewer") return { key: "viewer", label: "VIEWER" };
-  if (set.startsWith("settlement:")) return { key: "settlement", label: "SETTLEMENT" };
-  if (set.startsWith("finops:")) return { key: "finops", label: "FINOPS" };
-  return { key: "other", label: set.toUpperCase() };
+function rolePill(set: string): { key: string; label: string; technical: string } {
+  if (set === "org:owner") return { key: "owner", label: "Owner", technical: "ORG:OWNER" };
+  if (set === "org:staff") return { key: "staff", label: "Staff", technical: "ORG:STAFF" };
+  if (set === "viewer") return { key: "viewer", label: "Member", technical: "VIEWER" };
+  if (set.startsWith("settlement:")) {
+    return { key: "settlement", label: "Settles money", technical: set.toUpperCase() };
+  }
+  if (set.startsWith("finops:")) {
+    return { key: "finops", label: "Speaks for the money", technical: set.toUpperCase() };
+  }
+  return { key: "other", label: set, technical: set.toUpperCase() };
 }
 
 /** "Jan 2021" — the Joined column, month + year as the design shows. */
@@ -54,16 +68,35 @@ function joinedLabel(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
+/** "24 Jul 2026" — precise enough for provenance, short enough for a tooltip. */
+function grantedLabel(iso: string | null): string | null {
+  return iso === null
+    ? null
+    : new Date(iso).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+}
+
 /** Invite dialog: the human name and one-line meaning of each joinable role. */
 const INVITE_ROLE_LABEL: Record<string, string> = {
   "org:staff": "Staff",
-  viewer: "Viewer",
+  viewer: "Member",
 };
 
 const INVITE_ROLE_HELP: Record<string, string> = {
   "org:staff": "Runs seasons, teams, registrations and fixtures — not the money or roles.",
   viewer: "Read-only access to this organization.",
 };
+
+/** What a destructive click has to say out loud before it happens. */
+interface Consequence {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  run: () => Promise<{ ok: boolean; error?: string }>;
+}
 
 export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
   const router = useRouter();
@@ -73,14 +106,36 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
   const [inviteSet, setInviteSet] = useState("org:staff");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [pending, setPending] = useState<Consequence | null>(null);
+  const inviteResultRef = useRef<HTMLDivElement | null>(null);
+
+  // The minted link used to appear silently with focus still on <body>: a
+  // one-time secret announced to nobody. It is a status region now, and it
+  // takes focus the moment it exists.
+  useEffect(() => {
+    if (inviteUrl !== null) {
+      inviteResultRef.current?.focus();
+    }
+  }, [inviteUrl]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (needle === "") return view.members;
-    return view.members.filter(
-      (member) =>
-        (member.name ?? "").toLowerCase().includes(needle) || member.phone.includes(needle),
-    );
+    return view.members.filter((member) => {
+      // Search what the reader can SEE. The grid shows "+91 99990 00002"; a
+      // filter that only matched "+919999000002" answered "no results" to the
+      // string the user had just read off the row above.
+      const haystack = [
+        member.name ?? "",
+        member.phone,
+        formatPhone(member.phone),
+        ...member.capabilitySets.map((set) => rolePill(set).label),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(needle);
+    });
   }, [query, view.members]);
 
   const invite = async () => {
@@ -88,38 +143,90 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
     const result = await createInviteAction(slug, inviteSet);
     setBusy(false);
     if ("url" in result) {
+      setCopied(false);
       setInviteUrl(`${window.location.origin}${result.url}`);
     } else {
       toast({ title: result.error, tone: "danger" });
     }
   };
 
+  const confirm = async () => {
+    if (pending === null) return;
+    setBusy(true);
+    const result = await pending.run();
+    setBusy(false);
+    if (result.ok) {
+      setPending(null);
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Refused.", tone: "danger" });
+    }
+  };
+
+  const copy = async () => {
+    if (inviteUrl === null) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+    } catch {
+      toast({ title: "Couldn't copy — select the link and copy it by hand.", tone: "danger" });
+    }
+  };
+
+  /* The directory is not in the payload at all for someone who may not read it
+     (orgView gates it), so this is the honest state rather than an empty grid
+     that looks like a club with no members. */
+  if (!view.viewer.canSeeMembers) {
+    return (
+      <Card data-testid="members-panel">
+        <div className="od-member-head">
+          <div className="od-member-title">
+            <h2>Members</h2>
+            <span className="od-member-count">{view.memberCount}</span>
+          </div>
+        </div>
+        <EmptyState
+          headingLevel={3}
+          title="The member list isn't yours to see"
+          description={`${String(view.memberCount)} ${view.memberCount === 1 ? "person belongs" : "people belong"} to this organization. Names and phone numbers are shown to whoever can invite people or hand out roles — ask an owner if you need them.`}
+        />
+      </Card>
+    );
+  }
+
   return (
     <Card data-testid="members-panel">
       <div className="od-member-head">
         <div className="od-member-title">
           <h2>Members</h2>
-          <span className="od-member-count">{view.members.length}</span>
+          <span className="od-member-count">{view.memberCount}</span>
         </div>
         <div className="od-member-tools">
-          <input
-            type="search"
-            className="od-member-search"
-            placeholder="Search members"
-            aria-label="Search members"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-            }}
-          />
+          {/* A raw <input> at 220x34 that missed the Field standardisation
+              entirely — no wired label, no shared chrome, below the input
+              rung every other control on the page sits at. */}
+          <div className="od-member-searchbox">
+            <Field
+              label="Search members"
+              type="search"
+              placeholder="Name, number or role"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+              }}
+            />
+          </div>
           {/* Settlement/finance grants are handed out on the Money & roles tab —
-              a distinct act of trust from org staff, so it lives there. */}
-          <ButtonLink href={`/org/${slug}#money`} variant="secondary" size="sm">
-            Manage roles
-          </ButtonLink>
+              a distinct act of trust from org staff, so it lives there. Only
+              somebody who can actually issue one is offered the trip. */}
+          {view.viewer.canIssueGrants ? (
+            <ButtonLink href={`/org/${slug}#money`} variant="secondary" size="touch">
+              Manage roles
+            </ButtonLink>
+          ) : null}
           {view.viewer.canInvite ? (
             <Button
-              size="sm"
+              size="touch"
               onClick={() => {
                 setInviteUrl(null);
                 setInviteOpen(true);
@@ -132,81 +239,85 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
         </div>
       </div>
 
-      <div className="od-member-cols" aria-hidden>
-        <span className="od-member-person">Person</span>
-        <span className="od-member-roles">Roles</span>
-        <span className="od-member-joined">Joined</span>
-        <span className="od-member-action" />
-      </div>
+      {/* A grid of people, announced as one. It was a <ul> with column headings
+          marked aria-hidden, so assistive technology met seven undifferentiated
+          list items and no way to know which value was a role and which a date.
+          Explicit roles rather than a <table>: the flex layout the design needs
+          would strip a real table's semantics anyway. */}
+      <div className="od-member-table" role="table" aria-label="Members">
+        <div className="od-member-cols" role="row">
+          <span className="od-member-person" role="columnheader">
+            Person
+          </span>
+          <span className="od-member-roles" role="columnheader">
+            Roles
+          </span>
+          <span className="od-member-joined" role="columnheader">
+            Joined
+          </span>
+          <span className="od-member-action" role="columnheader">
+            <VisuallyHidden>Actions</VisuallyHidden>
+          </span>
+        </div>
 
-      <ul className="od-member-list">
-        {filtered.map((member) => (
-          <li key={member.personId} className="od-member-row">
-            <span className="od-member-person">
-              <span
-                className="od-member-avatar"
-                style={{ background: `hsl(${String(avatarHue(member.personId))} 55% 42%)` }}
-                aria-hidden
-              >
-                {initials(member.name, member.phone)}
-              </span>
-              <span className="od-member-id">
-                <strong>{member.name ?? "Unnamed"}</strong>
-                <span className="od-member-phone">{member.phone}</span>
-              </span>
-            </span>
-            <span className="od-member-roles">
-              {member.capabilitySets.length === 0 ? (
-                <span className="od-role-pill" data-role="viewer">
-                  MEMBER
+        <div className="od-member-list" role="rowgroup">
+          {filtered.map((member) => (
+            <MemberRowView
+              key={member.personId}
+              member={member}
+              view={view}
+              slug={slug}
+              onIntent={setPending}
+              onGrant={() => {
+                void issueGrantAction(slug, member.personId, "org:staff").then(() => {
+                  router.refresh();
+                });
+              }}
+            />
+          ))}
+        </div>
+      </div>
+      {filtered.length === 0 ? (
+        <p className="od-member-empty" role="status">
+          No members match “{query}”.
+        </p>
+      ) : null}
+
+      {/* Outstanding links. `revokeInvite` has existed since IP-2 with no caller
+          and no surface, so a link forwarded to the wrong number stayed live for
+          seven days with nothing in the product even admitting it existed. */}
+      {view.viewer.canInvite && view.pendingInvites.length > 0 ? (
+        <section className="od-pending" aria-labelledby="od-pending-title">
+          <h3 id="od-pending-title">
+            Invite links waiting to be used ({view.pendingInvites.length})
+          </h3>
+          <ul className="od-pending-list">
+            {view.pendingInvites.map((pending) => (
+              <li key={pending.id} className="od-pending-row">
+                <span className="od-pending-id">
+                  <strong>Joins as {INVITE_ROLE_LABEL[pending.capabilitySet] ?? "a member"}</strong>
+                  <span>Works once · expires {grantedLabel(pending.expiresAt) ?? "soon"}</span>
                 </span>
-              ) : (
-                member.capabilitySets.map((set) => {
-                  const pill = rolePill(set);
-                  return (
-                    <span key={set} className="od-role-pill" data-role={pill.key}>
-                      {pill.label}
-                    </span>
-                  );
-                })
-              )}
-            </span>
-            <span className="od-member-joined">{joinedLabel(member.joinedAt)}</span>
-            <span className="od-member-action">
-              {view.viewer.canIssueGrants && member.personId !== view.viewer.personId ? (
-                !member.capabilitySets.includes("org:staff") ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      void issueGrantAction(slug, member.personId, "org:staff").then(() => {
-                        router.refresh();
-                      });
-                    }}
-                  >
-                    Make staff
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      void revokeGrantAction(slug, member.personId, "org:staff").then(() => {
-                        router.refresh();
-                      });
-                    }}
-                  >
-                    Remove staff
-                  </Button>
-                )
-              ) : null}
-            </span>
-          </li>
-        ))}
-        {filtered.length === 0 ? (
-          <li className="od-member-empty">No members match “{query}”.</li>
-        ) : null}
-      </ul>
+                <Button
+                  size="touch"
+                  variant="ghost"
+                  onClick={() => {
+                    setPending({
+                      title: "Revoke this invite link?",
+                      body: `The link stops working immediately. Anyone holding it — including whoever you meant to send it to — can no longer join ${view.org.name} with it, and there is no way to bring it back. Mint a fresh one instead.`,
+                      confirmLabel: "Revoke link",
+                      run: () => revokeInviteAction(slug, pending.id),
+                    });
+                  }}
+                  data-testid={`revoke-invite-${pending.id}`}
+                >
+                  Revoke link
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <Dialog
         open={inviteOpen}
@@ -249,12 +360,176 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
           ))}
         </Select>
         {inviteUrl !== null ? (
-          <div className="od-invite-result" data-testid="invite-url">
-            <span className="od-invite-url">{inviteUrl}</span>
-            <span className="od-invite-note">Copy it now — it&apos;s shown once.</span>
+          <div
+            className="od-invite-result"
+            data-testid="invite-result"
+            role="status"
+            tabIndex={-1}
+            ref={inviteResultRef}
+          >
+            {/* The testid stays on the URL ALONE: it is read as text by three
+                e2e journeys that then navigate to it, and a note plus a copy
+                button folded into the same node would make it un-navigable. */}
+            <span className="od-invite-url" data-testid="invite-url">
+              {inviteUrl}
+            </span>
+            <div className="od-invite-actions">
+              <span className="od-invite-note">Copy it now — it&apos;s shown once.</span>
+              <Button
+                size="touch"
+                variant="secondary"
+                onClick={() => void copy()}
+                data-testid="copy-invite"
+              >
+                {copied ? "Copied" : "Copy link"}
+              </Button>
+            </div>
           </div>
         ) : null}
       </Dialog>
+
+      {/* Every permission change that TAKES something away names what is lost
+          before it happens — the repo's Dialog, never window.confirm. */}
+      <Dialog
+        open={pending !== null}
+        onClose={() => {
+          setPending(null);
+        }}
+        title={pending?.title ?? ""}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPending(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void confirm()}
+              loading={busy}
+              data-testid="confirm-member-change"
+            >
+              {pending?.confirmLabel ?? "Confirm"}
+            </Button>
+          </>
+        }
+      >
+        <p data-testid="member-change-consequence">{pending?.body}</p>
+      </Dialog>
     </Card>
+  );
+}
+
+function MemberRowView({
+  member,
+  view,
+  slug,
+  onIntent,
+  onGrant,
+}: {
+  member: MemberRow;
+  view: OrgView;
+  slug: string;
+  onIntent: (consequence: Consequence) => void;
+  onGrant: () => void;
+}) {
+  const name = member.name ?? "Unnamed";
+  const isOwner = member.capabilitySets.includes("org:owner");
+  const isStaff = member.capabilitySets.includes("org:staff");
+  const isSelf = member.personId === view.viewer.personId;
+  const pills = member.capabilitySets.length === 0 ? ["viewer"] : member.capabilitySets;
+
+  return (
+    <div className="od-member-row" role="row" data-testid={`member-${member.personId}`}>
+      <span className="od-member-person" role="cell">
+        <span
+          className="od-member-avatar"
+          style={{ background: avatarColor(member.personId) }}
+          aria-hidden
+        >
+          {initials(member.name, member.phone)}
+        </span>
+        <span className="od-member-id">
+          <strong>{name}</strong>
+          <span className="od-member-phone">{formatPhone(member.phone)}</span>
+        </span>
+      </span>
+      <span className="od-member-roles" role="cell">
+        {pills.map((set) => {
+          const pill = rolePill(set);
+          const grant = member.roles.find((row) => row.capabilitySet === set);
+          const granted = grantedLabel(grant?.grantedAt ?? null);
+          // Provenance the grants table has always stored and no surface ever
+          // showed: who let this person near this, and when.
+          const provenance =
+            grant === undefined
+              ? pill.technical
+              : [
+                  pill.technical,
+                  grant.grantedByName === null ? null : `granted by ${grant.grantedByName}`,
+                  granted,
+                ]
+                  .filter((part) => part !== null)
+                  .join(" · ");
+          return (
+            <span key={set} className="od-role-pill" data-role={pill.key} title={provenance}>
+              {pill.label}
+            </span>
+          );
+        })}
+      </span>
+      <span className="od-member-joined" role="cell">
+        <span className="od-member-joined-label">Joined </span>
+        {joinedLabel(member.joinedAt)}
+      </span>
+      <span className="od-member-action" role="cell">
+        {view.viewer.canIssueGrants && !isSelf ? (
+          isStaff ? (
+            <Button
+              size="touch"
+              variant="ghost"
+              onClick={() => {
+                onIntent({
+                  title: `Remove ${name} from staff?`,
+                  body: `${name} loses the ability to run seasons, add teams, review registrations and manage fixtures for this organization. They stay a member and keep read access. You can make them staff again at any time.`,
+                  confirmLabel: "Remove staff",
+                  run: () => revokeGrantAction(slug, member.personId, "org:staff"),
+                });
+              }}
+              data-testid={`remove-staff-${member.personId}`}
+            >
+              Remove staff
+            </Button>
+          ) : /* "Make staff" on a row that already reads Owner offered a
+                 DEMOTION dressed as a promotion — staff is a strictly smaller
+                 set than owner, and issuing it changed nothing at all. */
+          isOwner ? null : (
+            <Button size="touch" variant="secondary" onClick={onGrant}>
+              Make staff
+            </Button>
+          )
+        ) : null}
+        {view.viewer.canRemove && !isSelf ? (
+          <Button
+            size="touch"
+            variant="ghost"
+            onClick={() => {
+              onIntent({
+                title: `Remove ${name} from ${view.org.name}?`,
+                body: `${name} loses every role they hold here, disappears from this member list, and this organization disappears from theirs — including any tournament, team or money surface it reaches. Their account and their own organizations are untouched. They can only come back through a fresh invite link.`,
+                confirmLabel: "Remove from organization",
+                run: () => removeMemberAction(slug, member.personId),
+              });
+            }}
+            data-testid={`remove-member-${member.personId}`}
+          >
+            Remove
+          </Button>
+        ) : null}
+      </span>
+    </div>
   );
 }

@@ -4,7 +4,11 @@
    also gives the primary CTA the brand's vibrant lime accent instead of the
    muddy daylight olive. */
 .login {
-  /* Fills the viewport below the public shell's 64px glass header. */
+  /* Fallback only: the glass header's RESTING height is not its base 64px —
+     the scroll-timeline animation's `from` keyframe (72px) plus its hairline
+     border paints 73px at scroll offset 0, so subtracting 64 left a 9px phantom
+     scrollbar on every login page. The @supports block below stops guessing
+     and lets the shell's content row hand this element the space it has. */
   min-height: calc(100dvh - 64px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -22,6 +26,16 @@
     linear-gradient(165deg, var(--surface-sunken), var(--surface) 55%);
   color: var(--text-primary);
   font-family: var(--font-text);
+}
+
+/* Paired with `.content:has(> :global(.login))` in the public shell, which
+   makes the content row a column flex container for this surface only. No
+   header arithmetic survives here: the row measures whatever the header left. */
+@supports selector(:has(*)) {
+  .login {
+    min-height: 0;
+    flex: 1;
+  }
 }
 
 @media (min-width: 960px) {
@@ -114,9 +128,23 @@
 
 /* The form column. */
 .login-side {
-  display: grid;
-  place-items: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
   padding: var(--space-12) var(--space-5);
+}
+
+/* Below the two-column breakpoint the card was centred in the whole viewport,
+   which put its top edge a third of the way down the fold at 390 — an empty
+   gradient above the only thing on the page. It starts near the top instead. */
+@media (max-width: 959px) {
+  .login-side {
+    justify-content: flex-start;
+    padding-top: var(--space-8);
+  }
 }
 
 .login-panel {
@@ -144,23 +172,6 @@
   opacity: 0.65;
 }
 
-/* The full brand lockup replaces the old text eyebrow. It is transparent
-   artwork in gold/silver, so it only reads on the floodlit (dark) panel. */
-.login-lockup {
-  width: 200px;
-  max-width: 60%;
-  margin: 0 0 var(--space-4);
-}
-
-.login-eyebrow {
-  margin: 0 0 var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-size);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-accent);
-}
-
 .login-panel h1 {
   font-family: var(--font-display);
   font-weight: 600;
@@ -185,10 +196,18 @@
 }
 
 /* Recess the inputs below the card surface so they read on the dark panel
-   (both default to --surface-raised otherwise). Base state only — the module's
-   :hover/:focus-visible rules keep winning for interactive borders. */
+   (both default to --surface-raised otherwise). */
 .login-panel input {
   background: var(--surface-sunken);
+}
+
+/* The border override is deliberately BLIND TO INVALID INPUTS. As one rule it
+   was `.login-panel input` at specificity (0,1,1), beating the primitive's own
+   `.invalid` at (0,1,0) — so this was the one form in the product where a
+   rejected field kept its calm slate border and said nothing in colour. The
+   :not() carries the same weight but stops applying the moment Field sets
+   aria-invalid, handing the border back to the design system. */
+.login-panel input:not([aria-invalid="true"]) {
   border-color: var(--border-subtle);
 }
 
@@ -207,7 +226,12 @@
   flex-wrap: wrap;
 }
 
+/* A real tap target, not a 24px line of text: it sits beside a 44px button in
+   a row a thumb reaches for on a phone. */
 .login-change-number {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   background: transparent;
   border: none;
   padding: var(--space-1);
@@ -226,6 +250,81 @@
 .login-change-number:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* The account-creating consent line. This screen mints accounts and said
+   nothing about the terms under which it does. */
+.login-consent {
+  margin: calc(var(--space-1) * -1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-sm-line);
+}
+
+.login-consent a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.login-consent a:hover {
+  color: var(--text-primary);
+}
+
+/* The door out of an error the user cannot fix by trying harder (the hourly
+   ceiling). Sits under the field it belongs to, not in a footer. */
+.login-error-help {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.login-error-help a {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+/* The returning-device fast path, above the form rather than below an "OR". */
+.login-fast {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-2);
+}
+
+/* The trust marks, for the widths where the scene does not render. Exactly one
+   of the two copies is ever in the accessibility tree — the other is
+   display:none, which removes it. */
+.login-trust {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 424px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.login-trust li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.login-trust li::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+@media (min-width: 960px) {
+  .login-trust {
+    display: none;
+  }
 }
 
 /* "or" rule separating the OTP form from the passkey path. */

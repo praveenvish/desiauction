@@ -7,7 +7,7 @@ import {
   people,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { aliasedTable, and, asc, eq, isNull, sql } from "drizzle-orm";
 
 // Organizations + membership (IP-2_DESIGN §4). Membership records belonging;
 // grants carry permission — the two are deliberately separate (C-8).
@@ -90,14 +90,34 @@ export async function resolveTenant(
   return row ?? null;
 }
 
+/**
+ * Who handed a role out, and when.
+ *
+ * `grants` has carried `grantedBy`/`grantedAt` since the table existed and no
+ * surface ever showed either, so "who let this person near the money?" had no
+ * answer inside the product. Provenance travels with the role from here on.
+ */
+export interface MemberGrant {
+  capabilitySet: string;
+  grantedBy: string;
+  /** The granter's display name, when they are still a person we can name. */
+  grantedByName: string | null;
+  /** `grants.created_at` — the moment the role was handed over (ISO). */
+  grantedAt: string | null;
+}
+
 export interface MemberRow {
   personId: string;
   name: string | null;
   phone: string;
   capabilitySets: string[];
+  /** The same sets, each carrying the provenance the grants table records. */
+  roles: MemberGrant[];
   /** When they joined the org (ISO) — the members grid's "Joined" column. */
   joinedAt: string;
 }
+
+const granter = aliasedTable(people, "granter");
 
 export async function membersOf(db: Db, orgId: string): Promise<MemberRow[]> {
   const rows = await db
@@ -112,21 +132,123 @@ export async function membersOf(db: Db, orgId: string): Promise<MemberRow[]> {
     .where(eq(orgMembers.orgId, orgId))
     .orderBy(asc(orgMembers.joinedAt));
   const activeGrants = await db
-    .select({ personId: grants.personId, capabilitySet: grants.capabilitySet })
+    .select({
+      personId: grants.personId,
+      capabilitySet: grants.capabilitySet,
+      grantedBy: grants.grantedBy,
+      grantedByName: granter.name,
+      grantedAt: grants.createdAt,
+    })
     .from(grants)
+    .leftJoin(granter, eq(granter.id, grants.grantedBy))
     .where(and(eq(grants.scopeType, "org"), eq(grants.scopeId, orgId), isNull(grants.revokedAt)));
-  return rows.map((row) => ({
-    personId: row.personId,
-    name: row.name,
-    phone: row.phone,
-    joinedAt: (row.joinedAt instanceof Date
-      ? row.joinedAt
-      : new Date(String(row.joinedAt))
-    ).toISOString(),
-    capabilitySets: activeGrants
-      .filter((grant) => grant.personId === row.personId)
-      .map((grant) => grant.capabilitySet),
-  }));
+  const iso = (value: Date | string | null): string | null =>
+    value === null
+      ? null
+      : value instanceof Date
+        ? value.toISOString()
+        : new Date(value).toISOString();
+  return rows.map((row) => {
+    const mine = activeGrants.filter((grant) => grant.personId === row.personId);
+    return {
+      personId: row.personId,
+      name: row.name,
+      phone: row.phone,
+      joinedAt: (row.joinedAt instanceof Date
+        ? row.joinedAt
+        : new Date(String(row.joinedAt))
+      ).toISOString(),
+      capabilitySets: mine.map((grant) => grant.capabilitySet),
+      roles: mine.map((grant) => ({
+        capabilitySet: grant.capabilitySet,
+        grantedBy: grant.grantedBy,
+        grantedByName: grant.grantedByName,
+        grantedAt: iso(grant.grantedAt),
+      })),
+    };
+  });
+}
+
+/**
+ * How many people belong here — WITHOUT the directory.
+ *
+ * The Overview stat used to be `view.members.length`, which is why the whole
+ * phone book had to be in every payload just to render a number. A count is
+ * not private; the names and numbers behind it are.
+ */
+export async function memberCountOf(db: Db, orgId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(orgMembers)
+    .where(eq(orgMembers.orgId, orgId));
+  return row?.count ?? 0;
+}
+
+/** People holding an ACTIVE grant of this exact set on this org. */
+export async function holdersOf(db: Db, orgId: string, capabilitySet: string): Promise<string[]> {
+  const rows = await db
+    .select({ personId: grants.personId })
+    .from(grants)
+    .where(
+      and(
+        eq(grants.scopeType, "org"),
+        eq(grants.scopeId, orgId),
+        eq(grants.capabilitySet, capabilitySet),
+        isNull(grants.revokedAt),
+      ),
+    );
+  return [...new Set(rows.map((row) => row.personId))];
+}
+
+/**
+ * Would taking this person's ownership away leave the club with no owner?
+ *
+ * An ownerless organization is a dead one: `grant.issue`, `grant.revoke`,
+ * `org.members.invite` and `org.manage` all live in `org:owner`, so there is
+ * nobody left who can hand ownership back — the act that would repair it is the
+ * act that was just removed. Pure, so the rule is tested rather than trusted.
+ */
+export function wouldOrphanOrg(owners: readonly string[], targetPersonId: string): boolean {
+  return owners.length <= 1 && owners.includes(targetPersonId);
+}
+
+/**
+ * Take someone out of the organization entirely: every active grant revoked,
+ * then the membership row itself.
+ *
+ * "Remove staff" only ever demoted — the person stayed a member, kept reading
+ * the directory and kept the org in their /orgs list. Offboarding did not
+ * exist. Membership and grants are separate by design (C-8), so leaving means
+ * both are withdrawn, in that order, inside the caller's transaction.
+ */
+export async function removeMember(
+  db: Db,
+  orgId: string,
+  targetPersonId: string,
+  removedBy: string,
+): Promise<void> {
+  await db
+    .update(grants)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(grants.personId, targetPersonId),
+        eq(grants.scopeType, "org"),
+        eq(grants.scopeId, orgId),
+        isNull(grants.revokedAt),
+      ),
+    );
+  await db
+    .delete(orgMembers)
+    .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.personId, targetPersonId)));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: removedBy,
+    action: "org.members.removed",
+    scopeType: "org",
+    scopeId: orgId,
+    subject: targetPersonId,
+  });
 }
 
 export async function issueGrant(

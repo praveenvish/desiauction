@@ -5,7 +5,7 @@ import type { AuctionView, OwnerBoard } from "@desiauction/auction";
 import { engineDiagnosticsSchema, type EngineDiagnostics } from "@desiauction/contracts";
 import type { AuctionEventEnvelope, AuctionLedgerRow, SnapshotRefs } from "@desiauction/core";
 import { auctionOf } from "@desiauction/auction";
-import { competitions, teams, withTenantDb, type Db } from "@desiauction/db";
+import { competitions, organizations, teams, withTenantDb, type Db } from "@desiauction/db";
 import { asc, eq } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
@@ -97,6 +97,14 @@ export interface SpectatorView {
   competitionName: string;
   competitionSlug: string;
   auctionName: string;
+  /**
+   * Who is running this and where. Already public on `/c/<slug>` — the stage
+   * says "Watching live · <organizer> · <city>" so a guest arriving from a
+   * forwarded link knows whose night this is, which the auction's own name
+   * (usually "<Competition> Auction") does not tell them.
+   */
+  orgName: string | null;
+  location: string | null;
   wsUrl: string;
   /** PX-6: resolved history for late joiners (spectator-safe by construction). */
   resolved: ResolvedLot[];
@@ -138,10 +146,17 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
       preSignedPlayers(db, gate.competition.id),
     ]),
   );
+  const [org] = await systemDb
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, gate.competition.orgId))
+    .limit(1);
   return {
     competitionName: gate.competition.name,
     competitionSlug: gate.competition.slug,
     auctionName: gate.auction.name,
+    orgName: org?.name ?? null,
+    location: gate.competition.location,
     wsUrl: engineWsUrl(gate.auction.id),
     resolved,
     teams: teamRows,
@@ -165,8 +180,11 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
       name: competitions.name,
       slug: competitions.slug,
       visibility: competitions.visibility,
+      location: competitions.location,
+      orgName: organizations.name,
     })
     .from(competitions)
+    .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .where(eq(competitions.slug, slug))
     .limit(1);
   if (competition === undefined || competition.visibility !== "public") {
@@ -189,6 +207,8 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
     competitionName: competition.name,
     competitionSlug: competition.slug,
     auctionName: auction.name,
+    orgName: competition.orgName,
+    location: competition.location,
     wsUrl: engineWsUrl(auction.id),
     teams: teamRows,
     resolved,

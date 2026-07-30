@@ -117,7 +117,11 @@ export function SquadBoard({
     <Card data-testid="squad-board">
       <div className="competition-head">
         <h2>Squads</h2>
-        <span className="competitions-hint">icons &amp; retained are pre-signed, never bid</span>
+        {/* The shorthand was a note to ourselves: "pre-signed" is a schema word
+            and "never bid" reads as an instruction. The room needs the fact. */}
+        <span className="competitions-hint">
+          Icons and retained players joined before the auction — they were never bid on.
+        </span>
       </div>
       <div className="squad-grid">
         {squads.map(({ team, members }) => {

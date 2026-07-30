@@ -237,7 +237,7 @@ export default function FeaturesPage() {
           </div>
           <div className="mk-cta-actions" style={{ marginTop: "var(--space-10)" }}>
             <ButtonLink href="/login" variant="primary" size="lg">
-              Run your auction
+              Start your auction
             </ButtonLink>
             <ButtonLink href="/pricing" variant="secondary" size="lg">
               See pricing

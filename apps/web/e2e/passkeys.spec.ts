@@ -16,10 +16,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   // PX-3: new accounts land on onboarding; security panels live on /account.
+  // The name gate now guards /account like every other console route, so a
+  // fresh account must clear onboarding before the goto below can land there.
   await expect(page).toHaveURL(/\/(home|onboarding)/);
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("Passkey Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
   await page.goto("/account");
 }
 

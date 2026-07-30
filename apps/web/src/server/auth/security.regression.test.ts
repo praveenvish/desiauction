@@ -96,9 +96,12 @@ describe("SECURITY REGRESSION — identity contract", () => {
       .where(eq(otpInbox.phone, PHONE_A))
       .orderBy(desc(otpInbox.createdAt))
       .limit(1);
+    // "locked", not the generic "invalid": only a phone that HAS a live code
+    // can ever see this reason, so there is nothing here to enumerate — and the
+    // person holding the correct code is finally told why it stopped working.
     expect(await verifyOtp(db, PHONE_A, row?.code ?? "")).toEqual({
       ok: false,
-      reason: "invalid",
+      reason: "locked",
     });
     const [person] = await db.select().from(people).where(eq(people.phone, PHONE_A));
     const events = await db
@@ -134,7 +137,7 @@ describe("SECURITY REGRESSION — identity contract", () => {
       .limit(1);
     expect(await verifyOtp(db, PHONE_C, live?.code ?? "")).toEqual({
       ok: false,
-      reason: "invalid",
+      reason: "locked",
     });
   });
 

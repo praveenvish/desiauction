@@ -7,6 +7,17 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 // token; only its SHA-256 is stored. Token rotates at every login (fixation).
 
 export const SESSION_COOKIE = "da_session";
+
+/**
+ * "This device has signed in before" — nothing else. No id, no phone, no
+ * session material; it survives sign-out on purpose, because that is the whole
+ * point: a returning visitor's fastest route is the passkey they already
+ * enrolled, and the gate had no way to know to offer it first. Read only by
+ * /login, to decide which door leads. It lives beside SESSION_COOKIE rather
+ * than in actions.ts, which is a "use server" module and may export nothing but
+ * async server actions.
+ */
+export const RETURNING_COOKIE = "da_returning";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SLIDE_AFTER_MS = 24 * 60 * 60 * 1000;
 

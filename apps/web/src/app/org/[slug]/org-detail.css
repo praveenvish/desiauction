@@ -58,8 +58,18 @@
   color: var(--text-muted);
 }
 
+/* "Est. 2026" and "/demo-club" both broke mid-token at 390 — the year split
+   across two lines, the handle across three. They are single tokens; they wrap
+   as wholes or not at all. */
+.od-hero-meta > span {
+  white-space: nowrap;
+}
+
 .od-hero-slug {
   font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .od-hero-actions {
@@ -392,14 +402,73 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.od-authority-name {
+/* The name column and its provenance line.
+ *
+ * `flex: 1; min-width: 0` next to a `flex: none` badge and a `flex: none`
+ * Revoke meant the NAME was the only thing allowed to give way: at 390 these
+ * rows read "DF · [D] · FINANCE CONTROLLER · Revoke" with the name crushed to
+ * zero pixels. Whose money authority it was, was the one fact the row dropped.
+ * Below 560px the row wraps instead, and the name takes the full first line. */
+.od-authority-id {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+}
+
+.od-authority-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: var(--font-weight-medium);
   color: var(--text-heading);
+}
+
+.od-authority-provenance {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+@media (max-width: 560px) {
+  .od-authority-row {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .od-authority-id {
+    flex: 1 1 calc(100% - 32px - var(--space-3));
+  }
+
+  /* Badge and Revoke drop to their own line, under the name they describe. */
+  .od-authority-row > *:not(.od-authority-avatar):not(.od-authority-id) {
+    margin-left: calc(32px + var(--space-3));
+  }
+
+  .od-authority-row > *:not(.od-authority-avatar):not(.od-authority-id) ~ * {
+    margin-left: 0;
+  }
+}
+
+/* One sentence over both money panels, replacing the two near-identical
+   paragraphs that sat inside them making the same argument twice. */
+.od-authority-lead {
+  margin: 0;
+  max-width: 78ch;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+}
+
+.od-authority-lead strong {
+  color: var(--text-heading);
+}
+
+.od-authority-lead em {
+  font-style: normal;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 /* --- invite a member ------------------------------------------------------ */
@@ -431,6 +500,140 @@
 .od-invite-note {
   font-size: var(--text-xs-size);
   color: var(--text-muted);
+}
+
+/* The minted link is focusable so it can be given focus the moment it exists —
+   it used to appear silently, with focus still on <body>, as plain unselectable
+   text under the words "Copy it now — it's shown once". */
+.od-invite-result:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.od-invite-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* --- the rest of the /home setup ladder, inside the club ------------------- */
+.od-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.od-ladder-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.od-ladder-head h2 {
+  margin: 0;
+  /* Text face: the display face is reserved for >=30px (type-scale.test.ts). */
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.od-ladder-head p {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.od-ladder-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.od-rung {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.od-ladder-steps .od-rung:first-child {
+  border-top: none;
+}
+
+.od-rung-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-rung--done .od-rung-mark {
+  background: var(--success-subtle);
+  border-color: transparent;
+  color: var(--success-strong);
+}
+
+.od-rung--now .od-rung-mark {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.od-rung-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+}
+
+.od-rung-text strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-rung-text span {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.od-rung--done .od-rung-text strong {
+  color: var(--text-muted);
+}
+
+.od-rung-cta {
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .od-rung-cta {
+    flex: 1 1 100%;
+    padding-left: calc(28px + var(--space-3));
+  }
 }
 
 /* --- members table -------------------------------------------------------- */
@@ -473,22 +676,17 @@
   flex-wrap: wrap;
 }
 
-.od-member-search {
-  width: 220px;
+/* The search control is the Field primitive now, so it inherits the product's
+   input chrome, its label wiring and its height instead of being a bare
+   <input> at 220x34 that the standardisation pass never reached. */
+.od-member-searchbox {
+  width: 240px;
   max-width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: var(--text-sm-size);
 }
 
-.od-member-search:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-  border-color: var(--border-interactive);
+/* The tools row aligns on the CONTROLS, not on the label above them. */
+.od-member-tools {
+  align-items: flex-end;
 }
 
 /* Column widths are shared by the header and every row so they line up. */
@@ -517,8 +715,10 @@
 }
 
 .od-member-roles {
-  flex: none;
-  width: 260px;
+  /* Shrinkable, not fixed: the pills read "Speaks for the money" now, not
+     "FINOPS", and a hard 260px column had nowhere to put the difference. */
+  flex: 0 1 260px;
+  min-width: 0;
   display: flex;
   gap: var(--space-1);
   flex-wrap: wrap;
@@ -535,9 +735,11 @@
 
 .od-member-action {
   flex: none;
-  width: 120px;
+  min-width: 120px;
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .od-member-list {
@@ -585,52 +787,148 @@
   color: var(--text-muted);
 }
 
+/* --- outstanding invite links -------------------------------------------- */
+.od-pending {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.od-pending h3 {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.od-pending-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.od-pending-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) 0;
+}
+
+.od-pending-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+}
+
+.od-pending-id strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.od-pending-id span {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
 .od-member-empty {
   padding: var(--space-4) 0;
   color: var(--text-muted);
   font-size: var(--text-sm-size);
 }
 
-/* Role pills: uppercase mono, one colour per grant family (design). */
+/* Role pills.
+ *
+ * The tint and the text used to be the SAME token: `--info-base` at 18% for the
+ * background and `--info-base` again for the letters on top of it. That is a
+ * hue on a wash of itself, which is a decoration, not a contrast — it measured
+ * 2.26:1 for finops and 2.31:1 for staff and was the first axe break in nine
+ * screens. The tint stays; the text drops to the ink end of the same ramp
+ * (`--*-strong`, which each theme already defines as the readable one), and the
+ * `-subtle` tokens replace the hand-mixed 18%.
+ *
+ * The size was a hardcoded 10px, off the scale entirely. `--text-xs-size` is
+ * the smallest rung the product has, and it is what this is now. */
 .od-role-pill {
-  padding: 2px 7px;
+  padding: var(--space-05) var(--space-2);
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   background: color-mix(in srgb, var(--text-muted) 16%, transparent);
   color: var(--text-secondary);
 }
 
 .od-role-pill[data-role="owner"] {
-  background: color-mix(in srgb, var(--info-base) 18%, transparent);
-  color: var(--info-base);
+  background: var(--info-subtle);
+  color: var(--info-strong);
 }
 
 .od-role-pill[data-role="staff"] {
-  background: color-mix(in srgb, var(--warning-base) 18%, transparent);
-  color: var(--warning-base);
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
 }
 
 .od-role-pill[data-role="settlement"] {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: var(--accent-subtle);
   color: var(--text-accent);
 }
 
 .od-role-pill[data-role="finops"] {
-  background: color-mix(in srgb, var(--success-base) 18%, transparent);
-  color: var(--success-base);
+  background: var(--success-subtle);
+  color: var(--success-strong);
 }
 
-/* The roles and joined columns fold away first on a narrow viewport; the
-   person and the action never do. */
-@media (max-width: 720px) {
-  .od-member-roles,
-  .od-member-cols .od-member-roles,
-  .od-member-joined,
-  .od-member-cols .od-member-joined {
+/* The "Joined" cell carries its own label once the header row folds away. */
+.od-member-joined-label {
+  display: none;
+}
+
+/* Narrow: the row STACKS, it does not shed.
+ *
+ * The roles and joined columns used to be `display: none` below 720px, which
+ * left seven members, zero role pills, and a "Make staff" / "Remove staff"
+ * button on every row — the buttons that change a role were visible while the
+ * role itself was not. On a phone there was no surface anywhere in the product
+ * that said who held what. */
+@media (max-width: 860px) {
+  .od-member-cols {
     display: none;
+  }
+
+  .od-member-row {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .od-member-person {
+    flex: 1 1 100%;
+  }
+
+  /* Under the name, aligned to the text rather than to the avatar. */
+  .od-member-roles {
+    flex: 1 1 auto;
+    width: auto;
+    justify-content: flex-start;
+    padding-left: calc(36px + var(--space-3));
+  }
+
+  .od-member-joined {
+    flex: none;
+    width: auto;
+  }
+
+  .od-member-joined-label {
+    display: inline;
+  }
+
+  .od-member-action {
+    width: auto;
+    margin-left: auto;
   }
 }

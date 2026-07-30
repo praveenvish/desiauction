@@ -39,6 +39,8 @@ export function PublicShell({
   footerNewsletter,
   footerNote,
   footerBottomLinks = [],
+  footerCompact = false,
+  contentFill = false,
   linkComponent: Link = "a",
   children,
 }: PublicShellProps) {
@@ -74,7 +76,16 @@ export function PublicShell({
                     }))}
                   />
                 ) : (
-                  <Link key={link.href} href={link.href} className={styles["nav-link"]}>
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={styles["nav-link"]}
+                    // The header's only statement of where you are. Without it
+                    // a screen-reader user tabbing the nav on /c hears five
+                    // destinations and no indication that one of them is the
+                    // page already open.
+                    aria-current={link.active === true ? "page" : undefined}
+                  >
                     {link.label}
                   </Link>
                 ),
@@ -88,12 +99,21 @@ export function PublicShell({
         </div>
       </header>
       {/* Pages own their <main> landmark; this is the skip-link target. */}
-      <div id="main-content" className={styles["content"]} tabIndex={-1}>
+      <div
+        id="main-content"
+        className={styles["content"]}
+        data-fill={contentFill ? "" : undefined}
+        tabIndex={-1}
+      >
         {children}
       </div>
-      <footer className={styles["footer"]} data-theme="floodlight">
+      <footer
+        className={styles["footer"]}
+        data-theme="floodlight"
+        data-compact={footerCompact ? "" : undefined}
+      >
         <div className={styles["footer-inner"]}>
-          {footerGroups.length > 0 ? (
+          {footerCompact ? null : footerGroups.length > 0 ? (
             <div className={styles["footer-grid"]}>
               <div className={styles["footer-brand"]}>
                 <span className={styles["wordmark"]}>

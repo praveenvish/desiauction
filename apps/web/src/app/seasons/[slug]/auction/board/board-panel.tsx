@@ -3,6 +3,7 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
 
 import { useLiveFeed } from "../live-experience";
+import { purseRowKey, teamPurseRows, type TeamIdentity } from "../purse-board";
 import { useAuctionSocket } from "../use-auction-socket";
 
 import type { ResolvedLot } from "../../../../../server/auction/live-summary";
@@ -31,11 +32,13 @@ export function BoardPanel({
   resolved,
   auctionName,
   competitionName,
+  teamIdentities,
 }: {
   wsUrl: string;
   resolved: ResolvedLot[];
   auctionName: string;
   competitionName: string;
+  teamIdentities: TeamIdentity[];
 }) {
   const { snapshot, connection } = useAuctionSocket(wsUrl);
   const feed = useLiveFeed(resolved, snapshot);
@@ -49,14 +52,19 @@ export function BoardPanel({
     null,
   );
 
+  // ONE ROW PER TEAM. This grid used to map paddles: on the projector two
+  // hundred people watch, a franchise that had handed a paddle back and taken
+  // another appeared three times, each card repeating the team's whole purse
+  // and its whole squad — the hall read three times the money and three times
+  // the players. Released paddles rendered as live purses too.
   const teams =
     snapshot !== null
-      ? snapshot.paddles
-          .map((paddle) => ({
-            ...paddle,
-            squad: soldLots.filter((lot) => lot.teamName === paddle.teamName).length,
+      ? teamPurseRows(snapshot, teamIdentities)
+          .map((row) => ({
+            ...row,
+            squad: soldLots.filter((lot) => lot.teamName === row.teamName).length,
           }))
-          .sort((a, b) => b.committed - a.committed)
+          .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName))
       : [];
 
   const recent = [...soldLots].reverse().slice(0, 8);
@@ -132,13 +140,14 @@ export function BoardPanel({
         <div className="board-team-grid">
           {teams.map((team) => (
             <article
-              key={team.paddleId}
+              key={team.teamId}
               className="board-team"
-              data-released={team.released}
-              data-testid={`board-team-${team.paddleNumber}`}
+              data-testid={`board-team-${purseRowKey(team)}`}
             >
               <div className="board-team-top">
-                <span className="board-paddle">{team.paddleNumber}</span>
+                <span className="board-paddle">
+                  {team.activePaddles.length > 0 ? team.activePaddles.join(" · ") : "—"}
+                </span>
                 <h3 className="board-team-name">{team.teamName}</h3>
               </div>
               <div className="board-team-purse">

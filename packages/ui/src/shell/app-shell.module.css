@@ -20,6 +20,15 @@
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
+  /* 44px is the platform's target rung — the one Field's control and Button's
+     `touch` size were standardised on. This link costs nothing to grow: it is
+     out of flow and only visible while focused, so the rung is free here even
+     though it is charged elsewhere. Sized from the border box so the padding
+     lands inside the 44 instead of stacking on top of it. */
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 
 .skip:focus-visible {
@@ -108,11 +117,44 @@ a.wordmark:hover .wordmark-glyph {
   min-width: 0;
 }
 
-/* Under 720px the rail is gone, so the brand rides the top bar. Brand wordmark
-   + title + actions do not fit 390px, so the wordmark keeps only its glyph —
-   still the tap target home, minus the eight characters nobody navigates by. */
+/* Under 720px the rail is gone, so the brand rides the top bar. Two axes meet
+   in this one rule, and the version it replaces weighed only the first.
+
+   WIDTH — brand wordmark + title + actions do not fit a 390px bar, so the eight
+   characters nobody navigates by have to give up their pixels. Unchanged.
+
+   NAME — `display: none` surrendered those characters from the ACCESSIBILITY
+   TREE as well, and the glyph beside them is aria-hidden because it is
+   decorative. That left a link in the tab order with no accessible name at all:
+   axe `link-name`, serious, on every authenticated page under 720px — the only
+   violation anywhere in the product. Clipping drops exactly the same pixels
+   while keeping the words, so the link is still announced "DesiAuction".
+
+   The mark stays decorative on purpose. Giving the glyph alt text would name
+   the link after the LOGO; what a reader needs to hear is where the link goes,
+   and the wordmark already says it. Same clip pattern as VisuallyHidden
+   (src/live/visually-hidden.module.css) — reused rather than re-invented, and
+   inlined here because a CSS module cannot compose across packages by class. */
 .topbar-brand .wordmark-text {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The brand is a tap target too, and on this side of 720px it is a touch one.
+   Height is free — the bar is already 56px — so it takes the full 44px rung.
+   Width deliberately stays with the 32px glyph: the extra 12px would come
+   straight out of the title beside it, which is the scarcest space in the
+   product, and this link has a same-destination twin one tab stop away in the
+   bottom tab bar ("Home") that is 98px wide and 64px tall. */
+.topbar-brand .wordmark {
+  min-height: 44px;
 }
 
 /* Breadcrumb over title, as one block: the pair moves together, so the title
@@ -174,7 +216,9 @@ a.wordmark:hover .wordmark-glyph {
 }
 
 /* Under 720px the bar cannot hold brand + title + a labelled button + icons, so
-   the action wraps to a full-width row of its own instead of being dropped. */
+   the action wraps to a full-width row of its own instead of being dropped.
+   The same arithmetic fails again between 720px and 1000px for a different
+   reason — see the squeeze-band block below the desktop rules. */
 @media (max-width: 719px) {
   .topbar {
     height: auto;
@@ -206,6 +250,23 @@ a.wordmark:hover .wordmark-glyph {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* The bar states the target size for whatever the app hangs in it, rather than
+   each control being talked into 44px one stylesheet at a time — these come
+   from three different modules (the app's icon buttons, InlineSearch, the
+   PopoverMenu trigger) and were 36x36, 36x36 and 46x38. `min-*` wins over the
+   `width`/`height: 36px` those modules declare, so nothing has to be edited
+   there and no other shell inherits the change.
+
+   Menu items are excluded by role: an open PopoverMenu renders its list INSIDE
+   this cluster, and a menu row is a line of text in a panel, not a chip in a
+   bar — 44px square is the wrong shape for it and would resize every console
+   menu as a side effect of resizing the bar. */
+.top-actions :is(a, button):not([role="menuitem"]) {
+  box-sizing: border-box;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* ---- section tabs: its own strip, parked flush under the identity bar ---- */
@@ -376,6 +437,88 @@ a.wordmark:hover .wordmark-glyph {
   }
 }
 
+/* ---- the squeeze band (720–1000px): the title stops paying for everyone ----
+
+   Below 720px the bar is narrow and everyone can see it. Between 720 and 1000
+   it LOOKS roomy and is not: the rail takes 248px off the top before the bar
+   starts, so at 768px the whole identity bar is 472px wide — narrower than the
+   phone bar it replaced. Into that go a title, a labelled action and four
+   utility controls, and only the title can shrink (`.page-action` and
+   `.top-actions` are both `flex: none`, deliberately, since a truncated button
+   label is worse than a truncated sentence). So the title absorbed the entire
+   shortfall on its own: 114px of the 271px it asked for at 768px, which is
+   "Good evenin…" — and because this shell owns the one `<h1>` for every console
+   page, it was every page's name that was losing half its characters, not one
+   greeting's.
+
+   The arithmetic is what decides it, not taste: 271 (title) + 156 (action) +
+   178 (utilities) + 3 gaps = 629px asked of a 472px bar. No distribution of one
+   row satisfies that, so a row has to give — the same conclusion, and the same
+   remedy, as the sub-720 rule above. 1000px is where the title clears its ask
+   with the action still beside it, and it is also the point where the title
+   holds at least half the bar (52% at 1000, 44% at 900, 28% at 768).
+
+   Two axes again, and the second one is why this is gated on `:has()` rather
+   than applied to the band wholesale: a second row costs vertical space, and
+   this bar is sticky on every screen of every session. Only a page that
+   actually HAS an action pays — an actionless tablet page keeps its 64px bar to
+   the pixel, and its title still clears 278px at 768, which is the whole ask.
+   That matters beyond tidiness: `.tabbar` parks at `--shell-topbar-h`, so a
+   taller bar and a tab strip cannot both be true on one page without the strip
+   sliding under it. Today the two never meet — page actions live on the four
+   rail-root surfaces (/home, /orgs, /seasons, /tournaments) and tab strips live
+   on the section surfaces below them — and this gate is what keeps that from
+   being a coincidence: only the four grow, and none of them has tabs.
+
+   It is the TITLE that takes the whole first row, not the action that takes the
+   second. Wrapping the action alone (what the sub-720 rule does) reads as the
+   cheaper change and is not: `flex-basis: 100%` breaks the line at the action,
+   and everything after it in the DOM — the whole utility cluster — is carried
+   onto a THIRD row. That bar is 167px tall. Giving the identity the full first
+   row instead leaves the action and the cluster together on the second, costs
+   one row rather than two, and hands the title 472px at 768 instead of 271 —
+   room the longest console title will not exhaust. */
+@media (min-width: 720px) and (max-width: 999px) {
+  .topbar:has(.page-action) {
+    height: auto;
+    padding-bottom: var(--space-3);
+  }
+
+  .topbar-inner:has(.page-action) {
+    height: auto;
+    min-height: var(--shell-topbar-h);
+    flex-wrap: wrap;
+  }
+
+  .topbar-inner:has(.page-action) .identity {
+    flex-basis: 100%;
+  }
+
+  /* Row two, flush right, in the reading order the wide bar already has: the
+     action at the head of the utility cluster. The auto margin moves to the
+     action so the pair travels together instead of the free space splitting
+     between two auto margins and stranding the action mid-row. */
+  .topbar-inner:has(.page-action) .page-action {
+    margin-left: auto;
+  }
+
+  .topbar-inner:has(.page-action) .top-actions {
+    margin-left: 0;
+  }
+}
+
+/* Below 1000px every pixel of the bar is charged to the title, and the utility
+   controls just grew from 36px to 44px — which would have taken 22px straight
+   back out of the title that the wrap above just paid for. Bigger targets need
+   less gutter between them anyway: at 44px the target IS the padding, and the
+   glyphs still sit 28px apart. Above 1000px there is slack, so the original
+   rhythm stands. */
+@media (max-width: 999px) {
+  .top-actions {
+    gap: var(--space-1);
+  }
+}
+
 /* ---- rail navigation ---- */
 .rail-group + .rail-group {
   margin-top: var(--space-3);
@@ -404,10 +547,20 @@ a.wordmark:hover .wordmark-glyph {
   gap: 3px;
 }
 
+/* 36px tall until the platform standardised on a 44px target. Grown here too,
+   which costs 8px of rhythm per item and ~56px down the whole rail — weighed
+   against this: the rail is not a desktop-only control. It appears at 720px,
+   which is a tablet held in two hands, and these seven rows are the most
+   frequently hit targets in the product. The cost is bounded (the rail is a
+   sticky 100dvh column with room to spare at every viewport it renders in, and
+   it scrolls if a future group overflows), the benefit is on every session.
+   Sized from the border box so the existing padding lands inside the 44. */
 .rail-item {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  box-sizing: border-box;
+  min-height: 44px;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   color: color-mix(in srgb, var(--identity-glyph) 76%, transparent);

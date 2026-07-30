@@ -1,0 +1,24 @@
+/* Competition detail page (`/c/[slug]`) only. Deliberately additive: every
+   selector here is a class this page introduces, so loading this file cannot
+   restyle anything the directory (`directory.css`) already owns and shares with
+   the showcase. */
+
+/* The hero used to carry exactly one badge, so a single element could sit
+   directly in `.public-hero-inner`'s flex column. A live auction adds a second
+   one that has to sit BESIDE the registration state, not stack above it. */
+.public-hero-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The one thing on this page that costs a visitor nothing, said before they
+   commit to the click — the same promise the directory card makes one level up
+   ("No account needed"), so arriving here does not quietly withdraw it. */
+.public-live-note {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}

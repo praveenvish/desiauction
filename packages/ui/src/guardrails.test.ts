@@ -37,4 +37,32 @@ describe("token purity", () => {
     }
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
+
+  /**
+   * The space scale is deliberately gappy — it runs 0, 05, 1..6, 8, 10, 12, 16,
+   * 20, 24, with NO --space-7 and NO --space-9. Reaching for one of the missing
+   * rungs fails in the worst possible way: an unresolvable var() makes the whole
+   * declaration invalid at computed-value time, so `padding: var(--space-3)
+   * var(--space-7)` does not fall back to the first value — it drops the padding
+   * entirely, silently, with no console warning and no build error. Cheap to
+   * mistype, expensive to spot by eye. Caught here instead.
+   */
+  it("every --space reference resolves to a rung the scale actually defines", () => {
+    const scale = new Set(
+      readFileSync(join(SRC, "generated", "primitives.css"), "utf8").match(/--space-[0-9]+(?=:)/g),
+    );
+    const offenders: string[] = [];
+    for (const file of sourceFiles(SRC)) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          for (const ref of line.match(/--space-[0-9]+/g) ?? []) {
+            if (!scale.has(ref)) {
+              offenders.push(`${file.replace(SRC, "src")}:${String(index + 1)}  ${ref}`);
+            }
+          }
+        });
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
 });

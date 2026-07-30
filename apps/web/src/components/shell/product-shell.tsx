@@ -19,6 +19,7 @@ import {
   SubNavTabs,
   type InlineSearchHandle,
   type PaletteGroup,
+  type PublicShellLink,
   type ShellNavItem,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -28,12 +29,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { INBOX_SEEN_KEY } from "../../app/inbox/inbox-list";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
-import {
-  IconCamera,
-  IconGlobe,
-  IconMessageCircle,
-  IconPlay,
-} from "../../components/marketing/icons";
+import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
 import { BrandMark } from "./brand";
 import {
@@ -51,6 +47,7 @@ import {
   shellKind,
 } from "./nav";
 import { ShellActionContext } from "./page-action";
+import { ShellStatusContext } from "./page-status";
 import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
 import { ThemeToggle } from "./theme-toggle";
 import "./product-shell.css";
@@ -122,6 +119,39 @@ const RAIL_ICONS: Record<string, ReactNode> = {
   help: <IconHelp />,
 };
 
+/**
+ * The public header's five destinations, with the one you are already on marked
+ * so the shell can render `aria-current="page"`.
+ *
+ * "Tournaments" used to sit between two feature names ("Features", "Pricing")
+ * and read as a third — a thing the product has, rather than a place to go. The
+ * verb makes it a destination: the public directory of published tournaments.
+ *
+ * Matching is EXACT. A prefix match would light "Browse tournaments" up on
+ * /c/<slug> too, where the link no longer points at the page you are reading —
+ * `aria-current="page"` means this page, not this neighbourhood.
+ */
+function publicNav(pathname: string): PublicShellLink[] {
+  const mark = (link: PublicShellLink): PublicShellLink =>
+    link.href === pathname ? { ...link, active: true } : link;
+  return [
+    { label: "Features", href: "/features" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "Browse tournaments", href: "/c" },
+    {
+      label: "Resources",
+      href: "/help",
+      children: [
+        { label: "Help center", href: "/help" },
+        { label: "Blog", href: "/blog" },
+        { label: "Case studies", href: "/case-studies" },
+        { label: "API docs", href: "/api-docs" },
+      ].map(mark),
+    },
+    { label: "About", href: "/about" },
+  ].map(mark);
+}
+
 /** The design system has no gear glyph; the utility group needs one. */
 function IconSettings() {
   return (
@@ -156,6 +186,8 @@ export function ProductShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
   const [pageAction, setPageAction] = useState<ReactNode | null>(null);
+  // The Live shell's status strip, published by the page that owns the socket.
+  const [liveStatus, setLiveStatus] = useState<ReactNode | null>(null);
   const searchRef = useRef<InlineSearchHandle | null>(null);
   const kind = shellKind(pathname);
 
@@ -198,6 +230,15 @@ export function ProductShell({
       publish: setPageAction,
       retract: (token: ReactNode) => {
         setPageAction((current) => (current === token ? null : current));
+      },
+    }),
+    [],
+  );
+  const statusChannel = useMemo(
+    () => ({
+      publish: setLiveStatus,
+      retract: (token: ReactNode) => {
+        setLiveStatus((current) => (current === token ? null : current));
       },
     }),
     [],
@@ -444,57 +485,62 @@ export function ProductShell({
   if (kind === "live") {
     const exit = liveExit(pathname, session !== null);
     return (
-      <LiveShell
-        exitHref={exit.href}
-        exitLabel={exit.label}
-        linkComponent={Link}
-        brand={<BrandMark size={26} />}
-      >
-        {children}
-      </LiveShell>
+      // The live surfaces own the viewport, so the header strip is all the
+      // chrome they get: the one door out, the mark, and — now that a page can
+      // publish it (`PageStatus`) — the status ribbon, instead of a second copy
+      // of the auction's name inside the page's own content.
+      <ShellStatusContext.Provider value={statusChannel}>
+        <LiveShell
+          exitHref={exit.href}
+          exitLabel={exit.label}
+          linkComponent={Link}
+          brand={<BrandMark size={26} />}
+          // A spectator arrives with no account and the mark was dead text on
+          // the one screen the product is most often shared from.
+          brandHref="/"
+          {...(liveStatus !== null ? { statusSlot: liveStatus } : {})}
+        >
+          {children}
+        </LiveShell>
+      </ShellStatusContext.Provider>
     );
   }
 
   if (kind === "public" || session === null) {
+    // The gate is a conversion surface: it keeps the header (an escape hatch
+    // back into the site) but not the sitemap footer, and not the two header
+    // controls that point at the page you are already reading.
+    const atGate = pathname === "/login";
     return (
       <PublicShell
         wordmark="DesiAuction"
         wordmarkHref="/"
         glyph={<BrandMark size={30} />}
-        nav={[
-          { label: "Features", href: "/features" },
-          { label: "Pricing", href: "/pricing" },
-          { label: "Tournaments", href: "/c" },
-          {
-            label: "Resources",
-            href: "/help",
-            children: [
-              { label: "Help center", href: "/help" },
-              { label: "Blog", href: "/blog" },
-              { label: "Case studies", href: "/case-studies" },
-              { label: "API docs", href: "/api-docs" },
-            ],
-          },
-          { label: "About", href: "/about" },
-        ]}
+        nav={publicNav(pathname)}
         headerAction={
           session !== null ? (
             <Link className="shell-header-cta" href="/home">
               Open console
             </Link>
-          ) : (
+          ) : atGate ? null : (
             <>
               <Link className="shell-header-link" href="/login">
                 Sign in
               </Link>
               <Link className="shell-header-cta shell-desktop-only" href="/login">
-                Run your auction
+                Start your auction
               </Link>
             </>
           )
         }
+        footerCompact={atGate}
+        contentFill={atGate}
         // PX-10: the complete public footer (PX-1 01 §3) — only routes that
         // exist (the PX-2 no-dead-links ruling), all shipped in this milestone.
+        // Every footer link is a real route (the PX-2 no-dead-links ruling);
+        // 2026-07-25 founder call restored the newsletter and filled the
+        // groups out. What stays retired: superlatives the product can't
+        // evidence, and decorative social icons that link nowhere.
         footerGroups={[
           {
             label: "Product",
@@ -503,6 +549,7 @@ export function ProductShell({
               { label: "How it works", href: "/#how" },
               { label: "Pricing", href: "/pricing" },
               { label: "Security", href: "/security" },
+              { label: "Release notes", href: "/releases" },
             ],
           },
           {
@@ -518,6 +565,8 @@ export function ProductShell({
             label: "Resources",
             links: [
               { label: "Help center", href: "/help" },
+              { label: "FAQ", href: "/help/faq" },
+              { label: "Support", href: "/support" },
               { label: "Blog", href: "/blog" },
               { label: "Case studies", href: "/case-studies" },
               { label: "API docs", href: "/api-docs" },
@@ -533,22 +582,22 @@ export function ProductShell({
             ],
           },
         ]}
-        footerTagline="The most trusted platform to run live player auctions for tournaments across India."
-        footerSocial={
-          <>
-            <IconCamera />
-            <IconPlay />
-            <IconMessageCircle />
-            <IconGlobe />
-          </>
-        }
+        footerTagline="Live player auctions for Indian tournaments — server-verified bidding, settled to the rupee."
         footerNewsletter={<NewsletterForm />}
         footerNote="© 2026 DesiAuction — in beta. Tournament auctions, taken seriously."
-        footerBottomLinks={[
-          { label: "Privacy Policy", href: "/legal/privacy" },
-          { label: "Terms of Use", href: "/legal/terms" },
-          { label: "Refund Policy", href: "/legal/refunds" },
-        ]}
+        footerBottomLinks={
+          atGate
+            ? [
+                { label: "Privacy", href: "/legal/privacy" },
+                { label: "Terms", href: "/legal/terms" },
+                { label: "Support", href: "/support" },
+              ]
+            : [
+                { label: "Privacy Policy", href: "/legal/privacy" },
+                { label: "Terms of Use", href: "/legal/terms" },
+                { label: "Refund Policy", href: "/legal/refunds" },
+              ]
+        }
         linkComponent={Link}
       >
         {children}
@@ -675,7 +724,7 @@ export function ProductShell({
             <Link className="shell-railuser" href="/account">
               <span className="shell-railuser-avatar">{initials}</span>
               <span className="shell-railuser-text">
-                <strong>{session.name ?? session.phone}</strong>
+                <strong>{session.name ?? formatPhone(session.phone)}</strong>
                 <span>Organizer</span>
               </span>
             </Link>
@@ -742,7 +791,9 @@ export function ProductShell({
                 <PopoverMenu
                   label="Account menu"
                   trigger={<span className="shell-avatar">{initials}</span>}
-                  header={<span data-testid="shell-session-phone">{session.phone}</span>}
+                  header={
+                    <span data-testid="shell-session-phone">{formatPhone(session.phone)}</span>
+                  }
                   items={[
                     {
                       key: "account",
@@ -799,56 +850,69 @@ export function ProductShell({
         >
           {children}
         </AppShell>
-        <Drawer
-          open={drawerOpen}
-          onClose={() => {
-            setDrawerOpen(false);
-          }}
-          title="Menu"
-        >
-          <div className="shell-drawer-session">{session.phone}</div>
-          <ul className="shell-drawer-list">
-            {orgs.map((org) => (
-              <li key={org.slug}>
-                <Link href={`/org/${org.slug}`} className="shell-drawer-link">
-                  {org.name}
-                </Link>
-              </li>
-            ))}
-            <li>
-              <Link href="/account" className="shell-drawer-link">
-                Account
-              </Link>
-            </li>
-            <li>
-              <Link href="/help" className="shell-drawer-link">
-                Help
-              </Link>
-            </li>
-            {isAdmin ? (
+        {/* Mounted only while open, as on the public shell. A closed <dialog>
+            keeps its whole subtree in the DOM, and the Drawer titles itself
+            with an <h2> — so an always-mounted menu left a level-2 heading in
+            the markup of every console page, at every width, belonging to a
+            panel nobody had opened. Assistive tech was never affected (a closed
+            <dialog> is display:none, so it is absent from the a11y tree and
+            from axe's outline); what does see it is anything reading the DOM
+            blind to visibility — `locator("h2")`, `getByLabel` — the same noise
+            that makes FormDialog's fields ambiguous. Nothing is lost by
+            mounting late: the drawer keeps no state between openings, and
+            Drawer's own effect calls showModal() on mount. */}
+        {drawerOpen ? (
+          <Drawer
+            open
+            onClose={() => {
+              setDrawerOpen(false);
+            }}
+            title="Menu"
+          >
+            <div className="shell-drawer-session">{formatPhone(session.phone)}</div>
+            <ul className="shell-drawer-list">
+              {orgs.map((org) => (
+                <li key={org.slug}>
+                  <Link href={`/org/${org.slug}`} className="shell-drawer-link">
+                    {org.name}
+                  </Link>
+                </li>
+              ))}
               <li>
-                <Link href="/admin" className="shell-drawer-link">
-                  Platform admin
+                <Link href="/account" className="shell-drawer-link">
+                  Account
                 </Link>
               </li>
-            ) : null}
-            {/* The theme switch rides here under 720px: the bar has room for the
-              title or a fourth icon, and the title is what people navigate by. */}
-            <li className="shell-drawer-row">
-              <span>Theme</span>
-              <ThemeToggle />
-            </li>
-            <li>
-              <button
-                type="button"
-                className="shell-drawer-link shell-drawer-danger"
-                onClick={() => void logout()}
-              >
-                Sign out
-              </button>
-            </li>
-          </ul>
-        </Drawer>
+              <li>
+                <Link href="/help" className="shell-drawer-link">
+                  Help
+                </Link>
+              </li>
+              {isAdmin ? (
+                <li>
+                  <Link href="/admin" className="shell-drawer-link">
+                    Platform admin
+                  </Link>
+                </li>
+              ) : null}
+              {/* The theme switch rides here under 720px: the bar has room for the
+                title or a fourth icon, and the title is what people navigate by. */}
+              <li className="shell-drawer-row">
+                <span>Theme</span>
+                <ThemeToggle />
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="shell-drawer-link shell-drawer-danger"
+                  onClick={() => void logout()}
+                >
+                  Sign out
+                </button>
+              </li>
+            </ul>
+          </Drawer>
+        ) : null}
       </ShellActionContext.Provider>
     </ShellTitleContext.Provider>
   );

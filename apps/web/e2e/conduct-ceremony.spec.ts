@@ -35,9 +35,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
+  // PX-3: the name gate now guards every console route, not just /home — a
+  // fresh account that stops here never reaches the org/tournament screens
+  // this helper is used to reach.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 async function axeClean(page: Page, surface: string): Promise<void> {
@@ -120,6 +128,10 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  // Feasibility: these fixtures run a handful of players against squads of 8,
+  // which the setup screen now refuses until the shortfall is accepted on the
+  // record (it is the state that used to become an unclosable auction).
+  await organizer.getByTestId("accept-short-squads").check();
   await organizer.getByTestId("create-auction").click();
   await expect(organizer.getByTestId("auction-status")).toHaveText("scheduled", {
     timeout: 20_000,
@@ -244,12 +256,26 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(bigScreen.getByTestId("ceremony")).toHaveAttribute("data-phase", "sold", {
     timeout: 20_000,
   });
+  // DA-P0-5: undo reverses a sale, a squad and a team's money in front of a
+  // hall, so it asks first and NAMES what it is about to reverse.
   await organizer.getByTestId("cockpit-undo").click();
-  await expect(organizer.getByTestId("ceremony")).toHaveAttribute("data-phase", "reopened", {
+  await expect(organizer.getByTestId("undo-summary")).toContainText("reverses the sale");
+  await organizer.getByTestId("confirm-undo").click();
+  // DA-P0-6: an undone lot comes back HELD, not on a running 30-second clock —
+  // a correction must not be able to turn into a lost player.
+  await expect(organizer.getByTestId("ceremony")).toHaveAttribute("data-phase", "hold", {
     timeout: 20_000,
   });
+  await expect(organizer.getByTestId("ribbon-timer")).toHaveCount(0);
   // The purse restored on EVERY surface (compensation, not deletion).
   await expect(bigScreen.getByTestId("spectate-team-P02")).toContainText("₹2,00,00,000", {
+    timeout: 20_000,
+  });
+  // The auctioneer restarts it deliberately: requeue the frozen lot, open it.
+  await organizer.getByTestId("requeue-L001").click();
+  await expect(organizer.getByTestId("queue-L001")).toBeVisible({ timeout: 20_000 });
+  await organizer.getByTestId("open-L001").click();
+  await expect(organizer.getByTestId("ceremony")).toHaveAttribute("data-phase", "opening", {
     timeout: 20_000,
   });
   // Owner A takes the lead on the reopened lot right away (bidding restarts
@@ -361,9 +387,13 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   for (const page of [ownerA, ownerB, bigScreen]) {
     await expect(page.getByTestId("ribbon-status")).toHaveText("completed", { timeout: 20_000 });
   }
+  // Read from `data-version`, not the rendered text: the snapshot version is
+  // operator diagnostics, and the public stage (bigScreen here) now keeps it as
+  // a tooltip rather than printing "v47" in a spectator's chrome. The attribute
+  // is on every surface, so the convergence check still spans all four windows.
   const versions = await Promise.all(
     [organizer, ownerA, ownerB, bigScreen].map(
-      async (page) => (await page.getByTestId("ribbon-version").textContent()) ?? "",
+      async (page) => (await page.getByTestId("ribbon-version").getAttribute("data-version")) ?? "",
     ),
   );
   expect(new Set(versions).size).toBe(1);

@@ -13,6 +13,13 @@ import { inArray } from "drizzle-orm";
 // unverified person STUBS (phone is the identity anchor, C-24); each still lands
 // in `submitted` and enters the pool through the same human approval gate
 // (invariant 5). The whole import is one transaction: rollback-safe.
+//
+// DA-35 — DELIBERATE: no competition-status check, for the same reason
+// `addPlayerByPhone` has none. Closure shuts the PUBLIC door against strangers
+// arriving from a shared link; an organizer importing a roster they already
+// hold is the authority that closed it, not a stranger walking through it.
+// `submitRegistration` (the public path) keeps its `not_open` refusal, which is
+// where closure has to bite. The import dialog says which of the two you are in.
 
 export interface ImportResult {
   imported: number;

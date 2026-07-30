@@ -18,6 +18,9 @@ import {
   MyTeamCard,
   useLiveFeed,
 } from "../live-experience";
+import { PageStatus } from "../../../../../components/shell/page-status";
+import { AuctionAnnouncer } from "../auction-announcer";
+import { GavelButton } from "../cockpit/gavel-button";
 import { LotHero } from "../lot-hero";
 import { PaddleControl } from "../paddle-control";
 import { PurseBoard } from "../purse-board";
@@ -47,23 +50,30 @@ function commandId(): string {
 export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView }) {
   const router = useRouter();
   const toast = useToast();
-  const { snapshot, connection, remainingMs, version, ceremony, drift } = useAuctionSocket(
-    view.wsUrl,
-  );
+  const { snapshot, connection, remainingMs, version, ceremony, drift, stale, offline } =
+    useAuctionSocket(view.wsUrl);
   const feed = useLiveFeed(view.resolved, snapshot);
-  const readOnly = connection !== "open";
+  // The device being offline is as good a reason to stop taking bids as the
+  // socket being down — both mean the snapshot on screen is a memory.
+  const readOnly = stale;
   const [claimTeam, setClaimTeam] = useState(view.myPaddle?.teamId ?? "");
-  const [busy, setBusy] = useState(false);
+  /**
+   * DA: ONE global `busy` flag used to disable every button on the page while
+   * any command was in flight — including the gavel. Waiting on "Queue lots"
+   * is not a reason to take the gavel away from the auctioneer. The pending
+   * key names the ONE control that is actually working.
+   */
+  const [pending, setPending] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
   }, []);
 
   const send = useCallback(
-    async (type: string, payload: Record<string, unknown>, done?: string) => {
-      setBusy(true);
+    async (key: string, type: string, payload: Record<string, unknown>, done?: string) => {
+      setPending(key);
       const ack = await submitAuctionCommand(slug, commandId(), type, payload);
-      setBusy(false);
+      setPending(null);
       if (ack.accepted) {
         if (done !== undefined) {
           toast({ title: done, tone: "success" });
@@ -75,6 +85,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     },
     [slug, toast],
   );
+  const bidBusy = pending === "bid";
 
   // DA-02: which of my paddles is bidding. A conductor running the night from
   // one laptop holds several; the room used to bind to the first one for ever.
@@ -83,7 +94,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     view.myPaddles.find((entry) => entry.paddleId === activePaddleId) ?? view.myPaddle;
 
   const claim = async () => {
-    if (await send("ClaimPaddle", { teamId: claimTeam }, "Paddle claimed")) {
+    if (await send("claim", "ClaimPaddle", { teamId: claimTeam }, "Paddle claimed")) {
       router.refresh();
     }
   };
@@ -97,7 +108,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     if (teamId === undefined) {
       return;
     }
-    if (await send("ReleasePaddle", { teamId }, "Paddle released")) {
+    if (await send("release", "ReleasePaddle", { teamId }, "Paddle released")) {
       router.refresh();
     }
   };
@@ -139,7 +150,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     if (lotId === undefined) {
       return;
     }
-    await send("PlaceBid", { lotId, paddleId: myPaddle.paddleId, amountRaw: amount });
+    await send("bid", "PlaceBid", { lotId, paddleId: myPaddle.paddleId, amountRaw: amount });
   };
 
   // PX-6 bidder notifications: outbid (I was leading, now someone else) and
@@ -189,6 +200,13 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       resolvedLot.status === "sold" &&
       (resolvedLot.teamId === myPaddle?.teamId || resolvedLot.teamName === myPaddle?.teamName),
   ).length;
+  /** The auction is not taking bids — paused, or over. */
+  const notTakingBids = snapshot !== null && snapshot.auctionStatus !== "live";
+  const finished =
+    snapshot !== null &&
+    (snapshot.auctionStatus === "completed" ||
+      snapshot.auctionStatus === "reconciled" ||
+      snapshot.auctionStatus === "abandoned");
 
   return (
     <div
@@ -196,35 +214,21 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       data-testid="live-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
-      <StatusRibbon snapshot={snapshot} connection={connection} remainingMs={remainingMs} />
+      <AuctionAnnouncer snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
+      {/* The ribbon rides in the Live shell's header, as it already did on
+          /spectate. Two sticky bars used to sit at top: 0 and OVERLAP (measured
+          0-69 and 0-74) — the shell's header and the page's own ribbon, each
+          unaware of the other. One bar now, and 74px of the phone back. */}
+      <PageStatus>
+        <StatusRibbon
+          snapshot={snapshot}
+          connection={connection}
+          remainingMs={remainingMs}
+          variant="shell"
+          offline={offline}
+        />
+      </PageStatus>
 
-      {/* The ribbon above already carries status, connection and version. This
-          strip adds only what it does not: progress, clock drift, and the
-          read-only warning. It used to repeat all three in a second card. */}
-      <div className="live-substatus">
-        {snapshot !== null ? (
-          <AuctionProgress snapshot={snapshot} />
-        ) : (
-          <p className="competitions-hint">Waiting for the first snapshot…</p>
-        )}
-        <span className="live-substatus-meta">
-          <ConnectionQuality connection={connection} drift={drift} />
-          <span className="competitions-hint" data-testid="snapshot-version">
-            v{version}
-          </span>
-          {snapshot !== null ? (
-            <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
-              {snapshot.auctionStatus}
-            </Badge>
-          ) : null}
-          <Badge
-            tone={connection === "open" ? "success" : "warning"}
-            data-testid="connection-state"
-          >
-            {connection}
-          </Badge>
-        </span>
-      </div>
       {readOnly && snapshot !== null ? (
         <p role="alert" className="live-readonly" data-testid="readonly-banner">
           Reconnecting — you&apos;re seeing the last known state; bidding is disabled until
@@ -253,6 +257,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
                 remainingMs={remainingMs}
                 lotDurationMs={lotDurationMs}
                 leadColor={leadColor}
+                frozen={notTakingBids}
               />
               {myPaddle !== null ? (
                 <PaddleControl
@@ -262,7 +267,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
                   myPaddleNumber={myPaddle.paddleNumber}
                   myTeam={myTeam}
                   squadSigned={mySquadSigned}
-                  disabled={readOnly || busy}
+                  disabled={readOnly || bidBusy}
                   onBid={(amount) => {
                     void bid(amount);
                   }}
@@ -315,6 +320,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               feed={feed}
             />
           ) : null}
+          {snapshot !== null ? <AuctionProgress snapshot={snapshot} /> : null}
           <PurseBoard
             snapshot={snapshot}
             teams={view.teams}
@@ -365,7 +371,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             <Button
               variant="ghost"
               onClick={() => void release()}
-              loading={busy}
+              loading={pending === "release"}
               data-testid="release-paddle"
             >
               Hand back paddle
@@ -390,7 +396,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             </Select>
             <Button
               onClick={() => void claim()}
-              loading={busy}
+              loading={pending === "claim"}
               disabled={claimTeam === ""}
               data-testid="claim-paddle"
             >
@@ -426,38 +432,50 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           <div className="date-row">
             <Button
               variant="secondary"
-              onClick={() => void send("QueueLots", {}, "Lots queued")}
-              loading={busy}
+              onClick={() => void send("queue", "QueueLots", {}, "Lots queued")}
+              loading={pending === "queue"}
+              disabled={finished}
               data-testid="conduct-queue"
             >
               Queue lots
             </Button>
             <Button
               onClick={() =>
-                void send("OpenLot", { lotId: snapshot?.queue[0]?.lotId ?? "" }, "Lot opened")
+                void send(
+                  "open-lot",
+                  "OpenLot",
+                  { lotId: snapshot?.queue[0]?.lotId ?? "" },
+                  "Lot opened",
+                )
               }
-              loading={busy}
-              disabled={(snapshot?.queue.length ?? 0) === 0}
+              loading={pending === "open-lot"}
+              disabled={(snapshot?.queue.length ?? 0) === 0 || lot !== null || notTakingBids}
               data-testid="conduct-open-lot"
             >
               Open next lot{snapshot?.queue[0] ? ` (${snapshot.queue[0].lotNumber})` : ""}
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => void send("CloseLot", { lotId: lot?.lotId ?? "" }, "Lot closed")}
-              loading={busy}
-              disabled={lot === null}
-              data-testid="conduct-close-lot"
-            >
-              Close lot (gavel)
-            </Button>
+            {/* v1.1 G2: closing a lot is a HOLD, not a click — the same gate the
+                cockpit has had all along. This panel was the one place in the
+                product where the gavel was still a single tap, so the rule the
+                cockpit enforces could be walked around by opening /live. */}
+            <GavelButton
+              onConfirm={() => {
+                void send("close-lot", "CloseLot", { lotId: lot?.lotId ?? "" }, "Lot closed");
+              }}
+              disabled={lot === null || pending === "close-lot"}
+              testId="conduct-close-lot"
+              describedBy="live-gavel-hint"
+            />
           </div>
+          <p className="competitions-hint" id="live-gavel-hint">
+            Hold the gavel for a moment to close the lot — a tap will not do it.
+          </p>
           <div className="date-row">
             {snapshot?.auctionStatus === "live" ? (
               <Button
                 variant="ghost"
-                onClick={() => void send("PauseAuction", {}, "Paused")}
-                loading={busy}
+                onClick={() => void send("pause", "PauseAuction", {}, "Paused")}
+                loading={pending === "pause"}
                 data-testid="conduct-pause"
               >
                 Pause
@@ -466,34 +484,68 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             {snapshot?.auctionStatus === "paused" ? (
               <Button
                 variant="ghost"
-                onClick={() => void send("ResumeAuction", {}, "Resumed")}
-                loading={busy}
+                onClick={() => void send("resume", "ResumeAuction", {}, "Resumed")}
+                loading={pending === "resume"}
                 data-testid="conduct-resume"
               >
                 Resume
               </Button>
             ) : null}
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setCompleteOpen(true);
-              }}
-              loading={busy}
-              data-testid="conduct-complete"
-            >
-              Close auction
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => void send("RecoverAuction", {}, "Recovered — state verified")}
-              loading={busy}
-              data-testid="conduct-recover"
-            >
-              Recover
-            </Button>
+            {/* A finished auction cannot be completed, undone or recovered. The
+                room used to keep offering all three after the night was over. */}
+            {finished ? null : (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setCompleteOpen(true);
+                  }}
+                  data-testid="conduct-complete"
+                >
+                  Close auction
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    void send("recover", "RecoverAuction", {}, "Recovered — state verified")
+                  }
+                  loading={pending === "recover"}
+                  data-testid="conduct-recover"
+                >
+                  Recover
+                </Button>
+              </>
+            )}
           </div>
         </Card>
       ) : null}
+
+      {/* FEED DIAGNOSTICS — the operator's convergence check, and the only place
+          on this page raw transport words appear. The strip used to sit ABOVE
+          the lot, restating `live`, `open`, a version and a drift figure that
+          the ribbon already says in the room's own language — four statements
+          of transport state on one phone screen, one of them (`OPEN`) the raw
+          WebSocket readyState contradicting the ribbon's "Live feed". */}
+      <div className="live-diagnostics" data-testid="live-diagnostics">
+        <span className="live-diagnostics-label">Feed diagnostics</span>
+        <span className="live-substatus-meta">
+          <ConnectionQuality connection={connection} drift={drift} />
+          <span className="competitions-hint" data-testid="snapshot-version">
+            v{version}
+          </span>
+          {snapshot !== null ? (
+            <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
+              {snapshot.auctionStatus}
+            </Badge>
+          ) : null}
+          <Badge
+            tone={connection === "open" ? "success" : "warning"}
+            data-testid="connection-state"
+          >
+            {connection}
+          </Badge>
+        </span>
+      </div>
       <Dialog
         open={completeOpen}
         onClose={() => {
@@ -514,7 +566,6 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             </Button>
             <Button
               onClick={() => void confirmComplete()}
-              loading={busy}
               disabled={shortSquads && overrideReason.trim() === ""}
               data-testid="confirm-complete"
             >

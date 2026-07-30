@@ -8,26 +8,42 @@
   color: var(--text-primary);
 }
 
-.public-head {
-  padding: clamp(var(--space-10), 6vw, var(--space-16)) 0 var(--space-8);
-}
-
-.public-head h1 {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-semibold);
+/* The directory head is the SAME floodlit slab as the competition hero one
+   level down (`.public-hero`, below) — `/c` declared no surface at all, so it
+   rendered on the daylight page surface between a dark header and a dark
+   footer, and every `--text-accent` in it resolved to a muddy #865D12 instead
+   of brand gold. This block only trims the hero for a page whose h1 is one
+   word; the surface, the beams and the hairline all come from `.public-hero`.
+   The doubled class outranks `.public-hero h1`, declared later in this same
+   file, which would otherwise win on source order. */
+.public-hero.public-head h1 {
   font-size: clamp(2.25rem, 5vw, var(--display-md-size));
   line-height: 1.05;
   letter-spacing: -0.015em;
-  color: var(--text-heading);
-  margin: 0 0 var(--space-2);
+}
+
+/* `.public-hero-inner` is a flex column with its own gap, so the bottom margins
+   these carry elsewhere would stack on top of it. */
+.public-head .mk-kicker,
+.public-head h1,
+.public-head .public-sub {
+  margin-bottom: 0;
 }
 
 .public-sub {
   color: var(--text-secondary);
   font-size: var(--text-md-size);
   line-height: var(--text-md-line);
-  margin: 0 0 var(--space-6);
+  margin: 0;
   max-width: 56ch;
+}
+
+.public-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 760px;
 }
 
 .public-search {
@@ -35,7 +51,6 @@
   gap: var(--space-2);
   align-items: flex-end;
   flex-wrap: wrap;
-  max-width: 560px;
 }
 
 .public-search > :first-child {
@@ -43,8 +58,109 @@
   min-width: 200px;
 }
 
+/* One row, one height. The input carried the Field's 40px min-height plus its
+   own line-box (42px) while the button sat at 40px, so the two controls in a
+   single flex row had different heights AND different top edges. 44px is also
+   the touch-target floor, which the 40px button missed. */
+.public-search input,
+.public-search button,
+.public-search a {
+  min-height: 44px;
+}
+
+/* Skeletons paint `--surface-sunken`, which on the floodlit head is #070A0F —
+   all but invisible against the head's own gradient. A hairline gives the
+   placeholder an edge to be seen by without touching the shared primitive. */
+.public-controls-loading > * {
+  border: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+
+.public-facets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* The facet chips are LINKS, not buttons: a filtered directory is a URL a
+   visitor can send someone, exactly like `?q=`. `.showcase-filter` is shared
+   with the player showcase one level down, so only the anchor-specific reset
+   lives here. */
+/* No min-height here: this selector is more specific than `.showcase-filter`,
+   so a value set here silently defeats the 44px hit area the base rule now
+   establishes. Height is the base rule's job. */
+.public-filters a.showcase-filter {
+  text-decoration: none;
+}
+
+.public-filters a.showcase-filter:hover {
+  border-color: var(--border-interactive);
+  color: var(--text-primary);
+}
+
+/* `.showcase-filter[data-active]` marks selection by SINKING the chip — which
+   reads as pressed on the daylight surface it was built for, and as switched
+   OFF on this floodlit one, where sunken is darker and the strong border is
+   dimmer than the subtle one. Selection here is stated in accent instead, so it
+   reads the same way under either palette. */
+.public-filters a.showcase-filter[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text-heading);
+}
+
+.public-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.public-sort-label {
+  white-space: nowrap;
+}
+
 .public-body {
+  padding-top: clamp(var(--space-8), 5vw, var(--space-12));
   padding-bottom: clamp(var(--space-12), 7vw, var(--space-20));
+}
+
+.public-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.public-results-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.public-count {
+  margin: 0;
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.public-helper {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.public-empty-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
 }
 
 /* --- Directory cards ---------------------------------------------------------- */
@@ -53,6 +169,24 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: var(--space-5);
+}
+
+/* Three columns at 1440, three at 1920 and three at 2560 — because `auto-fill`
+   can only fill the space it is given, and `.mk-container` caps at 1200px, so
+   every screen above ~1250px spent its extra width on margin. On a browse
+   surface that is a straight trade of one more tournament in view for one more
+   scroll. Widened only around the RESULTS: the hero, its search field and the
+   facet chips keep their reading measure, because a 1500px-wide search input
+   is worse than a 1200px one, not better. A page holds 12, so 4 columns divide
+   evenly and the last row is never a ragged remainder. */
+@media (min-width: 1600px) {
+  .public-body > .mk-container {
+    max-width: 1560px;
+  }
+
+  .public-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .public-card-link {
@@ -90,75 +224,71 @@
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
 }
 
-/* Banner art: a floodlit night in one of four color moods, chosen
-   deterministically from the slug so a competition keeps its colors. */
-.public-card-art {
-  position: relative;
-  height: 112px;
-  background:
-    radial-gradient(
-      18rem 9rem at 82% -30%,
-      color-mix(in srgb, var(--art-glow) 55%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      14rem 8rem at 12% 120%,
-      color-mix(in srgb, var(--art-glow) 30%, transparent),
-      transparent 65%
-    ),
-    linear-gradient(160deg, var(--identity-field), var(--identity-field-deep));
+/* The card lifted on hover and then did nothing at all on press, so on a phone
+   — where there is no hover — the entire gesture was silent and the only
+   feedback was the next page arriving. It presses IN: the hover lift is undone
+   and the shadow drops back, which is the same physical story in reverse. */
+.public-card-link:active .public-card {
+  transform: translateY(0);
+  box-shadow: var(--shadow-1);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle));
 }
 
-.public-card-art::after {
-  /* Pitch arcs: two hairline ellipses, the ground under the light. */
+/* A directory is a surface people come back to, and nothing told them which
+   tournaments they had already opened — so every visit re-read the same rows.
+   `:visited` may only restyle colour-family properties (a browser privacy
+   restriction, not an oversight): no opacity, no content, nothing measurable
+   that could leak browsing history. So the mark is a colour shift on the
+   card's name, which is the line the eye lands on first. Colour alone is
+   acceptable here because "already seen" is a convenience, not information the
+   page depends on — the badges, dates and action label are unchanged. */
+.public-card-link:visited .public-card-name {
+  color: var(--text-secondary);
+}
+
+/* A live auction is the loudest thing this page can say, so the card says it
+   with the whole card and not just a badge: accent rule, accent border, lift. */
+.public-card-link[data-live] .public-card {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle));
+  box-shadow: var(--shadow-2);
+}
+
+.public-card-link[data-live] .public-card::before {
   content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -70%;
-  width: 130%;
-  height: 100%;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--identity-glyph) 22%, transparent);
-  box-shadow: 0 0 0 28px color-mix(in srgb, var(--identity-glyph) 7%, transparent);
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
 }
 
-.public-card-art[data-art="0"] {
-  --art-glow: var(--identity-accent);
+/* The 112px banner is gone. It was 36% of the card's height, carried no
+   information, and its four "deterministic" moods were only three: moods 0 and
+   2 both resolved to #E6B24A (--identity-accent and --ceremony-gold are the
+   same gold), so half the directory shared one banner while the code promised
+   "a tournament keeps its colors". The crest it used to hide now leads the
+   card at a legible size, and the height it ate pays for the state badges and
+   the action affordance underneath. */
+.public-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) 0;
+  min-width: 0;
 }
 
-.public-card-art[data-art="1"] {
-  --art-glow: var(--info-base);
-}
-
-.public-card-art[data-art="2"] {
-  --art-glow: var(--ceremony-gold);
-}
-
-.public-card-art[data-art="3"] {
-  --art-glow: var(--success-base);
-}
-
-.public-card-logo {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.public-card-crest {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
   object-fit: cover;
+  background: linear-gradient(150deg, var(--identity-field), var(--identity-field-deep));
+  border: 1px solid var(--identity-line);
+  box-sizing: border-box;
 }
 
 .public-card-mark {
-  position: absolute;
-  left: var(--space-5);
-  bottom: calc(-1 * var(--space-5));
-  width: 48px;
-  height: 48px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(150deg, var(--identity-field), var(--identity-field-deep));
-  border: 1px solid var(--identity-line);
-  box-shadow: var(--shadow-2);
   color: var(--identity-accent);
   font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
@@ -166,44 +296,108 @@
   letter-spacing: 0.02em;
 }
 
-.public-card-body {
+.public-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  min-width: 0;
+}
+
+.public-card-meta {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-8) var(--space-5) var(--space-5);
+  padding: var(--space-4) var(--space-5) 0;
   flex: 1;
 }
 
 .public-card-name {
+  margin: 0;
   font-family: var(--font-text);
   letter-spacing: -0.01em;
   font-weight: var(--font-weight-semibold);
-  font-size: var(--text-xl-size);
-  line-height: var(--text-xl-line);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
   color: var(--text-heading);
   overflow-wrap: break-word;
 }
 
+/* City and dates are the two facts a guest scans; they were the SMALLEST text
+   on the card at 13px. */
 .public-card-sub {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
   color: var(--text-secondary);
   min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .public-card-sub svg {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   color: var(--text-muted);
 }
 
+/* Two stacked rows rather than one wrapping one: a live card carries two badges
+   and a "no account needed" note, and letting those reflow around the action
+   left every card's call-to-action in a different place. */
 .public-card-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   margin-top: auto;
-  padding-top: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.public-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.public-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Not a link — the card already is one. This is the label that tells you where
+   the single tab stop goes, styled as an action so it reads as one. */
+.public-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  white-space: nowrap;
+}
+
+.public-card-action svg {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.public-card-link:hover .public-card-action svg {
+  transform: translateX(3px);
+}
+
+/* Watching is the one thing on this page that costs a visitor nothing, and the
+   card is the only place that can say so before they commit to the click. */
+.public-card-note {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-muted);
+  min-width: 0;
 }
 
 .public-pagination {
@@ -410,7 +604,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .public-card,
-  .public-card-link:hover .public-card {
+  .public-card-link:hover .public-card,
+  .public-card-link:active .public-card {
+    transition: none;
+    transform: none;
+  }
+
+  .public-card-action svg,
+  .public-card-link:hover .public-card-action svg {
     transition: none;
     transform: none;
   }
@@ -433,7 +634,12 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
+  /* These chips measured 25px tall — one pixel over SC 2.5.8's 24px AA floor,
+     and nowhere near what a thumb needs. Height comes from min-height rather
+     than vertical padding so the label stays optically centred and the count
+     pill beside it does not drift. */
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
   background: var(--surface);
@@ -528,6 +734,7 @@
 .showcase-search {
   flex: 1;
   min-width: 200px;
+  min-height: 44px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -543,6 +750,7 @@
 }
 
 .showcase-sort select {
+  min-height: 44px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -563,6 +771,26 @@
   padding: var(--space-8) 0;
   text-align: center;
   color: var(--text-secondary);
+}
+
+/* The page-limit disclosure. Framed like a notice rather than a hint because
+   it qualifies every number underneath it — the filter counts, the "N players"
+   line, the squad rollup and the CSV are all scoped to what loaded, and a
+   reader who misses this sentence reads all four as facts about the
+   tournament. Uses the informational tone, not a warning: nothing is wrong,
+   the page is simply a prefix and says so. */
+.showcase-truncated {
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--info-base);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-variant-numeric: tabular-nums;
 }
 
 .visually-hidden {
@@ -635,10 +863,12 @@
 }
 
 /* Players/Squads view toggle */
+/* The pill's own padding shrinks so the 44px buttons inside it do not push the
+   whole control past a comfortable height. */
 .showcase-viewtoggle {
   display: inline-flex;
   gap: var(--space-1);
-  padding: var(--space-1);
+  padding: var(--space-05);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
   background: var(--surface-sunken);
@@ -646,7 +876,10 @@
 }
 
 .showcase-view {
-  padding: var(--space-1) var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
   border: 0;
   border-radius: var(--radius-full);
   background: none;

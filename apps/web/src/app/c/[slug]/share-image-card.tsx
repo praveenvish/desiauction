@@ -170,6 +170,68 @@ export function renderPlayerShareCard(model: PlayerShareCard, monogram: string) 
   );
 }
 
+/**
+ * The /pricing share card. Same renderer family as the competition and player
+ * cards above — same palette, same floodlight wash, same wordmark — because a
+ * pricing link and a tournament link land in the SAME WhatsApp group, and two
+ * card designs from one product read as two products. Content is passed in
+ * rather than written here so the route can source every string from PRICING
+ * and the card can never quote a price the page has retired.
+ */
+export interface PricingShareCard {
+  readonly chip: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly promise: string;
+  readonly stats: readonly { readonly value: string; readonly label: string }[];
+}
+
+export function renderPricingCard(model: PricingShareCard) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        padding: 72,
+        background: C.surface,
+        backgroundImage: `radial-gradient(900px 500px at 0% -10%, ${C.surfaceRaised}, ${C.surface})`,
+        color: C.heading,
+        fontFamily: "sans-serif",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <MonogramTile text="DA" />
+        <StatusChip label={model.chip} tone="open" />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", fontSize: 64, lineHeight: 1.08, color: C.heading }}>
+          {model.title}
+        </div>
+        <div style={{ display: "flex", fontSize: 30, color: C.secondary }}>{model.subtitle}</div>
+        <div style={{ display: "flex", fontSize: 30, color: C.accent }}>{model.promise}</div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 40 }}>
+          {model.stats.map((stat) => (
+            <div key={stat.label} style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <div style={{ display: "flex", fontSize: 40, color: C.accent, fontWeight: 700 }}>
+                {stat.value}
+              </div>
+              <div style={{ display: "flex", fontSize: 26, color: C.muted }}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+        <Wordmark />
+      </div>
+    </div>
+  );
+}
+
 /** Neutral branded card for a missing / non-public competition — never leaks. */
 export function renderShareFallback() {
   return (

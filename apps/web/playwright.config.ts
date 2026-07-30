@@ -37,9 +37,17 @@ export default defineConfig({
       // memory threshold, restarting"), which ECONNRESETs in-flight requests and
       // cascades into failures/flakes. A larger heap keeps one stable server for
       // the whole run. (CI uses a pre-compiled server and is unaffected.)
+      //
+      // 2026-07-25: 4096 was still not enough. A run observed FOUR
+      // "approaching the used memory threshold, restarting" events inside the
+      // first ~20 tests, so several failures in that run were the harness
+      // dropping in-flight requests rather than the product. Raised to 8192.
+      // If restarts reappear at this ceiling, stop raising it and look for a
+      // leak instead — the number is already well past what one dev server
+      // should need.
       env: {
         ...process.env,
-        NODE_OPTIONS: "--max-old-space-size=4096",
+        NODE_OPTIONS: "--max-old-space-size=8192",
         // Its OWN build directory: sharing .next with a developer's server on
         // :3000 corrupts the webpack pack cache for both.
         NEXT_DIST_DIR: ".next-e2e",

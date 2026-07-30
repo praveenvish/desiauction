@@ -1,9 +1,10 @@
 "use client";
 
-import { Badge, Button, Card, EmptyState, Select, useToast } from "@desiauction/ui";
+import { Badge, Button, Card, Dialog, EmptyState, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { formatPhone } from "../../../lib/format-phone";
 import {
   issueMoneyAuthorityAction,
   revokeMoneyAuthorityAction,
@@ -55,6 +56,21 @@ function authorityInitials(name: string | null, phone: string): string {
   );
 }
 
+/** "24 Jul 2026" — the provenance line under a holder's name. */
+export function grantedLine(grantedByName: string | null, grantedAt: string | null): string | null {
+  const when =
+    grantedAt === null
+      ? null
+      : new Date(grantedAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+  if (grantedByName === null && when === null) return null;
+  if (grantedByName === null) return `Granted ${when ?? ""}`;
+  return when === null ? `Granted by ${grantedByName}` : `Granted by ${grantedByName} · ${when}`;
+}
+
 export function MoneyAuthorityPanel({
   slug,
   authority,
@@ -67,6 +83,7 @@ export function MoneyAuthorityPanel({
   const [busy, setBusy] = useState(false);
   const [personId, setPersonId] = useState("");
   const [role, setRole] = useState("settlement:officer");
+  const [revoking, setRevoking] = useState<MoneyAuthorityView["grants"][number] | null>(null);
 
   const act = async (run: () => Promise<{ ok: boolean; error?: string }>, done: string) => {
     setBusy(true);
@@ -85,11 +102,6 @@ export function MoneyAuthorityPanel({
   return (
     <Card data-testid="money-authority">
       <h2>Money authority</h2>
-      <p className="authority-hint">
-        Settlement is a separate trust from running the season. Being an owner here does not let
-        someone touch the books, and a settlement role does not let them run an auction — each is
-        granted on purpose, to a named person.
-      </p>
 
       {authority.grants.length === 0 ? (
         <EmptyState
@@ -108,18 +120,24 @@ export function MoneyAuthorityPanel({
               <span className="od-authority-avatar" aria-hidden>
                 {authorityInitials(grant.name, grant.phone)}
               </span>
-              <span className="od-authority-name">{grant.name ?? grant.phone}</span>
+              <span className="od-authority-id">
+                <span className="od-authority-name">{grant.name ?? formatPhone(grant.phone)}</span>
+                {/* Who handed this over, and when — stored since the table
+                    existed, shown nowhere until now. */}
+                {grantedLine(grant.grantedByName, grant.grantedAt) !== null ? (
+                  <span className="od-authority-provenance">
+                    {grantedLine(grant.grantedByName, grant.grantedAt)}
+                  </span>
+                ) : null}
+              </span>
               <Badge tone="info">{ROLE_LABEL[grant.capabilitySet] ?? grant.capabilitySet}</Badge>
               {authority.canIssue ? (
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="touch"
                   disabled={busy}
                   onClick={() => {
-                    void act(
-                      () => revokeMoneyAuthorityAction(slug, grant.grantId),
-                      "Money authority revoked.",
-                    );
+                    setRevoking(grant);
                   }}
                   data-testid={`revoke-authority-${grant.personId}`}
                 >
@@ -166,6 +184,7 @@ export function MoneyAuthorityPanel({
             ))}
           </Select>
           <Button
+            size="touch"
             disabled={busy || personId === ""}
             onClick={() => {
               void act(
@@ -183,6 +202,55 @@ export function MoneyAuthorityPanel({
       ) : (
         <p className="authority-hint">Only someone who can hand out roles here can change this.</p>
       )}
+
+      {/* Revoking was one click. Taking the LAST settlement role away leaves the
+          organization unable to record a rupee — the empty state above says so
+          in as many words — so the consequence is named before it happens, and
+          the server refuses the last controller outright. */}
+      <Dialog
+        open={revoking !== null}
+        onClose={() => {
+          setRevoking(null);
+        }}
+        title={`Revoke ${ROLE_LABEL[revoking?.capabilitySet ?? ""] ?? "settlement role"}?`}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setRevoking(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={busy}
+              onClick={() => {
+                const grant = revoking;
+                if (grant === null) return;
+                void act(
+                  () => revokeMoneyAuthorityAction(slug, grant.grantId),
+                  "Money authority revoked.",
+                ).then(() => {
+                  setRevoking(null);
+                });
+              }}
+              data-testid="confirm-revoke-authority"
+            >
+              Revoke
+            </Button>
+          </>
+        }
+      >
+        <p data-testid="revoke-authority-consequence">
+          {revoking?.name ?? formatPhone(revoking?.phone ?? "")} can no longer open or verify
+          settlement cases, record a payment, or settle and close one for this organization.
+          {authority.grants.length === 1
+            ? " They are the only person here who can, so until someone else is granted the role, no money can be recorded at all."
+            : ""}
+        </p>
+      </Dialog>
     </Card>
   );
 }

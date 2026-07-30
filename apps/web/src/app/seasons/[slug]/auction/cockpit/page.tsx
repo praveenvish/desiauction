@@ -18,32 +18,29 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <header className="dash-head">
-            <div className="competition-title-row">
-              <h1>{view.auctionName}</h1>
-              <span className="date-row">
-                <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
-                  Ledger
-                </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary">
-                  Replay
-                </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction/engine`} variant="secondary">
-                  Engine
-                </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
-                  Spectate
-                </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-                  Setup
-                </ButtonLink>
-              </span>
-            </div>
-            <p className="competitions-hint">
-              Open lots, take bids, and call the gavel — every screen stays in sync.
-            </p>
-          </header>
+          {/* Eight chrome stops stood between the keyboard and the auctioneer's
+              first control — five links to OTHER pages, ahead of the gavel. The
+              title stays (it is the page's heading); the doors move to the foot,
+              where leaving belongs on the surface you leave last. */}
+          <h1 className="auction-sr-only">{view.auctionName} — cockpit</h1>
           <CockpitPanel slug={slug} view={view} />
+          <nav className="live-exits" aria-label="Auction records and other views">
+            <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
+              Ledger
+            </ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary">
+              Replay
+            </ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction/engine`} variant="secondary">
+              Engine
+            </ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
+              Spectate
+            </ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
+              Setup
+            </ButtonLink>
+          </nav>
         </div>
       </main>
     </ToastProvider>

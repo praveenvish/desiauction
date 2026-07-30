@@ -399,6 +399,76 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(captains.map((row) => row.id)).toEqual([second]);
   });
 
+  it("a registration is never both Icon and Captain — the write path refuses, both ways", async () => {
+    const team = await createTeam(db, org.id, compId, owner, `Exclusive XI ${RUN}`);
+    expect(team.ok).toBe(true);
+    if (!team.ok) return;
+    const captain = await seed(compId, org.id, "Armband Holder", "excl1");
+    const icon = await seed(compId, org.id, "Marquee Signing", "excl2");
+
+    // Each mark on its own is legitimate and must keep working.
+    expect(
+      await setRegistrationMarks(
+        db,
+        org.id,
+        compId,
+        captain,
+        { isCaptain: true, teamId: team.team.id },
+        owner,
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      await setRegistrationMarks(
+        db,
+        org.id,
+        compId,
+        icon,
+        { isIcon: true, teamId: team.team.id },
+        owner,
+      ),
+    ).toEqual({ ok: true });
+
+    // Icon onto a stored Captain: refused on the EFFECTIVE state, not the patch.
+    expect(
+      await setRegistrationMarks(db, org.id, compId, captain, { isIcon: true }, owner),
+    ).toEqual({ ok: false, reason: "icon_and_captain" });
+    // Captain onto a stored Icon: the mirror case.
+    expect(
+      await setRegistrationMarks(db, org.id, compId, icon, { isCaptain: true }, owner),
+    ).toEqual({ ok: false, reason: "icon_and_captain" });
+    // Both in one call.
+    expect(
+      await setRegistrationMarks(
+        db,
+        org.id,
+        compId,
+        captain,
+        { isIcon: true, isCaptain: true },
+        owner,
+      ),
+    ).toEqual({ ok: false, reason: "icon_and_captain" });
+
+    // A refusal writes NOTHING — not the flag, and not an audit row implying it.
+    const [afterCaptain] = await db
+      .select({ isIcon: registrationsTable.isIcon, isCaptain: registrationsTable.isCaptain })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, captain));
+    expect(afterCaptain).toEqual({ isIcon: false, isCaptain: true });
+    const [afterIcon] = await db
+      .select({ isIcon: registrationsTable.isIcon, isCaptain: registrationsTable.isCaptain })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, icon));
+    expect(afterIcon).toEqual({ isIcon: true, isCaptain: false });
+
+    // Clearing one mark unblocks the other — the rule is a rule, not a trap.
+    expect(
+      await setRegistrationMarks(db, org.id, compId, captain, { isCaptain: false }, owner),
+    ).toEqual({ ok: true });
+    expect(
+      await setRegistrationMarks(db, org.id, compId, captain, { isIcon: true }, owner),
+    ).toEqual({ ok: true });
+  });
+
   it("statistics reconcile with the actual rows", async () => {
     const stats = await registrationStats(db, compId);
     const rows = await db

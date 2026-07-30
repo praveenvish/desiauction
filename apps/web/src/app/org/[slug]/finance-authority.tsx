@@ -1,9 +1,11 @@
 "use client";
 
-import { Badge, Button, Card, EmptyState, Select, useToast } from "@desiauction/ui";
+import { Badge, Button, Card, Dialog, EmptyState, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { formatPhone } from "../../../lib/format-phone";
+import { grantedLine } from "./money-authority";
 import {
   issueFinanceAuthorityAction,
   revokeFinanceAuthorityAction,
@@ -75,6 +77,7 @@ export function FinanceAuthorityPanel({
   const [busy, setBusy] = useState(false);
   const [personId, setPersonId] = useState("");
   const [role, setRole] = useState("finops:accountant");
+  const [revoking, setRevoking] = useState<FinanceAuthorityView["grants"][number] | null>(null);
 
   const act = async (run: () => Promise<{ ok: boolean; error?: string }>, done: string) => {
     setBusy(true);
@@ -93,11 +96,6 @@ export function FinanceAuthorityPanel({
   return (
     <Card data-testid="finance-authority">
       <h2>Finance authority</h2>
-      <p className="authority-hint">
-        Financial operations is its own trust again: settling the money and speaking for it are
-        different jobs. A settlement role does not let someone send a receipt or seal a year, and a
-        finance role does not let them touch a case.
-      </p>
 
       {authority.grants.length === 0 ? (
         <EmptyState
@@ -116,18 +114,22 @@ export function FinanceAuthorityPanel({
               <span className="od-authority-avatar" aria-hidden>
                 {authorityInitials(grant.name, grant.phone)}
               </span>
-              <span className="od-authority-name">{grant.name ?? grant.phone}</span>
+              <span className="od-authority-id">
+                <span className="od-authority-name">{grant.name ?? formatPhone(grant.phone)}</span>
+                {grantedLine(grant.grantedByName, grant.grantedAt) !== null ? (
+                  <span className="od-authority-provenance">
+                    {grantedLine(grant.grantedByName, grant.grantedAt)}
+                  </span>
+                ) : null}
+              </span>
               <Badge tone="info">{ROLE_LABEL[grant.capabilitySet] ?? grant.capabilitySet}</Badge>
               {authority.canIssue ? (
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="touch"
                   disabled={busy}
                   onClick={() => {
-                    void act(
-                      () => revokeFinanceAuthorityAction(slug, grant.grantId),
-                      "Finance authority revoked.",
-                    );
+                    setRevoking(grant);
                   }}
                   data-testid={`revoke-finance-${grant.personId}`}
                 >
@@ -174,6 +176,7 @@ export function FinanceAuthorityPanel({
             ))}
           </Select>
           <Button
+            size="touch"
             disabled={busy || personId === ""}
             onClick={() => {
               void act(
@@ -191,6 +194,52 @@ export function FinanceAuthorityPanel({
       ) : (
         <p className="authority-hint">Only someone who can hand out roles here can change this.</p>
       )}
+
+      {/* Same rule as settlement: what is lost is named before it is taken. */}
+      <Dialog
+        open={revoking !== null}
+        onClose={() => {
+          setRevoking(null);
+        }}
+        title={`Revoke ${ROLE_LABEL[revoking?.capabilitySet ?? ""] ?? "finance role"}?`}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setRevoking(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={busy}
+              onClick={() => {
+                const grant = revoking;
+                if (grant === null) return;
+                void act(
+                  () => revokeFinanceAuthorityAction(slug, grant.grantId),
+                  "Finance authority revoked.",
+                ).then(() => {
+                  setRevoking(null);
+                });
+              }}
+              data-testid="confirm-revoke-finance"
+            >
+              Revoke
+            </Button>
+          </>
+        }
+      >
+        <p data-testid="revoke-finance-consequence">
+          {revoking?.name ?? formatPhone(revoking?.phone ?? "")} can no longer issue receipts or
+          invoices, send or retry a delivery, or open and close the books for this organization.
+          {authority.grants.length === 1
+            ? " They are the only person here who can, so the finance workspace becomes invisible to everyone until someone else is granted the role."
+            : ""}
+        </p>
+      </Dialog>
     </Card>
   );
 }

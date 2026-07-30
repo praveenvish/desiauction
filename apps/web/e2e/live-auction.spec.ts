@@ -1,5 +1,17 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
+/**
+ * v1.1 (G2): the gavel is a HOLD, not a click — on /live's conduct panel now as
+ * well as the cockpit's. A plain click is deliberately inert (that IS the
+ * safety property), so the suite holds past the 600ms gate.
+ */
+async function holdCloseLot(page: Page): Promise<void> {
+  await page.getByTestId("conduct-close-lot").hover();
+  await page.mouse.down();
+  await page.waitForTimeout(900);
+  await page.mouse.up();
+}
+
 // M-IP4-2 founder demonstration: organizer + three bidder browsers run a live
 // lot end to end — claim, bid, outbid, last-second anti-snipe extension, gavel,
 // engine restart, reconnect — and EVERY window converges to the identical
@@ -22,9 +34,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
+  // PX-3: the name gate now guards every console route, not just /home — a
+  // fresh account that stops here never reaches the org/tournament screens
+  // this helper is used to reach.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 function playersCsv(): string {
@@ -103,6 +123,10 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  // Feasibility: these fixtures run a handful of players against squads of 8,
+  // which the setup screen now refuses until the shortfall is accepted on the
+  // record (it is the state that used to become an unclosable auction).
+  await organizer.getByTestId("accept-short-squads").check();
   await organizer.getByTestId("create-auction").click();
   await expect(organizer.getByTestId("auction-status")).toHaveText("scheduled", {
     timeout: 20_000,
@@ -184,6 +208,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   // Organizer: queue lots + open the auction from the setup page, then go live.
   await organizer.getByTestId("queue-all").click();
   await expect(organizer.getByTestId("lot-L001")).toContainText("queued");
+  await organizer.getByTestId("accept-short-open").check();
   await organizer.getByTestId("auction-open").click();
   await expect(organizer.getByTestId("auction-status")).toHaveText("live");
   await organizer.getByTestId("open-live").click();
@@ -244,7 +269,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   }
 
   // Organizer gavels the lot: sold to Team Charlie everywhere.
-  await organizer.getByTestId("conduct-close-lot").click();
+  await holdCloseLot(organizer);
   for (const page of everyone) {
     await expect(page.getByTestId("ceremony")).toBeVisible({ timeout: 20_000 });
   }
@@ -282,7 +307,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     .toBe(1);
 
   // Close it out: pass the lot (no bids), auction completes cleanly.
-  await organizer.getByTestId("conduct-close-lot").click();
+  await holdCloseLot(organizer);
   await expect(organizer.getByTestId("ceremony")).toBeVisible({ timeout: 20_000 });
   await organizer.getByTestId("conduct-complete").click();
   for (const page of everyone) {

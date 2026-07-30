@@ -7,7 +7,7 @@ import {
   registrations,
   teams,
 } from "@desiauction/db";
-import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
 import { systemDb } from "../db";
@@ -164,13 +164,44 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
 }
 
 /**
+ * How many approved players one public page will carry. A player serialises to
+ * ~1.83 KB in the RSC payload, so the unbounded query behind this page shipped
+ * ~800 KB for a 400-player pool — the maximum a Pro Pass allows — in a single
+ * response, on a surface whose whole audience is on a phone on mobile data.
+ *
+ * 200 is a budget (~370 KB), not a fact about any tournament, which is exactly
+ * why it may never be applied silently. A bare LIMIT does not make the page
+ * fast, it makes the page WRONG: the grid would announce "200 players", the
+ * filter chips would count 200, the CSV would export 200, and a pool of 412
+ * would be misreported to every visitor with no way for them to know. The pool
+ * size is therefore fetched alongside the rows and travels with them.
+ */
+const SHOWCASE_PAGE_LIMIT = 200;
+
+/**
+ * The approved pool as one public page can honestly present it: the rows it
+ * loaded, the size of the pool they came from, and whether those are the same
+ * number. `truncated` is not a nicety — every count, filter and export on the
+ * page is computed over `players`, so it is the only thing that stops those
+ * numbers being read as statements about the tournament.
+ */
+export interface ShowcasePool {
+  /** Loaded players, registration-number order — at most SHOWCASE_PAGE_LIMIT. */
+  players: ShowcasePlayer[];
+  /** Approved players in the pool, whether or not they are in `players`. */
+  total: number;
+  /** `total > players.length` — this page is a prefix of the pool, not the pool. */
+  truncated: boolean;
+}
+
+/**
  * Public pre-auction showcase (parity §3.3): the APPROVED player pool for a
  * public/open competition. Anonymous, system-pool. Never exposes phones (C-23)
  * or non-approved registrations; photos are consent-gated. `status` reflects
  * persisted squad assignment (assigned = sold); live snapshot status is a P2
  * enhancement.
  */
-export async function publicShowcase(slug: string): Promise<ShowcasePlayer[] | null> {
+export async function publicShowcase(slug: string): Promise<ShowcasePool | null> {
   const [comp] = await systemDb
     .select({
       id: competitions.id,
@@ -201,13 +232,26 @@ export async function publicShowcase(slug: string): Promise<ShowcasePlayer[] | n
       teamId: registrations.teamId,
       teamName: teams.name,
       isIcon: registrations.isIcon,
+      // The pool size, carried on every row. `count(*) over ()` is evaluated
+      // before LIMIT, so it counts the whole approved set — one query rather
+      // than a second round trip, and there is no window in which the rows and
+      // the count could describe different states of the table.
+      poolSize: sql<number>`count(*) over ()::int`,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
     .leftJoin(teams, eq(teams.id, registrations.teamId))
     .where(and(eq(registrations.competitionId, comp.id), eq(registrations.status, "approved")))
-    .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
-  return rows.map((r) => toShowcasePlayer(r, now));
+    .orderBy(asc(registrations.registrationNumber), asc(registrations.id))
+    .limit(SHOWCASE_PAGE_LIMIT);
+  // No rows means an empty pool, not a missing count: `count(*) over ()` has no
+  // row to ride on when the set is empty.
+  const total = rows[0]?.poolSize ?? 0;
+  return {
+    players: rows.map((r) => toShowcasePlayer(r, now)),
+    total,
+    truncated: total > rows.length,
+  };
 }
 
 export interface PublicPlayer extends ShowcasePlayer {
@@ -285,43 +329,129 @@ export interface DirectoryEntry {
   endsOn: string | null;
   open: boolean;
   logoUrl: string | null;
+  /** The auction's lifecycle status, or null when no auction exists yet. */
+  auctionStatus: string | null;
+  /**
+   * Watchable by anyone, right now. The directory could not say this at all
+   * before: it never selected auction status, so the single highest-conversion,
+   * lowest-commitment action on the platform — watching a live auction with no
+   * account — was invisible one click above the page that offers it.
+   */
+  live: boolean;
+}
+
+/** URL-backed facets. Anything else in `?filter=` / `?sort=` falls back to the
+ *  default rather than erroring — a hand-typed or stale link still renders. */
+export type DirectoryFilter = "all" | "open" | "live";
+export type DirectorySort = "opportunity" | "soon" | "name";
+
+export function parseDirectoryFilter(raw: string | undefined): DirectoryFilter {
+  return raw === "open" || raw === "live" ? raw : "all";
+}
+
+export function parseDirectorySort(raw: string | undefined): DirectorySort {
+  return raw === "soon" || raw === "name" ? raw : "opportunity";
+}
+
+/** Facet counts over the SEARCH alone, so the chips can say what switching to
+ *  them would actually yield (and never advertise an empty filter). */
+export interface DirectoryCounts {
+  all: number;
+  open: number;
+  live: number;
 }
 
 export interface DirectoryPage {
   entries: DirectoryEntry[];
   page: number;
   totalPages: number;
+  /** Rows matching the search AND the active filter. */
   total: number;
+  counts: DirectoryCounts;
+  /** Every published competition, search and facet ignored. The empty states
+   *  have to offer a way back to the whole directory and say how big it is —
+   *  a count taken inside a search that matched nothing would read "all 0". */
+  catalogue: number;
+  filter: DirectoryFilter;
+  sort: DirectorySort;
 }
 
 const DIRECTORY_PAGE_SIZE = 12;
+
+/**
+ * The competition's auction status as a correlated scalar rather than a LEFT
+ * JOIN. Nothing in the schema stops a competition owning more than one auction
+ * row, and one duplicated competition row silently corrupts LIMIT/OFFSET
+ * paging — page 2 would repeat page 1's tail. This keeps the directory at
+ * strictly one row per competition, whatever the auction table holds.
+ */
+const latestAuctionStatus = sql<string | null>`(
+    select ${auctions.status}
+    from ${auctions}
+    where ${auctions.competitionId} = ${competitions.id}
+    order by ${auctions.createdAt} desc
+    limit 1
+  )`;
+
+/** The same test the public competition page uses for its spectate door
+ *  (`/c/[slug]`): a paused auction is mid-lot, not over, and still watchable. */
+const isLive = sql<boolean>`${latestAuctionStatus} in ('live', 'paused')`;
 
 /** Competitions whose organizers PUBLISHED them (visibility='public'). */
 export async function publicCompetitionsDirectory(params: {
   q?: string;
   page?: number;
+  filter?: DirectoryFilter;
+  sort?: DirectorySort;
 }): Promise<DirectoryPage> {
-  const filters = [eq(competitions.visibility, "public")];
+  const filter = params.filter ?? "all";
+  const sort = params.sort ?? "opportunity";
+  const published = eq(competitions.visibility, "public");
   const term = params.q?.trim();
-  if (term !== undefined && term !== "") {
-    const like = `%${term}%`;
-    const clause = or(
-      ilike(competitions.name, like),
-      ilike(competitions.location, like),
-      ilike(organizations.name, like),
-    );
-    if (clause !== undefined) {
-      filters.push(clause);
-    }
-  }
-  const where = and(...filters);
+  const search =
+    term === undefined || term === ""
+      ? undefined
+      : or(
+          ilike(competitions.name, `%${term}%`),
+          ilike(competitions.location, `%${term}%`),
+          ilike(organizations.name, `%${term}%`),
+        );
+  // The search predicate WITHOUT the facet: the chip counts have to describe
+  // the facets a visitor could switch TO, not the one already applied.
+  const searchWhere = search === undefined ? published : and(published, search);
+  const facet =
+    filter === "open"
+      ? eq(competitions.status, "registration_open")
+      : filter === "live"
+        ? isLive
+        : undefined;
+  const where = facet === undefined ? searchWhere : and(searchWhere, facet);
+  // One pass over the published set yields the catalogue size and all three
+  // chip counts. FILTER (WHERE …) is parenthesised before the ::int cast —
+  // unparenthesised, the cast binds inside the filter clause, not to the
+  // aggregate.
+  const matches = search ?? sql`true`;
   const [countRow] = await systemDb
-    .select({ count: sql<number>`count(*)::int` })
+    .select({
+      catalogue: sql<number>`count(*)::int`,
+      all: sql<number>`(count(*) filter (where ${matches}))::int`,
+      open: sql<number>`(count(*) filter (where ${matches} and ${competitions.status} = 'registration_open'))::int`,
+      live: sql<number>`(count(*) filter (where ${matches} and ${isLive}))::int`,
+    })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
-    .where(where);
-  const total = countRow?.count ?? 0;
+    .where(published);
+  const counts: DirectoryCounts = {
+    all: countRow?.all ?? 0,
+    open: countRow?.open ?? 0,
+    live: countRow?.live ?? 0,
+  };
+  const total = counts[filter];
   const page = Math.max(params.page ?? 1, 1);
+  // Competition dates are bare, IST-implied dates (doc 05). A UTC "today" would
+  // still call an Indian tournament upcoming for the first 5½ hours of its
+  // opening day.
+  const istToday = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const rows = await systemDb
     .select({
       name: competitions.name,
@@ -332,11 +462,12 @@ export async function publicCompetitionsDirectory(params: {
       endsOn: competitions.endsOn,
       orgName: organizations.name,
       logoKey: competitions.logoUrl,
+      auctionStatus: latestAuctionStatus,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .where(where)
-    .orderBy(asc(competitions.startsOn), asc(competitions.id))
+    .orderBy(...directoryOrder(sort, istToday))
     .limit(DIRECTORY_PAGE_SIZE)
     .offset((page - 1) * DIRECTORY_PAGE_SIZE);
   return {
@@ -349,11 +480,47 @@ export async function publicCompetitionsDirectory(params: {
       endsOn: row.endsOn,
       open: row.status === "registration_open",
       logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
+      auctionStatus: row.auctionStatus,
+      live: row.auctionStatus === "live" || row.auctionStatus === "paused",
     })),
     page,
     totalPages: Math.max(1, Math.ceil(total / DIRECTORY_PAGE_SIZE)),
     total,
+    counts,
+    catalogue: countRow?.catalogue ?? 0,
+    filter,
+    sort,
   };
+}
+
+/**
+ * The default used to be `startsOn ASC` — which leads with the EARLIEST
+ * starting, i.e. the oldest and most likely finished, tournaments, and then
+ * Postgres's ASC NULLS LAST buries every date-not-yet-announced competition
+ * below them. A visitor's first screen was the least actionable half of the
+ * directory. "opportunity" buckets by what a guest can do about a row — watch
+ * it, join it, wait for it, read about it — and only orders by date inside a
+ * bucket. The other two sorts are opt-in and do exactly what their labels say.
+ */
+function directoryOrder(sort: DirectorySort, istToday: string): SQL[] {
+  const byDate = sql`${competitions.startsOn} asc nulls last`;
+  const byId = sql`${competitions.id} asc`;
+  if (sort === "soon") {
+    return [byDate, byId];
+  }
+  if (sort === "name") {
+    return [sql`${competitions.name} asc`, byId];
+  }
+  return [
+    sql`case
+          when ${isLive} then 0
+          when ${competitions.status} = 'registration_open' then 1
+          when ${competitions.startsOn} is null or ${competitions.startsOn} >= ${istToday} then 2
+          else 3
+        end asc`,
+    byDate,
+    byId,
+  ];
 }
 
 export interface MyRegistration {

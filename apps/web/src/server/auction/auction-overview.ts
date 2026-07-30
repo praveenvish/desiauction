@@ -41,9 +41,10 @@ export interface AuctionPaddleRow {
   teamId: string;
   teamName: string;
   color: string | null;
-  spent: number;
-  remaining: number;
-  purseTotal: number;
+  /** Money-gated (DA-30): a rival's remaining purse is the auction's one secret. */
+  spent?: number;
+  remaining?: number;
+  purseTotal?: number;
 }
 
 export interface AuctionOnBlock {
@@ -64,7 +65,15 @@ export interface AuctionEventRow {
 }
 
 export interface AuctionOverview {
-  counts: { sold: number; onBlock: number; queued: number; unsold: number };
+  /**
+   * `queued` means what the engine's open guard means by it: lots in status
+   * `queued`. It used to include `prepared`, so the progress card read "14
+   * queued" while `OpenAuction` refused with "No lots are queued yet" — the
+   * card and the door disagreeing about the same word, ten minutes before an
+   * auction. Prepared lots are counted separately, because they are the thing
+   * "Queue all prepared" acts on.
+   */
+  counts: { sold: number; onBlock: number; queued: number; prepared: number; unsold: number };
   totalLots: number;
   /** Paise across every sold lot. */
   moneyMoved: number;
@@ -74,13 +83,19 @@ export interface AuctionOverview {
   events: AuctionEventRow[];
 }
 
-const QUEUED = new Set(["prepared", "queued"]);
 const ON_BLOCK = new Set(["on_block", "closing_soon", "frozen"]);
 
 export async function auctionOverview(
   db: Db,
   auctionId: string,
   config: unknown,
+  /**
+   * DA-30: the burndown card resolved `auction.conduct` and used it to hide
+   * buttons, while every member of the org — which, after `acceptOwnerJoin`,
+   * means every rival team owner — was served each team's spend and remaining
+   * purse. The per-team money is now decided before the read is shaped.
+   */
+  options: { money: boolean } = { money: true },
 ): Promise<AuctionOverview> {
   const rules = rulesOf(config);
 
@@ -124,7 +139,7 @@ export async function auctionOverview(
 
   const paddleById = new Map(paddleRows.map((row) => [row.paddleId, row]));
 
-  const counts = { sold: 0, onBlock: 0, queued: 0, unsold: 0 };
+  const counts = { sold: 0, onBlock: 0, queued: 0, prepared: 0, unsold: 0 };
   let moneyMoved = 0;
   const spentByTeam = new Map<string, number>();
   for (const lot of lotRows) {
@@ -142,8 +157,10 @@ export async function auctionOverview(
       counts.unsold += 1;
     } else if (ON_BLOCK.has(lot.status)) {
       counts.onBlock += 1;
-    } else if (QUEUED.has(lot.status)) {
+    } else if (lot.status === "queued") {
       counts.queued += 1;
+    } else if (lot.status === "prepared") {
+      counts.prepared += 1;
     }
   }
 
@@ -180,9 +197,13 @@ export async function auctionOverview(
         teamId: row.teamId,
         teamName: row.teamName,
         color: row.color,
-        spent,
-        remaining: Math.max(0, rules.pursePerTeam - spent),
-        purseTotal: rules.pursePerTeam,
+        ...(options.money
+          ? {
+              spent,
+              remaining: Math.max(0, rules.pursePerTeam - spent),
+              purseTotal: rules.pursePerTeam,
+            }
+          : {}),
       };
     }),
     lots: lotRows.map((row) => ({

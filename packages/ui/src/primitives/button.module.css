@@ -52,6 +52,18 @@
   padding: var(--space-2) var(--space-4);
 }
 
+/* The platform's 44px touch-target rung. Type and padding are md's on purpose —
+   this is the SAME button at the convention's height, not a louder one, so it
+   drops in beside a 44px input without changing the weight of the row. Only the
+   floor moves; padding stays at md's so the label keeps its optical centring
+   (the extra 4px is split by the flex centring on .button). */
+.touch {
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+}
+
 .sm {
   font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);

@@ -1,5 +1,58 @@
 /* The tournaments accordion (Tournaments & Orgs.dc.html). */
 
+/* --- view switch ---------------------------------------------------------- */
+/* Two views of ONE dataset — the merge of what used to be /tournaments and
+   /seasons. It sits above the summary band because the band follows it, and it
+   carries words rather than glyphs: "grouped by tournament" and "every edition,
+   flat" are not ideas an icon pair can carry. */
+.tg-modes {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.tg-mode-btn {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tg-mode-btn:hover {
+  color: var(--text-primary);
+}
+
+.tg-mode-btn[aria-pressed="true"] {
+  background: var(--surface-raised);
+  color: var(--text-accent);
+  box-shadow: var(--shadow-1);
+}
+
+.tg-mode-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Below ~380px the pair is the widest thing on the page; the labels are the
+   last thing that may shrink, so the padding goes first. */
+@media (max-width: 400px) {
+  .tg-mode-btn {
+    padding: 0 var(--space-2);
+  }
+}
+
 /* --- toolbar -------------------------------------------------------------- */
 .tg-toolbar {
   display: flex;
@@ -41,6 +94,7 @@
 .tg-search-input {
   flex: 1;
   min-width: 0;
+  min-height: 44px;
   border: none;
   background: none;
   padding: var(--space-2) 0;
@@ -59,8 +113,15 @@
   color: var(--text-muted);
 }
 
+/* `min-width` is the floor this never had. It was `flex: 1; min-width: 0` under
+   620px with nothing to stop it, so at 390 the Status pill rendered 25px wide
+   and Sort's own content overflowed its box and printed "Newx". A pill that
+   cannot fit its label is not a smaller control, it is a broken one — the
+   toolbar wraps instead. */
 .tg-pill {
   flex: none;
+  min-width: 9rem;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -86,6 +147,9 @@
 /* A native <select> keeps the platform's own dropdown — on a phone that is the
    OS picker, which no custom listbox matches for reach or reliability. */
 .tg-pill-select {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
   border: none;
   background: none;
   padding: var(--space-2) var(--space-1) var(--space-2) 0;
@@ -110,11 +174,13 @@
   background: var(--surface-sunken);
 }
 
+/* 40x40 inside a 2px-padded group: the pair reads 44 tall alongside the 44px
+   search box and pills it sits with, without either button becoming a slab. */
 .tg-view-btn {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: var(--radius-sm);
   background: none;
@@ -135,6 +201,15 @@
 .tg-view-btn:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
+}
+
+/* Says what the filter did (nothing else would tell a screen reader that a
+   browser-side filter had changed the list) AND that the summary band above is
+   not filtered with it. */
+.tg-results {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
 }
 
 .tg-noresults {
@@ -190,15 +265,19 @@
   outline-offset: -2px;
 }
 
+/* A chevron from the icon set, not the text glyph "▸": a font-dependent
+   character rendered at whatever the reader's fallback font had. */
 .tg-caret {
   flex: none;
+  display: grid;
+  place-items: center;
   color: var(--text-muted);
-  font-size: 11px;
+  transform: rotate(-90deg);
   transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .tg-caret[data-open="true"] {
-  transform: rotate(90deg);
+  transform: rotate(0deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -244,12 +323,26 @@
   min-width: 0;
 }
 
+/* Badges never shrink (the primitive has no `min-width: 0` and its text is
+   nowrap), so they must also never be ASKED to — declared here rather than in
+   packages/ui, where a shrinking badge would change every surface. */
+.tg-badge {
+  flex: none;
+}
+
 /* The comp sets tournament names in the display face, but this is an 18px list
    label and the type-scale guardrail reserves that face for >=30px, brand marks
    and numerals — a rule the repo enforces in a test, so it outranks prototype
    pixels (HANDOFF precedence: repo canon > design system > prototype). Weight
    and colour carry the hierarchy instead. */
+/* `flex: 1 1 auto` is the whole of the fix. With only `min-width: 0` this
+   defaulted to `flex: 0 1 auto`, whose shrink is weighted by base width — and
+   it was losing the contest to a <Badge> that does not shrink at all and to
+   two `flex: none` siblings eating 109px of a 358px content box. At 390 the
+   name rendered FIVE pixels wide. Nothing caught it: the text clips rather
+   than scrolls, so the overflow check passed, and axe does not measure. */
 .tg-name {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -324,29 +417,13 @@
   color: var(--text-primary);
 }
 
-/* Quiet on purpose: the page spends its one gold on "New tournament". A button
-   now (opens the modal), so it carries its own reset. */
+/* A real secondary Button at the platform's 44px rung — the primitive carries
+   the chrome, this only stops it stretching in the header row. It used to be a
+   73x24 accent text link; /home sends people here saying "Add a season", so the
+   control that does that cannot be the quietest thing on the page. */
 .tg-add {
   flex: none;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-accent);
-  text-decoration: none;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-}
-
-.tg-add:hover {
-  background: var(--accent-subtle);
-}
-
-.tg-add:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  white-space: nowrap;
 }
 
 .tg-body {
@@ -486,7 +563,8 @@
 }
 
 .tg-more-caret {
-  font-size: 11px;
+  display: grid;
+  place-items: center;
   transition: transform var(--duration-fast) var(--ease-out);
 }
 
@@ -508,6 +586,12 @@
   padding: var(--space-4);
 }
 
+/* The flat "All seasons" view is the same grid without an accordion body
+   around it, so it owns the page's gutter rather than the panel's inset. */
+.tg-seasons {
+  padding: 0;
+}
+
 /* A two-line season name must not leave its neighbour's card short: the height
    runs down through link → card → article, none of which stretch on their own. */
 .tg-grid > .competition-link,
@@ -525,10 +609,14 @@
   color: var(--text-muted);
 }
 
+/* SC 2.5.8 asks for 24x24; this link measured 139x16. Padding is the cheapest
+   honest fix — the target grows, the type does not. */
 .tg-footnote a {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  min-height: 24px;
+  padding: var(--space-1) var(--space-2);
   color: var(--text-accent);
   text-decoration: none;
 }
@@ -547,10 +635,21 @@
   }
 }
 
+/* The compact date lives in the sub-line and only appears once the full-width
+   date column has left. Without it a phone showed name + org + badge + arrow,
+   and an organizer could not tell the 2026 edition from the 2029 one. */
+.tg-season-compact {
+  display: none;
+}
+
 @media (max-width: 860px) {
   .tg-season-when,
   .tg-season-where {
     display: none;
+  }
+
+  .tg-season-compact {
+    display: block;
   }
 }
 
@@ -561,13 +660,57 @@
     flex-basis: 100%;
   }
 
+  /* Grow to share the row, but never below a width that fits the label. Two
+     pills at 9rem plus the gap exceed 390, so they wrap onto separate lines —
+     which is the correct outcome, and the one the old rule prevented by
+     letting them collapse to 25px instead. */
   .tg-pill {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 9rem;
+  }
+}
+
+/* The accordion header never got a mobile treatment — only the toolbar did.
+   Below 620 the title takes a line of its own and the actions sit underneath,
+   so `+ Season` and the kebab stop competing with the name for a 358px box. */
+@media (max-width: 620px) {
+  .tg-head {
+    flex-wrap: wrap;
+    padding-right: var(--space-3);
+    padding-bottom: var(--space-3);
+    row-gap: var(--space-2);
   }
 
-  .tg-pill-select {
-    min-width: 0;
+  .tg-toggle {
+    flex: 1 0 100%;
+    padding-bottom: 0;
+  }
+
+  /* Giving the title its own ROW is only half the fix: the status badge is
+     ~76px of a 190px line and does not shrink, so the name was still down to
+     106px of the 251 it wants. On a phone the badge takes its own line and the
+     name is allowed to wrap — a tournament's name is the one string on this
+     page that should never be truncated to make room for a summary of it. */
+  .tg-id-top {
+    flex-wrap: wrap;
+  }
+
+  .tg-name {
+    flex: 1 1 100%;
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .tg-meta {
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .tg-add {
+    margin-left: var(--space-4);
+  }
+
+  .tg-kebab {
+    margin-left: auto;
   }
 }
 
@@ -608,7 +751,13 @@
   color: var(--text-secondary);
 }
 
+/* 175x18 measured — under the 24px AA floor on the short axis. */
 .tg-firstrun-alt {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
   background: none;
   border: none;
   cursor: pointer;
@@ -621,7 +770,6 @@
   text-decoration: underline;
 }
 
-.tg-add:focus-visible,
 .tg-firstrun-alt:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -681,4 +829,53 @@
   .tg-skel-bar {
     animation: none;
   }
+}
+
+/* --- tournament page ------------------------------------------------------ */
+.tg-backlink {
+  margin: 0;
+}
+
+.tg-backlink a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.tg-backlink a:hover {
+  color: var(--text-accent);
+}
+
+.tg-backlink a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* The sentence that explains what a tournament is, kept once the page is
+   populated instead of disappearing with the empty state that carried it. */
+.tg-what {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--text-secondary);
+}
+
+/* Where the create affordance would be for someone who holds no
+   `competition.create` here. Quiet, and never styled as a control. */
+.tg-cannot,
+.tg-firstrun-cannot {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+/* The date, restored to the row's sub-line on phones. */
+.tg-season-compact {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
 }

@@ -26,6 +26,14 @@
 .input {
   flex: 1;
   min-width: 0;
+  /* This is a raw <input>, not the Field primitive, so it inherited nothing
+     when Field's control was raised to 44px — it sat at 34, the shortest
+     interactive control on any public page, in the footer of every one of
+     them. Matched by hand rather than by refactoring to Field: this control
+     has no label of its own (the placeholder carries it) and lives inside a
+     flex row with its own submit, which is not the shape Field renders. */
+  min-height: 44px;
+  box-sizing: border-box;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);

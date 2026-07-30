@@ -59,8 +59,10 @@ test("founder demo: landing → discover → help → legal → register → sig
   // --- Anonymous visitor opens the landing page -----------------------------
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "The auction night your tournament deserves", level: 1 }),
+    page.getByRole("heading", { name: "SOLD, without the shouting", level: 1 }),
   ).toBeVisible();
+  // The council rebuild's honesty label: the simulated stage says it is one.
+  await expect(page.getByText("Simulated demo", { exact: false })).toBeVisible();
   await axeClean(page, "/");
 
   // --- Reads the product overview -------------------------------------------
@@ -70,7 +72,9 @@ test("founder demo: landing → discover → help → legal → register → sig
   await axeClean(page, "/features");
 
   // --- Discovers competitions ------------------------------------------------
-  await page.getByRole("link", { name: "Tournaments" }).first().click();
+  // The header item is "Browse tournaments" — a destination, not a feature
+  // name. .first(): the desktop nav and the mobile menu both render it.
+  await page.getByRole("link", { name: "Browse tournaments" }).first().click();
   await expect(page).toHaveURL(/\/c$/);
   await expect(page.getByRole("heading", { name: "Tournaments", level: 1 })).toBeVisible();
 
@@ -128,7 +132,7 @@ test("founder demo: landing → discover → help → legal → register → sig
   await page.goto("/search?q=pricing");
   await expect(page.getByRole("link", { name: /Pricing/ }).first()).toBeVisible();
   await page.goto("/search?q=release");
-  await expect(page.getByRole("link", { name: /Release notes/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Release notes/ }).first()).toBeVisible();
 });
 
 test("invalid routes render the branded 404 — no crash, no leak", async ({ page }) => {
@@ -147,8 +151,8 @@ test("invalid routes render the branded 404 — no crash, no leak", async ({ pag
 test("search is navigation only and honest about no matches", async ({ page }) => {
   await page.goto("/search?q=zzzznothingmatchesthis");
   await expect(page.getByTestId("search-empty")).toBeVisible();
-  // No form on the results posts anything — it's a GET search. Scoped to main:
-  // the shell footer legitimately carries the newsletter POST form everywhere.
+  // No form on the results posts anything — it's a GET search. (The footer
+  // newsletter form was retired by the 2026-07-24 council ruling.)
   const posts = await page.locator("main").locator('form[method="post"]').count();
   expect(posts).toBe(0);
 });
@@ -178,7 +182,7 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }

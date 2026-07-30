@@ -291,12 +291,21 @@ export function AuctionSummaryCard({
   slug,
   canConduct,
   viewerTeamName,
+  /**
+   * The replay is a MEMBER surface: `/…/auction/replay` answers a signed-out
+   * request with 307 → /login. Offering it to an anonymous spectator was a door
+   * that opens onto a sign-in wall at the exact moment the night ends. Guests
+   * get the two doors that work for them instead (this tournament, and their
+   * own).
+   */
+  canReplay = true,
 }: {
   snapshot: AuctionSnapshot;
   feed: LiveFeed;
   slug: string | null;
   canConduct: boolean;
   viewerTeamName: string | null;
+  canReplay?: boolean;
 }) {
   const sold = feed.resolved.filter((lot) => lot.status === "sold");
   const unsold = feed.resolved.filter((lot) => lot.status === "unsold");
@@ -351,12 +360,23 @@ export function AuctionSummaryCard({
       </ul>
       {slug !== null ? (
         <div className="date-row live-summary-actions">
-          <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary">
-            Watch the replay
-          </ButtonLink>
+          {canReplay ? (
+            <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary">
+              Watch the replay
+            </ButtonLink>
+          ) : (
+            <ButtonLink href={`/c/${slug}`} variant="secondary" data-testid="summary-tournament">
+              See the full tournament
+            </ButtonLink>
+          )}
           {canConduct ? (
             <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="ghost">
               Open the ledger
+            </ButtonLink>
+          ) : null}
+          {!canReplay ? (
+            <ButtonLink href="/" variant="primary" data-testid="summary-run-your-own">
+              Run your own auction
             </ButtonLink>
           ) : null}
         </div>
@@ -365,16 +385,74 @@ export function AuctionSummaryCard({
   );
 }
 
-/** Lobby: the locked rules of the night, verbatim from the auction config. */
-export function RulesCard({ rules }: { rules: AuctionRules }) {
+/**
+ * UP NEXT — the queue, which has been on the wire in every snapshot since
+ * M-IP4-3 and rendered nowhere.
+ *
+ * "Who is coming?" is the second question anyone in the room asks, and the only
+ * answer the product gave was a bare count buried in the progress line ("3 in
+ * queue"). Names are what a spectator is waiting for; a parent watching for one
+ * player wants to know whether to keep the phone up.
+ */
+export function UpNext({
+  snapshot,
+  limit = 5,
+}: {
+  snapshot: AuctionSnapshot | null;
+  limit?: number;
+}) {
+  const queue = snapshot?.queue ?? [];
+  if (queue.length === 0) {
+    return null;
+  }
+  return (
+    <Card data-testid="up-next">
+      <div className="competition-head">
+        <h2>Up next</h2>
+        <span className="competitions-hint">{queue.length} still to come</span>
+      </div>
+      <ol className="up-next-list">
+        {queue.slice(0, limit).map((entry, index) => (
+          <li key={entry.lotId}>
+            <span className="up-next-pos" aria-hidden>
+              {index + 1}
+            </span>
+            <span className="up-next-name">{entry.playerName ?? entry.lotNumber}</span>
+            <span className="up-next-role">{entry.role.replace(/_/g, " ")}</span>
+            <span className="up-next-base">base {formatPaiseINR(paise(entry.basePrice))}</span>
+          </li>
+        ))}
+      </ol>
+      {queue.length > limit ? (
+        <p className="competitions-hint">
+          and {queue.length - limit} more after {queue[limit - 1]?.playerName ?? "these"}
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * Lobby: the locked rules of the night, verbatim from the auction config.
+ * `pursePerTeam` is optional because it is money sight (DA-30): a viewer
+ * without it is served a payload that has no purse in it at all, so the row is
+ * absent rather than blanked.
+ */
+export function RulesCard({
+  rules,
+}: {
+  rules: Omit<AuctionRules, "pursePerTeam"> & { pursePerTeam?: number };
+}) {
   return (
     <Card data-testid="auction-rules">
       <h2>Rules of the night</h2>
       <ul className="conflict-list">
-        <li>
-          <span className="registration-name">Purse per team</span>
-          <span className="registration-phone">{formatPaiseINR(paise(rules.pursePerTeam))}</span>
-        </li>
+        {rules.pursePerTeam !== undefined ? (
+          <li>
+            <span className="registration-name">Purse per team</span>
+            <span className="registration-phone">{formatPaiseINR(paise(rules.pursePerTeam))}</span>
+          </li>
+        ) : null}
         <li>
           <span className="registration-name">Squad size</span>
           <span className="registration-phone">

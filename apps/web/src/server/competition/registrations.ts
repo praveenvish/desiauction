@@ -131,6 +131,14 @@ export type AddPlayerResult =
  * this is the same act performed one row at a time. The player lands in
  * `submitted` and passes the same human approval gate (invariant 5); status is
  * only ever moved afterwards by the aggregate, never written here.
+ *
+ * DA-35 — DELIBERATE: unlike `submitRegistration`, this does NOT refuse when
+ * intake is closed, and that asymmetry is the point. Closure closes the PUBLIC
+ * door: it stops strangers arriving from a shared link. An organizer entering a
+ * player they already agreed to take is not a stranger arriving — it is the
+ * organizer exercising the same authority that closed the door. Requiring them
+ * to reopen public registration to add one late signing would open the season
+ * to everyone with the link. The Registrations tab says so at the point of use.
  */
 export async function addPlayerByPhone(
   db: Db,
@@ -249,12 +257,25 @@ export async function myRegistration(
   db: Db,
   competitionId: string,
   personId: string,
-): Promise<{ status: RegistrationStatus; role: string; number: string } | null> {
+): Promise<{
+  id: string;
+  status: RegistrationStatus;
+  role: string;
+  number: string;
+  /**
+   * DA-35: the reason was captured, shipped to the organizer's browser and
+   * rendered nowhere — least of all to the person it was about, who was told
+   * to "reach the organizer through whoever shared the link". It is theirs.
+   */
+  rejectionReason: string | null;
+} | null> {
   const [row] = await db
     .select({
+      id: registrations.id,
       status: registrations.status,
       role: registrations.role,
       number: registrations.registrationNumber,
+      rejectionReason: registrations.rejectionReason,
     })
     .from(registrations)
     .where(
@@ -273,14 +294,37 @@ export interface RegistrationStats {
   rejected: number;
   waitlisted: number;
   withdrawn: number;
+  /**
+   * DA-35: what auction night will actually contain. Two tabs of one console
+   * disagreed — Registrations said "Approved 2" while the Auction tab's
+   * readiness gate said "1 approved player(s)" — because an Icon is approved
+   * AND excluded from the block (auction-ready.ts filters `!row.isIcon`). This
+   * figure is computed from the same two facts the auction filters on, so the
+   * two screens can no longer drift apart.
+   */
+  auctionPool: number;
+  /** Approved icons — pre-signed, never on the block. */
+  icons: number;
+  /**
+   * Approved icons with no team. An icon is only counted into a squad when
+   * `registrations.team_id = paddle.team_id`, so a teamless icon is in NO
+   * auction and NO squad — a player the product has quietly disappeared. The
+   * screen warns; the aggregate constraint itself is not ours to change.
+   */
+  iconsWithoutTeam: number;
 }
 
 export async function registrationStats(db: Db, competitionId: string): Promise<RegistrationStats> {
   const rows = await db
-    .select({ status: registrations.status, count: sql<number>`count(*)::int` })
+    .select({
+      status: registrations.status,
+      isIcon: registrations.isIcon,
+      hasTeam: sql<boolean>`${registrations.teamId} is not null`,
+      count: sql<number>`count(*)::int`,
+    })
     .from(registrations)
     .where(eq(registrations.competitionId, competitionId))
-    .groupBy(registrations.status);
+    .groupBy(registrations.status, registrations.isIcon, sql`${registrations.teamId} is not null`);
   const stats: RegistrationStats = {
     total: 0,
     submitted: 0,
@@ -288,14 +332,27 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     rejected: 0,
     waitlisted: 0,
     withdrawn: 0,
+    auctionPool: 0,
+    icons: 0,
+    iconsWithoutTeam: 0,
   };
   for (const row of rows) {
     // Registrations are created in "submitted"; "draft" is a machine-only state
     // that is never persisted here, so it is not a counted bucket.
     if (row.status !== "draft") {
-      stats[row.status] = row.count;
+      stats[row.status] += row.count;
     }
     stats.total += row.count;
+    if (row.status === "approved") {
+      if (row.isIcon) {
+        stats.icons += row.count;
+        if (!row.hasTeam) {
+          stats.iconsWithoutTeam += row.count;
+        }
+      } else {
+        stats.auctionPool += row.count;
+      }
+    }
   }
   return stats;
 }
@@ -438,6 +495,63 @@ export async function photoTargetsOf(db: Db, competitionId: string): Promise<Pho
   }));
 }
 
+/**
+ * DA-35: what a signed-OUT visitor may be shown about a registration link.
+ * The link was a login wall that never named the tournament — a stranger was
+ * asked to prove their phone number before being told what for. This is the
+ * "what for": the season, when it is, and where. Public seasons only; a private
+ * season's very name is not a stranger's to read.
+ */
+export async function publicRegistrationFacts(
+  db: Db,
+  slug: string,
+): Promise<{
+  name: string;
+  status: string;
+  location: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+} | null> {
+  const [row] = await db
+    .select({
+      name: competitions.name,
+      status: competitions.status,
+      location: competitions.location,
+      startsOn: competitions.startsOn,
+      endsOn: competitions.endsOn,
+    })
+    .from(competitions)
+    .where(and(eq(competitions.slug, slug), eq(competitions.visibility, "public")))
+    .limit(1);
+  return row ?? null;
+}
+
+export interface OrphanIcon {
+  id: string;
+  number: string;
+  name: string | null;
+}
+
+/**
+ * Approved icons with no team — named, so the warning can be acted on rather
+ * than merely counted. Review-gated by the caller (these are applicant names).
+ */
+export async function orphanIcons(db: Db, competitionId: string): Promise<OrphanIcon[]> {
+  return db
+    .select({ id: registrations.id, number: registrations.registrationNumber, name: people.name })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(
+      and(
+        eq(registrations.competitionId, competitionId),
+        eq(registrations.status, "approved"),
+        eq(registrations.isIcon, true),
+        sql`${registrations.teamId} is null`,
+      ),
+    )
+    .orderBy(asc(registrations.registrationNumber));
+}
+
 /** Name keys that appear on >1 registration in this competition (dup/conflict flag). */
 export async function duplicateNameKeys(db: Db, competitionId: string): Promise<Set<string>> {
   const rows = await db
@@ -454,22 +568,43 @@ export interface TimelineEntry {
   action: string;
   at: Date;
   meta: unknown;
+  /**
+   * DA-35: the timeline read "IMPORTED · APPROVE · MARKS_SET" and named nobody,
+   * while `audit_log.actor` held the answer the whole time. An audit trail that
+   * cannot say who is a log, not a trail.
+   */
+  actorName: string | null;
 }
 
 /** A registration's audit timeline (transitions + notes), oldest→newest. */
 export async function timelineOf(db: Db, registrationId: string): Promise<TimelineEntry[]> {
-  return db
-    .select({ action: auditLog.action, at: auditLog.at, meta: auditLog.meta })
-    .from(auditLog)
-    .where(eq(auditLog.subject, registrationId))
-    .orderBy(asc(auditLog.at));
+  return (
+    db
+      .select({
+        action: auditLog.action,
+        at: auditLog.at,
+        meta: auditLog.meta,
+        actorName: people.name,
+      })
+      .from(auditLog)
+      // LEFT join: a system actor (import runner, engine) has no people row, and
+      // an entry with no name must still appear.
+      .leftJoin(people, eq(people.id, auditLog.actor))
+      .where(eq(auditLog.subject, registrationId))
+      .orderBy(asc(auditLog.at))
+  );
 }
 
 /**
  * Deterministic CSV export — stable order (by registration number), competition-
  * scoped by the caller's capability + tenant resolution (no cross-tenant leakage).
  */
-export async function exportRegistrationsCsv(db: Db, competitionId: string): Promise<string> {
+export async function exportRegistrationsCsv(
+  db: Db,
+  competitionId: string,
+  /** Narrow to one squad — the Teams tab's per-team export (DA-34). */
+  teamId?: string,
+): Promise<string> {
   const rows = await db
     .select({
       number: registrations.registrationNumber,
@@ -482,12 +617,47 @@ export async function exportRegistrationsCsv(db: Db, competitionId: string): Pro
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
     .leftJoin(teams, eq(teams.id, registrations.teamId))
-    .where(eq(registrations.competitionId, competitionId))
+    .where(
+      teamId === undefined
+        ? eq(registrations.competitionId, competitionId)
+        : and(eq(registrations.competitionId, competitionId), eq(registrations.teamId, teamId)),
+    )
     .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
   return toCsv(
     ["registration_number", "name", "phone", "role", "status", "team"],
     rows.map((r) => [r.number, r.name ?? "", r.phone, r.role, r.status, r.team ?? ""]),
   );
+}
+
+/**
+ * Record that registrant data LEFT the system. An export is the one read on this
+ * screen that produces a durable artefact — hundreds of civilians' names and
+ * phone numbers in a file — and it was the only one that wrote no evidence. Who
+ * took it, when, how many rows and which squad now sit on the same append-only
+ * ledger as every triage decision (DPDP accountability, §8).
+ */
+export async function recordRegistrationExport(
+  db: Db,
+  orgId: string,
+  competitionId: string,
+  actorId: string,
+  detail: { rowCount: number; teamId?: string; filename: string },
+): Promise<void> {
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: actorId,
+    action: "registration.exported",
+    scopeType: "org",
+    scopeId: orgId,
+    // Subject is the competition: the export is an act on the whole intake,
+    // not on any one registration, so it must not land in a player's timeline.
+    subject: competitionId,
+    meta: {
+      rowCount: String(detail.rowCount),
+      filename: detail.filename,
+      ...(detail.teamId !== undefined ? { teamId: detail.teamId } : {}),
+    },
+  });
 }
 
 /** Bulk existence check for a set of ids in a competition (aggregate helper). */

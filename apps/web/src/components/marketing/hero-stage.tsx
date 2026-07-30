@@ -1,34 +1,61 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent } from "react";
-
-import { IconTrophy } from "./icons";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * The hero's live-auction visual, upgraded from a static mock to a lightly
- * interactive one (2026-07-18 restructure). Two motions, both purposeful and
- * both transform-first:
- *   • a count-up on the current bid — animates the NUMBER TEXT only, which holds
- *     full contrast at every frame (axe scans visual contrast regardless of
- *     aria-hidden — no opacity keyframes on text, ever);
- *   • a pointer parallax that separates the trophy plate from the stage card for
- *     depth, applied as translate on wrapper layers so the card keeps its CSS
- *     tilt.
- * The whole block is decorative (aria-hidden). Both motions no-op under
- * prefers-reduced-motion, and the server render already shows the final bid, so
- * with JS off nothing is lost.
+ * The hero's scripted auction replay (2026-07-24 council rebuild). Engineering
+ * Council ruling: the landing demonstrates the product with a SCRIPTED timeline
+ * through stage markup — a static asset with zero server dependency — never a
+ * live room. The loop: bids climb in Indian-grouped rupees while the calling
+ * team flips, the SOLD stamp slams (transform-only — axe scans visual contrast
+ * regardless of aria-hidden, so no opacity keyframes on text, ever), then the
+ * next fictional player takes the block.
+ *
+ * The server render IS the final SOLD frame of the first player, so no-JS and
+ * prefers-reduced-motion both show a truthful, complete scene. The whole block
+ * is decorative (aria-hidden); the visible "simulated demo" label lives in the
+ * page, outside this block. The old pointer parallax is deliberately gone —
+ * the council's motion rule is one signature gesture, and it's the stamp.
  */
 
-export interface HeroPlayer {
+export interface StagePlayer {
+  lot: number;
+  sold: number;
   name: string;
   role: string;
-  amount: string;
   team: string;
+  opening: number;
+  final: number;
 }
 
-const PARALLAX_STAGE_PX = 10;
-const PARALLAX_TROPHY_PX = 22;
-const COUNT_UP_MS = 950;
+const BID_STEP_MS = 950;
+const SOLD_HOLD_MS = 2600;
+const BID_STEPS = 5;
+
+function rupees(value: number): string {
+  return `₹${value.toLocaleString("en-IN")}`;
+}
+
+function initialsOf(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part.charAt(0))
+    .join("");
+}
+
+/** The bid ladder for one player: opening → final in BID_STEPS moves. */
+function ladder(player: StagePlayer): number[] {
+  const steps: number[] = [];
+  for (let i = 0; i <= BID_STEPS; i += 1) {
+    const t = i / BID_STEPS;
+    // Ease-out so the war slows as it nears the winning bid.
+    const eased = 1 - Math.pow(1 - t, 2);
+    const raw = player.opening + (player.final - player.opening) * eased;
+    steps.push(Math.round(raw / 500) * 500);
+  }
+  steps[steps.length - 1] = player.final;
+  return steps;
+}
 
 function reducedMotion(): boolean {
   return (
@@ -36,116 +63,88 @@ function reducedMotion(): boolean {
   );
 }
 
-/** Split "₹85,000" into its non-digit prefix and integer value. */
-function parseAmount(amount: string): { prefix: string; value: number } {
-  const match = /[\d,]+/.exec(amount);
-  if (match === null) {
-    return { prefix: amount, value: 0 };
-  }
-  return {
-    prefix: amount.slice(0, match.index),
-    value: Number(match[0].replace(/,/g, "")),
-  };
-}
+export function HeroStage({
+  script,
+  teams,
+}: {
+  script: readonly StagePlayer[];
+  teams: readonly string[];
+}) {
+  const first = script[0] as StagePlayer;
+  // SSR truth: the completed SOLD frame of player one.
+  const [playerIndex, setPlayerIndex] = useState(0);
+  const [bidIndex, setBidIndex] = useState(BID_STEPS);
+  const [phase, setPhase] = useState<"bidding" | "sold">("sold");
+  const timerRef = useRef<number | null>(null);
 
-export function HeroStage({ player }: { player: HeroPlayer }) {
-  const { prefix, value } = parseAmount(player.amount);
-  const [bid, setBid] = useState(player.amount);
-  const visualRef = useRef<HTMLDivElement>(null);
-  const trophyRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
-
-  // Count the bid up from a nearby figure on mount — a bidding war settling.
   useEffect(() => {
-    if (reducedMotion() || value <= 0) {
-      setBid(player.amount);
+    if (reducedMotion() || script.length === 0) {
       return;
     }
-    const from = Math.round(value * 0.6);
-    const start = performance.now();
-    let raf = 0;
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / COUNT_UP_MS);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const current = Math.round(from + (value - from) * eased);
-      setBid(`${prefix}${current.toLocaleString("en-IN")}`);
-      if (t < 1) {
-        raf = requestAnimationFrame(step);
+    let alive = true;
+    let player = 0;
+    let bid = BID_STEPS;
+    const tick = (delay: number, fn: () => void) => {
+      timerRef.current = window.setTimeout(() => {
+        if (alive) {
+          fn();
+        }
+      }, delay);
+    };
+    const advance = () => {
+      if (bid < BID_STEPS) {
+        bid += 1;
+        setBidIndex(bid);
+        if (bid === BID_STEPS) {
+          setPhase("sold");
+          tick(SOLD_HOLD_MS, advance);
+        } else {
+          tick(BID_STEP_MS, advance);
+        }
+      } else {
+        player = (player + 1) % script.length;
+        bid = 0;
+        setPlayerIndex(player);
+        setBidIndex(0);
+        setPhase("bidding");
+        tick(BID_STEP_MS, advance);
       }
     };
-    raf = requestAnimationFrame(step);
+    // Hold the server-rendered SOLD frame for a beat, then begin the loop.
+    tick(SOLD_HOLD_MS, advance);
     return () => {
-      cancelAnimationFrame(raf);
+      alive = false;
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+      }
     };
-  }, [player.amount, prefix, value]);
+  }, [script]);
 
-  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (reducedMotion()) {
-      return;
-    }
-    const el = visualRef.current;
-    if (el === null) {
-      return;
-    }
-    const rect = el.getBoundingClientRect();
-    const nx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-    const ny = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-    }
-    rafRef.current = requestAnimationFrame(() => {
-      if (trophyRef.current !== null) {
-        trophyRef.current.style.transform = `translate3d(${(-nx * PARALLAX_TROPHY_PX).toFixed(1)}px, ${(-ny * PARALLAX_TROPHY_PX).toFixed(1)}px, 0)`;
-      }
-      if (stageRef.current !== null) {
-        stageRef.current.style.transform = `translate3d(${(nx * PARALLAX_STAGE_PX).toFixed(1)}px, ${(ny * PARALLAX_STAGE_PX).toFixed(1)}px, 0)`;
-      }
-    });
-  }
-
-  function resetParallax() {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    if (trophyRef.current !== null) {
-      trophyRef.current.style.transform = "";
-    }
-    if (stageRef.current !== null) {
-      stageRef.current.style.transform = "";
-    }
-  }
-
-  const initials = player.name
-    .split(" ")
-    .map((part) => part.charAt(0))
-    .join("");
+  const player = script[playerIndex] ?? first;
+  const bids = ladder(player);
+  const amount = rupees(bids[Math.min(bidIndex, bids.length - 1)] ?? player.final);
+  // While bidding, the calling team rotates; the winner calls the final bid.
+  const callingTeam =
+    phase === "sold"
+      ? player.team
+      : (teams[(playerIndex + bidIndex) % teams.length] ?? player.team);
+  const teamSlot = ["a", "b", "c"][teams.indexOf(callingTeam) % 3] ?? "a";
 
   return (
-    <div
-      className="mk-hero-visual"
-      aria-hidden="true"
-      ref={visualRef}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={resetParallax}
-    >
-      <div className="mk-hero-trophy mk-parallax-layer" ref={trophyRef}>
-        <span className="mk-hero-trophy-icon">
-          <IconTrophy />
-        </span>
-      </div>
-      <div className="mk-stage-wrap mk-parallax-layer" ref={stageRef}>
-        <div className="mk-stage">
+    <div className="mk-hero-visual" aria-hidden="true">
+      <div className="mk-stage-wrap">
+        <div className="mk-stage" data-phase={phase}>
           <div className="mk-stage-top">
             <span className="mk-stage-live">
               <i />
               Live
             </span>
-            <span className="mk-stage-lot">Lot 23 · 42 sold</span>
+            <span className="mk-stage-lot">
+              Lot {player.lot} · {player.sold} sold
+            </span>
           </div>
           <div className="mk-stage-player">
-            <span className="mk-stage-mark">{initials}</span>
+            <span className="mk-stage-mark">{initialsOf(player.name)}</span>
             <span>
               <span className="mk-stage-name">{player.name}</span>
               <span className="mk-stage-role">{player.role}</span>
@@ -153,21 +152,22 @@ export function HeroStage({ player }: { player: HeroPlayer }) {
           </div>
           <div className="mk-stage-bid">
             <span>
-              <span className="mk-stage-bid-label">Current bid</span>
-              <span className="mk-stage-amount">{bid}</span>
+              <span className="mk-stage-bid-label">
+                {phase === "sold" ? "Winning bid" : "Current bid"}
+              </span>
+              <span className="mk-stage-amount">{amount}</span>
             </span>
             <span className="mk-stage-sold">SOLD</span>
           </div>
-          {/* Bid momentum: the war climbing to the winning gold bar. */}
           <div className="mk-stage-spark">
-            {Array.from({ length: 7 }).map((_, bar) => (
-              <i key={bar} />
+            {Array.from({ length: BID_STEPS + 2 }).map((_, bar) => (
+              <i key={bar} data-lit={bar <= bidIndex + 1} />
             ))}
           </div>
           <div className="mk-stage-teams">
-            <span className="mk-stage-team mk-stage-team-a">
+            <span className={`mk-stage-team mk-stage-team-${teamSlot}`}>
               <i />
-              by {player.team}
+              {phase === "sold" ? `to ${player.team}` : `${callingTeam} calling`}
             </span>
           </div>
         </div>

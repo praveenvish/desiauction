@@ -23,13 +23,12 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  // PX-3: complete first-time onboarding (name, skip org) to reach /home.
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  // First-time onboarding is one question (2026-07-24 collapse) — then /home.
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Shell Tester");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByTestId("onboarding-skip").click();
   await expect(page).toHaveURL(/\/home/);
 }
 
@@ -44,8 +43,10 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
 }) => {
   await otpLogin(page, PHONE);
 
-  // New-account home: onboarding empty state, no dead ends.
-  await expect(page.getByText("Welcome to DesiAuction")).toBeVisible();
+  // New-account home: the shell's one h1 greets the name onboarding just
+  // collected — "Welcome to DesiAuction" is the /onboarding page's own
+  // heading, not /home's.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Shell Tester");
 
   // Rail navigation: five items, forever. Help is last — it lands on the
   // Public shell (no rail), so the loop ends there and returns via URL.
@@ -79,7 +80,10 @@ test("search navigates; the identity bar names every surface consistently", asyn
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/orgs/);
 
-  // Create an org + competition to earn a context bar.
+  // Create an org + competition to earn a context bar. The dialog is closed
+  // until its trigger is clicked — a closed <dialog> keeps its form in the DOM
+  // but display:none, so filling straight through would match nothing.
+  await page.getByTestId("new-org").click();
   await page.getByLabel("Organization name").filter({ visible: true }).fill(`Shell Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org ${STAMP}`);

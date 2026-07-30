@@ -7,8 +7,9 @@ import {
   grants,
   newId,
   organizations,
+  orgMembers,
+  people,
   teams,
-  tournaments,
   withTenantDb,
 } from "@desiauction/db";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -16,15 +17,28 @@ import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
+import { canFinops } from "../financial-operations/authz";
+import { canSettlement } from "../settlement/authz";
 import { ForbiddenError, can, requireCapability } from "./authz";
-import { acceptInvite, createInvite, previewInvite } from "./invites";
+import {
+  acceptInvite,
+  createInvite,
+  pendingInvitesOf,
+  previewInvite,
+  revokeInvite,
+  type PendingInvite,
+} from "./invites";
 import {
   createOrg,
+  holdersOf,
   issueGrant,
+  memberCountOf,
   membersOf,
   orgsFor,
+  removeMember,
   resolveTenant,
   revokeGrants,
+  wouldOrphanOrg,
   type MemberRow,
   type OrgSummary,
 } from "./orgs";
@@ -60,8 +74,14 @@ export async function myOrgs(): Promise<OrgSummary[]> {
 }
 
 export interface OrgCard extends OrgSummary {
-  tournaments: number;
+  /**
+   * Seasons, not tournaments. A club with two seasons and seven members read
+   * "0 tourns · 6 teams" — the one figure it led with was the one that stays
+   * zero for anybody running one-off seasons, which is most people.
+   */
+  seasons: number;
   teams: number;
+  members: number;
   /** The viewer's standing here — "Owner", "Staff", or "Member". */
   role: string;
 }
@@ -85,17 +105,22 @@ export async function myOrgCards(): Promise<OrgCard[]> {
   const orgIds = orgs.map((org) => org.id);
   // Cross-org union scoped by the membership already proven above — the same
   // system-pool pattern the competitions and tournaments lists use.
-  const [tournamentRows, teamRows, grantRows] = await Promise.all([
+  const [seasonRows, teamRows, memberRows, grantRows] = await Promise.all([
     systemDb
-      .select({ orgId: tournaments.orgId, count: sql<number>`count(*)::int` })
-      .from(tournaments)
-      .where(inArray(tournaments.orgId, orgIds))
-      .groupBy(tournaments.orgId),
+      .select({ orgId: competitions.orgId, count: sql<number>`count(*)::int` })
+      .from(competitions)
+      .where(inArray(competitions.orgId, orgIds))
+      .groupBy(competitions.orgId),
     systemDb
       .select({ orgId: teams.orgId, count: sql<number>`count(*)::int` })
       .from(teams)
       .where(inArray(teams.orgId, orgIds))
       .groupBy(teams.orgId),
+    systemDb
+      .select({ orgId: orgMembers.orgId, count: sql<number>`count(*)::int` })
+      .from(orgMembers)
+      .where(inArray(orgMembers.orgId, orgIds))
+      .groupBy(orgMembers.orgId),
     systemDb
       .select({ scopeId: grants.scopeId, capabilitySet: grants.capabilitySet })
       .from(grants)
@@ -108,8 +133,9 @@ export async function myOrgCards(): Promise<OrgCard[]> {
         ),
       ),
   ]);
-  const tournamentsBy = new Map(tournamentRows.map((row) => [row.orgId, row.count]));
+  const seasonsBy = new Map(seasonRows.map((row) => [row.orgId, row.count]));
   const teamsBy = new Map(teamRows.map((row) => [row.orgId, row.count]));
+  const membersBy = new Map(memberRows.map((row) => [row.orgId, row.count]));
   const setsBy = new Map<string, string[]>();
   for (const row of grantRows) {
     setsBy.set(row.scopeId, [...(setsBy.get(row.scopeId) ?? []), row.capabilitySet]);
@@ -118,8 +144,9 @@ export async function myOrgCards(): Promise<OrgCard[]> {
     const sets = setsBy.get(org.id) ?? [];
     return {
       ...org,
-      tournaments: tournamentsBy.get(org.id) ?? 0,
+      seasons: seasonsBy.get(org.id) ?? 0,
       teams: teamsBy.get(org.id) ?? 0,
+      members: membersBy.get(org.id) ?? 0,
       role: sets.includes("org:owner") ? "Owner" : sets.includes("org:staff") ? "Staff" : "Member",
     };
   });
@@ -183,11 +210,37 @@ export async function createOrgAction(
 
 export interface OrgView {
   org: OrgSummary;
+  /**
+   * The directory — EMPTY unless the viewer is allowed to hold it. Membership
+   * gets you the org; it does not get you everybody's phone number.
+   */
   members: MemberRow[];
-  viewer: { personId: string; canInvite: boolean; canIssueGrants: boolean };
+  /** How many people belong here, whether or not the directory came with it. */
+  memberCount: number;
+  /** Live invite links, for whoever may mint them. Never the token itself. */
+  pendingInvites: PendingInvite[];
+  viewer: {
+    personId: string;
+    canInvite: boolean;
+    canIssueGrants: boolean;
+    /** True exactly when `members` is populated — the page must not guess. */
+    canSeeMembers: boolean;
+    /** `org.members.remove` — offboarding, owners only. */
+    canRemove: boolean;
+    /** `tournament.create` — whether the hero's CTA can actually succeed. */
+    canCreateTournament: boolean;
+  };
 }
 
-/** Tenant resolution + view assembly; non-members see nothing (null). */
+/**
+ * Tenant resolution + view assembly; non-members see nothing (null).
+ *
+ * The directory is gated HERE, in the payload, not in the markup. A plain
+ * member used to receive every colleague's name, raw E.164 phone, join date and
+ * full grant set because `membersOf` ran unconditionally and only the buttons
+ * were permission-checked. Hiding a phone book with CSS does not hide it: it is
+ * in the RSC payload, in view-source, in the network tab.
+ */
 export async function orgView(slug: string): Promise<OrgView | null> {
   const session = await requireSession();
   const org = await resolveTenantScoped(session.personId, slug);
@@ -196,12 +249,35 @@ export async function orgView(slug: string): Promise<OrgView | null> {
   }
   const scope = { scopeType: "org" as const, scopeId: org.id };
   return withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => {
-    const [members, canInvite, canIssueGrants] = await Promise.all([
-      membersOf(db, org.id),
-      can(db, session.personId, scope, "org.members.invite"),
-      can(db, session.personId, scope, "grant.issue"),
+    const [canInvite, canIssueGrants, canRemove, canCreateTournament, memberCount] =
+      await Promise.all([
+        can(db, session.personId, scope, "org.members.invite"),
+        can(db, session.personId, scope, "grant.issue"),
+        can(db, session.personId, scope, "org.members.remove"),
+        can(db, session.personId, scope, "tournament.create"),
+        memberCountOf(db, org.id),
+      ]);
+    // Whoever may invite or may hand out roles needs to see who is already
+    // here — that is the whole job. Nobody else does.
+    const canSeeMembers = canInvite || canIssueGrants;
+    const [members, pendingInvites] = await Promise.all([
+      canSeeMembers ? membersOf(db, org.id) : Promise.resolve([]),
+      canInvite ? pendingInvitesOf(db, org.id) : Promise.resolve([]),
     ]);
-    return { org, members, viewer: { personId: session.personId, canInvite, canIssueGrants } };
+    return {
+      org,
+      members,
+      memberCount,
+      pendingInvites,
+      viewer: {
+        personId: session.personId,
+        canInvite,
+        canIssueGrants,
+        canSeeMembers,
+        canRemove,
+        canCreateTournament,
+      },
+    };
   });
 }
 
@@ -209,8 +285,26 @@ export interface OrgActivityRow {
   id: string;
   action: string;
   subject: string;
+  /** Who the entry is ABOUT, named — null when the viewer may not be told. */
+  subjectName: string | null;
+  /** Who did it, named — same gate. */
+  actorName: string | null;
   at: string;
 }
+
+/**
+ * Audit actions that describe the MONEY: what was collected, closed, attested
+ * or exported. Reading them is `settlement.view` / `finops.view` work — they
+ * were on the Overview of every member of every org.
+ */
+function isMoneyAction(action: string): boolean {
+  const domain = action.split(".")[0] ?? "";
+  return domain === "finops" || domain === "settlement" || domain === "payment";
+}
+
+/** Rows shown, and rows read so the capability filter still fills the panel. */
+const ACTIVITY_PAGE = 6;
+const ACTIVITY_SCAN = 40;
 
 export interface OrgOverview {
   /** ISO — the header's "Est. {year}" and nothing more precise is shown. */
@@ -246,10 +340,23 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
     .from(organizations)
     .where(eq(organizations.id, org.id))
     .limit(1);
-  const canManage = await withTenantDb(
+  // One tenant boundary for every permission the Overview depends on: whether
+  // the description is editable, whether the directory (and so the NAMES in the
+  // activity feed) may be read, and whether the money's own trail may be.
+  const [canManage, canSeeMembers, canSeeMoney] = await withTenantDb(
     dbHandle,
     { personId: session.personId, orgId: org.id },
-    (db) => can(db, session.personId, { scopeType: "org", scopeId: org.id }, "org.manage"),
+    async (db) => {
+      const scope = { scopeType: "org" as const, scopeId: org.id };
+      const [manage, invite, issue, settlementView, finopsView] = await Promise.all([
+        can(db, session.personId, scope, "org.manage"),
+        can(db, session.personId, scope, "org.members.invite"),
+        can(db, session.personId, scope, "grant.issue"),
+        canSettlement(db, session.personId, org.id, "settlement.view"),
+        canFinops(db, session.personId, org.id, "finops.view"),
+      ]);
+      return [manage, invite || issue, settlementView || finopsView] as const;
+    },
   );
   const [grantRows, liveRows, activityRows] = await Promise.all([
     systemDb
@@ -268,19 +375,44 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
       .from(auctions)
       .innerJoin(competitions, eq(competitions.id, auctions.competitionId))
       .where(and(eq(auctions.orgId, org.id), eq(auctions.status, "live"))),
+    // Over-read, then filter by capability and take the last six. Filtering a
+    // page of six would have shown a member three rows and a hole.
     systemDb
       .select({
         id: auditLog.id,
         action: auditLog.action,
+        actor: auditLog.actor,
         subject: auditLog.subject,
         at: auditLog.at,
       })
       .from(auditLog)
       .where(and(eq(auditLog.scopeType, "org"), eq(auditLog.scopeId, org.id)))
       .orderBy(desc(auditLog.at))
-      .limit(6),
+      .limit(ACTIVITY_SCAN),
   ]);
   const sets = grantRows.map((row) => row.capabilitySet);
+  const visible = activityRows
+    .filter((row) => canSeeMoney || !isMoneyAction(row.action))
+    .slice(0, ACTIVITY_PAGE);
+  // "Access granted" with no who, to whom or by whom is a log line, not news.
+  // The names are directory data, so they ride the directory's own gate.
+  const named = new Map<string, string | null>();
+  if (canSeeMembers) {
+    const ids = [
+      ...new Set(
+        visible.flatMap((row) => [row.actor, row.subject ?? ""].filter((id) => id !== "")),
+      ),
+    ];
+    if (ids.length > 0) {
+      const peopleRows = await systemDb
+        .select({ id: people.id, name: people.name })
+        .from(people)
+        .where(inArray(people.id, ids));
+      for (const row of peopleRows) {
+        named.set(row.id, row.name);
+      }
+    }
+  }
   // createdAt is a Date column; the guard only covers a missing org row (which
   // resolveTenant has already ruled out — belt and braces).
   const createdAt = orgRow?.createdAt;
@@ -290,10 +422,12 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
     description: orgRow?.description ?? null,
     canManage,
     liveAuctions: liveRows.map((row) => ({ slug: row.slug, name: row.name })),
-    activity: activityRows.map((row) => ({
+    activity: visible.map((row) => ({
       id: row.id,
       action: row.action,
       subject: row.subject ?? "",
+      subjectName: named.get(row.subject ?? "") ?? null,
+      actorName: named.get(row.actor) ?? null,
       at: (row.at instanceof Date ? row.at : new Date(String(row.at))).toISOString(),
     })),
   };
@@ -331,6 +465,38 @@ export async function createInviteAction(
   }
 }
 
+/**
+ * Kill an outstanding invite link. Same capability as minting one — if you may
+ * hand out a key you may take an unused one back.
+ */
+export async function revokeInviteAction(
+  slug: string,
+  inviteId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const org = await resolveTenantScoped(session.personId, slug);
+  if (org === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => {
+      await requireCapability(
+        db,
+        session.personId,
+        { scopeType: "org", scopeId: org.id },
+        "org.members.invite",
+      );
+      await revokeInvite(db, org.id, inviteId, session.personId);
+    });
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: "You can't manage invites for this organization." };
+    }
+    return { ok: false, error: "Could not revoke that invite." };
+  }
+}
+
 export async function issueGrantAction(
   slug: string,
   targetPersonId: string,
@@ -357,29 +523,96 @@ export async function issueGrantAction(
   }
 }
 
+/** The refusal an org must never be able to click its way past. (Module-private:
+ * a "use server" file may export async functions and nothing else.) */
+const LAST_OWNER_REFUSAL =
+  "This is the last owner. An organization with no owner can never grant a role, invite anyone or be edited again — make someone else an owner first.";
+
 export async function revokeGrantAction(
   slug: string,
   targetPersonId: string,
   capabilitySet: string,
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSession();
   const org = await resolveTenantScoped(session.personId, slug);
   if (org === null) {
-    return { ok: false };
+    return { ok: false, error: "Not available." };
   }
   try {
-    await withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => {
-      await requireCapability(
-        db,
-        session.personId,
-        { scopeType: "org", scopeId: org.id },
-        "grant.revoke",
-      );
-      await revokeGrants(db, org.id, targetPersonId, capabilitySet, session.personId);
-    });
-    return { ok: true };
-  } catch {
-    return { ok: false };
+    return await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId: org.id },
+      async (db) => {
+        await requireCapability(
+          db,
+          session.personId,
+          { scopeType: "org", scopeId: org.id },
+          "grant.revoke",
+        );
+        // The one revocation that cannot be undone by anybody, because the
+        // undoing itself needs the capability being removed. Refused at the
+        // ACTION, not in the button — a UI guard is a suggestion.
+        if (capabilitySet === "org:owner") {
+          const owners = await holdersOf(db, org.id, "org:owner");
+          if (wouldOrphanOrg(owners, targetPersonId)) {
+            return { ok: false, error: LAST_OWNER_REFUSAL };
+          }
+        }
+        await revokeGrants(db, org.id, targetPersonId, capabilitySet, session.personId);
+        return { ok: true };
+      },
+    );
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: "You can't change roles in this organization." };
+    }
+    return { ok: false, error: "Could not change that role." };
+  }
+}
+
+/**
+ * Take a person out of the organization: grants revoked, membership deleted.
+ *
+ * Gated on `org.members.remove` — the capability has existed since IP-2 and had
+ * no caller, which is why offboarding did not exist. The last owner is refused
+ * here too: removing them is a strictly larger act than revoking their grant.
+ */
+export async function removeMemberAction(
+  slug: string,
+  targetPersonId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const org = await resolveTenantScoped(session.personId, slug);
+  if (org === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    return await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId: org.id },
+      async (db) => {
+        await requireCapability(
+          db,
+          session.personId,
+          { scopeType: "org", scopeId: org.id },
+          "org.members.remove",
+        );
+        if (targetPersonId === session.personId) {
+          return { ok: false, error: "You can't remove yourself from this organization." };
+        }
+        const owners = await holdersOf(db, org.id, "org:owner");
+        if (wouldOrphanOrg(owners, targetPersonId)) {
+          return { ok: false, error: LAST_OWNER_REFUSAL };
+        }
+        await removeMember(db, org.id, targetPersonId, session.personId);
+        return { ok: true };
+      },
+    );
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: "You can't remove people from this organization." };
+    }
+    return { ok: false, error: "Could not remove that member." };
   }
 }
 

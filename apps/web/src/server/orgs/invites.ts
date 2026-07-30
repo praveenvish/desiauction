@@ -135,6 +135,42 @@ export async function acceptInvite(db: Db, personId: string, token: string): Pro
   return { ok: true, orgSlug: org?.slug ?? "" };
 }
 
+export interface PendingInvite {
+  id: string;
+  capabilitySet: string;
+  /** When the link dies on its own. `invites` records no creation time and this
+   * work adds no column, so expiry is the only honest date to show. */
+  expiresAt: string;
+}
+
+/**
+ * Links that have been minted and not yet used.
+ *
+ * `revokeInvite` has existed since IP-2 with no caller and no surface: an
+ * organizer who forwarded a link to the wrong number could see neither that it
+ * was outstanding nor any way to kill it, and it stayed live for seven days.
+ * The token itself is never returned — only its hash is stored, and a link that
+ * could be re-read from the screen would not be one-time.
+ */
+export async function pendingInvitesOf(db: Db, orgId: string): Promise<PendingInvite[]> {
+  const rows = await db
+    .select({
+      id: invites.id,
+      capabilitySet: invites.capabilitySet,
+      expiresAt: invites.expiresAt,
+    })
+    .from(invites)
+    .where(and(eq(invites.orgId, orgId), isNull(invites.acceptedAt), isNull(invites.revokedAt)));
+  return rows
+    .filter((row) => row.expiresAt.getTime() >= Date.now())
+    .sort((a, b) => b.expiresAt.getTime() - a.expiresAt.getTime())
+    .map((row) => ({
+      id: row.id,
+      capabilitySet: row.capabilitySet,
+      expiresAt: row.expiresAt.toISOString(),
+    }));
+}
+
 export async function revokeInvite(
   db: Db,
   orgId: string,

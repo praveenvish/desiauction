@@ -15,7 +15,12 @@ export interface ShowcaseState {
 const DEFAULTS: ShowcaseState = { view: "players", filter: "all", sort: "number", query: "" };
 
 const VIEWS: ShowcaseView[] = ["players", "squads"];
-const FILTERS: ShowcaseFilter[] = ["all", "available", "sold"];
+// "retained" was missing while the grid rendered a Retained chip, so clicking it
+// applied the filter and then the URL sync (which round-trips through this
+// parser's allow-list) rewrote `?filter=retained` away — the one filter that
+// silently reset on reload and could not be shared. Every value the UI can
+// produce has to be a value this can parse back.
+const FILTERS: ShowcaseFilter[] = ["all", "available", "sold", "retained"];
 const SORTS: ShowcaseSort[] = ["number", "name", "status"];
 
 function pick<T extends string>(value: string | null, allowed: T[], fallback: T): T {

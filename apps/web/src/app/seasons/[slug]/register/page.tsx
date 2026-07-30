@@ -1,10 +1,13 @@
+import { isRejectionReason } from "@desiauction/core";
 import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../../../server/auth/actions";
-import { registrationLanding } from "../../../../server/competition/actions";
+import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
+import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
 import { RegisterFlow } from "./register-flow";
+import { WithdrawRegistration } from "./withdraw-registration";
 import "../../seasons.css";
 import "./register.css";
 
@@ -31,7 +34,7 @@ const STATUS_COPY: Record<
   },
   rejected: {
     title: "Registration not approved",
-    body: "This registration wasn't approved this time. If you think that's a mistake, reach the organizer through whoever shared the link.",
+    body: "The organizer decided not to approve this registration for this season.",
     tone: "danger",
   },
   withdrawn: {
@@ -65,7 +68,82 @@ export default async function RegisterPage({
   const source = typeof ref === "string" ? ref : "";
   const session = await currentSession();
   if (session === null) {
-    redirect(`/login?next=/seasons/${slug}/register`);
+    // DA-35: the share link was a login wall that never named the tournament —
+    // "Sign in to continue where you were headed" over a form a stranger has
+    // not been told the purpose of. A PUBLIC season now shows what it is, when
+    // it is, and what will be asked; the OTP moves to submission. Verify to
+    // submit, not to look. A private season keeps the redirect: its name is
+    // not a stranger's to read.
+    const preview = await registrationPreview(slug);
+    if (preview === null) {
+      redirect(`/login?next=/seasons/${slug}/register`);
+    }
+    return (
+      <main className="register">
+        <div className="register-panel">
+          <h1>Player registration</h1>
+          <Card data-testid="register-preview">
+            <h2>{preview.competitionName}</h2>
+            <p className="register-hint">
+              {[
+                preview.startsOn !== null
+                  ? preview.endsOn !== null && preview.endsOn !== preview.startsOn
+                    ? `${preview.startsOn} to ${preview.endsOn}`
+                    : preview.startsOn
+                  : null,
+                preview.location,
+              ]
+                .filter((part): part is string => part !== null && part !== "")
+                .join(" · ")}
+            </p>
+            {preview.open ? (
+              <>
+                <p className="register-hint">
+                  Registering puts you in this season&apos;s player pool. On auction day, team
+                  owners bid to sign you.
+                </p>
+                <h3>What you&apos;ll be asked</h3>
+                <ul className="register-asks">
+                  <li>Your name — it appears on the team sheet and the auction stage.</li>
+                  <li>Your mobile number — how the organizer reaches you about this season.</li>
+                  <li>Your playing role — batter, bowler, all-rounder or wicket-keeper.</li>
+                  <li>
+                    Optional: your date of birth and playing styles, and a photo for your player
+                    card. A photo, if you add one, is public.
+                  </li>
+                </ul>
+                <p className="register-hint">
+                  Nothing is submitted until you say so. We&apos;ll verify your mobile with a
+                  one-time code at that point.
+                </p>
+                <ButtonLink
+                  href={`/login?next=${encodeURIComponent(
+                    // Share attribution survives the login hop now: it used to
+                    // be dropped, and an arrival with `?ref=whatsapp` was
+                    // recorded as "direct" in the audit row.
+                    source === ""
+                      ? `/seasons/${slug}/register`
+                      : `/seasons/${slug}/register?ref=${encodeURIComponent(source)}`,
+                  )}`}
+                  data-testid="register-verify-cta"
+                >
+                  Verify my mobile and register
+                </ButtonLink>
+              </>
+            ) : (
+              <>
+                <p role="alert" data-testid="registration-closed">
+                  Registration for <strong>{preview.competitionName}</strong> is not open right now.
+                </p>
+                <ButtonLink href={`/c/${slug}`} variant="ghost">
+                  Back to the season page
+                </ButtonLink>
+              </>
+            )}
+          </Card>
+        </div>
+      </main>
+    );
   }
   const landing = await registrationLanding(slug);
   return (
@@ -92,9 +170,27 @@ export default async function RegisterPage({
               registration {landing.mine.number}
             </p>
             <p className="register-hint">{STATUS_COPY[landing.mine.status]?.body}</p>
+            {/* DA-35: the reason was captured, shipped and rendered nowhere.
+                The person it was about was told to "reach the organizer through
+                whoever shared the link" — a hearsay chain, for a fact the
+                product had. */}
+            {landing.mine.status === "rejected" && landing.mine.rejectionReason !== null ? (
+              <p className="register-hint" data-testid="my-rejection-reason">
+                <strong>Reason given:</strong>{" "}
+                {isRejectionReason(landing.mine.rejectionReason)
+                  ? REASON_TO_PLAYER[landing.mine.rejectionReason]
+                  : landing.mine.rejectionReason}
+                .
+              </p>
+            ) : null}
             <p className="register-hint">
               <Link href="/home">All your registrations live on Home</Link>.
             </p>
+            {landing.mine.status === "submitted" ||
+            landing.mine.status === "waitlisted" ||
+            landing.mine.status === "approved" ? (
+              <WithdrawRegistration slug={slug} />
+            ) : null}
           </Card>
         ) : !landing.open ? (
           <Card>

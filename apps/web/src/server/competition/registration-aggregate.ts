@@ -231,10 +231,24 @@ export async function assignTeam(
   return { ok: true };
 }
 
+export type MarksResult = { ok: true } | { ok: false; reason: "not_found" | "icon_and_captain" };
+
 /**
  * Set organizer marks on a registration: icon (pre-signed marquee, excluded from
  * the auction), captain, and/or the pre-auction team. Any omitted field is left
  * unchanged. Append-only audit, same pattern as assignTeam.
+ *
+ * INVARIANT: a registration is never both Icon and Captain. An Icon is
+ * pre-signed and never goes under the hammer; a Captain leads a squad that
+ * plays. Both at once is a player the auction skips and the team expects to
+ * lead — a contradiction about ONE person, and the write path is the authority.
+ *
+ * Note the DA-04 rule immediately below, and why it does NOT extend here. Two
+ * players competing for one armband is a preference — the organiser means "this
+ * player instead", so the previous captain is demoted. This is not that. There
+ * is no second player to prefer, and silently clearing a mark the organiser set
+ * would move the armband without telling them: exactly the invisible state
+ * change the Icon work is fixing. So: refuse, and say why.
  */
 export async function setRegistrationMarks(
   db: Db,
@@ -243,7 +257,7 @@ export async function setRegistrationMarks(
   registrationId: string,
   marks: { isIcon?: boolean; isCaptain?: boolean; teamId?: string | null },
   actorId: string,
-): Promise<{ ok: boolean }> {
+): Promise<MarksResult> {
   const set: Partial<{ isIcon: boolean; isCaptain: boolean; teamId: string | null }> = {};
   if (marks.isIcon !== undefined) {
     set.isIcon = marks.isIcon;
@@ -257,6 +271,28 @@ export async function setRegistrationMarks(
   if (Object.keys(set).length === 0) {
     return { ok: true };
   }
+  const [stored] = await db
+    .select({
+      isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      teamId: registrations.teamId,
+    })
+    .from(registrations)
+    .where(
+      and(eq(registrations.id, registrationId), eq(registrations.competitionId, competitionId)),
+    )
+    .limit(1);
+  if (stored === undefined) {
+    return { ok: false, reason: "not_found" };
+  }
+  // The EFFECTIVE state after this patch, not the patch alone: setting
+  // `isIcon: true` on a row that is already Captain is the same contradiction
+  // as sending both flags in one call.
+  const effectiveIcon = set.isIcon ?? stored.isIcon;
+  const effectiveCaptain = set.isCaptain ?? stored.isCaptain;
+  if (effectiveIcon && effectiveCaptain) {
+    return { ok: false, reason: "icon_and_captain" };
+  }
   await db.transaction(async (tx) => {
     // DA-04: a team has exactly one captain. `registrations_team_captain_uq`
     // makes two unrepresentable, so the armband has to CHANGE HANDS rather
@@ -264,14 +300,7 @@ export async function setRegistrationMarks(
     // instead", not "error". The demote is scoped to the team the registration
     // is landing on, which is the one in this update when the caller moves it
     // and the stored one otherwise.
-    const [current] = await tx
-      .select({ teamId: registrations.teamId })
-      .from(registrations)
-      .where(
-        and(eq(registrations.id, registrationId), eq(registrations.competitionId, competitionId)),
-      )
-      .limit(1);
-    const landingTeamId = set.teamId !== undefined ? set.teamId : (current?.teamId ?? null);
+    const landingTeamId = set.teamId !== undefined ? set.teamId : stored.teamId;
     if (set.isCaptain === true && landingTeamId !== null) {
       await tx
         .update(registrations)

@@ -40,7 +40,10 @@ export default async function TournamentPage({
         {view.editions.length === 0 ? (
           <div className="cat-blank">
             <p>No season has been run under this name yet.</p>
-            <Link href="/seasons" className="cat-blank-cta">
+            {/* The tournament's own page, not the index: "+ Season" there is
+                already scoped to THIS tournament, so the edition it creates
+                lands under the name the reader is standing on. */}
+            <Link href={`/tournaments/${view.tournament.slug}`} className="cat-blank-cta">
               Create the first season
             </Link>
           </div>

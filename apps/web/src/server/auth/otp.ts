@@ -88,12 +88,28 @@ export async function requestOtp(
   return { ok: true };
 }
 
-export type VerifyOtpResult = { ok: true; personId: string } | { ok: false; reason: "invalid" };
+export type VerifyOtpResult =
+  | { ok: true; personId: string; name: string | null }
+  /** No pending code for this phone — the ONE reason that must stay generic. */
+  | { ok: false; reason: "invalid"; attemptsLeft?: number }
+  | { ok: false; reason: "expired" }
+  | { ok: false; reason: "locked" };
 
 /**
- * One generic failure reason — wrong code, expired code, unknown phone and
- * exhausted attempts are indistinguishable to a caller (IP-2 §6). First
- * successful verification creates the person (phone-first signup, C-24).
+ * Verification, with reasons the person on the other end can act on.
+ *
+ * The no-enumeration rule (IP-2 §6) is about what a STRANGER can learn from a
+ * phone they do not own, and it still holds where it matters: a phone with no
+ * pending code — never requested, already consumed, unknown to the platform —
+ * returns the bare `invalid`, identical in every case. There is no signal to
+ * mine there.
+ *
+ * `expired`, `locked` and the remaining-attempt count are only ever reachable
+ * for a phone that HAS a live code, which means someone just asked for one and
+ * the SMS went to the handset. Telling that person "this code is burned, get a
+ * fresh one" leaks nothing they did not cause; withholding it is how the old
+ * single message stranded a user holding the correct code and told them, five
+ * times over, that they had typed it wrong.
  */
 export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise<VerifyOtpResult> {
   const normalized = normalizePhone(rawPhone);
@@ -109,12 +125,17 @@ export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise
     .orderBy(desc(otpCodes.createdAt))
     .limit(1);
 
-  if (
-    candidate === undefined ||
-    candidate.expiresAt.getTime() < Date.now() ||
-    candidate.attempts >= MAX_ATTEMPTS
-  ) {
+  if (candidate === undefined) {
     return { ok: false, reason: "invalid" };
+  }
+  // Burned before expired: a code killed by five wrong guesses inside its five
+  // minutes is a thing the user DID, and "too many attempts" is the sentence
+  // that explains why the code in their hand stopped working.
+  if (candidate.attempts >= MAX_ATTEMPTS) {
+    return { ok: false, reason: "locked" };
+  }
+  if (candidate.expiresAt.getTime() < Date.now()) {
+    return { ok: false, reason: "expired" };
   }
 
   if (candidate.codeHash !== hashCode(code)) {
@@ -127,22 +148,29 @@ export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise
       .set({ attempts: sql`${otpCodes.attempts} + 1` })
       .where(and(eq(otpCodes.id, candidate.id), lt(otpCodes.attempts, MAX_ATTEMPTS)))
       .returning({ attempts: otpCodes.attempts });
-    if (bumped !== undefined && bumped.attempts >= MAX_ATTEMPTS) {
+    if (bumped === undefined) {
+      // Lost the race to a parallel guess that took the last attempt.
+      return { ok: false, reason: "locked" };
+    }
+    if (bumped.attempts >= MAX_ATTEMPTS) {
       const [lockedPerson] = await db.select().from(people).where(eq(people.phone, phone)).limit(1);
       if (lockedPerson !== undefined) {
         await logSecurityEvent(lockedPerson.id, "auth.otp.lockout");
       }
+      return { ok: false, reason: "locked" };
     }
-    return { ok: false, reason: "invalid" };
+    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - bumped.attempts };
   }
 
   await db.update(otpCodes).set({ consumedAt: new Date() }).where(eq(otpCodes.id, candidate.id));
 
+  // The name rides back with the identity so the caller can route a nameless
+  // account straight to /onboarding instead of bouncing it off /home first.
   const [existing] = await db.select().from(people).where(eq(people.phone, phone)).limit(1);
   if (existing !== undefined) {
-    return { ok: true, personId: existing.id };
+    return { ok: true, personId: existing.id, name: existing.name };
   }
   const personId = newId();
   await db.insert(people).values({ id: personId, phone });
-  return { ok: true, personId };
+  return { ok: true, personId, name: null };
 }

@@ -10,8 +10,11 @@ export const metadata = { title: "Venues · DesiAuction" };
 export default async function VenuesPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const view = await venuesView(slug);
-  if (view === null) {
-    // Non-members and unknown slugs are indistinguishable (tenancy, IP-2 pattern).
+  // Non-members and unknown slugs are indistinguishable (tenancy, IP-2 pattern),
+  // and so is a member with no `venue.manage`: this page is a management desk,
+  // and it returned 200 to a plain viewer while /money and /settlement — the
+  // same shape of desk — correctly returned 404. Absent, not locked.
+  if (view === null || !view.viewer.canManage) {
     notFound();
   }
   return (

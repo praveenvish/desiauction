@@ -27,6 +27,10 @@ export function shellKind(pathname: string): ShellKind {
   if (
     pathname.startsWith("/gallery") ||
     pathname.startsWith("/dev") ||
+    // Onboarding is a focused, chrome-free moment (2026-07-24 collapse). The
+    // login page keeps the public header/footer (2026-07-25 founder call) so a
+    // visitor at the gate can still reach the rest of the site.
+    pathname.startsWith("/onboarding") ||
     BARE_AUCTION_RE.test(pathname)
   ) {
     return "bare";
@@ -81,8 +85,12 @@ export interface RailTarget {
  * the recurring tournament is how organizers name their calendar ("BPL", then
  * "BPL 1", "BPL 2"), the schema has modelled it since IP-3, and the layer was
  * unreachable — no route, no create flow, every UI-made season a one-off.
- * Seasons have not moved: they live under their tournament, and /seasons still
- * answers, so the rail's active key claims both.
+ * Seasons have not moved: they live under their tournament. The /seasons INDEX
+ * is gone — it was a second index over the same rows, kept alive only because
+ * nobody retired it, and it is now the "All seasons" view of /tournaments
+ * (`?view=seasons`) with the bare path redirecting there. What survives at
+ * /seasons/{slug} is the season WORKSPACE, which is where organizers do the
+ * bulk of their work, so the rail's active key still claims that whole prefix.
  */
 export const RAIL: RailTarget[] = [
   { key: "home", label: "Home", href: "/home" },
@@ -100,9 +108,10 @@ export function activeRailKey(pathname: string): string | null {
   if (pathname.startsWith("/org/") || pathname.startsWith("/orgs")) {
     return "orgs";
   }
-  // A season IS an edition of a tournament, so every /seasons/* surface lights
-  // the Tournaments rail item rather than leaving the rail blank while an
-  // organizer does the bulk of their work.
+  // A season IS an edition of a tournament, so every /seasons/{slug} surface
+  // lights the Tournaments rail item rather than leaving the rail blank while
+  // an organizer does the bulk of their work. The bare /seasons index no longer
+  // exists (it redirects), but the prefix has to stay for the workspace.
   if (pathname.startsWith("/tournaments") || pathname.startsWith("/seasons")) {
     return "tournaments";
   }
@@ -370,7 +379,12 @@ const OUTSIDE_RAIL: [string, string][] = [
  * through `<PageTitle subtitle=…>` instead.
  */
 const SURFACE_SUBTITLES: [string, string][] = [
-  ["/tournaments", "Your recurring competitions, and the seasons that run under them."],
+  // One line for both views of this page: the recurring competition, and the
+  // edition that actually runs. /home's ladder framing, compressed.
+  [
+    "/tournaments",
+    "Your recurring competitions, and every edition that runs under them — grouped, or all at once.",
+  ],
   ["/orgs", "The clubs and academies you run tournaments under."],
   ["/money", "Your purses, dues and receipts across every season."],
   ["/inbox", "Account activity now; approvals, receipts and auction updates join during the beta."],
@@ -466,10 +480,9 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
     };
   }
 
-  // The season list and a single tournament both hang off the Tournaments rail.
-  if (pathname.startsWith("/seasons")) {
-    return { crumbs: [{ label: "Tournaments", href: "/tournaments" }], title: "Seasons" };
-  }
+  // A single tournament hangs off the Tournaments rail. There is no branch for
+  // a bare /seasons any more: the index merged into /tournaments and the path
+  // redirects, so the shell never frames it. `/seasons/{slug}` is handled above.
   if (/^\/tournaments\/[^/]+/.test(pathname)) {
     return { crumbs: [{ label: "Tournaments", href: "/tournaments" }], title: "Tournament" };
   }
@@ -500,8 +513,12 @@ export function liveExit(pathname: string, hasSession: boolean): { href: string;
   if (match === null) {
     return { href: "/home", label: "Leave" };
   }
+  // An anonymous spectator did not come from the marketing home — they came
+  // from `/c/<slug>` (the landing page and the public directory both funnel
+  // there, and there is where the rest of this tournament is). Sending them to
+  // "/" was an exit that landed them somewhere they had never been.
   if (match.segment === "spectate" && !hasSession) {
-    return { href: "/", label: "Leave auction" };
+    return { href: `/c/${match.slug}`, label: "Leave auction" };
   }
   return { href: `/seasons/${match.slug}/auction`, label: "Leave auction" };
 }

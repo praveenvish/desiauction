@@ -21,10 +21,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   // PX-3: new accounts land on /onboarding; join links keep their next= target.
   await expect(page).toHaveURL(/\/(home|join|onboarding)/);
+  // The name gate now guards every console route, so a default (non-join)
+  // landing on /onboarding must clear it before /orgs will render.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 async function inSecondBrowser(browser: Browser, fn: (page: Page) => Promise<void>): Promise<void> {
@@ -47,8 +54,12 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
   await expect(page.getByTestId("org-name")).toHaveText(`MPL ${STAMP}`);
   const orgUrl = page.url();
 
-  // A creates a staff invite link.
-  await page.getByTestId("create-invite").click();
+  // A creates a staff invite link. The panel lives on the Members tab and the
+  // dialog must be OPEN before its submit is reachable — a closed <dialog>
+  // keeps its markup but is display:none.
+  await page.getByRole("tab", { name: "Members" }).click();
+  await page.getByTestId("open-invite").click();
+  await page.getByRole("dialog").getByTestId("create-invite").click();
   const inviteUrl = await page.getByTestId("invite-url").textContent();
   expect(inviteUrl).toContain("/join/");
 
@@ -66,11 +77,21 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
 
   // A sees B as a member with the staff set and can revoke it.
   await page.reload();
+  await page.getByRole("tab", { name: "Members" }).click();
   const members = page.getByTestId("members-panel");
-  await expect(members).toContainText(`+91${PHONE_B}`);
-  await expect(members).toContainText("org:staff");
+  // Phones render grouped now (formatPhone), the way /login has always shown
+  // them — the grid used to echo the raw E.164 identifier back.
+  await expect(members).toContainText(`+91 ${PHONE_B.slice(0, 5)} ${PHONE_B.slice(5)}`);
+  // Role pills say the plain word ("Staff"), with the technical set on the
+  // tooltip — so the role is asserted through its own attribute rather than a
+  // text match that the invite dialog's <option>Staff</option> also satisfies.
+  await expect(members.locator('[data-role="staff"]')).toHaveCount(1);
+  // Revoking a role is a confirmed act now, not a single click.
   await page.getByRole("button", { name: "Remove staff" }).click();
-  await expect(members).not.toContainText("org:staff");
+  const confirm = page.getByRole("dialog");
+  await expect(confirm.getByTestId("member-change-consequence")).toContainText("loses the ability");
+  await confirm.getByTestId("confirm-member-change").click();
+  await expect(members.locator('[data-role="staff"]')).toHaveCount(0);
 
   // Replay: the invite link is one-time — dead for anyone now.
   await inSecondBrowser(browser, async (pageC) => {

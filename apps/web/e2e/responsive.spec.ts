@@ -41,12 +41,11 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Viewport Tester");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByTestId("onboarding-skip").click();
   await expect(page).toHaveURL(/\/home/);
 }
 

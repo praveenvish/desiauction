@@ -261,8 +261,13 @@ body:has(.landing.mk) .mk-hero {
   position: absolute;
   inset: 0;
   z-index: 0;
+  /* The photo layer is a custom property so the format/size negotiation below
+     can swap ONE layer without restating the four-gradient fallback stack
+     (which must stay byte-identical in every branch, or the no-photo fallback
+     drifts). */
+  --mk-hero-photo-src: url("/marketing/hero-stadium.jpg");
   background-image:
-    url("/marketing/hero-stadium.jpg"),
+    var(--mk-hero-photo-src),
     radial-gradient(
       70rem 32rem at 18% -18%,
       color-mix(in srgb, var(--accent) 24%, transparent),
@@ -283,6 +288,38 @@ body:has(.landing.mk) .mk-hero {
   /* Full-bleed cover, weighted so the trophy reads as the focal point. */
   background-position: 64% center;
   background-repeat: no-repeat;
+}
+
+/* Format and size negotiation for the hero photo — the page's heaviest byte by
+   an order of magnitude. A CSS background gets no <picture>, no srcset and no
+   next/image, so image-set() does both jobs the browser would otherwise do:
+   it picks the first format the browser actually decodes (AVIF 128 KB → WebP
+   145 KB → the original JPEG 462 KB), and the media query hands phones a
+   1024px-wide cut (56 KB in AVIF) instead of the full 1717px desktop plate.
+   Guarded by @supports, because a browser that cannot parse image-set() would
+   throw away the WHOLE background-image declaration — gradients and all — and
+   leave the hero as a flat void. Inside the guard the custom property is
+   swapped; outside it, the plain JPEG above still paints. */
+@supports (background-image: image-set(url("/marketing/hero-stadium.avif") type("image/avif"))) {
+  .mk-hero-photo {
+    --mk-hero-photo-src: image-set(
+      url("/marketing/hero-stadium.avif") type("image/avif"),
+      url("/marketing/hero-stadium.webp") type("image/webp"),
+      url("/marketing/hero-stadium.jpg") type("image/jpeg")
+    );
+  }
+
+  /* Below the desktop breakpoint the pane is at most 1023 CSS px wide, so the
+     full plate is detail nobody can see — on a phone it was 462 KB of it. */
+  @media (max-width: 1023px) {
+    .mk-hero-photo {
+      --mk-hero-photo-src: image-set(
+        url("/marketing/hero-stadium-1024.avif") type("image/avif"),
+        url("/marketing/hero-stadium-1024.webp") type("image/webp"),
+        url("/marketing/hero-stadium-1024.jpg") type("image/jpeg")
+      );
+    }
+  }
 }
 
 /* Desktop: scale the photo up a touch beyond cover so there is horizontal room
@@ -507,29 +544,6 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
-.mk-hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-4);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--surface-raised) 65%, transparent);
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-size);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.mk-hero-badge svg {
-  width: 15px;
-  height: 15px;
-  color: var(--text-accent);
-  flex: none;
-}
-
 /* The highlighted word: solid token color (axe: gradient-clipped text can drop
    below contrast mid-gradient, so the "gradient" lives in the glow and the
    drawn underline instead — the glyphs themselves never move off a certified
@@ -588,10 +602,16 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
+/* Grid, not a wrapping flex row: when both CTAs fit on one line each track is
+   its own max-content, exactly as a flex row rendered them; when only one fits,
+   the single track is as wide as the LONGER of the two labels and both buttons
+   stretch to fill it. Stacked CTAs of two different widths (the flex row's
+   behaviour) read as two unrelated controls — a primary action should not look
+   like a different species from the alternative under it. */
 .mk-hero-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), max-content));
   gap: var(--space-3);
-  flex-wrap: wrap;
   margin-bottom: var(--space-8);
 }
 
@@ -677,18 +697,25 @@ body:has(.landing.mk) .mk-hero {
 
 .mk-hero-visual {
   position: relative;
+  /* A grid item's default `min-width: auto` floors it at its content's
+     min-content width — which for the stage card is 401px, so this pane
+     measured 401px at EVERY viewport and pushed 30px of the auction card off
+     the right of a 390px phone. Zero lets it track its column; the card's own
+     rules below make the contents fit once it can. */
+  min-width: 0;
 }
 
-/* Over the stadium photo the card yields the spotlight: the drawn trophy
-   plate is redundant beside the photo's real cup and stays hidden, and on
-   desktop the card docks smaller to the column's top-right so the cup rises
-   to its left and the plinth's gold "DesiAuction" stays visible beneath. */
-.mk-hero-visual .mk-hero-trophy {
-  display: none;
+/* 2026-07-25: photo hero restored by founder call — the demo wrapper (stage +
+   truth label) takes the old card composition: docked small to the column's
+   top-right so the photo's cup rises to its left and the plinth stays visible. */
+.mk-hero-demo {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
 }
 
 @media (min-width: 1024px) {
-  .mk-hero-visual {
+  .mk-hero-demo {
     align-self: end;
     justify-self: end;
     width: 100%;
@@ -696,67 +723,32 @@ body:has(.landing.mk) .mk-hero {
     --mk-stage-scale: 0.72;
     transform: scale(var(--mk-stage-scale));
     transform-origin: bottom right;
-    /* The full-bleed photo puts the trophy centre-right of the VIEWPORT, so the
-       card is pinned ~28px from the viewport's right edge — not the 1200px
-       container's — or it drifts back over the cup as the screen widens. The
-       container's content-box right sits at (50vw + 580px); shifting to
-       (100vw − 28px) needs margin-right (608px − 50vw), clamped to ≤ 0 so narrow
-       desktops keep the card inside the column. `translate` lifts it a touch
-       (mk-rise-stage owns `transform`). It reads as a live bid beside the cup. */
+    /* Pinned ~28px from the VIEWPORT's right edge (not the container's) so the
+       card never drifts back over the cup as the screen widens; clamped ≤ 0 so
+       narrow desktops keep it inside the column. */
     margin-right: min(0px, calc(596px - 50vw));
     translate: 0 -1.25rem;
   }
+
+  .mk-hero-visual {
+    width: 100%;
+  }
 }
 
-/* Trophy photo slot, sitting behind the stage card. Same photo-then-gradient
-   fallback pattern as .mk-hero-photo: a warm ceremony-gold glow stands in
-   until a real photo lands at /marketing/trophy.png, with a large outlined
-   trophy glyph (the same IconTrophy used in "How it works") as a watermark so
-   the empty slot still reads as intentional, not placeholder. */
-.mk-hero-trophy {
-  position: absolute;
-  /* Deliberately larger than — and risen above — the stage card it sits
-     behind: inset:0 would size this layer to match the card exactly, hiding
-     it completely under the card's own opaque background. Rising it above
-     the card's top edge is what makes the trophy glyph and its glow actually
-     visible, echoing the reference's trophy rising above the card. */
-  left: -8%;
-  right: -8%;
-  top: -46%;
-  bottom: 6%;
-  z-index: 0;
-  overflow: hidden;
-  border-radius: var(--radius-2xl);
-  background-image:
-    url("/marketing/trophy.png"),
-    radial-gradient(
-      24rem 20rem at 50% 22%,
-      color-mix(in srgb, var(--ceremony-gold) 32%, transparent),
-      transparent 68%
-    ),
-    linear-gradient(165deg, var(--surface-overlay) 0%, var(--surface-sunken) 100%);
-  background-size: cover, auto, auto;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-.mk-hero-trophy-icon {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 8%;
-  color: color-mix(in srgb, var(--ceremony-gold) 55%, transparent);
-}
-
-.mk-hero-trophy-icon svg {
-  width: 34%;
-  height: auto;
-  aspect-ratio: 1;
-  stroke-width: 1;
-  filter: drop-shadow(0 0 28px color-mix(in srgb, var(--ceremony-gold) 45%, transparent));
+/* The visible truth label under the simulated stage — NOT aria-hidden. Over
+   the stadium photo it rides a dark glass pill so it stays legible at any
+   brightness beneath it. */
+.mk-stage-note {
+  margin: 0;
+  max-width: 100%;
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+  text-align: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-sunken) 72%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .mk-stage {
@@ -779,7 +771,7 @@ body:has(.landing.mk) .mk-hero {
     0 24px 80px color-mix(in srgb, var(--surface-sunken) 55%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--text-heading) 7%, transparent);
   padding: var(--space-6);
-  max-width: 460px;
+  max-width: min(460px, 100%);
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
@@ -837,6 +829,50 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
+/* Below the desktop breakpoint the layout stacks and the card lands squarely on
+   the brightest part of the stadium plate — the floodlit glow and the trophy's
+   gold. Frosted glass is a desktop luxury: there the card sits over the dark
+   left third, so 76–82% tint plus a blur is plenty. Over gold it is not, and
+   white-on-gold is exactly the pair that fails. The surface goes fully opaque —
+   the same three tokens, just undiluted — so the player's name, WINNING BID,
+   the rupees and the SOLD stamp keep the contrast they were certified at,
+   whatever the photo is doing underneath. Desktop is untouched.
+   The card also has to physically FIT a 320px phone here: its content's
+   min-content width was 401px (the rupee amount at display-sm beside the SOLD
+   stamp), which is what pushed the page into horizontal scroll. Letting the
+   rows wrap is enough — the money keeps its full display size. */
+@media (max-width: 1023px) {
+  .mk-stage {
+    background: linear-gradient(
+      165deg,
+      var(--surface-overlay) 0%,
+      var(--surface-raised) 45%,
+      var(--surface) 100%
+    );
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    padding: var(--space-5);
+  }
+
+  /* The halo is not the rim it looks like. `.mk-stage` is positioned WITH a
+     z-index, so it opens a stacking context — and inside one, a negative-z-index
+     child paints AFTER the parent's own background, not behind it. So this
+     conic gradient (accent at 60%, gold at 50%) washes the entire card face,
+     not the 2px it overhangs. On desktop that IS the frosted look, over the
+     dark left third of the photo. Here it would put white text back on gold and
+     undo the opaque surface above it, so the phone keeps the plain 1px border
+     and the card's own shadow instead. */
+  .mk-stage::before {
+    display: none;
+  }
+
+  /* The bid row is the widest thing in the card; letting the stamp drop to its
+     own line is what makes 320px possible without shrinking the money. */
+  .mk-stage-bid {
+    flex-wrap: wrap;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .mk-stage::before {
     animation: mk-ring-spin 16s linear infinite;
@@ -891,6 +927,10 @@ body:has(.landing.mk) .mk-hero {
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-5);
+  /* "Live" and "Lot 23 · 18 sold" are a single unbreakable line on desktop; on
+     a narrow card the lot counter drops beneath the live dot rather than being
+     clipped to "18 SOL" at the card's edge. */
+  flex-wrap: wrap;
 }
 
 .mk-stage-live {
@@ -1269,7 +1309,6 @@ body:has(.landing.mk) .mk-hero {
 
 .mk-card::before,
 .mk-steps li::before,
-.mk-testi::before,
 .mk-tier::before {
   content: "";
   position: absolute;
@@ -1293,7 +1332,6 @@ body:has(.landing.mk) .mk-hero {
 
 .mk-card:hover::before,
 .mk-steps li:hover::before,
-.mk-testi:hover::before,
 .mk-tier:hover::before {
   opacity: 1;
   left: var(--space-3);
@@ -1468,17 +1506,21 @@ body:has(.landing.mk) .mk-hero {
   border-radius: var(--radius-sm);
 }
 
+/* The three-beat ramp was 64 → 38 → 13: the step titles rendered SMALLER than
+   the body copy tier and read as labels, skipping a whole level of hierarchy.
+   text-lg restores the missing tier (64 → 38 → 18 → 13 body). The nowrap +
+   ellipsis went with the small size — at 18px "The gavel falls; the books write
+   themselves" cannot survive one line, and a heading truncated mid-sentence is
+   a worse outcome than a heading on two lines. */
 .mk-steps h3 {
   font-family: var(--font-text);
   letter-spacing: -0.01em;
-  font-weight: var(--font-weight-medium);
-  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-lg-size);
   line-height: 1.3;
   color: var(--text-heading);
   margin: 0 0 var(--space-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-wrap: balance;
 }
 
 .mk-steps p {
@@ -1901,149 +1943,17 @@ body:has(.landing.mk) .mk-hero {
   font-weight: var(--font-weight-medium);
 }
 
-/* --- Testimonials -------------------------------------------------------------- */
-
-.mk-testi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  gap: var(--space-4);
-}
-
-.mk-testi {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-6);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-  text-align: left;
-  transition:
-    transform var(--duration-base) var(--ease-out),
-    box-shadow var(--duration-base) var(--ease-out),
-    border-color var(--duration-base) var(--ease-out);
-}
-
-.mk-testi:hover {
-  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
-  box-shadow: var(--shadow-3);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
-}
-
-.mk-testi-stars {
-  display: flex;
-  gap: 2px;
-  color: var(--ceremony-gold);
-}
-
-.mk-testi-stars svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Hovering a review makes its five stars take a bow, left to right. */
-@media (prefers-reduced-motion: no-preference) {
-  .mk-testi:hover .mk-testi-stars svg {
-    animation: mk-star-pop 0.5s var(--ease-out);
-  }
-
-  .mk-testi:hover .mk-testi-stars svg:nth-child(2) {
-    animation-delay: 45ms;
-  }
-
-  .mk-testi:hover .mk-testi-stars svg:nth-child(3) {
-    animation-delay: 90ms;
-  }
-
-  .mk-testi:hover .mk-testi-stars svg:nth-child(4) {
-    animation-delay: 135ms;
-  }
-
-  .mk-testi:hover .mk-testi-stars svg:nth-child(5) {
-    animation-delay: 180ms;
-  }
-}
-
-@keyframes mk-star-pop {
-  45% {
-    transform: scale(1.28) rotate(-10deg);
-  }
-}
-
-.mk-testi-quote {
-  margin: 0;
-  color: var(--text-primary);
-  line-height: 1.6;
-}
-
-.mk-testi-person {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: auto;
-}
-
-.mk-testi-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-full);
-  background: var(--accent-subtle);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--text-accent);
-  font-family: var(--font-text);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--text-sm-size);
-  transition: transform var(--duration-base) var(--ease-out);
-}
-
-.mk-testi:hover .mk-testi-avatar {
-  transform: scale(1.08);
-}
-
-.mk-testi-name {
-  display: block;
-  color: var(--text-heading);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--text-sm-size);
-}
-
-.mk-testi-role {
-  display: block;
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-}
-
-.mk-testi-dots {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-2);
-  margin-top: var(--space-6);
-}
-
-.mk-testi-dots i {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  background: var(--border-strong);
-}
-
-.mk-testi-dots i:first-child {
-  background: var(--accent);
-}
-
 /* --- CTA band ------------------------------------------------------------------ */
 
 /* Closing CTA: a full-bleed dark band that flows straight into the footer. The
-   player photo bleeds off the SECTION's right edge (masked into the band); a
-   green floodlit glow sits behind it as the token fallback until the real photo
-   lands at /marketing/cta-player.png. */
+   player photo would bleed off the SECTION's right edge (masked into the band);
+   a green floodlit glow sits behind it as the token fallback.
+
+   The photo slot is currently EMPTY BY DESIGN. It used to name
+   /marketing/cta-player.png, but that asset was never committed — so every
+   landing-page load fired a request that 404'd, on a layer whose only visible
+   result was the gradient underneath it. The url() is removed rather than the
+   slot: drop the file in and restore the one line below to light it up. */
 .mk-cta-band {
   position: relative;
   overflow: hidden;
@@ -2073,7 +1983,7 @@ body:has(.landing.mk) .mk-hero {
   z-index: 0;
   width: min(46%, 760px);
   background-image:
-    url("/marketing/cta-player.png"),
+    /* url("/marketing/cta-player.png"), — restore when the asset ships */
     radial-gradient(
       32rem 32rem at 68% 42%,
       color-mix(in srgb, var(--accent) 32%, transparent),
@@ -2173,12 +2083,96 @@ body:has(.landing.mk) .mk-hero {
   color: var(--text-accent);
 }
 
+/* --- The beta promise ---------------------------------------------------------
+   Replaces `.mk-note[role="note"]` on /pricing. Same accent panel, opposite
+   emphasis: the sentence that answers "what am I risking?" is set at display
+   scale and leads, and the mechanics that used to swallow it follow at body
+   size. Colours stay on `.mk-note`'s proven pairing (accent-subtle ground,
+   heading/primary ink) rather than dropping the body to `--text-secondary`,
+   which is not certified against this ground. */
+
+.mk-promise {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  box-sizing: border-box;
+  max-width: 760px;
+  margin: 0 auto var(--space-10);
+  padding: var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+  border-radius: var(--radius-2xl);
+  background: var(--accent-subtle);
+  text-align: left;
+}
+
+.mk-promise-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-accent);
+}
+
+.mk-promise-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Grid/flex child: without it the copy floors at its longest word and the panel
+   pushes the page sideways at 320px. */
+.mk-promise-copy {
+  min-width: 0;
+}
+
+/* Text face, not display: the scale tops out at 24px and the display face is
+   reserved for >=30px, brand lockups and numerals (src/components/type-scale.test.ts).
+   Weight and colour carry the promotion instead. */
+.mk-promise-headline {
+  margin: 0;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-lg-size), 2.4vw, var(--text-2xl-size));
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+
+.mk-promise-body {
+  margin: var(--space-3) 0 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+}
+
+/* THE 2-UP BAND IS GONE (2026-07-25). `auto-fit` with a 280px floor resolved to
+   exactly two columns from ~620px to ~939px, which put Free and Pro Pass side
+   by side and left Association alone on the next row beside a hole that grew
+   from 300px to 440px as the window widened. Choosing a price is a
+   read-ACROSS task, and 2+1 is the single arrangement that forbids it: the tier
+   you are comparing to is on a different line from the tiers you are comparing.
+   So the grid is explicit rather than opportunistic — one column until three
+   fit honestly, three from 960px (where each card lands at ~293px, clear of the
+   280px floor), and no state in between. Stacked, the grid is capped at one
+   card's width instead of letting a lone card sprawl to 860px on a tablet. */
 .mk-tiers {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   align-items: stretch;
-  margin-bottom: var(--space-10);
+  max-width: 560px;
+  margin: 0 auto var(--space-10);
+}
+
+@media (min-width: 960px) {
+  .mk-tiers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: none;
+  }
 }
 
 .mk-tier {
@@ -2292,6 +2286,15 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
+/* The tier's one action. `margin-top: auto` pushes it to the card's floor, so
+   three cards with different numbers of highlights still land their buttons on
+   one line — the row a reader's eye scans when comparing. Without it the CTA
+   floats up under the shortest list and the comparison reads ragged. */
+.mk-tier-action {
+  margin: auto 0 0;
+  padding-top: var(--space-2);
+}
+
 .mk-tier-flag {
   position: absolute;
   top: calc(-1 * var(--space-3));
@@ -2332,6 +2335,266 @@ body:has(.landing.mk) .mk-hero {
   width: 20px;
   height: 20px;
   color: var(--text-accent);
+}
+
+/* --- Tier comparison table ------------------------------------------------------
+   The cards sell; the table decides. The wrapper — not the document — is what
+   scrolls, so a 640px-wide table can sit on a 320px phone without the page
+   moving sideways under the reader's thumb. */
+
+.mk-compare-wrap {
+  box-sizing: border-box;
+  max-width: 900px;
+  margin: 0 auto var(--space-3);
+  overflow-x: auto;
+  /* `overflow-x: auto` scrolls the table correctly but does NOT stop it
+     contributing to `document.documentElement.scrollWidth` — measured at 360px:
+     the wrapper is 320px with 322px of internal scroll, nothing paints outside
+     it, and yet the document still reported 615/360. It is a table-specific
+     Chromium layout-overflow quirk, and it matters because the responsive
+     certification (e2e/responsive.spec.ts) asserts on exactly that property, so
+     a page that never actually scrolls sideways would still have failed the
+     gate. `contain: paint` is the fix that holds: document scrollWidth returns
+     to 360 and the wrapper keeps all 322px of horizontal scroll. Nothing here
+     is positioned or overflows deliberately, so the containment costs nothing. */
+  contain: paint;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mk-compare-wrap:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mk-compare {
+  width: 100%;
+  /* Below this the row labels wrap to four lines each and the table stops being
+     readable at a glance, which is the only reason it exists. Scroll instead. */
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.mk-compare-caption {
+  padding: var(--space-4) var(--space-5);
+  text-align: left;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mk-compare th,
+.mk-compare td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: center;
+  vertical-align: middle;
+  color: var(--text-secondary);
+}
+
+.mk-compare thead th {
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.mk-compare th[scope="row"] {
+  min-width: 260px;
+  text-align: left;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-regular);
+}
+
+.mk-compare tbody tr:last-child th,
+.mk-compare tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mk-compare-yes {
+  color: var(--text-accent);
+  vertical-align: middle;
+}
+
+.mk-compare-no {
+  color: var(--text-muted);
+}
+
+/* The price row closes the table because it is the answer every other row was
+   qualifying. Shaded so the eye lands on it after scanning up the column. */
+.mk-compare-price th[scope="row"],
+.mk-compare-price td {
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-compare-cadence {
+  display: block;
+  margin-top: var(--space-05);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.mk-compare-note {
+  max-width: 900px;
+  margin: 0 auto var(--space-10);
+  text-align: center;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+/* --- The trust pledge -------------------------------------------------------
+   Was `.mk-trustline`: the load-bearing sentence of the entire pricing model,
+   set at 26px caption scale between two large blocks, where it read as a
+   footnote to the tiers rather than the reason they are shaped that way. On
+   /pricing it is a block with an accent edge; the landing page keeps the
+   caption treatment, where it genuinely is an aside under a preview. */
+
+.mk-pledge {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  box-sizing: border-box;
+  max-width: 900px;
+  margin: 0 auto clamp(var(--space-10), 6vw, var(--space-16));
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mk-pledge-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.mk-pledge-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mk-pledge-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-md-size), 1.8vw, var(--text-xl-size));
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  text-wrap: pretty;
+}
+
+.mk-pledge-note {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* --- Procurement -------------------------------------------------------------
+   The block an association, school or corporate league needs before it can put
+   this in front of a committee. Three evidenced points, then the honest gap in
+   a deliberately different frame — a dashed edge, because what it says is that
+   the answer is not finished. */
+
+.mk-procure {
+  max-width: 900px;
+  margin: 0 auto clamp(var(--space-10), 6vw, var(--space-16));
+}
+
+.mk-procure-head {
+  margin-bottom: var(--space-6);
+}
+
+.mk-procure-head .mk-lead {
+  margin-bottom: 0;
+}
+
+.mk-procure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .mk-procure-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.mk-procure-list li {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.mk-procure-list svg {
+  width: 22px;
+  height: 22px;
+  color: var(--text-accent);
+}
+
+.mk-procure-list h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: 1.35;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-procure-list p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.mk-procure-gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.mk-procure-gap p {
+  flex: 1 1 26rem;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 /* --- FAQ --------------------------------------------------------------------------- */
@@ -2426,6 +2689,40 @@ body:has(.landing.mk) .mk-hero {
   line-height: 1.6;
 }
 
+/* An FAQ answer that paraphrases a published policy owes the reader the policy.
+   The answer above it gives up its closing padding so the pair reads as one
+   block rather than two stacked paragraphs. */
+.mk-faq-item p:has(+ .mk-faq-link) {
+  padding-bottom: var(--space-2);
+}
+
+.mk-faq-link {
+  padding: 0 var(--space-5) var(--space-3);
+}
+
+.mk-faq-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* SC 2.5.5 (AAA) / platform convention: this is the one link inside a
+     disclosure a thumb has to find after the summary has moved under it. */
+  min-height: 44px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.mk-faq-link a:hover {
+  text-decoration: underline;
+}
+
+.mk-faq-link a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
 /* --- Showcase rows (features page) --------------------------------------------------- */
 
 .mk-show {
@@ -2438,6 +2735,20 @@ body:has(.landing.mk) .mk-hero {
 
 .mk-show + .mk-show {
   border-top: 1px solid var(--border-subtle);
+}
+
+/* This padding exists for /features, where four rows stack and each needs air
+   on both sides of its divider. The home page renders ONE row inside a band
+   that already supplies the section rhythm, so the two paddings compounded into
+   a 114px dead gap above "The morning after". A lone row needs none of its own. */
+.mk-show:only-child {
+  padding-block: 0;
+}
+
+/* Grid item: without this it floors at its vignette's min-content width and
+   pushes the page sideways, exactly as .mk-hero-visual did. */
+.mk-show-visual {
+  min-width: 0;
 }
 
 @media (min-width: 960px) {
@@ -2615,7 +2926,6 @@ body:has(.landing.mk) .mk-hero {
     .mk-card,
     .mk-tier,
     .mk-steps li,
-    .mk-testi,
     .mk-stat,
     .mk-band-head {
       animation: mk-drift linear both;
@@ -2629,14 +2939,12 @@ body:has(.landing.mk) .mk-hero {
        animation-delay. */
     .mk-card:nth-child(2),
     .mk-steps li:nth-child(2),
-    .mk-testi:nth-child(2),
     .mk-stat:nth-child(2) {
       animation-range: entry 8% entry 68%;
     }
 
     .mk-card:nth-child(3),
     .mk-steps li:nth-child(3),
-    .mk-testi:nth-child(3),
     .mk-stat:nth-child(3) {
       animation-range: entry 16% entry 76%;
     }
@@ -2739,19 +3047,15 @@ body:has(.landing.mk) .mk-hero {
   .mk-card,
   .mk-tier,
   .mk-steps li,
-  .mk-testi,
   .mk-icon-tile,
   .mk-proof li,
   .mk-proof-tile,
-  .mk-testi-avatar,
   .mk-checklist svg,
   .mk-card:hover,
   .mk-tier:hover,
   .mk-steps li:hover,
-  .mk-testi:hover,
   .mk-proof li:hover,
   .mk-checklist li:hover svg,
-  .mk-testi:hover .mk-testi-avatar,
   .mk-card:hover .mk-icon-tile,
   .mk-steps li:hover .mk-icon-tile,
   .mk-stat:hover .mk-icon-tile,
@@ -2771,7 +3075,6 @@ body:has(.landing.mk) .mk-hero {
 
   .mk-card::before,
   .mk-steps li::before,
-  .mk-testi::before,
   .mk-tier::before,
   .mk-card::after,
   .mk-faq-item summary {
@@ -2800,154 +3103,6 @@ body:has(.landing.mk) .mk-hero {
 .mk-stage-wrap {
   position: relative;
   z-index: 1;
-}
-
-.mk-parallax-layer {
-  transition: transform var(--duration-base) var(--ease-out);
-  will-change: transform;
-}
-
-/* --- Testimonials carousel (client: TestimonialCarousel) -------------------
-   A native scroll-snap scroller: swipeable and complete with JS off, and on
-   desktop the three cards fit with no overflow so it reads as a static 3-up
-   grid. JS adds arrows/dots and auto-advance. Motion is scroll/transform only. */
-.mk-carousel {
-  position: relative;
-}
-
-.mk-carousel-viewport {
-  display: flex;
-  gap: var(--space-4);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding: var(--space-2) 0 var(--space-3);
-}
-
-.mk-carousel-viewport::-webkit-scrollbar {
-  display: none;
-}
-
-.mk-carousel-viewport > .mk-testi {
-  box-sizing: border-box;
-  flex: 0 0 calc((100% - 2 * var(--space-4)) / 3);
-  min-width: 0;
-  scroll-snap-align: start;
-}
-
-@media (max-width: 899px) {
-  .mk-carousel-viewport > .mk-testi {
-    flex-basis: calc((100% - var(--space-4)) / 2);
-  }
-}
-
-@media (max-width: 619px) {
-  .mk-carousel-viewport > .mk-testi {
-    flex-basis: 100%;
-  }
-}
-
-/* Desktop: all three reviews visible as a static row — no scroll, no controls
-   (the carousel only engages on narrower screens where they don't all fit). */
-@media (min-width: 900px) {
-  .mk-carousel-viewport {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    overflow: visible;
-    scroll-snap-type: none;
-    padding: 0;
-  }
-}
-
-.mk-carousel-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-}
-
-.mk-carousel-arrow {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-raised);
-  color: var(--text-primary);
-  cursor: pointer;
-  box-shadow: var(--shadow-1);
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
-}
-
-.mk-carousel-arrow svg {
-  width: 18px;
-  height: 18px;
-}
-
-.mk-carousel-arrow:first-child svg {
-  transform: rotate(180deg);
-}
-
-.mk-carousel-arrow:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-subtle));
-}
-
-.mk-carousel-arrow:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.mk-carousel-arrow:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.mk-carousel-dots {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.mk-carousel-dot {
-  width: 9px;
-  height: 9px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--border-strong);
-  cursor: pointer;
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
-}
-
-.mk-carousel-dot[data-active="true"] {
-  background: var(--accent);
-  transform: scale(1.3);
-}
-
-.mk-carousel-dot:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mk-parallax-layer {
-    transform: none !important;
-    transition: none;
-  }
-
-  .mk-carousel-arrow,
-  .mk-carousel-dot {
-    transition: none;
-  }
 }
 
 /* --- Page chrome: smooth scroll, reading progress, back-to-top ---------------
@@ -3071,5 +3226,549 @@ body:has(.landing.mk) .mk-hero {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
+  }
+}
+
+/* --- 2026-07-24 council rebuild additions --------------------------------- */
+
+/* Scripted stage phases. During the bidding phase the stamp is withheld;
+   flipping data-phase to "sold" swaps `animation` from none to the stamp,
+   which restarts the ceremony for every player. Visibility (not opacity)
+   gates the text, so lettering never renders at partial contrast. */
+.mk-stage[data-phase="bidding"] .mk-stage-sold {
+  visibility: hidden;
+  animation: none;
+}
+
+.mk-stage[data-phase="bidding"] .mk-stage-sold::after {
+  animation: none;
+}
+
+/* Bid-momentum bars light up as the war climbs; unlit bars are dim coals.
+   Opacity here animates decorative BARS, never text. */
+.mk-stage-spark i {
+  opacity: 0.35;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.mk-stage-spark i[data-lit="true"] {
+  opacity: 1;
+}
+
+/* Risk-reducer microcopy directly under the hero CTAs. */
+.mk-hero-note {
+  margin: calc(-1 * var(--space-6)) 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* The rehearsal line closing the worst-moment band. The bottom margin is
+   zeroed: it was the <p> default (~18px) stacking under the band's own 48px of
+   padding, and it is the last thing in the band, so it separated the section
+   from nothing at all. */
+.mk-rehearse {
+  margin: clamp(var(--space-8), 4vw, var(--space-12)) 0 0;
+  font-size: var(--text-lg-size);
+  color: var(--text-primary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+.mk-money-body {
+  color: var(--text-secondary);
+  max-width: 52ch;
+  line-height: 1.6;
+}
+
+/* The sample receipt — the artifact, rendered in receipt monospace. Ink, not
+   gold: gold stays sacred for SOLD and the primary CTA. */
+.mk-receipt {
+  margin: 0;
+  width: min(100%, 380px);
+  /* There is no global border-box reset in this codebase, so `width: 100%`
+     plus 24px of padding a side made this figure 50px WIDER than the column
+     that contains it — 400px inside a 350px phone, the second source of the
+     page's horizontal scroll. */
+  box-sizing: border-box;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  padding: var(--space-6);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  display: grid;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-2);
+}
+
+.mk-receipt-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* "RCP-0007" and "TEAM DUES — STRIKERS" are uppercase monospace with tracking
+     — together they are wider than a phone. They stack instead of overflowing. */
+  flex-wrap: wrap;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mk-receipt-amount {
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.mk-receipt-method,
+.mk-receipt-ledger {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mk-receipt-ledger {
+  border-top: 1px dashed var(--border-subtle);
+  padding-top: var(--space-2);
+}
+
+.mk-receipt-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs-size, 0.75rem);
+  color: var(--text-secondary);
+  font-family: var(--font-text);
+}
+
+/* ============================================================================
+   2026-07-25 — the five sections the home page was missing: live tournaments,
+   the lifecycle beyond auction night, a pricing preview, beta candor, and an
+   FAQ. Rules that govern every rule below:
+   • Tokens only. The space scale has NO --space-7 and NO --space-9; a
+     non-existent custom property voids the WHOLE shorthand it appears in, so a
+     single typo there silently removes a declaration rather than failing loud.
+   • There is no global border-box reset in this codebase (see .mk-receipt
+     above) — anything that pairs a width with padding sets it locally.
+   • Motion is transform-only and collapses under prefers-reduced-motion; the
+     axe contrast scan reads VISUAL pixels mid-keyframe, aria-hidden or not.
+   ========================================================================== */
+
+/* --- Live tournaments strip -------------------------------------------------
+   Sits on the floodlight directly under the capability shelf, which carries no
+   bottom padding by design (it is built to flow into a dark band). This band
+   supplies the gap from its own top padding, exactly as "How the night runs"
+   does when the strip is absent. */
+
+.mk-live-band {
+  padding-top: clamp(var(--space-8), 4vw, var(--space-12));
+}
+
+/* Heading left, the qualifying sentence right — the strip is the page's proof,
+   not its argument, so it does not get a full centred band head. */
+.mk-live-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: end;
+  max-width: none;
+}
+
+@media (min-width: 900px) {
+  .mk-live-head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+    gap: var(--space-8);
+  }
+}
+
+.mk-live-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+}
+
+.mk-live-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.mk-live-card {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.mk-live-card:hover {
+  transform: translateY(calc(-1 * var(--space-1)));
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+.mk-live-org {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* The organizer's monogram. It is aria-hidden, which buys it NOTHING from the
+   contrast scanner — axe measures rendered pixels — so the pair here is a
+   certified one, not a decorative wash. */
+.mk-live-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.mk-live-name {
+  margin: 0;
+  /* Text face, not display: the type-scale guard reserves the display face for
+     >=30px, and a tournament name here is 18px. Weight carries the prominence
+     instead — which is also the right answer typographically, since these are
+     arbitrary user-entered strings and the display face is cut for headlines. */
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: 1.25;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  /* e2e residue and real life both produce very long, very similar names. Two
+     lines, then ellipsis — a third line would push one card taller than its
+     row-mates and break the strip's line. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mk-live-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The card is the hit area; the link keeps the accessible name. */
+.mk-live-name a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.mk-live-name a:focus-visible {
+  outline: none;
+}
+
+.mk-live-name a:focus-visible::after {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xl);
+}
+
+.mk-live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mk-live-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.mk-live-meta svg {
+  flex: none;
+  opacity: 0.75;
+}
+
+/* Only two statuses are ever shown, because `DirectoryEntry` only knows two.
+   Anything else (draft, setup, finished) is a state the row cannot tell apart,
+   and a card that guessed would be inventing. */
+.mk-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.mk-live-status i {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.mk-live-status--live {
+  color: var(--live);
+}
+
+/* The live dot breathes so the row reads as "now" without a text animation:
+   scale only, never opacity — the label beside it must hold full contrast at
+   every frame of the scan. */
+.mk-live-status--live i {
+  animation: mk-live-pulse 2.4s var(--ease-out) infinite;
+}
+
+@keyframes mk-live-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.45);
+  }
+}
+
+.mk-live-status--open {
+  color: var(--text-accent);
+}
+
+.mk-live-actions {
+  margin: var(--space-5) 0 0;
+}
+
+/* --- Beyond auction night: the lifecycle rail --------------------------------
+   Ten stages, name over one line of body, in two columns from tablet up. The
+   hairline above each row makes the set read as one continuous rail rather than
+   ten floating cards — the point of the section is that these connect. */
+
+.mk-lifecycle {
+  list-style: none;
+  margin: clamp(var(--space-5), 3vw, var(--space-8)) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: clamp(var(--space-6), 4vw, var(--space-12));
+}
+
+@media (min-width: 860px) {
+  .mk-lifecycle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.mk-lifecycle li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-3);
+  row-gap: var(--space-05);
+  align-items: start;
+  /* Rows in a 2-up grid are as tall as their tallest neighbour. Without this
+     the two implicit rows INSIDE a short item stretch to fill that height, and
+     a one-line stage ("Season") drifted its body 11px further from its title
+     than the two-line stage beside it — a ragged baseline across the rail. */
+  align-content: start;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mk-lifecycle-glyph {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.mk-lifecycle h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: 1.4;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-lifecycle p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* The candor footnote under the rail. A note, not a card: it must read as the
+   section telling on itself, not as an eleventh feature. */
+.mk-gap-note {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: clamp(var(--space-5), 3vw, var(--space-8)) 0 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.mk-gap-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-accent);
+}
+
+.mk-gap-note p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.mk-gap-note strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- Pricing preview ---------------------------------------------------------
+   The same tier cards /pricing renders, minus the feature checklist: this is a
+   glance, and the full comparison is one link away. Without the checklist the
+   cards are short enough to sit in one flush row on desktop. */
+
+.mk-tiers--preview {
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.mk-tiers--preview .mk-tier {
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+
+/* On /pricing the hairline under the limits line divides it from the feature
+   checklist beneath. There is no checklist in a preview, so the rule was
+   underlining nothing — a border with no job below it, which reads as a card
+   that failed to finish loading. */
+.mk-tiers--preview .mk-tier-limits {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* The pricing page ends on its trust line, so that line carries up to 64px of
+   closing air. Here it is the middle of a page and has a CTA directly under
+   it; the full-stop spacing left a hole between them. */
+.mk-tiers--preview + .mk-trustline {
+  margin-bottom: var(--space-5);
+}
+
+/* --- Trust & beta candor -----------------------------------------------------
+   Copy on the left, the four certified guarantees as a 2×2 on the right. The
+   split keeps the section under ~400px instead of stacking six blocks down the
+   page — the whole risk of adding five sections is that the page becomes a
+   slab, and every one of them is laid out against that. */
+
+.mk-trust {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-6), 4vw, var(--space-12));
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .mk-trust {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+}
+
+.mk-trust-copy .mk-h2 {
+  margin-bottom: var(--space-4);
+}
+
+.mk-certified {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.mk-certified li {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.mk-certified .mk-icon-tile {
+  inline-size: 34px;
+  block-size: 34px;
+}
+
+.mk-certified h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: 1.35;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-certified p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* --- Motion budget for the new sections -------------------------------------
+   Everything above animates transform only. This is the belt-and-braces: a
+   reader who asks for less motion gets a completely still page. */
+@media (prefers-reduced-motion: reduce) {
+  .mk-live-card,
+  .mk-live-status--live i {
+    transition: none;
+    animation: none;
+  }
+
+  .mk-live-card:hover {
+    transform: none;
   }
 }

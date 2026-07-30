@@ -35,6 +35,9 @@ export function PasskeyLogin() {
     <div className="passkey-login">
       <Button
         variant="secondary"
+        // Matches the OTP CTA beside it: this is a touch-first surface, and the
+        // two doors out of the gate should not be different heights.
+        size="touch"
         onClick={() => void login()}
         loading={busy}
         data-testid="passkey-login"

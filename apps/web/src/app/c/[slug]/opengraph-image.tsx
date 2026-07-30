@@ -30,14 +30,17 @@ export default async function OpengraphImage({ params }: { params: Promise<{ slu
   if (view === null) {
     return new ImageResponse(renderShareFallback(), { ...size });
   }
-  const players = await publicShowcase(slug);
+  const pool = await publicShowcase(slug);
   const model = buildCompetitionShareCard({
     name: view.name,
     organizer: view.orgName,
     location: view.location,
     dateRange: formatDateRange(view.startsOn, view.endsOn),
     teamCount: view.teams.length,
-    playerCount: players?.length ?? 0,
+    // `total`, not the loaded rows: the showcase query is page-limited, and a
+    // share card that said "200 players" about a 412-player pool would be the
+    // most-forwarded wrong number the product produces.
+    playerCount: pool?.total ?? 0,
     status: view.status,
     auctionStatus: view.auctionStatus,
   });

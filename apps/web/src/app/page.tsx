@@ -1,73 +1,118 @@
-import { ButtonLink } from "@desiauction/ui";
+import { ButtonLink, VisuallyHidden } from "@desiauction/ui";
 import type { Metadata } from "next";
 
 import { env } from "../env";
-import {
-  CAPABILITY_CARDS,
-  LANDING,
-  LIVE_EXPERIENCE,
-  TESTIMONIALS,
-  TRUST_BAR,
-  TRUST_MARKS,
-} from "../content/marketing";
-import { HeroStage } from "../components/marketing/hero-stage";
-import { TestimonialCarousel } from "../components/marketing/testimonial-carousel";
+import { LANDING, PRICING, TRUST_MARKS } from "../content/marketing";
+import { HeroStage, type StagePlayer } from "../components/marketing/hero-stage";
+import { LiveTournaments } from "../components/marketing/live-tournaments";
 import {
   IconArrowRight,
   IconBolt,
-  IconBroadcast,
+  IconCalendar,
   IconCheck,
+  IconFileCheck,
   IconGavel,
+  IconGlobe,
   IconLedger,
+  IconMapPin,
   IconPhone,
   IconPlay,
   IconReceipt,
+  IconRefresh,
   IconRupee,
   IconShieldCheck,
+  IconSpark,
+  IconStar,
   IconTrophy,
   IconTv,
   IconUsers,
 } from "../components/marketing/icons";
+import { slugify } from "../lib/slug";
 import "./content.css";
 import "./marketing.css";
 
 export const metadata: Metadata = {
-  title: "DesiAuction — the auction night your tournament deserves",
+  title: "DesiAuction — SOLD, without the shouting",
   description: LANDING.hero.sub,
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/` },
   openGraph: {
-    title: "DesiAuction — tournament auctions, taken seriously",
+    title: "DesiAuction — SOLD, without the shouting",
     description: LANDING.hero.sub,
     url: `${env.PUBLIC_BASE_URL}/`,
     type: "website",
   },
 };
 
-const TRUST_ICONS = [IconShieldCheck, IconLedger, IconRupee, IconBolt, IconPhone] as const;
-const STEP_ICONS = [IconTrophy, IconUsers, IconTv, IconReceipt] as const;
-const STAT_ICONS = [IconLedger, IconShieldCheck, IconBolt, IconPhone] as const;
-const CAPABILITY_ICONS = [IconGavel, IconUsers, IconRupee, IconBroadcast, IconPhone] as const;
+/**
+ * The screen-reader equivalent of the hero stage. The stage is a looping,
+ * decorative animation (aria-hidden) and must stay that way — announcing bid
+ * numbers that change every 950ms would be noise, not information. But it is
+ * also this page's ONLY proof that the product works, so a visitor who cannot
+ * see it gets the same story as a finished sentence: one lot, opened, closed,
+ * sold. Derived from the script the animation actually plays, so the two can
+ * never drift apart, and deliberately worded WITHOUT the phrase "simulated
+ * demo" — that exact string is the visible truth label below the stage, and
+ * the e2e suite locates it by text.
+ */
+function stageNarration(player: StagePlayer): string {
+  const rupees = (value: number) => `₹${value.toLocaleString("en-IN")}`;
+  return (
+    `Simulated auction, one lot. Lot ${String(player.lot)}: ${player.name}, ` +
+    `${player.role.toLowerCase()}. ` +
+    `Bidding opened at ${rupees(player.opening)} and closed at ${rupees(player.final)} — ` +
+    `sold to ${player.team}.`
+  );
+}
+
+const BEAT_ICONS = [IconUsers, IconGavel, IconReceipt] as const;
+const WORST_ICONS = [IconPhone, IconBolt, IconLedger] as const;
+const TRUST_ICONS = [IconShieldCheck, IconLedger, IconRupee, IconTv, IconPhone] as const;
+/** One glyph per lifecycle stage, in LANDING.lifecycle.stages order. */
+const STAGE_ICONS = [
+  IconGlobe,
+  IconTrophy,
+  IconRefresh,
+  IconUsers,
+  IconGavel,
+  IconStar,
+  IconMapPin,
+  IconCalendar,
+  IconPlay,
+  IconRupee,
+] as const;
+/** One glyph per certified-capability card, in LANDING.trust.items order. */
+const CERTIFIED_ICONS = [IconShieldCheck, IconLedger, IconReceipt, IconFileCheck] as const;
 
 /**
- * The landing page (PX-1 05 §2), matched to the reference screenshot — hero →
- * how it works → trust → features → live demo → testimonials → CTA. Every
- * section answers one buyer question in order, and none exist that the
- * screenshot doesn't call for. Presentation is the `mk-` design layer; the
- * hero visual and testimonials are the two interactive client islands
- * (HeroStage, TestimonialCarousel), both transform-only and both degrading to
- * static under prefers-reduced-motion / no-JS. The no-fabrication rule holds
- * throughout: no invented customers, logos or metrics; the testimonials are
- * the single, explicitly-approved illustrative exception (see marketing.ts).
- * Photographic elements are named image slots under /public/marketing/ with
- * token-colored fallbacks.
+ * The landing page, rebuilt to the 2026-07-24 Product Creation Council
+ * blueprint. Seven sections, one CTA, and the page's only proof is the product
+ * visibly working plus candor — no testimonials, no stat bar, no capability
+ * grid, no photography. The hero stage is a scripted replay (HeroStage): a
+ * static-asset simulation labelled as such, with zero server dependency, whose
+ * server render is a truthful SOLD frame (the LCP is product DOM, not an
+ * image). The no-fabrication rule is now uniform: nothing on this page names a
+ * customer, a metric, or a real person.
+ *
+ * 2026-07-25 — five sections added, because the page sold ONE NIGHT of a
+ * product that runs a season, and answered none of a guest's commercial
+ * questions. In page order: live tournaments (real rows, the only unsimulated
+ * proof here), the lifecycle beyond auction night, a pricing preview, the beta
+ * candor that turns "no customers to name" from a hole into a statement, and an
+ * FAQ. Two invariants they are all built against:
+ *
+ *   1. This page renders when Postgres does not. The one database read lives in
+ *      <LiveTournaments/>, which degrades to rendering NOTHING — see the guard
+ *      there. `GET /` with the database stopped must still be a 200.
+ *   2. Anything the repository could not evidence is written AND flagged with a
+ *      `TODO(founder):` in ../content/marketing.ts, never invented and never
+ *      quietly dropped. Grep that file for the fact-check list.
  */
 export default function LandingPage() {
   return (
     <div className="landing mk">
       <main>
-        {/* Reading progress: a 2px accent hairline above the header. */}
         <div className="mk-progress" aria-hidden="true" />
-        {/* --- 1 · Hero: the floodlit night -------------------------------- */}
+        {/* --- 1 · Hero: the promise, and the product proving it ------------ */}
         <section className="mk-hero" data-theme="floodlight">
           <div className="mk-hero-photo" aria-hidden="true" />
           {/* Atmosphere: floodlight beams, stadium dust, film grain. */}
@@ -79,13 +124,8 @@ export default function LandingPage() {
           <div className="mk-container">
             <div className="mk-hero-grid">
               <div className="mk-hero-copy">
-                <p className="mk-hero-badge">
-                  <IconShieldCheck />
-                  {LANDING.hero.badge}
-                </p>
                 <h1 className="mk-h1">
-                  The auction night your tournament{" "}
-                  <span className="mk-hero-highlight">deserves.</span>
+                  SOLD, without the <span className="mk-hero-highlight">shouting.</span>
                 </h1>
                 <p className="mk-lead">{LANDING.hero.sub}</p>
                 <div className="mk-hero-actions">
@@ -93,22 +133,29 @@ export default function LandingPage() {
                     {LANDING.hero.ctaPrimary.label}
                     <IconArrowRight width={18} height={18} />
                   </ButtonLink>
+                  {/* Was a play glyph pointing at "#demo" — a promise of video
+                      that never played. The destination is the public directory
+                      now, so the icon is the spectator screen the visitor is
+                      being sent to. */}
                   <ButtonLink href={LANDING.hero.ctaSecondary.href} variant="secondary" size="lg">
-                    <IconPlay width={16} height={16} />
+                    <IconTv width={16} height={16} />
                     {LANDING.hero.ctaSecondary.label}
                   </ButtonLink>
                 </div>
+                <p className="mk-hero-note">{LANDING.hero.ctaNote}</p>
               </div>
-              {/* The live-room card, pinned to the viewport's top-right corner
-                  (see .mk-hero-visual) so it floats beside the full-bleed
-                  photo's trophy, clear of the cup. Parallax + count-up, decorative. */}
-              <HeroStage player={LANDING.hero.player} />
+              <div className="mk-hero-demo">
+                <HeroStage script={LANDING.hero.script} teams={LANDING.hero.demoTeams} />
+                <p className="mk-stage-note">
+                  {LANDING.hero.demoLabel}
+                  <VisuallyHidden>{stageNarration(LANDING.hero.script[0])}</VisuallyHidden>
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Full-width proof strip: its own thin band under the hero so the
-            photo's trophy plinth — the gold "DesiAuction" — stays clear. */}
+        {/* Full-width proof strip: verifiable capabilities, never metrics. */}
         <section
           className="mk-band mk-proof-band"
           data-theme="floodlight"
@@ -131,19 +178,30 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* --- 2 · How it works: the workflow, a light panel on the night -- */}
+        {/* --- 1b · Live tournaments: the page's only unsimulated proof -----
+            Placed directly under the capability strip, and kept on the
+            floodlight, because the proof band deliberately has NO bottom
+            padding — it is built to flow into the dark band beneath it. A light
+            band here would have butted the capability marks against a hard
+            edge. It also earns its position rhetorically: the strip above
+            claims, this one evidences, and only then does the page start
+            explaining. Renders nothing when the directory is empty or the
+            database is unreachable, which restores exactly today's layout. */}
+        <LiveTournaments />
+
+        {/* --- 2 · The night in three beats -------------------------------- */}
         <section className="mk-band" data-theme="floodlight" id="how" aria-labelledby="how-heading">
           <div className="mk-container">
             <div className="mk-panel" data-theme="daylight">
               <div className="mk-band-head mk-band-head--center mk-center">
-                <p className="mk-kicker">{LANDING.howItWorks.kicker}</p>
+                <p className="mk-kicker">{LANDING.beats.kicker}</p>
                 <h2 id="how-heading" className="mk-h2">
-                  {LANDING.howItWorks.h2}
+                  {LANDING.beats.h2}
                 </h2>
               </div>
               <ol className="mk-steps">
-                {LANDING.howItWorks.steps.map((step, index) => {
-                  const Icon = STEP_ICONS[index] ?? IconCheck;
+                {LANDING.beats.steps.map((step, index) => {
+                  const Icon = BEAT_ICONS[index] ?? IconGavel;
                   return (
                     <li key={step.title}>
                       <div className="mk-step-top">
@@ -167,136 +225,242 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* --- 3 · Trust: "One platform. Complete trust." ------------------- */}
-        <section className="mk-band" data-theme="floodlight" aria-labelledby="trust-heading">
-          <div className="mk-container">
-            <div className="mk-stats-panel mk-stats-panel--split">
-              <div className="mk-stats-lead">
-                <span className="mk-icon-tile mk-icon-tile--lg">
-                  <IconShieldCheck />
-                </span>
-                <div>
-                  <h2 id="trust-heading" className="mk-h2">
-                    {TRUST_BAR.h2}
-                  </h2>
-                  <p>{TRUST_BAR.sub}</p>
-                </div>
-              </div>
-              <div className="mk-stats-grid">
-                {TRUST_BAR.stats.map((stat, index) => {
-                  const Icon = STAT_ICONS[index] ?? IconCheck;
-                  return (
-                    <div key={stat.label} className="mk-stat">
-                      <span className="mk-icon-tile">
-                        <Icon />
-                      </span>
-                      <span className="mk-stat-text">
-                        <span className="mk-stat-value">{stat.value}</span>
-                        <span className="mk-stat-label">{stat.label}</span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* --- 4 · Features: everything you need ---------------------------- */}
-        <section className="mk-band" id="features" aria-labelledby="capabilities-heading">
+        {/* --- 3 · Built for the worst moment of the night ------------------ */}
+        <section className="mk-band" aria-labelledby="worst-heading">
           <div className="mk-container">
             <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">Built for organizers</p>
-              <h2 id="capabilities-heading" className="mk-h2">
-                Everything you need. Nothing you don&apos;t.
+              <p className="mk-kicker">{LANDING.worst.kicker}</p>
+              <h2 id="worst-heading" className="mk-h2">
+                {LANDING.worst.h2}
               </h2>
             </div>
-            <div className="mk-cards mk-cards--5">
-              {CAPABILITY_CARDS.map((card, index) => {
-                const Icon = CAPABILITY_ICONS[index] ?? IconCheck;
+            <div className="mk-cards">
+              {LANDING.worst.items.map((item, index) => {
+                const Icon = WORST_ICONS[index] ?? IconBolt;
                 return (
-                  <div key={card.title} className="mk-card">
+                  <div key={item.title} className="mk-card">
                     <span className="mk-icon-tile">
                       <Icon />
                     </span>
-                    <h3>{card.title}</h3>
-                    <p>{card.body}</p>
+                    <h3>{item.title}</h3>
+                    <p>{item.body}</p>
                   </div>
                 );
               })}
             </div>
+            <p className="mk-center mk-rehearse">
+              {LANDING.worst.rehearse}{" "}
+              <ButtonLink href="/login" variant="ghost">
+                Start rehearsing
+                <IconArrowRight width={16} height={16} />
+              </ButtonLink>
+            </p>
           </div>
         </section>
 
-        {/* --- 5 · Live demo: the moments that matter ----------------------- */}
-        <section className="mk-band mk-band--sunken" aria-labelledby="live-heading">
+        {/* --- 3b · Beyond auction night: the whole lifecycle ---------------
+            The page sold one night; an organizer running a six-week league read
+            that as "this cannot run my league" and left. Ten stages, one line
+            each, and — as load-bearing as the list — the paragraph that says
+            what is NOT built. Dark, because it sits between two light bands and
+            because a list of ten short lines is exactly the content the
+            floodlight scope reads best. */}
+        <section
+          className="mk-band mk-band--dark mk-lifecycle-band"
+          data-theme="floodlight"
+          aria-labelledby="lifecycle-heading"
+        >
+          <div className="mk-container">
+            <div className="mk-band-head mk-band-head--center mk-center">
+              <p className="mk-kicker">{LANDING.lifecycle.kicker}</p>
+              <h2 id="lifecycle-heading" className="mk-h2">
+                {LANDING.lifecycle.h2}
+              </h2>
+              <p className="mk-lead">{LANDING.lifecycle.sub}</p>
+            </div>
+            {/* `mk-lifecycle`, not `mk-stage*`: the hero card owns that prefix
+                (.mk-stage-name, .mk-stage-lot, .mk-stage-sold …) and a second,
+                unrelated "stage" in the same stylesheet would be a trap for
+                whoever edits it next. */}
+            <ol className="mk-lifecycle">
+              {LANDING.lifecycle.stages.map((stage, index) => {
+                const Icon = STAGE_ICONS[index] ?? IconCheck;
+                return (
+                  <li key={stage.name}>
+                    <span className="mk-lifecycle-glyph" aria-hidden="true">
+                      <Icon width={18} height={18} />
+                    </span>
+                    <h3>{stage.name}</h3>
+                    <p>{stage.body}</p>
+                  </li>
+                );
+              })}
+            </ol>
+            {/* The candor that makes the list above trustworthy. It is a <p>,
+                not a card, so it reads as the section's own footnote rather
+                than as an eleventh feature. */}
+            <div className="mk-gap-note" role="note">
+              <IconSpark width={18} height={18} />
+              <p>
+                <strong>{LANDING.lifecycle.gap.title}:</strong> {LANDING.lifecycle.gap.body}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* --- 4 · The morning after: the receipt -------------------------- */}
+        <section className="mk-band mk-band--sunken" aria-labelledby="money-heading">
           <div className="mk-container">
             <div className="mk-show">
               <div>
-                <p className="mk-kicker">Live auction experience</p>
-                <h2 id="live-heading" className="mk-h2">
-                  {LIVE_EXPERIENCE.h2}
+                <p className="mk-kicker">{LANDING.money.kicker}</p>
+                <h2 id="money-heading" className="mk-h2">
+                  {LANDING.money.h2}
                 </h2>
-                <ul className="mk-checklist" style={{ marginBottom: "var(--space-6)" }}>
-                  {LIVE_EXPERIENCE.checklist.map((item) => (
-                    <li key={item}>
-                      <IconCheck />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <ButtonLink href={LIVE_EXPERIENCE.cta.href} variant="ghost">
-                  {LIVE_EXPERIENCE.cta.label}
-                  <IconArrowRight width={16} height={16} />
-                </ButtonLink>
+                <p className="mk-money-body">{LANDING.money.body}</p>
               </div>
               <div className="mk-show-visual">
-                <div className="mk-video-mock" data-theme="floodlight" aria-hidden="true">
-                  <span className="mk-video-badge">
-                    <i />
-                    Live
-                  </span>
-                  <span className="mk-video-caption">{LIVE_EXPERIENCE.demo.tournamentName}</span>
-                  <span className="mk-video-play" data-theme="daylight">
-                    <IconPlay />
-                  </span>
-                  <span className="mk-video-activity">
-                    {LIVE_EXPERIENCE.demo.activity}
-                    <time>· 2 sec ago</time>
-                  </span>
-                  <div className="mk-board" data-theme="daylight">
-                    {LIVE_EXPERIENCE.demo.leaderboard.map((row, index) => (
-                      <div key={row.team} className="mk-board-row">
-                        <span
-                          className={`mk-board-team mk-stage-team-${["a", "b", "c"][index] ?? "a"}`}
-                        >
-                          <i />
-                          {row.team}
-                        </span>
-                        <span className="mk-board-amount">{row.amount}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <figure className="mk-receipt">
+                  <figcaption className="mk-receipt-head">
+                    <span>{LANDING.money.receipt.number}</span>
+                    <span>{LANDING.money.receipt.title}</span>
+                  </figcaption>
+                  <p className="mk-receipt-amount">{LANDING.money.receipt.amount}</p>
+                  <p className="mk-receipt-method">{LANDING.money.receipt.method}</p>
+                  <p className="mk-receipt-ledger">{LANDING.money.receipt.ledgerLine}</p>
+                  <p className="mk-receipt-note">{LANDING.money.receipt.note}</p>
+                </figure>
               </div>
             </div>
           </div>
         </section>
 
-        {/* --- 6 · Testimonials ---------------------------------------------- */}
-        <section className="mk-band" aria-labelledby="testimonials-heading">
+        {/* --- 4b · Pricing preview ----------------------------------------
+            The page answered none of a guest's commercial questions. Tiers are
+            read from PRICING so the home page can never quote a price /pricing
+            has retired, and the two paid tiers show their real "Published at
+            GA" placeholder rather than a number nobody has decided.
+            Deliberately WITHOUT the pricing page's "Most popular" flag: with
+            zero customers, popularity is precisely the kind of claim this page
+            is not allowed to make. */}
+        <section className="mk-band" aria-labelledby="pricing-heading">
           <div className="mk-container">
             <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">Trusted by organizers</p>
-              <h2 id="testimonials-heading" className="mk-h2">
-                Loved by tournament organizers across India
+              <p className="mk-kicker">{LANDING.pricingPreview.kicker}</p>
+              <h2 id="pricing-heading" className="mk-h2">
+                {LANDING.pricingPreview.h2}
               </h2>
+              <p className="mk-lead">{LANDING.pricingPreview.sub}</p>
             </div>
-            <TestimonialCarousel testimonials={TESTIMONIALS} />
+            <div className="mk-tiers mk-tiers--preview">
+              {PRICING.tiers.map((tier) => {
+                const tierId = `home-tier-${slugify(tier.name)}`;
+                return (
+                  <section
+                    key={tier.name}
+                    className={`mk-tier${tier.featured === true ? " mk-tier--featured" : ""}`}
+                    aria-labelledby={tierId}
+                  >
+                    <h3 id={tierId}>{tier.name}</h3>
+                    <p className="mk-tier-price">
+                      {/* Same rule as /pricing: the display slot is set for a
+                          numeral, so a tier whose price is a sentence drops to
+                          text scale instead of dwarfing the tier that has one. */}
+                      <span
+                        className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
+                      >
+                        {tier.price}
+                      </span>
+                      <span className="mk-tier-cadence">{tier.cadence}</span>
+                    </p>
+                    <p className="mk-tier-limits">{tier.limits}</p>
+                  </section>
+                );
+              })}
+            </div>
+            <p className="mk-trustline">
+              <IconShieldCheck />
+              <span>{PRICING.trustLine}</span>
+            </p>
+            <p className="mk-center mk-panel-actions">
+              <ButtonLink href={LANDING.pricingPreview.cta.href} variant="ghost">
+                {LANDING.pricingPreview.cta.label}
+                <IconArrowRight width={16} height={16} />
+              </ButtonLink>
+            </p>
           </div>
         </section>
 
-        {/* --- 7 · Closing CTA — full-bleed dark band flowing into the footer --- */}
+        {/* --- 4c · Trust & beta candor -------------------------------------
+            The page carries no customer names by policy and, until now, paid
+            that price in silence — the absence read as a product with nothing
+            to show. This spends the constraint instead: says the beta truth
+            out loud, then lists what IS certified in its place. */}
+        <section className="mk-band mk-band--sunken" aria-labelledby="trust-heading">
+          <div className="mk-container">
+            <div className="mk-trust">
+              <div className="mk-trust-copy">
+                <p className="mk-kicker">{LANDING.trust.kicker}</p>
+                <h2 id="trust-heading" className="mk-h2">
+                  {LANDING.trust.h2}
+                </h2>
+                <p className="mk-money-body">{LANDING.trust.body}</p>
+                <p className="mk-panel-actions">
+                  <ButtonLink href={LANDING.trust.cta.href} variant="secondary">
+                    {LANDING.trust.cta.label}
+                    <IconArrowRight width={16} height={16} />
+                  </ButtonLink>
+                </p>
+              </div>
+              <ul className="mk-certified">
+                {LANDING.trust.items.map((item, index) => {
+                  const Icon = CERTIFIED_ICONS[index] ?? IconCheck;
+                  return (
+                    <li key={item.title}>
+                      <span className="mk-icon-tile">
+                        <Icon width={18} height={18} />
+                      </span>
+                      <h3>{item.title}</h3>
+                      <p>{item.body}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* --- 4d · FAQ -----------------------------------------------------
+            Native <details>/<summary>: keyboard-operable and screen-reader
+            correct with no JS and no ARIA of our own to get wrong. Styling is
+            the same .mk-faq the pricing page uses, so the accordion the guest
+            meets here behaves identically to the one they meet there. */}
+        <section className="mk-band" aria-labelledby="faq-heading">
+          <div className="mk-container">
+            <div className="mk-band-head mk-band-head--center mk-center">
+              <p className="mk-kicker">{LANDING.faq.kicker}</p>
+              <h2 id="faq-heading" className="mk-h2">
+                {LANDING.faq.h2}
+              </h2>
+            </div>
+            <div className="mk-faq">
+              {LANDING.faq.items.map((item) => (
+                <details key={item.question} className="mk-faq-item">
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+              <p className="mk-center mk-panel-actions">
+                <ButtonLink href={LANDING.faq.cta.href} variant="ghost">
+                  {LANDING.faq.cta.label}
+                  <IconArrowRight width={16} height={16} />
+                </ButtonLink>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* --- 5 · Closing CTA ---------------------------------------------- */}
         <section className="mk-band mk-cta-band" data-theme="floodlight" aria-labelledby="beta">
           <div className="mk-cta-photo" aria-hidden="true" />
           {/* The hero's atmosphere returns for the closing scene. */}

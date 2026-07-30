@@ -50,9 +50,13 @@ export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }
           <div className="teams-head-title">
             <h2>Auction progress</h2>
           </div>
-          <span className="competitions-hint">
+          {/* "Queued" here means exactly what the open guard means by it.
+              Prepared lots are named separately — they are what "Queue all
+              prepared" is for, and calling them queued is how this card came
+              to claim 14 queued while the door said none. */}
+          <span className="competitions-hint" data-testid="auction-progress-counts">
             {counts.sold} sold · {counts.onBlock} on block · {counts.queued} queued ·{" "}
-            {counts.unsold} unsold
+            {counts.prepared} prepared · {counts.unsold} unsold
           </span>
         </div>
         <span className="auc-progress" aria-hidden>
@@ -77,6 +81,13 @@ export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }
           </span>
           <span className="auc-money">Money moved · {compactINR(moneyMoved)}</span>
         </div>
+        {counts.queued === 0 && counts.prepared > 0 ? (
+          <p className="competitions-hint" data-testid="nothing-queued-hint">
+            Nothing is queued yet. {counts.prepared} prepared lot
+            {counts.prepared === 1 ? " is" : "s are"} waiting for “Queue all prepared” — the auction
+            cannot open until at least one lot is queued.
+          </p>
+        ) : null}
       </Card>
 
       <div className="auc-split">
@@ -155,21 +166,28 @@ export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }
                       />
                       {paddle.teamName}
                     </span>
-                    <span className="auc-paddle-left">{compactINR(paddle.remaining)} left</span>
+                    {/* DA-30: a rival's remaining purse is the one thing an
+                        auction keeps back. Without money sight the figure is
+                        not dimmed — it was never sent. */}
+                    {paddle.remaining !== undefined ? (
+                      <span className="auc-paddle-left">{compactINR(paddle.remaining)} left</span>
+                    ) : null}
                   </span>
-                  <span className="season-bar" aria-hidden>
-                    <span
-                      className="season-bar-fill"
-                      style={{
-                        width: `${String(
-                          paddle.purseTotal > 0
-                            ? Math.round((paddle.spent / paddle.purseTotal) * 100)
-                            : 0,
-                        )}%`,
-                        ...(paddle.color !== null ? { background: paddle.color } : {}),
-                      }}
-                    />
-                  </span>
+                  {paddle.purseTotal !== undefined && paddle.spent !== undefined ? (
+                    <span className="season-bar" aria-hidden>
+                      <span
+                        className="season-bar-fill"
+                        style={{
+                          width: `${String(
+                            paddle.purseTotal > 0
+                              ? Math.round((paddle.spent / paddle.purseTotal) * 100)
+                              : 0,
+                          )}%`,
+                          ...(paddle.color !== null ? { background: paddle.color } : {}),
+                        }}
+                      />
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>

@@ -31,8 +31,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
 
@@ -60,7 +60,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Issuance Founder");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByTestId("onboarding-org")).toBeVisible();
+  await expect(page).toHaveURL(/\/home/);
 
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
@@ -72,6 +72,9 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   expect(orgSlug).not.toBe("");
 
   // --- Grant the two authorities this journey needs, from the product --------
+  // Both authority panels live on the org detail page's "Money & roles" tab;
+  // other tab panels render in the DOM but display:none until selected.
+  await page.getByRole("tab", { name: "Money & roles" }).click();
   await page.getByTestId("authority-person").selectOption({ label: "Issuance Founder" });
   await page.getByTestId("authority-role").selectOption("settlement:controller");
   await page.getByTestId("grant-authority").click();
@@ -167,6 +170,10 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await expect(page.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  // Feasibility: these fixtures run a handful of players against squads of 8,
+  // which the setup screen now refuses until the shortfall is accepted on the
+  // record (it is the state that used to become an unclosable auction).
+  await page.getByTestId("accept-short-squads").check();
   await page.getByTestId("create-auction").click();
   await expect(page.getByTestId("auction-status")).toHaveText("scheduled", { timeout: 20_000 });
   for (const team of ["Risers", "Royals"]) {
@@ -176,6 +183,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   }
   await page.getByTestId("queue-all").click();
   await expect(page.getByTestId("lots-table")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("accept-short-open").check();
   await page.getByTestId("auction-open").click();
   await expect(page.getByTestId("auction-status")).toHaveText("live", { timeout: 20_000 });
   await page.getByTestId("auction-complete").click();

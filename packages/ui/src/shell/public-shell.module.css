@@ -48,7 +48,7 @@
       color-mix(in srgb, var(--surface-sunken) 52%, transparent),
       color-mix(in srgb, var(--surface-sunken) 70%, transparent)
     ),
-    url("/marketing/hero-stadium.jpg");
+    var(--public-header-photo, url("/marketing/hero-stadium-1024.jpg"));
   background-size: auto, cover;
   background-position:
     center,
@@ -56,6 +56,28 @@
   background-repeat: no-repeat;
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   backdrop-filter: blur(14px) saturate(1.4);
+}
+
+/* This header is sticky on EVERY public page, so its decoration is a site-wide
+   byte, not a per-page one. It used to name the full 1717px plate — 462 KB — to
+   paint a band roughly 73 px tall that is then blurred 14 px and covered by a
+   near-opaque scrim. On /pricing that single request was 76% of the page.
+   The landing page had already solved this for its own hero (marketing.css):
+   negotiate the format with image-set() and hand over the 1024px cut. The same
+   applies here with more force, because nothing in a blurred 73 px strip can
+   resolve the difference. Guarded by @supports, since a browser that cannot
+   parse image-set() discards the WHOLE background-image declaration — scrim
+   gradient included — which is why the fallback above is a plain url(). */
+@supports (
+  background-image: image-set(url("/marketing/hero-stadium-1024.avif") type("image/avif"))
+) {
+  .header {
+    --public-header-photo: image-set(
+      url("/marketing/hero-stadium-1024.avif") type("image/avif"),
+      url("/marketing/hero-stadium-1024.webp") type("image/webp"),
+      url("/marketing/hero-stadium-1024.jpg") type("image/jpeg")
+    );
+  }
 }
 
 .header-inner {
@@ -151,12 +173,21 @@ a.wordmark:hover .wordmark-glyph {
   box-shadow: 0 0 16px color-mix(in srgb, var(--identity-accent) 30%, transparent);
 }
 
+/* 960px, not 720px. The inline nav needs 510px for its five items on one line;
+   add the wordmark, "Sign in" and the CTA and the header's content measures
+   ~960px. Showing it from 720px meant the band between 720 and 960 rendered a
+   nav it could not fit: at 900 the links wrapped onto a second row, by 820 the
+   CTA was being crushed, and at 768 — iPad portrait, the single most common
+   tablet width — the header ran 6px past the viewport and pushed the whole
+   document sideways, with the CTA squeezed to 79px and its label wrapping to
+   three clipped lines. The hamburger now takes over while there is still room
+   for it, so the header is never asked to fit what it cannot. */
 .nav {
   display: none;
   gap: var(--space-1);
 }
 
-@media (min-width: 720px) {
+@media (min-width: 960px) {
   .nav {
     display: flex;
   }
@@ -199,8 +230,29 @@ a.wordmark:hover .wordmark-glyph {
   transform: scaleX(1);
 }
 
+/* The page you are on wears the hover state permanently — the underline is
+   already this nav's language for "this one", so being here just means it is
+   always drawn. Announced by aria-current; this is the sighted half. */
+.nav-link[aria-current="page"] {
+  color: var(--text-heading);
+}
+
+.nav-link[aria-current="page"]::after {
+  transform: scaleX(1);
+}
+
+/* A 13px link in a column is a 16px-tall tap target — half the 44px minimum,
+   and the footer is where a phone user reaches for Privacy or Support with a
+   thumb. The target grows to 44px on the link itself (inline-flex + min-height,
+   so it works for one- and two-line labels alike). Each container then pays for
+   that height out of its own spacing instead of stacking on top of it — the
+   columns surrender their gap, the bottom bar surrenders margin — so the
+   rhythm stays even and no two targets ever overlap (an overlapping 44px box
+   steals its neighbour's taps, which is worse than a small one). */
 .footer-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--text-secondary);
   text-decoration: none;
   font-family: var(--font-text);
@@ -235,9 +287,10 @@ a.wordmark:hover .wordmark-glyph {
   gap: var(--space-3);
 }
 
-/* Mobile menu trigger: the desktop `.nav` is hidden below 720px, so the
-   hamburger carries the site nav there and disappears once the inline nav
-   returns. Sits in the floodlight header, so tokens resolve dark. */
+/* Mobile menu trigger: the desktop `.nav` is hidden below 960px, so the
+   hamburger carries the site nav there — phones AND tablets — and disappears
+   once the inline nav returns. Sits in the floodlight header, so tokens
+   resolve dark. */
 .menu-button {
   display: inline-flex;
   align-items: center;
@@ -269,7 +322,7 @@ a.wordmark:hover .wordmark-glyph {
   outline-offset: 2px;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 960px) {
   .menu-button {
     display: none;
   }
@@ -329,6 +382,17 @@ a.wordmark:hover .wordmark-glyph {
 .content {
   flex: 1;
   outline: none;
+}
+
+/* Opt-in, for surfaces that must FILL the space the header left rather than
+   guess at it. Every arithmetic version of this ("100dvh minus the header") is
+   wrong by the difference between the header's declared height and the height
+   its scroll-timeline `from` keyframe actually paints — on /login that showed
+   up as a permanent 9px scrollbar. Opt-in rather than default so no other
+   public page's block layout changes. */
+.content[data-fill] {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Footer: brand column + link columns over a sunken band. The top divider is
@@ -418,13 +482,16 @@ a.wordmark:hover .wordmark-glyph {
   color: var(--text-muted);
 }
 
+/* No gap: the links' own 44px boxes now supply the separation (they include
+   ~14px of padding above and below the text), so adding the old 8px on top
+   would only spread the column further without making anything easier to hit. */
 .footer-group-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
 }
 
 .footer-links {
@@ -479,6 +546,19 @@ a.wordmark:hover .wordmark-glyph {
   border-image: linear-gradient(90deg, transparent, var(--border-subtle) 20% 80%, transparent) 1;
 }
 
+/* Compact: the bottom bar IS the footer, so it needs neither the band of air
+   the columns sat in nor the rule that separated it from them. */
+.footer[data-compact] .footer-inner {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+
+.footer[data-compact] .footer-bottom {
+  padding-top: 0;
+  border-top: 0;
+  border-image: none;
+}
+
 .footer-note {
   margin: 0;
   font-family: var(--font-text);
@@ -492,8 +572,15 @@ a.wordmark:hover .wordmark-glyph {
   gap: var(--space-4);
 }
 
+/* The bottom bar lays its links out horizontally, so their 44px boxes sit
+   side by side and can grow vertically for free: the negative block margin
+   hands the extra height back to the bar, which keeps its original height and
+   its centred alignment with the copyright note. No overlap is possible — the
+   boxes never share a column. */
 .footer-bottom-links .footer-link {
   font-size: var(--text-xs-size);
+  /* -14px = half of (44px box − the ~16px line box these 12px links had). */
+  margin-block: -14px;
 }
 
 @media (prefers-reduced-motion: reduce) {

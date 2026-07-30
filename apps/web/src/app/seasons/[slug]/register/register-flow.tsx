@@ -12,6 +12,7 @@ import {
 import { Badge, Button, Card, Field, Select } from "@desiauction/ui";
 import { useEffect, useState, useTransition } from "react";
 
+import { formatPhone } from "../../../../lib/format-phone";
 import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
@@ -27,6 +28,41 @@ const ROLE_LABEL: Record<string, string> = {
 type Step = "profile" | "role" | "review";
 
 const draftKey = (slug: string) => `da:reg-draft:${slug}`;
+
+/**
+ * DA-35: the draft persisted ONE of the four answers step 2 collects. Date of
+ * birth and both playing styles were dropped on any refresh — and because the
+ * review omits blank rows by design, the loss was presented as a completed
+ * form. The draft is now the whole step.
+ */
+interface Draft {
+  role: string;
+  dob: string;
+  batting: string;
+  bowling: string;
+}
+
+function readDraft(slug: string): Draft | null {
+  const saved = window.localStorage.getItem(draftKey(slug));
+  if (saved === null || saved === "") {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(saved);
+    if (typeof parsed === "object" && parsed !== null) {
+      const record = parsed as Partial<Draft>;
+      return {
+        role: typeof record.role === "string" ? record.role : "",
+        dob: typeof record.dob === "string" ? record.dob : "",
+        batting: typeof record.batting === "string" ? record.batting : "",
+        bowling: typeof record.bowling === "string" ? record.bowling : "",
+      };
+    }
+  } catch {
+    // Drafts written before this shape were a bare role string.
+  }
+  return { role: saved, dob: "", batting: "", bowling: "" };
+}
 
 /**
  * Three steps, two truths: the name persists to people.name the moment step 1
@@ -60,17 +96,29 @@ export function RegisterFlow({
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // Draft recovery: restore the saved role and resume at review after a
-  // refresh or a browser restart.
+  const [restored, setRestored] = useState(false);
+
+  // Draft recovery: restore EVERY saved answer and resume at review after a
+  // refresh or a browser restart. The review below now shows all four, so
+  // landing there is a chance to check them, not a way to hide what was lost.
   useEffect(() => {
-    const saved = window.localStorage.getItem(draftKey(slug));
-    if (saved !== null && saved !== "") {
-      setRole(saved);
+    const saved = readDraft(slug);
+    if (saved !== null) {
+      setRole(saved.role);
+      setDob(saved.dob);
+      setBatting(saved.batting);
+      setBowling(saved.bowling);
       if (initialName.trim() !== "") {
         setStep("review");
+        setRestored(true);
       }
     }
   }, [slug, initialName]);
+
+  const saveDraft = (next: Partial<Draft>) => {
+    const current = readDraft(slug) ?? { role, dob, batting, bowling };
+    window.localStorage.setItem(draftKey(slug), JSON.stringify({ ...current, ...next }));
+  };
 
   const saveName = (formData: FormData) => {
     setError(null);
@@ -91,7 +139,7 @@ export function RegisterFlow({
   const chooseRole = (value: string) => {
     setRole(value);
     // Autosave the draft the moment it changes.
-    window.localStorage.setItem(draftKey(slug), value);
+    saveDraft({ role: value });
   };
 
   const submit = () => {
@@ -157,7 +205,7 @@ export function RegisterFlow({
   return (
     <Card data-testid="register-card">
       <p className="register-hint">
-        Registering for <strong>{competitionName}</strong> as {phone} — verified.
+        Registering for <strong>{competitionName}</strong> as {formatPhone(phone)} — verified.
       </p>
       <ol className="register-progress" aria-label="Registration progress">
         {steps.map((entry, index) => (
@@ -218,8 +266,9 @@ export function RegisterFlow({
             value={dob}
             onChange={(event) => {
               setDob(event.target.value);
+              saveDraft({ dob: event.target.value });
             }}
-            help="Shows your age on the player card."
+            help="Shows your age on the player card. Only your age is shown, never the date."
           />
           <Select
             label="Batting style (optional)"
@@ -227,6 +276,7 @@ export function RegisterFlow({
             value={batting}
             onChange={(event) => {
               setBatting(event.target.value);
+              saveDraft({ batting: event.target.value });
             }}
           >
             <option value="">Not specified</option>
@@ -242,6 +292,7 @@ export function RegisterFlow({
             value={bowling}
             onChange={(event) => {
               setBowling(event.target.value);
+              saveDraft({ bowling: event.target.value });
             }}
           >
             <option value="">Not specified</option>
@@ -278,11 +329,17 @@ export function RegisterFlow({
 
       {step === "review" ? (
         <div className="register-form" data-testid="register-step-review">
+          {restored ? (
+            <p className="register-hint" role="status" data-testid="draft-restored">
+              We brought back the answers you had already given. Check them, or go Back to change
+              anything.
+            </p>
+          ) : null}
           <dl className="register-review">
             <dt>Name</dt>
             <dd>{name}</dd>
             <dt>Mobile</dt>
-            <dd>{phone}</dd>
+            <dd>{formatPhone(phone)}</dd>
             <dt>Playing role</dt>
             <dd>{ROLE_LABEL[role] ?? role}</dd>
             {/* DA-21: step 2 collects date of birth and both styles, and the
@@ -310,11 +367,22 @@ export function RegisterFlow({
           </dl>
           <div className="register-photo">
             <SelfPhotoUploader slug={slug} name={name} />
-            <p className="competitions-hint">
-              A photo makes your player card stand out on the live board. You can add or remove it
-              any time.
+            {/* DA-35: the form asks a stranger for their face and their date of
+                birth, and the only thing it said about either was that a photo
+                "makes your player card stand out". Where the photo goes is not
+                a detail — it goes on public pages. */}
+            <p className="competitions-hint" data-testid="photo-privacy">
+              A photo is optional. If you add one it becomes public: it appears on this
+              season&apos;s public page, on the auction board and screen, and on link previews when
+              the season is shared. You can remove it any time and it disappears from all of them.
             </p>
           </div>
+          <p className="competitions-hint" data-testid="register-privacy">
+            What the organizer of {competitionName} receives: your name, your mobile number, your
+            playing role and anything optional you filled in above. It is used to run this season —
+            to reach you about it and to put you in the auction. You can withdraw your registration
+            from this page at any time.
+          </p>
           {error !== null ? (
             <p role="alert" className="register-error">
               {error}

@@ -29,9 +29,17 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
   const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
   await inbox.close();
-  await page.getByLabel(`Code sent to +91${phone}`).fill(code ?? "");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
+  // PX-3: the name gate now guards every console route, not just /home — a
+  // fresh account that stops here never reaches the org/tournament screens
+  // this helper is used to reach.
+  if (page.url().includes("/onboarding")) {
+    await page.getByLabel("What should we call you?").fill("E2E Tester");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page).toHaveURL(/\/home/);
+  }
 }
 
 async function onboardWithName(page: Page, phone: string, name: string): Promise<void> {
@@ -40,7 +48,7 @@ async function onboardWithName(page: Page, phone: string, name: string): Promise
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill(name);
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByTestId("onboarding-org")).toBeVisible();
+  await expect(page).toHaveURL(/\/home/);
 }
 
 async function inSecondBrowser(browser: Browser, fn: (page: Page) => Promise<void>): Promise<void> {
@@ -184,6 +192,10 @@ test("founder demo: org → competition → approve → team roster → venue �
   await expect(page.getByTestId("check-pool_present")).toContainText("Pass");
   await expect(page.getByTestId("readiness-fixtures")).toContainText("published");
   await page.goto(`${competitionUrl}/auction`);
+  // Feasibility: these fixtures run a handful of players against squads of 8,
+  // which the setup screen now refuses until the shortfall is accepted on the
+  // record (it is the state that used to become an unclosable auction).
+  await page.getByTestId("accept-short-squads").check();
   await page.getByTestId("create-auction").click();
   await page.goto(`${competitionUrl}/readiness`);
   await expect(page.getByTestId("readiness-verdict")).toHaveText("Ready for auction");

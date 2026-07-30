@@ -69,10 +69,18 @@ describe("OTP login against real Postgres", () => {
 
   it("wrong codes burn attempts; the 5th lockout survives even the right code", async () => {
     const code = await latestInboxCode(PHONE_B);
-    for (let i = 0; i < 5; i++) {
-      expect(await verifyOtp(db, PHONE_B, "000000")).toEqual({ ok: false, reason: "invalid" });
+    // Each rejection now says how much rope is left — the count is what turns
+    // "that code didn't work" from a shrug into something actionable.
+    for (const attemptsLeft of [4, 3, 2, 1]) {
+      expect(await verifyOtp(db, PHONE_B, "000000")).toEqual({
+        ok: false,
+        reason: "invalid",
+        attemptsLeft,
+      });
     }
-    expect(await verifyOtp(db, PHONE_B, code)).toEqual({ ok: false, reason: "invalid" });
+    // The fifth exhausts it, and every call after that names the real reason.
+    expect(await verifyOtp(db, PHONE_B, "000000")).toEqual({ ok: false, reason: "locked" });
+    expect(await verifyOtp(db, PHONE_B, code)).toEqual({ ok: false, reason: "locked" });
   });
 
   it("no-enumeration: unknown and known phones fail verification identically", async () => {

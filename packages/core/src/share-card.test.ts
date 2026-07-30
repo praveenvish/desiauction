@@ -164,6 +164,19 @@ describe("buildPlayerShareCard", () => {
     });
   });
 
+  // A retained player has a squad before the auction opens. The status branch
+  // used to be `sold ? … : Available`, so their card advertised them as
+  // available — the one card most likely to be forwarded to a group chat.
+  it("names the squad of a retained player instead of calling them available", () => {
+    expect(
+      buildPlayerShareCard({ ...player, status: "retained", teamName: "Mumbai Indians" }),
+    ).toMatchObject({ statusLabel: "Retained by Mumbai Indians", statusTone: "live" });
+    expect(buildPlayerShareCard({ ...player, status: "retained", teamName: null })).toMatchObject({
+      statusLabel: "Retained",
+      statusTone: "live",
+    });
+  });
+
   it("truncates an over-long name and degrades a blank one", () => {
     const long = buildPlayerShareCard({ ...player, name: "X".repeat(200) });
     expect(long.name.length).toBeLessThanOrEqual(70);

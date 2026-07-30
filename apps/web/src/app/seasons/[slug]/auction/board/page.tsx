@@ -23,11 +23,16 @@ export default async function BoardPage({ params }: { params: Promise<{ slug: st
     notFound();
   }
   return (
-    <BoardPanel
-      wsUrl={view.wsUrl}
-      resolved={view.resolved}
-      auctionName={view.auctionName}
-      competitionName={view.competitionName}
-    />
+    // A `bare` shell renders no chrome at all, so this page owned no landmark:
+    // the whole projector board was floating outside any region axe could name.
+    <main>
+      <BoardPanel
+        wsUrl={view.wsUrl}
+        resolved={view.resolved}
+        auctionName={view.auctionName}
+        competitionName={view.competitionName}
+        teamIdentities={view.teams}
+      />
+    </main>
   );
 }
