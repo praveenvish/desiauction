@@ -52,14 +52,35 @@ export const HELP_CATEGORIES: readonly HelpCategory[] = [
   {
     slug: "finops",
     title: "Financial operations guide",
-    description: "Receipts, invoices, exports, and closing the books.",
+    // Was "Receipts, invoices, exports, and closing the books" — three of those
+    // four cannot be done: the issuance lane refuses to issue an invoice, no
+    // screen reaches the exporter, and there is no fiscal close. The article
+    // itself has said so correctly since its rewrite; the category blurb did not.
+    description: "Declare your profile, issue receipts, and keep a sealed document register.",
   },
 ];
 
+/**
+ * The contact footer on every article. Two defects, both fixed here:
+ *
+ *   • the address was plain text on all twelve pages — a callout could not carry
+ *     a link at all until `Block` gained the field (content/blocks.tsx). The
+ *     first link is now a real mailto:;
+ *   • "put THAT in the subject line" named nothing. The string is AUCTION NIGHT
+ *     (content/support.ts), and the second link pre-fills it so the reader does
+ *     not have to retype a phrase we never told them.
+ */
 const CONTACT_FOOTER: Block = {
   kind: "callout",
   tone: "info",
-  text: "Still stuck? Email support@desiauction.in and we'll get back within a day. On auction night, put that in the subject line — those go first.",
+  text: "Still stuck? Email {0} and we'll get back within a day. If it's happening during a live auction, {1} — those go to the front of the queue.",
+  links: [
+    { text: "support@desiauction.in", href: "mailto:support@desiauction.in" },
+    {
+      text: "put AUCTION NIGHT in the subject line",
+      href: "mailto:support@desiauction.in?subject=AUCTION%20NIGHT",
+    },
+  ],
 };
 
 export const HELP_ARTICLES: readonly HelpArticle[] = [
@@ -75,12 +96,18 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: "DesiAuction runs the player auction for a tournament: registration, the live auction night, and the money afterwards — with one shared truth on every screen. This tour explains how the product is laid out so you can find the rest.",
       },
-      { kind: "heading", level: 2, text: "The five places you'll work" },
+      // There are FOUR rail items, not five (components/shell/nav.ts RAIL). The
+      // fifth — Money — was withdrawn under DA-18 because the surface behind it
+      // was a placeholder, and this list went on naming it as a place to work,
+      // with a description ("what you owe") that the /money page never had a
+      // query for. Its receipts half is true and now lives under Home, which is
+      // where a signed-in reader actually starts.
+      { kind: "heading", level: 2, text: "The four places you'll work" },
       {
         kind: "list",
         items: [
           {
-            text: "{0} — your starting point once you sign in: what needs attention, your seasons, and your money.",
+            text: "{0} — your starting point once you sign in: what needs attention, your seasons, and your registrations.",
             links: [{ text: "Home", href: "/home" }],
           },
           {
@@ -92,19 +119,24 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             links: [{ text: "Organizations", href: "/orgs" }],
           },
           {
-            text: "{0} — what you owe and every receipt you've been issued.",
-            links: [{ text: "Money", href: "/money" }],
-          },
-          {
             text: "{0} — this help centre, always one click away.",
             links: [{ text: "Help", href: "/help" }],
           },
         ],
       },
+      {
+        // /money is a real page and is NOT in the rail, so a reader who is owed
+        // a receipt has to be told where it is. What it shows is exactly the
+        // documents issued to your teams — it computes no balance and no due.
+        kind: "paragraph",
+        text: "There's one more page worth knowing: {0} lists every receipt a club has issued to a team you bid for. It isn't in the navigation bar during the beta, so bookmark it or come back here.",
+        links: [{ text: "Money", href: "/money" }],
+      },
       { kind: "heading", level: 2, text: "Roles are grants, not titles" },
       {
         kind: "paragraph",
-        text: "DesiAuction never asks \"are you an admin?\". It asks whether you hold a specific capability on a specific thing — running an organization, conducting an auction, handling the money. That's why owning an organization doesn't automatically let you touch its books: money authority is a separate, deliberate grant. Your organizer hands out grants from the organization page.",
+        text: "DesiAuction never asks \"are you an admin?\". It asks whether you hold a specific capability on a specific thing — running an organization, conducting an auction, handling the money. That's why owning an organization doesn't automatically let you touch its books: money authority is a separate, deliberate grant. Your organizer hands out grants from the organization page — {0} names every role and what it can do.",
+        links: [{ text: "the roles guide", href: "/help/roles-and-grants" }],
       },
       { kind: "heading", level: 2, text: "Where to go next" },
       {
@@ -142,12 +174,20 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "callout",
         tone: "info",
-        text: "A code is valid for five minutes. If you request too many in a row, we ask you to wait — that limit protects your account. A passkey sidesteps the wait entirely.",
+        // The real numbers, from server/auth/otp.ts: CODE_TTL_MS (5 min),
+        // RESEND_COOLDOWN_MS (30s), MAX_PER_HOUR (5), MAX_ATTEMPTS (5). A reader
+        // stuck at the phone step could not previously find out why.
+        text: "A code is valid for five minutes. You can ask for another after 30 seconds, and for up to five in an hour; five wrong entries lock that number briefly. Those limits protect your account — and once you have a passkey you never wait for a code again.",
       },
       { kind: "heading", level: 2, text: "Add a passkey" },
       {
         kind: "paragraph",
-        text: "A passkey lets you sign in with your device's fingerprint, face, or screen lock — no code to wait for. Add one from your {0} page under Security. You can add more than one (phone and laptop, say) and name each, so you always have a way in.",
+        // "under Security" named a section /account does not have. Its headings
+        // are Profile, Passkeys, Active sessions, Security activity,
+        // Notifications and Your data — and there IS a public /security page
+        // about the ledger, so a reader following the old instruction landed on
+        // marketing copy instead of their own account.
+        text: "A passkey lets you sign in with your device's fingerprint, face, or screen lock — no code to wait for. Add one from your {0} page, under Passkeys. You can add more than one (phone and laptop, say) and name each, so you always have a way in.",
         links: [{ text: "Account", href: "/account" }],
       },
       { kind: "heading", level: 2, text: "Staying safe" },
@@ -156,7 +196,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         items: [
           { text: "We will never ask for your sign-in code. Anyone who does is not us." },
           {
-            text: "See every device signed into your account under {0} → Security, and sign out any you don't recognize.",
+            text: "See every device signed into your account under {0} → Active sessions, and sign out any you don't recognize.",
             links: [{ text: "Account", href: "/account" }],
           },
           { text: "Your phone number is your identity here — keep it with you." },
@@ -239,6 +279,135 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     ],
   },
 
+  {
+    // NEW — the positive counterpart to the false privacy claim that used to
+    // sit in the fixtures article ("registration lists are never exposed").
+    // Every disclosure below was read off the public routes: /c, /c/[slug] and
+    // /c/[slug]/p/[number].
+    slug: "whats-public",
+    title: "What's public about you and your tournament",
+    summary: "Exactly what a stranger with a link can see — and what nobody can.",
+    category: "getting-started",
+    readMinutes: 4,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "A tournament starts private. Publishing it is a real disclosure, not just a listing, so here is precisely what changes.",
+      },
+      { kind: "heading", level: 2, text: "Before you publish" },
+      {
+        kind: "paragraph",
+        text: "Nothing is reachable without an account. The season, its players, its fixtures and its auction are visible only to your organization — a stranger with the link is asked to sign in. The one exception is the registration link, which is meant to be shared and works either way.",
+      },
+      { kind: "heading", level: 2, text: "After you publish" },
+      {
+        kind: "list",
+        items: [
+          {
+            text: "The season is listed in the public {0} directory, with its name, organization, location and dates.",
+            links: [{ text: "tournaments", href: "/c" }],
+          },
+          {
+            text: "Its page shows the approved player pool, the teams and their squads, and any fixtures you have published.",
+          },
+          {
+            text: "Each approved player gets their own page — name, number, playing role, age and styles if given, their photo if they uploaded one, and which team signed them.",
+          },
+          {
+            text: "Anyone with the link can watch the live auction, the venue board and the broadcast overlay, with no sign-in.",
+          },
+        ],
+      },
+      { kind: "heading", level: 2, text: "What is never public" },
+      {
+        kind: "list",
+        items: [
+          { text: "Phone numbers. They appear on no page a visitor can reach, published or not." },
+          {
+            text: "Money. Dues, collections, receipts and the ledger are behind a grant, always.",
+          },
+          { text: "Anything about a season you have not published." },
+        ],
+      },
+      {
+        kind: "callout",
+        tone: "info",
+        text: "Player pages are built to be shared — they carry a preview card for messaging apps — but they are marked not to be indexed, so they do not turn up in web searches. Tell your players that their name, role and team become shareable when you publish.",
+      },
+      CONTACT_FOOTER,
+    ],
+  },
+  {
+    // NEW. The product has four capability partitions and eight named roles and
+    // the help centre named none of them. The specific trap this article exists
+    // to prevent: `org:staff` (packages/core/src/capabilities.ts) holds neither
+    // `auction.conduct` nor `auction.override`, so a "staff" secretary can
+    // follow the whole auction guide and be refused at go-live.
+    slug: "roles-and-grants",
+    title: "Who can do what: roles and grants",
+    summary: "The four separate keys — organization, auction, settlement and finance.",
+    category: "getting-started",
+    readMinutes: 5,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "DesiAuction never asks whether you are an admin. It asks whether you hold a particular capability on a particular thing. A grant is what gives you one, and grants come in named sets for convenience only.",
+      },
+      { kind: "heading", level: 2, text: "Running the organization" },
+      {
+        kind: "definitions",
+        items: [
+          {
+            term: "Owner",
+            def: "Everything about the club and its competitions — members, tournaments, seasons, teams, registrations, venues and fixtures — plus the two auction-night capabilities, conducting and undo. Owners are also the only people who can hand out grants.",
+          },
+          {
+            term: "Staff",
+            def: "The day job: tournaments, teams, registrations, player verification, venues and fixtures. Staff can set an auction up completely, and cannot conduct it.",
+          },
+          { term: "Viewer", def: "Can see the workspace and change nothing." },
+        ],
+      },
+      {
+        kind: "callout",
+        tone: "warning",
+        text: "This is the one that catches people out. Staff can build the whole auction — teams, purses, paddles, lots — and will be refused at go-live, because conducting the auction is an owner capability. Decide who is holding the gavel before the night, not on it.",
+      },
+      { kind: "heading", level: 2, text: "The money is a separate key" },
+      {
+        kind: "paragraph",
+        text: "Owning the organization does not give you its books. Settlement and finance are their own partitions, granted deliberately and separately:",
+      },
+      {
+        kind: "definitions",
+        items: [
+          {
+            term: "Settlement officer",
+            def: "Records collections against what teams owe, and works the case.",
+          },
+          {
+            term: "Settlement controller",
+            def: "Everything an officer can do, plus waivers, adjustments and closing the case.",
+          },
+          {
+            term: "Finance clerk",
+            def: "Sees the finance workspace, issues documents and dispatches them.",
+          },
+          {
+            term: "Finance accountant / controller",
+            def: "The wider finance workspace, up to declaring the organization's financial profile and opening a numbering series.",
+          },
+        ],
+      },
+      { kind: "heading", level: 2, text: "Asking for a grant" },
+      {
+        kind: "paragraph",
+        text: "If a desk isn't there, you don't hold its grant — the platform hides what you cannot use rather than showing you a locked door. Ask an owner of the organization; grants are issued from the organization page and can be revoked the same way.",
+      },
+      CONTACT_FOOTER,
+    ],
+  },
+
   // --- Organizer -----------------------------------------------------------------------
   {
     slug: "competition-setup",
@@ -256,7 +425,13 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       { kind: "heading", level: 2, text: "Make it public (optional)" },
       {
         kind: "paragraph",
-        text: "Publishing a season lists it in the public {0} directory and lets anyone watch the auction live. Until you publish, the register and spectate links still work for anyone you send them to — publishing is about discovery, not access.",
+        // "publishing is about discovery, not access" was half false and the
+        // wrong half. Register: true, the link works unpublished. Spectate:
+        // FALSE — the spectate page falls back to the member-gated view, whose
+        // liveGate requires a session AND membership, so an unpublished season
+        // bounces a stranger to /login. Publishing is exactly about access for
+        // spectators.
+        text: "Publishing a season lists it in the public {0} directory and lets anyone watch the auction live, with no sign-in. Until you publish, the register link still works for anyone you send it to — but the spectate link does not: on an unpublished season only members of your organization can watch, and everyone else is asked to sign in. If you want a hall full of spectators, publish before the night.",
         links: [{ text: "tournaments", href: "/c" }],
       },
       { kind: "heading", level: 2, text: "Open registration" },
@@ -318,6 +493,48 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     ],
   },
   {
+    // NEW. The icon rule materially changes how an organizer builds the lot
+    // list — an icon is pre-signed and never reaches the block — and the help
+    // centre documented none of it while the release notes claimed articles
+    // "covering the whole journey". Every statement below is read off the
+    // shipped code: the Icon/Captain toggles and their mutual exclusion
+    // (registrations dashboard), the pool filter that drops icons
+    // (server/auction/auction-ready.ts), the "Icon with no team" warning, and
+    // the coach editor on the Teams tab.
+    slug: "icons-captains-and-coaches",
+    title: "Icons, captains and coaches",
+    summary: "Pre-sign your marquee players, mark the captains, and name each team's coach.",
+    category: "organizer",
+    readMinutes: 4,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "Not every player goes under the hammer. Most tournaments keep one or two marquee names attached to a team from the start, and most teams have a captain and a coach the room already knows. All three are marks you set on the registration desk and the Teams tab.",
+      },
+      { kind: "heading", level: 2, text: "Icons never enter the auction" },
+      {
+        kind: "paragraph",
+        text: "An icon is a player pre-signed to a team. Mark an approved registration as Icon and it is removed from the auction pool — it will never be queued as a lot, never be called, and never be bid on. This is the one mark that changes what happens on the night, so set your icons before you build the lot list.",
+      },
+      {
+        kind: "callout",
+        tone: "warning",
+        text: "An icon with no team is the trap. The player has left the pool and joined nobody, so they simply vanish from the night. The desk flags this as “Icon with no team” — assign the team as soon as you set the mark.",
+      },
+      { kind: "heading", level: 2, text: "Captains" },
+      {
+        kind: "paragraph",
+        text: "Captain is a label, not a rule: a captain is still auctioned like anyone else, and the mark shows on the registration desk, the team sheet and the squad board. A player is either an Icon or a Captain, never both — marking one greys out the other.",
+      },
+      { kind: "heading", level: 2, text: "Coaches" },
+      {
+        kind: "paragraph",
+        text: "A coach is a name on a team, not an account: type it into the coach field on the Teams tab and it appears wherever that team is listed. Coaches do not sign in, hold a paddle, or receive anything.",
+      },
+      CONTACT_FOOTER,
+    ],
+  },
+  {
     slug: "fixtures",
     title: "Fixtures: generating, resolving conflicts, publishing",
     summary: "Turn venues and dates into a conflict-free schedule, then publish it.",
@@ -347,9 +564,17 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         ],
       },
       {
+        // The old sentence — "Player phone numbers and registration lists are
+        // never exposed" — was a FALSE PRIVACY CLAIM, the most damaging kind.
+        // Phone numbers: true, they appear on no public surface. Registration
+        // lists: false. /c/[slug] renders a public Players section, and every
+        // approved player has a link-shareable public profile at
+        // /c/[slug]/p/[number] with an OG card. Say what is public instead, and
+        // point at the article that spells it out.
         kind: "callout",
         tone: "info",
-        text: "Only fixture times and venues are ever public. Player phone numbers and registration lists are never exposed.",
+        text: "Phone numbers are never public — they appear on no page a visitor can reach. Names and squads are, once you publish: see {0}.",
+        links: [{ text: "what's public about a tournament", href: "/help/whats-public" }],
       },
       CONTACT_FOOTER,
     ],
@@ -418,9 +643,20 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       },
       { kind: "heading", level: 2, text: "What you owe" },
       {
+        // Two false claims removed. (1) DUES: /money runs one query,
+        // myDocuments — there is no obligation, due or balance query behind it,
+        // so nothing on that page tells an owner what they owe. (2) INBOX:
+        // lib/inbox-events.ts is the complete label map and carries twelve
+        // auth/profile/registration keys and no finance event at all; /money's
+        // own source comment says "/inbox has no finance writer".
         kind: "paragraph",
-        text: "After the auction, your dues for the players you won appear on {0}. When your organizer records a payment, or issues you a receipt, it shows up there and in your inbox.",
+        text: "After the auction, your organizer works out what you owe from the auction's own record and tells you directly — there is no running balance on your account today. What you do get is the paperwork: when your organizer records your payment, the receipt appears on {0}.",
         links: [{ text: "Money", href: "/money" }],
+      },
+      {
+        kind: "callout",
+        tone: "warning",
+        text: "Your inbox carries sign-in, profile and registration news only. No receipt or payment is ever announced there, so check Money rather than waiting to be notified.",
       },
       CONTACT_FOOTER,
     ],
@@ -485,7 +721,13 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         kind: "list",
         items: [
           {
-            text: 'Pause the auction any time — spectators see a calm "resuming shortly", not a broken screen.',
+            // The quoted string "resuming shortly" existed in exactly one file
+            // in the repository: this one. What the room actually shows is
+            // "Paused — the clock is stopped" on the spectator panel and
+            // "AUCTION PAUSED" on the ceremony stage. The capability is real;
+            // the quotation was invented, and a quotation is a promise about
+            // words on a screen.
+            text: 'Pause the auction any time — spectators see a calm "Paused — the clock is stopped", and the stage reads AUCTION PAUSED. Nobody sees a broken screen.',
           },
           {
             text: "If a device drops, it reconnects to the exact state of the room. Nothing is missed, because the room's state is a server snapshot, not each screen's memory.",
@@ -501,6 +743,45 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: "Complete the auction to close the night. The results — squads and spend — become available, and the settlement case opens automatically. The full record stays available as a ledger and a replay.",
+      },
+      CONTACT_FOOTER,
+    ],
+  },
+
+  {
+    // NEW. /seasons/{slug}/auction/board and .../overlay ship, are linked from
+    // the cockpit's "Screens for the room" card, and were documented nowhere.
+    // Both read the same spectator-safe snapshot as /spectate, both render with
+    // no chrome, and both are noindex.
+    slug: "screens-for-the-room",
+    title: "Screens for the room: the venue board and the broadcast overlay",
+    summary: "Put the auction on a projector, and into your stream, with two chrome-free screens.",
+    category: "auction",
+    readMinutes: 3,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "Besides the cockpit you run the night from, the auction has two screens meant for everyone else in the hall. Both are fed by the same live snapshot as the cockpit, both show only what a spectator may see, and neither has any navigation on it — they are made to be left running.",
+      },
+      { kind: "heading", level: 2, text: "The venue board" },
+      {
+        kind: "paragraph",
+        text: "The board is the projector screen: who is on the block, the current price, every team's purse and squad, the biggest buys and the last few sales. Open it on the laptop plugged into the projector and leave it alone for the night.",
+      },
+      { kind: "heading", level: 2, text: "The broadcast overlay" },
+      {
+        kind: "paragraph",
+        text: "The overlay is a transparent lower-third built to be dropped into streaming software as a browser source, so it composites over your camera feed. You can put a sponsor's name on it when you copy the link.",
+      },
+      { kind: "heading", level: 2, text: "Getting the links" },
+      {
+        kind: "paragraph",
+        text: "Both live under “Screens for the room” in the auction cockpit, with a copy button each — you open them somewhere else, on a projector laptop or in a streaming tool, so copy the address rather than clicking through.",
+      },
+      {
+        kind: "callout",
+        tone: "info",
+        text: "Both screens follow the same rule as the spectator page: on a published season anyone with the link can open them, and on an unpublished one only your own organization can. Publish before the night if the projector laptop isn't signed in.",
       },
       CONTACT_FOOTER,
     ],
@@ -652,7 +933,12 @@ export const FAQS: readonly FaqItem[] = [
   {
     question: "What happens to my data if I stop using DesiAuction?",
     answer:
-      "Your data is never held hostage. Records stay readable and exportable, and financial ledgers are retained as immutable history. See our Data Retention policy for details.",
+      // "records stay readable and exportable" claimed a general exporter that
+      // no screen reaches: `exportRun`, `requestExport`, `buildExportArtifact`
+      // and `ExportKind` have zero non-test hits in apps/web/src. What DOES
+      // download today is the squad CSV (teams panel) and the fixtures CSV, so
+      // the claim is scoped to those two.
+      "Your data is never held hostage. Everything stays readable for as long as you have an account, squads and fixtures download as CSV, and financial ledgers are retained as immutable history. Exports for your accountant aren't built yet. See our Data Retention policy for details.",
   },
   {
     question: "Is there a refund if I change my mind?",

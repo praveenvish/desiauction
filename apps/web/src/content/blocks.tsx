@@ -39,9 +39,16 @@ export type Block =
   | { readonly kind: "list"; readonly ordered?: boolean; readonly items: readonly RichText[] }
   | { readonly kind: "steps"; readonly items: readonly RichText[] }
   | {
+      // A callout carries links exactly as a paragraph does. It did not, and
+      // that omission was not cosmetic: the "Still stuck?" contact footer at the
+      // end of all twelve help articles is a callout, so the one paragraph in
+      // the help centre that most needs a mailto: could not express one. Twelve
+      // pages rendered a support address as unclickable plain text because the
+      // CONTENT MODEL had no field for the link.
       readonly kind: "callout";
       readonly tone: "info" | "warning" | "success";
       readonly text: string;
+      readonly links?: readonly InlineLink[];
     }
   | { readonly kind: "definitions"; readonly items: readonly { term: string; def: string }[] };
 
@@ -59,6 +66,16 @@ function renderRich(text: string, links: readonly InlineLink[] = []): ReactNode 
     const link = links[Number(match[1])];
     if (link === undefined) {
       return <span key={index}>{part}</span>;
+    }
+    // mailto:/tel:/https: are not routes — next/link would try to treat them as
+    // navigations. Anything that is not an internal path renders as a plain
+    // anchor, which is what a support address has to be.
+    if (!link.href.startsWith("/")) {
+      return (
+        <a key={index} href={link.href} className="prose-link">
+          {link.text}
+        </a>
+      );
     }
     return (
       <Link key={index} href={link.href} className="prose-link">
@@ -129,7 +146,7 @@ export function Prose({ blocks }: { blocks: readonly Block[] }) {
           case "callout":
             return (
               <div key={index} className={`prose-callout prose-callout-${block.tone}`} role="note">
-                {block.text}
+                {renderRich(block.text, block.links)}
               </div>
             );
           case "definitions":
@@ -162,19 +179,37 @@ export function tocOf(
     }));
 }
 
+/**
+ * The text of one rich string as a READER sees it: placeholders replaced by the
+ * label of the link that fills them.
+ *
+ * This used to be `block.text` verbatim, which put literal "{0}" into the search
+ * haystack and threw away every link label — so a word that appeared only as
+ * link text ("Money", "Tournaments", "inbox", "signing in") was unsearchable on
+ * the very page that said it.
+ */
+function flatten(text: string, links: readonly InlineLink[] = []): string {
+  return text.replace(/\{(\d+)\}/g, (marker, index: string) => {
+    const link = links[Number(index)];
+    return link === undefined ? marker : link.text;
+  });
+}
+
 /** The plain-text of a page, for the search index — one place, never drifts. */
 export function plainTextOf(blocks: readonly Block[]): string {
   const out: string[] = [];
   for (const block of blocks) {
     switch (block.kind) {
       case "heading":
+        out.push(block.text);
+        break;
       case "paragraph":
       case "callout":
-        out.push(block.text);
+        out.push(flatten(block.text, block.links));
         break;
       case "list":
       case "steps":
-        out.push(block.items.map((item) => item.text).join(" "));
+        out.push(block.items.map((item) => flatten(item.text, item.links)).join(" "));
         break;
       case "definitions":
         out.push(block.items.map((item) => `${item.term} ${item.def}`).join(" "));

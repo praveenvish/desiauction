@@ -162,7 +162,14 @@ function publicNav(pathname: string): PublicShellLink[] {
       label: "Resources",
       href: "/help",
       children: [
-        { label: "Help center", href: "/help" },
+        // Three of the four slots went to /blog, /case-studies and /api-docs —
+        // honest placeholder pages, all of them — while the route to a human
+        // and the route to the terms were reachable only from the footer. A
+        // visitor with a problem should not have to scroll to the bottom of the
+        // page to find support.
+        { label: "Help centre", href: "/help" },
+        { label: "Support", href: "/support" },
+        { label: "Legal", href: "/legal" },
         { label: "Blog", href: "/blog" },
         { label: "Case studies", href: "/case-studies" },
         { label: "API docs", href: "/api-docs" },
@@ -584,7 +591,7 @@ export function ProductShell({
           {
             label: "Resources",
             links: [
-              { label: "Help center", href: "/help" },
+              { label: "Help centre", href: "/help" },
               { label: "FAQ", href: "/help/faq" },
               { label: "Support", href: "/support" },
               { label: "Blog", href: "/blog" },

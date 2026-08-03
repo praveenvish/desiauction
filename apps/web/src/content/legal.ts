@@ -111,6 +111,20 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
         kind: "paragraph",
         text: "To run your tournaments: to sign you in, to place you in seasons, to conduct auctions, and to keep an accurate, disputable-free record of the money. We do not sell your data to anyone, ever.",
       },
+      // This policy disclosed NONE of the publication that actually happens: a
+      // published season renders a public player pool, and every approved
+      // player gets a link-shareable profile page with a preview card. A
+      // privacy policy that omits the one place personal data becomes public is
+      // the wrong document to be silent in.
+      { kind: "heading", level: 2, text: "What becomes public" },
+      {
+        kind: "paragraph",
+        text: "A season is private until its organizer publishes it. When they do, the season's page becomes public and each approved player gets their own page carrying their name, registration number, playing role, age and playing styles where given, their photo if they uploaded one, and which team signed them. These pages are built to be shared as links and carry a preview card; they are marked not to be indexed by search engines.",
+      },
+      {
+        kind: "paragraph",
+        text: "Your mobile number is never published, on any page, whether or not a season is published. If you do not want your details published, tell your organizer before they publish the season — publication is their decision, on their tournament.",
+      },
       { kind: "heading", level: 2, text: "Who processes it" },
       {
         kind: "paragraph",
@@ -154,7 +168,12 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       { kind: "heading", level: 2, text: "Your data is never held hostage" },
       {
         kind: "paragraph",
-        text: "Whatever happens with a pass, your records stay readable and exportable. We never withhold your data to pressure a payment.",
+        // "readable and exportable" promised a general exporter that no screen
+        // reaches (grep: exportRun / requestExport / buildExportArtifact /
+        // ExportKind have zero non-test hits in apps/web/src). What downloads
+        // today is the squad CSV and the fixtures CSV. The load-bearing promise
+        // — we do not withhold your data over money — is unchanged and true.
+        text: "Whatever happens with a pass, your records stay readable, and squads and fixtures download as CSV. We never withhold your data to pressure a payment.",
       },
     ],
   },

@@ -16,11 +16,12 @@ import { useMemo } from "react";
 
 import type { FinanceWorkspace } from "../../../../server/financial-operations/actions";
 import { IssuancePanel } from "./issuance-panel";
-import { registerTotals, type RegisterRow } from "../../../../server/financial-operations/views";
+import type { RegisterRow } from "../../../../server/financial-operations/views";
 import {
   DOC_KIND_LABEL,
   FINANCE_VIEWS,
   filterRegister,
+  registerTotals,
 } from "../../../../server/financial-operations/register";
 import "../../../seasons/[slug]/money/money.css";
 import "./finance.css";

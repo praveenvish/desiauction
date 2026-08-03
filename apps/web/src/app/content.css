@@ -440,6 +440,55 @@ a.content-card:focus-visible {
   white-space: nowrap;
 }
 
+/* --- Touch targets ---------------------------------------------------------------------
+ *
+ * Every link on these pages passed axe and failed a thumb. `target-size` is not
+ * in `wcag21aa`, so 29 clean scans said nothing about it: measured at 390px,
+ * prose links were 15–19px tall, every table-of-contents link 15px, the "All
+ * help" and "All legal documents" back links 15px, the /support "Read: … →"
+ * calls to action 15px, and the search field and its button 37px. WCAG 2.5.8
+ * asks for 24; this platform's bar is 44.
+ *
+ * Standalone links become inline-flex boxes with a real minimum height. Inline
+ * links inside prose cannot — a block box would break the line — so they take
+ * vertical padding cancelled by an equal negative margin: the hit area grows,
+ * the text does not move, and nothing reflows.
+ */
+
+.prose-p .prose-link,
+.prose-ul .prose-link,
+.prose-ol .prose-link,
+.prose-steps .prose-link,
+.prose-callout .prose-link {
+  padding-block: var(--space-2);
+  margin-block: calc(-1 * var(--space-2));
+}
+
+.article-meta .prose-link,
+.support-card .prose-link,
+.content-section > h2 .prose-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.article-toc a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* The list gap existed to separate 15px text. The rows are 44px now, so the gap
+   is what would push a twelve-heading contents list off a phone screen. */
+.article-toc ul {
+  gap: 0;
+}
+
+.content-searchbar input,
+.content-searchbar button {
+  min-height: 44px;
+}
+
 /* --- FAQ (help/faq article) ------------------------------------------------------------ */
 
 .faq-item {

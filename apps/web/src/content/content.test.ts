@@ -5,6 +5,10 @@
 // — the "broken-link detection" the milestone requires, run at the source rather
 // than by crawling a live site. If any content link ever points at a route that
 // does not exist, this fails before it ships.
+import { readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { plainTextOf } from "./blocks";
@@ -15,48 +19,51 @@ import { RELEASES } from "./releases";
 import { SEARCH_INDEX, allContentLinks, searchContent } from "./search";
 import { SUPPORT } from "./support";
 
+const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "app");
+
 /**
- * The set of routes that actually exist. Static ones are listed; dynamic ones
- * are derived from the SAME registries the pages generate their params from, so
- * this set is exactly what Next will serve. A link is valid if it equals a known
- * route or (for hashes/queries) starts with one.
+ * Every STATIC route the app actually serves, walked off the filesystem.
+ *
+ * This was a hand-maintained set of 25 paths, which made the suite's central
+ * promise — "if any content link points at a route that does not exist, this
+ * fails before it ships" — untrue in the direction that matters: DELETE a route
+ * and every link to it keeps passing, because the list said the route existed.
+ * A list of routes maintained beside the routes is not evidence about the
+ * routes. This reads `src/app`, so a deleted page fails the suite.
+ *
+ * Route groups `(x)` collapse, private folders `_x` are skipped, and dynamic
+ * segments are left to the registry-derived set below — they are exactly what
+ * the pages' own `generateStaticParams` enumerate.
+ */
+function staticRoutes(dir: string = APP_DIR, prefix = ""): Set<string> {
+  const found = new Set<string>();
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isFile()) {
+      if (/^(page|route)\.(tsx?|jsx?)$/.test(entry.name)) {
+        found.add(prefix === "" ? "/" : prefix);
+      }
+      continue;
+    }
+    if (!entry.isDirectory() || entry.name.startsWith("_") || entry.name.startsWith("[")) {
+      continue;
+    }
+    // A route group contributes no path segment.
+    const next = /^\(.*\)$/.test(entry.name) ? prefix : `${prefix}/${entry.name}`;
+    for (const route of staticRoutes(join(dir, entry.name), next)) {
+      found.add(route);
+    }
+  }
+  return found;
+}
+
+/**
+ * The set of routes that actually exist: the static ones off disk, plus the
+ * dynamic ones derived from the SAME registries the pages generate their params
+ * from. A link is valid if it equals a known route or (for hashes/queries)
+ * starts with one.
  */
 function knownRoutes(): Set<string> {
-  const routes = new Set<string>([
-    // PX-10 public content
-    "/",
-    "/features",
-    "/pricing",
-    "/help",
-    "/help/faq",
-    "/legal",
-    "/support",
-    "/contact",
-    "/releases",
-    "/search",
-    // Home page rebuild (2026-07-18) — the shell's expanded nav/footer
-    "/about",
-    "/careers",
-    "/security",
-    "/rules-guidelines",
-    "/schedule-demo",
-    "/blog",
-    "/case-studies",
-    "/api-docs",
-    // Existing app routes content may link to (PX-2…PX-9)
-    "/c",
-    "/home",
-    // /seasons still answers — as a redirect to the merged index — so a link
-    // to it is not dead; /tournaments is where content should point now.
-    "/seasons",
-    "/tournaments",
-    "/orgs",
-    "/money",
-    "/inbox",
-    "/account",
-    "/login",
-    "/healthz",
-  ]);
+  const routes = staticRoutes();
   for (const article of HELP_ARTICLES) {
     routes.add(`/help/${article.slug}`);
   }
@@ -66,6 +73,10 @@ function knownRoutes(): Set<string> {
   for (const doc of LEGAL_DOCUMENTS) {
     routes.add(`/legal/${doc.slug}`);
   }
+  // "faq" is a RESERVED slug on /help/[slug] rather than an article, so the
+  // filesystem walk cannot see it — it is enumerated in that route's own
+  // generateStaticParams alongside the articles.
+  routes.add("/help/faq");
   return routes;
 }
 
@@ -81,6 +92,16 @@ describe("PX-10 · Broken-link detection", () => {
   it("every internal link in the content tree resolves to a real route", () => {
     const broken = allContentLinks().filter((href) => !isKnown(href, routes));
     expect(broken, `broken internal links: ${broken.join(", ")}`).toEqual([]);
+  });
+
+  it("the route set is read off disk, not remembered", () => {
+    // Guards the guard: if this ever stops seeing the app directory it would
+    // pass everything, which is the failure mode the hardcoded set had.
+    const routes = knownRoutes();
+    expect(routes.size).toBeGreaterThan(25);
+    expect(routes.has("/")).toBe(true);
+    expect(routes.has("/security")).toBe(true);
+    expect(routes.has("/this-route-does-not-exist")).toBe(false);
   });
 
   it("every search-index href resolves to a real route", () => {
@@ -161,6 +182,80 @@ describe("PX-10 · Content integrity", () => {
       expect(article.blocks.some((b) => b.kind === "heading")).toBe(true);
       // The content guide requires a "Still stuck? Contact us" footer on each.
       expect(plainTextOf(article.blocks).toLowerCase()).toContain("support@desiauction.in");
+    }
+  });
+
+  it("the contact footer is a LINK on every article, not printed text", () => {
+    // It was plain text on all twelve articles, because the `callout` block had
+    // no links field at all — the content model could not express the one link
+    // the help centre most needed. A reader who is stuck should not have to
+    // select an address with their thumb and paste it into a mail app.
+    for (const article of HELP_ARTICLES) {
+      const mailtos = article.blocks.flatMap((block) =>
+        block.kind === "callout" || block.kind === "paragraph"
+          ? (block.links ?? []).map((link) => link.href)
+          : [],
+      );
+      expect(mailtos, `${article.slug} has no mailto: in a callout or paragraph`).toContain(
+        "mailto:support@desiauction.in",
+      );
+    }
+  });
+
+  it("names the AUCTION NIGHT subject line it tells readers to use", () => {
+    // The footer said "put THAT in the subject line" and named no string. The
+    // string is defined once, on the support channel, and the footer must use
+    // the same words or the instruction is unfollowable.
+    const channel = SUPPORT.channels.find((entry) => entry.title === "Auction-night help");
+    expect(channel?.detail).toContain("AUCTION NIGHT");
+    const footer = plainTextOf(HELP_ARTICLES[0]?.blocks ?? []);
+    expect(footer).toContain("AUCTION NIGHT");
+  });
+
+  it("claims no capability the product cannot perform from a screen", () => {
+    // Each phrase below shipped on a public page and was disproved by the code:
+    // the exporter is reachable from no screen, the issuance lane refuses to
+    // issue an invoice, /inbox has no finance writer, there is no fiscal close,
+    // and the rail has four items. This is the regression net — a rewrite that
+    // reintroduces any of them fails here rather than in front of a customer.
+    // Marketing, pricing, /features and the release notes SELL. Nothing here
+    // may name a capability as delivered.
+    const selling = JSON.stringify({
+      landing: LANDING,
+      pricing: PRICING,
+      features: FEATURE_GROUPS,
+      releases: RELEASES,
+    }).toLowerCase();
+    for (const banned of [
+      "tally-compatible",
+      "tally-ready",
+      "readable and exportable",
+      "receipts, invoices and corrections",
+      "settlement, receipts and invoices",
+      "delivered to the recipient",
+      "year-end close",
+      "fiscal periods and a year-end",
+    ]) {
+      expect(selling, `disproved claim back on a selling page: ${banned}`).not.toContain(banned);
+    }
+
+    // Help and legal DESCRIBE, so they are allowed — required, even — to name
+    // Tally and invoices as things we do not do. What they may not do is
+    // describe a place or a flow that isn't there.
+    const describing = JSON.stringify({
+      help: HELP_ARTICLES.map((article) => plainTextOf(article.blocks)),
+      faqs: FAQS,
+      legal: LEGAL_DOCUMENTS.map((doc) => plainTextOf(doc.blocks)),
+    }).toLowerCase();
+    for (const banned of [
+      "the five places you'll work",
+      "what you owe and every receipt",
+      "account → security",
+      "registration lists are never exposed",
+      "resuming shortly",
+      "readable and exportable",
+    ]) {
+      expect(describing, `disproved claim back in help or legal: ${banned}`).not.toContain(banned);
     }
   });
 
@@ -283,6 +378,87 @@ describe("PX-10 · Search (navigation only)", () => {
     for (const hit of searchContent("auction")) {
       expect(hit.href.startsWith("/")).toBe(true);
     }
+  });
+
+  it("reaches the eleven public pages it used to omit", () => {
+    // The release notes claimed "search that reaches every public destination"
+    // while these were absent from the index. The worst was /security:
+    // searching "security" returned a sign-in help article and never the page
+    // named Security.
+    const hrefs = new Set(SEARCH_INDEX.map((doc) => doc.href));
+    for (const href of [
+      "/security",
+      "/about",
+      "/careers",
+      "/rules-guidelines",
+      "/schedule-demo",
+      "/blog",
+      "/case-studies",
+      "/api-docs",
+      "/legal",
+      "/help",
+      "/c",
+      "/tournaments",
+    ]) {
+      expect(hrefs, `search cannot reach ${href}`).toContain(href);
+    }
+    expect(searchContent("security").some((hit) => hit.href === "/security")).toBe(true);
+  });
+
+  it("finds what people actually type", () => {
+    // Every query below returned ZERO results before the synonym map.
+    const expectations: [string, string][] = [
+      ["otp", "/help/signing-in"],
+      ["log in", "/help/signing-in"],
+      ["captain", "/help/icons-captains-and-coaches"],
+      ["icon", "/help/icons-captains-and-coaches"],
+      ["coach", "/help/icons-captains-and-coaches"],
+      ["overlay", "/help/screens-for-the-room"],
+      ["api", "/api-docs"],
+      ["gdpr", "/legal/privacy"],
+      ["delete my account", "/legal/data-retention"],
+    ];
+    for (const [query, href] of expectations) {
+      expect(
+        searchContent(query).some((hit) => hit.href === href),
+        `"${query}" did not find ${href}`,
+      ).toBe(true);
+    }
+  });
+
+  it("spells organiser the way this market spells it", () => {
+    // `organizer` returned ten results and `organiser` returned none — the most
+    // damaging single miss on an Indian-market product.
+    const american = searchContent("organizer").map((hit) => hit.href);
+    const british = searchContent("organiser").map((hit) => hit.href);
+    expect(american.length).toBeGreaterThan(0);
+    expect(new Set(british)).toEqual(new Set(american));
+  });
+
+  it("ranks a whole-word title hit above the product's own name", () => {
+    // `titleLc.includes(word)` scored a full title hit for "auction" on every
+    // title containing "DesiAuction", so "A tour of DesiAuction" outranked the
+    // auction guides on a site about auctions.
+    const hits = searchContent("auction").map((hit) => hit.title);
+    const tour = hits.indexOf("A tour of DesiAuction");
+    const guide = hits.indexOf("Auction guide");
+    expect(guide).toBeGreaterThanOrEqual(0);
+    expect(guide, "the product's own name outranked a real title match").toBeLessThan(tour);
+  });
+
+  it("returns every match, so a caller can report a true count", () => {
+    // The page printed `results.length` from a list capped at twelve: "auction"
+    // matched far more and reported "12 results", with no route to the rest.
+    const hits = searchContent("auction");
+    expect(hits.length).toBeGreaterThan(12);
+    expect(searchContent("auction", 12).length).toBe(12);
+  });
+
+  it("finds a word that appears only inside a link label", () => {
+    // plainTextOf pushed the raw "{0}" placeholder and dropped link text, so a
+    // word carried only by a link was unsearchable on the page that said it.
+    expect(searchContent("tournaments").length).toBeGreaterThan(0);
+    expect(searchContent("roles guide").length).toBeGreaterThan(0);
   });
 
   it("is navigation only — every hit is a route, never a command", () => {

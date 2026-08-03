@@ -7,15 +7,15 @@ import "../content.css";
 
 export const metadata: Metadata = {
   title: "Support · DesiAuction",
-  description: "Get help, report a bug, check system status, and see what's new.",
+  description: "Get help, report a bug, and see what's new.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/support` },
 };
 
 /**
  * PX-10 §5 — the Support experience. Static routing only: contact channels,
- * issue categories that link to the right help, bug-reporting guidance, a system
- * status link, release notes and the version. No ticketing backend; no form here
- * pretends to file one.
+ * issue categories that link to the right help, bug-reporting guidance, release
+ * notes and the version. No ticketing backend; no form here pretends to file
+ * one, and no link pretends to be a status page.
  */
 export default function SupportPage() {
   return (
@@ -68,17 +68,25 @@ export default function SupportPage() {
       </section>
 
       <section className="content-section" aria-labelledby="status">
-        <h2 id="status">System status &amp; version</h2>
+        <h2 id="status">Version &amp; status</h2>
+        {/* The "system status" link pointed at /healthz — a route handler that
+            answers {"status":"ok","version":"dev","checks":{}}. A visitor sent
+            there during an outage got raw JSON that says "ok" regardless, which
+            is worse than no status page. There is no status page yet; say so.
+            TODO(founder): if a real status page is commissioned, link it here. */}
         <p className="prose-p">
           Running version <code>{env.APP_VERSION}</code>. See{" "}
           <Link href="/releases" className="prose-link">
             release notes
           </Link>{" "}
-          for what each update delivered, and{" "}
-          <Link href="/healthz" className="prose-link">
-            the health endpoint
-          </Link>{" "}
-          for a live liveness check.
+          for what each update delivered.
+        </p>
+        <p className="prose-p">
+          We don&rsquo;t publish a status page yet. If DesiAuction looks down to you, email{" "}
+          <a href="mailto:support@desiauction.in" className="prose-link">
+            support@desiauction.in
+          </a>{" "}
+          — and put AUCTION NIGHT in the subject if an auction is running.
         </p>
       </section>
     </main>

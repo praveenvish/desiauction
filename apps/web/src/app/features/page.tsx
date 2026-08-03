@@ -114,11 +114,15 @@ const VIGNETTES: Record<string, ReactNode> = {
           </span>
           <span className="mk-vpill mk-vpill--info">Recorded</span>
         </div>
+        {/* Was "Tally export · ledger-verified · Ready" — an illustration of a
+            feature that is reachable from no screen, rendered beside four that
+            ship. The vignette now shows the verification the workspace really
+            performs: an issued document re-derived and matched to its seal. */}
         <div className="mk-vrow">
           <span>
-            <strong>Tally export</strong> · ledger-verified
+            <strong>Register check</strong> · R-0042 re-derived
           </span>
-          <span className="mk-vpill mk-vpill--ok">Ready</span>
+          <span className="mk-vpill mk-vpill--ok">Matches seal</span>
         </div>
       </div>
     </div>

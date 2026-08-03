@@ -25,7 +25,9 @@ export function ArticleView({
     <main className="content-page">
       <p className="article-meta no-print">
         <Link href={backHref} className="prose-link">
-          ← {backLabel}
+          {/* The two page files already hide the glyph; this shared component
+              did not, so a screen reader read the arrow character aloud. */}
+          <span aria-hidden="true">←</span> {backLabel}
         </Link>
       </p>
       <h1>{title}</h1>

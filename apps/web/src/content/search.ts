@@ -8,10 +8,15 @@ import { RELEASES } from "./releases";
  * PX-10 §6 — the public search index.
  *
  * NAVIGATION ONLY, exactly like the console command palette (PX-2's ruling). A
- * hit is a destination; selecting it routes. The index is built ONCE from the
- * same content modules the pages render, so search can never advertise a page
- * that doesn't exist or miss one that does — and the broken-link suite asserts
- * every href here resolves.
+ * hit is a destination; selecting it routes. Content-driven entries are built
+ * from the same modules the pages render, so those can never drift — and the
+ * broken-link suite asserts every href here resolves.
+ *
+ * The static entries below are the part that CAN drift, and did: eleven live
+ * public routes were missing from this list, so the index quietly answered
+ * "security" with a sign-in article and never with /security. content.test.ts
+ * now asserts every public route has an entry, so adding a page without adding
+ * it here fails the suite rather than the customer.
  *
  * The index is static data derived at module load. It ships no secret: every
  * entry is a public page, so building it in the browser (or on the server) is
@@ -118,25 +123,239 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "What's new",
     RELEASES.flatMap((r) => [r.title, ...r.highlights]).join(" "),
   ),
+
+  // --- The pages the index used to omit -------------------------------------
+  // Eleven live public routes were missing, and the release notes claimed
+  // "search that reaches every public destination". The clearest failure:
+  // searching "security" returned a sign-in help article and NOT /security,
+  // the page that exists to answer that exact word. An index that skips a page
+  // is worse than no index — it answers, wrongly, with confidence.
+  doc(
+    "Security",
+    "/security",
+    "Marketing",
+    "How the platform is built",
+    "server verified bidding append only immutable ledger snapshot recovery grants not roles passkeys audit access control data protection",
+  ),
+  doc(
+    "About DesiAuction",
+    "/about",
+    "Marketing",
+    "Who we are",
+    "about us company mission beta story team",
+  ),
+  doc("Careers", "/careers", "Marketing", "Working here", "careers jobs hiring roles open"),
+  doc(
+    "Rules & guidelines",
+    "/rules-guidelines",
+    "Marketing",
+    "Using the platform fairly",
+    "rules guidelines fair play conduct acceptable use",
+  ),
+  doc(
+    "Schedule a demo",
+    "/schedule-demo",
+    "Marketing",
+    "See it with us",
+    "demo walkthrough call sales talk to us",
+  ),
+  doc("Blog", "/blog", "Marketing", "Writing", "blog posts articles news updates"),
+  doc(
+    "Case studies",
+    "/case-studies",
+    "Marketing",
+    "Tournaments in practice",
+    "case studies customers stories examples",
+  ),
+  doc(
+    "API docs",
+    "/api-docs",
+    "Marketing",
+    "For developers",
+    "api docs integration developer webhook endpoint",
+  ),
+  doc(
+    "Legal centre",
+    "/legal",
+    "Legal",
+    "All documents",
+    "legal centre terms privacy refunds cookies retention disclaimer conduct policies",
+  ),
+  doc(
+    "Help centre",
+    "/help",
+    "Help",
+    "All guides",
+    "help centre guides articles support how to documentation",
+  ),
+  doc(
+    "Browse tournaments",
+    "/c",
+    "Marketing",
+    "The public directory",
+    "tournaments directory published competitions seasons browse watch live spectate",
+  ),
+  doc(
+    "Your tournaments",
+    "/tournaments",
+    "Marketing",
+    "In the app",
+    "tournaments seasons your competitions workspace organizer",
+  ),
 ];
 
-/** Rank hits by where the query matches: title beats hint beats body. */
-export function searchContent(query: string, limit = 12): readonly SearchDoc[] {
+/**
+ * What real people type, mapped to what the index actually contains.
+ *
+ * Measured misses before this existed, every one returning ZERO results:
+ * `organiser` (the British and Indian spelling — `organizer` returned ten, and
+ * this is the single most damaging miss in this market), `otp`, `whatsapp`,
+ * `log in`, `captain`, `icon`, `coach`, `overlay`, `api`, `sla`, `gdpr`,
+ * `dpdp`, `delete my account`.
+ *
+ * Expansion is per TERM and additive: a term matches if it OR any of its
+ * expansions is found, so AND semantics across terms are untouched and no
+ * synonym can widen a query into noise.
+ */
+const SYNONYMS: Record<string, readonly string[]> = {
+  organiser: ["organizer"],
+  organisers: ["organizer"],
+  organisation: ["organization"],
+  organisations: ["organization"],
+  otp: ["one-time code", "code", "sign-in"],
+  sms: ["code", "sign-in", "mobile"],
+  whatsapp: ["share", "link", "register"],
+  login: ["sign in", "signing in"],
+  "log in": ["sign in", "signing in"],
+  signin: ["sign in", "signing in"],
+  password: ["passkey", "sign in"],
+  captain: ["captains"],
+  icon: ["icons"],
+  coach: ["coaches"],
+  marquee: ["icon"],
+  retained: ["icon"],
+  overlay: ["broadcast", "screens for the room"],
+  scoreboard: ["board", "screens for the room"],
+  projector: ["board", "screens for the room"],
+  obs: ["broadcast", "overlay"],
+  stream: ["broadcast", "overlay"],
+  api: ["api docs"],
+  sla: ["support", "response"],
+  uptime: ["support", "beta"],
+  gdpr: ["privacy", "data retention"],
+  dpdp: ["privacy", "data retention"],
+  delete: ["deletion"],
+  gst: ["gstin", "tax"],
+  gstin: ["gst"],
+  tally: ["export"],
+  upi: ["collection", "payment"],
+  refund: ["refunds"],
+  invoice: ["invoices"],
+  roles: ["role", "grant"],
+  permission: ["grant", "capability"],
+  permissions: ["grant", "capability"],
+  admin: ["grant", "owner"],
+  bid: ["bidding", "bids"],
+  paddle: ["paddles", "owner"],
+};
+
+/** A term matches if it, or any of its synonyms, is present in `haystack`. */
+function matches(haystack: string, term: string): boolean {
+  if (haystack.includes(term)) {
+    return true;
+  }
+  return (SYNONYMS[term] ?? []).some((alias) => haystack.includes(alias));
+}
+
+/**
+ * Whole-word containment.
+ *
+ * Title scoring used bare `includes`, so every title containing the product's
+ * own name scored a full title hit for "auction" — "A tour of DesiAuction"
+ * outranked "Auction guide" on the query `auction`, on a site about auctions.
+ */
+function hasWord(text: string, word: string): boolean {
+  let from = 0;
+  for (;;) {
+    const at = text.indexOf(word, from);
+    if (at === -1) {
+      return false;
+    }
+    const before = at === 0 ? "" : text[at - 1];
+    const after = text[at + word.length] ?? "";
+    const boundary = (char: string) => char === "" || !/[a-z0-9]/.test(char);
+    if (boundary(before ?? "") && boundary(after)) {
+      return true;
+    }
+    from = at + 1;
+  }
+}
+
+function titleHit(title: string, term: string): boolean {
+  if (hasWord(title, term)) {
+    return true;
+  }
+  return (SYNONYMS[term] ?? []).some((alias) => hasWord(title, alias));
+}
+
+/**
+ * Words that carry no signal here and, under substring matching, would fail a
+ * query outright: "delete my account" returned nothing because "my" appears in
+ * no haystack. Dropped unless the query is nothing but stopwords.
+ */
+const STOPWORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "my",
+  "our",
+  "your",
+  "of",
+  "for",
+  "to",
+  "and",
+  "or",
+  "is",
+  "are",
+  "in",
+  "on",
+  "how",
+  "do",
+  "i",
+  "can",
+  "what",
+]);
+
+/**
+ * Rank hits by where the query matches: title beats hint beats body.
+ *
+ * Returns EVERY match, ranked. It used to hard-cap at twelve and hand the
+ * caller no way to know it had — so the results page rendered "12 results" for
+ * a query with twenty-seven matches, and rows 13–27 were unreachable by any
+ * route. Truncation is a rendering decision and belongs to the caller; pass
+ * `limit` only when you mean to discard the rest.
+ */
+export function searchContent(query: string, limit?: number): readonly SearchDoc[] {
   const term = query.trim().toLowerCase();
   if (term.length < 2) {
     return [];
   }
-  const terms = term.split(/\s+/);
+  // A multi-word phrase that IS a synonym key ("log in") is kept whole —
+  // splitting it would drop "in" as a stopword and hunt for the word "log".
+  const all = term.split(/\s+/).filter((word) => word.length > 0);
+  const meaningful = all.filter((word) => !STOPWORDS.has(word));
+  const terms = SYNONYMS[term] === undefined ? (meaningful.length > 0 ? meaningful : all) : [term];
   const scored: { doc: SearchDoc; score: number }[] = [];
   for (const entry of SEARCH_INDEX) {
     const titleLc = entry.title.toLowerCase();
+    const hintLc = entry.hint.toLowerCase();
     let score = 0;
     for (const word of terms) {
-      if (titleLc.includes(word)) {
+      if (titleHit(titleLc, word)) {
         score += 10;
-      } else if (entry.hint.toLowerCase().includes(word)) {
+      } else if (matches(hintLc, word)) {
         score += 4;
-      } else if (entry.haystack.includes(word)) {
+      } else if (matches(entry.haystack, word)) {
         score += 1;
       } else {
         // Every term must appear somewhere — AND semantics, no loose matches.
@@ -148,10 +367,10 @@ export function searchContent(query: string, limit = 12): readonly SearchDoc[] {
       scored.push({ doc: entry, score });
     }
   }
-  return scored
+  const ranked = scored
     .sort((a, b) => b.score - a.score || a.doc.title.localeCompare(b.doc.title))
-    .slice(0, limit)
     .map((entry) => entry.doc);
+  return limit === undefined ? ranked : ranked.slice(0, limit);
 }
 
 /**
@@ -165,9 +384,17 @@ export function allContentLinks(): readonly string[] {
   for (const entry of SEARCH_INDEX) {
     links.add(entry.href);
   }
-  for (const article of HELP_ARTICLES) {
-    for (const block of article.blocks) {
-      if (block.kind === "paragraph") {
+  // The doc-comment above has always said "every article AND LEGAL DOCUMENT".
+  // Only the articles were walked, so a dead link in a legal document — the
+  // pages a reader reaches when something has already gone wrong — was the one
+  // kind this suite was blind to. Callouts are walked too, now that a callout
+  // can carry a link at all.
+  for (const blocks of [
+    ...HELP_ARTICLES.map((article) => article.blocks),
+    ...LEGAL_DOCUMENTS.map((document) => document.blocks),
+  ]) {
+    for (const block of blocks) {
+      if (block.kind === "paragraph" || block.kind === "callout") {
         for (const link of block.links ?? []) {
           links.add(link.href);
         }

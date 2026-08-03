@@ -11,21 +11,32 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+/** How many hits a first page shows before the reader has to ask for the rest. */
+const PAGE_SIZE = 12;
+
 /**
  * PX-10 §6 — public product search. NAVIGATION ONLY (PX-2's ruling): it filters
  * the static content index and links to destinations. It is a plain GET form
  * rendered on the server, so it works with no client JavaScript and every
- * result is a real, linkable URL. Reaches every public destination — help,
- * legal, marketing, support, release notes — which the founder demo requires.
+ * result is a real, linkable URL. It covers help, legal, marketing, support and
+ * the release notes.
+ *
+ * The count is the TRUE number of matches. It used to print `results.length`
+ * from a list `searchContent` had silently capped at twelve, so "auction" —
+ * twenty-seven matches — reported "12 results", and nothing in the UI could
+ * reach the other fifteen. Showing the rest is a query parameter away, and
+ * works with JavaScript off like everything else here.
  */
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; all?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, all } = await searchParams;
   const query = (q ?? "").trim();
-  const results = searchContent(query);
+  const matches = searchContent(query);
+  const showAll = all === "1";
+  const results = showAll ? matches : matches.slice(0, PAGE_SIZE);
   return (
     <main className="content-page">
       <h1>Search</h1>
@@ -35,20 +46,22 @@ export default async function SearchPage({
         <label className="visually-hidden-heading" htmlFor="search-q">
           Search
         </label>
+        {/* No autoFocus: it steals the caret from a reader who arrived with
+            results already on screen, and jumps a screen reader past the count
+            it was about to announce. */}
         <input
           id="search-q"
           name="q"
           type="search"
           defaultValue={query}
           placeholder="Search everything public…"
-          autoFocus
         />
         <button type="submit">Search</button>
       </form>
 
       {query.length < 2 ? (
         <p className="article-meta">Type at least two characters to search.</p>
-      ) : results.length === 0 ? (
+      ) : matches.length === 0 ? (
         <p className="article-meta" data-testid="search-empty">
           Nothing matches “{query}”. Try a different word, or browse{" "}
           <Link href="/help" className="prose-link">
@@ -59,7 +72,8 @@ export default async function SearchPage({
       ) : (
         <>
           <p className="article-meta" data-testid="search-count">
-            {results.length} result{results.length === 1 ? "" : "s"} for “{query}”
+            {matches.length} result{matches.length === 1 ? "" : "s"} for “{query}”
+            {results.length < matches.length ? `, showing the first ${String(results.length)}` : ""}
           </p>
           <ul className="search-results" data-testid="search-results">
             {results.map((result) => (
@@ -74,6 +88,17 @@ export default async function SearchPage({
               </li>
             ))}
           </ul>
+          {results.length < matches.length ? (
+            <p className="article-meta no-print">
+              <Link
+                href={`/search?q=${encodeURIComponent(query)}&all=1`}
+                className="prose-link"
+                data-testid="search-show-all"
+              >
+                Show all {matches.length} results
+              </Link>
+            </p>
+          ) : null}
         </>
       )}
     </main>

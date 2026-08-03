@@ -78,8 +78,16 @@ export interface RailTarget {
 }
 
 /**
- * Exactly five, forever (canon docs/16; PX-1 01 §1) — the COUNT is the canon,
- * and it still holds.
+ * FOUR items. The canon (docs/16; PX-1 01 §1) said "exactly five, forever", and
+ * this comment went on asserting it two lines above a four-item array — while
+ * the help centre, reading the same canon, told customers about "the five
+ * places you'll work" and named a Money page that is not in the rail.
+ *
+ * The count stopped being five under DA-18 (see the note on the removed slot
+ * below), and a comment that contradicts the array under it is how a false
+ * claim survives a rewrite of the array. The canon here is the RULE — a short,
+ * fixed, primary rail, every item a place a signed-in person actually works —
+ * not the number. Adding a fifth needs a product ruling; so does the sixth.
  *
  * Slot 2 was "Seasons". It is now "Tournaments", by an explicit product ruling:
  * the recurring tournament is how organizers name their calendar ("BPL", then

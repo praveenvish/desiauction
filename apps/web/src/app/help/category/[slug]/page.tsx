@@ -39,12 +39,16 @@ export default async function HelpCategoryPage({ params }: { params: Promise<{ s
     <main className="content-page">
       <p className="article-meta no-print">
         <Link href="/help" className="prose-link">
-          ← All help
+          <span aria-hidden="true">←</span> All help
         </Link>
       </p>
       <h1>{category.title}</h1>
       <p className="content-lead">{category.description}</p>
-      <ul className="content-grid">
+      {/* h1 → h3 skip on all six category pages: the article cards are h3 with
+          no h2 between them and the title. One group of cards, so the group
+          heading is the h2 the cards were missing. */}
+      <h2 id="articles">Articles in this guide</h2>
+      <ul className="content-grid" aria-labelledby="articles">
         {articles.map((article) => (
           <li key={article.slug}>
             <Link href={`/help/${article.slug}`} className="content-card">

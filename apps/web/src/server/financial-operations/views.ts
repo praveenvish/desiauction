@@ -742,45 +742,6 @@ export async function financeGrantsOf(db: Db, orgId: string): Promise<FinanceGra
 }
 
 /**
- * What this organization has documented in a financial year.
- *
- * The finance desk opened with three setup cards and a register and never once
- * stated a total — on demo-club, whose books reconcile exactly (Cup Kings
- * invoiced ₹1,20,000 against receipts of ₹70,000 + ₹50,000; Cup Chargers
- * ₹80,000 against ₹80,000), the desk said none of it. The only rupee figure
- * anywhere in the workspace was on the Settlement tab.
- *
- * Deliberately NOT called "outstanding". What a team still owes is settlement's
- * question and settlement answers it; subtracting receipts from invoices here
- * would invent a second, quieter answer to it — and since tax invoices cannot
- * currently be issued at all, that subtraction would read as a debt for every
- * organization on the platform. This totals what the register actually holds.
- */
-export interface RegisterTotals {
-  readonly fy: string;
-  readonly receiptedPaise: number;
-  readonly invoicedPaise: number;
-  readonly receipts: number;
-  readonly invoices: number;
-  readonly corrections: number;
-}
-
-export function registerTotals(rows: readonly RegisterRow[], fy: string): RegisterTotals {
-  const mine = rows.filter((row) => row.fy === fy);
-  const sum = (kind: string): number =>
-    mine.filter((row) => row.kind === kind).reduce((total, row) => total + row.amount, 0);
-  const count = (kind: string): number => mine.filter((row) => row.kind === kind).length;
-  return {
-    fy,
-    receiptedPaise: sum("receipt"),
-    invoicedPaise: sum("tax-invoice"),
-    receipts: count("receipt"),
-    invoices: count("tax-invoice"),
-    corrections: count("correction"),
-  };
-}
-
-/**
  * teamId -> team name, for the delivery register's recipient column.
  *
  * Separate from `namesOf` on purpose: that one queries `people`, and a dispatch

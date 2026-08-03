@@ -232,8 +232,14 @@ export const LANDING = {
         body: "Start, complete or call off each fixture as the day actually runs.",
       },
       {
+        // Was "Dues, receipts, invoices, the ledger, Tally-ready exports and the
+        // year-end close" — three of those six do not exist. The issuance lane
+        // tells its own operator "This lane will not be able to issue anything"
+        // for a tax invoice; the exporter is reachable from no screen; there is
+        // no fiscal close. Dues, receipts and the ledger are real and carry the
+        // line on their own.
         name: "Money",
-        body: "Dues, receipts, invoices, the ledger, Tally-ready exports and the year-end close.",
+        body: "Dues computed when the gavel falls, numbered receipts, and an append-only ledger.",
       },
     ],
     // TODO(founder): confirm you want to say this out loud on the home page.
@@ -286,8 +292,11 @@ export const LANDING = {
         body: "Every collection you record produces a numbered receipt, and every receipt lands on the ledger.",
       },
       {
-        title: "Your data, exportable",
-        body: "Your data is never held hostage — everything stays readable and exportable, forever.",
+        // This band's own header promises "every line is something you can
+        // check inside the product". "Exportable, forever" was not checkable:
+        // squads and fixtures download as CSV, and nothing else does.
+        title: "Your data, yours",
+        body: "Your data is never held hostage. Squads and fixtures download as CSV, and the record stays readable for as long as you have an account.",
       },
     ],
     cta: { label: "How the platform is built", href: "/security" },
@@ -451,10 +460,14 @@ export const PRICING = {
       price: "₹0",
       cadence: "always",
       limits: "Up to 4 teams and 40 players",
+      // "invoices" and "exports" both named things the platform refuses to do:
+      // the issuance lane will not issue a tax invoice, and no screen reaches
+      // the exporter. A tier card is the last thing read before a decision, so
+      // it says only what a buyer will find.
       highlights: [
         "The full live auction, cockpit and public stage",
-        "Settlement, receipts and invoices",
-        "Immutable ledger, audit and exports",
+        "Settlement and numbered receipts",
+        "Immutable ledger and audit trail",
       ],
       cta: { label: "Start free", href: "/login" },
     },
@@ -503,8 +516,8 @@ export const PRICING = {
         cells: ["Every tournament, within these limits", "One tournament", "A season's worth"],
       },
       { label: "The full live auction, cockpit and public stage", cells: [true, true, true] },
-      { label: "Settlement, receipts and invoices", cells: [true, true, true] },
-      { label: "Immutable ledger, audit and exports", cells: [true, true, true] },
+      { label: "Settlement and numbered receipts", cells: [true, true, true] },
+      { label: "Immutable ledger and audit trail", cells: [true, true, true] },
       { label: "Custom branding and auction overlays", cells: [false, true, true] },
     ] satisfies readonly ComparisonRow[],
     // TODO(founder): the two "By agreement" cells are the honest reading of the
@@ -541,19 +554,31 @@ export const PRICING = {
         body: "Every tournament is free through the beta, so there is no invoice to raise, no purchase order to route and no budget to release. Run the whole thing first and decide about paying afterwards — and a tournament you start during the beta stays free for good.",
       },
       {
-        title: "Your own books come out GST-shaped",
-        // Evidenced: finops_profiles carries legal name, a GST posture
-        // (none | gst-registered) and a GSTIN; the document register issues
-        // receipt / tax-invoice / correction kinds in numbered series; exports
-        // are Tally-compatible and verified against the ledger they came from.
-        // Deliberately says "the money your teams owe you" first — this is the
-        // organizer's accounting, not a bill from us, and conflating the two
-        // would be the easiest lie on this page to tell by accident.
-        body: "This is the money your teams owe you, not money you owe us. Declare your legal name and GSTIN once, and the money workspace issues numbered receipts and tax invoices in your own series, on an append-only ledger, with Tally-compatible exports verified against the ledger they came from.",
+        title: "Your own books, in your own numbering",
+        // This comment used to read "Evidenced:" and then list tax invoices and
+        // Tally-compatible exports. The EXPORTER exists — in the frozen IP-6
+        // package — and the PRODUCT does not: it is reachable from no screen,
+        // and `exportRun` / `requestExport` / `buildExportArtifact` / `ExportKind`
+        // have zero non-test hits across apps/web/src. The issuance lane says to
+        // its own operator, in the UI, "This lane will not be able to issue
+        // anything" when the profile is GST-registered. An engine that can do a
+        // thing no operator can reach is not evidence for a marketing claim.
+        //
+        // What IS evidenced: finops_profiles carries legal name, GST posture and
+        // GSTIN; the register numbers receipts in an unbroken per-kind,
+        // per-year series and seals them; every issued document can be
+        // re-derived and compared against its seal.
+        //
+        // TODO(founder): when a document download and an accountant export are
+        // reachable from a screen, this paragraph gets its second half back.
+        // Until then a committee buyer must not be told they will get files.
+        body: "This is the money your teams owe you, not money you owe us. Declare your legal name and GSTIN once, and the money workspace issues numbered receipts in your own unbroken series, sealed on an append-only ledger, each one re-derivable from the events behind it. Tax invoices and exports for your accountant are not built yet — raise those the way you do now.",
       },
       {
         title: "Nothing you record is held hostage",
-        body: "Rosters, receipts, the ledger and the auction's own record all export, and they stay readable and exportable whatever happens to a pass. No renewal ever stands between your organization and its own paperwork.",
+        // "all export" was false for rosters-plus-everything. The squad CSV and
+        // the fixtures CSV are the two downloads that exist.
+        body: "Squads and fixtures download as CSV, and receipts, the ledger and the auction's own record stay readable whatever happens to a pass. No renewal ever stands between your organization and its own paperwork.",
       },
     ],
     // TODO(founder): this paragraph is the honest edge of what the repo can
@@ -601,7 +626,7 @@ export const PRICING = {
     {
       question: "What happens when my pass expires?",
       answer:
-        "Your data is never held hostage — everything stays readable and exportable, forever. A pass covers running the auction; the records are yours to keep.",
+        "Your data is never held hostage. Everything stays readable, and squads and fixtures download as CSV. A pass covers running the auction; the records are yours to keep.",
     },
     {
       question: "Refunds?",
@@ -650,13 +675,18 @@ export const FEATURE_GROUPS = [
     ],
   },
   {
+    // /features renders this list as SHIPPED capability. Three of its five
+    // lines were not: invoice issuance is refused by the issuance lane itself,
+    // the exporter is reachable from no screen, and there is no fiscal close.
+    // They are replaced by two things the workspace does do — sealed, numbered
+    // documents, and re-derivation against that seal.
     title: "Money & records",
     features: [
       "Obligations computed automatically when the gavel falls",
       "Record cash, UPI and bank collections against dues",
-      "Receipts, invoices and corrections with real numbering",
-      "Tally-compatible exports, verified against the ledger",
-      "Fiscal periods and year-end close",
+      "Receipts numbered in an unbroken series and sealed when issued",
+      "Every document re-derivable from its events and checked against its seal",
+      "Squad and fixture CSV downloads",
     ],
   },
   {

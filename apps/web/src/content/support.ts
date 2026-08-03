@@ -25,7 +25,13 @@ export const SUPPORT = {
   issueCategories: [
     {
       title: "I can't sign in",
-      body: "Codes are valid for five minutes, and there's a limit on how many you can request in a row. If you're stuck, a passkey avoids codes entirely — or email us and we'll help.",
+      // The old answer was circular: it sent someone who cannot sign in to add
+      // a passkey, and passkey enrolment is on /account, which redirects to
+      // /login without a session. It also hid the numbers that explain the
+      // silence at the phone step. Both fixed: the real limits (from
+      // server/auth/otp.ts) first, and the passkey named as prevention for next
+      // time rather than as a way out of this.
+      body: "A code lasts five minutes. You can ask for another after 30 seconds, up to five in an hour, and five wrong entries lock that number for a while — if the screen has gone quiet, you have probably hit one of those, and waiting an hour clears it. Check the number you typed, and that the SMS hasn't been filtered. Still stuck, email us. Once you are in, add a passkey from your account page: it is what stops this happening next time, but it cannot get you in today.",
       link: { label: "Read: signing in & passkeys", href: "/help/signing-in" },
     },
     {
