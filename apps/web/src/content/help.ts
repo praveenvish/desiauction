@@ -297,7 +297,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       { kind: "heading", level: 2, text: "Before you publish" },
       {
         kind: "paragraph",
-        text: "Nothing is reachable without an account. The season, its players, its fixtures and its auction are visible only to your organization — a stranger with the link is asked to sign in. The one exception is the registration link, which is meant to be shared and works either way.",
+        text: "Nothing is reachable without an account. The season, its players, its fixtures and its auction are visible only to your organization — the season's public address returns the same not-found page a made-up address does. Opening registration does not change this: it opens the door, not the roster. The one thing that works either way is the registration link itself, which is meant to be shared — a signed-out stranger opening it is asked to sign in, and only once you publish does it show them the season's name and dates first.",
       },
       { kind: "heading", level: 2, text: "After you publish" },
       {
@@ -327,6 +327,9 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             text: "Money. Dues, collections, receipts and the ledger are behind a grant, always.",
           },
           { text: "Anything about a season you have not published." },
+          {
+            text: "The player pool as a file. No visitor can bulk-download it. Your own export of the registrations lives on the registration desk, and every export is recorded against whoever took it.",
+          },
         ],
       },
       {
@@ -614,14 +617,38 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
   {
     slug: "for-owners",
     title: "For team owners: joining, bidding, your purse, what you owe",
-    summary: "Accept your invite, bid on the night, and understand your dues.",
+    summary: "Accept your invite, get your paddle granted, and understand your dues.",
     category: "player",
     readMinutes: 6,
     blocks: [
       { kind: "heading", level: 2, text: "Joining your team" },
       {
         kind: "paragraph",
-        text: "Owners are invited by link. Accept it and you're taken straight into the auction room for your season, holding a paddle for your team.",
+        // FALSE CAPABILITY CLAIM (fixed): accepting an owner link makes you the
+        // team's owner and an organization member. It does NOT give you a
+        // paddle. `acceptOwnerJoin` writes membership + the AcceptOwnerInvite
+        // command; the paddle comes from a SEPARATE `GrantPaddle` command the
+        // organizer runs in the cockpit, and only then can you claim it. The
+        // live room's own no-grant hint has always said so.
+        text: "Owners are invited by link, and the link works once. Accepting makes you the owner of that team and takes you into the auction room — but it does not give you a paddle. Your organizer grants your paddle as a separate step in the cockpit; until they do, the room will tell you there's no grant yet and you cannot bid.",
+      },
+      {
+        kind: "callout",
+        tone: "warning",
+        text: "Accepting is not the same as being able to bid. If you've accepted and the room says there's no paddle grant yet, ask your organizer to grant your paddle — nothing you can do on your own screen will change it.",
+      },
+      {
+        kind: "list",
+        items: [
+          { text: "The link expires 7 days after your organizer creates it." },
+          { text: "It works once — the first person to open and accept it becomes the owner." },
+          {
+            text: "Anyone holding the link can use it, so don't forward it. It is not tied to your phone number.",
+          },
+          {
+            text: "An owner link cannot be withdrawn once it has been sent. If it goes astray, tell your organizer straight away.",
+          },
+        ],
       },
       { kind: "heading", level: 2, text: "Bidding on the night" },
       {
@@ -681,10 +708,25 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         items: [
           { text: "Add the teams that will bid." },
           {
-            text: "Invite each team's owner by link. When they accept, they hold that team's paddle.",
+            // FALSE CAPABILITY CLAIM (fixed): the worst of the three. An
+            // organizer who stopped at "they accept" arrived on the night with
+            // owners who could not bid, because `GrantPaddle` is a separate
+            // cockpit command the product never prompts for.
+            text: "Invite each team's owner by link and send it to them yourself — the platform sends nothing. The link works once and expires in 7 days.",
+          },
+          {
+            text: "When they accept, they become that team's owner. They do NOT yet have a paddle.",
+          },
+          {
+            text: "Grant each accepted owner their paddle from the cockpit's Owners & paddles panel. This is a separate, deliberate step — without it nobody can bid.",
           },
           { text: "Every team starts with the same purse — the money they have to spend." },
         ],
+      },
+      {
+        kind: "callout",
+        tone: "warning",
+        text: "An owner invitation cannot be withdrawn once you've sent it. There is no revoke control for owner links today: anyone holding the link can accept it, and a link sent to the wrong number stays usable until it expires 7 days later. Check the number before you send.",
       },
       { kind: "heading", level: 2, text: "Lots" },
       {

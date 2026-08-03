@@ -81,11 +81,20 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await expect(page.getByTestId("competition-status")).toHaveText("registration open");
 
   // Not published yet: the public page 404s and the directory doesn't list it.
+  //
+  // CHANGED — this block used to assert the opposite of the first line ("Open-
+  // registration pages render by link even before publishing…"), and that was
+  // the defect: `status = 'registration_open'` published the season page, the
+  // whole approved roster, every player's profile and four share cards, with no
+  // publish dialog and no warning. Visibility is now the only publication gate
+  // (server/competition/public.ts), so an unpublished season is absent whether
+  // or not registration is open — which is what the rest of this test then
+  // proves publishing changes.
   await inSecondBrowser(browser, async (anon) => {
-    // Open-registration pages render by link even before publishing…
-    await anon.goto(publicUrl);
-    await expect(anon.getByTestId("public-reg-status")).toHaveText("Registration open");
-    // …but only PUBLISHED competitions are listed in the directory. The
+    // Open registration opens the DOOR, not the roster.
+    const before = await anon.goto(publicUrl);
+    expect(before?.status()).toBe(404);
+    // …and only PUBLISHED competitions are listed in the directory. The
     // no-match state now echoes the query back instead of saying "Nothing
     // matches", so a guest can see WHICH search came up empty.
     await anon.goto(`/c?q=${STAMP}`);
@@ -192,6 +201,14 @@ test("player journey: discover → multi-step register with draft recovery → t
     await expect(player.getByTestId("register-step-review")).toContainText("Bowler");
     await expect(player.getByTestId("register-step-review")).toContainText("Kiran Player");
 
+    // Submitting is now an affirmative act: the review states that everything
+    // except the mobile number is published, and refuses out loud until the
+    // player says they understood it.
+    await expect(player.getByTestId("register-privacy")).toContainText("published");
+    await player.getByTestId("register-submit").click();
+    await expect(player.getByText(/tick the box above/)).toBeVisible();
+    await player.getByTestId("register-consent").check();
+
     // Submit from review; confirmation explains what happens next.
     await player.getByTestId("register-submit").click();
     await expect(player.getByTestId("registration-submitted")).toBeVisible();
@@ -240,6 +257,10 @@ test("attacks: tampered drafts are refused by the server; duplicates show status
     }, slug);
     await player.reload();
     await expect(player.getByTestId("register-step-review")).toBeVisible();
+    // Consent is given first so the SERVER's refusal is what this asserts —
+    // otherwise the client-side consent gate short-circuits ahead of it and the
+    // test stops proving anything about the server.
+    await player.getByTestId("register-consent").check();
     await player.getByTestId("register-submit").click();
     // The server's validation is the only validation — its refusal, verbatim.
     await expect(player.getByText("Choose a valid playing role.")).toBeVisible();
@@ -248,6 +269,7 @@ test("attacks: tampered drafts are refused by the server; duplicates show status
     await player.getByRole("button", { name: "Back" }).click();
     await player.getByLabel("Playing role").selectOption("wicket_keeper");
     await player.getByTestId("register-continue").click();
+    await player.getByTestId("register-consent").check();
     await player.getByTestId("register-submit").click();
     await expect(player.getByTestId("registration-submitted")).toBeVisible();
 

@@ -268,18 +268,33 @@ export async function resolveCompetition(
 export async function competitionForRegistration(
   db: Db,
   slug: string,
-): Promise<{ id: string; orgId: string; name: string; status: CompetitionStatus } | null> {
+): Promise<{
+  id: string;
+  orgId: string;
+  name: string;
+  status: CompetitionStatus;
+  /** `visibility === 'public'` — whether /c/[slug] and the player pages exist
+   *  for the public at all. Registration itself does NOT depend on this (a
+   *  private season still takes sign-ups by direct link); the player-facing
+   *  screens need it so they never link to a page that will 404. */
+  listed: boolean;
+} | null> {
   const [row] = await db
     .select({
       id: competitions.id,
       orgId: competitions.orgId,
       name: competitions.name,
       status: competitions.status,
+      visibility: competitions.visibility,
     })
     .from(competitions)
     .where(eq(competitions.slug, slug))
     .limit(1);
-  return row ?? null;
+  if (row === undefined) {
+    return null;
+  }
+  const { visibility, ...rest } = row;
+  return { ...rest, listed: visibility === "public" };
 }
 
 export type AdvanceResult =

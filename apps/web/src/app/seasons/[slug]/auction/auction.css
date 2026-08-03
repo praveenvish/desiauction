@@ -1404,6 +1404,31 @@
   font-size: var(--text-sm-size);
   color: var(--text-accent);
   word-break: break-all;
+  /* base64url alphabet includes `-`, and the mono face LIGATES `--` into a
+     single long dash: the token `QeqEV7XzujgI--7nrWkbxOZ…` rendered as
+     `QeqEV7XzujgƗ–7nrWkbxOZ…`. About one token in 125 contains `--`, and this
+     string is transcribed by hand into WhatsApp. Ligatures off, everywhere a
+     secret is displayed. */
+  font-variant-ligatures: none;
+  font-feature-settings:
+    "liga" 0,
+    "clig" 0,
+    "calt" 0;
+  display: block;
+}
+
+.owner-invite-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.owner-invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 /* --- Diagnostics / recovery dashboard --------------------------------------- */

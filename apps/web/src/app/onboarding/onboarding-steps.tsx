@@ -17,7 +17,7 @@ import { logoutAction, updateProfileAction } from "../../server/auth/actions";
  * nothing, at the end of the funnel. Telemetry fires at submit for the same
  * reason: there is no render after the save to fire it in.
  */
-export function OnboardingPanel({ phone }: { phone: string }) {
+export function OnboardingPanel({ phone, next }: { phone: string; next: string }) {
   const [state, formAction, pending] = useActionState(updateProfileAction, {});
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -50,6 +50,9 @@ export function OnboardingPanel({ phone }: { phone: string }) {
         {/* Tells the shared action which of its two forms this is: the one with
             somewhere to go afterwards. */}
         <input type="hidden" name="onboarding" value="1" />
+        {/* Where the name gate interrupted this person. Re-validated on the
+            server (`safeNext`) — a hidden field is user-controlled. */}
+        <input type="hidden" name="next" value={next} />
         <p className="onboarding-hint">
           Signed in as <strong>{formatPhone(phone)}</strong> — verified. ·{" "}
           <button

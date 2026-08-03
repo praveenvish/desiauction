@@ -15,7 +15,12 @@ import {
 // neutral fallback, never leaked data), and the pure share-card view.
 
 export const runtime = "nodejs"; // publicPlayer reads Postgres — not edge-safe.
-export const revalidate = 3600;
+// A withdrawn player 404s on their page immediately, and a season pulled
+// from publication vanishes with it — but this card kept previewing the person
+// for up to an hour afterwards. An hour is a reasonable number for a stats
+// cache and the wrong number for a takedown, which is what this cache is on the
+// far side of.
+export const revalidate = 60;
 export const alt = "Player card · DesiAuction";
 export const size = SHARE_IMAGE_SIZE;
 export const contentType = "image/png";

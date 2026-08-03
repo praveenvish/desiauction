@@ -1,0 +1,135 @@
+/* The two invitation landings (/join and /owner-join).
+   Both routes previously imported ONLY the org console stylesheet, which is
+   written for a dense signed-in directory. What they actually are is a single
+   transactional card at the highest-trust moment in the product. */
+
+.join-lead {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+}
+
+/* THE TEAM NAME is the most important word on the owner card and used to be the
+   least prominent element on it, set inside an info Badge at pill size. */
+.join-subject {
+  display: block;
+  /* Text face, not display: the type-scale guardrail reserves the display face
+     for >=30px, and this sits under a 30px h1. Weight and size carry it. */
+  font-family: var(--font-text);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.join-subject-meta {
+  margin: 0 0 var(--space-4);
+  color: var(--text-secondary);
+}
+
+/* "What you're accepting" — the authority disclosure. */
+.join-disclosure {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin: 0 0 var(--space-5);
+  background: var(--surface-raised);
+}
+
+.join-disclosure h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.join-disclosure ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.join-disclosure li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  color: var(--text-primary);
+  /* Long org/team names and E.164 numbers must wrap, never widen the page. */
+  overflow-wrap: anywhere;
+}
+
+.join-disclosure li::before {
+  content: "·";
+  color: var(--text-secondary);
+  flex: none;
+}
+
+/* The money line carries the most consequential fact on the owner card. */
+.join-disclosure li[data-weight="strong"] {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.join-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.join-decline {
+  margin: var(--space-4) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.join-decline a {
+  color: var(--text-primary);
+}
+
+/* "Signed in as … Not you? Sign out" — a form, so it lives outside the card. */
+.join-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.join-linkbutton {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--text-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.join-linkbutton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The live-auction warning on /owner-join: the invitee was never told the
+   night had already started. */
+.join-live-notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--warning-base);
+  background: var(--warning-subtle);
+  color: var(--text-primary);
+}

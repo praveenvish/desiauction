@@ -741,6 +741,12 @@ export async function bulkTriageAction(
 export interface RegistrationLanding {
   competitionName: string;
   open: boolean;
+  /** The season is published, so `/c/[slug]` and the player pages exist. The
+   *  status card links a player to their OWN public page, and must not offer a
+   *  link to a page that does not exist yet. */
+  listed: boolean;
+  /** The season's public slug, for that link. */
+  slug: string;
   // PX-5: the number is the player's human-quotable reference on the status view.
   mine: {
     id: string;
@@ -765,6 +771,8 @@ export async function registrationLanding(slug: string): Promise<RegistrationLan
   return {
     competitionName: competition.name,
     open: competition.status === "registration_open",
+    listed: competition.listed,
+    slug,
     mine,
   };
 }

@@ -1,11 +1,9 @@
 "use client";
 
-import { Button, PlayerImage } from "@desiauction/ui";
+import { PlayerImage } from "@desiauction/ui";
 import { useMemo } from "react";
 
 import { groupSquads } from "../../../components/showcase/showcase-filter";
-import { squadsToCsv } from "../../../components/showcase/showcase-csv";
-import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer } from "../../../server/competition/public";
 
 /**
@@ -20,24 +18,12 @@ export function SquadsView({ players }: { players: ShowcasePlayer[] }) {
     return <p className="showcase-empty">Squads appear here as players are sold.</p>;
   }
 
-  function downloadCsv() {
-    const blob = new Blob([squadsToCsv(players)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "squads.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
-    track("showcase.exported");
-  }
-
+  // The second anonymous bulk export lived here ("Download squads (CSV)"). It
+  // is gone for the same reason as the one on the Players tab — see the note in
+  // showcase-grid.tsx. A public page shows rosters; it does not hand them over
+  // as a file to an actor it cannot name.
   return (
     <>
-      <div className="squads-toolbar">
-        <Button variant="secondary" size="sm" onClick={downloadCsv}>
-          Download squads (CSV)
-        </Button>
-      </div>
       <div className="squads">
         {squads.map((squad) => (
           <section key={squad.teamName} className="squad" aria-label={squad.teamName}>

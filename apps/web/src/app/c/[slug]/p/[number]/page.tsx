@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 
 import { env } from "../../../../../env";
 import { publicPlayer } from "../../../../../server/competition/public";
+import { SharePlayer } from "./share-player";
 import "../../../../marketing.css";
 import "../../../directory.css";
 
@@ -31,7 +32,13 @@ function statusText(player: {
     return "Available";
   }
   if (player.status === "retained") {
-    return player.teamName !== null ? `Retained by ${player.teamName}` : "Retained";
+    // No team name means an approved ICON nobody has assigned yet. They are not
+    // available — `auctionReady` filters icons out of the pool, so no team can
+    // bid for them — and "Retained" on its own implies a retaining team there
+    // is no record of. Say the thing that is actually true of them.
+    return player.teamName !== null
+      ? `Retained by ${player.teamName}`
+      : "Icon player — not in the auction";
   }
   return player.teamName !== null ? `Sold to ${player.teamName}` : "Sold";
 }
@@ -49,14 +56,28 @@ export async function generateMetadata({
   const age = player.age !== null ? ` · ${String(player.age)} yrs` : "";
   const description = `${roleLabel(player.role)}${age} · ${statusText(player)} · ${player.competitionName}`;
   const url = `${env.PUBLIC_BASE_URL}/c/${slug}/p/${number}`;
+  // The image route's own `alt` export must be a static string, so every player
+  // card in the product described itself as "Player card · DesiAuction" — a
+  // blind recipient in a chat thread was handed a product name where the sighted
+  // people in the group could see a person. `og:image:alt` is derived per
+  // player, and it is what clients actually announce.
+  const imageAlt = `${player.name} — ${roleLabel(player.role)}, ${statusText(player)}, ${player.competitionName}`;
+  const images = [{ url: `${url}/opengraph-image`, width: 1200, height: 630, alt: imageAlt }];
   return {
     title: `${player.name} · ${player.competitionName}`,
     description,
     alternates: { canonical: url },
     // Player pages are for sharing by link, not independent search indexing.
     robots: { index: false, follow: true },
-    openGraph: { title: player.name, description, url, type: "profile", siteName: "DesiAuction" },
-    twitter: { card: "summary_large_image", title: player.name, description },
+    openGraph: {
+      title: player.name,
+      description,
+      url,
+      type: "profile",
+      siteName: "DesiAuction",
+      images,
+    },
+    twitter: { card: "summary_large_image", title: player.name, description, images },
   };
 }
 
@@ -139,8 +160,26 @@ export default async function PlayerProfilePage({
           </div>
         </section>
 
-        <section className="public-section">
+        {/* The page the OG route calls "the viral unit — a player posts their
+            own card" had exactly one action on it: a back link. No way for the
+            player to share the thing built to be shared, and no way for the
+            stranger who received it to join the tournament they were just shown.
+            Both, now, and the CTA only while the door is open. */}
+        <section className="public-section" aria-labelledby="share-heading">
+          <h2 id="share-heading" className="visually-hidden">
+            Share and register
+          </h2>
+          <SharePlayer playerName={player.name} />
           <div className="public-cta-row">
+            {player.competitionOpen ? (
+              <ButtonLink
+                href={`/seasons/${slug}/register`}
+                size="lg"
+                data-testid="player-join-cta"
+              >
+                Register for {player.competitionName}
+              </ButtonLink>
+            ) : null}
             <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg">
               ← Back to {player.competitionName}
             </ButtonLink>

@@ -16,10 +16,31 @@ import { queryFixtures, type FixtureSnapshot } from "./fixtures";
 
 // PX-5 public reads (PX-1 02 §I thin-wiring class): anonymous, system-pool
 // composites over EXISTING queries. Public exposure is governed by the
-// platform's own `competitions.visibility` column (schema, dormant until now):
-// the DIRECTORY lists only visibility='public'; a single page also renders for
-// open-registration competitions (the shared link already made those public in
-// practice). Nothing here reads phones, registrations, or any person data.
+// platform's own `competitions.visibility` column, and by NOTHING else.
+//
+// It used to also be governed by `status = 'registration_open'`, on the theory
+// that "the shared link already made those public in practice". It had not.
+// Opening registration is an operational act — one click on the Overview, no
+// publish dialog, no warning — and it was publishing the competition page, the
+// complete approved roster, every player's individual profile, four social
+// cards and a one-click CSV of the lot. 19 competitions their organizers had
+// marked `private` were serving 80-player rosters to anyone with the link.
+//
+// Two gates on the very same competition already disagreed with this one and
+// were right: `/seasons/[slug]/register` (publicRegistrationFacts) and
+// `/seasons/[slug]/auction/spectate` both test visibility alone, and the
+// register page states the policy in prose — "a private season's very name is
+// not a stranger's to read". The surface carrying other people's personal data
+// was the permissive one. Publication is now one decision, made in one place,
+// by the organizer, deliberately.
+//
+// Removing the status clause breaks no working flow: registration for a private
+// competition never went through here. A signed-in player still registers by
+// direct link (`competitionForRegistration`, no visibility test), and a
+// signed-out one still gets the login redirect they got before. What is gone is
+// the roster, not the door.
+//
+// Nothing here reads phones, registrations, or any person data.
 
 export interface PublicFixture {
   number: string;
@@ -39,6 +60,9 @@ export interface PublicCompetitionView {
   endsOn: string | null;
   orgName: string;
   open: boolean;
+  /** Always true now that visibility is the only gate — this view does not
+   *  exist for an unpublished competition. Kept so callers state the reason
+   *  they index a page rather than assuming it. */
   listed: boolean;
   /** Ready-to-render competition crest URL, or null for the monogram fallback. */
   logoUrl: string | null;
@@ -80,11 +104,12 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
   if (row === undefined) {
     return null;
   }
-  const open = row.status === "registration_open";
-  if (row.visibility !== "public" && !open) {
-    // Not published and not accepting the public — structurally absent.
+  if (row.visibility !== "public") {
+    // Not published — structurally absent, indistinguishable from a slug that
+    // was never created. Open registration is not publication.
     return null;
   }
+  const open = row.status === "registration_open";
   const [auctionRows, teams, fixtures] = await Promise.all([
     systemDb
       .select({ status: auctions.status })
@@ -108,7 +133,10 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     endsOn: row.endsOn,
     orgName: row.orgName,
     open,
-    listed: row.visibility === "public",
+    // Not `row.visibility === "public"` — the gate above already refused
+    // anything else, and the compiler now says so. The literal is the point:
+    // this view cannot exist for an unpublished competition.
+    listed: true,
     logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
     auctionStatus: auctionRows[0]?.status ?? null,
     teams,
@@ -148,7 +176,18 @@ interface ShowcaseRow {
   isIcon: boolean;
 }
 
-/** Row → public player: consent-gates the photo, derives age, maps squad→status. */
+/**
+ * Row → public player: consent-gates the photo, derives age, maps squad→status.
+ *
+ * Status was derived from `team_id` alone, so an APPROVED ICON with no team yet
+ * was published as "Available" — on the page, in the <title>, in the meta
+ * description and on the share card someone forwards to a WhatsApp group. It is
+ * not available: `auctionReady` filters icons out of the pool
+ * (`server/auction/auction-ready.ts`, `.filter((row) => !row.isIcon)`), so no
+ * team can bid for them in any auction this platform will ever run. The icon
+ * flag is checked FIRST because it is the fact that decides biddability; the
+ * team assignment only decides which name to print.
+ */
 function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
   return {
     number: r.number,
@@ -158,7 +197,7 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
     battingStyle: r.battingStyle,
     bowlingStyle: r.bowlingStyle,
     photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
-    status: r.teamId === null ? "available" : r.isIcon ? "retained" : "sold",
+    status: r.isIcon ? "retained" : r.teamId === null ? "available" : "sold",
     teamName: r.teamName,
   };
 }
@@ -205,7 +244,6 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
   const [comp] = await systemDb
     .select({
       id: competitions.id,
-      status: competitions.status,
       visibility: competitions.visibility,
     })
     .from(competitions)
@@ -214,8 +252,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
   if (comp === undefined) {
     return null;
   }
-  const open = comp.status === "registration_open";
-  if (comp.visibility !== "public" && !open) {
+  if (comp.visibility !== "public") {
     return null;
   }
   const now = new Date();
@@ -257,6 +294,10 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
 export interface PublicPlayer extends ShowcasePlayer {
   competitionName: string;
   competitionSlug: string;
+  /** Registration is open on this competition. A stranger who lands on a
+   *  friend's card had no way to join the same tournament — this is what lets
+   *  the page offer one, and only when the door is actually open. */
+  competitionOpen: boolean;
 }
 
 /**
@@ -281,8 +322,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   if (comp === undefined) {
     return null;
   }
-  const open = comp.status === "registration_open";
-  if (comp.visibility !== "public" && !open) {
+  if (comp.visibility !== "public") {
     return null;
   }
   const [row] = await systemDb
@@ -317,6 +357,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
     ...toShowcasePlayer(row, new Date()),
     competitionName: comp.name,
     competitionSlug: comp.slug,
+    competitionOpen: comp.status === "registration_open",
   };
 }
 

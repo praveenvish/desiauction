@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { BrandGlyph } from "@desiauction/ui";
 
 import { currentSession } from "../../server/auth/actions";
+import { safeNext } from "../../server/auth/redirect";
 import { OnboardingPanel } from "./onboarding-steps";
 import "./onboarding.css";
 
@@ -20,14 +21,23 @@ export const metadata = { title: "Welcome · DesiAuction" };
 // and zero links: someone who signed in on the wrong number had no way out of
 // it but the URL bar. It now carries the two doors a dead end needs — the mark,
 // home, and a way to sign out — and nothing else.
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
   const session = await currentSession();
   if (session === null) {
     redirect("/login?next=/onboarding");
   }
+  // Where the gate interrupted them. Console segments that know their own
+  // address pass it (see `requireOnboarded`); /home stays the invented default,
+  // and `safeNext` folds anything attacker-shaped back to it.
+  const { next } = await searchParams;
+  const destination = safeNext(next);
   const nameDone = session.name !== null && session.name.trim() !== "";
   if (nameDone) {
-    redirect("/home");
+    redirect(destination);
   }
   return (
     <main className="onboarding">
@@ -52,7 +62,7 @@ export default async function OnboardingPage() {
           </ul>
         </aside>
         <div className="onboarding-panel">
-          <OnboardingPanel phone={session.phone} />
+          <OnboardingPanel phone={session.phone} next={destination} />
         </div>
       </div>
     </main>

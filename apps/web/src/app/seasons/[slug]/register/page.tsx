@@ -27,9 +27,14 @@ const STATUS_COPY: Record<
     body: "The organizer approved your registration. Next stop: auction day, where team owners bid to sign you. The organizer will share when and where.",
     tone: "success",
   },
+  // "The season is full for now" is a specific, checkable fact the product does
+  // not have: there is no capacity column anywhere in the schema outside
+  // `grounds.capacity`, and nothing counts a pool against a limit. Waitlisting
+  // is manual organizer triage, for any reason they like — so the copy says
+  // that, rather than inventing a cause the player might reasonably act on.
   waitlisted: {
     title: "You're on the waitlist",
-    body: "The season is full for now. If a spot opens, the organizer moves waitlisted players up — keep an eye on this page.",
+    body: "The organizer has put your registration on the waitlist rather than approving it yet. They move waitlisted players into the pool as they decide — keep an eye on this page.",
     tone: "warning",
   },
   rejected: {
@@ -102,16 +107,36 @@ export default async function RegisterPage({
                   Registering puts you in this season&apos;s player pool. On auction day, team
                   owners bid to sign you.
                 </p>
+                {/* "Your name — it appears on the team sheet and the auction
+                    stage" describes a room. It is a URL: the name is published
+                    on a page anyone with the link can read. Said here, before
+                    anyone signs in, and again in full at the moment of
+                    submission. */}
                 <h3>What you&apos;ll be asked</h3>
                 <ul className="register-asks">
-                  <li>Your name — it appears on the team sheet and the auction stage.</li>
-                  <li>Your mobile number — how the organizer reaches you about this season.</li>
-                  <li>Your playing role — batter, bowler, all-rounder or wicket-keeper.</li>
                   <li>
-                    Optional: your date of birth and playing styles, and a photo for your player
-                    card. A photo, if you add one, is public.
+                    Your name — published on this season&apos;s public page and on a player page of
+                    your own, readable by anyone with the link.
+                  </li>
+                  <li>
+                    Your mobile number — how the organizer reaches you about this season. Never
+                    published on any page.
+                  </li>
+                  <li>
+                    Your playing role — batter, bowler, all-rounder or wicket-keeper. Published
+                    alongside your name.
+                  </li>
+                  <li>
+                    Optional: your date of birth (your age is published, the date never is), your
+                    playing styles, and a photo. Everything optional you give is published too.
                   </li>
                 </ul>
+                <p className="register-hint">
+                  Publication happens once the organizer publishes this season. You can withdraw at
+                  any time, which takes your pages down. See our{" "}
+                  <Link href="/legal/privacy">privacy policy</Link> and{" "}
+                  <Link href="/help/whats-public">what&apos;s public about you</Link>.
+                </p>
                 <p className="register-hint">
                   Nothing is submitted until you say so. We&apos;ll verify your mobile with a
                   one-time code at that point.
@@ -183,6 +208,33 @@ export default async function RegisterPage({
                 .
               </p>
             ) : null}
+            {/* A player was never shown their own public page. The only link to
+                `/c/[slug]/p/[number]` in the entire product was inside the
+                showcase dialog on the public page itself — not here, not on
+                /home, not in the inbox. They could not see what the world sees,
+                and could not check it was right. It is shown here, with the
+                address spelled out so it can be copied, and next to the withdraw
+                control, which is the takedown lever nobody was told about. */}
+            {landing.mine.status === "approved" && landing.listed ? (
+              <div className="register-public" data-testid="my-public-page">
+                <h3 className="register-public-head">Your public player page</h3>
+                <p className="register-hint">
+                  You are in the pool for a published season, so this page is live and anyone with
+                  the address can read it. It carries your name, number, playing role, age and
+                  styles if you gave them, your photo if you added one, and which team signs you —
+                  never your mobile number.
+                </p>
+                <p className="register-public-url">
+                  <Link href={`/c/${landing.slug}/p/${landing.mine.number}`}>
+                    /c/{landing.slug}/p/{landing.mine.number}
+                  </Link>
+                </p>
+                <p className="register-hint">
+                  Open it to see exactly what a stranger sees. If you do not want it published,
+                  withdraw below — that removes this page and the preview card that travels with it.
+                </p>
+              </div>
+            ) : null}
             <p className="register-hint">
               <Link href="/home">All your registrations live on Home</Link>.
             </p>
@@ -197,11 +249,17 @@ export default async function RegisterPage({
             <p role="alert" data-testid="registration-closed">
               Registration for <strong>{landing.competitionName}</strong> is not open right now.
             </p>
-            <p className="register-hint">
-              <ButtonLink href={`/c/${slug}`} variant="ghost">
-                Back to the season page
-              </ButtonLink>
-            </p>
+            {/* Only published seasons HAVE a season page. Offering this for an
+                unpublished one sends the player to a 404 — which is exactly
+                what an unpublished season is supposed to look like, and a dead
+                end for someone who was told to click it. */}
+            {landing.listed ? (
+              <p className="register-hint">
+                <ButtonLink href={`/c/${slug}`} variant="ghost">
+                  Back to the season page
+                </ButtonLink>
+              </p>
+            ) : null}
           </Card>
         ) : (
           <RegisterFlow

@@ -2533,4 +2533,19 @@ p + .date-row {
   font-family: var(--font-mono);
   font-size: var(--text-xs-size);
   overflow-wrap: anywhere;
+  /* See `.owner-url`: base64url tokens contain `-`, and the mono face ligates
+     `--` into one long dash, so ~0.8% of tokens DISPLAY wrongly on a string
+     people transcribe by hand. */
+  font-variant-ligatures: none;
+  font-feature-settings:
+    "liga" 0,
+    "clig" 0,
+    "calt" 0;
+}
+
+.teams-invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }

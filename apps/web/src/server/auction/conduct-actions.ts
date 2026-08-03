@@ -10,12 +10,21 @@ import type {
   SnapshotRefs,
 } from "@desiauction/core";
 import { auctionOf } from "@desiauction/auction";
-import { competitions, organizations, teams, withTenantDb, type Db } from "@desiauction/db";
-import { asc, eq } from "drizzle-orm";
+import {
+  auctionOwnerInvites,
+  competitions,
+  organizations,
+  orgMembers,
+  people,
+  teams,
+  withTenantDb,
+  type Db,
+} from "@desiauction/db";
+import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
 import { engineWsUrl, fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-client";
-import { liveGate } from "./live-actions";
+import { auctionMemberGate, liveGate } from "./live-actions";
 import {
   preSignedPlayers,
   resolvedLots,
@@ -45,6 +54,62 @@ const TEAM_IDENTITY = {
   primaryColor: teams.primaryColor,
 };
 
+export interface OwnerAcceptance {
+  /** `auction_owner_invites.id` — the key back onto `owners.invites`. */
+  inviteId: string;
+  personId: string;
+  name: string | null;
+  /** E.164 as stored; the panel formats it. Never blank for a real account. */
+  phone: string;
+  /** ISO. */
+  acceptedAt: string | null;
+  /**
+   * Still a member of this organization?
+   *
+   * `removeMember` revokes grants and deletes the membership row, and leaves
+   * `auction_owner_invites.accepted_by` and `paddle_grants` exactly where they
+   * were — both are auction-aggregate state that only the engine may write, and
+   * there is no command to withdraw either. So the cockpit went on listing an
+   * offboarded person as an owner ready to be handed a paddle. It cannot be
+   * unwound here; it CAN be told the truth about, and the grant refused.
+   */
+  stillMember: boolean;
+}
+
+/** Identity for every accepted owner invitation on this auction. */
+async function ownerAcceptancesOf(auctionId: string, orgId: string): Promise<OwnerAcceptance[]> {
+  const rows = await systemDb
+    .select({
+      inviteId: auctionOwnerInvites.id,
+      personId: auctionOwnerInvites.acceptedBy,
+      acceptedAt: auctionOwnerInvites.acceptedAt,
+      name: people.name,
+      phone: people.phone,
+      memberOrgId: orgMembers.orgId,
+    })
+    .from(auctionOwnerInvites)
+    .innerJoin(people, eq(people.id, auctionOwnerInvites.acceptedBy))
+    .leftJoin(
+      orgMembers,
+      and(eq(orgMembers.personId, auctionOwnerInvites.acceptedBy), eq(orgMembers.orgId, orgId)),
+    )
+    .where(
+      and(
+        eq(auctionOwnerInvites.auctionId, auctionId),
+        isNull(auctionOwnerInvites.revokedAt),
+        isNotNull(auctionOwnerInvites.acceptedBy),
+      ),
+    );
+  return rows.map((row) => ({
+    inviteId: row.inviteId,
+    personId: row.personId ?? "",
+    name: row.name,
+    phone: row.phone,
+    acceptedAt: row.acceptedAt === null ? null : row.acceptedAt.toISOString(),
+    stillMember: row.memberOrgId !== null,
+  }));
+}
+
 export interface CockpitView {
   competition: { name: string; slug: string };
   auctionId: string;
@@ -52,6 +117,21 @@ export interface CockpitView {
   wsUrl: string;
   view: AuctionView;
   owners: OwnerBoard;
+  /**
+   * WHO actually accepted each owner link, and when.
+   *
+   * `ownerBoard` (packages/auction) returns `acceptedByName`, which the cockpit
+   * rendered as the literal string "Owner" whenever the account had no name.
+   * A stranger who opened a forwarded link therefore appeared as a row reading
+   * "Owner" — indistinguishable from the legitimate owner of the same team,
+   * with no phone number anywhere on the screen. The organizer is about to hand
+   * one of them a paddle and money authority.
+   *
+   * The phone lives on `people` and is a web-tier read; the aggregate's view is
+   * FENCED for this work, so the identity is joined on here and matched by
+   * invite id.
+   */
+  ownerAcceptances: OwnerAcceptance[];
   teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
   viewer: { personId: string; canConduct: boolean; canOverride: boolean };
   /** Icons and retained players: on a squad, never in the pool. */
@@ -79,6 +159,7 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
       resolvedLots(db, gate.auction.id),
     ]),
   );
+  const ownerAcceptances = await ownerAcceptancesOf(gate.auction.id, gate.competition.orgId);
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionId: gate.auction.id,
@@ -86,6 +167,7 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
     wsUrl: engineWsUrl(gate.auction.id),
     view,
     owners,
+    ownerAcceptances,
     teams: teamRows,
     viewer: {
       personId: gate.personId,
@@ -145,7 +227,11 @@ export interface SpectatorView {
  * snapshot itself is already spectator-safe (names and numbers only).
  */
 export async function spectatorView(slug: string): Promise<SpectatorView | null> {
-  const gate = await liveGate(slug);
+  // MEMBERSHIP, not participation. This is the fallback for an UNPUBLISHED
+  // auction, and watching your own club's private season is exactly what a
+  // member should be able to do — the payload here carries no owner data,
+  // no diagnostics and no commands. The live ROOM is gated harder (liveGate).
+  const gate = await auctionMemberGate(slug);
   if (gate === null) {
     return null;
   }

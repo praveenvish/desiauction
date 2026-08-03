@@ -108,7 +108,10 @@ describe("AUTHZ REGRESSION — tenancy + capability contract", () => {
   it("invite lifecycle: create → accept once → replay fails", async () => {
     const invite = await createInvite(db, orgX.id, owner, "org:staff");
     const first = await acceptInvite(db, staff, invite.token);
-    expect(first).toEqual({ ok: true, orgSlug: orgX.slug });
+    // `orgName` joined the result so acceptance can finally CONFIRM itself:
+    // the redirect used to be silent, and an unnamed account was bounced
+    // straight on to /onboarding with nothing saying the invite had worked.
+    expect(first).toEqual({ ok: true, orgSlug: orgX.slug, orgName: orgX.name });
     const replay = await acceptInvite(db, staff, invite.token);
     expect(replay).toEqual({ ok: false });
     expect(await previewInvite(db, invite.token)).toBeNull();

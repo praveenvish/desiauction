@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { currentSession } from "./actions";
+import { safeNext } from "./redirect";
 
 /**
  * The name gate — the ONE thing onboarding asks for — enforced across the
@@ -18,9 +19,17 @@ import { currentSession } from "./actions";
  * exactly where the visitor was headed. This adds one condition on top: a
  * session that exists but has no name owes the product one question first.
  */
-export async function requireOnboarded(): Promise<void> {
+export async function requireOnboarded(next?: string): Promise<void> {
   const session = await currentSession();
   if (session !== null && (session.name === null || session.name.trim() === "")) {
-    redirect("/onboarding");
+    // INTERRUPT ONCE, THEN PUT THEM BACK. The gate always sent people to /home
+    // afterwards, which is fine for a rail click and wrong for the live auction
+    // room: an owner arriving straight off `acceptOwnerJoin` would be asked for
+    // their name and then landed somewhere else entirely, mid-auction. Segments
+    // that know where they are pass it; `next` is attacker-reachable in general
+    // so it goes through the same PX-11 allowlist as the login one.
+    redirect(
+      next === undefined ? "/onboarding" : `/onboarding?next=${encodeURIComponent(safeNext(next))}`,
+    );
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { roleLabel } from "@desiauction/core";
-import { Button, ButtonLink, Dialog, PlayerImage } from "@desiauction/ui";
+import { ButtonLink, Dialog, PlayerImage } from "@desiauction/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -15,7 +15,6 @@ import {
   serializeShowcaseParams,
   type ShowcaseView,
 } from "../../../components/showcase/showcase-params";
-import { showcaseToCsv } from "../../../components/showcase/showcase-csv";
 import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer, ShowcasePool } from "../../../server/competition/public";
 import { SquadsView } from "./squads-view";
@@ -72,17 +71,18 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
     [players, query, filter, sort],
   );
 
-  function downloadCsv() {
-    const blob = new Blob([showcaseToCsv(shown)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "players.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
-    track("showcase.exported");
-  }
-
+  // There was a "Download CSV" button here, and a "Download squads (CSV)" one
+  // in SquadsView. One anonymous click produced players.csv — number, name,
+  // role, age, batting, bowling, status, team, one row per approved player — a
+  // durable, portable file of civilians' personal data, taken with no account,
+  // no record that it happened, and nothing anywhere in the registration funnel
+  // disclosing that the button exists. The organizer's own export writes an
+  // audit row for exactly this reason (`recordRegistrationExport`,
+  // server/competition/registrations.ts:639): "an export is the one read that
+  // produces a durable artefact, and it was the only one that wrote no
+  // evidence." A public page has no actor to name in that row, so it does not
+  // get the capability. Reading the pool a card at a time is what this page is
+  // for; leaving with the whole database is not.
   return (
     <div className="showcase">
       {/* Said BEFORE the view toggle, the counts and the grid, because every
@@ -152,19 +152,6 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
                 <option value="status">Sort: status</option>
               </select>
             </label>
-            {/* `touch`, not `sm`: this sits in a row with .showcase-search and
-                .showcase-sort select, both of which hand-set min-height 44px.
-                At sm the button rendered 32px — 12px shorter than the controls
-                either side of it, and under the platform's touch convention on
-                the one public surface most likely to be opened on a phone. */}
-            <Button
-              variant="secondary"
-              size="touch"
-              onClick={downloadCsv}
-              disabled={shown.length === 0}
-            >
-              Download CSV
-            </Button>
           </div>
 
           <div className="showcase-filters" role="group" aria-label="Filter players">
@@ -234,8 +221,13 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
                             .join(" · ")}
                         </span>
                       ) : null}
+                      {/* "Signed" was the fallback for a player with no team
+                          name — which is exactly an approved icon nobody has
+                          assigned yet, so the card claimed a team that does not
+                          exist. An icon is not signed and not available: they
+                          are held out of the auction entirely. */}
                       <span className="showcase-card-status" data-status={p.status}>
-                        {p.status === "available" ? "Available" : (p.teamName ?? "Signed")}
+                        {p.status === "available" ? "Available" : (p.teamName ?? "Icon player")}
                       </span>
                     </span>
                   </button>
@@ -288,7 +280,9 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
               <dd>
                 {selected.status === "available"
                   ? "Available"
-                  : `${selected.teamName ?? "Signed"}${selected.status === "retained" ? " · retained" : ""}`}
+                  : selected.teamName === null
+                    ? "Icon player — not in the auction"
+                    : `${selected.teamName}${selected.status === "retained" ? " · retained" : ""}`}
               </dd>
             </dl>
             <ButtonLink

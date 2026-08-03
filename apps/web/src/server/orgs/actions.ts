@@ -13,6 +13,7 @@ import {
   withTenantDb,
 } from "@desiauction/db";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -23,9 +24,11 @@ import { ForbiddenError, can, requireCapability } from "./authz";
 import {
   acceptInvite,
   createInvite,
+  inviteLanding,
   pendingInvitesOf,
   previewInvite,
   revokeInvite,
+  type InviteLanding,
   type PendingInvite,
 } from "./invites";
 import {
@@ -436,7 +439,7 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
 export async function createInviteAction(
   slug: string,
   capabilitySet: string,
-): Promise<{ url: string } | { error: string }> {
+): Promise<{ url: string; reference: string; expiresAt: string } | { error: string }> {
   const session = await requireSession();
   const org = await resolveTenantScoped(session.personId, slug);
   if (org === null) {
@@ -454,7 +457,13 @@ export async function createInviteAction(
           "org.members.invite",
         );
         const invite = await createInvite(db, org.id, session.personId, capabilitySet);
-        return { url: `/join/${invite.token}` };
+        return {
+          url: `/join/${invite.token}`,
+          // The handle that lets the organizer match this link to the row it
+          // becomes in "waiting to be used" — the token itself never comes back.
+          reference: invite.reference,
+          expiresAt: invite.expiresAt.toISOString(),
+        };
       },
     );
   } catch (error) {
@@ -621,11 +630,43 @@ export async function invitePreview(token: string) {
   return previewInvite(systemDb, token);
 }
 
+/**
+ * The /join landing, resolved for the signed-in viewer.
+ *
+ * Also reports the viewer's own phone so the page can say "Signed in as …" —
+ * an invite link is a bearer token and the person opening it may well be signed
+ * in as somebody else's account on a shared handset.
+ */
+export async function inviteLandingView(token: string): Promise<{
+  landing: InviteLanding;
+  viewerPhone: string;
+}> {
+  const session = await requireSession();
+  // Pre-tenant token path (documented exception): runs on the system pool.
+  const landing = await inviteLanding(systemDb, session.personId, token);
+  return { landing, viewerPhone: session.phone };
+}
+
 export async function acceptInviteAction(token: string): Promise<void> {
   const session = await requireSession();
   // Pre-tenant token path (documented exception): runs on the system pool.
   const result = await acceptInvite(systemDb, session.personId, token);
   if (result.ok) {
+    // Land on the club WITH a confirmation. Acceptance used to redirect in
+    // silence — and an unnamed account was then bounced straight onward to
+    // /onboarding, whose heading is written for a founder creating an auction,
+    // with nothing anywhere in the product saying the invitation had worked.
+    //
+    // A short-lived cookie, matching `da_created_season`: the org URL is copied
+    // and extended by people and tests, so a `?joined=1` hanging off it would
+    // corrupt every one of those — AND the flag has to survive the name gate's
+    // interruption, which a query parameter on the ORIGINAL destination does
+    // not reliably do. The client reads it once and deletes it.
+    (await cookies()).set("da_joined_org", result.orgName, {
+      maxAge: 120,
+      path: "/",
+      sameSite: "lax",
+    });
     redirect(`/org/${result.orgSlug}`);
   }
   redirect("/orgs?invite=invalid");

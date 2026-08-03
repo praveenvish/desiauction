@@ -181,20 +181,44 @@ export function PurseBoard({
   heading = "Purses",
   /** Row testid prefix; spectate keeps its own so its suite is untouched. */
   rowTestIdPrefix = "purse",
+  /**
+   * Restrict the board to these teams. Null (the default) means "every team",
+   * which is what the cockpit and the spectator board want.
+   *
+   * A BIDDER does not get that. Remaining purse and committed spend are the two
+   * numbers a sealed-purse auction seals, and the owner room served every
+   * rival's to anyone with an org_members row. The list is empty-safe: a
+   * participant always has at least their own team in it.
+   */
+  visibleTeamIds = null,
+  /** Said out loud when the board is partial, so it doesn't read as the truth. */
+  note = null,
 }: {
   snapshot: AuctionSnapshot | null;
   teams: TeamIdentity[];
   myPaddleNumber?: string | null;
   heading?: string;
   rowTestIdPrefix?: string;
+  visibleTeamIds?: readonly string[] | null;
+  note?: string | null;
 }) {
   if (snapshot === null) {
     return null;
   }
-  const rows = teamPurseRows(snapshot, teams);
+  const all = teamPurseRows(snapshot, teams);
+  // Filtered AFTER the fold, not before: `teamPurseRows` also appends rows for
+  // paddles whose team is missing from the identity list, and filtering the
+  // input alone would let a rival's purse back in through that arm.
+  const rows =
+    visibleTeamIds === null ? all : all.filter((row) => visibleTeamIds.includes(row.teamId));
   return (
     <Card data-testid="purse-board">
       <h2>{heading}</h2>
+      {note === null ? null : (
+        <p className="competitions-hint" data-testid="purse-board-note">
+          {note}
+        </p>
+      )}
       <ul className="purse-list">
         {rows.map((row) => {
           const spentPct = row.total === 0 ? 0 : (row.committed / row.total) * 100;

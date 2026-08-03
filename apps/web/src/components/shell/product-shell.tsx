@@ -537,7 +537,15 @@ export function ProductShell({
     // The gate is a conversion surface: it keeps the header (an escape hatch
     // back into the site) but not the sitemap footer, and not the two header
     // controls that point at the page you are already reading.
-    const atGate = pathname === "/login";
+    // The invitation landings are gates too, and the most transactional pages
+    // in the product: one card, one decision. They were serving the full
+    // five-column sitemap footer, which at 390px was HALF the page under a
+    // single 300px card. Same compact treatment as /login.
+    const atGate =
+      pathname === "/login" || pathname.startsWith("/join/") || pathname.startsWith("/owner-join/");
+    // …but only /login takes the fill treatment (it is a floodlight surface;
+    // see the login polish note). The invitation cards stay on daylight.
+    const atLoginGate = pathname === "/login";
     return (
       <PublicShell
         wordmark="DesiAuction"
@@ -561,7 +569,7 @@ export function ProductShell({
           )
         }
         footerCompact={atGate}
-        contentFill={atGate}
+        contentFill={atLoginGate}
         // PX-10: the complete public footer (PX-1 01 §3) — only routes that
         // exist (the PX-2 no-dead-links ruling), all shipped in this milestone.
         // Every footer link is a real route (the PX-2 no-dead-links ruling);

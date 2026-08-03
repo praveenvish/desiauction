@@ -467,6 +467,32 @@ export async function logoutAction(): Promise<void> {
   redirect("/login");
 }
 
+/**
+ * Sign out and come BACK to where you were.
+ *
+ * The invitation landings need this: an invite link is a bearer token, and the
+ * person opening it on a shared handset is quite often signed in as somebody
+ * else. "Not you? Sign out" has to return them to the same link afterwards,
+ * which plain `logoutAction` (always /login) cannot do.
+ *
+ * `next` is not trusted: only a same-origin absolute path is honoured, and the
+ * backslash form is rejected too — `\\evil.com` is a protocol-relative URL to
+ * every browser (the open-redirect PX-11 closed).
+ */
+export async function logoutToAction(next: string): Promise<void> {
+  const safe = safeNext(next);
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  if (token !== undefined) {
+    const session = await getSessionByToken(db, token);
+    if (session !== null) {
+      await revokeSession(db, session.sessionId);
+    }
+  }
+  store.delete(SESSION_COOKIE);
+  redirect(safe);
+}
+
 export async function currentSession() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (token === undefined) {
@@ -537,7 +563,13 @@ export async function updateProfileAction(
     // The exit used to be a client effect: render the saved state, run an
     // effect, then router.push("/home") — measured at ~1.9s of the user staring
     // at a finished form. The server already knows where this goes.
-    redirect("/home");
+    //
+    // And it now goes BACK to wherever the name gate interrupted, not always
+    // /home: an owner who accepted an invitation and was stopped for their name
+    // on the way into the auction room belongs in the auction room. The field
+    // is user-controlled, so it goes through the PX-11 allowlist, which folds
+    // anything unexpected (including absent) to /home.
+    redirect(safeNext(formString(formData, "next")));
   }
   return { saved: true, firstTime: isFirstName };
 }

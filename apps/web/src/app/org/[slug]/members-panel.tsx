@@ -105,6 +105,7 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteSet, setInviteSet] = useState("org:staff");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteReference, setInviteReference] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pending, setPending] = useState<Consequence | null>(null);
@@ -138,12 +139,18 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
     });
   }, [query, view.members]);
 
+  /** Live, unused links for the role the dialog is currently set to. */
+  const outstandingForRole = view.pendingInvites.filter(
+    (row) => row.capabilitySet === inviteSet,
+  ).length;
+
   const invite = async () => {
     setBusy(true);
     const result = await createInviteAction(slug, inviteSet);
     setBusy(false);
     if ("url" in result) {
       setCopied(false);
+      setInviteReference(result.reference);
       setInviteUrl(`${window.location.origin}${result.url}`);
     } else {
       toast({ title: result.error, tone: "danger" });
@@ -294,9 +301,27 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
           <ul className="od-pending-list">
             {view.pendingInvites.map((pending) => (
               <li key={pending.id} className="od-pending-row">
+                {/* Twelve rows that read "Joins as Staff · works once · expires
+                    31 Jul 2026" are twelve identical rows. `invites` has no
+                    `created_at` column and this work adds no migration — but
+                    every id here is a ULID, whose first ten characters ARE its
+                    mint time, and the row has always carried who minted it.
+                    Plus a reference echoed beside the URL at mint time, so a row
+                    can be matched to a link that was sent. */}
                 <span className="od-pending-id">
                   <strong>Joins as {INVITE_ROLE_LABEL[pending.capabilitySet] ?? "a member"}</strong>
-                  <span>Works once · expires {grantedLabel(pending.expiresAt) ?? "soon"}</span>
+                  <span>
+                    Ref {pending.reference} · works once · expires{" "}
+                    {grantedLabel(pending.expiresAt) ?? "soon"}
+                  </span>
+                  <span>
+                    {pending.createdByName === null
+                      ? "Minted"
+                      : `Minted by ${pending.createdByName}`}
+                    {pending.createdAt === null
+                      ? ""
+                      : ` · ${grantedLabel(pending.createdAt) ?? ""}`}
+                  </span>
                 </span>
                 <Button
                   size="touch"
@@ -345,6 +370,20 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
           Mint a one-time link and share it yourself — over WhatsApp, however you like. It works
           once and expires in 7 days.
         </p>
+        {/* UNBOUNDED MINTING. Six clicks produced six live 192-bit credentials
+            with nothing said about the five already outstanding. There is no
+            rate limit behind this button and adding one is a separate decision;
+            what the dialog can do — and never did — is tell the truth about
+            what is already live for the role being minted. */}
+        {outstandingForRole > 0 ? (
+          <p className="od-invite-lead" role="status" data-testid="invite-outstanding">
+            You already have {outstandingForRole} unused {INVITE_ROLE_LABEL[inviteSet] ?? inviteSet}{" "}
+            link
+            {outstandingForRole === 1 ? "" : "s"} waiting to be used. Each one is a live key to this
+            organization — send an existing link rather than minting another, or revoke the ones you
+            no longer need.
+          </p>
+        ) : null}
         <Select
           label="They join as"
           help={INVITE_ROLE_HELP[inviteSet]}
@@ -374,7 +413,10 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
               {inviteUrl}
             </span>
             <div className="od-invite-actions">
-              <span className="od-invite-note">Copy it now — it&apos;s shown once.</span>
+              <span className="od-invite-note">
+                Copy it now — it&apos;s shown once.
+                {inviteReference === null ? "" : ` Ref ${inviteReference}.`}
+              </span>
               <Button
                 size="touch"
                 variant="secondary"

@@ -10,8 +10,10 @@ import {
   resolveKeyDown,
   resolveKeyUp,
 } from "../../../../../components/auction/cockpit-keys";
+import { formatDateTime } from "../../../../../lib/format-date";
+import { formatPhone } from "../../../../../lib/format-phone";
 import { GavelButton, type GavelHandle } from "./gavel-button";
-import type { CockpitView } from "../../../../../server/auction/conduct-actions";
+import type { CockpitView, OwnerAcceptance } from "../../../../../server/auction/conduct-actions";
 import { grantPaddleAction, inviteOwnerAction } from "../../../../../server/auction/owner-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
 import { PageStatus } from "../../../../../components/shell/page-status";
@@ -33,6 +35,24 @@ function commandId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * "Priya Sharma · +91 93301 00281 · accepted 28 Jul 2026, 7:12 pm".
+ *
+ * An owner invitation is an unaddressed bearer token: the organizer cannot know
+ * in advance who will use it, so the least the product can do is say who DID.
+ * The panel previously showed a name or the literal word "Owner", and never a
+ * phone number anywhere.
+ */
+function describeAcceptor(who: OwnerAcceptance): string {
+  return [
+    who.name ?? "Unnamed account",
+    formatPhone(who.phone),
+    who.acceptedAt === null ? null : `accepted ${formatDateTime(who.acceptedAt)}`,
+  ]
+    .filter((part) => part !== null)
+    .join(" · ");
+}
+
 export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }) {
   const router = useRouter();
   const toast = useToast();
@@ -52,6 +72,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const busy = pending !== null;
   const [inviteTeam, setInviteTeam] = useState("");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
@@ -159,6 +180,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     const result = await inviteOwnerAction(slug, inviteTeam);
     setPending(null);
     if (result.ok) {
+      setInviteCopied(false);
       setInviteUrl(`${window.location.origin}${result.joinPath}`);
       toast({ title: "Owner invitation minted — forward the link.", tone: "success" });
       router.refresh();
@@ -166,6 +188,28 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       toast({ title: result.error, tone: "danger" });
     }
   };
+
+  /**
+   * The owner URL had no copy control at all: a 32-character base64url token
+   * had to be selected by hand off a wrapping mono line and pasted into
+   * WhatsApp. Every other minted secret in the product (the org invite dialog)
+   * has had a copy button for milestones.
+   */
+  const copyInvite = async () => {
+    if (inviteUrl === null) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopied(true);
+    } catch {
+      toast({ title: "Couldn't copy — select the link and copy it by hand.", tone: "danger" });
+    }
+  };
+
+  /** Who accepted a given invitation — name, phone and when (see CockpitView). */
+  const acceptanceOf = (inviteId: string) =>
+    view.ownerAcceptances.find((row) => row.inviteId === inviteId);
 
   const grant = async (teamId: string, personId: string) => {
     setPending(`grant-${teamId}`);
@@ -625,6 +669,17 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             <p className="competitions-hint">
               Invitation → acceptance → grant → claim. No active paddle without an explicit grant.
             </p>
+            {/* P0-2, said where an organizer would look for the control that
+                does not exist. `auction_owner_invites.revoked_at` is READ in six
+                places and WRITTEN in none: there is no RevokeOwnerInvite command
+                in AUCTION_EVENT_TYPES, no engine handler and no control. Both
+                live in fenced packages, so this milestone states the gap rather
+                than papering over it. */}
+            <p className="competitions-hint" data-testid="owner-invite-irrevocable">
+              <strong>An owner link cannot be withdrawn once you send it.</strong> There is no
+              revoke for owner invitations today — anyone holding the link can accept it, and it
+              stays usable until it expires 7 days after minting. Check the number before you send.
+            </p>
             <div className="date-row">
               <Select
                 label="Team"
@@ -644,59 +699,128 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               <Button
                 onClick={() => void invite()}
                 loading={pending === "invite"}
-                disabled={inviteTeam === ""}
+                /* `finished` joins the derived blocked states. The control was
+                   offered on a completed auction and failed on click with
+                   "This auction has ended." — the panel already derived
+                   !auctionExists and !canConduct, and simply never asked the
+                   auction what state it was in. */
+                disabled={inviteTeam === "" || finished}
                 data-testid="invite-owner"
               >
                 Invite owner
               </Button>
             </div>
-            {inviteUrl !== null ? (
-              <p className="owner-url" data-testid="owner-invite-url">
-                {inviteUrl}
+            {finished ? (
+              <p className="competitions-hint" data-testid="invite-owner-blocked">
+                This auction has ended — there is no owner left to invite.
               </p>
+            ) : null}
+            {inviteUrl !== null ? (
+              <div className="owner-invite-result" data-testid="owner-invite-result">
+                {/* `owner-url` sets `font-variant-ligatures: none`: base64url
+                    tokens contain `-`, and the mono face was ligating `--` into
+                    one long dash. Roughly one token in 125 displayed wrongly,
+                    and this string is copied by hand. */}
+                <span className="owner-url" data-testid="owner-invite-url">
+                  {inviteUrl}
+                </span>
+                <div className="owner-invite-actions">
+                  <Button
+                    size="touch"
+                    variant="secondary"
+                    onClick={() => void copyInvite()}
+                    data-testid="copy-owner-invite"
+                  >
+                    {inviteCopied ? "Copied" : "Copy link"}
+                  </Button>
+                  <span className="competitions-hint">
+                    Send it yourself — the platform sends nothing. It works once and cannot be
+                    withdrawn.
+                  </span>
+                </div>
+              </div>
             ) : null}
 
             {view.owners.invites.length > 0 ? (
               <div data-testid="owner-invites">
-                {view.owners.invites.map((entry) => (
-                  <div key={entry.id} className="owner-row" data-testid={`invite-row-${entry.id}`}>
-                    <Badge
-                      tone={
-                        entry.acceptedBy !== null ? "success" : entry.expired ? "danger" : "info"
-                      }
+                {view.owners.invites.map((entry) => {
+                  const who = acceptanceOf(entry.id);
+                  return (
+                    <div
+                      key={entry.id}
+                      className="owner-row"
+                      data-testid={`invite-row-${entry.id}`}
                     >
-                      {entry.acceptedBy !== null
-                        ? "accepted"
-                        : entry.expired
-                          ? "expired"
-                          : "pending"}
-                    </Badge>
-                    <span className="registration-name">{entry.teamName}</span>
-                    {entry.acceptedByName !== null ? (
-                      <span className="competitions-hint">{entry.acceptedByName}</span>
-                    ) : null}
-                  </div>
-                ))}
+                      <Badge
+                        tone={
+                          entry.acceptedBy !== null ? "success" : entry.expired ? "danger" : "info"
+                        }
+                      >
+                        {entry.acceptedBy !== null
+                          ? "accepted"
+                          : entry.expired
+                            ? "expired"
+                            : "pending"}
+                      </Badge>
+                      <span className="registration-name">{entry.teamName}</span>
+                      {who === undefined ? null : (
+                        <span className="competitions-hint">{describeAcceptor(who)}</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
 
             {grantable.length > 0 ? (
               <>
                 <h2>Ready to grant</h2>
-                {grantable.map((entry) => (
-                  <div key={entry.id} className="owner-row" data-testid={`grantable-${entry.id}`}>
-                    <span className="registration-name">{entry.acceptedByName ?? "Owner"}</span>
-                    <span className="competitions-hint">{entry.teamName}</span>
-                    <Button
-                      size="sm"
-                      onClick={() => void grant(entry.teamId, entry.acceptedBy ?? "")}
-                      loading={pending === `grant-${entry.teamId}`}
-                      data-testid={`grant-${entry.teamId}`}
-                    >
-                      Grant paddle
-                    </Button>
-                  </div>
-                ))}
+                {/* THE MOMENT MONEY AUTHORITY CHANGES HANDS. This list used to
+                    read "Owner" — the literal fallback string — for any account
+                    without a name, with no phone anywhere, so two rows for the
+                    same team (a legitimate owner and a stranger who opened a
+                    forwarded link) were indistinguishable. */}
+                {grantable.map((entry) => {
+                  const who = acceptanceOf(entry.id);
+                  return (
+                    <div key={entry.id} className="owner-row" data-testid={`grantable-${entry.id}`}>
+                      <span className="registration-name">
+                        {who?.name ?? "Unnamed account"}
+                        {who === undefined ? null : (
+                          <span
+                            className="registration-phone"
+                            data-testid={`grantable-phone-${entry.id}`}
+                          >
+                            {formatPhone(who.phone)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="competitions-hint">
+                        {entry.teamName}
+                        {who?.acceptedAt == null
+                          ? ""
+                          : ` · accepted ${formatDateTime(who.acceptedAt)}`}
+                        {who !== undefined && !who.stillMember
+                          ? " · REMOVED from this organization"
+                          : ""}
+                      </span>
+                      <Button
+                        size="sm"
+                        onClick={() => void grant(entry.teamId, entry.acceptedBy ?? "")}
+                        loading={pending === `grant-${entry.teamId}`}
+                        /* Offboarded. `removeMember` cannot withdraw an auction
+                           acceptance (no command exists), so the row survives —
+                           but handing a paddle and a purse to somebody who has
+                           been removed from the club is not a click to leave
+                           enabled. */
+                        disabled={who !== undefined && !who.stillMember}
+                        data-testid={`grant-${entry.teamId}`}
+                      >
+                        Grant paddle
+                      </Button>
+                    </div>
+                  );
+                })}
               </>
             ) : null}
 

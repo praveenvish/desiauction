@@ -15,7 +15,11 @@ const C = {
   heading: "#E8EEF9",
   secondary: "#9FB0CC",
   muted: "#7285A6",
-  accent: "#CDF53C",
+  // The product accent is gold. This was still the pre-redesign lime, and every
+  // other token in this file matches ui/generated/floodlight.css exactly — so
+  // the most-duplicated pixel in the product, the one on every link preview in
+  // every WhatsApp group, was the one showing the wrong brand.
+  accent: "#E6B24A",
   onAccent: "#070A0F",
   open: "#3DD68C",
 } as const;

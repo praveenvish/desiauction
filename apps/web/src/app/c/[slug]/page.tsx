@@ -33,7 +33,8 @@ export async function generateMetadata({
     title: `${view.name} · DesiAuction`,
     description,
     alternates: { canonical: url },
-    // Unlisted-but-open pages work by link; only published pages invite indexing.
+    // This view only exists for a published competition, so `listed` is always
+    // true here; the test stays as the statement of WHY the page is indexable.
     robots: view.listed ? { index: true, follow: true } : { index: false, follow: false },
     openGraph: { title: view.name, description, url, type: "website", siteName: "DesiAuction" },
     // The `opengraph-image` / `twitter-image` routes inject the card image; the

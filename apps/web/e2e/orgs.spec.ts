@@ -7,6 +7,8 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 const STAMP = String(Date.now()).slice(-8);
 const PHONE_A = `93${STAMP}`;
 const PHONE_B = `94${STAMP}`;
+/** A stranger holding a forwarded link — the replay that must stay refused. */
+const PHONE_C = `95${STAMP}`;
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   if (!page.url().includes("/login")) {
@@ -93,11 +95,22 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
   await confirm.getByTestId("confirm-member-change").click();
   await expect(members.locator('[data-role="staff"]')).toHaveCount(0);
 
-  // Replay: the invite link is one-time — dead for anyone now.
+  // Replay by SOMEBODY ELSE: the link is one-time — dead, and the refusal is
+  // the same sentence unknown, expired and revoked tokens get.
   await inSecondBrowser(browser, async (pageC) => {
     await pageC.goto(inviteUrl ?? "");
-    await otpLogin(pageC, PHONE_B);
+    await otpLogin(pageC, PHONE_C);
     await expect(pageC.getByText("no longer valid")).toBeVisible();
+  });
+
+  // Replay by ITS OWN ACCEPTOR — the single most likely repeat interaction on
+  // this route, because the message is still in their WhatsApp. They are a
+  // member, the product knows it, and it used to tell them the opposite.
+  await inSecondBrowser(browser, async (pageB) => {
+    await pageB.goto(inviteUrl ?? "");
+    await otpLogin(pageB, PHONE_B);
+    await expect(pageB.getByTestId("join-already-member")).toContainText(`MPL ${STAMP}`);
+    await expect(pageB.getByText("no longer valid")).toHaveCount(0);
   });
 
   // ISOLATION: B creates their own org; A cannot reach it — 404, not 403.

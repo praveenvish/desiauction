@@ -25,6 +25,7 @@ import { CreateCompetitionForm } from "../../seasons/create-competition-form";
 import { CreateTournamentForm } from "../../tournaments/create-tournament-form";
 import { TournamentAccordion, type AccordionGroup } from "../../tournaments/tournament-accordion";
 import { FinanceAuthorityPanel } from "./finance-authority";
+import { JoinedToast } from "./joined-toast";
 import { MembersPanel } from "./members-panel";
 import { MoneyAuthorityPanel } from "./money-authority";
 import "../../orgs/orgs.css";
@@ -535,6 +536,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
 
   return (
     <ToastProvider>
+      {/* "You've joined X" — the confirmation acceptance never gave. */}
+      <JoinedToast />
       <main className="org-detail">
         {/* The org's name IS the shell's h1, one row up and sticky — the hero
             keeps the identity that only it can show: mark, role, age, handle. */}

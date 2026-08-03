@@ -963,8 +963,51 @@
   font-variant-numeric: tabular-nums;
 }
 
-.squads-toolbar {
+/* .squads-toolbar held the anonymous "Download squads (CSV)" button and has no
+   markup left to style — see squads-view.tsx. */
+
+/* --- Share control on the public player page ---
+   Same shape as the organizer's .share-reg (seasons.css) but scoped to the
+   public surface: this page must not pull in the app-shell stylesheet for one
+   control. min-width is 180px, not 220px — this sits inside .mk-container at
+   320px, where 220 forces the row past the viewport. */
+.public-share {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.public-share-label {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.public-share-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.public-share-input {
+  flex: 1;
+  min-width: 180px;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-family: var(--font-mono, monospace);
+}
+
+.public-share-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

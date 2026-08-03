@@ -8,9 +8,14 @@
   padding: var(--space-2) var(--space-6) var(--space-10);
 }
 
-/* /join is a PUBLIC surface with no identity bar above it. */
+/* /join is a PUBLIC surface with no identity bar above it.
+
+   `min-height: 100vh` used to sit here, on a route whose entire content is one
+   ~300px card. It pushed the footer a full viewport down and left ~700px of
+   empty surface between the decision and the page's end — the card floated in
+   the middle of nothing at 390px. The route is one card; it is now as tall as
+   one card. */
 .join {
-  min-height: 100vh;
   background: var(--surface);
   color: var(--text-primary);
   font-family: var(--font-text);

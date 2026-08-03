@@ -115,6 +115,35 @@
   margin: 0;
 }
 
+/* The player's own public page, shown to them on the approved status card. */
+.register-public {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  margin-bottom: var(--space-3);
+}
+
+.register-public-head {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-primary);
+}
+
+/* A URL, so it wraps at the slashes on a 320px screen instead of pushing the
+   card sideways. */
+.register-public-url {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .register-error {
   color: var(--danger-strong);
   font-size: var(--text-sm-size);
@@ -133,4 +162,58 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* The publication disclosure, at the moment of submission. Given a surface of
+   its own rather than another grey hint, because it is the one paragraph on
+   this screen that changes what a person would decide. */
+.register-consent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.register-consent-head {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-primary);
+}
+
+.register-consent-line {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.register-consent-line strong {
+  color: var(--text-primary);
+}
+
+/* Sits immediately above the Submit row. The 44px min-height keeps the whole
+   label — not just the 16px box — inside the platform's touch target. */
+.register-consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.register-consent-check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }

@@ -102,12 +102,23 @@ export function SquadBoard({
   resolved,
   snapshot,
   squadMax,
+  /**
+   * Whether the "N left" purse line may be shown per squad.
+   *
+   * A bidder gets their OWN. The cockpit and the spectator board get them all,
+   * exactly as before. This is the same seal as the purse board: a squad card
+   * quietly carried a second copy of every rival's remaining money.
+   */
+  showPurse = true,
+  note = null,
 }: {
   teams: TeamIdentity[];
   preSigned: PreSignedPlayer[];
   resolved: ResolvedLot[];
   snapshot: AuctionSnapshot | null;
   squadMax: number;
+  showPurse?: boolean;
+  note?: string | null;
 }) {
   const squads = squadsOf(teams, preSigned, resolved);
   const purseByTeam = new Map(
@@ -123,6 +134,11 @@ export function SquadBoard({
           Icons and retained players joined before the auction — they were never bid on.
         </span>
       </div>
+      {note === null ? null : (
+        <p className="competitions-hint" data-testid="squad-board-note">
+          {note}
+        </p>
+      )}
       <div className="squad-grid">
         {squads.map(({ team, members }) => {
           const remaining = purseByTeam.get(team.id);
@@ -135,7 +151,7 @@ export function SquadBoard({
                   {members.length}/{squadMax}
                 </span>
               </div>
-              {remaining !== undefined ? (
+              {showPurse && remaining !== undefined ? (
                 <p className="squad-team-purse">{formatPaiseINR(paise(remaining))} left</p>
               ) : null}
               {members.length === 0 ? (

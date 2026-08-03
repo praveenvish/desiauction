@@ -117,13 +117,30 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       // privacy policy that omits the one place personal data becomes public is
       // the wrong document to be silent in.
       { kind: "heading", level: 2, text: "What becomes public" },
+      // This sentence was FALSE when it was written. A season was also published
+      // by `status = 'registration_open'` — an operational click with no publish
+      // dialog — so nineteen seasons their organizers had marked private were
+      // serving complete rosters. The gate is now visibility and nothing else
+      // (server/competition/public.ts), which is what makes the first sentence
+      // below true; the code change landed first, deliberately, so the policy
+      // was never the thing out in front. The rest names every surface, because
+      // "the season's page" was not the whole disclosure either — the profile
+      // pages, the preview cards and a bulk export were all part of it.
       {
         kind: "paragraph",
-        text: "A season is private until its organizer publishes it. When they do, the season's page becomes public and each approved player gets their own page carrying their name, registration number, playing role, age and playing styles where given, their photo if they uploaded one, and which team signed them. These pages are built to be shared as links and carry a preview card; they are marked not to be indexed by search engines.",
+        text: "A season is private until its organizer publishes it. Publishing is a single, deliberate decision they make on the season itself — nothing else does it, and opening registration does not. Until they publish, none of the pages below exist for anyone outside the organizing team, and the season's address returns the same not-found page as an address that was never created.",
       },
       {
         kind: "paragraph",
-        text: "Your mobile number is never published, on any page, whether or not a season is published. If you do not want your details published, tell your organizer before they publish the season — publication is their decision, on their tournament.",
+        text: "When they publish, four things become readable by anyone with the link, with no account and no sign-in: the season's own page, listing the approved player pool, the teams and their squads, and any fixtures published; a page of their own for each approved player, carrying their name, registration number, playing role, age where a date of birth was given, playing styles where given, their photo if they uploaded one, and which team signed them; a preview card generated for each of those pages, so a name and a playing role travel with the link into a messaging app; and the live auction, the venue board and the broadcast overlay while the auction is running.",
+      },
+      {
+        kind: "paragraph",
+        text: "Player pages are marked not to be indexed by search engines, so they do not turn up in web searches — they are built to be shared as links, not found by strangers. Nobody can download the player pool as a file from a public page. Organizers can export the registrations for their own season, and every export is recorded against the person who took it.",
+      },
+      {
+        kind: "paragraph",
+        text: "Your mobile number is never published, on any page, whether or not a season is published. Publication is the organizer's decision on their tournament, so tell them before they publish if you do not want your details public — but you do not have to rely on that: withdrawing your registration, from the season's registration page, removes you from the player pool and takes your player page and its preview card down with it.",
       },
       { kind: "heading", level: 2, text: "Who processes it" },
       {

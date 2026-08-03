@@ -684,6 +684,7 @@ function RosterDetail({
                 ownerName={team.ownerName}
                 canConduct={view.viewer.canConduct}
                 auctionExists={view.rulesSource !== null}
+                auctionFinished={view.rulesSource?.finished ?? false}
               />
             </div>
           </div>
@@ -793,15 +794,19 @@ function OwnerInvite({
   ownerName,
   canConduct,
   auctionExists,
+  auctionFinished,
 }: {
   slug: string;
   teamId: string;
   ownerName: string | null;
   canConduct: boolean;
   auctionExists: boolean;
+  /** completed / reconciled / abandoned — the night is over. */
+  auctionFinished: boolean;
 }) {
   const toast = useToast();
   const [url, setUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [minting, startMinting] = useTransition();
 
   if (!auctionExists) {
@@ -820,10 +825,27 @@ function OwnerInvite({
       </p>
     );
   }
+  // The panel derived blocked states for `!auctionExists` and `!canConduct` and
+  // never asked what STATE the auction was in — so "Invite owner" was offered
+  // on a completed auction and failed on click with "This auction has ended."
+  if (auctionFinished) {
+    return (
+      <p className="teams-notice" data-testid="owner-invite-blocked">
+        This auction has ended — owner invitations are closed for this season.
+      </p>
+    );
+  }
   return (
     <div className="teams-settings-forms" data-testid="owner-invite">
       <p className="teams-form-label">
         {ownerName !== null ? `Owner · ${ownerName}` : "This team has no owner yet."}
+      </p>
+      {/* Stated where the organizer is about to act, not only in the help
+          centre: there is no RevokeOwnerInvite command anywhere in the product
+          (see the cockpit's Owners & paddles panel for the full note). */}
+      <p className="teams-notice" data-testid="teams-owner-irrevocable">
+        An owner link works once, expires in 7 days, and{" "}
+        <strong>cannot be withdrawn once sent</strong> — anyone holding it can accept it.
       </p>
       <Button
         variant="secondary"
@@ -836,6 +858,7 @@ function OwnerInvite({
               toast({ tone: "danger", title: result.error });
               return;
             }
+            setCopied(false);
             setUrl(`${window.location.origin}${result.joinPath}`);
             toast({ tone: "success", title: "Invitation link ready — send it to the owner." });
           });
@@ -844,9 +867,36 @@ function OwnerInvite({
         {ownerName !== null ? "Invite another owner" : "Invite owner"}
       </Button>
       {url !== null ? (
-        <p className="teams-invite-url" data-testid="teams-owner-invite-url">
-          {url}
-        </p>
+        <>
+          {/* The testid stays on the URL ALONE — it is read as text by the
+              suites, which then navigate to it. */}
+          <p className="teams-invite-url" data-testid="teams-owner-invite-url">
+            {url}
+          </p>
+          <div className="teams-invite-actions">
+            <Button
+              size="touch"
+              variant="secondary"
+              data-testid="copy-teams-owner-invite"
+              onClick={() => {
+                void navigator.clipboard.writeText(url).then(
+                  () => {
+                    setCopied(true);
+                  },
+                  () => {
+                    toast({
+                      tone: "danger",
+                      title: "Couldn't copy — select the link and copy it by hand.",
+                    });
+                  },
+                );
+              }}
+            >
+              {copied ? "Copied" : "Copy link"}
+            </Button>
+            <span className="teams-notice">Send it yourself — the platform sends nothing.</span>
+          </div>
+        </>
       ) : null}
     </div>
   );

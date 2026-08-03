@@ -188,6 +188,11 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
 
   const lot = snapshot?.currentLot ?? null;
   const grantedTeams = view.teams.filter((team) => view.myGrantTeamIds.includes(team.id));
+  // The squad board's row universe. A conductor keeps every franchise; a bidder
+  // gets their own — see `viewer.canSeeAllSquads`.
+  const boardTeams = view.viewer.canSeeAllSquads
+    ? view.teams
+    : view.teams.filter((team) => view.myTeamIds.includes(team.id));
   const myTeam = view.teams.find((team) => team.id === myPaddle?.teamId);
   // The ring measures against the window the lot is actually running: an
   // extended lot restarts on the anti-snipe clock, not the opening one.
@@ -322,21 +327,38 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             />
           ) : null}
           {snapshot !== null ? <AuctionProgress snapshot={snapshot} /> : null}
+          {/* THE SEAL. A bidder sees their own purse and committed spend, the
+              lot on the block and the public bid feed — not every rival's
+              remaining money. Decided on the server (`viewer.canSeeAllPurses`)
+              and obeyed here; the conductor's board is unchanged. */}
           <PurseBoard
             snapshot={snapshot}
             teams={view.teams}
             myPaddleNumber={myPaddle?.paddleNumber ?? null}
+            visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
+            heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
+            note={
+              view.viewer.canSeeAllPurses
+                ? null
+                : "Rivals' remaining purses are sealed — you see your own."
+            }
           />
           <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={view.preSigned} />
         </div>
       </div>
 
       <SquadBoard
-        teams={view.teams}
+        teams={boardTeams}
         preSigned={view.preSigned}
         resolved={feed.resolved}
         snapshot={snapshot}
         squadMax={view.rules.squadMax}
+        showPurse={view.viewer.canSeeAllPurses}
+        note={
+          view.viewer.canSeeAllSquads
+            ? null
+            : "Your squad. Every sale is called out in the room and appears in the bid feed."
+        }
       />
 
       {/* The claim door. Once a paddle is held, PaddleControl above owns the
@@ -405,9 +427,15 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             </Button>
           </div>
         ) : (
+          /* DERIVED, not asserted. This told a freshly-accepted owner to
+             "accept your owner invitation" — the act they had just completed to
+             get to this page. They are in this room precisely BECAUSE they
+             accepted (`myTeamIds` is non-empty for anyone who did), so the only
+             thing left to say is the one thing they can't do themselves. */
           <p className="competitions-hint" data-testid="no-grant-hint">
-            No paddle grant yet — accept your owner invitation and ask the organizer to grant your
-            paddle.
+            {view.myTeamIds.length > 0
+              ? "You're the owner — but a paddle is a separate step. Ask the organizer to grant your paddle; you'll be able to claim it here the moment they do."
+              : "No paddle grant yet — ask the organizer to grant your paddle."}
           </p>
         )}
         {snapshot !== null ? (

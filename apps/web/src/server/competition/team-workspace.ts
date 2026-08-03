@@ -100,7 +100,19 @@ export interface TeamsWorkspace {
    * Where the purse and squad rules were set, so the figure has a provenance
    * the screen can link to. Null before an auction exists.
    */
-  rulesSource: { auctionExists: boolean; locked: boolean } | null;
+  rulesSource: {
+    auctionExists: boolean;
+    locked: boolean;
+    /**
+     * The night is over (completed / reconciled / abandoned).
+     *
+     * The Teams tab derived "no auction" and "not allowed" and never asked what
+     * STATE the auction was in, so it kept offering "Invite owner" after
+     * settlement — the click then failed with the engine's "This auction has
+     * ended." A blocked state, derived like the other two.
+     */
+    finished: boolean;
+  } | null;
 }
 
 export async function teamsWorkspace(
@@ -254,6 +266,13 @@ export async function teamsWorkspace(
     rulesSource:
       auction === undefined
         ? null
-        : { auctionExists: true, locked: auction.status !== "scheduled" },
+        : {
+            auctionExists: true,
+            locked: auction.status !== "scheduled",
+            finished:
+              auction.status === "completed" ||
+              auction.status === "reconciled" ||
+              auction.status === "abandoned",
+          },
   };
 }

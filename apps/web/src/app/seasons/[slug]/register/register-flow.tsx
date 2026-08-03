@@ -94,6 +94,10 @@ export function RegisterFlow({
   const [step, setStep] = useState<Step>(nameDone ? "role" : "profile");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Deliberately NOT part of the device-local draft: consent is an act at the
+  // moment of submission, not a preference restored from localStorage on a
+  // machine the person may not be sitting at.
+  const [consented, setConsented] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const [restored, setRestored] = useState(false);
@@ -144,6 +148,12 @@ export function RegisterFlow({
 
   const submit = () => {
     setError(null);
+    if (!consented) {
+      setError(
+        "Please tick the box above to confirm you understand what becomes public before you submit.",
+      );
+      return;
+    }
     startTransition(async () => {
       const formData = new FormData();
       formData.set("role", role);
@@ -230,7 +240,7 @@ export function RegisterFlow({
             autoComplete="name"
             defaultValue={name}
             placeholder="Rohan Kulkarni"
-            help="Appears on the team sheet and the auction stage."
+            help="Published on this season's public page and on a player page of your own once the organizer publishes the season."
             {...(error !== null ? { error } : {})}
           />
           <Button type="submit" loading={pending}>
@@ -259,6 +269,19 @@ export function RegisterFlow({
               </option>
             ))}
           </Select>
+          {/* TODO(founder): this field accepts a date of birth from a minor
+              with no gate, no guardian step and no differential treatment, and
+              the derived age is then published on a public player page and on
+              the share card that goes into a WhatsApp group. Nothing in
+              apps/web or packages/core mentions a guardian, a minor or parental
+              consent — the concept does not exist in this product. Needs a
+              founder decision with legal advice, not an engineering guess:
+              whether anything at all may be published about an under-18
+              registrant, under what consent mechanism, how a guardian is
+              verified, whether age should be published for ANY registrant, and
+              whether profiles expire after the tournament. Deliberately not
+              decided here; the disclosure below is made honest for everyone in
+              the meantime. */}
           <Field
             label="Date of birth (optional)"
             name="dateOfBirth"
@@ -268,7 +291,7 @@ export function RegisterFlow({
               setDob(event.target.value);
               saveDraft({ dob: event.target.value });
             }}
-            help="Shows your age on the player card. Only your age is shown, never the date."
+            help="Your AGE is published on your public player card and on shared link previews — the date itself never is. Leave this blank and no age is shown."
           />
           <Select
             label="Batting style (optional)"
@@ -377,12 +400,74 @@ export function RegisterFlow({
               the season is shared. You can remove it any time and it disappears from all of them.
             </p>
           </div>
-          <p className="competitions-hint" data-testid="register-privacy">
-            What the organizer of {competitionName} receives: your name, your mobile number, your
-            playing role and anything optional you filled in above. It is used to run this season —
-            to reach you about it and to put you in the auction. You can withdraw your registration
-            from this page at any time.
-          </p>
+          {/* This said "What the organizer of {name} RECEIVES: your name, your
+              mobile number, your playing role and anything optional you filled
+              in above." Receives. A reasonable person reads that as "this goes
+              to the club" — and then nine of those fields are published on the
+              open internet, of which exactly one, the photo, was disclosed as
+              public. The paragraph above about the photo is what a real
+              disclosure reads like ("Where the photo goes is not a detail — it
+              goes on public pages"); this is the rest of the form held to that
+              same standard. The split is the point: one line for what stays
+              private, one for what does not. */}
+          <div className="register-consent" data-testid="register-privacy">
+            {/* h2, not h3: the only heading above this on the page is the h1,
+                and the review step renders no h2 of its own — an h3 here skips
+                a level and axe fails `heading-order`. */}
+            <h2 className="register-consent-head">Before you submit: what becomes public</h2>
+            <p className="register-consent-line">
+              <strong>Your mobile number stays private.</strong> It goes to the organizer of{" "}
+              {competitionName} so they can reach you about this season, and it is published on no
+              page, ever — not on the season page, not on your player page, not on a shared link.
+            </p>
+            <p className="register-consent-line">
+              <strong>Everything else here is published</strong> once the organizer publishes this
+              season: your name, your registration number, your playing role, your age if you gave a
+              date of birth, your batting and bowling styles if you gave them, your photo if you add
+              one, and later which team signs you. Anyone with the link can read it — no account, no
+              sign-in.
+            </p>
+            <p className="register-consent-line">
+              It appears in two places: this season&apos;s public player list, and a page of your
+              own at a web address you can share. Both produce a preview card carrying your name and
+              role when the link is pasted into WhatsApp or posted anywhere else. Player pages are
+              marked not to be indexed by search engines, so they do not turn up in web searches.
+            </p>
+            <p className="register-consent-line">
+              You can withdraw your registration from this page at any time, which takes both pages
+              down. Full detail:{" "}
+              <a href="/legal/privacy" target="_blank" rel="noreferrer">
+                Privacy policy
+              </a>{" "}
+              ·{" "}
+              <a href="/help/whats-public" target="_blank" rel="noreferrer">
+                What&apos;s public about you
+              </a>
+              .
+            </p>
+          </div>
+          {/* An affirmative act, adjacent to Submit — not a paragraph above the
+              fold-break that a thumb scrolls past. Submit stays ENABLED and
+              refuses out loud: a greyed-out button with no spoken reason is the
+              same silence this whole block exists to end. */}
+          <label className="register-consent-check" htmlFor="register-consent-box">
+            <input
+              id="register-consent-box"
+              type="checkbox"
+              checked={consented}
+              data-testid="register-consent"
+              onChange={(event) => {
+                setConsented(event.target.checked);
+                if (event.target.checked) {
+                  setError(null);
+                }
+              }}
+            />
+            <span>
+              I understand that my name, playing role and the other details above will be published
+              on public pages anyone with the link can read, and that my mobile number will not.
+            </span>
+          </label>
           {error !== null ? (
             <p role="alert" className="register-error">
               {error}
