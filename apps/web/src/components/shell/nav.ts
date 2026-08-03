@@ -165,9 +165,13 @@ export const PUBLIC_DESTINATIONS: readonly {
   },
   {
     key: "help-finops",
-    label: "Help — receipts, invoices and exports",
+    label: "Help — receipts and your document register",
     href: "/help/receipts-and-exports",
-    keywords: "finance financial operations receipt invoice tally export books",
+    // "invoice", "tally" and "export" stay in the keywords deliberately: people
+    // WILL search for them, and the topic now answers those searches honestly
+    // by naming them under "What isn't here yet". Dropping the keywords would
+    // send that reader to an empty result instead of a straight answer.
+    keywords: "finance financial operations receipt invoice tally export books register seal",
   },
   {
     key: "help-settlement",

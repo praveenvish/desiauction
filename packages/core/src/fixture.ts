@@ -183,6 +183,23 @@ export interface RoundRobinPairing {
  * the order; identical inputs → identical pairings). Odd team counts get a bye.
  * Each pair meets exactly once per leg; `rounds: 2` replays every pairing with
  * home/away swapped. No randomness anywhere.
+ *
+ * HOME ADVANTAGE. The seat rule below balances home and away as evenly as the
+ * parity of the fixture count allows — max imbalance 1, for every team, at every
+ * size (asserted for N = 2..16 in the tests). Two facts make it work:
+ *
+ *   - a rotating team occupies every seat 1..n-1 exactly once across a leg, so
+ *     "the earlier seat is home" hands it half-1 homes and half-1 aways, plus
+ *     the one round it spends in seat n-1 facing the fixed seat;
+ *   - that last fixture is the only free choice left, so it alternates on round
+ *     parity — which also splits the FIXED seat's own leg evenly.
+ *
+ * The previous rule keyed home on `(r + i)` parity. In the circle method a
+ * rotating team's seat advances in lockstep with the round, so `r + i` held
+ * constant parity for that team and the alternation never fired: one team took
+ * every one of its fixtures away (0 home in 15, at 16 teams). Double round
+ * robin hid it because leg 2 mirrors leg 1 and the two legs cancel — which is
+ * exactly why leg 2 is still a pure mirror here.
  */
 export function roundRobinPairings(teamIds: readonly string[], rounds: 1 | 2): RoundRobinPairing[] {
   const circle: (string | null)[] = [...teamIds];
@@ -204,8 +221,10 @@ export function roundRobinPairings(teamIds: readonly string[], rounds: 1 | 2): R
         if (a === null || b === null) {
           continue; // bye
         }
-        // Alternate home advantage deterministically; leg 2 swaps every pairing.
-        const homeFirst = (r + i) % 2 === 0 ? leg === 0 : leg === 1;
+        // The earlier seat hosts; the fixed seat's own fixture alternates on
+        // round parity. Leg 2 mirrors leg 1, so a double robin stays perfect.
+        const seatHosts = i === 0 ? r % 2 === 0 : true;
+        const homeFirst = leg === 0 ? seatHosts : !seatHosts;
         pairings.push({
           round,
           match,
@@ -325,10 +344,17 @@ export function planRoundRobin(input: GeneratePlanInput): GeneratePlanResult {
 // Structural, deterministic, no heuristics. Future Auction scheduling and Match
 // Operations consume THIS engine — scheduling logic exists nowhere else.
 
+/**
+ * There is deliberately no "venue overlap" here. Two grounds at one venue
+ * hosting simultaneous matches is the entire reason a venue has two grounds —
+ * flagging it made the generator's own output (from the grounds the UI offered)
+ * arrive pre-loaded with 120 conflicts at 240 fixtures, and taught organizers to
+ * ignore the panel. The same ground twice over is `ground_double_booking`, which
+ * is a real, blocking invariant.
+ */
 export type ConflictType =
   | "team_double_booking"
   | "ground_double_booking"
-  | "venue_overlap"
   | "invalid_duration"
   | "invalid_kickoff"
   | "duplicate_fixture"
@@ -337,15 +363,14 @@ export type ConflictType =
 /**
  * blocking = violates a permanent invariant (simultaneous team/ground, dates
  * outside the competition, malformed schedule data) — the aggregate refuses it.
- * warning = structurally suspicious (same-venue overlap, same-day rematch) —
- * surfaced to the organizer, who decides.
+ * warning = structurally suspicious (a same-day rematch) — surfaced to the
+ * organizer, who decides.
  */
 export type ConflictSeverity = "blocking" | "warning";
 
 export const CONFLICT_SEVERITY: Record<ConflictType, ConflictSeverity> = {
   team_double_booking: "blocking",
   ground_double_booking: "blocking",
-  venue_overlap: "warning",
   invalid_duration: "blocking",
   invalid_kickoff: "blocking",
   duplicate_fixture: "warning",
@@ -357,7 +382,6 @@ export interface FixtureForConflicts {
   homeTeamId: string;
   awayTeamId: string;
   groundId: string | null;
-  venueId: string | null;
   kickoffAt: string | null; // YYYY-MM-DDTHH:MM wall clock
   durationMinutes: number | null;
   status: FixtureStatus;
@@ -415,7 +439,6 @@ function conflict(type: ConflictType, ids: string[], detail: string): Conflict {
 const CONFLICT_ORDER: readonly ConflictType[] = [
   "team_double_booking",
   "ground_double_booking",
-  "venue_overlap",
   "duplicate_fixture",
   "invalid_kickoff",
   "invalid_duration",
@@ -502,15 +525,6 @@ export function detectConflicts(
       if (overlap && a.groundId !== null && a.groundId === b.groundId) {
         conflicts.push(
           conflict("ground_double_booking", [a.id, b.id], "the ground hosts two fixtures at once"),
-        );
-      } else if (
-        overlap &&
-        a.venueId !== null &&
-        a.venueId === b.venueId &&
-        a.groundId !== b.groundId
-      ) {
-        conflicts.push(
-          conflict("venue_overlap", [a.id, b.id], "two fixtures overlap at the same venue"),
         );
       }
       if (dates[i] !== null && dates[i] === dates[j] && pairKeys[i] === pairKeys[j]) {

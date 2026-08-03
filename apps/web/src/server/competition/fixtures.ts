@@ -10,7 +10,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import { alias } from "drizzle-orm/pg-core";
-import { and, asc, desc, eq, gte, ilike, lte, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, sql, type SQL } from "drizzle-orm";
 
 // FIXTURE SNAPSHOTS (M-IP3-3, CTO addition 2). The immutable projection every
 // downstream surface reads — calendar, exports, and (future) the Auction and
@@ -119,14 +119,35 @@ export interface FixtureStats {
   inProgress: number;
   completed: number;
   cancelled: number;
+  /**
+   * How many rounds the SCHEDULE spans. The header used to derive this from the
+   * 25 rows of the current page, so a 30-round, 240-fixture season announced
+   * itself as "240 fixtures across 4 rounds". Rounds are a property of the
+   * schedule, so they are counted where the schedule is.
+   */
+  rounds: number;
 }
 
-export async function fixtureStats(db: Db, competitionId: string): Promise<FixtureStats> {
-  const rows = await db
-    .select({ status: fixtures.status, count: sql<number>`count(*)::int` })
-    .from(fixtures)
-    .where(eq(fixtures.competitionId, competitionId))
-    .groupBy(fixtures.status);
+export async function fixtureStats(
+  db: Db,
+  competitionId: string,
+  visible?: readonly FixtureStatus[],
+): Promise<FixtureStats> {
+  const scope = and(
+    eq(fixtures.competitionId, competitionId),
+    ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
+  );
+  const [rows, [roundRow]] = await Promise.all([
+    db
+      .select({ status: fixtures.status, count: sql<number>`count(*)::int` })
+      .from(fixtures)
+      .where(scope)
+      .groupBy(fixtures.status),
+    db
+      .select({ max: sql<number>`coalesce(max(${fixtures.round}), 0)::int` })
+      .from(fixtures)
+      .where(scope),
+  ]);
   const stats: FixtureStats = {
     total: 0,
     draft: 0,
@@ -135,6 +156,7 @@ export async function fixtureStats(db: Db, competitionId: string): Promise<Fixtu
     inProgress: 0,
     completed: 0,
     cancelled: 0,
+    rounds: roundRow?.max ?? 0,
   };
   const keys: Record<FixtureStatus, keyof FixtureStats> = {
     draft: "draft",
@@ -153,8 +175,24 @@ export async function fixtureStats(db: Db, competitionId: string): Promise<Fixtu
 
 export type FixtureSort = "kickoff" | "kickoff_desc" | "number" | "round";
 
+/**
+ * The statuses a member without `fixture.manage` may see. A draft is an
+ * organizer's unfinished thinking — half-slotted, wrong dates, teams still
+ * moving — and `scheduled` is explicitly not yet the public record (the
+ * lifecycle's own words: "Scheduled → Published: the schedule becomes the
+ * public record"). Cancelled stays visible because a match that is off is news.
+ */
+export const PUBLIC_FIXTURE_STATUSES: readonly FixtureStatus[] = [
+  "published",
+  "in_progress",
+  "completed",
+  "cancelled",
+];
+
 export interface FixtureQuery {
   status?: FixtureStatus;
+  /** Restrict to these statuses regardless of the filter (capability gate). */
+  visible?: readonly FixtureStatus[];
   teamId?: string;
   groundId?: string;
   search?: string; // fixture number
@@ -188,6 +226,9 @@ export async function queryFixtures(
   query: FixtureQuery,
 ): Promise<FixturePage> {
   const filters: SQL[] = [eq(fixtures.competitionId, competitionId)];
+  if (query.visible !== undefined) {
+    filters.push(inArray(fixtures.status, [...query.visible]));
+  }
   if (query.status !== undefined) {
     filters.push(eq(fixtures.status, query.status));
   }
@@ -244,6 +285,7 @@ export async function calendarRange(
   competitionId: string,
   from: string,
   to: string,
+  visible?: readonly FixtureStatus[],
 ): Promise<CalendarDay[]> {
   const rows = await snapshotQuery(db)
     .where(
@@ -251,6 +293,7 @@ export async function calendarRange(
         eq(fixtures.competitionId, competitionId),
         gte(fixtures.kickoffAt, from),
         lte(fixtures.kickoffAt, `${to}T23:59`),
+        ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
       ),
     )
     .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq));
@@ -269,9 +312,10 @@ export async function weekView(
   db: Db,
   competitionId: string,
   start: string,
+  visible?: readonly FixtureStatus[],
 ): Promise<CalendarDay[]> {
   const end = addDays(start, 6);
-  const filled = await calendarRange(db, competitionId, start, end);
+  const filled = await calendarRange(db, competitionId, start, end, visible);
   const byDate = new Map(filled.map((d) => [d.date, d.fixtures]));
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDays(start, i);
@@ -283,9 +327,16 @@ export async function weekView(
 export async function competitionTimeline(
   db: Db,
   competitionId: string,
+  visible?: readonly FixtureStatus[],
 ): Promise<FixtureSnapshot[]> {
   const rows = await snapshotQuery(db)
-    .where(and(eq(fixtures.competitionId, competitionId), sql`${fixtures.kickoffAt} is not null`))
+    .where(
+      and(
+        eq(fixtures.competitionId, competitionId),
+        sql`${fixtures.kickoffAt} is not null`,
+        ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
+      ),
+    )
     .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
     .limit(1000);
   return rows.map(toSnapshot);
@@ -296,6 +347,7 @@ export async function upcomingFixtures(
   db: Db,
   competitionId: string,
   fromKickoff: string,
+  visible?: readonly FixtureStatus[],
   limit = 8,
 ): Promise<FixtureSnapshot[]> {
   const rows = await snapshotQuery(db)
@@ -304,6 +356,7 @@ export async function upcomingFixtures(
         eq(fixtures.competitionId, competitionId),
         gte(fixtures.kickoffAt, fromKickoff),
         sql`${fixtures.status} not in ('cancelled', 'completed')`,
+        ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
       ),
     )
     .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
@@ -323,8 +376,9 @@ export async function matchDay(
   db: Db,
   competitionId: string,
   date: string,
+  visible?: readonly FixtureStatus[],
 ): Promise<MatchDayGround[]> {
-  const days = await calendarRange(db, competitionId, date, date);
+  const days = await calendarRange(db, competitionId, date, date, visible);
   const dayFixtures = days[0]?.fixtures ?? [];
   const groupsByKey = new Map<string, MatchDayGround>();
   for (const fixture of dayFixtures) {
@@ -414,8 +468,31 @@ export async function fixtureTimeline(db: Db, fixtureId: string): Promise<Fixtur
     .orderBy(asc(auditLog.at));
 }
 
-/** Current wall-clock "YYYY-MM-DDTHH:MM" in server-local time (app layer only). */
+/**
+ * Current wall-clock "YYYY-MM-DDTHH:MM" for an Indian tournament.
+ *
+ * `getFullYear`/`getHours` read the SERVER's zone. That is right on a laptop in
+ * Asia/Calcutta and wrong on every UTC host we would deploy to: measured, the
+ * same instant gave 2026-08-01T08:18 on the host and 2026-08-01T02:48 under
+ * TZ=UTC, so between 00:00 and 05:29 IST match day opened on the PREVIOUS date
+ * and the "Upcoming" cut-off sat five and a half hours in the past. Kickoffs are
+ * IST wall clock (packages/core/src/fixture.ts), so "now" must be too — pinned
+ * the way every other date in this product is (see lib/format-date.ts).
+ */
+const IST_WALL_CLOCK = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 export function nowWallClock(now = new Date()): string {
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const parts = new Map<Intl.DateTimeFormatPartTypes, string>(
+    IST_WALL_CLOCK.formatToParts(now).map((p) => [p.type, p.value]),
+  );
+  const get = (type: Intl.DateTimeFormatPartTypes): string => parts.get(type) ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }

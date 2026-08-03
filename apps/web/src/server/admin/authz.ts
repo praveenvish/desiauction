@@ -3,6 +3,7 @@ import { withTenantDb } from "@desiauction/db";
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
 import { grantsFor } from "../orgs/authz";
+import { recordAdminAccess, type AdminSurface } from "./access-log";
 import { hasPlatformCapability } from "./capabilities";
 
 /**
@@ -46,4 +47,23 @@ export async function platformAdminGate(): Promise<AdminIdentity | null> {
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */
 export async function isPlatformAdmin(): Promise<boolean> {
   return (await platformAdminGate()) !== null;
+}
+
+/**
+ * The gate, for a PAGE — the same evaluation, plus the access record.
+ *
+ * Pages use this; the per-call gates inside `actions.ts` deliberately do not,
+ * so one page view is one row rather than one row per projection. See
+ * `access-log.ts` for why administration writes at all, and why this is the
+ * only thing it writes.
+ */
+export async function platformAdminPageGate(
+  surface: AdminSurface,
+  subject: string | null = null,
+): Promise<AdminIdentity | null> {
+  const admin = await platformAdminGate();
+  if (admin !== null) {
+    await recordAdminAccess(admin, surface, subject);
+  }
+  return admin;
 }

@@ -6,6 +6,7 @@ import { SpectatePanel } from "./spectate-panel";
 import "../../../seasons.css";
 import "../auction.css";
 
+import type { AuctionStatus } from "@desiauction/core";
 import type { Metadata } from "next";
 
 // Spectator mode (M-IP4-3): read-only. Consumes the AuctionSnapshot stream and
@@ -28,6 +29,25 @@ async function viewOf(slug: string) {
  * distribution channel for this market — previewed as a naked URL while
  * `/c/<slug>` next door rendered a full 1200x630 card.
  */
+/** What a link to this auction is actually offering, per state. */
+const WATCH_VERB: Record<AuctionStatus, string> = {
+  scheduled: "starting soon",
+  live: "watch live",
+  paused: "watch live",
+  completed: "the results",
+  reconciled: "the results",
+  abandoned: "abandoned",
+};
+
+const FOLLOW_LINE: Record<AuctionStatus, (competition: string) => string> = {
+  scheduled: (competition) => `${competition} goes under the hammer soon.`,
+  live: (competition) => `Follow every lot of ${competition} live.`,
+  paused: (competition) => `Follow every lot of ${competition} live.`,
+  completed: (competition) => `Every lot of ${competition}, and what each player went for.`,
+  reconciled: (competition) => `Every lot of ${competition}, and what each player went for.`,
+  abandoned: (competition) => `${competition}'s auction was abandoned.`,
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -41,11 +61,17 @@ export async function generateMetadata({
   const where = [view.orgName, view.location]
     .filter((part): part is string => part !== null && part !== "")
     .join(" · ");
-  const title = `${view.auctionName} — watch live`;
+  /**
+   * DA-20: "watch live" was a constant. Pasted into WhatsApp, a night that had
+   * finished three weeks ago still previewed as a live auction, and a scheduled
+   * one invited people to watch something that had not started.
+   */
+  const title = `${view.auctionName} — ${WATCH_VERB[view.auctionStatus]}`;
+  const follow = FOLLOW_LINE[view.auctionStatus];
   const description =
     where === ""
-      ? `Follow every lot of ${view.competitionName} live. No account needed.`
-      : `Follow every lot of ${view.competitionName} live — ${where}. No account needed.`;
+      ? `${follow(view.competitionName)} No account needed.`
+      : `${follow(view.competitionName)} ${where}. No account needed.`;
   return {
     title: `${title} · DesiAuction`,
     description,
@@ -68,7 +94,10 @@ export default async function SpectatePage({ params }: { params: Promise<{ slug:
     // a document a screen-reader user cannot orient in, and axe says so.
     <main className="registrations-dash">
       <div className="dash-stack">
-        <h1 className="auction-sr-only">{view.auctionName} — live</h1>
+        {/* The document's ONE heading claimed "live" on a settled auction. */}
+        <h1 className="auction-sr-only">
+          {view.auctionName} — {WATCH_VERB[view.auctionStatus]}
+        </h1>
         <ToastProvider>
           <SpectatePanel
             wsUrl={view.wsUrl}
@@ -78,6 +107,7 @@ export default async function SpectatePage({ params }: { params: Promise<{ slug:
             rules={view.rules}
             preSigned={view.preSigned}
             auctionName={view.auctionName}
+            auctionStatus={view.auctionStatus}
             orgName={view.orgName}
             location={view.location}
           />

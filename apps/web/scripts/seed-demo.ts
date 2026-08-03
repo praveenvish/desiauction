@@ -98,6 +98,7 @@ import {
   computeCaseObligations,
   createPayment,
   openCase,
+  settleCase,
   verifyCase,
   type SettlementActor,
 } from "../src/server/settlement/writer.js";
@@ -465,6 +466,21 @@ async function main(): Promise<void> {
     paymentIds.push(pid);
   }
 
+  /*
+   * Carry the exemplar to the state its own banner claims.
+   *
+   * The seed stopped after the third attested payment and then printed "case
+   * settled". It was not: the case sat in `settling` with every rupee collected
+   * — which is a real and different thing, and it made /home and the season
+   * Overview disagree with the Money tab about whether the books were done.
+   * Settling is the last step this seed can honestly take on its own; CLOSING
+   * seals an evidence package for ever, which is a decision a demo has no
+   * business making unprompted, and it would leave the exemplar with no live
+   * money workflow left to show.
+   */
+  const settled = await settleCase(sDeps, sActor, caseId, newId());
+  if (!settled.ok) throw new Error(`settleCase: ${settled.reason}`);
+
   // --- Financial operations: documents → dispatch → export → fiscal close -----
   mkdirSync(ARTIFACT_DIR, { recursive: true });
   const fDeps = finopsDeps(db, { storageDir: ARTIFACT_DIR });
@@ -594,7 +610,7 @@ DEMO DATA READY (repeatable — rerun any time)
   Playground      Demo Premier League      /competitions/demo-premier-league
                   4 teams · 10 approved + 2 submitted players · registration OPEN
   Settled example Demo Cup (settled)       /competitions/demo-cup-settled
-                  auction complete · case settled · ${String(paymentIds.length)} payments · receipts,
+                  auction complete · case SETTLED (not closed) · ${String(paymentIds.length)} payments · receipts,
                   invoices, 1 in-app dispatch, 1 export, fiscal ${endedFy} SEALED
 
   Sign in at /login with a phone below — the code appears at /dev/inbox.

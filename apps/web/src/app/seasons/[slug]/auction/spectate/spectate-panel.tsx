@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise, type AuctionSnapshot } from "@desiauction/core";
+import { formatPaiseINR, paise, type AuctionSnapshot, type AuctionStatus } from "@desiauction/core";
 import { Badge, Card } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
@@ -89,6 +89,19 @@ function SaleAnnouncer({ snapshot }: { snapshot: AuctionSnapshot | null }) {
   );
 }
 
+/**
+ * What this page IS, per state. It used to be the constant "Watching live",
+ * printed under a SCHEDULED badge and over a completed auction alike.
+ */
+const WATCHING: Record<AuctionStatus, string> = {
+  scheduled: "Starting soon",
+  live: "Watching live",
+  paused: "Paused — the clock is stopped",
+  completed: "Auction complete",
+  reconciled: "Auction settled",
+  abandoned: "Auction abandoned",
+};
+
 /** The bids that decided the lot just resolved — kept, not wiped. */
 function ResolvedBidHeader({ outcome }: { outcome: NonNullable<AuctionSnapshot["lastOutcome"]> }) {
   const parts = [
@@ -112,6 +125,7 @@ export function SpectatePanel({
   rules,
   preSigned,
   auctionName,
+  auctionStatus,
   orgName,
   location,
 }: {
@@ -122,10 +136,17 @@ export function SpectatePanel({
   rules: AuctionRules;
   preSigned: PreSignedPlayer[];
   auctionName: string;
+  /**
+   * The auction's state as the SERVER knows it — the honest answer before the
+   * first snapshot lands, and the one the share text uses. The identity line
+   * read "Watching live" under a SCHEDULED badge.
+   */
+  auctionStatus: AuctionStatus;
   orgName: string | null;
   location: string | null;
 }) {
-  const { snapshot, connection, remainingMs, ceremony, stale, offline } = useAuctionSocket(wsUrl);
+  const { snapshot, connection, remainingMs, ceremony, stale, offline, clock } =
+    useAuctionSocket(wsUrl);
   const feed = useLiveFeed(resolved, snapshot);
   const [hydrated, setHydrated] = useState(false);
   // PX-6 large-screen mode: the projector view — ceremony only, huge type.
@@ -230,7 +251,7 @@ export function SpectatePanel({
           way back out, and hiding the row's parent would hide that too. */}
       <div className="spectate-head">
         <p className="spectate-identity stage-hide" data-testid="spectate-identity">
-          {snapshot === null ? "Connecting…" : "Watching live"}
+          {WATCHING[snapshot?.auctionStatus ?? auctionStatus]}
           {identity.length > 0 ? ` · ${identity.join(" · ")}` : ""}
         </p>
         <div className="stage-toggle-row">
@@ -279,13 +300,18 @@ export function SpectatePanel({
             remainingMs={remainingMs}
             lotDurationMs={lotDurationMs}
             leadColor={leadColor}
+            clock={clock}
             testId="spectate-lot"
           />
         </div>
       )}
 
       <div className="stage-hide">
-        <ShareAuction slug={slug} auctionName={auctionName} />
+        <ShareAuction
+          slug={slug}
+          auctionName={auctionName}
+          auctionStatus={snapshot?.auctionStatus ?? auctionStatus}
+        />
       </div>
 
       {snapshot !== null && finished ? (
@@ -328,9 +354,15 @@ export function SpectatePanel({
                         // COMPLETED ribbon is the same lie the ceremony used to
                         // tell in 44px type.
                         "The auction is over — every lot is settled."
-                      : (snapshot?.lotsResolved ?? 0) > 0
+                      : // "The next player is coming up" rendered 400px from
+                        // "REMAINING 0" and "2/2 lots · 0 in queue": the guard
+                        // asked whether the AUCTION was over, not whether there
+                        // was anyone left to sell.
+                        (snapshot?.queue.length ?? 0) > 0
                         ? "That lot is done. The next player is coming up."
-                        : "Bids appear here once a lot opens."}
+                        : (snapshot?.lotsResolved ?? 0) > 0
+                          ? "That was the last player in the queue."
+                          : "Bids appear here once a lot opens."}
                 </p>
               ) : (
                 <ol className="timeline">
@@ -384,9 +416,9 @@ export function SpectatePanel({
       </div>
 
       <p className="spectate-footer stage-hide" data-testid="spectate-footer">
-        This auction is running on DesiAuction ·{" "}
+        <span>This auction is running on DesiAuction. Yours can too.</span>
         <a href="/" data-testid="spectate-footer-cta">
-          Run your own →
+          Run your own auction →
         </a>
       </p>
     </div>

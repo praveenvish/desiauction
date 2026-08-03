@@ -23,10 +23,24 @@
  */
 export const DELIVERY_LANES = ["requested", "sent", "confirmed", "failed"] as const;
 
+/**
+ * "Succeeded" was a promise the platform cannot keep.
+ *
+ * The `in-app` adapter returns `ok`/`confirmed` unconditionally, on the
+ * reasoning that "delivery IS visibility — the dispatch register is the tray a
+ * signed-in officer reads". But that register is org-scoped and finance-gated,
+ * so the actual recipient — the team owner who paid — sees nothing: `/inbox`
+ * carries security events only. And `email` writes a `.txt` file into a local
+ * directory; there is no SMTP. So a receipt the customer never got was reported
+ * to the operator as "Succeeded".
+ *
+ * These labels now describe what the platform actually observed. Fixing the
+ * adapters means thawing IP-6; telling the truth about them does not.
+ */
 export const DELIVERY_LANE_LABEL: Record<string, string> = {
   requested: "Queued",
   sent: "Processing",
-  confirmed: "Succeeded",
+  confirmed: "Recorded as sent",
   failed: "Failed",
 };
 

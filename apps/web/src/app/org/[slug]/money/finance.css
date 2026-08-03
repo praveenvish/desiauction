@@ -222,3 +222,22 @@
   margin-top: var(--space-05);
   flex: 0 0 auto;
 }
+
+/*
+ * The register's document links are the only route into a document, and their
+ * text is a document number — short by nature. As a bare inline link that made
+ * them 5.0 x 15px: below the 24 x 24 minimum of WCAG 2.2 SC 2.5.8 (AA), not
+ * merely below this product's 44px convention. axe never flagged it because
+ * `target-size` is not in the wcag21aa tag set, so it has to be held by hand.
+ *
+ * inline-flex + min-height gives the row a real target without turning the
+ * link into a block that swallows the whole cell.
+ */
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--space-1);
+  margin-inline: calc(var(--space-1) * -1);
+  font-variant-numeric: tabular-nums;
+}

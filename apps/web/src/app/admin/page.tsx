@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { adminOutcomes, adminOverview } from "../../server/admin/actions";
-import { platformAdminGate } from "../../server/admin/authz";
+import { platformAdminPageGate } from "../../server/admin/authz";
 import { OverviewPanel } from "./overview-panel";
 import "../seasons/seasons.css";
 import "./admin.css";
@@ -25,7 +25,7 @@ export const metadata = { title: "Platform admin · DesiAuction" };
  * notFound() exactly as it does to redirect()).
  */
 export default async function AdminPage() {
-  if ((await platformAdminGate()) === null) {
+  if ((await platformAdminPageGate("overview")) === null) {
     notFound();
   }
   return (

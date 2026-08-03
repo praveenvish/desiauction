@@ -6,16 +6,16 @@ import { systemDb } from "../db";
 import { webFinopsDeps } from "../financial-operations/deps";
 import { platformAdminGate } from "./authz";
 import {
-  adminSearch,
   auditExplorer,
   organizationDetail,
   organizationDirectory,
+  organizationExists,
   outcomesProjection,
+  personExists,
   platformHealth,
   platformOverview,
   userDetail,
   userDirectory,
-  type AdminSearchHit,
   type AuditFilters,
   type AuditPage,
   type OrgDetail,
@@ -65,11 +65,34 @@ export async function adminOutcomes(windowDays = 30): Promise<OutcomeMetrics | n
 export async function adminOrganizations(
   query?: string,
   filter?: OrgFilter,
+  after?: string,
 ): Promise<OrgDirectory | null> {
   if ((await platformAdminGate()) === null) {
     return null;
   }
-  return organizationDirectory(systemDb, { query, filter });
+  return organizationDirectory(systemDb, { query, filter, after });
+}
+
+/**
+ * Record existence, answered BEFORE the Suspense boundary opens.
+ *
+ * A boundary above a `notFound()` commits a 200 first (the PX-2 finding), so a
+ * miss discovered inside `<Suspense>` produced an HTTP 200 carrying a "this
+ * page doesn't exist" body — while the identical URL returned a hard 404 to a
+ * non-admin. Gate, exist, then stream.
+ */
+export async function adminOrganizationExists(slug: string): Promise<boolean> {
+  if ((await platformAdminGate()) === null) {
+    return false;
+  }
+  return organizationExists(systemDb, slug);
+}
+
+export async function adminPersonExists(personId: string): Promise<boolean> {
+  if ((await platformAdminGate()) === null) {
+    return false;
+  }
+  return personExists(systemDb, personId);
 }
 
 export async function adminOrganization(slug: string): Promise<OrgDetail | null> {
@@ -79,11 +102,11 @@ export async function adminOrganization(slug: string): Promise<OrgDetail | null>
   return organizationDetail(systemDb, slug);
 }
 
-export async function adminUsers(query?: string): Promise<UserDirectory | null> {
+export async function adminUsers(query?: string, after?: string): Promise<UserDirectory | null> {
   if ((await platformAdminGate()) === null) {
     return null;
   }
-  return userDirectory(systemDb, query ?? "");
+  return userDirectory(systemDb, query ?? "", after);
 }
 
 export async function adminUser(personId: string): Promise<UserDetail | null> {
@@ -105,14 +128,6 @@ export async function adminHealth(): Promise<PlatformHealth | null> {
     return null;
   }
   return platformHealth(deps(), systemDb);
-}
-
-/** Command search (CTO §6): navigation targets for the palette. Gated like the rest. */
-export async function adminSearchAction(query: string): Promise<AdminSearchHit[]> {
-  if ((await platformAdminGate()) === null) {
-    return [];
-  }
-  return adminSearch(systemDb, query);
 }
 
 /** Nav-only: whether to render the Platform admin door in the avatar menu. */

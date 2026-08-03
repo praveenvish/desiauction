@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import { formatPhone } from "../src/lib/format-phone";
+
 // PX-2 Product Shell verification: authenticated landing, rail navigation,
 // breadcrumbs + competition tabs, command palette, user menu, mobile chrome,
 // route visibility. Permanent — every future milestone builds inside this.
@@ -35,6 +37,14 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
 function rail(page: Page) {
   // The nav model renders twice (rail ≥720px, bottom tabs below); scope to the
   // visible one so assertions hold at any viewport.
+  //
+  // Both copies answer to "Primary" again. They had drifted apart — the mobile
+  // bottom tabs were renamed "Sections" while the desktop rail stayed
+  // "Primary" — and this helper was briefly widened to accept either. That hid
+  // the defect rather than fixing it: one landmark with two names depending on
+  // screen width, and `responsive.spec.ts` unable to find the primary
+  // navigation on a phone at all. The name was put back in
+  // packages/ui/src/shell/app-shell.tsx, so this asks for the one true name.
   return page.getByRole("navigation", { name: "Primary" }).locator("visible=true");
 }
 
@@ -48,14 +58,16 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   // heading, not /home's.
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Shell Tester");
 
-  // Rail navigation: five items, forever. Help is last — it lands on the
-  // Public shell (no rail), so the loop ends there and returns via URL.
+  // Rail navigation: four items. Money was pulled from the rail (DA-18) — a
+  // primary nav item is a promise, and /money is still a "being built during
+  // the beta" placeholder, so it stays reachable only from the season's own
+  // Money tab, not the top-level rail. Help is last — it lands on the Public
+  // shell (no rail), so the loop ends there and returns via URL.
   const nav = rail(page).first();
   for (const [label, url] of [
     ["Tournaments", /\/tournaments/],
     ["Organizations", /\/orgs/],
     ["Home", /\/home/],
-    ["Money", /\/money/],
     ["Help", /\/help/],
   ] as const) {
     await nav.getByRole("link", { name: label }).click();
@@ -63,9 +75,11 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   }
   await page.goto("/home");
 
-  // User menu → Account; signed-in phone is shown in the menu header.
+  // User menu → Account; signed-in phone is shown in the menu header, grouped
+  // for readability ("is this YOUR number?" — format-phone.ts) rather than the
+  // raw stored digit run.
   await page.getByRole("button", { name: "Account menu" }).click();
-  await expect(page.getByTestId("shell-session-phone")).toHaveText(`+91${PHONE}`);
+  await expect(page.getByTestId("shell-session-phone")).toHaveText(formatPhone(`+91${PHONE}`));
   await page.getByRole("menuitem", { name: "Account" }).click();
   await expect(page).toHaveURL(/\/account/);
   await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
@@ -143,7 +157,11 @@ test("search navigates; the identity bar names every surface consistently", asyn
   await page.getByRole("menuitem", { name: new RegExp(`^Shell Cup ${STAMP}`) }).click();
   await expect(page).toHaveURL(/\/seasons\/shell-cup-(?!b)/);
 
-  // Org switcher: multi-org users can jump straight to an org home.
+  // Org switcher: multi-org users can jump straight to an org home. It shares
+  // the season switcher's slot in the top bar (one cluster, context-driven) —
+  // the season switcher renders inside a season workspace, the org switcher
+  // everywhere else — so it only appears once we step back out of the season.
+  await page.goto("/orgs");
   await page.getByRole("button", { name: "Switch organization" }).click();
   await page.getByRole("menuitem", { name: `Shell Org B ${STAMP}` }).click();
   await expect(page).toHaveURL(/\/org\/shell-org-b/);

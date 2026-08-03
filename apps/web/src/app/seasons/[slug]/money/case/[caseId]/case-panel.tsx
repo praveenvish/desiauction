@@ -13,7 +13,9 @@ import {
 } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
+import { formatDateTime } from "../../../../../../lib/format-date";
 import { replayEvidence, type ReviewView } from "../../../../../../server/settlement/actions";
+import { CASE_STATE, PAYMENT_STATE } from "../../money-words";
 import "../../money.css";
 
 /**
@@ -92,8 +94,13 @@ function Amount({ value }: { value: number }) {
   return <span title={`${String(value)} paise`}>{inr(value)}</span>;
 }
 
+/**
+ * Pinned locale AND zone. A bare `toLocaleString("en-IN", …)` reads the HOST
+ * time zone, which differs between the SSR render and the browser — the
+ * hydration-mismatch class `lib/format-date` exists to close.
+ */
 function when(atMs: number): string {
-  return new Date(atMs).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  return formatDateTime(atMs);
 }
 
 export function CasePanel({
@@ -120,7 +127,8 @@ export function CasePanel({
           <div>
             <h2>Case {settlementCase.caseId.slice(-8)}</h2>
             <p className="section-note">
-              Opened against auction {settlementCase.auctionId.slice(-8)}
+              Opened {when(Date.parse(settlementCase.openedAt))} against auction{" "}
+              {settlementCase.auctionId.slice(-8)}
               {settlementCase.closures > 0
                 ? ` · closed ${String(settlementCase.closures)} time${settlementCase.closures === 1 ? "" : "s"}`
                 : ""}
@@ -133,7 +141,7 @@ export function CasePanel({
             </p>
           </div>
           <Badge tone={STATUS_TONE[settlementCase.status] ?? "neutral"} data-testid="review-status">
-            {settlementCase.status}
+            {CASE_STATE[settlementCase.status] ?? settlementCase.status}
           </Badge>
         </div>
         <div className="stat-row">
@@ -145,6 +153,11 @@ export function CasePanel({
             value={settlementCase.financial.outstanding}
             id="r-outstanding"
           />
+          {/* Recorded, not yet confirmed — real money that moves no tile on the
+              books, and so used to move nothing on any screen either. */}
+          {settlementCase.pending > 0 ? (
+            <Tile label="Awaiting confirmation" value={settlementCase.pending} id="r-pending" />
+          ) : null}
         </div>
       </Card>
 
@@ -219,7 +232,12 @@ function ObligationsTab({ review }: { review: ReviewView }) {
     );
   }
   return (
-    <div className="table-scroll">
+    <div
+      className="table-scroll money-scroll"
+      tabIndex={0}
+      role="region"
+      aria-label="Every team's obligation"
+    >
       <table className="money-table" data-testid="review-obligations">
         <caption>
           <VisuallyHidden>Every team's obligation, with adjustments and waivers</VisuallyHidden>
@@ -247,7 +265,11 @@ function ObligationsTab({ review }: { review: ReviewView }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.teamId} data-testid={`review-obligation-${row.teamId}`}>
-              <td data-label="Team">{row.teamName}</td>
+              {/* The team is the row header: without it a screen reader reads
+                  "Outstanding, ₹80,000" and never says whose. */}
+              <th scope="row" data-label="Team">
+                {row.teamName}
+              </th>
               <td data-label="Computed" className="num">
                 <Amount value={row.amount} />
               </td>
@@ -289,17 +311,23 @@ function PaymentsTab({ review }: { review: ReviewView }) {
     );
   }
   return (
-    <div className="table-scroll">
+    <div
+      className="table-scroll money-scroll"
+      tabIndex={0}
+      role="region"
+      aria-label="Every payment against this case"
+    >
       <table className="money-table" data-testid="review-payments">
         <caption>
           <VisuallyHidden>Every payment against this case</VisuallyHidden>
         </caption>
         <thead>
           <tr>
-            <th scope="col">Reference</th>
             <th scope="col">Team</th>
+            <th scope="col">Recorded</th>
+            <th scope="col">Reference</th>
             <th scope="col">Method</th>
-            <th scope="col">Status</th>
+            <th scope="col">State</th>
             <th scope="col" className="num">
               Amount
             </th>
@@ -314,14 +342,29 @@ function PaymentsTab({ review }: { review: ReviewView }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.paymentId} data-testid={`review-payment-${row.paymentId}`}>
+              <th scope="row" data-label="Team">
+                {row.teamName}
+              </th>
+              <td data-label="Recorded" className="money-when">
+                {when(Date.parse(row.recordedAt))}
+              </td>
               <td data-label="Reference">
                 <span className="digest">{row.providerRef ?? row.paymentId.slice(-10)}</span>
               </td>
-              <td data-label="Team">{row.teamName}</td>
               <td data-label="Method">{METHOD_LABEL[row.method] ?? row.method}</td>
-              <td data-label="Status">
-                <Badge tone={PAYMENT_TONE[row.status] ?? "neutral"}>{row.status}</Badge>
-                {row.attested ? <span className="section-note"> attested by hand</span> : null}
+              <td data-label="State">
+                <Badge tone={PAYMENT_TONE[row.status] ?? "neutral"}>
+                  {PAYMENT_STATE[row.status] ?? row.status}
+                </Badge>
+                {/* `attestedBy` was fetched on every read and rendered nowhere,
+                    while the action's own copy promised the money was "recorded
+                    against your name". */}
+                {row.attested ? (
+                  <span className="section-note">
+                    {" "}
+                    confirmed by hand by {row.attestedByName ?? "a settlement controller"}
+                  </span>
+                ) : null}
               </td>
               <td data-label="Amount" className="num">
                 <Amount value={row.amount} />
@@ -420,6 +463,35 @@ function VerificationTab({
         Verification re-reads the log and proves it still folds to the same fingerprint.
       </p>
 
+      {/*
+       * The checks that justified closing used to VANISH at the moment they
+       * became the record: `readiness` is computed only while a case is
+       * `settled`, so the closed case — the one whose checks matter for ever —
+       * showed none. Closure is structurally impossible unless every check
+       * passes (packages/settlement closure refuses on the first failure), so
+       * on a closed case each one passed, and the verification digest on the
+       * Evidence tab is the reproducible proof of exactly that.
+       */}
+      {settlementCase.status === "closed" ? (
+        <>
+          <h3>Closure checks</h3>
+          <p className="section-note">
+            Every check below passed when this case closed — closure refuses outright on the first
+            failure, so a closed case is a case that cleared all of them. Their result is
+            fingerprinted in the verification digest on the Evidence tab, and Replay re-runs them
+            against the log.
+          </p>
+          <ul className="check-list" data-testid="review-sealed-checks">
+            {Object.entries(CHECK_LABEL).map(([key, label]) => (
+              <li key={key}>
+                <Badge tone="success">Passed</Badge>
+                <span>{label}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
       {readiness !== null ? (
         <>
           <h3>Closure checks</h3>
@@ -444,7 +516,12 @@ function VerificationTab({
       {review.audit.journal.length === 0 ? (
         <p className="section-note">No money has moved on this case yet.</p>
       ) : (
-        <div className="table-scroll">
+        <div
+          className="table-scroll money-scroll"
+          tabIndex={0}
+          role="region"
+          aria-label="Accounts this case moved"
+        >
           <table className="money-table" data-testid="review-journal">
             <caption>
               <VisuallyHidden>Accounts this case moved, with debits and credits</VisuallyHidden>
@@ -463,9 +540,15 @@ function VerificationTab({
             <tbody>
               {review.audit.journal.map((line) => (
                 <tr key={line.account}>
-                  <td data-label="Account">
+                  {/* `dues:01KYAF06VBRK9DXMD5Q3G550E3:01KYAF06W2Q2Q1V5C7C0N8SZ7X`
+                      is a correct account code and is not language. The code
+                      stays — an auditor reconciles against the literal string —
+                      but it is no longer the only thing on the row. */}
+                  <th scope="row" data-label="Account">
+                    {line.label}
+                    <br />
                     <span className="digest">{line.account}</span>
-                  </td>
+                  </th>
                   <td data-label="Debit" className="num">
                     <Amount value={line.debit} />
                   </td>

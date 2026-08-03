@@ -79,9 +79,82 @@
   flex: 1;
 }
 
+/* Security activity is PROSE now (shared with /inbox), so it is set in the text
+   face like every other sentence in the product. The monospace treatment only
+   survives for an action key this build has no name for — where the raw string
+   IS the content and reads as a token on purpose. */
 .events .security-name {
-  font-family: var(--font-mono);
   font-weight: var(--font-weight-regular);
+}
+
+.events .security-name[data-raw="true"] {
+  font-family: var(--font-mono);
+}
+
+.security-intro {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.security-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.security-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.security-error {
+  margin: var(--space-3) 0 0;
+  color: var(--danger-strong);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.account-prose {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-md-line);
+}
+
+.account-prose:last-child {
+  margin-bottom: 0;
+}
+
+.account-links {
+  color: var(--text-muted);
+}
+
+.account-facts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-05) 0;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-md-line);
+}
+
+.account-facts dt {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.account-facts dd {
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+}
+
+.account-facts dd:last-child {
+  margin-bottom: 0;
 }
 
 .account-head {
@@ -125,10 +198,26 @@
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.profile-id {
+  min-width: 0;
 }
 
 .profile-id h2 {
   margin: 0;
+}
+
+.profile-name {
+  margin: var(--space-05) 0 0;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.profile-signout {
+  margin-left: auto;
 }
 
 .profile-phone {
@@ -145,6 +234,12 @@
   flex-direction: column;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
+}
+
+/* "Save name" used to stretch full-bleed at 478px — a 460px-wide secondary
+   button for a two-word action, reading as the page's primary commitment. */
+.profile-save {
+  display: flex;
 }
 
 .profile-completion {

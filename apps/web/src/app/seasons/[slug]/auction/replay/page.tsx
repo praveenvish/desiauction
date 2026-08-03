@@ -23,6 +23,9 @@ export default async function ReplayPage({ params }: { params: Promise<{ slug: s
             <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
               Cockpit
             </ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
+              Ledger
+            </ButtonLink>
           </div>
           <p className="competitions-hint">
             {data.auctionName} — pure visualization: fold the immutable log, observe every state,

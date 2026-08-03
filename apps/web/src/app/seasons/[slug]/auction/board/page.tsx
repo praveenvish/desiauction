@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { env } from "../../../../../env";
 import { publicSpectatorView, spectatorView } from "../../../../../server/auction/conduct-actions";
 import { BoardPanel } from "./board-panel";
 import "../auction.css";
@@ -26,11 +27,17 @@ export default async function BoardPage({ params }: { params: Promise<{ slug: st
     // A `bare` shell renders no chrome at all, so this page owned no landmark:
     // the whole projector board was floating outside any region axe could name.
     <main>
+      {/* `orgName` and `location` were already on SpectatorView and this page
+          simply dropped them, so a photograph of the projector six months later
+          had nothing on it naming whose night it was or where. */}
       <BoardPanel
         wsUrl={view.wsUrl}
         resolved={view.resolved}
         auctionName={view.auctionName}
         competitionName={view.competitionName}
+        orgName={view.orgName}
+        location={view.location}
+        watchUrl={`${env.PUBLIC_BASE_URL}/c/${slug}`.replace(/^https?:\/\//, "")}
         teamIdentities={view.teams}
       />
     </main>

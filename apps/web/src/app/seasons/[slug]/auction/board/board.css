@@ -4,6 +4,11 @@
    fed by the read-only AuctionSnapshot. */
 
 .board {
+  /* A projector does not scroll. This was `content-box` with `min-height:
+     100dvh` and 48px of padding, so the document was always exactly 2x padding
+     taller than the screen — 1176px at 1920x1080, 996px at 1440x900 — and every
+     venue screen showed a 96px phantom scrollbar with content hidden under it. */
+  box-sizing: border-box;
   min-height: 100dvh;
   padding: clamp(20px, 4vw, 48px);
   background:
@@ -27,11 +32,36 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  /* 12-13px on a 100" screen is legible from ~1.6m. This is the line that says
+     whether the auction is running at all. */
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* PER-STATUS COLOUR. The kicker was hard-coded to `var(--live)`, so across a
+   whole 1920x1080 frame "AUCTION PAUSED" and "AUCTION ABANDONED" were the same
+   #3DD68C as "LIVE AUCTION" and the only difference was a 9px dot. */
+.board[data-status="live"] .board-kicker {
   color: var(--live);
+}
+.board[data-status="paused"] .board-kicker,
+.board[data-status="scheduled"] .board-kicker {
+  color: var(--warning-strong);
+}
+.board[data-status="abandoned"] .board-kicker {
+  color: var(--danger-strong);
+}
+.board[data-status="completed"] .board-kicker,
+.board[data-status="reconciled"] .board-kicker {
+  color: var(--ceremony-gold);
+}
+/* A stale feed is never green, whatever the last snapshot claimed. */
+.board[data-stale="true"] .board-kicker {
+  color: var(--warning-strong);
 }
 .board-live-dot {
   width: 9px;
@@ -43,7 +73,7 @@
 .board-title {
   margin: 8px 0 4px;
   font-family: var(--font-display, inherit);
-  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-size: clamp(var(--text-3xl-size), 5vw, var(--display-lg-size));
   line-height: 1.02;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -51,7 +81,8 @@
   text-wrap: balance;
 }
 .board-sub {
-  font-size: 15px;
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
   color: var(--text-secondary);
 }
 .board-progress {
@@ -62,7 +93,7 @@
   min-width: 240px;
 }
 .board-progress-count {
-  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-size: clamp(var(--text-2xl-size), 4vw, var(--display-md-size));
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--text-heading);
@@ -72,7 +103,7 @@
   font-size: 0.6em;
 }
 .board-progress-label {
-  font-size: 12px;
+  font-size: var(--text-base-size);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -95,7 +126,7 @@
 /* --- headline tiles --- */
 .board-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 14px;
 }
 .board-tile {
@@ -107,18 +138,21 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg, 16px);
 }
-.board-tile--wide {
-  grid-column: span 2;
-}
 .board-tile-label {
-  font-size: 12px;
+  font-size: var(--text-base-size);
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
+/* THE MONEY, DOUBLED.
+   Measured at 1920x1080 on a 100" screen (1px = 1.151mm, cap ~= 0.72 x
+   font-size, comfortable at D/150): 38.4px carried the headline money 4.8m —
+   fine for thirty people, useless in a 200-seat hall. 64px carries it ~8m.
+   The room reclaimed for it is the 184px of dead space that used to sit under
+   the standings and the second column the "Most expensive" tile was taking. */
 .board-tile-value {
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-size: clamp(var(--text-2xl-size), 3.6vw, var(--display-lg-size));
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--money-value);
@@ -131,7 +165,7 @@
   color: var(--ceremony-gold);
 }
 .board-tile-note {
-  font-size: 14px;
+  font-size: var(--text-xl-size);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -142,7 +176,7 @@
 /* --- standings --- */
 .board-section-title {
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: var(--text-md-size);
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -162,9 +196,6 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg, 16px);
 }
-.board-team[data-released="true"] {
-  opacity: 0.55;
-}
 .board-team-top {
   display: flex;
   align-items: center;
@@ -172,6 +203,7 @@
 }
 .board-paddle {
   flex: none;
+  font-size: var(--text-md-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -182,12 +214,11 @@
   background: color-mix(in srgb, var(--live) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--live) 40%, transparent);
   color: var(--live);
-  font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .board-team-name {
-  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  font-size: clamp(var(--text-lg-size), 2vw, var(--text-3xl-size));
   font-weight: 700;
   color: var(--text-heading);
   line-height: 1.1;
@@ -198,13 +229,13 @@
   gap: 2px;
 }
 .board-purse-value {
-  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  font-size: clamp(var(--text-2xl-size), 2.8vw, var(--display-md-size));
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--money-remaining, var(--live));
 }
 .board-purse-label {
-  font-size: 11px;
+  font-size: var(--text-sm-size);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -218,14 +249,14 @@
   border-top: 1px solid var(--border-subtle);
 }
 .board-team-stats dt {
-  font-size: 11px;
+  font-size: var(--text-sm-size);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 .board-team-stats dd {
   margin: 2px 0 0;
-  font-size: 16px;
+  font-size: var(--text-2xl-size);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -247,41 +278,283 @@
   background: color-mix(in srgb, var(--surface-raised) 40%, transparent);
 }
 .board-recent-name {
+  font-size: var(--text-2xl-size);
   font-weight: 700;
   color: var(--text-heading);
 }
 .board-recent-team {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-xl-size);
 }
 .board-recent-price {
+  font-size: var(--text-2xl-size);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--ceremony-gold);
 }
 
-/* --- reconnect note --- */
-.board-conn {
-  position: fixed;
-  bottom: 18px;
-  left: 18px;
-  padding: 6px 12px;
-  border-radius: var(--radius-full, 999px);
-  background: color-mix(in srgb, var(--warning-base) 22%, var(--surface-sunken));
-  border: 1px solid var(--warning-base);
-  color: var(--warning-strong);
-  font-size: 12px;
+/* --- the lot on the block --------------------------------------------------
+   The board never read `snapshot.currentLot`: opening a lot live left the
+   projector byte-identical to the frame before it opened. This is the largest
+   block on the wall because it is the reason the room is in the room. */
+.board-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: clamp(16px, 3vw, 40px);
+  padding: clamp(16px, 2.4vw, 30px) clamp(18px, 2.6vw, 34px);
+  border-radius: var(--radius-lg, 16px);
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--live) 34%, var(--border-subtle));
+}
+.board[data-status="paused"] .board-block,
+.board[data-stale="true"] .board-block {
+  border-color: color-mix(in srgb, var(--warning-base) 50%, var(--border-subtle));
+}
+.board-block-kicker {
+  font-size: var(--text-xl-size);
   font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.board-block-name {
+  margin: 6px 0 4px;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(var(--text-3xl-size), 5.4vw, var(--display-xl-size));
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+.board-block-meta {
+  font-size: var(--text-2xl-size);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+.board-block-money {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+.board-block-label {
+  font-size: var(--text-base-size);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.board-block-amount {
+  font-size: clamp(var(--text-3xl-size), 4.6vw, var(--display-lg-size));
+  line-height: 1.05;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--money-value);
+}
+.board-block-leader {
+  font-size: var(--text-2xl-size);
+  font-weight: 700;
+  color: var(--ceremony-gold);
+}
+.board-block-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 120px;
+}
+.board-block-seconds {
+  font-size: clamp(var(--display-sm-size), 5vw, var(--display-xl-size));
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+/* The last-fifteen-seconds warning was colour ONLY. The ring keeps the colour
+   and gains a border, so the urgency survives a colour-blind viewer, a
+   badly-calibrated projector and a greyscale photograph. */
+.board-block-seconds[data-hot="true"] {
+  color: var(--danger-strong);
+  padding: 0 var(--space-3);
+  border: var(--space-05) solid var(--danger-strong);
+  border-radius: var(--radius-md, 12px);
+}
+.board-block-stopped {
+  font-size: var(--text-2xl-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--warning-strong);
+  text-align: center;
+}
+
+/* --- the staleness banner --------------------------------------------------
+   The board used to say nothing at all when the feed died: `connection !==
+   "open"` in a 12px chip in a corner, and `stale`/`offline` ignored outright.
+   If the numbers behind it are a memory, that is the biggest fact on the wall. */
+.board-stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding: clamp(12px, 1.6vw, 20px) clamp(16px, 2vw, 26px);
+  border-radius: var(--radius-lg, 16px);
+  background: color-mix(in srgb, var(--warning-base) 24%, var(--surface-sunken));
+  border: var(--space-05) solid var(--warning-base);
+}
+.board-stale-head {
+  font-size: clamp(var(--text-2xl-size), 2.6vw, var(--display-sm-size));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warning-strong);
+}
+.board-stale-body {
+  font-size: clamp(var(--text-lg-size), 1.5vw, var(--text-3xl-size));
+  color: var(--text-primary);
+}
+
+/* --- the pre-auction board -------------------------------------------------
+   At 6pm this frame was four zeroes and an em dash over 40% empty space. */
+.board-doors {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2vw, 28px);
+  padding: clamp(20px, 3vw, 40px);
+  border-radius: var(--radius-lg, 16px);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+.board-doors-lede {
+  font-family: var(--font-display, inherit);
+  font-size: clamp(var(--text-3xl-size), 4.4vw, var(--display-lg-size));
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+.board-doors-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: clamp(12px, 2vw, 28px);
+  margin: 0;
+}
+.board-doors-facts dt {
+  font-size: var(--text-base-size);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.board-doors-facts dd {
+  margin: var(--space-1) 0 0;
+  font-size: clamp(var(--text-3xl-size), 3.6vw, var(--display-lg-size));
+  line-height: 1.05;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+.board-doors-watch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.board-doors-watch-label {
+  font-size: var(--text-base-size);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--live);
+}
+.board-doors-watch-url {
+  font-size: clamp(var(--text-xl-size), 2.4vw, var(--display-sm-size));
+  font-weight: 700;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+/* THE PROJECTOR FIT.
+   `box-sizing` alone removed the phantom 96px, but doubling the money type
+   spends the room it freed. A venue screen is exactly ONE frame — nobody
+   scrolls a projector — so above tablet width the board is locked to the
+   viewport and the least important band, the older recent sales, is what gets
+   clipped rather than the standings or the lot on the block. Below that width
+   the board is a web page again and scrolls normally. */
+@media (min-width: 1600px) {
+  .board {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  /* If anything has to give at projector size it is the sales HISTORY, never
+     the standings and never the lot on the block. Below 1600px this is a web
+     page on somebody's laptop, not a wall, and it simply scrolls. */
+  .board-recent {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .board-recent-list {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* A LOT ON THE BLOCK COSTS 297px, and it is worth every one of them — but it
+     has to come out of somewhere or the bottom row of standings is sliced in
+     half (measured: content 1212 against a 1080 frame, the last team card
+     ending at 1164). It comes out of the chrome around the numbers, not the
+     numbers: tighter gutters, tighter tiles, and the headline figures stepping
+     from 64px to 40px for the duration of the lot — still 5m of legibility,
+     while the player's name and the live price carry the wall. */
+  .board:has(.board-block) {
+    gap: 22px;
+    padding: 30px clamp(20px, 4vw, 48px);
+  }
+  .board:has(.board-block) .board-tile {
+    padding: 14px 22px;
+    gap: 4px;
+  }
+  .board:has(.board-block) .board-tile-value {
+    font-size: var(--display-sm-size);
+  }
+  .board:has(.board-block) .board-block-name {
+    font-size: clamp(var(--text-3xl-size), 4.4vw, var(--display-lg-size));
+  }
+  .board:has(.board-block) .board-block {
+    padding: 20px clamp(18px, 2.6vw, 34px);
+  }
+}
+
+/* The board's live region: heard, never seen — the wall itself is the visual. */
+.board-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 560px) {
-  .board-tile--wide {
-    grid-column: span 1;
-  }
+  /* The buyer used to be dropped on a phone, leaving "Rahul Singh  ₹35,000" —
+     a sale with no purchaser, which is half the news. It wraps under the name
+     instead. */
   .board-recent-list li {
     grid-template-columns: 1fr auto;
   }
   .board-recent-team {
-    display: none;
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .board-block {
+    grid-template-columns: 1fr;
+  }
+  .board-block-clock {
+    justify-self: start;
   }
 }

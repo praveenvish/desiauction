@@ -2,8 +2,10 @@ import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
+import { formatPhone } from "../../../../lib/format-phone";
+import { formatCount } from "../../../../server/admin/format";
 import type { UserDetail } from "../../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime } from "../../admin-ui";
+import { ReadOnlyNotice, RelativeTime, absoluteIst } from "../../admin-ui";
 
 /**
  * PX-9 §3 — the user inspector.
@@ -29,24 +31,26 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
             </ButtonLink>
           </span>
         </div>
+        {/* The ONE surface that shows the whole number — an operator arrived
+            here on purpose, for one person. The directory shows four digits. */}
         <p className="dash-hint">
-          {person.phone} · <span className="admin-id">{person.id}</span> · joined{" "}
-          {person.createdAt.toISOString().slice(0, 10)}
+          {formatPhone(person.phone)} · <span className="admin-id">{person.id}</span> · joined{" "}
+          {absoluteIst(person.createdAt)}
         </p>
       </header>
       <ReadOnlyNotice />
 
       <div className="stat-row">
         <div className="stat-tile">
-          <span className="stat-value">{orgs.length}</span>
+          <span className="stat-value">{formatCount(orgs.length)}</span>
           <span className="stat-label">Organizations</span>
         </div>
         <div className="stat-tile">
-          <span className="stat-value">{active.length}</span>
+          <span className="stat-value">{formatCount(active.length)}</span>
           <span className="stat-label">Active grants</span>
         </div>
         <div className="stat-tile">
-          <span className="stat-value">{grants.length - active.length}</span>
+          <span className="stat-value">{formatCount(grants.length - active.length)}</span>
           <span className="stat-label">Revoked grants</span>
         </div>
       </div>
@@ -65,30 +69,40 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                 <tr>
                   <th scope="col">Scope</th>
                   <th scope="col">Capability set</th>
-                  <th scope="col">Granted by</th>
+                  <th scope="col">Granted</th>
                   <th scope="col">State</th>
                 </tr>
               </thead>
               <tbody>
                 {grants.map((grant) => (
                   <tr key={grant.id} className="reg-row">
-                    <td>
+                    <td data-label="Scope">
                       <span className="registration-name">{grant.scopeLabel}</span>
                       <span className="admin-meta">{grant.scopeType}</span>
                     </td>
-                    <td>
+                    <td data-label="Capability set">
                       <span className="admin-action">{grant.capabilitySet}</span>
                     </td>
-                    <td>
+                    {/* `createdAt` was queried and never rendered, so a grant —
+                        the record of who trusted whom — had no date at all.
+                        And the seed writes `granted_by` as the RECIPIENT, so
+                        "Granted by Demo Founder" on Demo Founder's own platform
+                        grant read as an admin granting themselves. It is a
+                        self-reference, so it is named as one rather than
+                        dressed up as a decision somebody made. */}
+                    <td data-label="Granted">
+                      <span className="admin-meta">{absoluteIst(grant.createdAt)}</span>{" "}
                       <span className="admin-meta">
-                        {grant.grantedByName ?? grant.grantedBy.slice(-6)}
+                        {grant.grantedBy === person.id
+                          ? "· installed out-of-band (self-referencing grantor)"
+                          : `· by ${grant.grantedByName ?? grant.grantedBy.slice(-6)}`}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="State">
                       {grant.revokedAt === null ? (
                         <Badge tone="success">Active</Badge>
                       ) : (
-                        <Badge tone="neutral">Revoked</Badge>
+                        <Badge tone="neutral">Revoked {absoluteIst(grant.revokedAt)}</Badge>
                       )}
                     </td>
                   </tr>

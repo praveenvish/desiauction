@@ -57,6 +57,13 @@ const CHANNEL_LABEL: Record<string, string> = {
   "org-webhook": "Webhook",
 };
 
+/** Settlement's stream types, in the operator's words. */
+const STREAM_LABEL: Record<string, string> = {
+  case: "Settlement case",
+  payment: "Payment",
+  obligation: "Due",
+};
+
 function when(atMs: number): string {
   return new Date(atMs).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
@@ -162,19 +169,31 @@ export function DocumentPanel({ slug, workspace }: { slug: string; workspace: Do
           What this document was made from. Finance quotes settlement — it never decides money. The
           watermark is the exact point in settlement&apos;s history this document stands on.
         </p>
+        {/* This block read `case 9H7MMHGFTW @ #6` — a stream type, a truncated
+            ULID and a bare `#n`, with nothing saying what any of it was. The
+            ids and positions are the right content: this is provenance, and a
+            watermark IS a position in a log, not a business reference you can
+            look up. What was missing was saying so. Team names and amounts
+            deliberately stay out — they belong to the document above, and
+            repeating them here would imply this block is describing the money
+            rather than pinning where in settlement's history it was read. */}
         <dl className="kv-grid" data-testid="settlement-ref">
           <div>
-            <dt>Source</dt>
+            <dt>Made from</dt>
             <dd className="digest">{settlement.sourceRef ?? "—"}</dd>
           </div>
-          {Object.entries(settlement.watermark).map(([stream, seq]) => (
-            <div key={stream}>
-              <dt>{stream.split(":")[0]}</dt>
-              <dd className="digest">
-                {(stream.split(":")[1] ?? "").slice(-10)} @ #{seq}
-              </dd>
-            </div>
-          ))}
+          {Object.entries(settlement.watermark).map(([stream, seq]) => {
+            const [kind, id] = stream.split(":");
+            return (
+              <div key={stream}>
+                <dt>{STREAM_LABEL[kind ?? ""] ?? kind}</dt>
+                <dd>
+                  <span className="digest">…{(id ?? "").slice(-8)}</span>
+                  <span className="section-note"> · read up to event {seq}</span>
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       </Card>
 
@@ -188,7 +207,12 @@ export function DocumentPanel({ slug, workspace }: { slug: string; workspace: Do
             description="No delivery has been requested for this document. Deliveries are requested by the organization's issuance policy, not from this screen."
           />
         ) : (
-          <div className="table-scroll">
+          <div
+            className="table-scroll money-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Deliveries for this document"
+          >
             <table className="money-table" data-testid="doc-deliveries">
               <caption>
                 <VisuallyHidden>Every delivery attempted for this document</VisuallyHidden>

@@ -223,8 +223,10 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             links: [{ text: "money after the gavel", href: "/help/money-after-the-gavel" }],
           },
           {
-            text: "Issue receipts and invoices, and export for your accountant. See {0}.",
-            links: [{ text: "receipts, invoices and exports", href: "/help/receipts-and-exports" }],
+            text: "Issue receipts and keep a sealed document register. See {0}.",
+            links: [
+              { text: "receipts and your document register", href: "/help/receipts-and-exports" },
+            ],
           },
         ],
       },
@@ -549,44 +551,65 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
   // --- Financial operations ------------------------------------------------------------
   {
     slug: "receipts-and-exports",
-    title: "Receipts, invoices and exports (including Tally)",
-    summary: "Issue documents, deliver them, and hand clean books to your accountant.",
+    // This topic described a finance product we do not have yet: Tally exports,
+    // invoice issuance, corrections, in-app delivery with downloads, and sealing
+    // the fiscal year. Six of its eight claims were false — the title and summary
+    // among them. Every one of those functions exists in the platform and is
+    // reachable from no screen, so a reader could not have discovered the gap
+    // except by trying and failing. Help that oversells is worse than no help:
+    // it is read before the purchase and disproved after it. What follows is
+    // what the finance workspace actually does today. Restore a claim here only
+    // when a real operator can perform it from a real screen.
+    title: "Receipts and your document register",
+    summary: "Issue receipts, keep a sealed record, and check that it still reproduces.",
     category: "finops",
-    readMinutes: 6,
+    readMinutes: 4,
     blocks: [
       { kind: "heading", level: 2, text: "Declare your profile first" },
       {
         kind: "paragraph",
-        text: "Financial operations start when your organization declares its financial profile — its legal name and tax posture — and opens a numbering series. That's what lets the platform number documents correctly and consistently.",
+        text: "Financial operations start when your organization declares its financial profile — its legal name and tax posture — and opens a numbering series. That's what lets the platform number documents correctly and consistently. Until both exist, nothing can be issued.",
       },
-      { kind: "heading", level: 2, text: "Receipts and invoices" },
+      {
+        kind: "paragraph",
+        text: "Finance is a separate key from running competitions, and owning the club does not grant it. Someone with the Grants role has to give you a finance role before the workspace opens — until then it isn't there.",
+      },
+      { kind: "heading", level: 2, text: "Receipts" },
       {
         kind: "list",
         items: [
-          { text: "A receipt records money received; an invoice records dues raised." },
           {
-            text: "Once a payment is captured, the platform can issue its receipt automatically — or you can issue documents yourself from the finance workspace.",
+            text: "A receipt records money that has arrived. It is issued after a settlement officer records the payment — the platform does not collect money for you.",
           },
           {
-            text: "A correction issues a fresh document rather than editing a sealed one — the record is never quietly changed.",
+            text: "Once a payment is captured, the platform issues its receipt automatically — or you can issue one yourself from the finance workspace.",
+          },
+          {
+            text: "Documents are numbered in an unbroken series per kind, per financial year, and sealed when issued. Nothing is edited after the fact.",
           },
         ],
       },
-      { kind: "heading", level: 2, text: "Delivery" },
+      { kind: "heading", level: 2, text: "What isn't here yet" },
       {
-        kind: "paragraph",
-        text: "Issued documents are delivered to the recipient's {0}, where they can be viewed and downloaded. If a delivery fails, the finance workspace shows it and lets you retry.",
-        links: [{ text: "inbox", href: "/inbox" }],
+        kind: "list",
+        items: [
+          {
+            text: "Tax invoices. If your organization is registered for GST, the platform will not issue a tax invoice rather than guess the tax split — so raise bills the way you do now.",
+          },
+          {
+            // Name Tally explicitly even though we do not do it. This article
+            // is the search hit for "tally export" (content.test.ts asserts it),
+            // and someone who heard the word elsewhere deserves a straight
+            // answer here rather than an empty result page.
+            text: "Exports for your accountant, including Tally-compatible files, and downloadable or printable copies of a document.",
+          },
+          { text: "Sealing a financial year." },
+        ],
       },
-      { kind: "heading", level: 2, text: "Exports for your accountant" },
+      { kind: "heading", level: 2, text: "Checking the record" },
       {
         kind: "paragraph",
-        text: "Export your books as a Tally-compatible file to hand straight to your accountant. Every export is verified against the ledger it came from, so what you hand over always matches the source.",
-      },
-      { kind: "heading", level: 2, text: "Closing the year" },
-      {
-        kind: "paragraph",
-        text: "At year end, attest your days, resolve any exceptions, and seal the fiscal period. A sealed year is closed for good — reopening it is a deliberate, audited override.",
+        text: "Every issued document can be re-derived from the events behind it and compared against the seal taken when it was issued. The workspace shows you that verdict plainly, including when a document does not reproduce — which is the case worth knowing about.",
       },
       CONTACT_FOOTER,
     ],

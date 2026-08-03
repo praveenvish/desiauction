@@ -777,9 +777,20 @@ p + .date-row {
 
 .conflict-list li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+/* Which two fixtures — the question the old panel never answered. */
+.conflict-fixtures {
+  color: var(--text-heading);
+}
+
+.conflict-fixture-line {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
 }
 
 .ground-picker {
@@ -798,12 +809,24 @@ p + .date-row {
   font-size: var(--text-sm-size);
 }
 
+/* WCAG 2.2 SC 2.5.8 (AA). Measured, these were a 13x13 input inside a 193x19
+   label — under the 24x24 minimum on the short axis, with two labels stacked
+   adjacently so the spacing exception could not rescue them. axe stayed green
+   only because `target-size` is not in the wcag21aa tag set it was run with.
+   The label IS the target, so the label carries the height. */
 .check-row {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 24px;
+  padding-block: var(--space-1);
   color: var(--text-primary);
   font-size: var(--text-sm-size);
+}
+
+.check-row input[type="checkbox"] {
+  inline-size: 16px;
+  block-size: 16px;
 }
 
 .calendar-nav {
@@ -814,10 +837,15 @@ p + .date-row {
   flex-wrap: wrap;
 }
 
+/* The calendar and match-day navigation is the one surface used one-handed at
+   a ground, and it measured 29px tall. 44px is the reachable size there. */
 .calendar-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--text-accent);
   text-decoration: none;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   text-transform: capitalize;
 }
@@ -2060,9 +2088,24 @@ p + .date-row {
  * The design publishes a schedule round by round, with each fixture reading as
  * two colour-chipped team codes. The round header is a full-width table row. */
 
-.round-head td {
+/* A rowgroup header, so assistive tech announces which round a fixture is in
+   rather than treating the band as a stray data cell. */
+.round-head th {
   padding: var(--space-3) var(--space-3) var(--space-2);
   background: var(--surface-sunken);
+  text-align: start;
+  font-weight: inherit;
+}
+
+/* The table needs a name; it does not need the name repeated on screen above a
+   heading that already says "Schedule". */
+.table-caption {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .round-head-label {

@@ -116,9 +116,16 @@ test("founder demo: landing → discover → help → legal → register → sig
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page).toHaveURL(/\/search\?q=/);
   await expect(page.getByTestId("search-results")).toBeVisible();
-  await page.getByRole("link", { name: /Receipts, invoices and exports/ }).click();
+  // The topic was retitled when its copy was corrected: it used to promise
+  // Tally exports, invoice issuance, in-app delivery with downloads and sealing
+  // the year — six of its eight claims described functions no screen can reach.
+  // It now documents what the workspace actually does, and names the gaps under
+  // "What isn't here yet", which is what this assertion pins. "Tally" is still
+  // findable by search (content.test.ts covers that) — it is named there as a
+  // thing we do not do yet, rather than promised as a thing we do.
+  await page.getByRole("link", { name: /Receipts and your document register/ }).click();
   await expect(page).toHaveURL(/\/help\/receipts-and-exports$/);
-  await expect(page.getByRole("heading", { name: /Tally/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What isn't here yet/ })).toBeVisible();
 
   // --- Views Support ---------------------------------------------------------
   await page.goto("/support");

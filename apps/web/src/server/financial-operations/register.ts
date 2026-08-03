@@ -15,6 +15,22 @@ export const DOC_KIND_LABEL: Record<string, string> = {
   correction: "Correction",
 };
 
+/**
+ * One home for the tax posture's words. It had two: the Finance tab said
+ * "Not registered for GST" while the Reconciliation tab's Posture card printed
+ * the raw enum, `none`, for the same field one click away. Both now read from
+ * here, so they cannot drift again.
+ */
+export const POSTURE_LABEL: Record<string, string> = {
+  none: "Not registered for GST",
+  "gst-registered": "Registered for GST",
+};
+
+export function postureLabel(posture: string | null): string {
+  if (posture === null) return "Not declared";
+  return POSTURE_LABEL[posture] ?? posture;
+}
+
 export interface FinanceView {
   readonly key: string;
   readonly label: string;

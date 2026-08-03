@@ -35,12 +35,20 @@ export default async function OverlayPage({
   }
   const sponsorName = typeof sponsor === "string" && sponsor.trim() !== "" ? sponsor.trim() : null;
   return (
-    <OverlayPanel
-      wsUrl={view.wsUrl}
-      resolved={view.resolved}
-      auctionName={view.auctionName}
-      sponsor={sponsorName}
-      watchUrl={`${env.PUBLIC_BASE_URL}/c/${slug}`}
-    />
+    // A `bare` shell renders no chrome, so this page owned NO landmark and NO
+    // h1 at all — the sibling /board page fixed exactly that (board/page.tsx)
+    // and the overlay was never brought along. The heading is off-screen
+    // because the whole point of this surface is that it composites over video:
+    // it must exist for orientation, and must not print to air.
+    <main>
+      <h1 className="auction-sr-only">{view.auctionName} — broadcast overlay</h1>
+      <OverlayPanel
+        wsUrl={view.wsUrl}
+        resolved={view.resolved}
+        auctionName={view.auctionName}
+        sponsor={sponsorName}
+        watchUrl={`${env.PUBLIC_BASE_URL}/c/${slug}`}
+      />
+    </main>
   );
 }

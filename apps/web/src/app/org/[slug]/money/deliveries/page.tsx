@@ -1,4 +1,4 @@
-import { LoadingState, ToastProvider } from "@desiauction/ui";
+import { AnnouncerProvider, LoadingState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -22,20 +22,22 @@ export default async function DeliveriesPage({ params }: { params: Promise<{ slu
     notFound();
   }
   return (
-    <ToastProvider>
-      <main className="registrations-dash">
-        <div className="dash-stack finance-stack">
-          <header className="dash-head">
-            <p className="competitions-hint">
-              Every receipt and notice the platform tried to deliver — and what happened to it
-            </p>
-          </header>
-          <Suspense fallback={<LoadingState variant="page" />}>
-            <Lanes slug={slug} />
-          </Suspense>
-        </div>
-      </main>
-    </ToastProvider>
+    <AnnouncerProvider>
+      <ToastProvider>
+        <main className="registrations-dash">
+          <div className="dash-stack finance-stack">
+            <header className="dash-head">
+              <p className="competitions-hint">
+                Every receipt and notice the platform tried to deliver — and what happened to it
+              </p>
+            </header>
+            <Suspense fallback={<LoadingState variant="page" />}>
+              <Lanes slug={slug} />
+            </Suspense>
+          </div>
+        </main>
+      </ToastProvider>
+    </AnnouncerProvider>
   );
 }
 

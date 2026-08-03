@@ -27,11 +27,10 @@ export default async function FixturesPage({
   if (dashboard === null) {
     notFound();
   }
-  // How many rounds this schedule spans — the design's "N fixtures across M rounds".
-  const rounds = dashboard.page.rows.reduce(
-    (max, row) => (row.round !== null && row.round > max ? row.round : max),
-    0,
-  );
+  // How many rounds this schedule spans — the design's "N fixtures across M
+  // rounds". Counted over the SCHEDULE (fixtureStats), not over the 25 rows of
+  // the current page, which reported a 30-round season as 4 rounds.
+  const rounds = dashboard.stats.rounds;
   return (
     <ToastProvider>
       <main className="registrations-dash">
@@ -64,6 +63,8 @@ export default async function FixturesPage({
           </header>
           <FixturesPanel
             slug={slug}
+            orgSlug={dashboard.orgSlug}
+            isPublic={dashboard.competition.visibility === "public"}
             stats={dashboard.stats}
             page={dashboard.page}
             teams={dashboard.teams}

@@ -1,6 +1,9 @@
 "use client";
 
 import { formatPaiseINR, paise } from "@desiauction/core";
+import { useSyncExternalStore } from "react";
+
+import type { AuctionClock } from "./use-auction-socket";
 import type { AuctionSnapshot } from "@desiauction/core";
 
 // THE LOT HERO — the one thing every live surface leads with: what is on the
@@ -16,18 +19,37 @@ const RING_LENGTH = 2 * Math.PI * 54;
 /** The countdown turns from gold to danger inside the last 15 seconds. */
 const HOT_SECONDS = 15;
 
+/** Stable no-op store: `useSyncExternalStore` must not be called conditionally. */
+const noopSubscribe = () => () => undefined;
+const nullSnapshot = (): number | null => null;
+
+/**
+ * The ring is the ONE consumer that wants sub-second resolution — everything
+ * else on these pages renders whole seconds. It therefore subscribes to the
+ * socket's isolated 10Hz clock itself, so the smooth sweep costs a re-render of
+ * this component and nothing above it. Without a clock (replay, tests) it falls
+ * back to the quantised prop and simply steps once a second.
+ */
 export function CountdownRing({
   remainingMs,
   totalMs,
+  clock,
 }: {
   remainingMs: number | null;
   totalMs: number;
+  clock?: AuctionClock | undefined;
 }) {
-  const seconds = remainingMs === null ? null : Math.max(0, Math.ceil(remainingMs / 1000));
+  const smooth = useSyncExternalStore(
+    clock?.subscribe ?? noopSubscribe,
+    clock?.getSnapshot ?? nullSnapshot,
+    nullSnapshot,
+  );
+  const ms = clock === undefined ? remainingMs : smooth;
+  const seconds = ms === null ? null : Math.max(0, Math.ceil(ms / 1000));
   const hot = seconds !== null && seconds <= HOT_SECONDS;
   // Guard the divisor: a lot whose duration is unknown draws a full ring
   // rather than dividing by zero and vanishing.
-  const fraction = totalMs <= 0 || remainingMs === null ? 1 : Math.min(1, remainingMs / totalMs);
+  const fraction = totalMs <= 0 || ms === null ? 1 : Math.min(1, ms / totalMs);
   return (
     <div className="lot-ring" data-hot={hot ? "true" : "false"} data-testid="countdown-ring">
       <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden>
@@ -59,11 +81,14 @@ export function LotHero({
   lotDurationMs,
   leadColor,
   frozen = false,
+  clock,
   testId = "current-lot",
 }: {
   lot: NonNullable<AuctionSnapshot["currentLot"]>;
   remainingMs: number | null;
   lotDurationMs: number;
+  /** Passed straight through to the ring's own 10Hz subscription. */
+  clock?: AuctionClock | undefined;
   /** The leading franchise's identity colour, when it has one. */
   leadColor: string | null;
   /**
@@ -101,7 +126,7 @@ export function LotHero({
             The clock is stopped. Bidding resumes when the auctioneer restarts it.
           </p>
         ) : (
-          <CountdownRing remainingMs={remainingMs} totalMs={lotDurationMs} />
+          <CountdownRing remainingMs={remainingMs} totalMs={lotDurationMs} clock={clock} />
         )}
       </div>
 

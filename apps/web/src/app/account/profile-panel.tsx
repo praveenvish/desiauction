@@ -2,8 +2,9 @@
 
 import { Badge, Button, Card, Field, PlayerImage, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, type ReactNode } from "react";
 
+import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
 import { updateProfileAction } from "../../server/auth/actions";
 
@@ -12,6 +13,8 @@ export interface ProfilePanelProps {
   phone: string;
   name: string | null;
   passkeyCount: number;
+  /** The sign-out form, which must be a client component to sweep localStorage. */
+  signOut: ReactNode;
 }
 
 /**
@@ -19,8 +22,11 @@ export interface ProfilePanelProps {
  * Avatar is the branded generated identity (C-25) — photo upload arrives with
  * player registration consent (photoConsent columns), not here. Timezone and
  * language are product rulings (IST, English) — not settings, so not shown.
+ *
+ * This is now the ONE identity card on the page: the headless <dl> that used to
+ * sit above it repeated the same phone and name with no heading of its own.
  */
-export function ProfilePanel({ personId, phone, name, passkeyCount }: ProfilePanelProps) {
+export function ProfilePanel({ personId, phone, name, passkeyCount, signOut }: ProfilePanelProps) {
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(updateProfileAction, {});
@@ -30,13 +36,15 @@ export function ProfilePanel({ personId, phone, name, passkeyCount }: ProfilePan
     if (state.saved === true && !announced.current) {
       announced.current = true;
       track("profile.updated");
-      toast({ tone: "success", title: "Name updated" });
+      // "Name updated" was said to people who had just SET a name for the first
+      // time. The action now reports which of the two happened.
+      toast({ tone: "success", title: state.firstTime === true ? "Name added" : "Name updated" });
       router.refresh();
     }
     if (state.saved !== true) {
       announced.current = false;
     }
-  }, [state.saved, router, toast]);
+  }, [state.saved, state.firstTime, router, toast]);
 
   const hasName = name !== null && name.trim() !== "";
   const done = (hasName ? 1 : 0) + (passkeyCount > 0 ? 1 : 0);
@@ -44,18 +52,24 @@ export function ProfilePanel({ personId, phone, name, passkeyCount }: ProfilePan
   return (
     <Card className="profile-card" data-testid="profile-panel">
       <div className="profile-head">
-        <PlayerImage
-          name={name !== null && name.trim() !== "" ? name : "New member"}
-          seed={personId}
-          size="md"
-          shape="round"
-        />
+        <PlayerImage name={hasName ? name : "New member"} seed={personId} size="md" shape="round" />
         <div className="profile-id">
           <h2>Profile</h2>
+          <p className="profile-name" data-testid="account-name">
+            {hasName ? name : "—"}
+          </p>
           <p className="profile-phone">
-            {phone} <Badge tone="success">Verified</Badge>
+            {/*
+              The one screen whose entire job is "is this YOUR number?" printed
+              the raw stored identifier, +919999000001, while the shell menu one
+              click away — and nine other surfaces — grouped it. `formatPhone`'s
+              own doc comment names this screen.
+            */}
+            <span data-testid="account-phone">{formatPhone(phone)}</span>{" "}
+            <Badge tone="success">Verified</Badge>
           </p>
         </div>
+        <div className="profile-signout">{signOut}</div>
       </div>
       <form action={formAction} className="profile-form">
         <Field
@@ -67,9 +81,11 @@ export function ProfilePanel({ personId, phone, name, passkeyCount }: ProfilePan
           help="Appears on team sheets and the auction stage. Your avatar is generated from it."
           {...(state.error !== undefined ? { error: state.error } : {})}
         />
-        <Button type="submit" loading={pending} variant="secondary">
-          Save name
-        </Button>
+        <div className="profile-save">
+          <Button type="submit" loading={pending} variant="secondary">
+            Save name
+          </Button>
+        </div>
       </form>
       <div className="profile-completion" data-testid="profile-completion">
         <span className="profile-completion-label">Profile {done}/2 complete</span>

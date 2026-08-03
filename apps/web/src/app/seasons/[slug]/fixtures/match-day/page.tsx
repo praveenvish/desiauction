@@ -3,6 +3,7 @@ import { ButtonLink, Card, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { formatWallDate } from "../../../../../lib/format-date";
 import { matchDayView } from "../../../../../server/competition/fixture-actions";
 import { MatchDayPanel } from "./match-day-panel";
 import "../../../seasons.css";
@@ -43,7 +44,7 @@ export default async function MatchDayPage({
                 <Link href={dayHref(addDays(view.date, -1))} className="calendar-tab">
                   ← previous day
                 </Link>
-                <strong data-testid="match-day-date">{view.date}</strong>
+                <strong data-testid="match-day-date">{formatWallDate(view.date)}</strong>
                 <Link href={dayHref(addDays(view.date, 1))} className="calendar-tab">
                   next day →
                 </Link>

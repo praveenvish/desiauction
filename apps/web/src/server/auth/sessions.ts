@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { newId, people, sessions, type Db } from "@desiauction/db";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne } from "drizzle-orm";
 
 // DB-backed revocable sessions (IP-2_DESIGN D2). The cookie carries the raw
 // token; only its SHA-256 is stored. Token rotates at every login (fixation).
@@ -91,7 +91,16 @@ export interface SessionSummary {
   lastSeenAt: Date;
 }
 
-/** Active sessions for the account security surface (M-IP2-2). */
+/**
+ * Active sessions for the account security surface (M-IP2-2).
+ *
+ * ORDERED, because this list is read by a human being deciding which row to
+ * kill. Without an ORDER BY Postgres returned them in whatever order the heap
+ * happened to hold — measured at 142 rows on one real account, all bearing the
+ * same user agent, with "This device" 7,252px down the page. Newest-first is
+ * the only order in which "sign out anything you don't recognize" is a
+ * followable instruction; the caller pins the current device above it.
+ */
 export async function listSessions(db: Db, personId: string): Promise<SessionSummary[]> {
   return db
     .select({
@@ -107,5 +116,33 @@ export async function listSessions(db: Db, personId: string): Promise<SessionSum
         isNull(sessions.revokedAt),
         gt(sessions.expiresAt, new Date()),
       ),
-    );
+    )
+    .orderBy(desc(sessions.lastSeenAt), desc(sessions.createdAt));
+}
+
+/**
+ * "Sign out everywhere else" — every live session for this person except the
+ * one making the request. Person-scoped by construction: the WHERE names the
+ * personId, so this can never reach another account's rows, and the surviving
+ * session is named explicitly rather than inferred.
+ *
+ * Returns how many were killed so the surface can say something true.
+ */
+export async function revokeOtherSessions(
+  db: Db,
+  personId: string,
+  keepSessionId: string,
+): Promise<number> {
+  const revoked = await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(sessions.personId, personId),
+        ne(sessions.id, keepSessionId),
+        isNull(sessions.revokedAt),
+      ),
+    )
+    .returning({ id: sessions.id });
+  return revoked.length;
 }

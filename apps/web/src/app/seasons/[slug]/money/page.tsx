@@ -1,4 +1,4 @@
-import { ButtonLink, ToastProvider } from "@desiauction/ui";
+import { AnnouncerProvider, ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { settlementConsole } from "../../../../server/settlement/actions";
@@ -23,30 +23,34 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
     notFound();
   }
   return (
+    /* The toast region is polite by design and queues. A REFUSED money command
+       needs the assertive channel, which lives on the announcer. */
     <ToastProvider>
-      <main className="registrations-dash">
-        <div className="dash-stack money-stack">
-          <header className="dash-head">
-            <div className="competition-title-row title-row-actions">
-              <span className="date-row">
-                {view.case !== null ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/money/case/${view.case.caseId}`}
-                    variant="secondary"
-                    data-testid="open-case-review"
-                  >
-                    Case review
-                  </ButtonLink>
-                ) : null}
-              </span>
-            </div>
-            <p className="competitions-hint">
-              Settlement — what was owed, what came in, what closed
-            </p>
-          </header>
-          <MoneyPanel slug={slug} console={view} />
-        </div>
-      </main>
+      <AnnouncerProvider>
+        <main className="registrations-dash">
+          <div className="dash-stack money-stack">
+            <header className="dash-head">
+              <div className="competition-title-row title-row-actions">
+                <span className="date-row">
+                  {view.case !== null ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/money/case/${view.case.caseId}`}
+                      variant="secondary"
+                      data-testid="open-case-review"
+                    >
+                      Case review
+                    </ButtonLink>
+                  ) : null}
+                </span>
+              </div>
+              <p className="competitions-hint">
+                Settlement — what was owed, what came in, what closed
+              </p>
+            </header>
+            <MoneyPanel slug={slug} console={view} />
+          </div>
+        </main>
+      </AnnouncerProvider>
     </ToastProvider>
   );
 }

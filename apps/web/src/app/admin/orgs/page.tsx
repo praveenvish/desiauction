@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { adminOrganizations } from "../../../server/admin/actions";
-import { platformAdminGate } from "../../../server/admin/authz";
+import { platformAdminPageGate } from "../../../server/admin/authz";
 import type { OrgFilter } from "../../../server/admin/views";
 import { OrgsPanel } from "./orgs-panel";
 import "../../seasons/seasons.css";
@@ -21,12 +21,12 @@ function filterOf(value: string | undefined): OrgFilter {
 export default async function AdminOrgsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filter?: string }>;
+  searchParams: Promise<{ q?: string; filter?: string; after?: string }>;
 }) {
-  if ((await platformAdminGate()) === null) {
+  if ((await platformAdminPageGate("organizations")) === null) {
     notFound();
   }
-  const { q, filter } = await searchParams;
+  const { q, filter, after } = await searchParams;
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
@@ -36,16 +36,27 @@ export default async function AdminOrgsPage({
             organization&rsquo;s own console.
           </p>
         </header>
-        <Suspense key={`${q ?? ""}-${filter ?? ""}`} fallback={<LoadingState variant="page" />}>
-          <Directory query={q} filter={filterOf(filter)} />
+        <Suspense
+          key={`${q ?? ""}-${filter ?? ""}-${after ?? ""}`}
+          fallback={<LoadingState variant="page" />}
+        >
+          <Directory query={q} filter={filterOf(filter)} after={after} />
         </Suspense>
       </div>
     </main>
   );
 }
 
-async function Directory({ query, filter }: { query: string | undefined; filter: OrgFilter }) {
-  const directory = await adminOrganizations(query, filter);
+async function Directory({
+  query,
+  filter,
+  after,
+}: {
+  query: string | undefined;
+  filter: OrgFilter;
+  after: string | undefined;
+}) {
+  const directory = await adminOrganizations(query, filter, after);
   if (directory === null) {
     notFound();
   }

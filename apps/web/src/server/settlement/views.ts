@@ -6,6 +6,7 @@ import {
   journalSummary,
   isSettlementCapabilitySet,
   outstandingOf,
+  parseAccount,
   reconciledOverlay,
   type CaseFinancial,
   type CaseStatus,
@@ -49,6 +50,8 @@ export interface ObligationView {
   readonly waived: number;
   readonly reinstated: number;
   readonly outstanding: number;
+  /** Recorded against this team but not yet attested — see `PaymentView.pending`. */
+  readonly pending: number;
 }
 
 export interface PaymentView {
@@ -62,7 +65,22 @@ export interface PaymentView {
   readonly refundedTotal: number;
   readonly attested: boolean;
   readonly attestedBy: string | null;
+  /**
+   * The attester, NAMED. The action's own copy promises the money is "recorded
+   * against your name"; the id was fetched and then never rendered, so the
+   * promise was kept in the database and broken on the screen.
+   */
+  readonly attestedByName: string | null;
   readonly providerRef: string | null;
+  /** When this payment was recorded (ISO). Already stored — never shown. */
+  readonly recordedAt: string;
+  /**
+   * Money recorded but not yet attested: real to the person who wrote it down,
+   * invisible to the books until someone says the cash is in hand. Neither the
+   * tiles nor the obligation rows moved when it was recorded, so it read as if
+   * nothing had happened at all.
+   */
+  readonly pending: number;
 }
 
 export interface CaseView {
@@ -79,6 +97,15 @@ export interface CaseView {
   readonly recoveries: number;
   readonly closedAtSeq: number | null;
   readonly financial: CaseFinancial;
+  /**
+   * Money recorded and not yet attested, across the whole case. Derived from
+   * the payment projection rows the writer maintains — settlement computes no
+   * such figure because the books rightly know nothing about it until it is
+   * attested. It is reported BESIDE `financial`, never inside it.
+   */
+  readonly pending: number;
+  /** When the case was opened (ISO). The header band had no date on it at all. */
+  readonly openedAt: string;
   readonly obligations: readonly ObligationView[];
   readonly payments: readonly PaymentView[];
   readonly overlay: ReconciledOverlay;
@@ -92,6 +119,19 @@ export async function teamNames(db: Db, competitionId: string): Promise<Map<stri
     .from(teams)
     .where(eq(teams.competitionId, competitionId));
   return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+/** personId → display name, for the handful of people a case actually names. */
+async function personNames(db: Db, ids: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .select({ id: people.id, name: people.name, phone: people.phone })
+    .from(people)
+    .where(inArray(people.id, unique));
+  return new Map(rows.map((row) => [row.id, row.name ?? row.phone]));
 }
 
 function nameOf(names: Map<string, string>, teamId: string): string {
@@ -112,11 +152,33 @@ export async function caseView(
   }
   const projection = fold.projection;
   const names = await teamNames(db, projection.competitionId);
-  const paymentRows = await db
-    .select()
-    .from(payments)
-    .where(eq(payments.caseId, caseId))
-    .orderBy(asc(payments.createdAt));
+  const [paymentRows, caseRows] = await Promise.all([
+    db.select().from(payments).where(eq(payments.caseId, caseId)).orderBy(asc(payments.createdAt)),
+    db
+      .select({ createdAt: settlementCases.createdAt })
+      .from(settlementCases)
+      .where(eq(settlementCases.id, caseId))
+      .limit(1),
+  ]);
+  const attesterNames = await personNames(
+    db,
+    paymentRows.map((row) => row.attestedBy).filter((id): id is string => id !== null),
+  );
+
+  // Recorded, not yet attested. `created`/`authorized` are the states where a
+  // human has written the money down but nobody has said it arrived; anything
+  // beyond them has either landed on the books or failed off them.
+  const pendingOf = (row: (typeof paymentRows)[number]): number =>
+    row.status === "created" || row.status === "authorized"
+      ? Math.max(0, row.amount - row.captured)
+      : 0;
+  const pendingByTeam = new Map<string, number>();
+  let pendingTotal = 0;
+  for (const row of paymentRows) {
+    const value = pendingOf(row);
+    pendingTotal += value;
+    pendingByTeam.set(row.teamId, (pendingByTeam.get(row.teamId) ?? 0) + value);
+  }
 
   const obligations = collectionSummary(projection).map((line) => {
     const raw = projection.obligations[line.teamId];
@@ -130,6 +192,7 @@ export async function caseView(
       waived: line.waived,
       reinstated: line.reinstated,
       outstanding: line.outstanding,
+      pending: pendingByTeam.get(line.teamId) ?? 0,
     } satisfies ObligationView;
   });
 
@@ -147,6 +210,8 @@ export async function caseView(
     recoveries: projection.recoveries,
     closedAtSeq: projection.closedAtSeq,
     financial: caseFinancial(projection),
+    pending: pendingTotal,
+    openedAt: (caseRows[0]?.createdAt ?? new Date(0)).toISOString(),
     obligations,
     payments: paymentRows.map((row) => ({
       paymentId: row.id,
@@ -159,7 +224,10 @@ export async function caseView(
       refundedTotal: row.refundedTotal,
       attested: row.attested,
       attestedBy: row.attestedBy,
+      attestedByName: row.attestedBy === null ? null : (attesterNames.get(row.attestedBy) ?? null),
       providerRef: row.providerRef,
+      recordedAt: row.createdAt.toISOString(),
+      pending: pendingOf(row),
     })),
     overlay: reconciledOverlay(projection),
     evidence: projection.closureEvidence,
@@ -178,9 +246,50 @@ export interface TimelineView {
   readonly reason: string | null;
 }
 
+/**
+ * A journal line with its account said in words.
+ *
+ * `dues:01KYAF06VBRK9DXMD5Q3G550E3:01KYAF06W2Q2Q1V5C7C0N8SZ7X` is a correct
+ * account code and is not language. The CODE stays — an auditor reconciling
+ * against the ledger needs the literal string — but it stops being the only
+ * thing on the row.
+ */
+export interface JournalLineView extends JournalSummaryLine {
+  /** e.g. "Dues — Cup Kings", "Cash received", "Waived on this case". */
+  readonly label: string;
+}
+
 export interface CaseAuditView {
   readonly timeline: readonly TimelineView[];
-  readonly journal: readonly JournalSummaryLine[];
+  readonly journal: readonly JournalLineView[];
+}
+
+const METHOD_WORDS: Record<string, string> = {
+  "manual:cash": "Cash received",
+  "manual:upi-direct": "UPI received",
+  "manual:bank": "Bank transfer received",
+  "gateway:razorpay": "Razorpay received",
+};
+
+function accountLabel(account: string, names: Map<string, string>): string {
+  const parsed = parseAccount(account);
+  if (parsed === null) {
+    return account;
+  }
+  switch (parsed.family) {
+    case "dues":
+      return parsed.teamId === null ? "Dues" : `Dues — ${nameOf(names, parsed.teamId)}`;
+    case "case-control":
+      return "This case";
+    case "funds":
+      return parsed.method === null
+        ? "Funds"
+        : (METHOD_WORDS[parsed.method] ?? `Received by ${parsed.method}`);
+    case "waived":
+      return "Waived on this case";
+    case "refund-liability":
+      return "Refunds owed";
+  }
 }
 
 const SYSTEM_ACTORS = new Set(["system", "sweep"]);
@@ -224,7 +333,11 @@ export async function caseAudit(
       reason,
     } satisfies TimelineView;
   });
-  return { timeline, journal: journal === null ? [] : journalSummary(journal, caseId) };
+  const journalLines = journal === null ? [] : journalSummary(journal, caseId);
+  return {
+    timeline,
+    journal: journalLines.map((line) => ({ ...line, label: accountLabel(line.account, names) })),
+  };
 }
 
 async function actorNames(

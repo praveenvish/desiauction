@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { adminAudit } from "../../../server/admin/actions";
-import { platformAdminGate } from "../../../server/admin/authz";
+import { platformAdminPageGate } from "../../../server/admin/authz";
 import type { AuditFilters } from "../../../server/admin/views";
 import { AuditPanel } from "./audit-panel";
 import "../../seasons/seasons.css";
@@ -23,7 +23,7 @@ export default async function AdminAuditPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if ((await platformAdminGate()) === null) {
+  if ((await platformAdminPageGate("audit")) === null) {
     notFound();
   }
   const params = await searchParams;
@@ -38,6 +38,7 @@ export default async function AdminAuditPage({
     ...(one("scopeId") !== undefined ? { scopeId: one("scopeId") } : {}),
     ...(one("from") !== undefined ? { from: one("from") } : {}),
     ...(one("to") !== undefined ? { to: one("to") } : {}),
+    ...(one("after") !== undefined ? { after: one("after") } : {}),
   };
   return (
     <main className="registrations-dash">

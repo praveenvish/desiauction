@@ -85,11 +85,20 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {/* Replay the remembered console theme before first paint (no flash). */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <ProductShell
-          session={session !== null ? { name: session.name, phone: session.phone } : null}
+          session={
+            session !== null
+              ? { name: session.name, phone: session.phone, personId: session.personId }
+              : null
+          }
           orgs={orgs.map((org) => ({
             slug: org.slug,
             name: org.name,
             canFinance: financeOrgs.has(org.id),
+            // Settlement and Finance are separate capability partitions, and
+            // the money tab strip spans both. Without this the strip was built
+            // from membership alone, so someone with neither key saw four tabs
+            // that all 404 for them.
+            canSettle: settlementOrgs.has(org.id),
           }))}
           competitions={competitions}
           isAdmin={isAdmin}

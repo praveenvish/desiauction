@@ -528,12 +528,29 @@ function lifecycleFor(dash: HomeDashboardData): {
       key: "settlement",
       name: "Settlement",
       count: settlement.competitions,
+      /**
+       * "settled" used to be derived from `outstanding === 0`. It is not the
+       * same claim: a case with every rupee collected stays `settling` until
+       * somebody settles it, so this rail told an organizer "₹2L collected ·
+       * settled" while the Money tab correctly said COLLECTING. Settlement is a
+       * case STATUS, and only the case may say it.
+       *
+       * The money words are also gated: without a settlement grant on the org
+       * the figures fold to zero, and "₹0 collected" must not be reported as a
+       * fact about books this person cannot open.
+       */
       detail:
         settlement.competitions === 0
           ? "Nothing due yet"
-          : settlement.outstandingPaise > 0
-            ? `${rupeesShort(settlement.outstandingPaise)} still outstanding`
-            : `${rupeesShort(settlement.collectedPaise)} collected · settled`,
+          : settlement.visible === 0
+            ? settlement.awaiting > 0
+              ? "Settling"
+              : "Settled"
+            : settlement.outstandingPaise > 0
+              ? `${rupeesShort(settlement.outstandingPaise)} still outstanding`
+              : settlement.awaiting > 0
+                ? `${rupeesShort(settlement.collectedPaise)} collected · not settled yet`
+                : `${rupeesShort(settlement.collectedPaise)} collected · settled`,
       tone: "violet",
       icon: <Glyph d={G.rupee} />,
       // NOT /money. That surface renders "This area is being built during the

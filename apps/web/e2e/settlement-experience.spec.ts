@@ -233,12 +233,14 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await page.getByTestId("pay-method").selectOption("manual:cash");
   await page.getByTestId("pay-amount").fill("1,20,000");
   await page.getByTestId("record-payment").click();
-  await expect(page.getByTestId("payments-table")).toContainText("created", { timeout: 20_000 });
+  // The gateway enums (`created`/`captured`) are no longer printed at a desk
+  // where the money arrived as cash in an envelope.
+  await expect(page.getByTestId("payments-table")).toContainText("Recorded", { timeout: 20_000 });
 
   // Recording is not collecting: nothing moves until a human attests it.
   await expect(page.getByTestId("discharged")).toContainText("₹0");
-  await page.getByRole("button", { name: "Attest receipt" }).first().click();
-  await expect(page.getByTestId("payments-table")).toContainText("captured", { timeout: 20_000 });
+  await page.getByRole("button", { name: "Confirm received" }).first().click();
+  await expect(page.getByTestId("payments-table")).toContainText("Received", { timeout: 20_000 });
   await expect(page.getByTestId("discharged")).toContainText("₹1,20,000");
   await expect(page.getByTestId("outstanding")).toContainText("₹80,000");
 
@@ -262,12 +264,17 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await expect(page.getByTestId("outstanding")).toContainText("₹0");
 
   // --- Settle → close ---------------------------------------------------------
+  // Settling locks every amount on the case, so it confirms first.
   await page.getByTestId("settle-case").click();
+  await page.getByTestId("confirm-settle").click();
   await expect(page.getByTestId("case-status")).toHaveText("Settled", { timeout: 20_000 });
   await expect(page.getByTestId("closure-ready")).toBeVisible();
   await axeClean(page, "settlement console · settled");
 
+  // Closing seals the evidence for ever — the highest-consequence act on the
+  // surface, and the one that shipped with no confirmation at all.
   await page.getByTestId("close-case").click();
+  await page.getByTestId("confirm-close").click();
   await expect(page.getByTestId("case-status")).toHaveText("Reconciled", { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Settlement complete" })).toBeVisible();
   await axeClean(page, "settlement console · reconciled");
@@ -277,7 +284,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await expect(page).toHaveURL(/\/money\/case\//);
   caseUrl = page.url();
   await caseReady(page);
-  await expect(page.getByTestId("review-status")).toHaveText("closed");
+  await expect(page.getByTestId("review-status")).toHaveText("Reconciled");
 
   await page.getByRole("tab", { name: "Evidence" }).click();
   await expect(page.getByTestId("evidence-grid")).toBeVisible();
@@ -312,7 +319,10 @@ test("case review: the audit surfaces, deep-linked", async ({ page }) => {
 
   await page.getByRole("tab", { name: "Payments" }).click();
   await expect(page.getByTestId("review-payments")).toContainText("Cash");
-  await expect(page.getByTestId("review-payments")).toContainText("attested by hand");
+  // The attester is NAMED: the action promises "recorded against your name".
+  await expect(page.getByTestId("review-payments")).toContainText(
+    "confirmed by hand by Settlement Founder",
+  );
 
   await page.getByRole("tab", { name: "Verification" }).click();
   // The pin the money stands on, and the books it moved.

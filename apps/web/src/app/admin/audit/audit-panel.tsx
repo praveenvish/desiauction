@@ -1,7 +1,8 @@
 import { Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
-import type { AuditEntry, AuditPage } from "../../../server/admin/views";
+import { formatCount } from "../../../server/admin/format";
+import type { AuditEntry, AuditFilters, AuditPage } from "../../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
 
 /**
@@ -13,7 +14,8 @@ import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
  * paraphrased its evidence would be worthless in the moment it matters.
  */
 export function AuditPanel({ page }: { page: AuditPage }) {
-  const { rows, actions, total, filters, truncated } = page;
+  const { rows, actions, total, filters, nextCursor } = page;
+  const nextHref = nextCursor === null ? null : auditHref(filters, nextCursor);
   return (
     <>
       <ReadOnlyNotice />
@@ -88,26 +90,55 @@ export function AuditPanel({ page }: { page: AuditPage }) {
       </Card>
 
       <Card>
+        {/* A hundred audit entries under zero headings: the page had one h1 and
+            nothing else, so nothing named what the list was. */}
+        <h2 className="admin-section-title">Events</h2>
         <p className="admin-meta" data-testid="admin-audit-count">
-          {rows.length} shown · {total} matching event{total === 1 ? "" : "s"}
-          {truncated ? " · showing the newest 100 — narrow the filters to see more" : ""}
+          {formatCount(rows.length)} shown · {formatCount(total)} matching event
+          {total === 1 ? "" : "s"} · times are IST
         </p>
         {rows.length === 0 ? (
           <EmptyState
-            headingLevel={2}
+            headingLevel={3}
             title="No matching events"
             description="Nothing in the audit log matches these filters."
           />
         ) : (
-          <ul className="admin-timeline" data-testid="admin-audit-list">
-            {rows.map((row) => (
-              <AuditRow key={row.id} row={row} />
-            ))}
-          </ul>
+          <>
+            <ul className="admin-timeline" data-testid="admin-audit-list">
+              {rows.map((row) => (
+                <AuditRow key={row.id} row={row} />
+              ))}
+            </ul>
+            {/* Paging replaces "narrow the filters to see more" — which was the
+                only route past event 100 of 3,720. */}
+            <nav className="admin-pagination" aria-label="Older events">
+              {nextHref === null ? (
+                <span className="admin-meta">End of the matching events.</span>
+              ) : (
+                <Link href={nextHref} data-testid="admin-audit-next">
+                  Older 100 →
+                </Link>
+              )}
+            </nav>
+          </>
         )}
       </Card>
     </>
   );
+}
+
+/** The current filters, plus a cursor. Every filter survives the page turn. */
+function auditHref(filters: AuditFilters, after: string): string {
+  const params = new URLSearchParams();
+  for (const key of ["q", "action", "actor", "scopeId", "from", "to"] as const) {
+    const value = filters[key];
+    if (value !== undefined && value !== "") {
+      params.set(key, value);
+    }
+  }
+  params.set("after", after);
+  return `/admin/audit?${params.toString()}`;
 }
 
 function AuditRow({ row }: { row: AuditEntry }) {
@@ -136,7 +167,9 @@ function AuditRow({ row }: { row: AuditEntry }) {
           <pre className="admin-evidence">{JSON.stringify(row.meta)}</pre>
         ) : null}
       </span>
-      <RelativeTime at={row.at} />
+      {/* On a forensic surface the absolute moment IS the datum, so it is drawn
+          rather than hidden in a `title` only a mouse can reach. */}
+      <RelativeTime at={row.at} absolute />
     </li>
   );
 }

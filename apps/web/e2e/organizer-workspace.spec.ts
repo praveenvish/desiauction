@@ -181,6 +181,8 @@ test("founder demo: org → competition → approve → team roster → venue �
   await page.getByLabel("Kickoff times").fill("18:00,20:00");
   await page.getByRole("checkbox", { name: /Main Oval/ }).check();
   await page.getByTestId("generate-fixtures").click();
+  // Generation previews before it writes; confirm it.
+  await page.getByTestId("confirm-generate").click();
   await expect(page.getByTestId("fixtures-table")).toBeVisible({ timeout: 20_000 });
   await page.getByTestId("schedule-all").click();
   await page.getByTestId("publish-all").click();

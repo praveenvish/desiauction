@@ -48,6 +48,11 @@ export default async function LedgerPage({
             <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
               Cockpit
             </ButtonLink>
+            {/* The ledger and the replay viewer are two readings of the same
+                event log and neither knew the other existed. */}
+            <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary">
+              Replay viewer
+            </ButtonLink>
           </div>
           <p className="competitions-hint" data-testid="ledger-meta">
             {view.auctionName} · {view.totalRows} rows · regenerated from the event log in{" "}

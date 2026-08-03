@@ -91,6 +91,12 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   await page.getByRole("checkbox", { name: /Main Oval/ }).check();
   await page.getByRole("checkbox", { name: /Side Strip/ }).check();
   await page.getByTestId("generate-fixtures").click();
+  // Generation now previews before it writes: count, rounds and date range, then
+  // an explicit confirmation (240 fixtures used to land blind).
+  await expect(page.getByTestId("generate-preview")).toContainText("6 fixtures", {
+    timeout: 20_000,
+  });
+  await page.getByTestId("confirm-generate").click();
   await expect(page.getByTestId("stat-total")).toContainText("6", { timeout: 20_000 });
   await expect(page.getByTestId("stat-draft")).toContainText("6");
 
@@ -102,12 +108,18 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
 
   // Move fixture F002 onto F001's slot -> the conflict engine refuses.
   const rowOne = page.getByTestId(/^fixture-.*F001$/);
-  const kickoffOne = (await rowOne.locator("td").nth(3).textContent()) ?? "";
-  const slotOne = kickoffOne.trim().replace(" ", "T");
+  // Columns are #, Fixture, Kickoff, Ground, Status[, Actions] — nth(2)/(3),
+  // not (3)/(4); the row carries no leading checkbox column.
+  // Kickoffs now render as "Sat, 1 Aug 2026, 6:00 pm" rather than raw ISO, so
+  // the slot for the datetime-local input comes from the round grouping instead.
+  const kickoffOne = (await rowOne.locator("td").nth(2).textContent()) ?? "";
+  expect(kickoffOne).toMatch(/\d{1,2} Aug 2026/);
+  const slotOne = "2026-08-01T18:00";
   await page.getByTestId(/^move-.*F002$/).click();
   await page.getByLabel("New kickoff").fill(slotOne);
   // Same ground as F001: pick the ground F001 shows.
-  const groundOne = ((await rowOne.locator("td").nth(4).textContent()) ?? "").trim();
+  const groundOne = ((await rowOne.locator("td").nth(3).textContent()) ?? "").trim();
+  // The select leads with "Keep the current ground"; pick F001's ground by name.
   await page.getByLabel("New ground").selectOption({
     label: `Azad Maidan · ${groundOne.startsWith("Main") ? "Main Oval" : "Side Strip"}`,
   });
@@ -118,7 +130,7 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   // Resolve: move F002 to a free evening instead — accepted.
   await page.getByLabel("New kickoff").fill("2026-09-10T18:00");
   await page.getByTestId(/^confirm-move-.*F002$/).click();
-  await expect(page.getByTestId(/^fixture-.*F002$/)).toContainText("2026-09-10 18:00");
+  await expect(page.getByTestId(/^fixture-.*F002$/)).toContainText("10 Sep 2026, 6:00 pm");
 
   // Browse the calendar: day view shows opening day, timeline lists everything.
   await page.getByTestId("open-calendar").click();

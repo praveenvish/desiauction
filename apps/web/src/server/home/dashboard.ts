@@ -94,7 +94,26 @@ export interface HomeStages {
   setup: { competitions: number; teams: number };
   registration: { competitions: number; registered: number; approved: number };
   auction: { competitions: number; live: number; bids: number };
-  settlement: { competitions: number; collectedPaise: number; outstandingPaise: number };
+  settlement: {
+    competitions: number;
+    collectedPaise: number;
+    outstandingPaise: number;
+    /**
+     * Settlement cases at this stage that have NOT reached `settled` or
+     * `closed`. The rail used to derive the word "settled" from
+     * `outstanding === 0` — but a case with every rupee collected is
+     * `settling` until somebody settles it, and the rail told the organizer
+     * their books were done while the Money tab, correctly, said COLLECTING.
+     * Whether the books are settled is the CASE's answer, never arithmetic's.
+     */
+    awaiting: number;
+    /**
+     * How many of these seasons this person may actually see money for. Without
+     * a settlement grant the figures fold to zero, and "₹0 collected" must not
+     * be reported as a fact about the books.
+     */
+    visible: number;
+  };
 }
 
 /** Per-competition counts the console already paid for, keyed by competition id. */
@@ -263,7 +282,13 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
         setup: { competitions: 0, teams: 0 },
         registration: { competitions: 0, registered: 0, approved: 0 },
         auction: { competitions: 0, live: 0, bids: 0 },
-        settlement: { competitions: 0, collectedPaise: 0, outstandingPaise: 0 },
+        settlement: {
+          competitions: 0,
+          collectedPaise: 0,
+          outstandingPaise: 0,
+          awaiting: 0,
+          visible: 0,
+        },
       },
       auctions: [],
       top: [],
@@ -294,7 +319,11 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
 
   // --- settlement cases -> obligations + payments ---------------------------
   const caseRows = await systemDb
-    .select({ id: settlementCases.id, competitionId: settlementCases.competitionId })
+    .select({
+      id: settlementCases.id,
+      competitionId: settlementCases.competitionId,
+      status: settlementCases.status,
+    })
     .from(settlementCases)
     .where(inArray(settlementCases.competitionId, competitionIds));
   const caseIds = caseRows.map((row) => row.id);
@@ -499,11 +528,26 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
 
   // Lifecycle placement: money in flight wins, then the competition's own status.
   const settling = new Set(caseRows.map((row) => row.competitionId));
+  // Whether the BOOKS are done is the case's own status, not arithmetic over
+  // obligations. A voided case never happened and is not counted either way.
+  const caseAwaiting = new Set(
+    caseRows
+      .filter(
+        (row) => row.status !== "settled" && row.status !== "closed" && row.status !== "voided",
+      )
+      .map((row) => row.competitionId),
+  );
   const stages: HomeStages = {
     setup: { competitions: 0, teams: 0 },
     registration: { competitions: 0, registered: 0, approved: 0 },
     auction: { competitions: 0, live: 0, bids: 0 },
-    settlement: { competitions: 0, collectedPaise: 0, outstandingPaise: 0 },
+    settlement: {
+      competitions: 0,
+      collectedPaise: 0,
+      outstandingPaise: 0,
+      awaiting: 0,
+      visible: 0,
+    },
   };
   for (const competition of view.competitions) {
     const id = competition.id;
@@ -511,6 +555,12 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       stages.settlement.competitions += 1;
       stages.settlement.collectedPaise += collectedBy.get(id) ?? 0;
       stages.settlement.outstandingPaise += outstandingBy.get(id) ?? 0;
+      if (caseAwaiting.has(id)) {
+        stages.settlement.awaiting += 1;
+      }
+      if (settleable.has(competition.orgId)) {
+        stages.settlement.visible += 1;
+      }
     } else if (competition.status === "registration_closed") {
       stages.auction.competitions += 1;
       stages.auction.bids += bidsBy.get(id) ?? 0;

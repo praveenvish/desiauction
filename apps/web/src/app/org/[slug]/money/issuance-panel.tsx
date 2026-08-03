@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   Badge,
   Button,
@@ -22,7 +23,7 @@ import {
   type FinanceWorkspace,
   type FinopsResult,
 } from "../../../../server/financial-operations/actions";
-import { DOC_KIND_LABEL } from "../../../../server/financial-operations/register";
+import { DOC_KIND_LABEL, postureLabel } from "../../../../server/financial-operations/register";
 
 /**
  * PX-8 completion — the lifecycle's ENTRANCE.
@@ -36,11 +37,6 @@ import { DOC_KIND_LABEL } from "../../../../server/financial-operations/register
  * Nothing here numbers a document, decides a tax, or duplicates a rule.
  * `nextNumber` is the platform's derived projection, rendered.
  */
-
-const POSTURE_LABEL: Record<string, string> = {
-  none: "Not registered for GST",
-  "gst-registered": "Registered for GST",
-};
 
 export function IssuancePanel({ slug, workspace }: { slug: string; workspace: FinanceWorkspace }) {
   const router = useRouter();
@@ -79,6 +75,7 @@ export function IssuancePanel({ slug, workspace }: { slug: string; workspace: Fi
           slug={slug}
           series={issuance.series}
           fy={workspace.board.fy}
+          posture={issuance.profile.posture}
           canManage={canManage}
           busy={busy}
           act={act}
@@ -154,7 +151,7 @@ function ProfileCard({
           </div>
           <div>
             <dt>Tax posture</dt>
-            <dd>{POSTURE_LABEL[profile.posture] ?? profile.posture}</dd>
+            <dd>{postureLabel(profile.posture)}</dd>
           </div>
           {profile.gstin === null ? null : (
             <div>
@@ -320,6 +317,7 @@ function SeriesCard({
   slug,
   series,
   fy,
+  posture,
   canManage,
   busy,
   act,
@@ -327,6 +325,9 @@ function SeriesCard({
   slug: string;
   series: FinanceWorkspace["board"]["issuance"]["series"];
   fy: string;
+  /** The org's declared tax posture — decides whether a tax-invoice lane could
+      ever issue a number. See the warning in the open-a-series dialog. */
+  posture: string;
   canManage: boolean;
   busy: boolean;
   act: (run: () => Promise<FinopsResult>, done: string) => Promise<boolean>;
@@ -358,7 +359,12 @@ function SeriesCard({
           description="A document needs a lane to take its number from. One lane per kind per fiscal year, forever — the platform makes that structural, so a number can never be reused."
         />
       ) : (
-        <div className="table-scroll">
+        <div
+          className="table-scroll money-scroll"
+          tabIndex={0}
+          role="region"
+          aria-label="Numbering series"
+        >
           <table className="money-table" data-testid="series-table">
             <caption>
               <VisuallyHidden>
@@ -480,6 +486,21 @@ function SeriesCard({
           <option value="tax-invoice">Tax invoices</option>
           <option value="correction">Corrections</option>
         </Select>
+        {/* Say it BEFORE the series exists, not after. A series is append-only
+            and permanent, so a GST-registered organization could open an
+            INV/2026-27 lane, be told nothing, and only discover on first use
+            that the platform refuses every tax invoice it could ever hold —
+            DesiAuction does not decompose GST and declines rather than guess
+            the split. That refusal is deliberate; opening a lane that can
+            never issue a number, in silence, is not. */}
+        {kind === "tax-invoice" && posture !== "none" ? (
+          <p className="section-note" data-testid="series-gst-warning">
+            <strong>This lane will not be able to issue anything.</strong> DesiAuction doesn&rsquo;t
+            work out GST splits, so it won&rsquo;t issue a tax invoice for a GST-registered
+            organization rather than guess the tax. The series would be permanent and permanently
+            empty — raise invoices the way you do now, and use a receipt series here.
+          </p>
+        ) : null}
         <Field
           label="Fiscal year"
           help="Like 2026-27."
@@ -541,7 +562,12 @@ function CandidatesCard({
               ? "Auto-receipt is on, so these will be issued by the platform on its next ingest. You can issue one by hand now if it cannot wait."
               : "Auto-receipt is off, so these wait for a human. Turning it on in the profile above lets the platform issue them itself."}
           </p>
-          <div className="table-scroll">
+          <div
+            className="table-scroll money-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Payments awaiting a receipt"
+          >
             <table className="money-table" data-testid="candidates-table">
               <caption>
                 <VisuallyHidden>Captured payments with no receipt</VisuallyHidden>
@@ -550,6 +576,11 @@ function CandidatesCard({
                 <tr>
                   <th scope="col">Team</th>
                   <th scope="col">Payment</th>
+                  {/* An operator was being asked to issue a receipt for a
+                      payment without being shown how much it was for. */}
+                  <th scope="col" className="num">
+                    Amount
+                  </th>
                   <th scope="col" className="num">
                     <VisuallyHidden>Actions</VisuallyHidden>
                   </th>
@@ -561,6 +592,15 @@ function CandidatesCard({
                     <td data-label="Team">{candidate.teamName}</td>
                     <td data-label="Payment">
                       <span className="digest">{candidate.paymentId.slice(-10)}</span>
+                    </td>
+                    <td data-label="Amount" className="num">
+                      {candidate.capturedPaise === null ? (
+                        <span className="section-note">—</span>
+                      ) : (
+                        <span title={`${String(candidate.capturedPaise)} paise`}>
+                          {formatPaiseINR(paise(candidate.capturedPaise))}
+                        </span>
+                      )}
                     </td>
                     <td data-label="" className="num">
                       <div className="money-row-actions">

@@ -28,16 +28,23 @@ import {
   startEnrollment,
   type PasskeySummary,
 } from "./passkeys";
-import { listSecurityEvents, logSecurityEvent, type SecurityEvent } from "./security-events";
+import {
+  countSecurityEvents,
+  listSecurityEvents,
+  logSecurityEvent,
+  type SecurityEvent,
+} from "./security-events";
 import {
   createSession,
   getSessionByToken,
   listSessions,
+  revokeOtherSessions,
   revokeSession,
   RETURNING_COOKIE,
   SESSION_COOKIE,
   type SessionSummary,
 } from "./sessions";
+import { describeUserAgent } from "./user-agent";
 
 const CHALLENGE_COOKIE = "da_pk_challenge";
 
@@ -249,16 +256,29 @@ export async function startPasskeyEnrollmentAction(): Promise<PublicKeyCredentia
 export async function finishPasskeyEnrollmentAction(
   response: RegistrationResponseJSON,
   deviceName: string,
-): Promise<{ ok: boolean }> {
+): Promise<ActionResult> {
   const session = await currentSession();
   const challenge = await takeChallenge();
-  if (session === null || challenge === null) {
-    return { ok: false };
+  if (session === null) {
+    return { ok: false, error: SESSION_LAPSED };
+  }
+  if (challenge === null) {
+    return {
+      ok: false,
+      error: "That enrollment took too long. Tap Add passkey and try again.",
+    };
+  }
+  const named = deviceName.trim().replace(/\s+/g, " ");
+  if (named === "") {
+    // A blank name silently became "Passkey". Two devices both called "Passkey"
+    // defeat the entire point of the list they appear in.
+    return { ok: false, error: "Name this device first — you'll need to tell them apart." };
   }
   try {
-    return await finishEnrollment(db, session.personId, challenge, response, deviceName);
+    const result = await finishEnrollment(db, session.personId, challenge, response, named);
+    return result.ok ? { ok: true } : { ok: false, error: "That passkey couldn't be verified." };
   } catch {
-    return { ok: false };
+    return { ok: false, error: "We couldn't save that passkey. Try again." };
   }
 }
 
@@ -288,55 +308,150 @@ export async function finishPasskeyLoginAction(
   return { ok: true };
 }
 
-export async function renamePasskeyAction(passkeyId: string, name: string): Promise<void> {
-  const session = await currentSession();
-  if (session !== null) {
-    await renamePasskey(db, session.personId, passkeyId, name);
-  }
+/**
+ * Every destructive action on this surface returns a RESULT.
+ *
+ * These three used to return `Promise<void>`. A failure was therefore not
+ * merely unreported — it was unrepresentable: the caller did `.then(refresh)`
+ * and a lapsed session, a row that had already gone, or a database error all
+ * looked exactly like success. Removing your only passwordless credential is
+ * not an operation that may fail silently.
+ */
+export interface ActionResult {
+  ok: boolean;
+  /** A sentence for a human. Present only when `ok` is false. */
+  error?: string;
 }
 
-export async function removePasskeyAction(passkeyId: string): Promise<void> {
+const SESSION_LAPSED = "Your session has expired. Sign in again to make this change.";
+
+export async function renamePasskeyAction(passkeyId: string, name: string): Promise<ActionResult> {
   const session = await currentSession();
-  if (session !== null) {
-    await removePasskey(db, session.personId, passkeyId);
+  if (session === null) {
+    return { ok: false, error: SESSION_LAPSED };
   }
+  const trimmed = name.trim().replace(/\s+/g, " ");
+  if (trimmed === "") {
+    return { ok: false, error: "Give this device a name." };
+  }
+  if (trimmed.length > 60) {
+    return { ok: false, error: "That's a bit long — 60 characters or fewer." };
+  }
+  try {
+    await renamePasskey(db, session.personId, passkeyId, trimmed);
+  } catch {
+    return { ok: false, error: "We couldn't rename that passkey. Try again." };
+  }
+  return { ok: true };
+}
+
+export async function removePasskeyAction(passkeyId: string): Promise<ActionResult> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: SESSION_LAPSED };
+  }
+  try {
+    await removePasskey(db, session.personId, passkeyId);
+  } catch {
+    return { ok: false, error: "We couldn't remove that passkey. Try again." };
+  }
+  return { ok: true };
 }
 
 // --- Account security surface ------------------------------------------------
 
+export interface SessionView extends SessionSummary {
+  current: boolean;
+  /** "Chrome on macOS" — see `describeUserAgent`. Null when unparseable. */
+  device: string | null;
+}
+
 export interface AccountSecurity {
   passkeys: PasskeySummary[];
-  sessions: (SessionSummary & { current: boolean })[];
+  sessions: SessionView[];
   events: SecurityEvent[];
+  /** How many events exist in total, so the panel can admit what it hides. */
+  eventsTotal: number;
 }
+
+/**
+ * How many security events the account panel loads. Ten was the old hard cap
+ * and it could not show a passkey removal from last week, because ten sign-ins
+ * had happened since. Fifty is loaded and the panel paginates locally; the
+ * total is carried alongside so nothing is silently truncated.
+ */
+const ACCOUNT_EVENT_WINDOW = 50;
 
 export async function accountSecurity(): Promise<AccountSecurity | null> {
   const session = await currentSession();
   if (session === null) {
     return null;
   }
-  const [passkeys, sessionList, events] = await Promise.all([
+  const [passkeys, sessionList, events, eventsTotal] = await Promise.all([
     listPasskeys(db, session.personId),
     listSessions(db, session.personId),
-    listSecurityEvents(session.personId),
+    listSecurityEvents(session.personId, ACCOUNT_EVENT_WINDOW),
+    countSecurityEvents(session.personId),
   ]);
+  // `listSessions` returns newest-first; this device is pinned above that,
+  // wherever it happens to fall by last-seen. The one row a person needs to
+  // recognise before revoking anything must not require scrolling to find.
+  const viewed: SessionView[] = sessionList.map((entry) => ({
+    ...entry,
+    current: entry.id === session.sessionId,
+    device: describeUserAgent(entry.userAgent),
+  }));
   return {
     passkeys,
-    sessions: sessionList.map((entry) => ({ ...entry, current: entry.id === session.sessionId })),
+    sessions: [...viewed.filter((entry) => entry.current), ...viewed.filter((e) => !e.current)],
     events,
+    eventsTotal,
   };
 }
 
-export async function revokeSessionAction(sessionId: string): Promise<void> {
+export async function revokeSessionAction(sessionId: string): Promise<ActionResult> {
   const session = await currentSession();
   if (session === null) {
-    return;
+    return { ok: false, error: SESSION_LAPSED };
   }
+  // Ownership is proved against the caller's OWN session list, never against
+  // the id they sent — a tampered id belonging to another account simply is
+  // not in this set. Verified by security.regression: the victim's session
+  // stays live.
   const owned = await listSessions(db, session.personId);
-  if (owned.some((entry) => entry.id === sessionId)) {
+  if (!owned.some((entry) => entry.id === sessionId)) {
+    return { ok: false, error: "That device is no longer signed in." };
+  }
+  try {
     await revokeSession(db, sessionId);
+  } catch {
+    return { ok: false, error: "We couldn't sign that device out. Try again." };
+  }
+  await logSecurityEvent(session.personId, "auth.session.revoked");
+  return { ok: true };
+}
+
+/**
+ * The one control that makes a long session list actionable. A person who
+ * cannot tell 141 identical rows apart can still say "keep this device, drop
+ * everything else" — which is the answer they actually want when they suspect
+ * something is wrong.
+ */
+export async function revokeOtherSessionsAction(): Promise<ActionResult & { revoked?: number }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: SESSION_LAPSED };
+  }
+  let revoked: number;
+  try {
+    revoked = await revokeOtherSessions(db, session.personId, session.sessionId);
+  } catch {
+    return { ok: false, error: "We couldn't sign the other devices out. Try again." };
+  }
+  if (revoked > 0) {
     await logSecurityEvent(session.personId, "auth.session.revoked");
   }
+  return { ok: true, revoked };
 }
 
 export async function logoutAction(): Promise<void> {
@@ -369,6 +484,12 @@ export interface ProfileFormState {
   saved?: boolean;
   /** What was typed, echoed back so a rejected submit does not wipe the field. */
   name?: string;
+  /**
+   * This save SET the name for the first time rather than changing one. The
+   * toast said "Name updated" to people who had never had a name — the same
+   * error the ledger used to make (see `profile.name.set`).
+   */
+  firstTime?: boolean;
 }
 
 /**
@@ -404,15 +525,19 @@ export async function updateProfileAction(
   if (name.length > 60) {
     return { error: "That's a bit long — 60 characters or fewer.", name: raw };
   }
+  const isFirstName = session.name === null || session.name.trim() === "";
   await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
     db.update(people).set({ name }).where(eq(people.id, session.personId)),
   );
-  await logSecurityEvent(session.personId, "profile.name.updated");
+  await logSecurityEvent(
+    session.personId,
+    isFirstName ? "profile.name.set" : "profile.name.updated",
+  );
   if (fromOnboarding) {
     // The exit used to be a client effect: render the saved state, run an
     // effect, then router.push("/home") — measured at ~1.9s of the user staring
     // at a finished form. The server already knows where this goes.
     redirect("/home");
   }
-  return { saved: true };
+  return { saved: true, firstTime: isFirstName };
 }

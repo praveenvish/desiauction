@@ -2,8 +2,9 @@ import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
+import { formatCount, lifecycleLabel, maskPhone } from "../../../../server/admin/format";
 import type { OrgDetail } from "../../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, statusTone } from "../../admin-ui";
+import { ReadOnlyNotice, RelativeTime, absoluteIst, statusTone } from "../../admin-ui";
 
 /**
  * PX-9 §2 — the organization inspector.
@@ -24,6 +25,9 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
       <header className="dash-head">
         <div className="competition-title-row title-row-actions">
           <span className="date-row">
+            {/* Opens only for someone who also holds org capability HERE —
+                `platform:admin` confers none. Named beside the door rather
+                than discovered as a 404 behind it. */}
             <ButtonLink href={`/org/${org.slug}`} variant="secondary" data-testid="admin-open-org">
               Open console
             </ButtonLink>
@@ -33,28 +37,39 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
           </span>
         </div>
         <p className="dash-hint">
-          <span className="admin-id">{org.slug}</span> · created{" "}
-          {org.createdAt.toISOString().slice(0, 10)}
+          <span className="admin-id">{org.slug}</span> · created {absoluteIst(org.createdAt)}
+        </p>
+        <p className="admin-meta">
+          The console link needs organizer permissions on this organization; a platform grant
+          confers none.
         </p>
       </header>
       <ReadOnlyNotice />
 
       <div className="stat-row">
         <div className="stat-tile">
-          <span className="stat-value">{competitions.length}</span>
+          <span className="stat-value">{formatCount(competitions.length)}</span>
           <span className="stat-label">Seasons</span>
         </div>
         <div className="stat-tile">
-          <span className="stat-value">{members.length}</span>
+          <span className="stat-value">{formatCount(members.length)}</span>
           <span className="stat-label">Members</span>
         </div>
         <div className="stat-tile">
-          <span className="stat-value">{active.length}</span>
+          <span className="stat-value">{formatCount(active.length)}</span>
           <span className="stat-label">Active grants</span>
         </div>
-        <div className="stat-tile">
-          <span className="stat-value">{finance.declared ? "Yes" : "No"}</span>
-          <span className="stat-label">Finance declared</span>
+        {/* "Yes" set in 24px tabular-nums read as a number that had lost its
+            digits. A fact is a badge, not a figure. */}
+        <div className="stat-tile admin-fact">
+          <span className="stat-label">Finance</span>
+          {finance.declared ? (
+            <Badge tone="info">
+              Declared{finance.posture === null ? "" : ` · ${finance.posture}`}
+            </Badge>
+          ) : (
+            <Badge tone="neutral">Not declared</Badge>
+          )}
         </div>
       </div>
 
@@ -77,34 +92,40 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               <tbody>
                 {competitions.map((competition) => (
                   <tr key={competition.id} className="reg-row">
-                    <td>
+                    <td data-label="Season">
                       <Link href={`/seasons/${competition.slug}`} className="registration-name">
                         {competition.name}
                       </Link>
                     </td>
-                    <td>
-                      <Badge tone={statusTone(competition.status)}>{competition.status}</Badge>
-                    </td>
-                    <td>
-                      <Badge tone={competition.visibility === "public" ? "info" : "neutral"}>
-                        {competition.visibility}
+                    {/* Capability SETS are rendered verbatim on purpose; a
+                        lifecycle state is not a set. "REGISTRATION_CLOSED" is
+                        an un-translated database value, not a name anyone
+                        needs to type back. */}
+                    <td data-label="Status">
+                      <Badge tone={statusTone(competition.status)}>
+                        {lifecycleLabel(competition.status)}
                       </Badge>
                     </td>
-                    <td>
+                    <td data-label="Visibility">
+                      <Badge tone={competition.visibility === "public" ? "info" : "neutral"}>
+                        {lifecycleLabel(competition.visibility)}
+                      </Badge>
+                    </td>
+                    <td data-label="Auction">
                       {competition.auctionStatus === null ? (
-                        <span className="admin-meta">—</span>
+                        <span className="admin-meta">No auction</span>
                       ) : (
                         <Badge tone={statusTone(competition.auctionStatus)}>
-                          {competition.auctionStatus}
+                          {lifecycleLabel(competition.auctionStatus)}
                         </Badge>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Settlement">
                       {competition.caseStatus === null ? (
-                        <span className="admin-meta">—</span>
+                        <span className="admin-meta">No case</span>
                       ) : (
                         <Badge tone={statusTone(competition.caseStatus)}>
-                          {competition.caseStatus}
+                          {lifecycleLabel(competition.caseStatus)}
                         </Badge>
                       )}
                     </td>
@@ -136,19 +157,19 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               <tbody>
                 {grants.map((grant) => (
                   <tr key={grant.id} className="reg-row">
-                    <td>
+                    <td data-label="Person">
                       <Link href={`/admin/users/${grant.personId}`} className="registration-name">
                         {grant.name ?? grant.personId.slice(-6)}
                       </Link>
                     </td>
-                    <td>
+                    <td data-label="Capability set">
                       <span className="admin-action">{grant.capabilitySet}</span>
                     </td>
-                    <td>
+                    <td data-label="State">
                       {grant.revokedAt === null ? (
                         <Badge tone="success">Active</Badge>
                       ) : (
-                        <Badge tone="neutral">Revoked</Badge>
+                        <Badge tone="neutral">Revoked {absoluteIst(grant.revokedAt)}</Badge>
                       )}
                     </td>
                   </tr>
@@ -170,9 +191,11 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                 <li key={member.personId}>
                   <span>
                     <Link href={`/admin/users/${member.personId}`} className="registration-name">
-                      {member.name ?? member.phone}
+                      {member.name ?? maskPhone(member.phone)}
                     </Link>
-                    <span className="admin-meta">{member.phone}</span>
+                    {/* A membership list is a directory; the whole number lives on the
+                        one person's page. */}
+                    <span className="admin-meta">{maskPhone(member.phone)}</span>
                   </span>
                   <RelativeTime at={member.joinedAt} />
                 </li>

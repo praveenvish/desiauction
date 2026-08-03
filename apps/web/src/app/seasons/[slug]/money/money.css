@@ -10,6 +10,49 @@
   max-width: 1040px;
 }
 
+/* --- Rupee figures are nine glyphs wide -------------------------------------------
+ * The console's shared `.stat-row` floors a tile at 120px (seasons.css). With
+ * `.stat-value` at 24px mono that leaves an 87px value box on a 375px phone and
+ * `₹2,00,000` renders as `₹2,00,00` — silently wrong, on the one screen where
+ * being silently wrong about a number is unforgivable. Measured: the widest
+ * figure the product can produce needs 130px, and a tile spends 34px on padding
+ * and borders, so no track may be narrower than 164px. The floor is raised HERE
+ * rather than in seasons.css because money is the only surface carrying figures
+ * this long; every other console tile counts teams and lots.
+ *
+ * Verified value-box widths at this floor: 320→164, 360→204, 375→253, 390→268,
+ * 414→292, 430→308, 500→344, 700→150, 768→348, 840→187, 1100→135, 1440→220.
+ */
+.money-stack .stat-row {
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+}
+
+/* --- The case identity band -------------------------------------------------------
+ * The header row was 1096×58 holding one 115px button, above one grey line: no
+ * case number, no date, no money, no status. The case says who it is here. */
+.case-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.case-identity dt {
+  color: var(--text-muted);
+}
+
+.case-identity dd {
+  margin: 0 var(--space-3) 0 var(--space-1);
+  color: var(--text-secondary);
+}
+
+.case-identity .digest {
+  font-size: var(--text-sm-size);
+}
+
 /* --- The one sub-nav shared by the org's four money desks ----------------------
  * Settlement · Finance · Deliveries · Reconciliation read as tabs of a single
  * workspace. The primitive draws the tabs; this wrapper supplies the underline
@@ -67,6 +110,32 @@
 
 /* --- Money tables ---------------------------------------------------------------- */
 
+/*
+ * seasons.css opens `@media (max-width: 1100px)` and switches `.table-scroll`
+ * to `overflow-x: visible`. That rule was written for `.reg-table`, which turns
+ * every row into a card at 1100px and so genuinely needs no scroller. But
+ * `.money-table` only stacks at 640px, so between 641 and 1100 the money tables
+ * had NEITHER a scroller NOR a stack: measured `scrollWidth 826 > clientWidth
+ * 768` on the console and 811 > 768 on case review, with the Waive buttons
+ * rendering outside the white card. The wrappers on the money surfaces carry a
+ * second class so their scroller can be given back without touching the shared
+ * rule /registrations depends on. Two classes, so source order cannot decide it.
+ *
+ * A scroller that only a mouse can reach is not a fix, so the wrappers are
+ * focusable, labelled regions (axe `scrollable-region-focusable`).
+ */
+@media (min-width: 641px) {
+  .table-scroll.money-scroll {
+    overflow-x: auto;
+  }
+}
+
+.table-scroll.money-scroll:focus-visible {
+  outline: var(--space-05) solid var(--accent);
+  outline-offset: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
 .money-table {
   width: 100%;
   border-collapse: collapse;
@@ -85,6 +154,43 @@
   color: var(--text-muted);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
+}
+
+/*
+ * The team name is the ROW HEADER, not a cell. Both tables shipped six
+ * `th[scope="col"]` and zero `th[scope="row"]`, so a screen reader announced
+ * "Outstanding, ₹80,000" with no team attached to it — the one word that makes
+ * the figure actionable. Marked up as a header, it reads like a body cell.
+ */
+.money-table tbody th,
+.money-table tfoot th {
+  color: inherit;
+  font-weight: inherit;
+  white-space: normal;
+}
+
+/* The timestamp column: present, dated, and never the loudest thing in the row. */
+.money-when {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * Where focus lands after a money action succeeds. Focus used to return to
+ * <body>, so a keyboard or screen-reader user was dropped at the top of the
+ * document with no idea whether ₹1,20,000 had just moved.
+ */
+.money-result {
+  margin: var(--space-3) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.money-result:focus-visible {
+  outline: var(--space-05) solid var(--accent);
+  outline-offset: var(--space-1);
+  border-radius: var(--radius-sm);
 }
 
 .money-table td.num,
@@ -109,6 +215,39 @@
   display: flex;
   gap: var(--space-2);
   justify-content: flex-end;
+  align-items: center;
+}
+
+/*
+ * The platform's 44px rung, applied to the in-row money controls. Hand-measured
+ * before this: Waive was 64×32. axe stays green either way — `target-size` is
+ * not in the wcag21aa rule set — which is exactly why it had to be measured by
+ * hand. `sm` keeps the type small so the row does not shout; only the target
+ * grows.
+ */
+.money-row-actions > button,
+.money-row-actions > a {
+  min-height: 44px;
+}
+
+/*
+ * "Open case review" was a 107×15 bare `<a>` — an unstyled user-agent link
+ * (#0000ee) on the screen that decides money, which fails contrast outright
+ * against Floodlight's surface. Same shape as `.season-inline-link`.
+ */
+.money-inline-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.money-inline-link:hover,
+.money-inline-link:focus-visible {
+  text-decoration: underline;
 }
 
 /* --- Forms: the collection recorder ---------------------------------------------- */
@@ -282,10 +421,47 @@
   padding: 0;
 }
 
+/*
+ * The saved-view pills measured 18-19px tall — below the 24 x 24 minimum of
+ * WCAG 2.2 SC 2.5.8 (AA), not merely below this product's 44px convention. They
+ * sit adjacent to one another, so the spacing exception does not rescue them
+ * either. axe passes them because `target-size` is not in the wcag21aa tag set,
+ * which is exactly why this has to be held by hand.
+ */
+.saved-views a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--space-2);
+}
+
 .section-note {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-sm-size);
+}
+
+/*
+ * A heading that only the accessibility tree sees. Declared HERE, not borrowed
+ * from content.css: that sheet is loaded by the marketing and content surfaces,
+ * not by the console, and its own comment records the last time this class was
+ * assumed present and silently did nothing — a "visually hidden" label
+ * rendering as visible text mid-page. Every console surface that needs it
+ * imports money.css.
+ *
+ * Used where a section is obvious to the eye (a row of tiles, a card) but had
+ * no heading at all in the tree.
+ */
+.visually-hidden-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* --- Phone (04 §9): money tables collapse to labelled rows, never a scrollbar ----- */
@@ -298,7 +474,9 @@
   .money-table,
   .money-table tbody,
   .money-table tr,
-  .money-table td {
+  .money-table td,
+  .money-table tbody th,
+  .money-table tfoot th {
     display: block;
     width: 100%;
   }
@@ -308,12 +486,15 @@
     padding: var(--space-2) 0;
   }
 
-  .money-table td {
+  .money-table td,
+  .money-table tbody th,
+  .money-table tfoot th {
     border-bottom: none;
     display: flex;
     justify-content: space-between;
     gap: var(--space-3);
     padding: var(--space-1) 0;
+    text-align: left;
   }
 
   .money-table td.num {
@@ -321,13 +502,16 @@
   }
 
   /* The header the <thead> stopped carrying rides the cell itself. */
-  .money-table td::before {
+  .money-table td::before,
+  .money-table tbody th::before,
+  .money-table tfoot th::before {
     content: attr(data-label);
     color: var(--text-muted);
     font-weight: var(--font-weight-medium);
   }
 
-  .money-table td[data-label=""]::before {
+  .money-table td[data-label=""]::before,
+  .money-table tbody th[data-label=""]::before {
     content: none;
   }
 

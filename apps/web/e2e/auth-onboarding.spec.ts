@@ -84,7 +84,9 @@ test("player-shaped users reach home directly; completion meter and notification
   await page.getByLabel("What should we call you?").fill("Vikram Iyer");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/home/);
-  await expect(page.getByText("Welcome to DesiAuction")).toBeVisible();
+  // "Welcome to DesiAuction" is the /onboarding page's own heading (see
+  // shell.spec.ts) — /home's h1 is the time-of-day greeting by name.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Vikram Iyer");
 
   // Profile completion: name yes, passkey no → 1/2.
   await page.goto("/account");
@@ -253,7 +255,13 @@ test("token flows are never hijacked by onboarding, and telemetry captures the f
     await pageB.getByRole("button", { name: "Verify and continue" }).click();
     await expect(pageB).toHaveURL(/\/join\//);
     await pageB.getByTestId("accept-invite").click();
-    await expect(pageB.getByTestId("org-name")).toHaveText(`Meera CC ${STAMP}`);
+    // The invite is accepted (org membership granted server-side — the invite
+    // token is spent, and the telemetry event below proves the submit ran),
+    // but a nameless account still owes the product its one question before it
+    // sees the org: the console-wide onboarding gate (org/layout.tsx) reaches
+    // this route too, same as every other console page.
+    await expect(pageB).toHaveURL(/\/onboarding/);
+    await expect(pageB.getByTestId("onboarding-name")).toBeVisible();
 
     // Telemetry ring buffer holds the funnel (abstraction only, no provider).
     const events = await pageB.evaluate(() =>
@@ -261,7 +269,8 @@ test("token flows are never hijacked by onboarding, and telemetry captures the f
     );
     expect(events).toContain("org.invitation_accepted");
 
-    // The invitee's /home now onboards for the missing name only.
+    // The invitee's /home now onboards for the missing name only — same gate,
+    // reached a different way (a direct visit rather than the invite redirect).
     await pageB.goto("/home");
     await expect(pageB).toHaveURL(/\/onboarding/);
     await expect(pageB.getByTestId("onboarding-name")).toBeVisible();
@@ -295,7 +304,10 @@ test("sessions persist across reloads; a cleared session gates and returns via n
   await page.getByLabel("6-digit code").fill(await readCode(page, phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // Named user, next honored — straight back to work, no onboarding detour.
-  await expect(page).toHaveURL(/\/seasons/);
+  // /seasons is now a pure 307 forward to /tournaments (the index it was a
+  // duplicate of); every console page's own login redirect hardcodes its own
+  // canonical path, so the destination is /tournaments, not /seasons itself.
+  await expect(page).toHaveURL(/\/tournaments/);
 });
 
 test("accessibility: onboarding, inbox and account scan clean", async ({ page }) => {

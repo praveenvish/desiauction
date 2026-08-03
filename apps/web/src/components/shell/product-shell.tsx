@@ -27,7 +27,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
-import { INBOX_SEEN_KEY } from "../../app/inbox/inbox-list";
+import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
@@ -55,6 +55,13 @@ import "./product-shell.css";
 export interface ShellSession {
   name: string | null;
   phone: string;
+  /**
+   * Who is signed in. The bell's unread watermark is namespaced by it — one
+   * origin-global key meant that on a shared handset, person A reading their
+   * inbox marked person B's unread approval as already read. See
+   * `inboxSeenKey` in lib/inbox-events.
+   */
+  personId: string;
 }
 
 export interface ShellOrg {
@@ -62,6 +69,9 @@ export interface ShellOrg {
   name: string;
   /** PX-8: holder of `finops.view` on this org — gates the Finance destinations. */
   canFinance?: boolean;
+  /** Holder of `settlement.view` — a DIFFERENT capability partition from
+      `canFinance`, though the two share one tab strip. */
+  canSettle?: boolean;
 }
 
 export interface ShellCompetition {
@@ -87,16 +97,26 @@ export interface ProductShellProps {
 }
 
 /** Bell with unread dot: newest event vs. the device's last inbox visit. */
-function BellLink({ latestEventAt, pathname }: { latestEventAt: string | null; pathname: string }) {
+function BellLink({
+  latestEventAt,
+  pathname,
+  personId,
+}: {
+  latestEventAt: string | null;
+  pathname: string;
+  /** Namespaces the watermark. Without it the bell reads whoever last used
+      this device, which on a shared handset is the wrong person. */
+  personId: string;
+}) {
   const [unread, setUnread] = useState(false);
   useEffect(() => {
     if (latestEventAt === null) {
       setUnread(false);
       return;
     }
-    const seen = window.localStorage.getItem(INBOX_SEEN_KEY);
+    const seen = window.localStorage.getItem(inboxSeenKey(personId));
     setUnread(seen === null || latestEventAt > seen);
-  }, [latestEventAt, pathname]);
+  }, [latestEventAt, pathname, personId]);
   return (
     <Link
       className="shell-icon-button shell-bell"
@@ -658,12 +678,30 @@ export function ProductShell({
   } else if (orgMatch !== null) {
     const slug = orgMatch[1] as string;
     const activeDesk = activeOrgMoneyTab(pathname, slug);
-    if (activeDesk !== null && orgs.some((entry) => entry.slug === slug)) {
+    const org = orgs.find((entry) => entry.slug === slug) ?? null;
+    /*
+     * Build the strip from the capabilities actually held, not from membership.
+     *
+     * The four desks span TWO capability partitions — Settlement is gated by
+     * `settlement.view`, the three Finance desks by `finops.view` — and neither
+     * is implied by owning the organization. Gating the strip on membership
+     * meant a person with no money authority landed on "This page doesn't
+     * exist" underneath a working tab bar offering Settlement · Finance ·
+     * Deliveries · Reconciliation, all four of which 404 for them. The pages
+     * themselves take great care to be indistinguishable from nothing; the
+     * chrome around them was announcing exactly what it was hiding.
+     *
+     * An empty list renders no strip at all, so the 404 is bare.
+     */
+    const desks = orgMoneyTabs(slug).filter((tab) =>
+      tab.key === "settlement" ? org?.canSettle === true : org?.canFinance === true,
+    );
+    if (activeDesk !== null && desks.length > 0) {
       tabsNode = (
         <SubNavTabs
           label="Money operations"
           linkComponent={Link}
-          tabs={orgMoneyTabs(slug).map((tab) => ({ ...tab, active: tab.key === activeDesk }))}
+          tabs={desks.map((tab) => ({ ...tab, active: tab.key === activeDesk }))}
         />
       );
     }
@@ -741,7 +779,11 @@ export function ProductShell({
               <span className="shell-desktop-only">
                 <ThemeToggle />
               </span>
-              <BellLink latestEventAt={latestEventAt} pathname={pathname} />
+              <BellLink
+                latestEventAt={latestEventAt}
+                pathname={pathname}
+                personId={session.personId}
+              />
               {/* Switchers live with the other controls now — one cluster, in the
                 same place, whether you are switching season or organization. */}
               {seasonSwitcherFor !== null && competitions.length > 1 ? (

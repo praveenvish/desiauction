@@ -16,7 +16,7 @@ import { useMemo } from "react";
 
 import type { FinanceWorkspace } from "../../../../server/financial-operations/actions";
 import { IssuancePanel } from "./issuance-panel";
-import type { RegisterRow } from "../../../../server/financial-operations/views";
+import { registerTotals, type RegisterRow } from "../../../../server/financial-operations/views";
 import {
   DOC_KIND_LABEL,
   FINANCE_VIEWS,
@@ -40,6 +40,29 @@ const HEALTH_TONE: Record<string, BadgeTone> = {
   degraded: "warning",
   failed: "danger",
 };
+
+/**
+ * The runner's own freshness budget (operations.ts measures
+ * `oldestRequestedAgeMs` against 15 minutes). Work still waiting past it means
+ * nothing is picking it up.
+ */
+const RUNNER_BUDGET_MS = 15 * 60_000;
+
+/**
+ * A waiting time in words. Pure: it takes an already-elapsed duration, resolved
+ * on the server against the injected clock, so this renders identically in both
+ * places. Deliberately coarse — the operator needs "is this stuck?", and
+ * "9 days" answers that where "1192" never did.
+ */
+function waitedFor(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return "under a minute";
+  if (minutes < 60) return `${String(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? "1 hour" : `${String(hours)} hours`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1 day" : `${String(days)} days`;
+}
 
 const COMPONENT_LABEL: Record<string, string> = {
   follower: "Settlement ingest",
@@ -90,6 +113,9 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
     () => filterRegister(register, view, kind, query),
     [register, view, kind, query],
   );
+  // Totals are of the WHOLE year's register, not the filtered view — a total
+  // that moves when you type in a search box is not a total.
+  const totals = useMemo(() => registerTotals(register, board.fy), [register, board.fy]);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
@@ -115,22 +141,41 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
           </Badge>
         </div>
         <ul className="health-row" data-testid="health-row">
-          {board.dashboard.components.map((component) => (
-            <li
-              key={component.component}
-              className="health-lamp"
-              data-status={component.status}
-              data-testid={`health-${component.component}`}
-            >
-              <span className="health-name">
-                {COMPONENT_LABEL[component.component] ?? component.component}
-              </span>
-              <span className="health-detail">
-                {component.status}
-                {component.detail === null ? "" : ` · ${component.detail}`}
-              </span>
-            </li>
-          ))}
+          {board.dashboard.components.map((component) => {
+            // The runner lamp is corrected here against this org's own queue.
+            // Upstream, runner health is `dead === 0` with no depth or age
+            // test — and a runner that never runs cannot produce a dead job,
+            // so being completely down scores "healthy". Observed: 1192 jobs
+            // waiting, oldest 9 days, 0 dead, lamp green. A stalled queue is
+            // the operator's problem whatever the platform thinks, so if work
+            // has been waiting past the runner's own 15-minute budget we say
+            // so rather than repeat a verdict our data contradicts.
+            const stalled =
+              component.component === "runner" &&
+              board.jobs.oldestQueuedWaitMs !== null &&
+              board.jobs.oldestQueuedWaitMs > RUNNER_BUDGET_MS;
+            const status =
+              stalled && component.status === "healthy" ? "degraded" : component.status;
+            const detail = stalled
+              ? `nothing picked up for ${waitedFor(board.jobs.oldestQueuedWaitMs)}`
+              : component.detail;
+            return (
+              <li
+                key={component.component}
+                className="health-lamp"
+                data-status={status}
+                data-testid={`health-${component.component}`}
+              >
+                <span className="health-name">
+                  {COMPONENT_LABEL[component.component] ?? component.component}
+                </span>
+                <span className="health-detail">
+                  {status}
+                  {detail === null ? "" : ` · ${detail}`}
+                </span>
+              </li>
+            );
+          })}
         </ul>
         <p className="freshness" data-testid="freshness">
           <span>
@@ -142,9 +187,53 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
               {board.follower.current ? "current" : `${String(board.follower.totalBehind)} behind`}
             </strong>
           </span>
+          {/* This org's jobs, not the platform's. `board.runner.jobs` counts
+              every organization's work — it printed "1192 queued" on an org
+              that owned five jobs, and on a brand-new org that owned none.
+              The age is here because it is the number that tells the truth:
+              upstream health is `dead === 0` with no age or depth test, so a
+              runner that never runs reports healthy. */}
           <span>
-            Jobs <strong>{board.runner.jobs.queued} queued</strong>, {board.runner.jobs.dead} dead
+            Jobs <strong>{board.jobs.queued} waiting</strong>
+            {board.jobs.oldestQueuedWaitMs === null
+              ? ""
+              : `, oldest ${waitedFor(board.jobs.oldestQueuedWaitMs)}`}
+            {board.jobs.dead === 0 ? "" : `, ${String(board.jobs.dead)} given up`}
           </span>
+        </p>
+      </Card>
+
+      {/* --- What the register actually holds ---------------------------------
+          The desk stated no money total at all: an operator could reconcile
+          nothing without opening the register and adding it up by eye. */}
+      <Card>
+        <h2>This financial year</h2>
+        <div className="stat-row">
+          <Tile
+            label="Receipted"
+            value={inr(totals.receiptedPaise)}
+            id="stat-receipted"
+            note={`${String(totals.receipts)} ${totals.receipts === 1 ? "receipt" : "receipts"}`}
+          />
+          {totals.invoices > 0 ? (
+            <Tile
+              label="Invoiced"
+              value={inr(totals.invoicedPaise)}
+              id="stat-invoiced"
+              note={`${String(totals.invoices)} ${totals.invoices === 1 ? "invoice" : "invoices"}`}
+            />
+          ) : null}
+          {totals.corrections > 0 ? (
+            <Tile label="Corrections" value={String(totals.corrections)} id="stat-corrections" />
+          ) : null}
+        </div>
+        <p className="section-note">
+          {/* Point at settlement rather than answering "who still owes us?" here.
+              Two surfaces answering one money question with different arithmetic
+              is how a book stops being trusted. */}
+          What each team still owes is tracked in{" "}
+          <Link href={`/org/${slug}/settlement`}>Settlement</Link>, which is where dues are computed
+          and collected.
         </p>
       </Card>
 
@@ -266,7 +355,19 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
             }
           />
         ) : (
-          <div className="table-scroll">
+          // `money-scroll` restores overflow-x above 640px. `seasons.css` turns
+          // .table-scroll's scrolling OFF under 1100px because .reg-table
+          // card-stacks there — but .money-table only stacks at 640px, so
+          // between 641 and 1100 these tables had neither a scroller nor a
+          // stacked layout and simply escaped the card. Measured 785 > 768 here.
+          // The class lives in money.css so /registrations keeps the behaviour
+          // that rule was written for.
+          <div
+            className="table-scroll money-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Document register"
+          >
             <table className="money-table" data-testid="register-table">
               <caption>
                 <VisuallyHidden>Every document this organization has issued</VisuallyHidden>
@@ -279,7 +380,15 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
                   <th scope="col" className="num">
                     Amount
                   </th>
-                  <th scope="col">Reproducible</th>
+                  {/* "Sealed digest", not "Reproducible": this column has
+                      always rendered the digest taken when the document was
+                      issued, and the code below says so plainly. Under the old
+                      header a treasurer scanning for a broken document read hex
+                      strings as a yes/no answer — and on mobile the stacked row
+                      said literally "Reproducible bdebeedba536…". The live
+                      reproduction check runs on the detail page, which is the
+                      only place that actually re-derives the document. */}
+                  <th scope="col">Sealed digest</th>
                 </tr>
               </thead>
               <tbody>
@@ -299,9 +408,14 @@ function RegisterLine({ slug, row }: { slug: string; row: RegisterRow }) {
   return (
     <tr data-testid={`doc-${row.docId}`}>
       <td data-label="Number">
-        <Link href={`/org/${slug}/money/documents/${row.docId}`}>
+        {/* The qualified number, and a target you can actually hit. The link
+            text used to be the bare series-relative number — usually a single
+            digit — which made this 5.0 × 15px: below the 24 × 24 floor of
+            WCAG 2.2 SC 2.5.8, and the ONLY route into a document. axe stays
+            silent on it because `target-size` is not in the wcag21aa tag set. */}
+        <Link className="doc-link" href={`/org/${slug}/money/documents/${row.docId}`}>
           {row.kind === "correction" ? "CN " : ""}
-          {row.number}
+          {row.formatted}
         </Link>
       </td>
       <td data-label="Kind">{DOC_KIND_LABEL[row.kind] ?? row.kind}</td>
@@ -309,7 +423,7 @@ function RegisterLine({ slug, row }: { slug: string; row: RegisterRow }) {
       <td data-label="Amount" className="num">
         <span title={`${String(row.amount)} paise`}>{inr(row.amount)}</span>
       </td>
-      <td data-label="Reproducible">
+      <td data-label="Sealed digest">
         {/* The register lists what exists; the DETAIL page runs the live
             reproduction. A digest here is the sealed one, not a claim. */}
         <span className="digest">{row.contentDigest.slice(0, 12)}…</span>

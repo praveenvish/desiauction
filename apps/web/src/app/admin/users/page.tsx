@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { adminUsers } from "../../../server/admin/actions";
-import { platformAdminGate } from "../../../server/admin/authz";
+import { platformAdminPageGate } from "../../../server/admin/authz";
 import { UsersPanel } from "./users-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -14,12 +14,12 @@ export const metadata = { title: "Users · Platform admin · DesiAuction" };
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; after?: string }>;
 }) {
-  if ((await platformAdminGate()) === null) {
+  if ((await platformAdminPageGate("users")) === null) {
     notFound();
   }
-  const { q } = await searchParams;
+  const { q, after } = await searchParams;
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
@@ -29,16 +29,22 @@ export default async function AdminUsersPage({
             they actually are.
           </p>
         </header>
-        <Suspense key={q ?? ""} fallback={<LoadingState variant="page" />}>
-          <Directory query={q} />
+        <Suspense key={`${q ?? ""}-${after ?? ""}`} fallback={<LoadingState variant="page" />}>
+          <Directory query={q} after={after} />
         </Suspense>
       </div>
     </main>
   );
 }
 
-async function Directory({ query }: { query: string | undefined }) {
-  const directory = await adminUsers(query);
+async function Directory({
+  query,
+  after,
+}: {
+  query: string | undefined;
+  after: string | undefined;
+}) {
+  const directory = await adminUsers(query, after);
   if (directory === null) {
     notFound();
   }

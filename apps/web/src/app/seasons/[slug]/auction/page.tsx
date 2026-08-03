@@ -6,6 +6,7 @@ import { auctionDashboard } from "../../../../server/auction/actions";
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
 import { AuctionOverviewPanel } from "./auction-overview-panel";
 import { AuctionPanel } from "./auction-panel";
+import { BroadcastLinks } from "./broadcast-links";
 import "../../seasons.css";
 
 export const metadata = { title: "Auction · DesiAuction" };
@@ -104,6 +105,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           {dashboard.overview !== null ? (
             <AuctionOverviewPanel overview={dashboard.overview} />
           ) : null}
+          {/* The board and the overlay were unreachable from anywhere in the
+              product. The dashboard is where an organizer sets the night up, so
+              it is where they collect the two URLs they will open elsewhere. */}
+          {dashboard.viewer.canConduct ? <BroadcastLinks slug={slug} /> : null}
           <AuctionPanel slug={slug} dashboard={dashboard} />
         </div>
       </main>

@@ -3,6 +3,7 @@ import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { formatKickoff, formatWallDate } from "../../../../../lib/format-date";
 import { calendarView } from "../../../../../server/competition/fixture-actions";
 import type { FixtureSnapshot } from "../../../../../server/competition/fixtures";
 import "../../../seasons.css";
@@ -29,7 +30,7 @@ function FixtureLine({ fixture }: { fixture: FixtureSnapshot }) {
         {fixture.homeTeamName} vs {fixture.awayTeamName}
       </span>
       <span className="registration-phone">
-        {fixture.kickoffAt !== null ? fixture.kickoffAt.replace("T", " ") : "unscheduled"}
+        {fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "unscheduled"}
         {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
         {fixture.venueName !== null ? ` (${fixture.venueName})` : ""}
       </span>
@@ -92,7 +93,7 @@ export default async function CalendarPage({
                 <Link href={href({ date: addDays(view.date, -step) })} className="calendar-tab">
                   ← previous
                 </Link>
-                <strong data-testid="calendar-date">{view.date}</strong>
+                <strong data-testid="calendar-date">{formatWallDate(view.date)}</strong>
                 <Link
                   href={href({ date: addDays(view.date, step) })}
                   className="calendar-tab"
@@ -121,7 +122,8 @@ export default async function CalendarPage({
         ) : (
           view.days.map((day) => (
             <Card key={day.date} data-testid={`day-${day.date}`}>
-              <h2>{day.date}</h2>
+              {/* A calendar that never names a weekday is not a calendar. */}
+              <h2>{formatWallDate(day.date)}</h2>
               {day.fixtures.length === 0 ? (
                 <p className="competitions-hint">No fixtures.</p>
               ) : (

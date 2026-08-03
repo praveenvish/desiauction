@@ -3,7 +3,12 @@
 import { auctionView, ledgerOf, loadEvents, ownerBoard, snapshotRefs } from "@desiauction/auction";
 import type { AuctionView, OwnerBoard } from "@desiauction/auction";
 import { engineDiagnosticsSchema, type EngineDiagnostics } from "@desiauction/contracts";
-import type { AuctionEventEnvelope, AuctionLedgerRow, SnapshotRefs } from "@desiauction/core";
+import type {
+  AuctionEventEnvelope,
+  AuctionLedgerRow,
+  AuctionStatus,
+  SnapshotRefs,
+} from "@desiauction/core";
 import { auctionOf } from "@desiauction/auction";
 import { competitions, organizations, teams, withTenantDb, type Db } from "@desiauction/db";
 import { asc, eq } from "drizzle-orm";
@@ -98,6 +103,15 @@ export interface SpectatorView {
   competitionSlug: string;
   auctionName: string;
   /**
+   * DA-20: the auction's OWN state, so the surfaces above the socket stop
+   * asserting "live". The document title on a settled auction read "Demo Cup
+   * (settled) Auction — live"; the OG card, the WhatsApp share text and the
+   * spectator's identity line all said the same thing on scheduled, completed
+   * and abandoned nights. Every one of them was a constant, and the fact was
+   * already sitting on the auction row this read already loads.
+   */
+  auctionStatus: AuctionStatus;
+  /**
    * Who is running this and where. Already public on `/c/<slug>` — the stage
    * says "Watching live · <organizer> · <city>" so a guest arriving from a
    * forwarded link knows whose night this is, which the auction's own name
@@ -155,6 +169,7 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
     competitionName: gate.competition.name,
     competitionSlug: gate.competition.slug,
     auctionName: gate.auction.name,
+    auctionStatus: gate.auction.status,
     orgName: org?.name ?? null,
     location: gate.competition.location,
     wsUrl: engineWsUrl(gate.auction.id),
@@ -207,6 +222,7 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
     competitionName: competition.name,
     competitionSlug: competition.slug,
     auctionName: auction.name,
+    auctionStatus: auction.status,
     orgName: competition.orgName,
     location: competition.location,
     wsUrl: engineWsUrl(auction.id),

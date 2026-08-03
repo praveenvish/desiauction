@@ -45,20 +45,73 @@ export function ReadOnlyNotice() {
       <span aria-hidden>👁</span>
       <span>
         Read-only. Administration observes the platform; every operational fix happens in the
-        console that owns it, under that console&rsquo;s own permissions.
+        console that owns it, under that console&rsquo;s own permissions — which a platform grant
+        alone does not confer. Page views here are recorded in the audit log.
       </span>
     </p>
   );
 }
 
-/** Absolute time in the title, human distance in the text — one element, both truths. */
-export function RelativeTime({ at }: { at: Date }) {
+/**
+ * The absolute time, and the distance from now.
+ *
+ * It used to be `title={iso}` and nothing else: the absolute timestamp was
+ * reachable by hovering a mouse and by no other means — not by keyboard, not
+ * announced to a screen reader, and invisible on every touch device. On a
+ * forensic surface the absolute time is the PRIMARY datum, and it also named no
+ * timezone anywhere, so "14:20" was 14:20 in a zone the reader had to guess.
+ *
+ * So: the accessible name always carries the full, zone-named timestamp, and
+ * `absolute` renders it visibly for the surfaces (audit, schedules) where the
+ * exact moment is the point rather than the colour.
+ *
+ * Rendered on the server only — these are server components, so `Date.now()`
+ * here cannot disagree with a client render.
+ */
+export function RelativeTime({ at, absolute = false }: { at: Date; absolute?: boolean }) {
   const iso = at.toISOString();
+  const exact = absoluteIst(at);
   return (
-    <time className="admin-when" dateTime={iso} title={iso}>
-      {distance(at)}
+    <time
+      // The relative form is two words and stays on one line; the absolute form
+      // is "02 Aug 2026, 15:23 IST · 3d ago", which at 320px must be allowed to
+      // wrap or it pushes the card open (measured: 409px of a 320px viewport).
+      className={absolute ? "admin-when admin-when-wide" : "admin-when"}
+      dateTime={iso}
+      title={exact}
+    >
+      {/* The exact moment is what assistive technology is told, always. Not via
+          `aria-label`: `<time>` carries no ARIA role, so labelling it would be
+          `aria-prohibited-attr` — a real axe violation traded for a fix. */}
+      <span className="admin-sr-only">{exact}</span>
+      {absolute ? (
+        <span aria-hidden>
+          {exact} · {distance(at)}
+        </span>
+      ) : (
+        <span aria-hidden>{distance(at)}</span>
+      )}
     </time>
   );
+}
+
+/**
+ * IST, named. The product is Indian and every operator reading this console
+ * works in one timezone; the stored value is UTC, and printing it unlabelled
+ * was a five-and-a-half-hour lie by omission.
+ */
+const IST = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+export function absoluteIst(at: Date): string {
+  return `${IST.format(at)} IST`;
 }
 
 function distance(at: Date): string {

@@ -720,6 +720,39 @@ function SpendBar({ spend, max }: { spend: number; max: number }) {
 }
 
 /**
+ * What is true about this season's money, for THIS reader.
+ *
+ * Two rules, in order. Nothing is claimed about the books that the settlement
+ * case does not itself say — `settled`/`closed` are statuses, not the result of
+ * `outstanding === 0`. And nothing is said about the books at all to someone
+ * who may not open them: a viewer without money sight is told the auction is
+ * done, which is true, and nothing further.
+ */
+function retroLine(view: SeasonOverviewView): string {
+  const settlement = view.settlement;
+  if (!view.viewer.canSeeMoney) {
+    return "This season is over: the auction is done.";
+  }
+  if (settlement === null) {
+    return "This season is over: the auction is done. No settlement case has been opened for it yet.";
+  }
+  switch (settlement.status) {
+    case "closed":
+      return "This season is over: the auction is done, the books are settled and the case is closed.";
+    case "settled":
+      return "This season is over: the auction is done and the books are settled. The case has not been closed yet.";
+    case "discrepant":
+      return "This season is over, but its books are frozen: the auction log no longer matches what the settlement case pinned.";
+    case "settling":
+      return settlement.outstanding !== undefined && settlement.outstanding > 0
+        ? "This season is over: the auction is done, but the books are still being settled and money is still owed."
+        : "This season is over: the auction is done and everything owed has come in, but the books have not been settled yet.";
+    default:
+      return "This season is over: the auction is done, and its settlement case is still being worked through.";
+  }
+}
+
+/**
  * A season that is over (DA-14). A half-finished six-step checklist is the
  * wrong shape for something with no next step: what an organizer wants from a
  * finished season is what happened, and the offer to run it again.
@@ -739,9 +772,14 @@ function Retrospective({
   return (
     <Card className="season-stepper-card" data-testid="lifecycle-panel">
       <div className="season-retro">
-        {/* The state badge is the hero's job — this line says what it means. */}
+        {/* The state badge is the hero's job — this line says what it means.
+            It used to be a hardcoded sentence that consulted no status at all:
+            "the books are settled" was printed over a case sitting in
+            `settling`, and printed to a viewer with no settlement grant, who
+            gets a 404 on /money. It now reads the case, and says nothing about
+            books it may not show. */}
         <p className="season-retro-line" data-testid="season-completed">
-          This season is over: the auction is done and the books are settled.
+          {retroLine(view)}
         </p>
         <dl className="season-retro-figures">
           <div>

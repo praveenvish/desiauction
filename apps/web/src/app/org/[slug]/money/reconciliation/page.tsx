@@ -1,4 +1,4 @@
-import { LoadingState, ToastProvider } from "@desiauction/ui";
+import { AnnouncerProvider, LoadingState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -30,20 +30,22 @@ export default async function ReconciliationPage({
     notFound();
   }
   return (
-    <ToastProvider>
-      <main className="registrations-dash">
-        <div className="dash-stack finance-stack">
-          <header className="dash-head">
-            <p className="competitions-hint">
-              Does finance still agree with settlement — proved from the log, not asserted
-            </p>
-          </header>
-          <Suspense fallback={<LoadingState variant="page" />}>
-            <Desk slug={slug} />
-          </Suspense>
-        </div>
-      </main>
-    </ToastProvider>
+    <AnnouncerProvider>
+      <ToastProvider>
+        <main className="registrations-dash">
+          <div className="dash-stack finance-stack">
+            <header className="dash-head">
+              <p className="competitions-hint">
+                Does finance still agree with settlement — proved from the log, not asserted
+              </p>
+            </header>
+            <Suspense fallback={<LoadingState variant="page" />}>
+              <Desk slug={slug} />
+            </Suspense>
+          </div>
+        </main>
+      </ToastProvider>
+    </AnnouncerProvider>
   );
 }
 

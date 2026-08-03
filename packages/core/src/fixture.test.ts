@@ -194,6 +194,54 @@ describe("round-robin pairings (pure, deterministic)", () => {
   it("is deterministic: identical inputs, identical output", () => {
     expect(roundRobinPairings(four, 2)).toEqual(roundRobinPairings(four, 2));
   });
+
+  /**
+   * Home advantage is the thing club cricket argues about most, and single round
+   * robin is the product's default. The old `(r + i) % 2` checkerboard handed one
+   * team ZERO home games at every size (N=16: 0 home in 15 fixtures) because a
+   * rotating team's seat advances with the round, so its `r + i` parity never
+   * changed. Double round robin cancelled the bug out, which is why it hid.
+   */
+  const homeAwaySplit = (teamIds: readonly string[], rounds: 1 | 2) => {
+    const home = new Map(teamIds.map((t) => [t, 0]));
+    const away = new Map(teamIds.map((t) => [t, 0]));
+    for (const p of roundRobinPairings(teamIds, rounds)) {
+      home.set(p.homeTeamId, (home.get(p.homeTeamId) ?? 0) + 1);
+      away.set(p.awayTeamId, (away.get(p.awayTeamId) ?? 0) + 1);
+    }
+    return teamIds.map((t) => ({ team: t, home: home.get(t) ?? 0, away: away.get(t) ?? 0 }));
+  };
+
+  it("balances home and away within 1 for every team, N = 2..16, both modes", () => {
+    for (let n = 2; n <= 16; n++) {
+      const teamIds = Array.from({ length: n }, (_, i) => `T${String(i).padStart(2, "0")}`);
+      for (const rounds of [1, 2] as const) {
+        for (const split of homeAwaySplit(teamIds, rounds)) {
+          expect(Math.abs(split.home - split.away)).toBeLessThanOrEqual(1);
+          // Every team plays every opponent: the totals must add up too.
+          expect(split.home + split.away).toBe((n - 1) * rounds);
+        }
+      }
+    }
+  });
+
+  it("no team is shut out of home fixtures in a single round robin", () => {
+    for (const n of [4, 8, 16]) {
+      const teamIds = Array.from({ length: n }, (_, i) => `T${String(i).padStart(2, "0")}`);
+      for (const split of homeAwaySplit(teamIds, 1)) {
+        expect(split.home).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("a double round robin stays perfectly balanced", () => {
+    for (const n of [4, 8, 16]) {
+      const teamIds = Array.from({ length: n }, (_, i) => `T${String(i).padStart(2, "0")}`);
+      for (const split of homeAwaySplit(teamIds, 2)) {
+        expect(split.home).toBe(split.away);
+      }
+    }
+  });
 });
 
 describe("slot assignment (planRoundRobin)", () => {
@@ -231,7 +279,6 @@ describe("slot assignment (planRoundRobin)", () => {
       homeTeamId: f.homeTeamId,
       awayTeamId: f.awayTeamId,
       groundId: f.groundId,
-      venueId: "V1",
       kickoffAt: f.kickoffAt,
       durationMinutes: f.durationMinutes,
       status: "draft",
@@ -296,7 +343,6 @@ describe("conflict engine (structural, deterministic)", () => {
     homeTeamId: "A",
     awayTeamId: "B",
     groundId: "G1",
-    venueId: "V1",
     kickoffAt: "2026-08-01T18:00",
     durationMinutes: 120,
     status: "scheduled",
@@ -335,7 +381,7 @@ describe("conflict engine (structural, deterministic)", () => {
     expect(detectConflicts([base, backToBack])).toEqual([]);
   });
 
-  it("same venue, different grounds, overlapping → warning only", () => {
+  it("two grounds at one venue, overlapping → SILENT (that is what two grounds are for)", () => {
     const sameVenue: FixtureForConflicts = {
       ...base,
       id: "f2",
@@ -344,11 +390,7 @@ describe("conflict engine (structural, deterministic)", () => {
       groundId: "G2",
       kickoffAt: "2026-08-01T19:00",
     };
-    const conflicts = detectConflicts([base, sameVenue]);
-    expect(conflicts).toEqual([
-      expect.objectContaining({ type: "venue_overlap", severity: "warning" }),
-    ]);
-    expect(blockingConflicts(conflicts)).toEqual([]);
+    expect(detectConflicts([base, sameVenue])).toEqual([]);
   });
 
   it("flags invalid duration, invalid kickoff, and missing kickoff on scheduled fixtures", () => {
@@ -376,7 +418,6 @@ describe("conflict engine (structural, deterministic)", () => {
       homeTeamId: "B",
       awayTeamId: "A",
       groundId: "G2",
-      venueId: "V2",
       kickoffAt: "2026-08-01T21:00",
     };
     const conflicts = detectConflicts([base, rematch]);
@@ -433,7 +474,6 @@ describe("conflict engine (structural, deterministic)", () => {
       homeTeamId: "X",
       awayTeamId: "Y",
       groundId: "G7",
-      venueId: "V7",
       kickoffAt: "2026-08-09T18:00",
     };
     const conflicts = detectConflicts([base, clash, lonely]);

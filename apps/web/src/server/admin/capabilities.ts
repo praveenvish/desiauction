@@ -49,6 +49,17 @@ export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = ["plat
 export const PLATFORM_SCOPE_TYPE = "platform";
 export const PLATFORM_SCOPE_ID = "00000000000000000000000000";
 
+/**
+ * The one audit action administration itself authors (see `access-log.ts`).
+ *
+ * It lives HERE, in the pure vocabulary module, rather than beside the writer,
+ * because the projections need to NAME it — the Overview excludes it from
+ * "recent platform activity" and the audit explorer links to it — and the
+ * projections must not be able to import the writer. A shared name in a module
+ * with no IO keeps the read path readable and still write-free.
+ */
+export const ADMIN_ACCESS_ACTION = "admin.accessed";
+
 export function isPlatformCapabilitySet(value: string): value is PlatformCapabilitySet {
   return (PLATFORM_CAPABILITY_SETS as readonly string[]).includes(value);
 }

@@ -2,12 +2,19 @@ import type { OutcomeMetrics } from "@desiauction/core";
 import { Badge, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
+import { ADMIN_ACCESS_ACTION } from "../../server/admin/capabilities";
+import { formatCount, lifecycleLabel, waitedFor } from "../../server/admin/format";
 import type { PlatformOverview } from "../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, statusTone } from "./admin-ui";
 
 function pct(rate: number): number {
   return Math.round(rate * 100);
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  direct: "no share link",
+  other: "unrecognised link",
+};
 
 /**
  * PX-9 §1 — the platform overview.
@@ -24,7 +31,7 @@ export function OverviewPanel({
   overview: PlatformOverview;
   outcomes: OutcomeMetrics;
 }) {
-  const { totals, runner, followers, attention, recent } = overview;
+  const { totals, runnerVerdict, followers, attention, recent, liveAuctions } = overview;
   return (
     <>
       <ReadOnlyNotice />
@@ -63,7 +70,12 @@ export function OverviewPanel({
               .sort((a, b) => b[1] - a[1])
               .map(([src, n]) => (
                 <Badge key={src} tone="neutral">
-                  {src} {n}
+                  {/* The badge uppercases, so the fold's two bucket keys read
+                      as "OTHER" and "DIRECT" — which name nothing. `other` is a
+                      `?ref` the platform does not recognise; `direct` is no
+                      `?ref` at all (attribution.ts:44). They are different
+                      findings and the chip should say which. */}
+                  {SOURCE_LABELS[src] ?? src} <span className="admin-count">{formatCount(n)}</span>
                 </Badge>
               ))}
           </div>
@@ -73,7 +85,11 @@ export function OverviewPanel({
       <div className="admin-grid">
         <Card>
           <h2 className="admin-section-title">Auctions</h2>
-          <StatusList lines={overview.auctionsByStatus} empty="No auction has been created yet." />
+          <StatusList
+            lines={overview.auctionsByStatus}
+            liveAuctions={liveAuctions}
+            empty="No auction has been created yet."
+          />
         </Card>
         <Card>
           <h2 className="admin-section-title">Settlements</h2>
@@ -82,18 +98,37 @@ export function OverviewPanel({
         <Card>
           <h2 className="admin-section-title">System status</h2>
           <div className="admin-health-org">
+            {/* `runnerVerdict`, NOT `runner.healthy`. The snapshot's rule is
+                `dead === 0`, which a runner that never runs also satisfies:
+                measured at 1,558 queued and 2 done with the oldest job eleven
+                days old, it reported HEALTHY in green — three lines above
+                "Settlement ingest 2 behind", which was behind because of it. */}
             <div className="admin-health-row">
               <span>Job runner</span>
-              <Badge tone={runner.healthy ? "success" : "danger"}>
-                {runner.healthy ? "Healthy" : `${String(runner.jobs.dead)} dead`}
+              <Badge
+                tone={runnerVerdict.healthy ? "success" : "danger"}
+                data-testid="admin-overview-runner"
+              >
+                {runnerVerdict.healthy ? "Healthy" : "Not running"}
               </Badge>
             </div>
+            {runnerVerdict.detail !== null ? (
+              <p className="admin-meta">{runnerVerdict.detail}</p>
+            ) : null}
             <div className="admin-chips">
-              {Object.entries(runner.jobs).map(([state, count]) => (
-                <Badge key={state} tone={state === "dead" && count > 0 ? "danger" : "neutral"}>
-                  {state} {count}
+              <Badge
+                tone={runnerVerdict.queued > 0 && !runnerVerdict.healthy ? "warning" : "neutral"}
+              >
+                queued <span className="admin-count">{formatCount(runnerVerdict.queued)}</span>
+              </Badge>
+              <Badge tone={runnerVerdict.dead > 0 ? "danger" : "neutral"}>
+                dead <span className="admin-count">{formatCount(runnerVerdict.dead)}</span>
+              </Badge>
+              {runnerVerdict.oldestQueuedWaitMs === null ? null : (
+                <Badge tone={runnerVerdict.healthy ? "neutral" : "danger"}>
+                  oldest waited {waitedFor(runnerVerdict.oldestQueuedWaitMs)}
                 </Badge>
-              ))}
+              )}
             </div>
             <div className="admin-health-row">
               <span>Settlement ingest</span>
@@ -112,10 +147,19 @@ export function OverviewPanel({
 
       <Card>
         <h2 className="admin-section-title">Attention queue</h2>
+        {/* Every link here used to read "Open the console →" and point at an
+            org console that `platform:admin` cannot open — the grant confers
+            zero org capability by design, so each one 404'd for its only
+            audience. The links now go where administration can actually go, and
+            the sentence says who holds the fix. */}
+        <p className="admin-meta">
+          Administration cannot act on any of these. Each links to what an administrator can open;
+          the repair itself lives in the owning console, under that console&rsquo;s own permissions.
+        </p>
         {attention.length === 0 ? (
           <EmptyState
             title="Nothing needs a human"
-            description="No dead jobs, no stalled ingest, no discrepant case, no failed delivery."
+            description="No dead jobs, no stalled runner, no stuck auction, no discrepant case, no failed delivery."
           />
         ) : (
           <ul className="admin-attention" data-testid="admin-attention">
@@ -130,7 +174,7 @@ export function OverviewPanel({
                 </span>
                 {row.href !== null ? (
                   <Link href={row.href} className="admin-meta">
-                    Open the console →
+                    Inspect →
                   </Link>
                 ) : null}
               </li>
@@ -158,6 +202,16 @@ export function OverviewPanel({
             </ul>
             <Link href="/admin/audit" className="admin-meta">
               Open the audit explorer →
+            </Link>{" "}
+            {/* Administration records its own page views, so this list would
+                otherwise fill with an admin watching themselves refresh. They
+                are excluded HERE only, and this link is the disclosure. */}
+            <Link
+              href={`/admin/audit?action=${ADMIN_ACCESS_ACTION}`}
+              className="admin-meta"
+              data-testid="admin-access-log-link"
+            >
+              Administration&rsquo;s own access log →
             </Link>
           </>
         )}
@@ -169,7 +223,8 @@ export function OverviewPanel({
 function Tile({ label, value, href }: { label: string; value: number; href?: string }) {
   const tile = (
     <div className="stat-tile">
-      <span className="stat-value">{value}</span>
+      {/* 1539 and 1558 were four unbroken digits the eye has to count. */}
+      <span className="stat-value">{formatCount(value)}</span>
       <span className="stat-label">{label}</span>
     </div>
   );
@@ -182,11 +237,22 @@ function Tile({ label, value, href }: { label: string; value: number; href?: str
   );
 }
 
+/**
+ * The `live` row is the one status that cannot be rendered as the enum says.
+ *
+ * `● LIVE 40`, with a pulsing dot, reads as forty rooms bidding right now. All
+ * forty had been sitting `live` for four to ten days: not activity, forty
+ * auction nights that ended without anyone closing them. So the count derives
+ * from RECENCY and splits, and the pulsing "live" tone is reserved for the
+ * auctions that are actually live.
+ */
 function StatusList({
   lines,
+  liveAuctions,
   empty,
 }: {
   lines: readonly { status: string; count: number }[];
+  liveAuctions?: { total: number; stale: number };
   empty: string;
 }) {
   if (lines.length === 0) {
@@ -194,11 +260,29 @@ function StatusList({
   }
   return (
     <div className="admin-chips">
-      {lines.map((line) => (
-        <Badge key={line.status} tone={statusTone(line.status)}>
-          {line.status} <span className="admin-count">{line.count}</span>
-        </Badge>
-      ))}
+      {lines.map((line) => {
+        if (line.status === "live" && liveAuctions !== undefined && liveAuctions.stale > 0) {
+          const running = liveAuctions.total - liveAuctions.stale;
+          return (
+            <span key={line.status} className="admin-chips">
+              {running > 0 ? (
+                <Badge tone="live">
+                  live now <span className="admin-count">{formatCount(running)}</span>
+                </Badge>
+              ) : null}
+              <Badge tone="danger" data-testid="admin-stuck-live">
+                stuck in live <span className="admin-count">{formatCount(liveAuctions.stale)}</span>
+              </Badge>
+            </span>
+          );
+        }
+        return (
+          <Badge key={line.status} tone={statusTone(line.status)}>
+            {lifecycleLabel(line.status)}{" "}
+            <span className="admin-count">{formatCount(line.count)}</span>
+          </Badge>
+        );
+      })}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { auditLog, newId, withTenantDb } from "@desiauction/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import { dbHandle } from "../db";
 
@@ -19,6 +19,11 @@ export type SecurityAction =
   | "auth.session.revoked"
   // PX-3: profile changes are person-scoped evidence on the same ledger.
   | "profile.name.updated"
+  // The FIRST name is not an update. Every new account's very first inbox row
+  // read "Name updated" about a name that had never existed — the product's
+  // opening sentence to a person, and it was wrong about the one thing that
+  // had just happened. Same ledger, no new store; a different verb.
+  | "profile.name.set"
   // DA-19: the decisions a PLAYER cares about. 48 people were approved and one
   // rejected during certification and not one of them was told — the inbox
   // carried sign-in events only, and its own empty state admitted it. These
@@ -50,15 +55,41 @@ export interface SecurityEvent {
   meta: unknown;
 }
 
-export async function listSecurityEvents(personId: string): Promise<SecurityEvent[]> {
+/**
+ * The person's ledger, newest first.
+ *
+ * The limit used to be a hard 10 with no pagination and no truncation notice.
+ * Every sign-in writes a row, so on a real account all ten read
+ * `auth.login.otp` and a passkey removal from the week before was invisible —
+ * an audit surface that could not show an audit event. The limit is now the
+ * caller's to choose, and `countSecurityEvents` lets a surface say how much it
+ * is NOT showing instead of quietly truncating.
+ */
+export async function listSecurityEvents(
+  personId: string,
+  limit = 10,
+  offset = 0,
+): Promise<SecurityEvent[]> {
   return withTenantDb(dbHandle, { personId }, (db) =>
     db
       .select({ action: auditLog.action, at: auditLog.at, meta: auditLog.meta })
       .from(auditLog)
       .where(eq(auditLog.scopeId, personId))
       .orderBy(desc(auditLog.at))
-      .limit(10),
+      .limit(limit)
+      .offset(offset),
   );
+}
+
+/** How many person-scoped events exist — so a truncated list can admit it. */
+export async function countSecurityEvents(personId: string): Promise<number> {
+  const rows = await withTenantDb(dbHandle, { personId }, (db) =>
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(auditLog)
+      .where(eq(auditLog.scopeId, personId)),
+  );
+  return rows[0]?.total ?? 0;
 }
 
 /** PX-3 bell indicator: the newest person-scoped event's timestamp (one row). */

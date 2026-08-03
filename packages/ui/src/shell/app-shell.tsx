@@ -182,7 +182,17 @@ export function AppShell({
           {children}
         </div>
       </div>
-      <nav className={styles["bottom-tabs"]} aria-label="Sections">
+      {/* "Primary", not "Sections". This is the SAME navigation as the desktop
+          rail (NavigationRail label="Primary", above) — it maps the same `nav`
+          prop, so the same items and the same destinations — laid out as bottom
+          tabs because the viewport is narrow. Naming it differently gave a
+          screen-reader user two names
+          for one landmark depending on the width of their screen, and made
+          "the primary navigation" unfindable on a phone: responsive.spec.ts
+          searches for nav[name="Primary"] at 320px and found nothing at all.
+          "Sections" was also simply wrong — the section tabs are a separate
+          strip (the `tabs` prop, rendered above). */}
+      <nav className={styles["bottom-tabs"]} aria-label="Primary">
         {nav.map((item) => (
           <Link
             key={item.key}

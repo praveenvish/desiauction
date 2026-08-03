@@ -143,7 +143,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
             <li className="readiness-row" data-testid="readiness-fixtures">
               <Badge
                 tone={
-                  fixtures !== null && fixtures.conflicts.length > 0
+                  fixtures !== null && (fixtures.conflicts ?? []).length > 0
                     ? "danger"
                     : fixtures !== null && fixtures.stats.published > 0
                       ? "success"
@@ -151,8 +151,8 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                 }
               >
                 {fixtures !== null
-                  ? fixtures.conflicts.length > 0
-                    ? `${String(fixtures.conflicts.length)} conflict${fixtures.conflicts.length === 1 ? "" : "s"}`
+                  ? (fixtures.conflicts ?? []).length > 0
+                    ? `${String((fixtures.conflicts ?? []).length)} conflict${(fixtures.conflicts ?? []).length === 1 ? "" : "s"}`
                     : `${String(fixtures.stats.published)} published`
                   : "—"}
               </Badge>

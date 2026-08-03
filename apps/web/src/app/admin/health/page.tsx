@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { adminHealth } from "../../../server/admin/actions";
-import { platformAdminGate } from "../../../server/admin/authz";
+import { platformAdminPageGate } from "../../../server/admin/authz";
 import { HealthPanel } from "./health-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -22,7 +22,7 @@ export const metadata = { title: "Health · Platform admin · DesiAuction" };
  * `finops.operate`.
  */
 export default async function AdminHealthPage() {
-  if ((await platformAdminGate()) === null) {
+  if ((await platformAdminPageGate("health")) === null) {
     notFound();
   }
   return (

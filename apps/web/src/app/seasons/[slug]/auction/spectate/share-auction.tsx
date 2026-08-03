@@ -3,6 +3,22 @@
 import { useToast } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
+import type { AuctionStatus } from "@desiauction/core";
+
+/**
+ * What you are actually forwarding. "Watch … live" went out on completed,
+ * scheduled and abandoned auctions alike — a WhatsApp message inviting someone
+ * to watch a night that finished three weeks ago.
+ */
+const SHARE_VERB: Record<AuctionStatus, string> = {
+  scheduled: "Coming up:",
+  live: "Watch live:",
+  paused: "Watch live:",
+  completed: "Results:",
+  reconciled: "Results:",
+  abandoned: "Abandoned:",
+};
+
 /**
  * The conversion surface on the product's most-forwarded screen.
  *
@@ -18,10 +34,13 @@ import { useEffect, useState } from "react";
 export function ShareAuction({
   slug,
   auctionName,
+  auctionStatus,
   testId = "share-auction",
 }: {
   slug: string;
   auctionName: string;
+  /** DA-20: the message said "live" whatever the night was actually doing. */
+  auctionStatus: AuctionStatus;
   testId?: string;
 }) {
   const toast = useToast();
@@ -31,7 +50,7 @@ export function ShareAuction({
     setUrl(`${window.location.origin}/seasons/${slug}/auction/spectate`);
   }, [slug]);
 
-  const message = `Watch ${auctionName} live on DesiAuction`;
+  const message = `${SHARE_VERB[auctionStatus]} ${auctionName} on DesiAuction`;
 
   async function copy() {
     try {
@@ -45,7 +64,9 @@ export function ShareAuction({
   return (
     <div className="share-auction" data-testid={testId}>
       <p className="share-auction-lede">
-        Anyone can watch — no account needed.
+        {auctionStatus === "completed" || auctionStatus === "reconciled"
+          ? "Anyone can see the results — no account needed."
+          : "Anyone can watch — no account needed."}
         <span className="share-auction-sub">Send the link; it opens straight to the stage.</span>
       </p>
       <div className="share-auction-actions">

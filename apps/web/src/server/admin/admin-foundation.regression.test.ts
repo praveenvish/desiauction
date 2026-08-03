@@ -16,17 +16,31 @@
 //       admin projection is driven through a db handle that throws on any
 //       mutation, and the whole suite must still go green.
 import { capabilitiesOf, hasCapability } from "@desiauction/core";
-import { createDb, grants as grantsTable, newId, people, type DbHandle } from "@desiauction/db";
+import {
+  auctions,
+  auditLog,
+  createDb,
+  finopsProfiles,
+  grants as grantsTable,
+  newId,
+  people,
+  type DbHandle,
+} from "@desiauction/db";
 import { hasFinopsCapability, finopsCapabilitiesOf } from "@desiauction/financial-operations";
+import { runnerHealthSnapshot } from "@desiauction/financial-operations/server";
 import { hasSettlementCapability, settlementCapabilitiesOf } from "@desiauction/settlement";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { readFileSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { createOrg } from "../orgs/orgs";
 import { grantsFor } from "../orgs/authz";
 import { webFinopsDeps } from "../financial-operations/deps";
+import { recordAdminAccess } from "./access-log";
 import {
+  ADMIN_ACCESS_ACTION,
   PLATFORM_SCOPE_ID,
   PLATFORM_SCOPE_TYPE,
   hasPlatformCapability,
@@ -34,12 +48,15 @@ import {
   platformCapabilitiesOf,
 } from "./capabilities";
 import {
-  adminSearch,
+  attentionQueue,
   auditExplorer,
   organizationDetail,
   organizationDirectory,
+  organizationExists,
+  personExists,
   platformHealth,
   platformOverview,
+  runnerVerdictOf,
   userDetail,
   userDirectory,
 } from "./views";
@@ -321,9 +338,6 @@ describe("PX-9 · The read-only guarantee, proved at runtime", () => {
 
     const health = await platformHealth(deps, ro);
     expect(Array.isArray(health.orgs)).toBe(true);
-
-    const hits = await adminSearch(ro, "PX9");
-    expect(hits.length).toBeGreaterThan(0);
   }, 120_000);
 
   it("the proof harness itself has teeth — a write through it throws", () => {
@@ -365,15 +379,187 @@ describe("PX-9 · The projections tell the truth", () => {
     expect(none.rows).toHaveLength(0);
     expect(none.total).toBe(0);
   });
+});
 
-  it("command search is navigation only — every hit is a route, never a command", async () => {
-    const hits = await adminSearch(db, `PX9 Admin Org ${RUN}`);
-    expect(hits.length).toBeGreaterThan(0);
-    for (const hit of hits) {
-      expect(hit.href.startsWith("/")).toBe(true);
-    }
-    expect(hits.some((hit) => hit.href === `/admin/orgs/${orgSlug}`)).toBe(true);
-    // A one-character query returns nothing rather than the whole platform.
-    expect(await adminSearch(db, "P")).toEqual([]);
+/**
+ * THE READ-ONLY PROOF, RE-ARMED (Screen 21).
+ *
+ * Administration now writes exactly one thing: its own access record (see
+ * `access-log.ts` for the decision and its justification). The runtime proof
+ * above is unchanged and still drives every projection through a handle that
+ * refuses to mutate — but a runtime proof can only see the code paths it
+ * happens to drive, and a write introduced in a module it does not call would
+ * have slipped past it.
+ *
+ * So the guarantee is also asserted STATICALLY, over the source. Every file
+ * under administration is read, and a mutation verb in any of them fails the
+ * suite — except in `access-log.ts`, which is allowed exactly the one insert it
+ * exists for. The test is strictly stronger than before: it fails on any write
+ * that is not the access log, wherever that write is added.
+ */
+describe("PX-9 · Administration holds ONE write, and the source proves it", () => {
+  const ADMIN_DIRS = [
+    resolve(import.meta.dirname, "."),
+    resolve(import.meta.dirname, "../../app/admin"),
+  ];
+  const WRITE_VERB = /\.(insert|update|delete|transaction)\s*\(/;
+  const ALLOWED = "access-log.ts";
+
+  function sourceFiles(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return sourceFiles(full);
+      }
+      return /\.tsx?$/.test(entry.name) && !entry.name.includes(".test.") ? [full] : [];
+    });
+  }
+
+  it("no module under administration mutates, except the named access log", () => {
+    const offenders = ADMIN_DIRS.flatMap(sourceFiles)
+      .filter((file) => !file.endsWith(ALLOWED))
+      .filter((file) => WRITE_VERB.test(readFileSync(file, "utf8")))
+      .map((file) => file.replace(resolve(import.meta.dirname, "../../../.."), ""));
+    expect(offenders, "a write appeared in administration outside the access log").toEqual([]);
   });
+
+  it("the access log holds exactly ONE write, and it is an INSERT", () => {
+    const source = readFileSync(join(import.meta.dirname, ALLOWED), "utf8");
+    const writes = source.match(new RegExp(WRITE_VERB, "g")) ?? [];
+    expect(writes).toEqual([".insert("]);
+    // …of exactly one action, on the platform singleton scope.
+    expect(source).toContain("ADMIN_ACCESS_ACTION");
+    expect(source).toContain("PLATFORM_SCOPE_ID");
+  });
+
+  it("the access log writes one row, naming the actor, the surface and nothing else", async () => {
+    const before = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(auditLog)
+      .where(eq(auditLog.actor, adminId));
+    await recordAdminAccess({ personId: adminId }, "users", null);
+    const rows = await db
+      .select({
+        action: auditLog.action,
+        scopeType: auditLog.scopeType,
+        scopeId: auditLog.scopeId,
+        meta: auditLog.meta,
+      })
+      .from(auditLog)
+      .where(and(eq(auditLog.actor, adminId), eq(auditLog.action, ADMIN_ACCESS_ACTION)));
+    expect(rows).toHaveLength((before[0]?.n ?? 0) + 1);
+    expect(rows[0]?.scopeType).toBe(PLATFORM_SCOPE_TYPE);
+    // Never the inspected org's scope: an admin READING an organization is not
+    // that organization's activity and must not appear in its timeline.
+    expect(rows[0]?.scopeId).toBe(PLATFORM_SCOPE_ID);
+    expect(rows[0]?.meta).toEqual({ surface: "users" });
+    await db.delete(auditLog).where(eq(auditLog.actor, adminId));
+  });
+});
+
+describe("PX-9 · The filters are the database's, and the list has an end", () => {
+  it("FILTERS RUN IN SQL, not over the newest fifty rows", async () => {
+    // The old code took 50 rows ordered by created_at desc and filtered them in
+    // Node, so "Finance declared" reported 1 of the 3 orgs that had declared —
+    // the other two sat at ranks 252 and 271 of 349 — and "Open cases" reported
+    // zero while asserting "This filter has no organizations yet."
+    const declared = await db.select({ n: sql<number>`count(*)::int` }).from(finopsProfiles);
+    const finance = await organizationDirectory(db, { filter: "finance" });
+    expect(finance.total).toBe(declared[0]?.n ?? 0);
+    expect(finance.rows.every((row) => row.financeDeclared)).toBe(true);
+
+    // …and the denominator stays the denominator.
+    expect(finance.platformTotal).toBeGreaterThanOrEqual(finance.total);
+
+    const quiet = await organizationDirectory(db, { filter: "quiet" });
+    expect(quiet.rows.every((row) => row.competitions === 0)).toBe(true);
+
+    const settling = await organizationDirectory(db, { filter: "settling" });
+    expect(settling.rows.every((row) => row.openCases + row.settledCases > 0)).toBe(true);
+  }, 60_000);
+
+  it("PAGINATION reaches past row 50, and page two never repeats page one", async () => {
+    const first = await organizationDirectory(db, {});
+    if (first.nextCursor === null) {
+      // Small database: nothing to page. The assertion below would be vacuous.
+      expect(first.rows.length).toBeLessThan(50);
+      return;
+    }
+    const second = await organizationDirectory(db, { after: first.nextCursor });
+    expect(second.rows.length).toBeGreaterThan(0);
+    const firstIds = new Set(first.rows.map((row) => row.id));
+    expect(second.rows.some((row) => firstIds.has(row.id))).toBe(false);
+    // The denominator is the same question on both pages.
+    expect(second.platformTotal).toBe(first.platformTotal);
+  }, 60_000);
+
+  it("a forged or stale cursor yields page one rather than an error", async () => {
+    const page = await organizationDirectory(db, { after: newId() });
+    expect(page.rows.length).toBeGreaterThan(0);
+  }, 30_000);
+
+  it("EXISTENCE is answerable before the boundary opens, for real and malformed ids", async () => {
+    expect(await organizationExists(db, orgSlug)).toBe(true);
+    expect(await organizationExists(db, `no-such-org-${RUN}`)).toBe(false);
+    expect(await personExists(db, adminId)).toBe(true);
+    expect(await personExists(db, PLATFORM_SCOPE_ID)).toBe(false);
+    // A malformed id must MISS, not throw: the audit explorer links to
+    // whatever the actor column holds, and 704 of those are not people.
+    expect(await personExists(db, "NOTAULID")).toBe(false);
+  }, 30_000);
+});
+
+describe("PX-9 · The runner verdict can go red", () => {
+  it("a runner with a queue older than its own freshness budget is NOT healthy", async () => {
+    const deps = webFinopsDeps(db);
+    const snapshot = await runnerHealthSnapshot(deps);
+    const verdict = await runnerVerdictOf(deps, db, snapshot);
+
+    // The snapshot's own rule, restated so the divergence is visible.
+    expect(snapshot.healthy).toBe(snapshot.jobs.dead === 0);
+
+    if (verdict.oldestQueuedWaitMs !== null && verdict.oldestQueuedWaitMs > 15 * 60 * 1000) {
+      // THE DEFECT: `dead === 0` reported green over 1,558 jobs whose oldest
+      // had waited eleven days.
+      expect(verdict.healthy).toBe(false);
+      expect(verdict.detail).not.toBeNull();
+    }
+    if (verdict.dead > 0) {
+      expect(verdict.healthy).toBe(false);
+    }
+    // Age is never negative, however the clock and `not_before_ms` disagree.
+    expect(verdict.oldestQueuedWaitMs === null || verdict.oldestQueuedWaitMs >= 0).toBe(true);
+  }, 60_000);
+
+  it("the attention queue can see a tenant with no finance profile", async () => {
+    const deps = webFinopsDeps(db);
+    const snapshot = await runnerHealthSnapshot(deps);
+    const verdict = await runnerVerdictOf(deps, db, snapshot);
+    const queue = await attentionQueue(deps, db, verdict);
+    const kinds = new Set(queue.map((row) => row.kind));
+
+    // Whatever this database holds, the queue's REACH is no longer bounded by
+    // `finops_profiles`: a stalled runner and a stuck auction are raised for
+    // every tenant, and 346 of 349 orgs have no finance profile at all.
+    if (verdict.oldestQueuedWaitMs !== null && verdict.oldestQueuedWaitMs > 15 * 60 * 1000) {
+      expect(kinds.has("runner:stalled")).toBe(true);
+    }
+    const stuck = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(auctions)
+      .where(
+        and(
+          eq(auctions.status, "live"),
+          lt(auctions.createdAt, new Date(Date.now() - 12 * 60 * 60 * 1000)),
+        ),
+      );
+    if ((stuck[0]?.n ?? 0) > 0) {
+      expect(kinds.has("auction:stuck-live")).toBe(true);
+    }
+    // Every row an admin can actually open — no link into a console that
+    // `platform:admin` cannot enter.
+    for (const row of queue) {
+      expect(row.href === null || row.href.startsWith("/admin/")).toBe(true);
+    }
+  }, 90_000);
 });

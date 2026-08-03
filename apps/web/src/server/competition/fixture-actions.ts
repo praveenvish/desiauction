@@ -1,7 +1,8 @@
 "use server";
 
-import { parseFixtureCsv, type Conflict, type FixtureStatus } from "@desiauction/core";
-import { withTenantDb, type Db } from "@desiauction/db";
+import { parseFixtureCsv, type FixtureStatus } from "@desiauction/core";
+import { organizations, withTenantDb, type Db } from "@desiauction/db";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -20,8 +21,10 @@ import {
   completeFixture,
   competitionConflicts,
   createFixture,
+  discardDrafts,
   editFixture,
   generateFixtures,
+  previewGeneration,
   publishAllScheduled,
   publishFixture,
   rescheduleFixture,
@@ -31,9 +34,11 @@ import {
   type FixtureMutationResult,
   type FixturePatch,
   type GenerateInput,
+  type GeneratePreview,
+  type LabelledConflict,
   type ManualFixtureInput,
 } from "./fixture-aggregate";
-import { commitFixtureImport, unknownImportNames } from "./fixture-import";
+import { commitFixtureImport, importDryRun } from "./fixture-import";
 import {
   calendarRange,
   competitionTimeline,
@@ -45,6 +50,7 @@ import {
   queryFixtures,
   upcomingFixtures,
   weekView,
+  PUBLIC_FIXTURE_STATUSES,
   type CalendarDay,
   type FixturePage,
   type FixtureSnapshot,
@@ -116,9 +122,14 @@ async function fixtureGate(
   return { ok: true, personId: session.personId, competition };
 }
 
-function conflictMessages(conflicts: Conflict[]): string {
+/**
+ * A refusal has to name what it refused. "A team is booked twice at once" sends
+ * an organizer hunting through 240 fixtures; the conflict already knows which
+ * two, so say which two.
+ */
+function conflictMessages(conflicts: LabelledConflict[]): string {
   const first = conflicts[0];
-  const head = first === undefined ? "Scheduling conflict." : first.detail;
+  const head = first === undefined ? "Scheduling conflict." : first.summary;
   return conflicts.length > 1 ? `${head} (+${String(conflicts.length - 1)} more)` : head;
 }
 
@@ -268,13 +279,29 @@ export interface FixtureDashboardParams {
   page?: string;
 }
 
+/**
+ * DA-13's shape, seventh occurrence. `canManage` decided which BUTTONS rendered
+ * while the read model shipped the same payload to everyone, so a member with
+ * zero grants received all 240 DRAFT fixtures, the whole pager and 120 conflict
+ * items — an organizer's unfinished schedule and its problems, served to
+ * someone who cannot act on any of it — plus `activeGroundsOf(orgId)`, every
+ * ground the ORGANIZATION owns rather than the ones this season uses.
+ *
+ * The capability is resolved BEFORE the read and the keys are simply absent
+ * without it (the `seasonOverviewView({ money })` shape): a key that is never
+ * populated cannot leak through a component that forgets to check.
+ */
 export interface FixtureDashboard {
   competition: CompetitionSummary;
+  /** Where to create venues and grounds — the activation path, as a link. */
+  orgSlug: string;
   stats: FixtureStats;
   page: FixturePage;
   teams: TeamSummary[];
-  grounds: GroundOption[];
-  conflicts: Conflict[];
+  /** Absent without fixture.manage — the org's ground inventory is not public. */
+  grounds?: GroundOption[];
+  /** Absent without fixture.manage — an unfinished schedule's problems. */
+  conflicts?: LabelledConflict[];
   viewer: { canManage: boolean };
 }
 
@@ -301,10 +328,14 @@ export async function fixtureDashboard(
   const scope = { orgId: competition.orgId, competitionId: competition.id };
   const pageNum = Number.parseInt(params.page ?? "1", 10);
   return inCompetitionOrg(session.personId, competition, async (db) => {
-    const [canManage, stats, page, teamList, groundList, conflicts] = await Promise.all([
-      canCompetition(db, session.personId, scope, "fixture.manage"),
-      fixtureStats(db, competition.id),
+    // The gate runs FIRST; every read below is shaped by its answer.
+    const canManage = await canCompetition(db, session.personId, scope, "fixture.manage");
+    const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
+    const [orgSlug, stats, page, teamList, groundList, conflicts] = await Promise.all([
+      orgSlugOf(db, competition.orgId),
+      fixtureStats(db, competition.id, visible),
       queryFixtures(db, competition.id, {
+        ...(visible !== undefined ? { visible } : {}),
         ...(params.status !== undefined && VALID_STATUS.has(params.status as FixtureStatus)
           ? { status: params.status as FixtureStatus }
           : {}),
@@ -316,22 +347,43 @@ export async function fixtureDashboard(
         pageSize: PAGE_SIZE,
       }),
       teamsOf(db, competition.id),
-      activeGroundsOf(db, competition.orgId),
-      competitionConflicts(db, competition),
+      canManage ? activeGroundsOf(db, competition.orgId) : Promise.resolve(undefined),
+      canManage ? competitionConflicts(db, competition) : Promise.resolve(undefined),
     ]);
     return {
       competition,
+      orgSlug,
       stats,
       page,
       teams: teamList,
-      grounds: groundList,
-      conflicts,
+      ...(groundList !== undefined ? { grounds: groundList } : {}),
+      ...(conflicts !== undefined ? { conflicts } : {}),
       viewer: { canManage },
     };
   });
 }
 
+async function orgSlugOf(db: Db, orgId: string): Promise<string> {
+  const [row] = await db
+    .select({ slug: organizations.slug })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+  return row?.slug ?? "";
+}
+
 // --- Aggregate operations (thin, gated pass-throughs) --------------------------------
+
+const GENERATE_ERROR: Record<string, string> = {
+  fixtures_exist: "Fixtures already exist — discard the drafts or cancel them before regenerating.",
+  too_few_teams: "Add at least 2 teams first.",
+  duplicate_team: "Team list has a duplicate.",
+  no_grounds: "Pick at least one ground.",
+  unknown_ground: "Pick grounds that belong to this organization.",
+  invalid_start_date: "Pick a valid start date.",
+  invalid_kickoff_times: "Kickoff times must be HH:MM.",
+  invalid_duration: "Duration must be 1–1440 minutes.",
+};
 
 export async function generateFixturesAction(
   slug: string,
@@ -348,17 +400,7 @@ export async function generateFixturesAction(
     if (result.reason === "conflicts") {
       return { ok: false, error: conflictMessages(result.conflicts) };
     }
-    const message: Record<string, string> = {
-      fixtures_exist: "Fixtures already exist — cancel them before regenerating.",
-      too_few_teams: "Add at least 2 teams first.",
-      duplicate_team: "Team list has a duplicate.",
-      no_grounds: "Pick at least one ground.",
-      unknown_ground: "Pick grounds that belong to this organization.",
-      invalid_start_date: "Pick a valid start date.",
-      invalid_kickoff_times: "Kickoff times must be HH:MM.",
-      invalid_duration: "Duration must be 1–1440 minutes.",
-    };
-    return { ok: false, error: message[result.reason] ?? "Could not generate." };
+    return { ok: false, error: GENERATE_ERROR[result.reason] ?? "Could not generate." };
   }
   return { ok: true, created: result.created };
 }
@@ -440,9 +482,21 @@ export async function rescheduleFixtureAction(
   return result.ok ? { ok: true } : { ok: false, error: mutationError(result) };
 }
 
-export async function scheduleAllAction(
-  slug: string,
-): Promise<{ ok: boolean; applied?: number; skipped?: number; error?: string }> {
+/**
+ * Bulk results say what happened. These actions returned `{ ok: true }`
+ * unconditionally and the client toasted a fixed green "Schedule published" on
+ * `ok` alone — so pressing Publish with ZERO fixtures reported success, and 240
+ * fixtures with 240 skips reported the same success. The counts were always in
+ * the result; they just never reached the sentence.
+ */
+export interface BulkFixtureResult {
+  ok: boolean;
+  applied?: number;
+  skipped?: number;
+  error?: string;
+}
+
+export async function scheduleAllAction(slug: string): Promise<BulkFixtureResult> {
   const gate = await fixtureGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
@@ -453,9 +507,7 @@ export async function scheduleAllAction(
   return { ok: true, ...result };
 }
 
-export async function publishAllAction(
-  slug: string,
-): Promise<{ ok: boolean; applied?: number; skipped?: number; error?: string }> {
+export async function publishAllAction(slug: string): Promise<BulkFixtureResult> {
   const gate = await fixtureGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
@@ -464,6 +516,35 @@ export async function publishAllAction(
     publishAllScheduled(db, gate.competition, gate.personId),
   );
   return { ok: true, ...result };
+}
+
+/** Cancel every draft — the undo for a generation the organizer didn't want. */
+export async function discardDraftsAction(slug: string): Promise<BulkFixtureResult> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    discardDrafts(db, gate.competition, gate.personId),
+  );
+  return { ok: true, ...result };
+}
+
+/** What Generate would write, before it writes it. No mutation. */
+export async function previewGenerationAction(
+  slug: string,
+  input: GenerateInput,
+): Promise<{ ok: true; preview: GeneratePreview } | { ok: false; error: string }> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    previewGeneration(db, gate.competition, input),
+  );
+  return result.ok
+    ? { ok: true, preview: result.preview }
+    : { ok: false, error: GENERATE_ERROR[result.reason] ?? "Could not plan a schedule." };
 }
 
 export async function fixtureTimelineAction(
@@ -505,14 +586,23 @@ export async function calendarView(
       ? params.date
       : nowWallClock().slice(0, 10);
   return inCompetitionOrg(session.personId, competition, async (db) => {
+    // Same gate as the dashboard: the calendar is the same schedule, laid out
+    // differently, so a grantless member sees the same published subset here.
+    const canManage = await canCompetition(
+      db,
+      session.personId,
+      { orgId: competition.orgId, competitionId: competition.id },
+      "fixture.manage",
+    );
+    const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
     const [days, timeline, upcoming] = await Promise.all([
       view === "week"
-        ? weekView(db, competition.id, date)
+        ? weekView(db, competition.id, date, visible)
         : view === "day"
-          ? calendarRange(db, competition.id, date, date)
+          ? calendarRange(db, competition.id, date, date, visible)
           : Promise.resolve([]),
-      view === "timeline" ? competitionTimeline(db, competition.id) : Promise.resolve([]),
-      upcomingFixtures(db, competition.id, nowWallClock()),
+      view === "timeline" ? competitionTimeline(db, competition.id, visible) : Promise.resolve([]),
+      upcomingFixtures(db, competition.id, nowWallClock(), visible),
     ]);
     return { competition, view, date, days, timeline, upcoming };
   });
@@ -539,15 +629,18 @@ export async function matchDayView(
       ? params.date
       : nowWallClock().slice(0, 10);
   return inCompetitionOrg(session.personId, competition, async (db) => {
-    const [groundGroups, canManage] = await Promise.all([
-      matchDay(db, competition.id, date),
-      canCompetition(
-        db,
-        session.personId,
-        { orgId: competition.orgId, competitionId: competition.id },
-        "fixture.manage",
-      ),
-    ]);
+    const canManage = await canCompetition(
+      db,
+      session.personId,
+      { orgId: competition.orgId, competitionId: competition.id },
+      "fixture.manage",
+    );
+    const groundGroups = await matchDay(
+      db,
+      competition.id,
+      date,
+      canManage ? undefined : PUBLIC_FIXTURE_STATUSES,
+    );
     return { competition, date, groundGroups, viewer: { canManage } };
   });
 }
@@ -576,20 +669,26 @@ export async function fixtureImportPreviewAction(
     return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
   }
   const parsed = parseFixtureCsv(csv);
-  const nameErrors = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
-    unknownImportNames(db, gate.competition, parsed.rows),
-  );
-  return {
-    validCount: nameErrors.length === 0 ? parsed.rows.length : 0,
-    errors: [...parsed.errors, ...nameErrors],
-  };
+  const dbErrors =
+    parsed.errors.length > 0
+      ? []
+      : await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+          importDryRun(db, gate.competition, parsed.rows),
+        );
+  const errors = [...parsed.errors, ...dbErrors];
+  return { validCount: errors.length === 0 ? parsed.rows.length : 0, errors };
 }
 
 /** Re-validate and commit atomically. Refuses any file with errors. */
 export async function fixtureImportCommitAction(
   slug: string,
   csv: string,
-): Promise<{ ok: boolean; imported?: number; error?: string }> {
+): Promise<{
+  ok: boolean;
+  imported?: number;
+  error?: string;
+  errors?: { line: number; message: string }[];
+}> {
   const gate = await fixtureGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
@@ -605,9 +704,14 @@ export async function fixtureImportCommitAction(
     commitFixtureImport(db, gate.competition, gate.personId, parsed.rows),
   );
   if (!result.ok) {
+    const first = result.errors[0];
     return {
       ok: false,
-      error: `Fix ${String(result.errors.length)} row error(s) before importing.`,
+      error:
+        first === undefined
+          ? "Nothing was imported."
+          : `Line ${String(first.line)}: ${first.message}${result.errors.length > 1 ? ` (+${String(result.errors.length - 1)} more)` : ""}`,
+      errors: result.errors,
     };
   }
   return { ok: true, imported: result.imported };

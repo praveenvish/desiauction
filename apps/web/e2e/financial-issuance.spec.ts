@@ -212,11 +212,11 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await page.getByTestId("pay-method").selectOption("manual:cash");
   await page.getByTestId("pay-amount").fill("50000");
   await page.getByTestId("record-payment").click();
-  await expect(page.getByTestId("payments-table")).toContainText("created", { timeout: 20_000 });
+  await expect(page.getByTestId("payments-table")).toContainText("Recorded", { timeout: 20_000 });
 
   // THE CAPTURE — the fact the whole financial lifecycle hangs from.
-  await page.getByRole("button", { name: "Attest receipt" }).first().click();
-  await expect(page.getByTestId("payments-table")).toContainText("captured", { timeout: 20_000 });
+  await page.getByRole("button", { name: "Confirm received" }).first().click();
+  await expect(page.getByTestId("payments-table")).toContainText("Received", { timeout: 20_000 });
   await expect(page.getByTestId("discharged")).toContainText("₹50,000");
 
   // --- Finance names it as awaiting a receipt ---------------------------------

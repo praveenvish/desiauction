@@ -11,28 +11,33 @@ import {
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createFixtureAction,
+  discardDraftsAction,
   exportFixturesAction,
   fixtureImportCommitAction,
   fixtureImportPreviewAction,
   fixtureLifecycleAction,
   fixtureTimelineAction,
   generateFixturesAction,
+  previewGenerationAction,
   publishAllAction,
   rescheduleFixtureAction,
   scheduleAllAction,
+  type BulkFixtureResult,
   type FixtureDashboard,
   type FixtureImportPreview,
   type FixtureLifecycleAction,
 } from "../../../../server/competition/fixture-actions";
-import { formatDateTime } from "../../../../lib/format-date";
+import { formatDateTime, formatKickoff, formatWallDate } from "../../../../lib/format-date";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
 
 type Snapshot = FixtureDashboard["page"]["rows"][number];
+type GeneratePreview = Awaited<ReturnType<typeof previewGenerationAction>>;
 
 const FIXTURE_TONE = {
   draft: "neutral",
@@ -54,6 +59,9 @@ const STATUS_FILTERS = [
 ];
 const SORTS = ["kickoff", "kickoff_desc", "number", "round"];
 
+// At 240 fixtures the conflict panel ran 3565px of a 6431px page. Bound it.
+const CONFLICTS_SHOWN = 20;
+
 // The single next lifecycle step per status (one gate at a time, doc 44 pattern).
 const NEXT_ACTION: Partial<
   Record<Snapshot["status"], { action: FixtureLifecycleAction; label: string }>
@@ -66,23 +74,31 @@ const NEXT_ACTION: Partial<
 
 export function FixturesPanel({
   slug,
+  orgSlug,
+  isPublic,
   stats,
   page,
   teams,
-  grounds,
-  conflicts,
+  grounds: groundsProp,
+  conflicts: conflictsProp,
   canManage,
   filters,
 }: {
   slug: string;
+  orgSlug: string;
+  isPublic: boolean;
   stats: FixtureDashboard["stats"];
   page: FixtureDashboard["page"];
   teams: FixtureDashboard["teams"];
-  grounds: FixtureDashboard["grounds"];
-  conflicts: FixtureDashboard["conflicts"];
+  grounds?: FixtureDashboard["grounds"];
+  conflicts?: FixtureDashboard["conflicts"];
   canManage: boolean;
   filters: { status: string; team: string; ground: string; q: string; sort: string };
 }) {
+  // Both arrive undefined without fixture.manage — the server omits the keys
+  // rather than trusting this component to hide them.
+  const grounds = groundsProp ?? [];
+  const conflicts = conflictsProp ?? [];
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -100,7 +116,8 @@ export function FixturesPanel({
     setHydrated(true);
   }, []);
 
-  // Generate wizard state.
+  // Generate wizard state. `plan` holds the dry run awaiting confirmation.
+  const [plan, setPlan] = useState<Extract<GeneratePreview, { ok: true }> | null>(null);
   const [genRounds, setGenRounds] = useState("1");
   const [genStart, setGenStart] = useState("");
   const [genTimes, setGenTimes] = useState("18:00");
@@ -114,11 +131,18 @@ export function FixturesPanel({
   const [manKickoff, setManKickoff] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
 
   // The schedule reads by round, the way a fixture list is actually published.
   // Map preserves insertion order, so rounds appear in the server's sort order.
+  //
+  // The round header used to read "Week {round}" — the round number printed a
+  // second time, in a costume. The generator puts each round on a CONSECUTIVE
+  // DAY, so rounds 1, 2 and 3 were 1, 2 and 3 August: three days inside one
+  // calendar week, labelled three different weeks. It now shows when the round
+  // is actually played, derived from its own fixtures.
   const rounds = useMemo(() => {
     const groups = new Map<number | null, Snapshot[]>();
     for (const row of page.rows) {
@@ -126,7 +150,20 @@ export function FixturesPanel({
       list.push(row);
       groups.set(row.round, list);
     }
-    return [...groups.entries()];
+    return [...groups.entries()].map(([round, rows]) => {
+      const dates = [
+        ...new Set(rows.map((r) => r.kickoffAt?.slice(0, 10)).filter((d) => d !== undefined)),
+      ].sort();
+      const first = dates[0];
+      const last = dates[dates.length - 1];
+      const when =
+        first === undefined || last === undefined
+          ? null
+          : first === last
+            ? formatWallDate(first)
+            : `${formatWallDate(first)} – ${formatWallDate(last)}`;
+      return { round, rows, when };
+    });
   }, [page.rows]);
 
   const pushQuery = useCallback(
@@ -150,35 +187,86 @@ export function FixturesPanel({
     [router, slug, filters],
   );
 
-  const act = async (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
+  /**
+   * `done` may be a sentence or a function of the result. Bulk actions must use
+   * the function form: "Schedule published" fired on `ok` alone, so publishing
+   * ZERO fixtures reported success in green while the `applied`/`skipped` counts
+   * sat unread in the very same object.
+   */
+  const act = async <T extends { ok: boolean; error?: string }>(
+    fn: () => Promise<T>,
+    done?: string | ((result: T) => { title: string; tone: "success" | "info" | "danger" }),
+  ) => {
     setBusy(true);
     const result = await fn();
     setBusy(false);
     if (result.ok) {
-      if (done !== undefined) {
+      if (typeof done === "function") {
+        toast(done(result));
+      } else if (done !== undefined) {
         toast({ title: done, tone: "success" });
       }
       router.refresh();
     } else {
       toast({ title: result.error ?? "That didn't work.", tone: "danger" });
     }
+    return result;
+  };
+
+  const generateInput = () => ({
+    rounds: genRounds === "2" ? (2 as const) : (1 as const),
+    startDate: genStart,
+    kickoffTimes: genTimes
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t !== ""),
+    groundIds: [...genGrounds],
+    durationMinutes: Number.parseInt(genDuration, 10),
+  });
+
+  const askToGenerate = async () => {
+    setBusy(true);
+    const result = await previewGenerationAction(slug, generateInput());
+    setBusy(false);
+    if (!result.ok) {
+      toast({ title: result.error, tone: "danger" });
+      return;
+    }
+    setPlan(result);
   };
 
   const generate = () =>
     act(
-      () =>
-        generateFixturesAction(slug, {
-          rounds: genRounds === "2" ? 2 : 1,
-          startDate: genStart,
-          kickoffTimes: genTimes
-            .split(",")
-            .map((t) => t.trim())
-            .filter((t) => t !== ""),
-          groundIds: [...genGrounds],
-          durationMinutes: Number.parseInt(genDuration, 10),
-        }),
-      "Fixtures generated",
+      () => generateFixturesAction(slug, generateInput()),
+      (result) => {
+        setPlan(null);
+        return {
+          title: `${String(result.created ?? 0)} fixtures generated as drafts.`,
+          tone: "success" as const,
+        };
+      },
     );
+
+  /** "3 of 240 scheduled, 237 skipped" — what actually happened, every time. */
+  const bulkOutcome =
+    (verb: string, noun: string, nothing: string) =>
+    (result: BulkFixtureResult): { title: string; tone: "success" | "info" } => {
+      const applied = result.applied ?? 0;
+      const skipped = result.skipped ?? 0;
+      if (applied === 0 && skipped === 0) {
+        return { title: nothing, tone: "info" };
+      }
+      if (applied === 0) {
+        return { title: `Nothing ${verb} — ${String(skipped)} ${noun} skipped.`, tone: "info" };
+      }
+      return {
+        title:
+          skipped === 0
+            ? `${String(applied)} ${noun} ${verb}.`
+            : `${String(applied)} ${noun} ${verb}, ${String(skipped)} skipped.`,
+        tone: "success",
+      };
+    };
 
   const createManual = () =>
     act(async () => {
@@ -269,18 +357,40 @@ export function FixturesPanel({
         <StatTile label="Scheduled" value={stats.scheduled} testId="stat-scheduled" />
         <StatTile label="Published" value={stats.published} testId="stat-published" />
         <StatTile label="Completed" value={stats.completed} testId="stat-completed" />
+        <StatTile label="Cancelled" value={stats.cancelled} testId="stat-cancelled" />
       </div>
 
       {conflicts.length > 0 ? (
         <Card data-testid="conflict-panel">
           <h2>Conflicts</h2>
+          <p className="competitions-hint">
+            {conflicts.length} clash{conflicts.length === 1 ? "" : "es"} in this season&apos;s
+            schedule.
+            {conflicts.length > CONFLICTS_SHOWN
+              ? ` Showing the first ${String(CONFLICTS_SHOWN)}.`
+              : ""}
+          </p>
+          {/* Unbounded, this panel ran 3565px of a 6431px page at 240 fixtures. */}
           <ul className="conflict-list">
-            {conflicts.map((entry, index) => (
+            {conflicts.slice(0, CONFLICTS_SHOWN).map((entry, index) => (
               <li key={index} data-testid="conflict-item">
                 <Badge tone={entry.severity === "blocking" ? "danger" : "warning"}>
                   {entry.type.replace(/_/g, " ")}
                 </Badge>
-                <span>{entry.detail}</span>
+                {/* The fixture numbers were always in the payload; now they are
+                    on the screen, so "which two?" has an answer. */}
+                <span>
+                  <strong className="conflict-fixtures">
+                    {entry.fixtures.map((f) => f.number).join(" · ")}
+                  </strong>{" "}
+                  {entry.detail}
+                  {entry.fixtures.map((f) => (
+                    <span className="conflict-fixture-line" key={f.id}>
+                      {f.number} — {f.teams}
+                      {f.kickoffAt !== null ? `, ${formatKickoff(f.kickoffAt)}` : ""}
+                    </span>
+                  ))}
+                </span>
               </li>
             ))}
           </ul>
@@ -306,8 +416,27 @@ export function FixturesPanel({
           </div>
           <p className="competitions-hint">
             Deterministic round robin over this season&apos;s teams — same inputs, same schedule,
-            every time. Generated fixtures land as drafts.
+            every time. Generated fixtures land as drafts, and home and away are shared out evenly.
           </p>
+          {/* The blocked activation path, stated BEFORE the form rather than as
+              one unlinked sentence buried inside it. An org with no venues can
+              never generate, and "your organization page" was not a link. */}
+          {teams.length < 2 || grounds.length === 0 ? (
+            <div className="dash-hint" data-testid="generate-blocked">
+              <p>
+                {teams.length < 2
+                  ? `This season has ${teams.length === 0 ? "no" : "one"} team. A round robin needs at least two.`
+                  : "This organization has no active grounds yet, so there is nowhere to play."}
+              </p>
+              {teams.length < 2 ? (
+                <Link href={`/seasons/${slug}/teams`}>Add teams</Link>
+              ) : (
+                <Link href={`/org/${orgSlug}/venues`} data-testid="add-venues-link">
+                  Add a venue and its grounds
+                </Link>
+              )}
+            </div>
+          ) : null}
           <div className="date-row">
             <Select
               label="Rounds"
@@ -351,7 +480,8 @@ export function FixturesPanel({
             <legend>Grounds</legend>
             {grounds.length === 0 ? (
               <p className="competitions-hint">
-                No active grounds. Create a venue and grounds from your organization page first.
+                No active grounds yet — <Link href={`/org/${orgSlug}/venues`}>add a venue</Link> and
+                its grounds first.
               </p>
             ) : (
               grounds.map((ground) => (
@@ -378,7 +508,7 @@ export function FixturesPanel({
           </fieldset>
           <div className="date-row">
             <Button
-              onClick={() => void generate()}
+              onClick={() => void askToGenerate()}
               loading={busy}
               disabled={genStart === "" || genGrounds.size === 0}
               data-testid="generate-fixtures"
@@ -387,7 +517,12 @@ export function FixturesPanel({
             </Button>
             <Button
               variant="secondary"
-              onClick={() => void act(() => scheduleAllAction(slug), "Drafts scheduled")}
+              onClick={() =>
+                void act(
+                  () => scheduleAllAction(slug),
+                  bulkOutcome("scheduled", "drafts", "There are no drafts to schedule."),
+                )
+              }
               loading={busy}
               data-testid="schedule-all"
             >
@@ -395,14 +530,128 @@ export function FixturesPanel({
             </Button>
             <Button
               variant="secondary"
-              onClick={() => void act(() => publishAllAction(slug), "Schedule published")}
+              onClick={() =>
+                void act(
+                  () => publishAllAction(slug),
+                  bulkOutcome(
+                    "published",
+                    "fixtures",
+                    "There is nothing to publish — no fixture is scheduled yet.",
+                  ),
+                )
+              }
               loading={busy}
               data-testid="publish-all"
             >
               Publish schedule
             </Button>
+            {stats.draft > 0 ? (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setDiscardOpen(true);
+                }}
+                loading={busy}
+                data-testid="discard-drafts"
+              >
+                Discard {stats.draft} draft{stats.draft === 1 ? "" : "s"}
+              </Button>
+            ) : null}
           </div>
+          {isPublic ? null : (
+            <p className="competitions-hint" data-testid="private-season-note">
+              This season is private, so a published schedule is still visible only to members. Make
+              it public from the season settings to give it a public page.
+            </p>
+          )}
         </Card>
+      ) : null}
+
+      {/* 240 fixtures used to be written blind — no count, no date range, no
+          confirmation. A league asked to start 1 March silently ended 28 June,
+          discoverable only on page 10. */}
+      {canManage ? (
+        <Dialog
+          open={plan !== null}
+          onClose={() => {
+            setPlan(null);
+          }}
+          title="Generate this schedule?"
+          footer={
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPlan(null);
+              }}
+            >
+              Cancel
+            </Button>
+          }
+        >
+          {plan !== null ? (
+            <div data-testid="generate-preview">
+              <p>
+                <strong>{plan.preview.count}</strong> fixtures across{" "}
+                <strong>{plan.preview.rounds}</strong> round
+                {plan.preview.rounds === 1 ? "" : "s"}, for {plan.preview.teams} teams.
+              </p>
+              <p>
+                First match {formatWallDate(plan.preview.firstDate)}; last match{" "}
+                {formatWallDate(plan.preview.lastDate)}.
+              </p>
+              <p className="competitions-hint">
+                They land as drafts, so nothing is public yet — and you can discard them all in one
+                click if the dates are wrong.
+              </p>
+              <Button onClick={() => void generate()} loading={busy} data-testid="confirm-generate">
+                Generate {plan.preview.count} fixtures
+              </Button>
+            </div>
+          ) : null}
+        </Dialog>
+      ) : null}
+
+      {canManage ? (
+        <Dialog
+          open={discardOpen}
+          onClose={() => {
+            setDiscardOpen(false);
+          }}
+          title={`Discard ${String(stats.draft)} drafts?`}
+          footer={
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDiscardOpen(false);
+              }}
+            >
+              Keep them
+            </Button>
+          }
+        >
+          <p>
+            Every draft fixture is cancelled and its slot released. Scheduled, published and played
+            fixtures are untouched. This is how you start a generation over.
+          </p>
+          <Button
+            onClick={() =>
+              void act(
+                async () => {
+                  const result = await discardDraftsAction(slug);
+                  if (result.ok) {
+                    setDiscardOpen(false);
+                  }
+                  return result;
+                },
+                bulkOutcome("discarded", "drafts", "There are no drafts to discard."),
+              )
+            }
+            loading={busy}
+            data-testid="confirm-discard-drafts"
+          >
+            Discard the drafts
+          </Button>
+        </Dialog>
       ) : null}
 
       {canManage ? (
@@ -601,32 +850,34 @@ export function FixturesPanel({
         </div>
         <div className="table-scroll">
           <table className="reg-table" data-testid="fixtures-table">
+            <caption className="table-caption">
+              This season&apos;s fixtures, grouped by round — {page.total} match
+              {page.total === 1 ? "" : "es"} matching the current filters.
+            </caption>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Fixture</th>
-                <th>Kickoff</th>
-                <th>Ground</th>
-                <th>Status</th>
+                <th scope="col">#</th>
+                <th scope="col">Fixture</th>
+                <th scope="col">Kickoff</th>
+                <th scope="col">Ground</th>
+                <th scope="col">Status</th>
                 {canManage ? (
-                  <th>
+                  <th scope="col">
                     <VisuallyHidden>Actions</VisuallyHidden>
                   </th>
                 ) : null}
               </tr>
             </thead>
             <tbody>
-              {rounds.map(([round, rows]) => (
+              {rounds.map(({ round, rows, when }) => (
                 <Fragment key={String(round)}>
                   <tr className="round-head">
-                    <td colSpan={canManage ? 6 : 5}>
+                    <th scope="rowgroup" colSpan={canManage ? 6 : 5}>
                       <span className="round-head-label">
                         {round !== null ? `Round ${String(round)}` : "Unscheduled"}
                       </span>
-                      {round !== null ? (
-                        <span className="round-head-week">Week {String(round)}</span>
-                      ) : null}
-                    </td>
+                      {when !== null ? <span className="round-head-week">{when}</span> : null}
+                    </th>
                   </tr>
                   {rows.map((fixture) => (
                     <FixtureRow
@@ -734,6 +985,9 @@ export function FixturesPanel({
             <label className="io-file" htmlFor="fixture-csv-input">
               <span>Paste a CSV — columns: {FIXTURE_CSV_HEADER}</span>
             </label>
+            {/* A preview describes the text it was run against. Editing the
+                CSV after previewing left a stale "N valid row(s)" on screen
+                above an Import button that would commit something else. */}
             <textarea
               id="fixture-csv-input"
               ref={csvRef}
@@ -742,6 +996,9 @@ export function FixturesPanel({
               rows={5}
               placeholder="Paste CSV rows here"
               defaultValue=""
+              onChange={() => {
+                setPreview(null);
+              }}
             />
             <div className="io-row">
               <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
@@ -816,7 +1073,7 @@ function FixtureRow({
   canManage: boolean;
   busy: boolean;
   moving: boolean;
-  grounds: FixtureDashboard["grounds"];
+  grounds: NonNullable<FixtureDashboard["grounds"]>;
   moveKickoff: string;
   moveGround: string;
   onMoveKickoff: (value: string) => void;
@@ -854,7 +1111,7 @@ function FixtureRow({
             </span>
           </span>
         </td>
-        <td>{fixture.kickoffAt !== null ? fixture.kickoffAt.replace("T", " ") : "—"}</td>
+        <td>{fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "—"}</td>
         <td>
           {fixture.groundName ?? "—"}
           {fixture.venueName !== null ? (
@@ -908,7 +1165,7 @@ function FixtureRow({
       </tr>
       {moving ? (
         <tr data-testid={`move-row-${fixture.number}`}>
-          <td colSpan={canManage ? 7 : 6}>
+          <td colSpan={canManage ? 6 : 5}>
             <div className="date-row">
               <Field
                 label="New kickoff"
@@ -927,6 +1184,7 @@ function FixtureRow({
                   onMoveGround(event.target.value);
                 }}
               >
+                <option value="">Keep the current ground</option>
                 {grounds.map((ground) => (
                   <option key={ground.id} value={ground.id}>
                     {ground.venueName} · {ground.name}

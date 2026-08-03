@@ -47,7 +47,7 @@ import {
   scheduleFixture,
   startFixture,
 } from "./fixture-aggregate";
-import { commitFixtureImport } from "./fixture-import";
+import { commitFixtureImport, importDryRun } from "./fixture-import";
 import {
   calendarRange,
   competitionTimeline,
@@ -236,6 +236,31 @@ describe("FIXTURE OPS REGRESSION — deterministic generation", () => {
     // No blocking conflicts anywhere in the generated schedule.
     const conflicts = await competitionConflicts(db, comp);
     expect(conflicts.filter((c) => c.severity === "blocking")).toEqual([]);
+  });
+
+  /**
+   * The home/away balance, asserted on the PERSISTED schedule rather than only
+   * on the pure planner. Single round robin is the UI default, and it used to
+   * hand exactly one team every single one of its fixtures away — reproduced in
+   * the product as Panthers 0 home / 3 away over four teams.
+   */
+  it("HOME ADVANTAGE: no team is shut out of home fixtures in the written schedule", async () => {
+    const page = await queryFixtures(db, comp.id, { sort: "number", page: 1, pageSize: 50 });
+    const home = new Map<string, number>();
+    const away = new Map<string, number>();
+    for (const fixture of page.rows) {
+      home.set(fixture.homeTeamName, (home.get(fixture.homeTeamName) ?? 0) + 1);
+      away.set(fixture.awayTeamName, (away.get(fixture.awayTeamName) ?? 0) + 1);
+    }
+    const names = [...new Set([...home.keys(), ...away.keys()])];
+    expect(names.length).toBe(4);
+    for (const name of names) {
+      const h = home.get(name) ?? 0;
+      const a = away.get(name) ?? 0;
+      expect(h + a).toBe(3);
+      expect(h).toBeGreaterThan(0);
+      expect(Math.abs(h - a)).toBeLessThanOrEqual(1);
+    }
   });
 
   it("generation is deterministic: an identical competition yields the identical schedule", async () => {
@@ -548,6 +573,42 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
     const result = await commitFixtureImport(db, comp, owner, parsed.rows);
     expect(result).toEqual({ ok: true, imported: 2 });
     expect((await fixtureStats(db, comp.id)).total).toBe(before + 2);
+  });
+
+  /**
+   * Import was the one write path that never met the conflict engine. The Move
+   * path REFUSED a team double-booking; the identical collision then succeeded
+   * through Import, and the preview called it "1 valid row(s) · 0 error(s)".
+   * The aggregate's contract — "the invariants are machine-enforced, not
+   * UI-suggested" — has to be true at every door, so this asserts both doors.
+   */
+  it("CSV IMPORT GATE: a duplicate of a live fixture is refused, on its own line", async () => {
+    const existing = (
+      await queryFixtures(db, comp.id, { status: "published", page: 1, pageSize: 1 })
+    ).rows[0];
+    if (existing === undefined || existing.kickoffAt === null) {
+      throw new Error("expected a published fixture to clash with");
+    }
+    const before = (await fixtureStats(db, comp.id)).total;
+    const csv =
+      "home_team,away_team,kickoff,ground,duration_minutes\n" +
+      `${existing.homeTeamName},${existing.awayTeamName},${existing.kickoffAt.replace("T", " ")},${existing.groundName ?? ""},120`;
+    const parsed = parseFixtureCsv(csv);
+    expect(parsed.errors).toEqual([]);
+    const dryRun = await importDryRun(db, comp, parsed.rows);
+    expect(dryRun.length).toBeGreaterThan(0);
+    expect(dryRun[0]?.line).toBe(2);
+    expect(dryRun[0]?.message).toContain(existing.number);
+
+    const result = await commitFixtureImport(db, comp, owner, parsed.rows);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected refusal");
+    }
+    expect(result.errors[0]?.line).toBe(2);
+    expect(result.errors[0]?.message).toContain("booked twice");
+    // Nothing was written — the refusal is a refusal, not a warning.
+    expect((await fixtureStats(db, comp.id)).total).toBe(before);
   });
 
   it("IMPORT ROLLBACK: a failure mid-commit writes nothing", async () => {

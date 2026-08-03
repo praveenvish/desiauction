@@ -16,6 +16,7 @@ import { grantPaddleAction, inviteOwnerAction } from "../../../../../server/auct
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
 import { PageStatus } from "../../../../../components/shell/page-status";
 import { AuctionAnnouncer } from "../auction-announcer";
+import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard } from "../squad-board";
@@ -614,6 +615,11 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         </div>
 
         <div className="cockpit-col">
+          {/* DA-20: the cockpit rendered no outbound links at ALL, so the two
+              surfaces the room and the stream actually watch — the venue board
+              and the OBS overlay — had no door anywhere in the product. */}
+          <BroadcastLinks slug={slug} />
+
           <Card data-testid="owners-card">
             <h2>Owners &amp; paddles</h2>
             <p className="competitions-hint">

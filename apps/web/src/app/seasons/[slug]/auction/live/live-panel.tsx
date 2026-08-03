@@ -50,7 +50,7 @@ function commandId(): string {
 export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView }) {
   const router = useRouter();
   const toast = useToast();
-  const { snapshot, connection, remainingMs, version, ceremony, drift, stale, offline } =
+  const { snapshot, connection, remainingMs, version, ceremony, drift, stale, offline, clock } =
     useAuctionSocket(view.wsUrl);
   const feed = useLiveFeed(view.resolved, snapshot);
   // The device being offline is as good a reason to stop taking bids as the
@@ -258,6 +258,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
                 lotDurationMs={lotDurationMs}
                 leadColor={leadColor}
                 frozen={notTakingBids}
+                clock={clock}
               />
               {myPaddle !== null ? (
                 <PaddleControl

@@ -146,16 +146,116 @@ const REASONS: Record<string, string> = {
   corrects_mismatch: "That correction does not match the document it names.",
   // Local (this module's own input gates)
   reason_required: "Give a reason — this action is recorded against your name.",
+
+  // --- Setup: the profile and the numbering series ---------------------------
+  // These are the FIRST two forms an operator ever touches, and both were
+  // answering in raw code: mistyping a GSTIN replied with the entire message
+  // "gstin_invalid", and asking for a second receipt series replied
+  // "series_key_taken". Everything below was reachable and unwritten.
+  gstin_invalid: "That doesn't look like a GSTIN. It's 15 characters, like 27AAAPL1234C1ZV.",
+  gstin_forbidden_without_registration:
+    "You've given a GSTIN but set the tax posture to not registered. Pick one: either register the GSTIN or leave it blank.",
+  profile_exists:
+    "This organization already has a finance profile — amend it instead of declaring a new one.",
+  profile_prefix_unfoldable:
+    "The profile this series belongs to could not be read. Nothing was changed.",
+  series_key_taken:
+    "You already have a series of that kind for this financial year. One lane per kind per year — a second would let a number repeat.",
+  series_kind_mismatch: "That series is for a different kind of document.",
+  series_closed: "That series is closed, so it cannot take another number.",
+  series_missing: "That numbering series no longer exists.",
+  series_unfoldable: "That numbering series could not be read. Nothing was changed.",
+  fy_invalid: "That isn't a financial year. Use the form 2026-27.",
+  fiscal_year_mismatch:
+    "That document belongs to a different financial year than the series you picked.",
+
+  // --- Issuing -----------------------------------------------------------------
+  tax_decomposition_not_available:
+    "DesiAuction doesn't work out GST splits, so it won't issue a tax invoice for a GST-registered organization rather than guess the tax. Receipts are unaffected — raise the bill the way you do now.",
+  no_open_receipt_series:
+    "There's no open receipt series for this financial year, so nothing can be numbered. Open one first.",
+  duplicate_document_source: "A document has already been issued for that payment.",
+  payment_not_captured:
+    "That payment hasn't been confirmed as received yet, so it has nothing to receipt.",
+  obligation_unknown: "The due this refers to could not be found.",
+  party_mismatch: "The party on that document doesn't match the one on the payment.",
+  document_unknown: "That document no longer exists.",
+  corrects_required: "A correction has to name the document it corrects.",
+  detail_required: "Add the detail this action needs.",
+  decomposition_mismatch:
+    "The amounts on that document don't add up to its total. Nothing was issued.",
+
+  // --- Closing the year ---------------------------------------------------------
+  days_unattested:
+    "Some days in this year haven't been attested yet. Every day has to be signed off before the year can be sealed.",
+  fiscal_year_not_ended: "That financial year hasn't ended yet.",
+  period_not_closed: "That financial year hasn't been closed.",
+  close_event_missing: "The closing record for that year could not be found.",
+  evidence_missing: "The evidence for that year could not be found.",
+  system_cannot_attest_exceptions:
+    "There are open exceptions on that day, and the platform won't sign them off for you. Resolve them, then attest.",
+
+  // --- Deliveries and exports -----------------------------------------------------
+  dispatch_missing: "That delivery could not be found.",
+  dispatch_terminal: "That delivery has already finished — it cannot be changed now.",
+  dispatch_incomplete: "That delivery is still in flight.",
+  unknown_dispatch: "That delivery could not be found.",
+  export_missing: "That export could not be found.",
+  export_result_invalid: "That export finished with a result the platform could not accept.",
+  unknown_export: "That export could not be found.",
+
+  // --- Integrity: the platform refusing to speak for something it cannot prove ------
+  // An operator cannot act on any of these; what they need is to know nothing
+  // was changed and that this is worth reporting, not a mistake they made.
+  certification_nondeterministic:
+    "This organization's finance log did not fold the same way twice, so the platform will not certify it. Nothing was changed — please report this.",
+  illegal_replayed_transition:
+    "The finance log contains a step that could not legally follow the one before it. Nothing was changed — please report this.",
+  cause_not_compensating: "That correction doesn't undo what it claims to. Nothing was changed.",
+  number_gap: "There's a gap in this series' numbering. Nothing was changed — please report this.",
+  sequence_gap: "There's a gap in the finance log. Nothing was changed — please report this.",
+  watermark_behind_source:
+    "Settlement has moved ahead of finance. The next ingest should catch it up.",
+  watermark_regression:
+    "Finance's position in the settlement log moved backwards. Nothing was changed — please report this.",
+  watermark_malformed: "Finance's position in the settlement log could not be read.",
+  source_ref_malformed: "The settlement reference on that document could not be read.",
+  source_unfoldable: "The settlement record this was made from could not be read.",
+  issuance_event_missing: "The issuing record for that document could not be found.",
 };
+
+/**
+ * Records whose shape the platform could not read. They all mean the same thing
+ * to an operator — something is corrupt, nothing changed, tell someone — so they
+ * share one sentence rather than nine near-identical ones.
+ */
+const MALFORMED = new Set([
+  "malformed_dispatch",
+  "malformed_document",
+  "malformed_export",
+  "malformed_period",
+  "malformed_profile",
+  "malformed_series",
+  "unknown_event_type",
+  "unknown_period",
+  "unknown_profile",
+  "unknown_series",
+]);
 
 function messageFor(reason: string, detail?: string): string {
   const known = REASONS[reason];
   if (known !== undefined) {
     return known;
   }
-  // An operator reading a raw reason code can still call for help with the
-  // exact word. Silence would be worse than jargon.
-  return `${reason}${detail === undefined || detail === "" ? "" : ` — ${detail}`}`;
+  if (MALFORMED.has(reason)) {
+    return "Part of this organization's finance record could not be read. Nothing was changed — please report this.";
+  }
+  // The last resort is still a SENTENCE. This used to return the bare reason
+  // code, so an operator mistyping a GSTIN was told, in full, "gstin_invalid".
+  // Keep the code — it is what support will ask for — but say what happened
+  // around it, and never present an identifier as if it were an explanation.
+  const code = detail === undefined || detail === "" ? reason : `${reason} — ${detail}`;
+  return `That didn't go through, and nothing was changed. Please report this code: ${code}`;
 }
 
 export type FinopsResult = { ok: true } | { ok: false; error: string };
@@ -362,7 +462,7 @@ export async function deliveryWorkspace(orgSlug: string): Promise<DeliveryWorksp
     return null;
   }
   return withTenantDb(dbHandle, { personId: gate.personId, orgId: gate.org.id }, async (db) => {
-    const deliveries = await deliveriesView(webFinopsDeps(db), gate.org.id);
+    const deliveries = await deliveriesView(webFinopsDeps(db), db, gate.org.id);
     return { org: gate.org, deliveries, viewer: gate.viewer } satisfies DeliveryWorkspace;
   });
 }
@@ -401,7 +501,7 @@ export async function documentWorkspace(
     return null;
   }
   return withTenantDb(dbHandle, { personId: gate.personId, orgId: gate.org.id }, async (db) => {
-    const detail = await documentDetailView(webFinopsDeps(db), gate.org.id, docId);
+    const detail = await documentDetailView(webFinopsDeps(db), db, gate.org.id, docId);
     if (detail === null) {
       return null;
     }

@@ -1,4 +1,4 @@
-import { LoadingState, ToastProvider } from "@desiauction/ui";
+import { AnnouncerProvider, LoadingState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -29,21 +29,23 @@ export default async function OrgMoneyPage({ params }: { params: Promise<{ slug:
     notFound();
   }
   return (
-    <ToastProvider>
-      <main className="registrations-dash">
-        <div className="dash-stack finance-stack">
-          <header className="dash-head">
-            <p className="competitions-hint">
-              Financial operations — what the platform did after settlement, and what still needs a
-              human
-            </p>
-          </header>
-          <Suspense fallback={<LoadingState variant="page" />}>
-            <Board slug={slug} />
-          </Suspense>
-        </div>
-      </main>
-    </ToastProvider>
+    <AnnouncerProvider>
+      <ToastProvider>
+        <main className="registrations-dash">
+          <div className="dash-stack finance-stack">
+            <header className="dash-head">
+              <p className="competitions-hint">
+                Financial operations — what the platform did after settlement, and what still needs
+                a human
+              </p>
+            </header>
+            <Suspense fallback={<LoadingState variant="page" />}>
+              <Board slug={slug} />
+            </Suspense>
+          </div>
+        </main>
+      </ToastProvider>
+    </AnnouncerProvider>
   );
 }
 

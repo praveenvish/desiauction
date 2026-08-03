@@ -68,8 +68,25 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
 
   return (
     <>
+      {/* This desk was the only console page in the audit with no <h2> at all:
+          four stat tiles, a filter bar and a case list, none of them announced
+          as a section. A screen-reader user got the shell's h1 and then a flat
+          run of content. The headings are visually hidden because the tiles and
+          the card already read as sections to the eye — it is only the
+          accessibility tree that was missing them. */}
+      <h2 className="visually-hidden-heading">Summary</h2>
       <div className="stat-row">
-        <Tile label="Needs attention" value={String(stats.attention)} id="stat-attention" />
+        {/* Say what "attention" means. A case with ₹0 outstanding still counts
+            here — it has been collected but not settled and closed — and
+            without this note that reads as the desk nagging about a season
+            whose money is visibly all in. The count is right; it was the
+            silence that was wrong. */}
+        <Tile
+          label="Needs attention"
+          value={String(stats.attention)}
+          id="stat-attention"
+          note="not yet closed"
+        />
         <Tile
           label="Collected today"
           value={inr(stats.collectedToday)}
@@ -81,6 +98,7 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
       </div>
 
       <Card>
+        <h2 className="visually-hidden-heading">Cases</h2>
         <ul className="saved-views" data-testid="saved-views">
           {SAVED_VIEWS.map((saved) => (
             <li key={saved.key}>

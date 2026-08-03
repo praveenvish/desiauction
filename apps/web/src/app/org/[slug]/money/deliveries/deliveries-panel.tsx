@@ -1,5 +1,6 @@
 "use client";
 
+import { useFinopsAct } from "../use-finops-act";
 import {
   Badge,
   Button,
@@ -7,12 +8,11 @@ import {
   Dialog,
   EmptyState,
   Field,
-  useToast,
   VisuallyHidden,
   type BadgeTone,
 } from "@desiauction/ui";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
@@ -21,7 +21,6 @@ import {
   requeueJobAction,
   retryDeliveryAction,
   type DeliveryWorkspace,
-  type FinopsResult,
 } from "../../../../../server/financial-operations/actions";
 import {
   DELIVERY_LANE_LABEL,
@@ -55,6 +54,23 @@ const CHANNEL_LABEL: Record<string, string> = {
   "org-webhook": "Webhook",
 };
 
+/** Statuses that have stopped moving — a wait time is meaningless on these. */
+const TERMINAL = new Set(["confirmed", "failed"]);
+
+/**
+ * How long a delivery has been waiting, in words. The duration is resolved on
+ * the server against the injected clock; this only formats it.
+ */
+function waitedFor(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return "under a minute";
+  if (minutes < 60) return `${String(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? "1 hour" : `${String(hours)} hours`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1 day" : `${String(days)} days`;
+}
+
 function when(atMs: number): string {
   return new Date(atMs).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
@@ -66,11 +82,8 @@ export function DeliveriesPanel({
   slug: string;
   workspace: DeliveryWorkspace;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
@@ -85,21 +98,12 @@ export function DeliveriesPanel({
   const { deliveries, viewer } = workspace;
   const rows = filterDeliveries(deliveries.rows, lane);
 
-  const act = async (run: () => Promise<FinopsResult>, done: string): Promise<boolean> => {
-    setBusy(true);
-    const result = await run();
-    setBusy(false);
-    if (result.ok) {
-      toast({ title: done, tone: "success" });
-      router.refresh();
-      return true;
-    }
-    toast({ title: result.error, tone: "danger" });
-    return false;
-  };
+  const { busy, act, outcomeNote } = useFinopsAct();
 
   return (
     <div data-testid="deliveries-panel" data-hydrated={hydrated ? "true" : "false"}>
+      {/* Where focus lands after a command, and what it says. */}
+      {outcomeNote}
       {/* --- The lanes, each a filter you can link to ------------------------- */}
       <div className="lane-row" data-testid="lane-row">
         {DELIVERY_LANES.map((key) => (
@@ -123,6 +127,16 @@ export function DeliveriesPanel({
           </Link>
         </p>
       ) : null}
+      {/* Say what "recorded as sent" is worth. The in-app channel confirms every
+          dispatch unconditionally into a register only finance staff can read,
+          and the email channel writes a file to a server directory — so an
+          operator could see a full column of successes for receipts no customer
+          ever received. */}
+      <p className="section-note" data-testid="delivery-reach-note">
+        These statuses describe what the platform did, not what the recipient saw. Documents
+        aren&rsquo;t yet delivered to the people they name — if a customer needs their receipt, send
+        it to them yourself.
+      </p>
 
       {/* --- Retry status ----------------------------------------------------- */}
       {deliveries.retries.retrying.length > 0 ? (
@@ -178,7 +192,9 @@ export function DeliveriesPanel({
                     Requeue
                   </Button>
                 ) : (
-                  <span className="attention-action">needs finops.operate</span>
+                  <span className="attention-action">
+                    You need the Accountant role to requeue a job
+                  </span>
                 )}
               </li>
             ))}
@@ -200,7 +216,12 @@ export function DeliveriesPanel({
             }
           />
         ) : (
-          <div className="table-scroll">
+          <div
+            className="table-scroll money-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Delivery register"
+          >
             <table className="money-table" data-testid="deliveries-table">
               <caption>
                 <VisuallyHidden>
@@ -210,8 +231,9 @@ export function DeliveriesPanel({
               <thead>
                 <tr>
                   <th scope="col">Status</th>
+                  <th scope="col">Requested</th>
                   <th scope="col">Channel</th>
-                  <th scope="col">Subject</th>
+                  <th scope="col">Document</th>
                   <th scope="col">Recipient</th>
                   <th scope="col">Attempts</th>
                   <th scope="col" className="num">
@@ -230,18 +252,51 @@ export function DeliveriesPanel({
                         <span className="section-note"> {row.failureCode}</span>
                       )}
                     </td>
+                    {/* When it was asked for, and how long it has been waiting.
+                        Without this a delivery stuck for seven days looked
+                        exactly like one requested a minute ago. */}
+                    <td data-label="Requested">
+                      {row.requestedAtMs === null ? (
+                        <span className="section-note">—</span>
+                      ) : (
+                        <>
+                          <span>{when(row.requestedAtMs)}</span>
+                          {row.waitingMs !== null && !TERMINAL.has(row.status) ? (
+                            <span className="section-note">
+                              {" "}
+                              · waiting {waitedFor(row.waitingMs)}
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </td>
                     <td data-label="Channel">{CHANNEL_LABEL[row.channel] ?? row.channel}</td>
-                    <td data-label="Subject">
+                    {/* The document's number, not the word "document" — every
+                        row's link used to read identically. */}
+                    <td data-label="Document">
                       {row.subjectRef.startsWith("doc:") ? (
-                        <Link href={`/org/${slug}/money/documents/${row.subjectRef.slice(4)}`}>
-                          document
+                        <Link
+                          className="doc-link"
+                          href={`/org/${slug}/money/documents/${row.subjectRef.slice(4)}`}
+                        >
+                          {row.subjectNumber ?? "This document"}
                         </Link>
                       ) : (
                         <span className="digest">{row.subjectRef}</span>
                       )}
                     </td>
+                    {/* The team the receipt is addressed to, named. The raw ref
+                        stays as the title so the id is recoverable for support.
+                        `owner:<id>` names a TEAM, not a person — resolving it
+                        against `people` matched nothing on every real dispatch. */}
                     <td data-label="Recipient">
-                      <span className="digest">{row.recipientRef}</span>
+                      {row.recipientName === null ? (
+                        <span className="digest" title={row.recipientRef}>
+                          {row.recipientRef}
+                        </span>
+                      ) : (
+                        <span title={row.recipientRef}>{row.recipientName}</span>
+                      )}
                     </td>
                     <td data-label="Attempts">
                       {row.job === null ? (

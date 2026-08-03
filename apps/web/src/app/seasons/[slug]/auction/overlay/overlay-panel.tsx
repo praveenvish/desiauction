@@ -3,6 +3,7 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
 import type { CSSProperties } from "react";
 
+import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
 import { useAuctionSocket } from "../use-auction-socket";
 
@@ -35,17 +36,19 @@ export function OverlayPanel({
   sponsor: string | null;
   watchUrl: string;
 }) {
-  const { snapshot, connection, remainingMs, ceremony } = useAuctionSocket(wsUrl);
+  // DA-20: this read `connection !== "open"` and ignored `stale`/`offline`
+  // outright, so a device that went offline mid-auction kept broadcasting a
+  // pulsing "Live" strip and a running price to air with no warning at all.
+  const { snapshot, remainingMs, ceremony, stale, offline } = useAuctionSocket(wsUrl);
   const feed = useLiveFeed(resolved, snapshot);
 
   const lot = snapshot?.currentLot ?? null;
   const outcome = snapshot?.lastOutcome ?? null;
+  const status = snapshot?.auctionStatus ?? null;
+  const paused = status === "paused";
+  const finished = status === "completed" || status === "reconciled" || status === "abandoned";
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
-  const showTimer =
-    lot !== null &&
-    lot.endsAtMs !== null &&
-    seconds !== null &&
-    snapshot?.auctionStatus !== "paused";
+  const showTimer = lot !== null && lot.endsAtMs !== null && seconds !== null && !paused && !stale;
 
   // The ticker: the auction's sold history, newest last. Falls back to a title
   // card before the first sale so the strip is never empty on air.
@@ -53,7 +56,16 @@ export function OverlayPanel({
   const watchLabel = watchUrl.replace(/^https?:\/\//, "");
 
   // Which lower-third to show: the live lot, else the last outcome, else "up next".
-  const tone = lot !== null ? "live" : (outcome?.kind ?? "idle");
+  // The TONE now consults the auction's own status first. A paused auction used
+  // to go out with tone "live", a green accent, a lot on the block and simply no
+  // clock — the stream showing a stopped room as a running one.
+  const tone = stale
+    ? "stale"
+    : paused
+      ? "paused"
+      : lot !== null
+        ? "live"
+        : (outcome?.kind ?? "idle");
   const nextUp = snapshot !== null && snapshot.queue.length > 0 ? snapshot.queue[0] : null;
 
   return (
@@ -73,7 +85,10 @@ export function OverlayPanel({
 
       {/* --- top ticker --- */}
       <div className="obs-ticker">
-        <span className="obs-ticker-live">Live</span>
+        {/* The strip asserted "Live" over a paused, finished or dead feed. */}
+        <span className="obs-ticker-live" data-state={tone === "live" ? "live" : "other"}>
+          {stale ? "No feed" : paused ? "Paused" : finished ? "Ended" : "Live"}
+        </span>
         <div className="obs-ticker-track">
           <div className="obs-ticker-move">
             {sold.length > 0
@@ -97,87 +112,110 @@ export function OverlayPanel({
         </div>
       </div>
 
-      {connection !== "open" ? <div className="obs-conn">Reconnecting…</div> : null}
+      {/* THE STALENESS BAR, sized to be read on a stream rather than a 12px chip
+          nobody watching a broadcast could resolve. */}
+      {stale ? (
+        <div className="obs-stale" role="alert" data-testid="obs-stale">
+          <b>{offline ? "Feed offline" : "Feed lost"}</b>
+          <span>Figures below are the last we heard — the clock is stopped.</span>
+        </div>
+      ) : null}
 
       {/* --- lower third --- */}
-      <div className="obs-lowerthird" data-tone={tone} data-testid="obs-lowerthird">
-        <span className="obs-accent" aria-hidden="true" />
-        <div className="obs-lt-main">
+      <div className="obs-foot">
+        <div className="obs-lowerthird" data-tone={tone} data-testid="obs-lowerthird">
+          <span className="obs-accent" aria-hidden="true" />
+          <div className="obs-lt-main">
+            {lot !== null ? (
+              <>
+                <span className="obs-lt-eyebrow">
+                  {paused ? "Paused" : "On the block"} · {lot.lotNumber}
+                </span>
+                <span className="obs-lt-name">{lot.playerName ?? "Unnamed"}</span>
+                <span className="obs-lt-meta obs-lt-meta--role">
+                  {lot.role.replace(/_/g, " ")} · base {money(lot.basePrice)}
+                </span>
+              </>
+            ) : outcome !== null ? (
+              <>
+                {/* This printed `outcome.kind` — the engine's own enum — to air:
+                    a frozen lot went out as "HELD", and an undone sale would
+                    have gone out as "REOPENED". The ceremony already owned the
+                    human words. */}
+                <span className="obs-lt-eyebrow">{OUTCOME_TITLE[outcome.kind]}</span>
+                <span className="obs-lt-name">{outcome.playerName ?? outcome.lotNumber}</span>
+                {/* And every non-sold outcome fell back to the AUCTION'S OWN
+                    NAME as its explanation, so the audience was told nothing
+                    about what had just happened. */}
+                <span className="obs-lt-meta">{outcomeMeta(outcome)}</span>
+              </>
+            ) : (
+              <>
+                <span className="obs-lt-eyebrow">{nextUp !== null ? "Up next" : "Auction"}</span>
+                <span className="obs-lt-name">
+                  {nextUp?.playerName ?? nextUp?.lotNumber ?? auctionName}
+                </span>
+                <span className="obs-lt-meta">
+                  {snapshot !== null
+                    ? `${String(snapshot.lotsResolved)}/${String(snapshot.lotsTotal)} lots settled`
+                    : "Connecting…"}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Right block: the money — live bid, or the winning price on a sale. */}
           {lot !== null ? (
-            <>
-              <span className="obs-lt-eyebrow">On the block · {lot.lotNumber}</span>
-              <span className="obs-lt-name">{lot.playerName ?? "Unnamed"}</span>
-              <span className="obs-lt-meta">
-                {lot.role.replace(/_/g, " ")} · base {money(lot.basePrice)}
+            <div className="obs-lt-bid">
+              <span className="obs-lt-bid-label">
+                {lot.currentBid !== null ? "Current bid" : "Opening"}
               </span>
-            </>
-          ) : outcome !== null ? (
-            <>
-              <span className="obs-lt-eyebrow">{outcome.kind}</span>
-              <span className="obs-lt-name">{outcome.playerName ?? outcome.lotNumber}</span>
-              <span className="obs-lt-meta">
-                {outcome.kind === "sold" && outcome.teamName !== null
-                  ? `to ${outcome.teamName}`
-                  : auctionName}
+              <span className="obs-lt-bid-amount">
+                {money(lot.currentBid?.amount ?? lot.nextMinimumBid)}
               </span>
-            </>
-          ) : (
-            <>
-              <span className="obs-lt-eyebrow">{nextUp !== null ? "Up next" : "Auction"}</span>
-              <span className="obs-lt-name">
-                {nextUp?.playerName ?? nextUp?.lotNumber ?? auctionName}
-              </span>
-              <span className="obs-lt-meta">
-                {snapshot !== null
-                  ? `${String(snapshot.lotsResolved)}/${String(snapshot.lotsTotal)} lots settled`
-                  : "Connecting…"}
-              </span>
-            </>
-          )}
+              {lot.currentBid !== null ? (
+                <span className="obs-lt-leader">
+                  {lot.currentBid.teamName} · {lot.currentBid.paddleNumber}
+                </span>
+              ) : null}
+              {/* The clock's absence used to be the ONLY sign that the auction
+                  was paused, and an absence broadcasts as nothing at all. */}
+              {showTimer ? (
+                <span className="obs-lt-timer" data-hot={seconds <= 15}>
+                  {seconds}s{lot.extensions > 0 ? ` · +${String(lot.extensions)}` : ""}
+                </span>
+              ) : (
+                <span className="obs-lt-timer obs-lt-timer--stopped">
+                  {paused ? "Clock stopped" : stale ? "No feed" : "—"}
+                </span>
+              )}
+            </div>
+          ) : outcome !== null && outcome.kind === "sold" && outcome.amount !== null ? (
+            <div className="obs-lt-bid">
+              <span className="obs-lt-bid-label">Sold for</span>
+              <span className="obs-lt-bid-amount">{money(outcome.amount)}</span>
+              {outcome.paddleNumber !== null ? (
+                <span className="obs-lt-leader">Paddle {outcome.paddleNumber}</span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
-        {/* Right block: the money — live bid, or the winning price on a sale. */}
-        {lot !== null ? (
-          <div className="obs-lt-bid">
-            <span className="obs-lt-bid-label">
-              {lot.currentBid !== null ? "Current bid" : "Opening"}
-            </span>
-            <span className="obs-lt-bid-amount">
-              {money(lot.currentBid?.amount ?? lot.nextMinimumBid)}
-            </span>
-            {lot.currentBid !== null ? (
-              <span className="obs-lt-leader">
-                {lot.currentBid.teamName} · {lot.currentBid.paddleNumber}
-              </span>
-            ) : null}
-            {showTimer ? (
-              <span className="obs-lt-timer" data-hot={seconds <= 15}>
-                {seconds}s{lot.extensions > 0 ? ` · +${String(lot.extensions)}` : ""}
-              </span>
-            ) : null}
+        {/* --- brand / watch cluster --- */}
+        {/* Both of these used to be independently pinned to `bottom: 28px`, so
+            below ~800px the lower third and the brand cluster overlapped by
+            73px. They share one flex footer now and can never collide. */}
+        <div className="obs-brand">
+          {sponsor !== null ? (
+            <div className="obs-sponsor">
+              <span>Presented by</span>
+              {sponsor}
+            </div>
+          ) : null}
+          <div className="obs-watch">
+            <span className="obs-watch-label">Watch live</span>
+            <span className="obs-watch-url">{watchLabel}</span>
           </div>
-        ) : outcome !== null && outcome.kind === "sold" && outcome.amount !== null ? (
-          <div className="obs-lt-bid">
-            <span className="obs-lt-bid-label">Sold for</span>
-            <span className="obs-lt-bid-amount">{money(outcome.amount)}</span>
-            {outcome.paddleNumber !== null ? (
-              <span className="obs-lt-leader">Paddle {outcome.paddleNumber}</span>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {/* --- brand / watch cluster --- */}
-      <div className="obs-brand">
-        {sponsor !== null ? (
-          <div className="obs-sponsor">
-            <span>Presented by</span>
-            {sponsor}
-          </div>
-        ) : null}
-        <div className="obs-watch">
-          <span className="obs-watch-label">Watch live</span>
-          <span className="obs-watch-url">{watchLabel}</span>
         </div>
       </div>
     </div>

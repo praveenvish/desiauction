@@ -676,7 +676,7 @@ describe("PX-8 completion · The POLICY issues, not the screen", () => {
   it("the auto-issued receipt REPRODUCES from the log like any other", async () => {
     const rows = await registerView(deps, org.id);
     const issued = rows.find((row) => row.sourceRef?.includes(autoPayment) === true);
-    const detail = await documentDetailView(deps, org.id, issued?.docId ?? "");
+    const detail = await documentDetailView(deps, db, org.id, issued?.docId ?? "");
     expect(detail?.snapshot.reproducible).toBe(true);
     // It took the NEXT number in the same lane — dense, no gap.
     expect(detail?.snapshot.document.number).toBe(2);
@@ -698,9 +698,13 @@ describe("PX-8 completion · The POLICY issues, not the screen", () => {
       "healthy",
     );
     const rec = await reconciliationView(deps, org.id);
-    expect(rec.certification?.pass).toBe(true);
+    // The health this asserts now comes from the live, non-writing compliance
+    // snapshot rather than a certification derived by the act of reading. See
+    // "Reconciliation — reads the record, never writes it" below.
     expect(rec.compliance.documents.total).toBe(2);
     expect(rec.compliance.documents.reproducible).toBe(true);
+    const certified = await certificationSnapshot(deps, org.id);
+    expect(certified?.pass).toBe(true);
   });
 
   it("ATTACK · refuses to receipt the same payment twice", async () => {
@@ -808,14 +812,14 @@ describe("PX-8 · The delivery lifecycle", () => {
     }
 
     // Queued.
-    let view = await deliveriesView(deps, org.id);
+    let view = await deliveriesView(deps, db, org.id);
     expect(view.counts["requested"]).toBe(1);
     expect(view.rows.find((row) => row.dispatchId === ack.streamId)?.status).toBe("requested");
 
     await drainAll();
 
     // Succeeded (in-app confirms on send — the platform's own lifecycle).
-    view = await deliveriesView(deps, org.id);
+    view = await deliveriesView(deps, db, org.id);
     const row = view.rows.find((entry) => entry.dispatchId === ack.streamId);
     expect(row?.status).toBe("confirmed");
     expect(view.counts["confirmed"]).toBe(1);
@@ -849,7 +853,7 @@ describe("PX-8 · The delivery lifecycle", () => {
     failedDispatch = ack.streamId;
     await drainAll();
 
-    const view = await deliveriesView(deps, org.id);
+    const view = await deliveriesView(deps, db, org.id);
     const row = view.rows.find((entry) => entry.dispatchId === failedDispatch);
     expect(row?.status).toBe("failed");
     // The operator must be told the provider's own code, not a euphemism.
@@ -867,12 +871,12 @@ describe("PX-8 · The delivery lifecycle", () => {
     // A failed dispatch is terminal (IP-6 §8.3): the retry is a NEW stream.
     expect(ack.streamId).not.toBe(failedDispatch);
 
-    const view = await deliveriesView(deps, org.id);
+    const view = await deliveriesView(deps, db, org.id);
     expect(view.rows.find((row) => row.dispatchId === failedDispatch)?.status).toBe("failed");
     expect(view.rows.find((row) => row.dispatchId === ack.streamId)?.status).toBe("requested");
 
     await drainAll();
-    const after = await deliveriesView(deps, org.id);
+    const after = await deliveriesView(deps, db, org.id);
     // WhatsApp confirms on a provider CALLBACK, not on send, so the retry rests
     // in Processing — unlike in-app, which confirms as it sends. The lanes are
     // the channel's real lifecycle, not a uniform fiction.
@@ -885,7 +889,7 @@ describe("PX-8 · The delivery lifecycle", () => {
   });
 
   it("ATTACK · refuses to retry a delivery that has not failed", async () => {
-    const view = await deliveriesView(deps, org.id);
+    const view = await deliveriesView(deps, db, org.id);
     const confirmed = view.rows.find((row) => row.status === "confirmed");
     expect(confirmed).toBeDefined();
     const ack = await retryDispatch(deps, actor, confirmed?.dispatchId ?? "", newId());
@@ -946,7 +950,7 @@ describe("PX-8 · The delivery lifecycle", () => {
     }
     // Enqueue only — do not drain, so the job is still on the queue to be found.
     await enqueueDispatchSends(deps, Date.now());
-    const view = await deliveriesView(deps, org.id);
+    const view = await deliveriesView(deps, db, org.id);
     const row = view.rows.find((entry) => entry.dispatchId === ack.streamId);
     expect(row?.job, "the dispatch → job join found nothing").not.toBeNull();
     expect(row?.job?.maxAttempts).toBeGreaterThan(0);
@@ -958,7 +962,7 @@ describe("PX-8 · The delivery lifecycle", () => {
   });
 
   it("exposes dead jobs WITH the id the requeue writer needs", async () => {
-    const view = await deliveriesView(deps, org.id);
+    const view = await deliveriesView(deps, db, org.id);
     for (const job of view.dead) {
       // `retrySnapshot` narrows the id away; the desk cannot act without it.
       expect(job.jobId).toMatch(/^[0-9A-Z]{26}$/);
@@ -969,7 +973,7 @@ describe("PX-8 · The delivery lifecycle", () => {
 // ============================================================================
 describe("PX-8 · Operations detail — one document, end to end", () => {
   it("renders the certified document snapshot with its LIVE reproduction verdict", async () => {
-    const detail = await documentDetailView(deps, org.id, receipt1);
+    const detail = await documentDetailView(deps, db, org.id, receipt1);
     const truth = await documentSnapshot(deps, receipt1);
     expect(detail).not.toBeNull();
     expect(detail?.snapshot).toEqual(truth);
@@ -979,7 +983,7 @@ describe("PX-8 · Operations detail — one document, end to end", () => {
   });
 
   it("shows the SETTLEMENT reference the document was made from", async () => {
-    const detail = await documentDetailView(deps, org.id, receipt1);
+    const detail = await documentDetailView(deps, db, org.id, receipt1);
     // Finance quotes settlement; the watermark pins exactly where.
     expect(detail?.settlement.sourceRef).toContain("payment:");
     expect(Object.keys(detail?.settlement.watermark ?? {}).length).toBeGreaterThan(0);
@@ -987,7 +991,7 @@ describe("PX-8 · Operations detail — one document, end to end", () => {
   });
 
   it("shows every delivery attempted for it — including the failure", async () => {
-    const detail = await documentDetailView(deps, org.id, receipt1);
+    const detail = await documentDetailView(deps, db, org.id, receipt1);
     const statuses = (detail?.deliveries ?? []).map((row) => row.status).sort();
     expect(statuses).toContain("failed");
     expect(statuses).toContain("confirmed");
@@ -998,7 +1002,7 @@ describe("PX-8 · Operations detail — one document, end to end", () => {
   });
 
   it("builds an audit timeline from the log, in the order it happened", async () => {
-    const detail = await documentDetailView(deps, org.id, receipt1);
+    const detail = await documentDetailView(deps, db, org.id, receipt1);
     const timeline = detail?.timeline ?? [];
     expect(timeline[0]?.type).toBe("DocumentIssued");
     expect(timeline.map((entry) => entry.type)).toContain("DispatchFailed");
@@ -1010,30 +1014,55 @@ describe("PX-8 · Operations detail — one document, end to end", () => {
 
   it("EXISTENCE PRIVACY · another org's document is indistinguishable from none", async () => {
     const other = await createOrg(db, outsider, `Peek ${RUN}`);
-    expect(await documentDetailView(deps, other.id, receipt1)).toBeNull();
-    expect(await documentDetailView(deps, org.id, newId())).toBeNull();
+    expect(await documentDetailView(deps, db, other.id, receipt1)).toBeNull();
+    expect(await documentDetailView(deps, db, org.id, newId())).toBeNull();
     await db.delete(orgMembers).where(eq(orgMembers.orgId, other.id));
     await db.delete(organizations).where(eq(organizations.id, other.id));
   });
 });
 
 // ============================================================================
-describe("PX-8 · Reconciliation — derived, never asserted", () => {
-  it("renders a FRESH certification, identical to the platform's", async () => {
+/**
+ * This block used to be titled "derived, never asserted", and it asserted that
+ * the view re-derived a FRESH certification on every read. That principle was
+ * right about staleness and wrong about cost: `certifyOperations` writes an
+ * audit row inside its own transaction, so deriving on read meant **every page
+ * view appended two `finops.CertificationDerived` rows**, stamped with the job
+ * runner's name for a runner that had not run — and the desk then displayed
+ * those page views back as the organization's certification history. A read
+ * that forges the register meant to prove integrity is worse than a read that
+ * might be stale.
+ *
+ * So the desk now READS what the runner recorded. Staleness is handled by
+ * showing the date, not by hiding it. Deriving without writing would mean
+ * thawing IP-6, which is tracked separately; until then `compliance` below
+ * still carries a live, non-writing reproducibility signal.
+ */
+describe("PX-8 · Reconciliation — reads the record, never writes it", () => {
+  it("reports the certification the runner recorded, newest first", async () => {
     const view = await reconciliationView(deps, org.id);
-    const truth = await certificationSnapshot(deps, org.id);
-    expect(view.certification?.pass).toBe(truth?.pass);
-    expect(view.certification?.digest).toBe(truth?.digest);
-    expect(view.certification?.checks).toEqual(truth?.checks);
+    const recorded = await deps.store.loadAuditBreadcrumbs(org.id, "finops.CertificationDerived");
+    expect(view.certifications.length).toBe(recorded.length);
+    if (recorded.length > 0) {
+      // Newest first, which is the opposite of the breadcrumb order.
+      expect(view.certifications[0]?.atMs).toBe(recorded[recorded.length - 1]?.atMs);
+    }
   });
 
-  it("passes every certification check on a healthy org", async () => {
+  it("does NOT write to the audit ledger when the page is read", async () => {
+    const before = await deps.store.loadAuditBreadcrumbs(org.id, "finops.CertificationDerived");
+    await reconciliationView(deps, org.id);
+    await reconciliationView(deps, org.id);
+    await reconciliationView(deps, org.id);
+    const after = await deps.store.loadAuditBreadcrumbs(org.id, "finops.CertificationDerived");
+    expect(after.length).toBe(before.length);
+  });
+
+  it("still proves documents reproduce, without deriving a certification", async () => {
+    // The live integrity signal that survives the change: `complianceSnapshot`
+    // checks reproducibility and writes nothing.
     const view = await reconciliationView(deps, org.id);
-    expect(view.certification).not.toBeNull();
-    for (const check of view.certification?.checks ?? []) {
-      expect(check.pass, `${check.name}: ${check.detail ?? ""}`).toBe(true);
-    }
-    expect(view.certification?.pass).toBe(true);
+    expect(view.compliance.documents.reproducible).toBe(true);
   });
 
   it("reports the ingest frontier as PENDING, not lost", async () => {
@@ -1158,7 +1187,7 @@ describe("PX-8 · Search & saved views — filtering narrows, never invents", ()
   });
 
   it("filters deliveries by lane, and an unknown lane hides nothing", async () => {
-    const view = await deliveriesView(deps, org.id);
+    const view = await deliveriesView(deps, db, org.id);
     expect(filterDeliveries(view.rows, "failed").every((row) => row.status === "failed")).toBe(
       true,
     );

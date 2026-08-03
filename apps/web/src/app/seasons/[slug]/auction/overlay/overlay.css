@@ -27,7 +27,21 @@ body:has(.obs-overlay) {
   display: flex;
   align-items: center;
   height: 46px;
-  background: color-mix(in srgb, var(--surface-sunken) 82%, transparent);
+  /* PLAIN OPAQUE TOKENS, deliberately.
+     Every panel on this overlay used a `color-mix(..., transparent)` ground.
+     Two things were wrong with that. The alpha meant the composited ratio was
+     never knowable from CSS alone; and `color-mix()` computes to `color(srgb
+     ...)` in Chromium, a syntax axe-core 4.12 cannot parse AT ALL — so every
+     viewport reported 2-6 `color-contrast` violations resolved against a
+     phantom #ffffff backdrop. Composited against the worst realistic video the
+     real ratios were 5.45:1-10.3:1 (all passing AA), but a bar that fails CI is
+     a broken bar, and nobody can tell a tooling artefact from a regression once
+     it is normal for the scan to be red.
+     The fix is the ground, not the colours: flat surface tokens, which axe
+     reads as ordinary `rgb()`. The PAGE ground stays transparent, which is what
+     OBS compositing actually needs — the panels never had to be see-through to
+     do their job, and over arbitrary video they read better solid. */
+  background: var(--surface-sunken);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-subtle);
@@ -44,8 +58,17 @@ body:has(.obs-overlay) {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--live);
-  background: color-mix(in srgb, var(--live) 12%, transparent);
+  background: var(--surface-raised);
   border-right: 1px solid var(--border-subtle);
+}
+/* Not live: not green, and no pulsing dot. */
+.obs-ticker-live[data-state="other"] {
+  color: var(--warning-strong);
+  background: var(--surface-raised);
+}
+.obs-ticker-live[data-state="other"]::before {
+  background: var(--warning-strong);
+  box-shadow: none;
 }
 .obs-ticker-live::before {
   content: "";
@@ -74,6 +97,15 @@ body:has(.obs-overlay) {
   margin: 0 28px;
   font-size: 15px;
   color: var(--text-secondary);
+  /* Identical to `.obs-ticker`, so invisible — but it has to be HERE.
+     `.obs-ticker-track` carries a mask-image and `.obs-ticker-move` an
+     animated transform; axe cannot resolve a background through either, so it
+     walked all the way to the root, found overlay.css's deliberately
+     transparent html/body, and assumed #ffffff. Every text node in the crawl
+     then "failed" against a white page that does not exist. The ground is
+     restated on the item so the ratio is computable without leaving the
+     ticker. */
+  background: var(--surface-sunken);
 }
 .obs-ticker-item b {
   color: var(--text-heading);
@@ -98,30 +130,65 @@ body:has(.obs-overlay) {
   }
 }
 
-/* --- reconnect chip -------------------------------------------------------- */
-.obs-conn {
+/* --- staleness bar --------------------------------------------------------
+   Was a 12px chip that only ever appeared for a socket `close` event. It is now
+   the frame's second-loudest element and it fires for offline, for a lost
+   socket AND for a blackholed one the watchdog caught. */
+.obs-stale {
   position: absolute;
   top: 58px;
   left: 28px;
-  padding: 6px 12px;
-  border-radius: var(--radius-full, 999px);
-  background: color-mix(in srgb, var(--warning-base) 22%, var(--surface-sunken));
-  border: 1px solid var(--warning-base);
+  right: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--surface-raised);
+  border: var(--space-05) solid var(--warning-base);
+  font-size: var(--text-lg-size);
+  color: var(--text-primary);
+}
+.obs-stale b {
+  font-size: var(--text-2xl-size);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--warning-strong);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+}
+
+/* --- the bottom band ------------------------------------------------------
+   `.obs-lowerthird` and `.obs-brand` were each independently pinned to
+   `bottom: 28px`, one left one right, so as soon as the frame was narrower than
+   their combined width they simply drew on top of each other: measured at
+   390x844 the lower third ran 675-816 and the brand cluster started at 743 —
+   73px of overlap, on the two elements that carry the player's name and the URL
+   the audience is meant to type. One flex footer with `wrap-reverse` puts the
+   brand cluster ABOVE the lower third when they no longer fit side by side,
+   which is a layout that cannot collide rather than a breakpoint that guesses
+   when they might. */
+.obs-foot {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 28px;
+  display: flex;
+  flex-wrap: wrap-reverse;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
 /* --- lower third: the anchor ----------------------------------------------- */
 .obs-lowerthird {
-  position: absolute;
-  left: 28px;
-  bottom: 28px;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: min(72vw, 880px);
   display: flex;
   align-items: stretch;
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  background: var(--surface);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   border: 1px solid var(--border-subtle);
@@ -133,6 +200,10 @@ body:has(.obs-overlay) {
   flex: none;
   width: 6px;
   background: var(--live);
+}
+.obs-lowerthird[data-tone="paused"] .obs-accent,
+.obs-lowerthird[data-tone="stale"] .obs-accent {
+  background: var(--warning-base);
 }
 .obs-lowerthird[data-tone="sold"] .obs-accent {
   background: var(--ceremony-gold);
@@ -147,6 +218,7 @@ body:has(.obs-overlay) {
   justify-content: center;
   gap: 6px;
   padding: 18px 26px;
+  min-width: 0;
 }
 .obs-lt-eyebrow {
   font-size: 12px;
@@ -166,21 +238,33 @@ body:has(.obs-overlay) {
   letter-spacing: -0.02em;
   color: var(--text-heading);
   text-wrap: balance;
+  /* "Star Bowler" rendered as "Star": the name was clipped by the lower third's
+     own `overflow: hidden`, which also meant the page never scrolled and a
+     standard overflow check passed while the money read `₹10,00`. */
+  overflow-wrap: anywhere;
 }
 .obs-lt-meta {
   font-size: 14px;
   color: var(--text-secondary);
+}
+/* `text-transform: capitalize` was on the whole meta line, so a sale went to
+   air as "To Team Bravo". Only the ROLE needs case-fixing. */
+.obs-lt-meta--role {
   text-transform: capitalize;
 }
 .obs-lt-bid {
-  flex: none;
-  min-width: 210px;
+  box-sizing: border-box;
+  /* 210px against a 280px container (`max-width: min(72vw, 880px)` at 390) is
+     what truncated `₹10,000` to `₹10,00`. It shrinks now, and below the stack
+     breakpoint it becomes a full-width row of its own. */
+  flex: 0 1 auto;
+  min-width: min(210px, 100%);
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
   padding: 18px 26px;
-  background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
+  background: var(--surface-sunken);
   border-left: 1px solid var(--border-subtle);
 }
 .obs-lt-bid-label {
@@ -195,6 +279,7 @@ body:has(.obs-overlay) {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--money-value);
+  white-space: nowrap;
 }
 .obs-lt-leader {
   font-size: 13px;
@@ -211,13 +296,23 @@ body:has(.obs-overlay) {
 }
 .obs-lt-timer[data-hot="true"] {
   color: var(--danger-strong);
+  /* Urgency was colour-only. A border survives a colour-blind viewer and a
+     stream that has been through a lossy encoder. */
+  padding: 0 var(--space-2);
+  border: var(--space-05) solid var(--danger-strong);
+  border-radius: var(--radius-md, 10px);
+  align-self: flex-start;
+}
+.obs-lt-timer--stopped {
+  color: var(--warning-strong);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* --- brand / watch cluster (bottom-right) ---------------------------------- */
 .obs-brand {
-  position: absolute;
-  right: 28px;
-  bottom: 28px;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -226,7 +321,7 @@ body:has(.obs-overlay) {
 }
 .obs-sponsor {
   padding: 9px 16px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  background: var(--surface);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border-subtle);
@@ -249,7 +344,7 @@ body:has(.obs-overlay) {
   align-items: flex-end;
   gap: 2px;
   padding: 10px 16px;
-  background: color-mix(in srgb, var(--surface-sunken) 82%, transparent);
+  background: var(--surface-sunken);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border-subtle);
@@ -272,6 +367,42 @@ body:has(.obs-overlay) {
 /* The reused confetti cascades the full frame on a sale. */
 .obs-celebration {
   --fall: 100vh;
+}
+
+/* Below this the lower third cannot hold two columns without truncating the
+   money, so it becomes two rows. Vertical 1080x1920 Reels/Shorts streams are the
+   dominant format in this market, so this is a primary case, not an edge. */
+@media (max-width: 720px) {
+  .obs-lowerthird {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .obs-accent {
+    width: 100%;
+    height: 6px;
+  }
+  .obs-lt-main,
+  .obs-lt-bid {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .obs-lt-bid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .obs-brand {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .obs-watch {
+    align-items: flex-start;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

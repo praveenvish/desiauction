@@ -76,6 +76,16 @@ module.exports = {
       },
     },
     {
+      name: "admin-projections-hold-no-write",
+      comment:
+        "PX-9 + Screen 21: `access-log.ts` is the ONE module in administration that holds a write verb (see its header for the decision and its four locks). The PROJECTIONS must never acquire it: a read path that can also write is a read path nobody can reason about, and the runtime read-only proof drives exactly these modules. If a projection needs to record something, that is the review conversation, not an import.",
+      severity: "error",
+      from: {
+        path: "^apps/web/src/server/admin/(views|format|capabilities)\\.ts$",
+      },
+      to: { path: "^apps/web/src/server/admin/access-log\\.ts$" },
+    },
+    {
       name: "admin-never-imports-finops-commands",
       comment:
         "PX-9: the finops server barrel carries the WRITER alongside the snapshots. Administration's views may consume snapshots (imported by name), but nothing under admin may reach the command surface of a domain package.",

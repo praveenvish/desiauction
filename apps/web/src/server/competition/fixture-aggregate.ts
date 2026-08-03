@@ -17,7 +17,9 @@ import {
 } from "@desiauction/core";
 import { auditLog, fixtures, grounds, newId, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
+import { formatKickoff } from "../../lib/format-date";
 import type { CompetitionSummary } from "./competitions";
 
 // THE FIXTURE AGGREGATE (M-IP3-3, CTO addition 1). This module is the ONLY place
@@ -28,7 +30,26 @@ import type { CompetitionSummary } from "./competitions";
 // (team/ground double-booking, window violations, malformed schedule data) are
 // refused here — the invariants are machine-enforced, not UI-suggested.
 
-export type ConflictRefusal = { ok: false; reason: "conflicts"; conflicts: Conflict[] };
+/**
+ * A conflict the organizer can act on. Core deals in fixture IDs — correct for a
+ * pure engine, useless on screen: "two fixtures overlap at the same venue" three
+ * times over names nothing an organizer can look up. Every conflict that leaves
+ * this module carries the fixture numbers, the teams and the kickoff.
+ */
+export interface ConflictFixture {
+  id: string;
+  number: string;
+  teams: string;
+  kickoffAt: string | null;
+}
+
+export interface LabelledConflict extends Conflict {
+  fixtures: ConflictFixture[];
+  /** One sentence naming the fixtures involved — the toast and panel line. */
+  summary: string;
+}
+
+export type ConflictRefusal = { ok: false; reason: "conflicts"; conflicts: LabelledConflict[] };
 
 export type FixtureMutationResult =
   | { ok: true; status: FixtureStatus }
@@ -44,21 +65,76 @@ export type FixtureMutationResult =
  * candidate's own competition window. Cross-competition window flags never
  * involve the candidate, so `conflictsInvolving` filters them out.
  */
-async function conflictInputs(db: Db, orgId: string): Promise<FixtureForConflicts[]> {
+export async function conflictInputs(db: Db, orgId: string): Promise<FixtureForConflicts[]> {
   return db
     .select({
       id: fixtures.id,
       homeTeamId: fixtures.homeTeamId,
       awayTeamId: fixtures.awayTeamId,
       groundId: fixtures.groundId,
-      venueId: grounds.venueId,
       kickoffAt: fixtures.kickoffAt,
       durationMinutes: fixtures.durationMinutes,
       status: fixtures.status,
     })
     .from(fixtures)
-    .leftJoin(grounds, eq(grounds.id, fixtures.groundId))
     .where(eq(fixtures.orgId, orgId));
+}
+
+const homeTeams = alias(teams, "conflict_home_teams");
+const awayTeams = alias(teams, "conflict_away_teams");
+
+/**
+ * Resolve every fixture a conflict set names into something an organizer can
+ * find on the schedule. Candidate rows that do not exist yet (generation and
+ * import both conflict-check BEFORE writing) keep their synthetic id and are
+ * described by the caller's `pending` map.
+ */
+export async function labelConflicts(
+  db: Db,
+  conflicts: readonly Conflict[],
+  pending: ReadonlyMap<string, ConflictFixture> = new Map(),
+): Promise<LabelledConflict[]> {
+  const ids = [...new Set(conflicts.flatMap((c) => c.fixtureIds))].filter((id) => !pending.has(id));
+  const rows =
+    ids.length === 0
+      ? []
+      : await db
+          .select({
+            id: fixtures.id,
+            number: fixtures.fixtureNumber,
+            home: homeTeams.name,
+            away: awayTeams.name,
+            kickoffAt: fixtures.kickoffAt,
+          })
+          .from(fixtures)
+          .leftJoin(homeTeams, eq(homeTeams.id, fixtures.homeTeamId))
+          .leftJoin(awayTeams, eq(awayTeams.id, fixtures.awayTeamId))
+          .where(inArray(fixtures.id, ids));
+  const byId = new Map<string, ConflictFixture>(pending);
+  for (const row of rows) {
+    byId.set(row.id, {
+      id: row.id,
+      number: row.number,
+      teams: `${row.home ?? "Unknown"} vs ${row.away ?? "Unknown"}`,
+      kickoffAt: row.kickoffAt,
+    });
+  }
+  return conflicts.map((conflict) => {
+    const involved = conflict.fixtureIds.map(
+      (id) => byId.get(id) ?? { id, number: "—", teams: "Unknown fixture", kickoffAt: null },
+    );
+    return { ...conflict, fixtures: involved, summary: conflictSummary(conflict, involved) };
+  });
+}
+
+function conflictSummary(conflict: Conflict, involved: readonly ConflictFixture[]): string {
+  const named = involved.map((f) => `${f.number} (${f.teams})`).join(" and ");
+  const when = involved.find((f) => f.kickoffAt !== null)?.kickoffAt ?? null;
+  const at = when === null ? "" : ` at ${formatKickoff(when)}`;
+  if (involved.length > 1) {
+    return `${named} — ${conflict.detail}${at}.`;
+  }
+  return `${named} — ${conflict.detail}.`;
 }
 
 function windowOf(competition: CompetitionSummary): {
@@ -69,21 +145,26 @@ function windowOf(competition: CompetitionSummary): {
 }
 
 /** Blocking conflicts the candidate set is involved in, against the whole org. */
-async function blockingFor(
+export async function blockingFor(
   db: Db,
   competition: CompetitionSummary,
   candidates: readonly FixtureForConflicts[],
   replaceIds: readonly string[],
-): Promise<Conflict[]> {
+  pending: ReadonlyMap<string, ConflictFixture> = new Map(),
+): Promise<LabelledConflict[]> {
   const existing = (await conflictInputs(db, competition.orgId)).filter(
     (f) => !replaceIds.includes(f.id),
   );
   const all = detectConflicts([...existing, ...candidates], windowOf(competition));
-  return blockingConflicts(
-    conflictsInvolving(
-      all,
-      candidates.map((c) => c.id),
+  return labelConflicts(
+    db,
+    blockingConflicts(
+      conflictsInvolving(
+        all,
+        candidates.map((c) => c.id),
+      ),
     ),
+    pending,
   );
 }
 
@@ -91,7 +172,7 @@ async function blockingFor(
 export async function competitionConflicts(
   db: Db,
   competition: CompetitionSummary,
-): Promise<Conflict[]> {
+): Promise<LabelledConflict[]> {
   const orgFixtures = await conflictInputs(db, competition.orgId);
   const mine = new Set(
     (
@@ -101,19 +182,10 @@ export async function competitionConflicts(
         .where(eq(fixtures.competitionId, competition.id))
     ).map((r) => r.id),
   );
-  return conflictsInvolving(detectConflicts(orgFixtures, windowOf(competition)), [...mine]);
-}
-
-async function venueOf(db: Db, groundId: string | null): Promise<string | null> {
-  if (groundId === null) {
-    return null;
-  }
-  const [row] = await db
-    .select({ venueId: grounds.venueId })
-    .from(grounds)
-    .where(eq(grounds.id, groundId))
-    .limit(1);
-  return row?.venueId ?? null;
+  return labelConflicts(
+    db,
+    conflictsInvolving(detectConflicts(orgFixtures, windowOf(competition)), [...mine]),
+  );
 }
 
 interface FixtureRow {
@@ -285,10 +357,6 @@ export async function generateFixtures(
     return { ok: false, reason: plan.reason };
   }
 
-  const venueByGround = new Map<string, string | null>();
-  for (const groundId of input.groundIds) {
-    venueByGround.set(groundId, await venueOf(db, groundId));
-  }
   const baseSeq = await nextSeq(db, competition.id);
   const code = competitionCode(competition.name, competition.startsOn);
   const candidates: FixtureForConflicts[] = plan.fixtures.map((f, i) => ({
@@ -296,7 +364,6 @@ export async function generateFixtures(
     homeTeamId: f.homeTeamId,
     awayTeamId: f.awayTeamId,
     groundId: f.groundId,
-    venueId: venueByGround.get(f.groundId) ?? null,
     kickoffAt: f.kickoffAt,
     durationMinutes: f.durationMinutes,
     status: "draft",
@@ -346,6 +413,96 @@ export async function generateFixtures(
     });
   });
   return { ok: true, created: plan.fixtures.length };
+}
+
+export interface GeneratePreview {
+  teams: number;
+  count: number;
+  rounds: number;
+  firstDate: string;
+  lastDate: string;
+}
+
+export type GeneratePreviewResult =
+  | { ok: true; preview: GeneratePreview }
+  | { ok: false; reason: "fixtures_exist" | GeneratePlanResultError };
+
+/**
+ * The same plan, costed but not written. 240 fixtures used to land blind — no
+ * count, no date range, no confirmation — and a league asked to start 1 March
+ * silently ended 28 June, discoverable only on page 10 of the schedule.
+ * Deliberately reuses `planRoundRobin`, so the preview cannot drift from the
+ * schedule it is previewing.
+ */
+export async function previewGeneration(
+  db: Db,
+  competition: CompetitionSummary,
+  input: GenerateInput,
+): Promise<GeneratePreviewResult> {
+  const [existing] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(fixtures)
+    .where(and(eq(fixtures.competitionId, competition.id), ne(fixtures.status, "cancelled")));
+  if ((existing?.count ?? 0) > 0) {
+    return { ok: false, reason: "fixtures_exist" };
+  }
+  const teamRows = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.competitionId, competition.id))
+    .orderBy(asc(teams.name), asc(teams.id));
+  const plan = planRoundRobin({
+    teamIds: teamRows.map((t) => t.id),
+    rounds: input.rounds,
+    startDate: input.startDate,
+    kickoffTimes: input.kickoffTimes,
+    groundIds: input.groundIds,
+    durationMinutes: input.durationMinutes,
+  });
+  if (!plan.ok) {
+    return { ok: false, reason: plan.reason };
+  }
+  const dates = plan.fixtures.map((f) => f.kickoffAt.slice(0, 10)).sort();
+  return {
+    ok: true,
+    preview: {
+      teams: teamRows.length,
+      count: plan.fixtures.length,
+      rounds: plan.fixtures.reduce((max, f) => (f.round > max ? f.round : max), 0),
+      firstDate: dates[0] ?? input.startDate,
+      lastDate: dates[dates.length - 1] ?? input.startDate,
+    },
+  };
+}
+
+/**
+ * Undo for a generation nobody wanted. `generateFixtures` refuses while any
+ * non-cancelled fixture exists, and there was no delete, no bulk cancel and no
+ * discard — undoing 240 fixtures meant 240 clicks. Cancelling every draft
+ * releases their slots and clears the way to regenerate; published and started
+ * fixtures are never touched, which is why this is drafts-only.
+ */
+export async function discardDrafts(
+  db: Db,
+  competition: CompetitionSummary,
+  actorId: string,
+): Promise<BulkLifecycleResult> {
+  const drafts = await db
+    .select({ id: fixtures.id })
+    .from(fixtures)
+    .where(and(eq(fixtures.competitionId, competition.id), eq(fixtures.status, "draft")))
+    .orderBy(asc(fixtures.seq));
+  let applied = 0;
+  let skipped = 0;
+  for (const draft of drafts) {
+    const result = await cancelFixture(db, competition, draft.id, actorId, "discarded draft");
+    if (result.ok) {
+      applied++;
+    } else {
+      skipped++;
+    }
+  }
+  return { applied, skipped };
 }
 
 // --- Manual creation + editing --------------------------------------------------
@@ -471,13 +628,12 @@ function invalidPatch(patch: FixturePatch): boolean {
   );
 }
 
-async function candidateOf(db: Db, row: FixtureRow): Promise<FixtureForConflicts> {
+function candidateOf(row: FixtureRow): FixtureForConflicts {
   return {
     id: row.id,
     homeTeamId: row.homeTeamId,
     awayTeamId: row.awayTeamId,
     groundId: row.groundId,
-    venueId: await venueOf(db, row.groundId),
     kickoffAt: row.kickoffAt,
     durationMinutes: row.durationMinutes,
     status: row.status,
@@ -508,7 +664,7 @@ export async function editFixture(
   const next = patchedRow(row, patch);
   if (row.status === "scheduled") {
     // A scheduled fixture holds a live slot — the invariant check applies.
-    const blockers = await blockingFor(db, competition, [await candidateOf(db, next)], [row.id]);
+    const blockers = await blockingFor(db, competition, [candidateOf(next)], [row.id]);
     if (blockers.length > 0) {
       return { ok: false, reason: "conflicts", conflicts: blockers };
     }
@@ -574,7 +730,7 @@ export async function scheduleFixture(
   const blockers = await blockingFor(
     db,
     competition,
-    [await candidateOf(db, { ...next, status: "scheduled" })],
+    [candidateOf({ ...next, status: "scheduled" })],
     [row.id],
   );
   if (blockers.length > 0) {
@@ -690,7 +846,7 @@ export async function rescheduleFixture(
     // A reschedule may move a fixture, never un-schedule it.
     return { ok: false, reason: "invalid_input" };
   }
-  const blockers = await blockingFor(db, competition, [await candidateOf(db, next)], [row.id]);
+  const blockers = await blockingFor(db, competition, [candidateOf(next)], [row.id]);
   if (blockers.length > 0) {
     return { ok: false, reason: "conflicts", conflicts: blockers };
   }

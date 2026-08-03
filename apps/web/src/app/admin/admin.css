@@ -211,6 +211,94 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A count column is read by comparing digits down the column, which only works
+   when the digits line up. */
+@media (min-width: 1101px) {
+  .admin-stack .reg-table td.admin-num,
+  .admin-stack .reg-table th.admin-num {
+    text-align: right;
+  }
+}
+
+/* The absolute timestamp is announced on every surface; it is DRAWN only where
+   the exact moment is the point. */
+.admin-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Target size (WCAG 2.2 §2.5.8). The row links measured 276×16 at 1440 and
+   98×32 at 390 — fifty of them stacked, each a 16px-tall strip. `target-size`
+   is not in the wcag21aa tag set, so axe passed every one of them; the ruler
+   did not. Padding rather than a bare min-height, so the growth is part of the
+   hit area instead of dead space beneath the text. */
+.admin-stack .reg-table td a,
+.admin-stack .admin-timeline a,
+.admin-stack .admin-attention a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-block: var(--space-1);
+}
+
+/* Inline links inside a running line (the audit row's scope id) cannot become
+   44px tall without breaking the sentence they sit in; they get the width and
+   as much height as an inline box allows. */
+.admin-stack .admin-attention-kind a {
+  display: inline-block;
+  min-height: 24px;
+  padding-block: var(--space-1);
+  min-width: 44px;
+}
+
+/* The finance tile is a fact, not a figure: "Yes" in 24px tabular-nums read as
+   a number that had lost its digits. */
+.admin-fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+}
+
+.admin-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.admin-pagination a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm-size);
+}
+
+/* The absolute timestamp is a sentence, not a token — it wraps. */
+.admin-when-wide {
+  white-space: normal;
+}
+
+/* Below 1100px every `.reg-table` row is a card and every cell a flex line. A
+   cell holding a timestamp AND a badge had nowhere to put the badge, so it went
+   past the card's right edge and took the page with it. */
+@media (max-width: 1100px) {
+  .admin-stack .reg-table td {
+    flex-wrap: wrap;
+  }
+}
+
 /* 360px (PX-1 04 §9): tables scroll inside their own container, never the page. */
 @media (max-width: 640px) {
   .admin-timeline li {
