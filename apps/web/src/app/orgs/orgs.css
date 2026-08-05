@@ -498,3 +498,22 @@ a.cat-group-head:hover {
   font-size: var(--text-md-size);
   line-height: 1.6;
 }
+
+/*
+ * The way from an org's read-only view of a tournament to the workspace where a
+ * season is actually added. That link previously existed only inside the empty
+ * state, so it vanished the moment a tournament had its first season — and an
+ * organizer coming back for next year's edition had no route to create it.
+ *
+ * 44px because it is the one action on the page (SC 2.5.8's floor is 24, this
+ * product's convention is 44, and `target-size` is not in the wcag21aa tag set
+ * so axe would not have said otherwise).
+ */
+.cat-workspace-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--space-2);
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+}

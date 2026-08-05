@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageTitle } from "../../../../../components/shell/page-title";
+import { dateRange, statusLabel, statusTone } from "../../../../tournaments/season-card";
 import { tournamentView } from "../../../../../server/orgs/catalogue";
 import "../../../../orgs/orgs.css";
 
@@ -35,6 +36,13 @@ export default async function TournamentPage({
           <span className="cat-group-count">
             {view.editions.length} {view.editions.length === 1 ? "season" : "seasons"}
           </span>
+          {/* The only route to this tournament's workspace — where a season is
+              actually added — used to sit inside the EMPTY state, so the moment
+              a tournament had one season the way to add its second disappeared.
+              An organizer's second year is the common case, not the rare one. */}
+          <Link href={`/tournaments/${view.tournament.slug}`} className="cat-workspace-link">
+            Open tournament workspace
+          </Link>
         </div>
 
         {view.editions.length === 0 ? (
@@ -58,11 +66,17 @@ export default async function TournamentPage({
                       {edition.teams} {edition.teams === 1 ? "team" : "teams"} · {edition.players}{" "}
                       {edition.players === 1 ? "player" : "players"}
                       {edition.location !== null ? ` · ${edition.location}` : ""}
-                      {edition.startsOn !== null ? ` · ${edition.startsOn}` : ""}
+                      {/* Was the raw column, `2026-08-01`. The sibling view of
+                          these same rows renders "1 Aug – 15 Aug 2026" through
+                          `dateRange`, which is exported for exactly this. */}
+                      {dateRange(edition.startsOn, edition.endsOn) !== null
+                        ? ` · ${dateRange(edition.startsOn, edition.endsOn) ?? ""}`
+                        : ""}
                     </span>
-                    <Badge tone={edition.status === "registration_open" ? "success" : "neutral"}>
-                      {edition.status === "registration_open" ? "Open" : "Closed"}
-                    </Badge>
+                    {/* Four states, not two. This badge read
+                        `status === "registration_open" ? "Open" : "Closed"`, so
+                        a draft and a finished tournament were the same word. */}
+                    <Badge tone={statusTone(edition.status)}>{statusLabel(edition.status)}</Badge>
                   </Link>
                 </li>
               ))}
