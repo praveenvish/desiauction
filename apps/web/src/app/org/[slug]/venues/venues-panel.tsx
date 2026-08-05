@@ -134,19 +134,33 @@ export function VenuesPanel({
                   </thead>
                   <tbody>
                     {venue.grounds.map((ground) => (
+                      /* Every cell carries its heading. `.reg-table` becomes
+                         `display: block` with `thead { display: none }` below
+                         1100px (seasons.css), and the headings return only
+                         through `td::before { content: attr(data-label) }`.
+                         Without them this table reads, on every laptop and
+                         phone, as a name, a word, a number, "yes", "outdoor",
+                         "active" — six values with no way to tell which is the
+                         capacity and which is the surface. Screen 21 found the
+                         same omission on six administration tables; auditing
+                         every `.reg-table` in the product turned up five more
+                         files with none at all, all fixed together. */
                       <tr key={ground.id} data-testid={`ground-${ground.id}`}>
-                        <td>{ground.name}</td>
-                        <td>{ground.surface}</td>
-                        <td>{ground.capacity ?? "—"}</td>
-                        <td>{ground.floodlights ? "yes" : "no"}</td>
-                        <td>{ground.indoor ? "indoor" : "outdoor"}</td>
-                        <td>
+                        <td data-label="Ground">{ground.name}</td>
+                        <td data-label="Surface">{ground.surface}</td>
+                        <td data-label="Capacity">{ground.capacity ?? "—"}</td>
+                        {/* "yes" / "no" / "indoor" answered a question the
+                            header asked, and at this width the header is gone.
+                            Each cell now says what it is on its own. */}
+                        <td data-label="Lights">{ground.floodlights ? "Floodlit" : "No lights"}</td>
+                        <td data-label="Indoor">{ground.indoor ? "Indoor" : "Outdoor"}</td>
+                        <td data-label="Status">
                           <Badge tone={ground.status === "active" ? "success" : "warning"}>
                             {ground.status}
                           </Badge>
                         </td>
                         {canManage ? (
-                          <td>
+                          <td data-label="">
                             <Button
                               size="sm"
                               variant="ghost"

@@ -77,19 +77,30 @@ export default async function LedgerPage({
             </thead>
             <tbody>
               {view.rows.map((row) => (
+                /* `.reg-table` hides its `thead` below 1100px and restores the
+                   headings through `td::before { content: attr(data-label) }`
+                   (seasons.css). Ten unlabelled cells is an audit record nobody
+                   can read on a laptop — and this one is the evidence surface
+                   for a disputed bid. */
                 <tr key={row.seq} data-testid={`ledger-row-${String(row.seq)}`}>
-                  <td>{row.seq}</td>
-                  <td>{formatTime(row.atMs)}</td>
-                  <td>{row.actorName}</td>
-                  <td>{row.paddleNumber ?? "—"}</td>
-                  <td>{row.teamName ?? "—"}</td>
-                  <td>
+                  <td data-label="#">{row.seq}</td>
+                  <td data-label="Time">{formatTime(row.atMs)}</td>
+                  <td data-label="Actor">{row.actorName}</td>
+                  <td data-label="Paddle">{row.paddleNumber ?? "—"}</td>
+                  <td data-label="Team">{row.teamName ?? "—"}</td>
+                  <td data-label="Lot">
                     {row.lotNumber !== null ? `${row.lotNumber} ${row.playerName ?? ""}` : "—"}
                   </td>
-                  <td>{row.amount !== null ? formatPaiseINR(paise(row.amount)) : "—"}</td>
-                  <td className={resultClass(row.result)}>{row.result}</td>
-                  <td>{row.reason ?? "—"}</td>
-                  <td title={row.correlationId}>{row.correlationId.slice(-6)}</td>
+                  <td data-label="Bid">
+                    {row.amount !== null ? formatPaiseINR(paise(row.amount)) : "—"}
+                  </td>
+                  <td data-label="Result" className={resultClass(row.result)}>
+                    {row.result}
+                  </td>
+                  <td data-label="Reason">{row.reason ?? "—"}</td>
+                  <td data-label="Correlation" title={row.correlationId}>
+                    {row.correlationId.slice(-6)}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -180,9 +180,13 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
               </thead>
               <tbody>
                 {entries.map((entry, index) => (
+                  /* `.reg-table` hides its `thead` below 1100px and restores the
+                     headings from `data-label` (seasons.css). */
                   <tr key={index}>
-                    <td className="photo-match-file">{entry.file.name}</td>
-                    <td>
+                    <td data-label="File" className="photo-match-file">
+                      {entry.file.name}
+                    </td>
+                    <td data-label="Player">
                       {entry.match.ok ? (
                         <>
                           {entry.match.target.name ?? "Unnamed"}{" "}
@@ -196,7 +200,7 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
                         <span className="photo-match-reason">{entry.match.reason}</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       {entry.status === "ready" ? (
                         <Badge tone="info">ready</Badge>
                       ) : entry.status === "uploading" ? (

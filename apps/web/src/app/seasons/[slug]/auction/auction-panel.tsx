@@ -527,15 +527,19 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 </thead>
                 <tbody>
                   {view.lots.map((lot) => (
+                    /* `.reg-table` drops its `thead` below 1100px and brings the
+                       headings back through `data-label` (seasons.css). */
                     <tr key={lot.id} data-testid={`lot-${lot.lotNumber}`}>
-                      <td className="reg-number">{lot.lotNumber}</td>
-                      <td>{lot.playerName ?? "Unnamed"}</td>
-                      <td>{lot.role.replace(/_/g, " ")}</td>
-                      <td>{formatPaiseINR(paise(lot.basePrice))}</td>
-                      <td>
+                      <td data-label="#" className="reg-number">
+                        {lot.lotNumber}
+                      </td>
+                      <td data-label="Player">{lot.playerName ?? "Unnamed"}</td>
+                      <td data-label="Role">{lot.role.replace(/_/g, " ")}</td>
+                      <td data-label="Base">{formatPaiseINR(paise(lot.basePrice))}</td>
+                      <td data-label="Status">
                         <Badge tone={LOT_TONE[lot.status]}>{lot.status.replace(/_/g, " ")}</Badge>
                       </td>
-                      <td>
+                      <td data-label="Result">
                         {lot.soldPrice !== null
                           ? `${formatPaiseINR(paise(lot.soldPrice))} → ${lot.soldToPaddle ?? ""}`
                           : lot.bidCount > 0

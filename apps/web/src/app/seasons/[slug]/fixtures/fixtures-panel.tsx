@@ -1088,9 +1088,16 @@ function FixtureRow({
   const cancellable = fixture.status !== "completed" && fixture.status !== "cancelled";
   return (
     <>
+      {/* `.reg-table` hides its `thead` below 1100px and restores the headings
+          from `data-label` (seasons.css). The `<caption>` and `scope="col"`
+          landed here earlier; the labels did not, so on a phone at the ground
+          this read as a number, two team names, a time, a place and a word,
+          with nothing saying which was the kickoff and which the ground. */}
       <tr data-testid={`fixture-${fixture.number}`}>
-        <td className="reg-number">{fixture.number}</td>
-        <td>
+        <td data-label="#" className="reg-number">
+          {fixture.number}
+        </td>
+        <td data-label="Fixture">
           <span className="registration-name">
             <span className="fx-team">
               <span
@@ -1111,18 +1118,20 @@ function FixtureRow({
             </span>
           </span>
         </td>
-        <td>{fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "—"}</td>
-        <td>
+        <td data-label="Kickoff">
+          {fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "—"}
+        </td>
+        <td data-label="Ground">
           {fixture.groundName ?? "—"}
           {fixture.venueName !== null ? (
             <span className="registration-phone">{fixture.venueName}</span>
           ) : null}
         </td>
-        <td>
+        <td data-label="Status">
           <Badge tone={FIXTURE_TONE[fixture.status]}>{fixture.status.replace(/_/g, " ")}</Badge>
         </td>
         {canManage ? (
-          <td className="reg-actions">
+          <td data-label="" className="reg-actions">
             {next !== undefined ? (
               <Button
                 size="sm"
