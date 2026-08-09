@@ -1,0 +1,105 @@
+import { timingSafeEqual } from "node:crypto";
+
+import { NextResponse } from "next/server";
+
+import { env } from "../../../../env";
+import { systemDb } from "../../../../server/db";
+import { applyInbound } from "../../../../server/messaging/inbound";
+
+/**
+ * INBOUND SMS WEBHOOK — where a STOP actually lands.
+ *
+ * Follows the trusted-ingress order the settlement webhook established
+ * (server/settlement/webhook.ts): verify the shared secret BEFORE touching the
+ * database, and never answer with a 500, because the shape of a failure must
+ * not tell the caller how far they got.
+ *
+ * The secret is a header rather than an HMAC because the operator posts a plain
+ * form body with no signing scheme of its own. That is weaker than the
+ * settlement gateway's signature, and the mitigations are: the secret is
+ * long-lived and out of band, the endpoint performs exactly one narrow action
+ * (suppress or lift a number), and it discloses nothing at all in its response.
+ * The worst a leaked secret buys an attacker is the ability to silence numbers
+ * they already know — annoying, reversible with START, and recorded.
+ *
+ * `SMS_INBOUND_SECRET` unset means the endpoint is CLOSED, not open. A webhook
+ * that accepts anything when misconfigured is worse than one that never
+ * accepts: the failure is silent and the list fills with forgeries.
+ */
+
+export const dynamic = "force-dynamic";
+
+/** Constant-time compare, so the response time does not leak the secret. */
+function secretMatches(provided: string | null, expected: string): boolean {
+  if (provided === null) {
+    return false;
+  }
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  // timingSafeEqual throws on a length mismatch, which would itself be a
+  // timing signal — compare lengths first and still run the comparison.
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Operators disagree about field names, and the cost of guessing wrong is a
+ * STOP that silently does nothing. Accept the common spellings rather than
+ * pinning one vendor's contract into the route.
+ */
+function readField(source: Record<string, unknown>, names: readonly string[]): string {
+  for (const name of names) {
+    const value = source[name];
+    if (typeof value === "string" && value.trim() !== "") {
+      return value;
+    }
+  }
+  return "";
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  const expected = env.SMS_INBOUND_SECRET;
+  if (expected === undefined || expected === "") {
+    // Closed until configured. 404 rather than 503: an unconfigured endpoint
+    // should be indistinguishable from one that does not exist.
+    return new NextResponse(null, { status: 404 });
+  }
+  if (!secretMatches(request.headers.get("x-inbound-secret"), expected)) {
+    return new NextResponse(null, { status: 401 });
+  }
+
+  let payload: Record<string, unknown> = {};
+  try {
+    const contentType = request.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      payload = (await request.json()) as Record<string, unknown>;
+    } else {
+      payload = Object.fromEntries(new URLSearchParams(await request.text()));
+    }
+  } catch {
+    return new NextResponse(null, { status: 400 });
+  }
+
+  const from = readField(payload, ["from", "sender", "mobile", "msisdn", "number"]);
+  const body = readField(payload, ["text", "message", "content", "body", "keyword"]);
+  if (from === "") {
+    return new NextResponse(null, { status: 400 });
+  }
+
+  const result = await applyInbound(systemDb, { from, body });
+
+  /*
+   * 200 even for a keyword we do not recognise.
+   *
+   * The operator retries anything that is not a 2xx, and a person texting
+   * "thanks" is not an error to retry — it is a message with no instruction in
+   * it. Reserving non-2xx for "we could not read this request at all" keeps the
+   * retry queue meaningful.
+   *
+   * The body says only what we did with the instruction, never whether the
+   * number is known to us.
+   */
+  return NextResponse.json(
+    result.handled ? { status: "ok", action: result.intent } : { status: "ok", action: "ignored" },
+    { status: 200 },
+  );
+}

@@ -48,6 +48,15 @@ const envSchema = z.object({
   MSG91_TEMPLATE_REGISTRATION_REJECTED: z.string().min(1).optional(),
   MSG91_TEMPLATE_REGISTRATION_WITHDRAWN: z.string().min(1).optional(),
   MSG91_TEMPLATE_REGISTRATION_RESTORED: z.string().min(1).optional(),
+  /**
+   * Shared secret on the inbound-SMS webhook, which is where a STOP lands.
+   *
+   * Unset means the endpoint is CLOSED (404), never open. A webhook that
+   * accepts anything when it is misconfigured is worse than one that never
+   * accepts: the failure is silent and the suppression list fills with
+   * forgeries. Long, random, and set out of band on the operator's console.
+   */
+  SMS_INBOUND_SECRET: z.string().min(16).optional(),
   // PX-5 SEO: absolute origin for canonical URLs, Open Graph and the sitemap.
   PUBLIC_BASE_URL: z.url().default("http://localhost:3000"),
   // PX-8: the finops artifact + outbox root (IP-6 §22 — everything injected).

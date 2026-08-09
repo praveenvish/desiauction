@@ -1,9 +1,17 @@
-import { consentRecords, createDb, newId, people, type DbHandle } from "@desiauction/db";
-import { eq, inArray } from "drizzle-orm";
+import {
+  consentRecords,
+  createDb,
+  newId,
+  people,
+  suppressions as suppressionsTable,
+  type DbHandle,
+} from "@desiauction/db";
+import { eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { liftSuppression, maySend, recordConsent, suppress } from "./consent";
+import { applyInbound } from "./inbound";
 
 /**
  * The consent gate, against a real database.
@@ -33,6 +41,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(suppressionsTable).where(like(suppressionsTable.contact, `%${RUN}%`));
   await db.delete(people).where(inArray(people.phone, PHONES));
   await handle.sql.end({ timeout: 5 });
 });
@@ -109,6 +118,86 @@ describe("suppression outranks everything", () => {
       scope: "registration",
     });
     expect(decision.send).toBe(true);
+  });
+});
+
+describe("an inbound STOP closes the loop", () => {
+  // The property the whole feature exists for: a person replies STOP to a
+  // message, and the next send to that number does not happen. Everything else
+  // in this file is a component; this is the outcome.
+  const PHONE_INBOUND = `+9195${RUN}04`;
+
+  it("silences a number that texts STOP, and START brings it back", async () => {
+    const before = await maySend(db, {
+      contact: PHONE_INBOUND,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+    });
+    expect(before.send, "a number with no history receives messages").toBe(true);
+
+    const stopped = await applyInbound(db, { from: PHONE_INBOUND, body: "STOP" });
+    expect(stopped).toEqual({ handled: true, intent: "stop" });
+
+    const after = await maySend(db, {
+      contact: PHONE_INBOUND,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+    });
+    expect(after.send, "a transactional message must not survive a STOP").toBe(false);
+
+    await applyInbound(db, { from: PHONE_INBOUND, body: "START" });
+    const resumed = await maySend(db, {
+      contact: PHONE_INBOUND,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+    });
+    expect(resumed.send, "START is the way back in").toBe(true);
+  });
+
+  it("normalises a bare number onto the same key a send uses", async () => {
+    // The failure this guards: an operator delivers `9512345678`, the send
+    // addresses `+919512345678`, and the STOP is recorded against a key nothing
+    // ever matches. The person keeps receiving messages having done as told.
+    // Exactly ten digits, because that is what a real Indian mobile is and what
+    // the normaliser is entitled to assume. An eleven-digit fixture made this
+    // test fail on its own bad data, not on the code.
+    const bare = `9${RUN}05`;
+    await applyInbound(db, { from: bare, body: "STOP" });
+    const decision = await maySend(db, {
+      contact: `+91${bare}`,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+    });
+    expect(decision.send).toBe(false);
+  });
+
+  it("is idempotent, so a retried STOP does not grow the list", async () => {
+    const repeated = `+9195${RUN}06`;
+    await applyInbound(db, { from: repeated, body: "STOP" });
+    await applyInbound(db, { from: repeated, body: "stop" });
+    await applyInbound(db, { from: repeated, body: "STOP!" });
+    const rows = await db
+      .select({ id: suppressionsTable.id })
+      .from(suppressionsTable)
+      .where(eq(suppressionsTable.contact, repeated));
+    expect(rows.length, "three STOPs, one row").toBe(1);
+  });
+
+  it("ignores a message with no instruction rather than acting on it", async () => {
+    const chatty = `+9195${RUN}07`;
+    const result = await applyInbound(db, { from: chatty, body: "who is this?" });
+    expect(result).toEqual({ handled: false, reason: "unknown_keyword" });
+    const decision = await maySend(db, {
+      contact: chatty,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+    });
+    expect(decision.send, "an unrecognised reply must not silence anyone").toBe(true);
   });
 });
 
