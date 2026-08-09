@@ -88,6 +88,77 @@ export const otpCodes = pgTable(
   ],
 );
 
+/**
+ * WHAT A PERSON AGREED TO, AND WHEN.
+ *
+ * Append-only. A withdrawal is a new row with `granted = false`, never an
+ * update — "did they agree on the day we sent it?" is a question about a moment
+ * in the past, and a mutable row cannot answer it. Under the DPDP Act and the
+ * DLT regime we have to be able to show when someone agreed, to what, and how
+ * they took it back.
+ *
+ * No RLS and no org column, deliberately: consent is between the platform and a
+ * person, not a club. It follows `people`, `sessions` and `otp_codes`, the other
+ * identity tables, which carry no tenant policy either.
+ */
+export const consentRecords = pgTable(
+  "consent_records",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    /** What they agreed to — "sms.transactional", "sms.promotional". */
+    purpose: text("purpose").notNull(),
+    granted: boolean("granted").notNull(),
+    /** Where the agreement came from, so an audit can retrace it. */
+    source: text("source", {
+      enum: ["registration", "account", "sms_stop", "sms_start", "import", "support"],
+    }).notNull(),
+    /** The wording shown, the page, whatever proves what they actually saw. */
+    evidence: jsonb("evidence").notNull().default({}),
+    requestIp: text("request_ip"),
+    userAgent: text("user_agent"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("consent_person_idx").on(table.personId, table.purpose, table.createdAt)],
+);
+
+/**
+ * ADDRESSES WE MUST NOT SEND TO.
+ *
+ * Keyed by the CONTACT, not by a person, and that is the point: a STOP arrives
+ * from a phone number, and a hard bounce from an email address. Neither
+ * necessarily maps to an account, and both must be honoured anyway. Continuing
+ * to send to a hard bounce is how a sending domain dies; continuing after a STOP
+ * is how a sender header gets blocked.
+ *
+ * `scope` is "global" or a topic, so a person can stop registration texts
+ * without losing their sign-in codes — which is why sign-in codes have to be
+ * exempt in the UI copy too, or "turn off SMS" locks someone out of their
+ * account.
+ */
+export const suppressions = pgTable(
+  "suppressions",
+  {
+    id: id(),
+    /** E.164 phone or a lowercased email — whatever the channel addresses. */
+    contact: text("contact").notNull(),
+    channel: text("channel", { enum: ["sms", "email"] }).notNull(),
+    scope: text("scope").notNull().default("global"),
+    reason: text("reason", {
+      enum: ["stop", "bounce", "complaint", "manual", "unreachable"],
+    }).notNull(),
+    /** Set when a STOP is reversed by START, so the row stays as evidence. */
+    liftedAt: ts("lifted_at"),
+    note: text("note"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    // The read every send performs: is this contact suppressed on this channel,
+    // for this scope, right now.
+    index("suppressions_contact_idx").on(table.contact, table.channel, table.scope),
+  ],
+);
+
 // Development-only delivery target for the DevInboxSender (IP-2_DESIGN D3).
 export const otpInbox = pgTable("otp_inbox", {
   id: id(),

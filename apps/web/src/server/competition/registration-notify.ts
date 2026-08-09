@@ -3,6 +3,7 @@ import { auditLog, newId, otpInbox, people, registrations, type Db } from "@desi
 import { eq, inArray } from "drizzle-orm";
 
 import { env } from "../../env";
+import { maySend } from "../messaging/consent";
 import {
   SMS_TEMPLATES,
   renderTemplate,
@@ -293,24 +294,63 @@ export async function notifyDecision(
     actorId: string;
   },
   sender?: PlayerSmsSender,
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; suppressed: number }> {
   if (input.registrationIds.length === 0) {
-    return { sent: 0, failed: 0 };
+    return { sent: 0, failed: 0, suppressed: 0 };
   }
   const link = `${env.PUBLIC_BASE_URL}/seasons/${input.competitionSlug}/register`;
   const body = messageFor(input.event, input.competitionName, link, input.reason);
   if (body === null) {
-    return { sent: 0, failed: 0 };
+    return { sent: 0, failed: 0, suppressed: 0 };
   }
   const rows = await db
-    .select({ id: registrations.id, phone: people.phone })
+    .select({ id: registrations.id, phone: people.phone, personId: people.id })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
     .where(inArray(registrations.id, input.registrationIds as string[]));
   const delivery = sender ?? createPlayerSmsSender(db);
   let sent = 0;
   let failed = 0;
+  let suppressed = 0;
   for (const row of rows) {
+    /*
+     * The consent gate, before the send and not after it.
+     *
+     * A decision notice is transactional — it is the direct consequence of
+     * something this person did — so it needs no opt-in. What it must honour is
+     * a STOP, and until now there was nothing to honour it with: no
+     * suppression list, no opt-out, no STOP handling anywhere in the product.
+     *
+     * A suppressed person is NOT a failure. Their decision still stands, their
+     * status page still shows it, and counting them as failed would send an
+     * organizer chasing a delivery problem that does not exist.
+     */
+    const decision = await maySend(db, {
+      contact: row.phone,
+      channel: "sms",
+      category: body.template.category,
+      scope: "registration",
+      personId: row.personId,
+    });
+    if (!decision.send) {
+      suppressed += 1;
+      try {
+        await db.insert(auditLog).values({
+          id: newId(),
+          actor: input.actorId,
+          action: "registration.notify_suppressed",
+          scopeType: "org",
+          scopeId: input.orgId,
+          subject: row.id,
+          // Recorded so "why didn't they get it?" has an answer that is not a
+          // shrug. A silent skip is indistinguishable from a bug.
+          meta: { channel: "sms", reason: decision.reason },
+        });
+      } catch {
+        // Same rule as below: evidence never fails a committed decision.
+      }
+      continue;
+    }
     let error: string | null = null;
     try {
       await delivery.send(row.phone, body);
@@ -330,12 +370,15 @@ export async function notifyDecision(
         scopeType: "org",
         scopeId: input.orgId,
         subject: row.id,
-        meta: error === null ? { channel: "sms" } : { channel: "sms", error },
+        meta:
+          error === null
+            ? { channel: "sms", template: `${body.template.key}@${body.template.version}` }
+            : { channel: "sms", template: `${body.template.key}@${body.template.version}`, error },
       });
     } catch {
       // Evidence of a notification must never be the thing that fails a
       // decision that has already committed.
     }
   }
-  return { sent, failed };
+  return { sent, failed, suppressed };
 }
