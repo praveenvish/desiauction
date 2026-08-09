@@ -26,7 +26,28 @@ const envSchema = z.object({
   // the dev sender is structurally invisible outside development.
   OTP_PROVIDER: z.enum(["dev", "msg91"]).default("dev"),
   MSG91_AUTH_KEY: z.string().min(1).optional(),
+  /**
+   * The OTP flow's DLT template id, and ONLY the OTP flow's. Its registered
+   * text has a code slot; it cannot carry a sentence.
+   *
+   * It used to be reused for all five registration decision notices, which is
+   * both a DLT mismatch — the regime registers one template per message shape —
+   * and the reason a decision SMS would have arrived as a mangled OTP. Each
+   * decision shape now has its own variable below.
+   */
   MSG91_TEMPLATE_ID: z.string().min(1).optional(),
+  /**
+   * One registered DLT template id per message shape. Optional individually:
+   * a shape with no id refuses to send and names the missing variable, which is
+   * far better than sending against somebody else's registration. The names
+   * are declared on each template in server/messaging/templates.ts and must
+   * stay in step with it — a test holds that.
+   */
+  MSG91_TEMPLATE_REGISTRATION_APPROVED: z.string().min(1).optional(),
+  MSG91_TEMPLATE_REGISTRATION_WAITLISTED: z.string().min(1).optional(),
+  MSG91_TEMPLATE_REGISTRATION_REJECTED: z.string().min(1).optional(),
+  MSG91_TEMPLATE_REGISTRATION_WITHDRAWN: z.string().min(1).optional(),
+  MSG91_TEMPLATE_REGISTRATION_RESTORED: z.string().min(1).optional(),
   // PX-5 SEO: absolute origin for canonical URLs, Open Graph and the sitemap.
   PUBLIC_BASE_URL: z.url().default("http://localhost:3000"),
   // PX-8: the finops artifact + outbox root (IP-6 §22 — everything injected).
