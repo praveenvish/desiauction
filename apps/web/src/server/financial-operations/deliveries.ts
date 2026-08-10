@@ -24,18 +24,33 @@
 export const DELIVERY_LANES = ["requested", "sent", "confirmed", "failed"] as const;
 
 /**
- * "Succeeded" was a promise the platform cannot keep.
+ * "Succeeded" was a promise the platform could not keep — and now partly can.
  *
- * The `in-app` adapter returns `ok`/`confirmed` unconditionally, on the
- * reasoning that "delivery IS visibility — the dispatch register is the tray a
- * signed-in officer reads". But that register is org-scoped and finance-gated,
- * so the actual recipient — the team owner who paid — sees nothing: `/inbox`
- * carries security events only. And `email` writes a `.txt` file into a local
- * directory; there is no SMTP. So a receipt the customer never got was reported
- * to the operator as "Succeeded".
+ * THE ORIGINAL DEFECT. The `in-app` adapter returned `ok`/`confirmed`
+ * unconditionally, on the reasoning that "delivery IS visibility — the dispatch
+ * register is the tray a signed-in officer reads". But that register is
+ * org-scoped and finance-gated, so the actual recipient — the team owner who
+ * paid — saw nothing; `/inbox` carried security events only. And `email` wrote
+ * a `.txt` file into a local directory. A receipt the customer never got was
+ * reported to the operator as "Succeeded".
  *
- * These labels now describe what the platform actually observed. Fixing the
- * adapters means thawing IP-6; telling the truth about them does not.
+ * WHAT CHANGED. `finopsDeps` takes adapter overrides, so both were replaced by
+ * INJECTION rather than by thawing IP-6:
+ *   · in-app writes a person-scoped audit row, which is what `/inbox` reads, so
+ *     `confirmed` now means a row the recipient can actually open;
+ *   · email is a real HTTP adapter that deliberately does NOT confirm on a 2xx,
+ *     and confirms only when the provider's delivery callback says a mailbox
+ *     received it.
+ *
+ * WHY THE LABELS STAY CAUTIOUS ANYWAY. The email override is installed only
+ * when `EMAIL_API_*` is fully configured; without it the platform's own
+ * filesystem outbox remains, and that one still confirms on writing a file. So
+ * `confirmed` is truthful on some deployments and optimistic on others, and a
+ * label cannot know which. "Recorded as sent" is true in both, which is the
+ * property a status word on a money screen needs.
+ *
+ * Making the FILESYSTEM adapter stop confirming means thawing IP-6. Saying
+ * only what is true on every deployment does not.
  */
 export const DELIVERY_LANE_LABEL: Record<string, string> = {
   requested: "Queued",
