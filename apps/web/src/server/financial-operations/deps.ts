@@ -5,8 +5,9 @@ import type { DeliveryPort } from "@desiauction/financial-operations";
 import { finopsDeps, type FinopsDeps } from "@desiauction/financial-operations/server";
 
 import { env } from "../../env";
-import { createHttpEmailAdapter } from "../messaging/email-adapter";
-import { createPersonInAppAdapter } from "../messaging/in-app-adapter";
+import { createHttpEmailAdapter, type EmailResolver } from "../messaging/email-adapter";
+import { createPersonInAppAdapter, ownersOfRecipient } from "../messaging/in-app-adapter";
+import { verifiedEmailOf } from "../auth/email-change";
 
 /**
  * The web tier's FinOps dependencies — built in exactly ONE place (PX-8).
@@ -31,32 +32,52 @@ export const FINOPS_STORAGE_DIR: string = resolve(process.cwd(), env.FINOPS_STOR
  * change without a restart, and a per-request check would invite a deploy where
  * half the requests mail and half write files.
  */
-const emailAdapter: (() => DeliveryPort) | null =
+/**
+ * Resolve a dispatch's recipient to a VERIFIED address, or null.
+ *
+ * `verifiedEmailOf` reads `email_verified_at`, never the column alone — an
+ * address somebody typed and never confirmed is a string, and the adapter
+ * refusing `no_email_on_file` remains the correct outcome for it. A club's
+ * receipt carries a name, an amount and a competition; a mistyped domain would
+ * put all three in a stranger's inbox.
+ *
+ * A team can have more than one person who accepted ownership (only one holds
+ * the paddle). The FIRST with a verified address is used: the document is
+ * addressed to the team, one copy is what "delivered" means, and mailing every
+ * owner would make one dispatch several deliveries the register cannot count.
+ */
+function resolveOwnerEmail(db: Db): EmailResolver {
+  return async (recipientRef: string) => {
+    const owners = await ownersOfRecipient(db, recipientRef);
+    for (const personId of owners) {
+      const email = await verifiedEmailOf(db, personId);
+      if (email !== null) {
+        return email;
+      }
+    }
+    return null;
+  };
+}
+
+/**
+ * The email adapter, or null when the provider is not fully configured.
+ *
+ * Resolved once at module load rather than per request: the answer cannot
+ * change without a restart, and a per-request check would invite a deploy where
+ * half the requests mail and half write files.
+ */
+const emailAdapter: ((db: Db) => DeliveryPort) | null =
   env.EMAIL_API_ENDPOINT !== undefined &&
   env.EMAIL_API_KEY !== undefined &&
   env.EMAIL_FROM !== undefined
-    ? () =>
+    ? (db: Db) =>
         createHttpEmailAdapter(
           {
             endpoint: env.EMAIL_API_ENDPOINT ?? "",
             apiKey: env.EMAIL_API_KEY ?? "",
             from: env.EMAIL_FROM ?? "",
           },
-          /*
-           * There is no address to resolve to. `people` carries a phone and a
-           * name and nothing else — this product signs people in by SMS and has
-           * never asked anyone for an email.
-           *
-           * So this resolver is honest rather than absent: it always returns
-           * null, the adapter refuses non-retryably with `no_email_on_file`,
-           * and the deliveries desk shows a document that did not reach anyone
-           * instead of a green "Succeeded" for a file on a disk.
-           *
-           * Making it real needs a `people.email` column, a field that asks for
-           * it, and a verification round-trip — an unverified address is a
-           * liability, not a channel. Tracked, not smuggled in here.
-           */
-          () => Promise.resolve(null),
+          resolveOwnerEmail(db),
         )
     : null;
 
@@ -83,7 +104,7 @@ export function webFinopsDeps(db: Db): FinopsDeps {
        * which is the wrong outcome but a VISIBLE one. A half-configured mailer
        * that accepts documents and drops them is the same failure, silently.
        */
-      ...(emailAdapter === null ? {} : { email: emailAdapter() }),
+      ...(emailAdapter === null ? {} : { email: emailAdapter(db) }),
     },
   });
 }

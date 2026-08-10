@@ -30,8 +30,40 @@ export const people = pgTable("people", {
   // by the media storage port. Only meaningful once photoConsentAt is set.
   photoUrl: text("photo_url"),
   photoUploadedAt: ts("photo_uploaded_at"),
+  /**
+   * An address to send documents to — receipts, invoices, corrections.
+   *
+   * VERIFIED OR ABSENT. `emailVerifiedAt` is what the delivery resolver reads;
+   * an address with no timestamp is a string somebody typed, not a channel.
+   * Sending a club's receipt to an unverified address is how it reaches a
+   * stranger's mailbox because a player fat-fingered a domain.
+   */
+  email: text("email"),
+  emailVerifiedAt: ts("email_verified_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
+
+/**
+ * Codes that prove an address belongs to the person typing it.
+ *
+ * Separate from `otp_codes`, whose column is named `phone` and whose indexes
+ * are built for sign-in. Person-scoped, because you must already be signed in
+ * to add an address — so the code is useless without the session beside it.
+ */
+export const emailVerifications = pgTable(
+  "email_verifications",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    email: text("email").notNull(),
+    codeHash: text("code_hash").notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    consumedAt: ts("consumed_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("email_verifications_person_idx").on(table.personId, table.createdAt)],
+);
 
 export const organizations = pgTable("organizations", {
   id: id(),

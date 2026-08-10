@@ -28,6 +28,9 @@ export type SecurityAction =
   // sign-in is phone-first, so this row is the record of the single change that
   // can take an account away from somebody.
   | "auth.phone.changed"
+  // An address the platform may now send documents to. On the person's own
+  // ledger, because it is a change to how the product can reach them.
+  | "profile.email.verified"
   // DA-19: the decisions a PLAYER cares about. 48 people were approved and one
   // rejected during certification and not one of them was told — the inbox
   // carried sign-in events only, and its own empty state admitted it. These

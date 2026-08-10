@@ -32,6 +32,26 @@ import { eq } from "drizzle-orm";
 /** What the inbox will render. Kept here so the label map has one thing to match. */
 export const FINANCE_DOCUMENT_ISSUED = "finance.document.issued";
 
+/**
+ * A dispatch's `recipientRef` → the people who can be told.
+ *
+ * `owner:<teamId>`, resolved through the paddles actually claimed for that
+ * team. Shared with the email resolver rather than reimplemented there: the
+ * earlier defect this module exists to fix was resolving the ref against the
+ * wrong table, and two copies of that lookup is two chances to do it again.
+ */
+export async function ownersOfRecipient(db: Db, recipientRef: string): Promise<string[]> {
+  const teamId = recipientRef.startsWith("owner:") ? recipientRef.slice("owner:".length) : "";
+  if (teamId === "") {
+    return [];
+  }
+  const owners = await db
+    .selectDistinct({ personId: paddles.personId })
+    .from(paddles)
+    .where(eq(paddles.teamId, teamId));
+  return owners.map((owner) => owner.personId);
+}
+
 export function createPersonInAppAdapter(db: Db): DeliveryPort {
   return {
     channel: "in-app",

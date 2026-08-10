@@ -7,6 +7,7 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
+import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -19,6 +20,12 @@ import { createPlayerSmsSender } from "../competition/registration-notify";
 import { maySend } from "../messaging/consent";
 import { SMS_TEMPLATES, renderTemplate } from "../messaging/templates";
 import { requestOtp, verifyOtp } from "./otp";
+import {
+  confirmEmailVerification,
+  requestEmailVerification,
+  type EmailVerificationResult,
+} from "./email-change";
+import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
 import { safeNext } from "./redirect";
@@ -716,4 +723,102 @@ async function notifyPhoneChanged(previousPhone: string, newPhone: string): Prom
     slots: rendered.slots,
     body: rendered.body,
   });
+}
+
+/**
+ * ADDING A VERIFIED EMAIL ADDRESS.
+ *
+ * The email delivery adapter has refused every document with `no_email_on_file`
+ * since it was written, correctly: this product has never collected an address.
+ * Its own comment named the three missing pieces — a column, a form field and a
+ * verification flow — and this is the last of them.
+ *
+ * The address is written only once a code sent to that mailbox comes back. An
+ * unverified address is a liability rather than a channel: a mistyped domain
+ * would put a club's receipt, with a name and an amount on it, into a
+ * stranger's inbox.
+ */
+
+/** The address on the account, and whether it has been confirmed. */
+export async function accountEmail(): Promise<{ email: string | null; verified: boolean }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { email: null, verified: false };
+  }
+  const [row] = await db
+    .select({ email: people.email, verifiedAt: people.emailVerifiedAt })
+    .from(people)
+    .where(eq(people.id, session.personId))
+    .limit(1);
+  return { email: row?.email ?? null, verified: row?.verifiedAt != null };
+}
+
+export interface EmailChangeState {
+  step: "idle" | "code";
+  email?: string;
+  error?: string;
+  done?: boolean;
+}
+
+export async function requestEmailVerificationAction(
+  previous: EmailChangeState,
+  formData: FormData,
+): Promise<EmailChangeState> {
+  const session = await currentSession();
+  if (session === null) {
+    redirect("/login?next=/account");
+  }
+  const raw = formString(formData, "email");
+  const result = await requestEmailVerification(db, { personId: session.personId, email: raw });
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      "invalid-email":
+        raw.trim() === "" ? "Enter an email address." : "That doesn't look like an email address.",
+      "same-email": "That address is already confirmed on this account.",
+      "hourly-limit": "Too many confirmation emails. Try again in an hour.",
+    };
+    return { step: previous.step, error: message[result.reason] };
+  }
+  try {
+    await createCodeMailer(db).send(result.email, result.code);
+  } catch (error) {
+    if (error instanceof MailSendError) {
+      // The code is already minted and will simply go unused. Saying so beats a
+      // crash screen, and beats a code step for a message that never arrived.
+      return { step: "idle", error: "We couldn't send that email right now. Try again shortly." };
+    }
+    throw error;
+  }
+  return { step: "code", email: result.email };
+}
+
+export async function confirmEmailVerificationAction(
+  previous: EmailChangeState,
+  formData: FormData,
+): Promise<EmailChangeState> {
+  const session = await currentSession();
+  if (session === null) {
+    redirect("/login?next=/account");
+  }
+  const result: EmailVerificationResult = await confirmEmailVerification(db, {
+    personId: session.personId,
+    code: formString(formData, "code"),
+  });
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      invalid:
+        result.attemptsLeft === undefined
+          ? "That code didn't match. Request a new one."
+          : `That code didn't match. ${String(result.attemptsLeft)} attempts left.`,
+      expired: "That code has expired. Request a new one.",
+      locked: "Too many attempts. Request a new code.",
+      // Named plainly: the person holds the mailbox, so they have learned a
+      // fact about an address they control.
+      taken: "That address is already confirmed on another account.",
+    };
+    return { step: "code", email: previous.email ?? "", error: message[result.reason] };
+  }
+  await logSecurityEvent(session.personId, "profile.email.verified");
+  revalidatePath("/account");
+  return { step: "idle", done: true, email: result.email };
 }

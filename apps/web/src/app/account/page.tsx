@@ -2,9 +2,15 @@ import { Card, PageIntro, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { accountSecurity, currentSession, logoutAction } from "../../server/auth/actions";
+import {
+  accountEmail,
+  accountSecurity,
+  currentSession,
+  logoutAction,
+} from "../../server/auth/actions";
 import { notificationSettings } from "../../server/messaging/actions";
 import { NotificationSwitches } from "./notification-switches";
+import { EmailVerify } from "./email-verify";
 import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
 import { SignOutButton } from "./sign-out-button";
@@ -20,6 +26,7 @@ export default async function AccountPage() {
   }
   const security = await accountSecurity();
   const settings = await notificationSettings();
+  const email = await accountEmail();
   return (
     <ToastProvider>
       <main className="account">
@@ -43,6 +50,11 @@ export default async function AccountPage() {
             passkeyCount={security?.passkeys.length ?? 0}
             signOut={<SignOutButton logout={logoutAction} />}
           />
+          {/* Beside the identity it belongs to, and above Security: this is a
+              contact route the product will actually use, not a credential. */}
+          <Card>
+            <EmailVerify current={email.email} verified={email.verified} />
+          </Card>
           {security !== null ? <SecurityPanels security={security} /> : null}
 
           {/*
