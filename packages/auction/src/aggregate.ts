@@ -632,8 +632,18 @@ export async function transitionLot(
         .set({ teamId: null })
         .where(eq(registrations.id, lot.registrationId));
     }
-    if (command === "requeue" && leading !== null) {
-      // Frozen-lot override: prior leading money is voided-but-visible.
+    if ((command === "requeue" || command === "withdraw") && leading !== null) {
+      /*
+       * Frozen-lot override: prior leading money is voided-but-visible.
+       *
+       * `withdraw` joins `requeue` here because a frozen lot can now be
+       * withdrawn — the exit that keeps a mistaken bid from deadlocking the
+       * whole auction (see LOT_EDGES.frozen). A withdrawn lot with a bid still
+       * marked `accepted` would leave the ledger asserting live money against a
+       * lot that no longer exists, which is the same untidiness requeue has
+       * always cleaned up. Withdrawal from prepared or queued cannot reach this
+       * branch: those states have no bids.
+       */
       const bidDecision = bidTransition("accepted", "invalidate");
       if (bidDecision.ok) {
         await tx.update(bids).set({ status: bidDecision.next }).where(eq(bids.id, leading.id));
@@ -644,7 +654,9 @@ export async function transitionLot(
           correlationId,
           atMs,
           "BidInvalidated",
-          { lotId: lot.id, bidId: leading.id, reason: "requeue" },
+          // The command that voided it, not a constant — "requeue" on a
+          // withdrawal would misreport why the money stopped counting.
+          { lotId: lot.id, bidId: leading.id, reason: command },
           leading.id,
           reason,
         );

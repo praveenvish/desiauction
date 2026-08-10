@@ -190,6 +190,38 @@ describe("lot lifecycle machine", () => {
     expect(lotTransition("on_block", "hold")).toEqual({ ok: true, next: "frozen" });
   });
 
+  it("a frozen lot holding a MISTAKEN bid is not trapped into selling", () => {
+    /*
+     * The deadlock this edge exists for, and it was reachable in ordinary use.
+     *
+     * A lot is frozen because there is money on it that must not resolve
+     * automatically. In a `{ mode: "final" }` auction — supported, not exotic —
+     * a frozen lot with a leading bid had exactly one legal move: SELL, at the
+     * very price the conductor froze it to avoid. `pass` was refused for having
+     * money on it and `requeue` did not exist. And because `unresolvedLots`
+     * counts frozen lots, `complete` was refused too: the night could not end
+     * without making the sale.
+     */
+    const trapped = { hasLeadingBid: true, requeueAllowed: false };
+    expect(lotTransition("frozen", "pass", trapped)).toEqual({
+      ok: false,
+      reason: "guard_failed",
+    });
+    expect(lotTransition("frozen", "requeue", trapped)).toEqual({
+      ok: false,
+      reason: "guard_failed",
+    });
+    // The way out. Terminal, and NOT counted unresolved, so the auction closes.
+    expect(lotTransition("frozen", "withdraw", trapped)).toEqual({
+      ok: true,
+      next: "withdrawn",
+    });
+    expect(lotTransition("withdrawn", "requeue", trapped)).toEqual({
+      ok: false,
+      reason: "illegal_transition",
+    });
+  });
+
   it("frozen exits to sold / unsold / requeue under the same guards", () => {
     expect(lotTransition("frozen", "sell", LED)).toEqual({ ok: true, next: "sold" });
     expect(lotTransition("frozen", "pass", UNLED)).toEqual({ ok: true, next: "unsold" });

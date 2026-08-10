@@ -44,6 +44,7 @@ import {
 } from "../competition/competitions";
 import { createOrg } from "../orgs/orgs";
 import {
+  auctionReadiness,
   createAuction,
   issuePaddle,
   loadEvents,
@@ -512,6 +513,66 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
       ok: true,
       status: "unsold",
     });
+  });
+
+  it("a frozen lot holding a MISTAKEN bid can be withdrawn, and its money is voided", async () => {
+    /*
+     * The deadlock, reproduced. A lot is frozen precisely because there is
+     * money on it that must not resolve automatically. Its exits were sell
+     * (needs a leading bid), pass (needs NO leading bid) and requeue (needs the
+     * unsold policy to allow another round). So a frozen lot carrying a bid the
+     * conductor does not want to honour, in an auction with its rounds spent —
+     * or configured `{ mode: "final" }`, which has no rounds at all — had ONE
+     * legal move: sell, at the very price it was frozen to avoid. And frozen
+     * lots count as unresolved, so `complete` was refused too: the night could
+     * not end without making the sale.
+     */
+    // The lot arrives here `unsold` with one round spent, from the test above.
+    // Requeueing it spends the second and last, which is how the exhaustion is
+    // reached — by playing the policy out rather than by writing the counter.
+    const lot = await lotByPlayer(auction.id, "Sharma Local");
+    expect((await transitionLot(db, auction, lot.id, owner, "requeue")).ok).toBe(true);
+    expect((await lotByPlayer(auction.id, "Sharma Local")).roundsUsed).toBe(2);
+    expect((await transitionLot(db, auction, lot.id, owner, "open")).ok).toBe(true);
+    const bid = await placeBid(db, auction, owner, {
+      lotId: lot.id,
+      paddleId: paddleIds[0] as string,
+      amountRaw: 5_000_000, // the base — a first bid needs no leader
+      bidderAuthorized: true,
+    });
+    expect(bid.ok).toBe(true);
+    expect(await transitionLot(db, auction, lot.id, owner, "hold")).toEqual({
+      ok: true,
+      status: "frozen",
+    });
+    // Both other exits are shut.
+    expect(await transitionLot(db, auction, lot.id, owner, "pass")).toEqual({
+      ok: false,
+      reason: "guard_failed",
+    });
+    expect(await transitionLot(db, auction, lot.id, owner, "requeue")).toEqual({
+      ok: false,
+      reason: "guard_failed",
+    });
+
+    expect(await transitionLot(db, auction, lot.id, owner, "withdraw")).toEqual({
+      ok: true,
+      status: "withdrawn",
+    });
+    /*
+     * The money goes with it. A withdrawn lot whose bid still read `accepted`
+     * would leave the ledger asserting live money against a lot that no longer
+     * exists — the same untidiness `requeue` has always cleaned up, which is
+     * why withdrawal now shares that branch.
+     */
+    const [voided] = await db
+      .select({ status: bidsTable.status })
+      .from(bidsTable)
+      .where(eq(bidsTable.id, bid.ok ? bid.bidId : ""));
+    expect(voided?.status, "voided-but-visible, never deleted").toBe("invalidated");
+    // And the lot no longer blocks the night.
+    const readiness = await auctionReadiness(db, auction.id, auction);
+    expect(readiness.unresolvedLots).toBe(0);
   });
 
   it("withdraw is legal only pre-block; close is guard-blocked until all resolve", async () => {

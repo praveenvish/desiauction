@@ -163,14 +163,35 @@ export type LotCommand =
   | "sell" // → sold (guard: leading bid exists — purchase durability is IP-6)
   | "pass" // → unsold (guard: NO leading bid)
   | "requeue" // unsold | frozen → queued (guard: unsold policy allows)
-  | "withdraw"; // prepared | queued → withdrawn
+  | "withdraw"; // prepared | queued | frozen → withdrawn
 
 const LOT_EDGES: Record<LotStatus, ReadonlySet<LotCommand>> = {
   prepared: new Set(["queue", "withdraw"]),
   queued: new Set(["open", "withdraw"]),
   on_block: new Set(["closing", "hold", "sell", "pass"]),
   closing_soon: new Set(["extend", "hold", "sell", "pass"]),
-  frozen: new Set(["sell", "pass", "requeue"]),
+  /*
+   * `withdraw` is here because without it a frozen lot could DEADLOCK an entire
+   * auction, and the deadlock was reachable in ordinary use.
+   *
+   * A lot is frozen precisely because there is money on it that must not be
+   * resolved automatically — invariant 17, human resolution. Its three exits
+   * were sell (needs a leading bid), pass (needs NO leading bid) and requeue
+   * (needs `unsoldPolicy.mode === "requeue"` with rounds left). So for a frozen
+   * lot holding a MISTAKEN bid in an auction configured `{ mode: "final" }` —
+   * a supported configuration, not an exotic one — pass was refused for having
+   * money on it, requeue did not exist, and the only legal move was to SELL at
+   * the very price the conductor froze the lot to avoid. `unresolvedLots`
+   * counts frozen, so `complete` was refused too: the night could not end
+   * without making the sale.
+   *
+   * Withdrawing is the honest exit and needs no new event, no new state and no
+   * back edge. `LotWithdrawn` already exists and its replay accepts a lot in
+   * any status; `withdrawn` is terminal and is NOT counted unresolved, so the
+   * auction can close. The aggregate voids the leading bid on the way out, the
+   * same way `requeue` always has.
+   */
+  frozen: new Set(["sell", "pass", "requeue", "withdraw"]),
   unsold: new Set(["requeue"]),
   // Sold is terminal: undo is a COMPENSATING event (lot.reopened, doc 41),
   // never a backward edge — history stays intact (C-9). Arrives post-M-IP4-1.

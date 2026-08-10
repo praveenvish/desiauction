@@ -623,6 +623,20 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   just undone. Requeue it and it goes back to the top of the queue for you to open
                   deliberately.
                 </p>
+                {/* The second way out, and until now there was no first one for
+                    half these lots. Requeue is refused when the auction's unsold
+                    policy is "final", or when the lot has used its rounds — and
+                    Requeue was the only button here. A frozen lot with a
+                    mistaken bid on it could then be neither passed (it has
+                    money on it) nor requeued, and a frozen lot blocks completing
+                    the auction, so the night could not end without making the
+                    sale the conductor froze the lot to avoid. */}
+                <p className="competitions-hint" data-testid="frozen-lot-withdraw-hint">
+                  If Requeue is refused — this auction is set to one round, or the lot has used them
+                  — <strong>Withdraw</strong> takes the player out of the auction for good and voids
+                  any bid standing on the lot. It cannot be undone, and it is the only way to close
+                  an auction that has a frozen lot on it.
+                </p>
                 <ol className="cockpit-queue">
                   {view.view.lots
                     .filter((entry) => entry.status === "frozen" || entry.status === "unsold")
@@ -649,6 +663,25 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                           >
                             Requeue
                           </Button>
+                          {entry.status === "frozen" ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                void send(
+                                  `withdraw-${entry.id}`,
+                                  "WithdrawLot",
+                                  { lotId: entry.id },
+                                  `${entry.lotNumber} withdrawn`,
+                                )
+                              }
+                              loading={pending === `withdraw-${entry.id}`}
+                              disabled={stale}
+                              data-testid={`withdraw-frozen-${entry.lotNumber}`}
+                            >
+                              Withdraw
+                            </Button>
+                          ) : null}
                         </span>
                       </li>
                     ))}
