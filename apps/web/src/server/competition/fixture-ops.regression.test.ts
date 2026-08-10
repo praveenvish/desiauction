@@ -24,7 +24,7 @@ import {
   venues as venuesTable,
   type DbHandle,
 } from "@desiauction/db";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
@@ -54,7 +54,9 @@ import {
   fixtureStats,
   fixtureTimeline,
   matchDay,
+  publishedSchedule,
   queryFixtures,
+  PUBLIC_SCHEDULE_LIMIT,
   upcomingFixtures,
 } from "./fixtures";
 import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
@@ -544,6 +546,32 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
     expect(groups.length).toBeGreaterThan(0);
     const upcoming = await upcomingFixtures(db, comp.id, `${firstDate}T00:00`);
     expect(upcoming.every((f) => f.status !== "cancelled" && f.status !== "completed")).toBe(true);
+  });
+
+  it("the published schedule reports its TOTAL, not just the page it returns", async () => {
+    /*
+     * The bug: the public competition page asked for page 1 at a page size of
+     * 100 and discarded the total. A season with more than 100 published
+     * fixtures rendered 100 of them under a heading reading "Published
+     * schedule", and nothing on the page admitted the rest existed — a
+     * spectator looking for a late-season match concluded it was unscheduled.
+     *
+     * The count must therefore be the count of ALL published fixtures, never
+     * the length of the returned page, which is what makes it possible for the
+     * page to say "showing the first N of M".
+     */
+    const published = await publishedSchedule(db, comp.id);
+    const [{ count }] = (await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(fixturesTable)
+      .where(
+        and(eq(fixturesTable.competitionId, comp.id), eq(fixturesTable.status, "published")),
+      )) as [{ count: number }];
+    expect(published.total, "the total counts every published fixture").toBe(count);
+    expect(published.rows.length).toBeLessThanOrEqual(PUBLIC_SCHEDULE_LIMIT);
+    expect(published.rows.every((row) => row.status === "published")).toBe(true);
+    const kickoffs = published.rows.map((row) => row.kickoffAt ?? "");
+    expect(kickoffs, "kickoff order, as a schedule is read").toEqual([...kickoffs].sort());
   });
 
   it("CSV IMPORT VALIDATION: an unknown team refuses the WHOLE file (no partial writes)", async () => {

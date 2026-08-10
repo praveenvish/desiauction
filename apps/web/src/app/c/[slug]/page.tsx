@@ -243,6 +243,16 @@ export default async function PublicCompetitionPage({
                 </li>
               ))}
             </ul>
+            {/* Said only when it is true, and said plainly. A list that stops
+                short under a heading reading "Published schedule" tells a
+                spectator their match is not scheduled, which is worse than
+                telling them the page is showing part of a long one. */}
+            {view.fixtureTotal > view.fixtures.length ? (
+              <p className="public-hint" data-testid="public-schedule-truncated">
+                Showing the first {view.fixtures.length} of {view.fixtureTotal} fixtures. Ask{" "}
+                {view.orgName} for the full schedule.
+              </p>
+            ) : null}
           </section>
         ) : null}
 

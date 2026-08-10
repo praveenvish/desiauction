@@ -12,7 +12,7 @@ import { and, asc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { storage } from "../media";
 import { systemDb } from "../db";
 import { teamsOf, type TeamSummary } from "./competitions";
-import { queryFixtures, type FixtureSnapshot } from "./fixtures";
+import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
 
 // PX-5 public reads (PX-1 02 §I thin-wiring class): anonymous, system-pool
 // composites over EXISTING queries. Public exposure is governed by the
@@ -70,6 +70,8 @@ export interface PublicCompetitionView {
   auctionStatus: string | null;
   teams: TeamSummary[];
   fixtures: PublicFixture[];
+  /** Every published fixture, including any beyond the rendered bound. */
+  fixtureTotal: number;
 }
 
 function toPublicFixture(row: FixtureSnapshot): PublicFixture {
@@ -117,12 +119,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       .where(eq(auctions.competitionId, row.id))
       .limit(1),
     teamsOf(systemDb, row.id),
-    queryFixtures(systemDb, row.id, {
-      status: "published",
-      sort: "kickoff",
-      page: 1,
-      pageSize: 100,
-    }),
+    publishedSchedule(systemDb, row.id),
   ]);
   return {
     name: row.name,
@@ -141,6 +138,9 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     auctionStatus: auctionRows[0]?.status ?? null,
     teams,
     fixtures: fixtures.rows.map(toPublicFixture),
+    // Carried so the page can say "showing 500 of 640" rather than presenting a
+    // truncated list under a heading that claims to be the whole schedule.
+    fixtureTotal: fixtures.total,
   };
 }
 

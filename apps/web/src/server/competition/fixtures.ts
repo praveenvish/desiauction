@@ -443,6 +443,39 @@ export async function organizerSchedule(
  * Every fixture snapshot of a competition in seq order — the ScheduleSnapshot's
  * fixture list (see schedule-snapshot.ts, the canonical downstream read model).
  */
+/**
+ * The published schedule as the PUBLIC sees it, with an honest total.
+ *
+ * The public competition page used to ask `queryFixtures` for page 1 at a page
+ * size of 100 and throw the total away. A season with 300 published fixtures
+ * therefore showed 100 of them under a heading that said "Published schedule",
+ * and the other 200 were invisible with nothing on the page admitting it —
+ * spectators looking for a match in the back half of a league found no match
+ * and concluded it was not scheduled.
+ *
+ * The bound stays, because this is an uncached public endpoint and an unbounded
+ * scan is a denial-of-service invitation. What changes is that the bound is
+ * high enough to hold a real season whole, and that the caller is told the
+ * count so a truncated page can say so instead of lying by omission.
+ */
+export const PUBLIC_SCHEDULE_LIMIT = 500;
+
+export async function publishedSchedule(
+  db: Db,
+  competitionId: string,
+): Promise<{ rows: FixtureSnapshot[]; total: number }> {
+  const where = and(eq(fixtures.competitionId, competitionId), eq(fixtures.status, "published"));
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(fixtures)
+    .where(where);
+  const rows = await snapshotQuery(db)
+    .where(where)
+    .orderBy(...SORTS["kickoff"])
+    .limit(PUBLIC_SCHEDULE_LIMIT);
+  return { rows: rows.map(toSnapshot), total: countRow?.count ?? 0 };
+}
+
 export async function competitionFixtureSnapshots(
   db: Db,
   competitionId: string,
