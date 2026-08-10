@@ -49,6 +49,24 @@ export function maskPhone(phone: string): string {
 }
 
 /**
+ * A suppressed contact, masked. Either a phone number or an email address —
+ * the suppression list is keyed by the CONTACT and holds both.
+ *
+ * The domain survives on an email because it is the operationally useful part:
+ * a run of bounces all landing on one domain is the shape of a blocklisting,
+ * and masking it away would hide the only pattern worth spotting. The local
+ * part is the person, and goes.
+ */
+export function maskContact(contact: string): string {
+  const at = contact.indexOf("@");
+  if (at <= 0) {
+    return maskPhone(contact);
+  }
+  const local = contact.slice(0, at);
+  return `${local.slice(0, 1)}•••${contact.slice(at)}`;
+}
+
+/**
  * Lifecycle states, in words.
  *
  * Capability SETS are rendered verbatim on purpose — `org:owner` and

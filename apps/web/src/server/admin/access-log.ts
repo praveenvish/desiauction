@@ -53,11 +53,18 @@ import { ADMIN_ACCESS_ACTION, PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "./c
 
 /**
  * The surfaces an admin can open, as a CLOSED set. A free-form string would
- * make this a general-purpose logger; naming the seven routes keeps it a record
+ * make this a general-purpose logger; naming the eight routes keeps it a record
  * of administration and nothing else.
  */
 export type AdminSurface =
-  "overview" | "organizations" | "organization" | "users" | "user" | "audit" | "health";
+  | "overview"
+  | "organizations"
+  | "organization"
+  | "users"
+  | "user"
+  | "audit"
+  | "health"
+  | "messaging";
 
 /**
  * Record that an administrator opened a surface.

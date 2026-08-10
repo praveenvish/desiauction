@@ -9,6 +9,7 @@ import {
   orgMembers,
   people,
   settlementCases,
+  suppressions,
   type Db,
 } from "@desiauction/db";
 import {
@@ -31,6 +32,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNull,
   lt,
   lte,
   notInArray,
@@ -39,6 +41,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 
+import { SMS_TEMPLATES } from "../messaging/templates";
 import { ADMIN_ACCESS_ACTION } from "./capabilities";
 import { formatCount, waitedFor } from "./format";
 
@@ -1335,3 +1338,95 @@ export async function platformHealth(deps: FinopsDeps, db: Db): Promise<Platform
 // there deliberately rather than left half-built here. Until then the honest
 // state is: administration has no command search, and /admin/orgs?q= and
 // /admin/audit?q= are the search surfaces it does have.
+
+// --- Messaging (Phase 3) ---------------------------------------------------------------
+//
+// The gap this closes: a registered DLT template id lives in an ENVIRONMENT
+// VARIABLE, and a shape whose variable is unset refuses to send. That refusal
+// is correct — sending against somebody else's registration is worse than not
+// sending — but until now it was invisible. Nobody could answer "can this
+// deployment actually text people?" without reading a process's environment.
+//
+// Read only, like everything else here. Administration does not edit template
+// TEXT (that would break DLT matching, and the platform carries the regulatory
+// risk), and it offers no button to lift a suppression: a person texting START
+// lifts their own, and the day support genuinely needs to lift somebody else's
+// is the day that conversation happens at review rather than in production.
+
+export interface TemplateStatusRow {
+  readonly key: string;
+  readonly channel: string;
+  readonly category: string;
+  readonly locale: string;
+  /** The env var carrying this shape's registered DLT id. */
+  readonly variable: string;
+  /** Whether that variable is set. The VALUE is never read out — it is a
+   *  provider identifier, and administration has no reason to display it. */
+  readonly configured: boolean;
+  /** The registered text, slots and all, so the sentence is auditable here. */
+  readonly body: string;
+}
+
+export interface SuppressionRow {
+  readonly contact: string;
+  readonly channel: string;
+  readonly scope: string;
+  readonly reason: string;
+  readonly createdAt: Date;
+}
+
+export interface MessagingOverview {
+  readonly templates: readonly TemplateStatusRow[];
+  readonly configured: number;
+  readonly total: number;
+  /** Live suppressions by reason — a rising bounce count is a domain in trouble. */
+  readonly byReason: readonly { reason: string; channel: string; count: number }[];
+  readonly liveSuppressions: number;
+  readonly recent: readonly SuppressionRow[];
+}
+
+export async function messagingOverview(
+  db: Db,
+  env: Readonly<Record<string, string | undefined>>,
+): Promise<MessagingOverview> {
+  const templates: TemplateStatusRow[] = Object.values(SMS_TEMPLATES).map((template) => ({
+    key: template.key,
+    channel: template.channel,
+    category: template.category,
+    locale: template.locale,
+    variable: template.providerTemplateEnv,
+    configured: (env[template.providerTemplateEnv] ?? "") !== "",
+    body: template.body,
+  }));
+  const [byReason, recent] = await Promise.all([
+    db
+      .select({
+        reason: suppressions.reason,
+        channel: suppressions.channel,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(suppressions)
+      .where(isNull(suppressions.liftedAt))
+      .groupBy(suppressions.reason, suppressions.channel),
+    db
+      .select({
+        contact: suppressions.contact,
+        channel: suppressions.channel,
+        scope: suppressions.scope,
+        reason: suppressions.reason,
+        createdAt: suppressions.createdAt,
+      })
+      .from(suppressions)
+      .where(isNull(suppressions.liftedAt))
+      .orderBy(desc(suppressions.createdAt))
+      .limit(25),
+  ]);
+  return {
+    templates,
+    configured: templates.filter((row) => row.configured).length,
+    total: templates.length,
+    byReason: [...byReason].sort((a, b) => b.count - a.count),
+    liveSuppressions: byReason.reduce((sum, row) => sum + row.count, 0),
+    recent,
+  };
+}

@@ -2,11 +2,13 @@
 
 import type { OutcomeMetrics } from "@desiauction/core";
 
+import { env } from "../../env";
 import { systemDb } from "../db";
 import { webFinopsDeps } from "../financial-operations/deps";
 import { platformAdminGate } from "./authz";
 import {
   auditExplorer,
+  messagingOverview,
   organizationDetail,
   organizationDirectory,
   organizationExists,
@@ -18,6 +20,7 @@ import {
   userDirectory,
   type AuditFilters,
   type AuditPage,
+  type MessagingOverview,
   type OrgDetail,
   type OrgDirectory,
   type OrgFilter,
@@ -128,6 +131,26 @@ export async function adminHealth(): Promise<PlatformHealth | null> {
     return null;
   }
   return platformHealth(deps(), systemDb);
+}
+
+/**
+ * Messaging configuration and the live suppression list.
+ *
+ * The environment is read HERE, not inside the projection, so the projection
+ * stays pure and the read-only proof can drive it with an empty one. It reads
+ * the PARSED env rather than `process.env`, which §11 confines to `env.ts` —
+ * the widening cast is safe because every field on it is a string, a string
+ * array or undefined, and the projection only ever asks "is this name set?".
+ *
+ * The question it answers had no answer before: a template's registered DLT id
+ * lives in a variable, a shape without one refuses to send, and "can this
+ * deployment text anyone?" was decidable only by inspecting a running process.
+ */
+export async function adminMessaging(): Promise<MessagingOverview | null> {
+  if ((await platformAdminGate()) === null) {
+    return null;
+  }
+  return messagingOverview(systemDb, env as unknown as Record<string, string | undefined>);
 }
 
 /** Nav-only: whether to render the Platform admin door in the avatar menu. */

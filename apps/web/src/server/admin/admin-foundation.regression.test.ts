@@ -54,6 +54,7 @@ import {
   organizationDirectory,
   organizationExists,
   personExists,
+  messagingOverview,
   platformHealth,
   platformOverview,
   runnerVerdictOf,
@@ -338,6 +339,15 @@ describe("PX-9 · The read-only guarantee, proved at runtime", () => {
 
     const health = await platformHealth(deps, ro);
     expect(Array.isArray(health.orgs)).toBe(true);
+
+    const messaging = await messagingOverview(ro, {});
+    // Driven with an EMPTY environment on purpose: the honest reading of a
+    // deployment with no registered ids is "nothing can be sent", and a
+    // projection that quietly reported them configured would hide the one
+    // failure this surface exists to make visible.
+    expect(messaging.total).toBeGreaterThan(0);
+    expect(messaging.configured).toBe(0);
+    expect(Array.isArray(messaging.recent)).toBe(true);
   }, 120_000);
 
   it("the proof harness itself has teeth — a write through it throws", () => {

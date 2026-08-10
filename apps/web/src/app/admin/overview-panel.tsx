@@ -140,6 +140,13 @@ export function OverviewPanel({
             </div>
             <Link href="/admin/health" className="admin-meta">
               Platform health →
+            </Link>{" "}
+            {/* The door this console lacked. Whether the deployment holds the
+                registered DLT ids it needs is a health fact like any other —
+                without an id a message shape does not send at all — and it was
+                answerable only by reading a running process's environment. */}
+            <Link href="/admin/messaging" className="admin-meta" data-testid="admin-messaging-link">
+              Messaging →
             </Link>
           </div>
         </Card>
