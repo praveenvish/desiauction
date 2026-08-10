@@ -19,6 +19,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { auctionOf } from "@desiauction/auction";
+import { recordConsent } from "../messaging/consent";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
@@ -856,6 +857,18 @@ export async function submitRegistrationAction(
   if (competition === null) {
     return { error: "This competition is not available." };
   }
+  /*
+   * Consent is checked HERE, not only in the browser.
+   *
+   * The register flow gates its own Submit button, and a client gate is a
+   * courtesy: it stops an honest mistake and nothing else. Approving this
+   * registration publishes the person's name, role, age and photo on a page
+   * anyone with the link can read, so the agreement to that has to be a fact
+   * the server established, not one it was told about.
+   */
+  if (formString(formData, "publicationConsent") !== "true") {
+    return { error: "Please confirm you understand what becomes public before you register." };
+  }
   const role = formString(formData, "role");
   const profile = {
     dateOfBirth: formString(formData, "dateOfBirth"),
@@ -887,6 +900,50 @@ export async function submitRegistrationAction(
             ? "You've already registered for this competition — check your status."
             : "Choose a valid playing role.",
     };
+  }
+  /*
+   * Record what they agreed to, after the registration commits.
+   *
+   * Two rows, because they are two different agreements and conflating them
+   * would make either one unanswerable later:
+   *
+   *   publication      — the checkbox they ticked, stored with the sentence
+   *                      they actually read rather than a version number, so
+   *                      the record survives this copy being rewritten.
+   *   sms.transactional — they gave a mobile number in order to be told what
+   *                      happens to this registration. That is the agreement,
+   *                      and it is recorded rather than assumed.
+   *
+   * After the write, never before: a consent record for a registration that
+   * failed is a claim about something that did not happen. And never fatal —
+   * the registration has committed, and losing the evidence must not lose the
+   * registration. It is logged as a gap instead.
+   */
+  try {
+    const consentText = formString(formData, "publicationConsentText");
+    await recordConsent(systemDb, {
+      personId: session.personId,
+      purpose: "publication",
+      granted: true,
+      source: "registration",
+      evidence: {
+        competition: slug,
+        wording: consentText === "" ? null : consentText,
+      },
+    });
+    await recordConsent(systemDb, {
+      personId: session.personId,
+      purpose: "sms.transactional",
+      granted: true,
+      source: "registration",
+      evidence: {
+        competition: slug,
+        basis: "gave a mobile number to be told the outcome of this registration",
+      },
+    });
+  } catch {
+    // Evidence must never be the thing that fails a registration that has
+    // already committed — the same rule the decision notices follow.
   }
   return { done: true };
 }

@@ -30,6 +30,17 @@ type Step = "profile" | "role" | "review";
 const draftKey = (slug: string) => `da:reg-draft:${slug}`;
 
 /**
+ * The exact words beside the checkbox, in one place, because they are both
+ * rendered here AND stored verbatim on the consent record.
+ *
+ * Storing the sentence rather than a version number is deliberate: this file
+ * will be edited, and a record saying "agreed to publication v3" is worthless
+ * once v3 is gone. What a person agreed to has to survive the copy changing.
+ */
+const PUBLICATION_CONSENT_LABEL =
+  "I understand that my name, playing role and the other details above will be published on public pages anyone with the link can read, and that my mobile number will not.";
+
+/**
  * DA-35: the draft persisted ONE of the four answers step 2 collects. Date of
  * birth and both playing styles were dropped on any refresh — and because the
  * review omits blank rows by design, the loss was presented as a completed
@@ -169,6 +180,19 @@ export function RegisterFlow({
       if (source !== "") {
         formData.set("source", source);
       }
+      /*
+       * The consent travels to the server, for two reasons.
+       *
+       * It has to be ENFORCED there: the check above is a client gate, and a
+       * client gate is a courtesy. And it has to be RECORDED there, with the
+       * wording actually shown, because "what did they agree to?" is a question
+       * about a past moment and today's copy is not evidence of it.
+       *
+       * The label is sent verbatim rather than as a version number so the
+       * record survives this file being edited — which it will be.
+       */
+      formData.set("publicationConsent", "true");
+      formData.set("publicationConsentText", PUBLICATION_CONSENT_LABEL);
       const result = await submitRegistrationAction(slug, {}, formData);
       if (result.done === true) {
         window.localStorage.removeItem(draftKey(slug));
@@ -463,10 +487,7 @@ export function RegisterFlow({
                 }
               }}
             />
-            <span>
-              I understand that my name, playing role and the other details above will be published
-              on public pages anyone with the link can read, and that my mobile number will not.
-            </span>
+            <span>{PUBLICATION_CONSENT_LABEL}</span>
           </label>
           {error !== null ? (
             <p role="alert" className="register-error">
