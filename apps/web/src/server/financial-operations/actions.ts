@@ -12,6 +12,7 @@ import {
   cancelDispatch,
   confirmDispatchManually,
   declareProfile,
+  issuanceSnapshot,
   issueCorrection,
   issueInvoice,
   issueReceipt,
@@ -490,6 +491,12 @@ export interface DocumentWorkspace {
   readonly org: OrgSummary;
   readonly detail: DocumentDetailView;
   readonly viewer: FinopsViewer;
+  /**
+   * Open CORRECTION series, carried so the page can offer the one command that
+   * repairs a wrong document — and can say plainly when it cannot, because
+   * there is no correction series open, rather than showing a dead button.
+   */
+  readonly correctionSeries: readonly { readonly id: string; readonly label: string }[];
 }
 
 export async function documentWorkspace(
@@ -501,11 +508,23 @@ export async function documentWorkspace(
     return null;
   }
   return withTenantDb(dbHandle, { personId: gate.personId, orgId: gate.org.id }, async (db) => {
-    const detail = await documentDetailView(webFinopsDeps(db), db, gate.org.id, docId);
+    const deps = webFinopsDeps(db);
+    const [detail, issuance] = await Promise.all([
+      documentDetailView(deps, db, gate.org.id, docId),
+      issuanceSnapshot(deps, gate.org.id),
+    ]);
     if (detail === null) {
       return null;
     }
-    return { org: gate.org, detail, viewer: gate.viewer } satisfies DocumentWorkspace;
+    const correctionSeries = issuance.series
+      .filter((series) => series.kind === "correction" && series.status === "open")
+      .map((series) => ({ id: series.seriesId, label: `${series.prefix} ${series.fy}` }));
+    return {
+      org: gate.org,
+      detail,
+      viewer: gate.viewer,
+      correctionSeries,
+    } satisfies DocumentWorkspace;
   });
 }
 

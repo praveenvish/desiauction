@@ -19,6 +19,7 @@ import {
   type DocumentWorkspace,
   type FinopsResult,
 } from "../../../../../../server/financial-operations/actions";
+import { CorrectionForm } from "./correction-form";
 import { DOC_KIND_LABEL } from "../../../../../../server/financial-operations/register";
 import { DELIVERY_LANE_LABEL } from "../../../../../../server/financial-operations/deliveries";
 import "../../../../../seasons/[slug]/money/money.css";
@@ -196,6 +197,16 @@ export function DocumentPanel({ slug, workspace }: { slug: string; workspace: Do
           })}
         </dl>
       </Card>
+
+      {/* --- Corrections -------------------------------------------------------- */}
+      <CorrectionForm
+        slug={slug}
+        docId={document.docId}
+        sourceRef={settlement.sourceRef}
+        series={workspace.correctionSeries}
+        canDocument={viewer.canDocument}
+        isCorrection={document.kind === "correction"}
+      />
 
       {/* --- Delivery history + retry ------------------------------------------ */}
       <Card>
