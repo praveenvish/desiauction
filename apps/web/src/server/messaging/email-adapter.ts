@@ -127,6 +127,92 @@ export class EmailBreaker {
  */
 export type EmailResolver = (recipientRef: string) => Promise<string | null>;
 
+/**
+ * Which provider events mean what.
+ *
+ * `delivered` is the only one that confirms. Everything else is a failure, and
+ * the two that matter most are `bounce` and `complaint`: continuing to send to
+ * a hard bounce is how a sending domain dies, and a complaint is somebody
+ * telling their mail provider we are spam. Both must reach the suppression
+ * list, which the route does — the parser's job is only to classify.
+ */
+const DELIVERED_EVENTS = new Set(["delivered", "delivery", "email.delivered"]);
+const FAILED_EVENTS = new Set([
+  "bounce",
+  "bounced",
+  "hard_bounce",
+  "complaint",
+  "complained",
+  "spam",
+  "dropped",
+  "failed",
+  "email.bounced",
+  "email.complained",
+]);
+
+/** The events that mean "never send to this address again". */
+export const SUPPRESSING_EVENTS = new Set([
+  "bounce",
+  "bounced",
+  "hard_bounce",
+  "complaint",
+  "complained",
+  "spam",
+  "email.bounced",
+  "email.complained",
+]);
+
+export interface ParsedCallback {
+  readonly event: string;
+  readonly dispatchId: string;
+  readonly providerEventRef: string;
+  readonly recipient: string | null;
+}
+
+/**
+ * Parse a provider's delivery report without committing to one vendor.
+ *
+ * `dispatchId` comes back through the providerRef we set on send
+ * (`email:<dispatchId>`); every provider on the table can echo a tag, a custom
+ * header or a message id. The event ref is the provider's own id, and it is
+ * what makes replay idempotent — the platform keys the command on
+ * `provider:{providerEventRef}`, so a provider retrying a webhook cannot
+ * double-confirm.
+ */
+export function parseEmailCallback(raw: string): ParsedCallback | null {
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const read = (names: readonly string[]): string => {
+    for (const name of names) {
+      const value = payload[name];
+      if (typeof value === "string" && value.trim() !== "") {
+        return value;
+      }
+    }
+    return "";
+  };
+  const event = read(["event", "type", "eventType", "RecordType"]).toLowerCase();
+  const ref = read(["providerRef", "tag", "messageId", "message_id", "MessageID"]);
+  const eventRef = read(["eventId", "event_id", "id", "ID"]);
+  const dispatchId = ref.startsWith("email:") ? ref.slice("email:".length) : "";
+  if (event === "" || dispatchId === "") {
+    return null;
+  }
+  return {
+    event,
+    dispatchId,
+    // Fall back to the dispatch and event together rather than to a constant:
+    // an idempotency key that is the same for every event would make the second
+    // report about a message a no-op.
+    providerEventRef: eventRef === "" ? `${dispatchId}:${event}` : eventRef,
+    recipient: read(["recipient", "email", "to", "Recipient"]) || null,
+  };
+}
+
 export function createHttpEmailAdapter(
   config: EmailAdapterConfig,
   resolve: EmailResolver,
@@ -202,6 +288,42 @@ export function createHttpEmailAdapter(
         breaker.recordFailure();
         return { ok: false as const, code: "provider_unreachable", retryable: true };
       }
+    },
+    /**
+     * The other half of "acceptance is not delivery".
+     *
+     * `send` returns a providerRef and deliberately does not confirm. This is
+     * where the confirmation comes from, and the platform's own
+     * `ingestDeliveryCallback` does the rest — it is idempotent on
+     * `provider:{providerEventRef}`, refuses late or out-of-order transitions
+     * against the frozen state machine, and audits even the attempts it
+     * rejects. That ingress has existed, exported and tested, with no caller.
+     */
+    verifyCallback(raw: string) {
+      const parsed = parseEmailCallback(raw);
+      if (parsed === null) {
+        return { ok: false as const, reason: "unparseable" };
+      }
+      if (DELIVERED_EVENTS.has(parsed.event)) {
+        return {
+          ok: true as const,
+          dispatchId: parsed.dispatchId,
+          providerEventRef: parsed.providerEventRef,
+          kind: "delivered" as const,
+        };
+      }
+      if (FAILED_EVENTS.has(parsed.event)) {
+        return {
+          ok: true as const,
+          dispatchId: parsed.dispatchId,
+          providerEventRef: parsed.providerEventRef,
+          kind: "failed" as const,
+          code: parsed.event,
+        };
+      }
+      // Opens, clicks and the rest are not delivery truth. Refusing them keeps
+      // the dispatch's state machine about whether the message arrived.
+      return { ok: false as const, reason: `unhandled_event:${parsed.event}` };
     },
   };
 }

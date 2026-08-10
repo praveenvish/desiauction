@@ -70,6 +70,12 @@ const envSchema = z.object({
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
+  /**
+   * Shared secret on the provider delivery-report webhook. Unset closes the
+   * endpoint with a 404 — an open callback would let a stranger mark documents
+   * delivered, which is worse than never learning they were.
+   */
+  DELIVERY_CALLBACK_SECRET: z.string().min(16).optional(),
   // PX-5 SEO: absolute origin for canonical URLs, Open Graph and the sitemap.
   PUBLIC_BASE_URL: z.url().default("http://localhost:3000"),
   // PX-8: the finops artifact + outbox root (IP-6 §22 — everything injected).
