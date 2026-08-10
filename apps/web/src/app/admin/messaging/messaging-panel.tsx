@@ -86,6 +86,65 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
         </Card>
       </section>
 
+      <section aria-labelledby="admin-delivery">
+        <h2 className="admin-section-title" id="admin-delivery">
+          Delivery by message
+        </h2>
+        <Card>
+          <p className="admin-meta">
+            The last {String(overview.deliveryWindowDays)} days, counted from the audit rows the
+            sender writes — not from a separate counter that could drift from them.
+          </p>
+          {overview.delivery.length === 0 ? (
+            <EmptyState
+              title="Nothing sent yet"
+              description="Decision notices appear here once an organizer approves, waitlists or declines somebody."
+            />
+          ) : (
+            <div className="table-scroll">
+              <table className="reg-table" data-testid="admin-delivery-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Message</th>
+                    <th scope="col" className="admin-num">
+                      Sent
+                    </th>
+                    <th scope="col" className="admin-num">
+                      Failed
+                    </th>
+                    <th scope="col" className="admin-num">
+                      Suppressed
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.delivery.map((row) => (
+                    <tr key={row.template} className="reg-row">
+                      <td data-label="Message">
+                        <span className="registration-name">{row.template}</span>
+                      </td>
+                      <td data-label="Sent" className="admin-count admin-num">
+                        {String(row.sent)}
+                      </td>
+                      {/* Failed is a delivery problem. Suppressed is the gate
+                          working — somebody said stop, or a club switched the
+                          topic off. Folding them together would send an
+                          operator chasing an outage that is not happening. */}
+                      <td data-label="Failed" className="admin-count admin-num">
+                        {row.failed === 0 ? "0" : <strong>{String(row.failed)}</strong>}
+                      </td>
+                      <td data-label="Suppressed" className="admin-count admin-num">
+                        {String(row.suppressed)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </section>
+
       <section aria-labelledby="admin-suppressions">
         <h2 className="admin-section-title" id="admin-suppressions">
           Suppression list

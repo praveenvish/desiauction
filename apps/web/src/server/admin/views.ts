@@ -1375,6 +1375,29 @@ export interface SuppressionRow {
   readonly createdAt: Date;
 }
 
+/**
+ * Per-shape delivery over a window, counted from the audit rows the sender
+ * already writes.
+ *
+ * No new table and no new write path. `notifyDecision` records
+ * `registration.notified`, `registration.notify_failed` and
+ * `registration.notify_suppressed`, each naming its template — so the numbers
+ * are derived from the platform's own evidence rather than from a counter that
+ * could drift from it.
+ *
+ * Suppressed is reported BESIDE failed and never inside it. A suppressed
+ * message is the gate working: somebody said stop, or a club switched a topic
+ * off. Folding the two together would send an operator chasing a delivery
+ * problem that does not exist — which is the same mistake the organizer-facing
+ * counts were fixed for.
+ */
+export interface TemplateDeliveryRow {
+  readonly template: string;
+  readonly sent: number;
+  readonly failed: number;
+  readonly suppressed: number;
+}
+
 export interface MessagingOverview {
   readonly templates: readonly TemplateStatusRow[];
   readonly configured: number;
@@ -1383,6 +1406,8 @@ export interface MessagingOverview {
   readonly byReason: readonly { reason: string; channel: string; count: number }[];
   readonly liveSuppressions: number;
   readonly recent: readonly SuppressionRow[];
+  readonly delivery: readonly TemplateDeliveryRow[];
+  readonly deliveryWindowDays: number;
 }
 
 export async function messagingOverview(
@@ -1398,7 +1423,9 @@ export async function messagingOverview(
     configured: (env[template.providerTemplateEnv] ?? "") !== "",
     body: template.body,
   }));
-  const [byReason, recent] = await Promise.all([
+  const windowDays = 30;
+  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  const [byReason, recent, delivered] = await Promise.all([
     db
       .select({
         reason: suppressions.reason,
@@ -1420,7 +1447,46 @@ export async function messagingOverview(
       .where(isNull(suppressions.liftedAt))
       .orderBy(desc(suppressions.createdAt))
       .limit(25),
+    db
+      .select({
+        // `->>` and not `->`: the arrow operator returns a JSON string complete
+        // with its quotes, which would group "x" and x as different templates.
+        // Nullable on purpose: `->>` returns null for a row whose meta has no
+        // template key, and typing it as a plain string would make the fallback
+        // below unreachable while the value still arrives as null at runtime.
+        template: sql<string | null>`${auditLog.meta}->>'template'`,
+        action: auditLog.action,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(auditLog)
+      .where(
+        and(
+          inArray(auditLog.action, [
+            "registration.notified",
+            "registration.notify_failed",
+            "registration.notify_suppressed",
+          ]),
+          gte(auditLog.at, since),
+        ),
+      )
+      .groupBy(sql`${auditLog.meta}->>'template'`, auditLog.action),
   ]);
+  const byTemplate = new Map<string, { sent: number; failed: number; suppressed: number }>();
+  for (const row of delivered) {
+    // Rows written before the suppressed audit carried a template name have no
+    // key. They are counted under "(unrecorded)" rather than dropped: a silent
+    // omission would understate exactly the shape whose history is longest.
+    const key = row.template ?? "(unrecorded)";
+    const entry = byTemplate.get(key) ?? { sent: 0, failed: 0, suppressed: 0 };
+    if (row.action === "registration.notified") {
+      entry.sent += row.count;
+    } else if (row.action === "registration.notify_failed") {
+      entry.failed += row.count;
+    } else {
+      entry.suppressed += row.count;
+    }
+    byTemplate.set(key, entry);
+  }
   return {
     templates,
     configured: templates.filter((row) => row.configured).length,
@@ -1428,5 +1494,9 @@ export async function messagingOverview(
     byReason: [...byReason].sort((a, b) => b.count - a.count),
     liveSuppressions: byReason.reduce((sum, row) => sum + row.count, 0),
     recent,
+    delivery: [...byTemplate.entries()]
+      .map(([template, counts]) => ({ template, ...counts }))
+      .sort((a, b) => b.sent + b.failed + b.suppressed - (a.sent + a.failed + a.suppressed)),
+    deliveryWindowDays: windowDays,
   };
 }

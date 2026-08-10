@@ -505,3 +505,49 @@ describe("promotional needs a recorded opt-in", () => {
     expect(rows.length, "append-only: the grant and the withdrawal both survive").toBe(2);
   });
 });
+
+describe("quiet hours", () => {
+  it("refuses at 2am and allows at 2pm, on the RECIPIENT's clock", async () => {
+    // Re-granted first: the withdrawal above would otherwise be the reason, and
+    // a test that passes for the wrong reason is worse than no test.
+    await recordConsent(db, {
+      personId: plainId,
+      purpose: "sms.promotional",
+      granted: true,
+      source: "account",
+    });
+    const promotional = (now: Date) =>
+      maySend(db, {
+        contact: PHONE_PLAIN,
+        channel: "sms",
+        category: "promotional",
+        scope: "marketing",
+        personId: plainId,
+        now,
+      });
+    // 20:30 UTC is 02:00 IST the next day — the case a naive server-local
+    // implementation gets wrong, and the reason the offset is pinned.
+    const night = await promotional(new Date("2026-08-10T20:30:00.000Z"));
+    expect(night.send).toBe(false);
+    if (!night.send) {
+      expect(night.reason).toBe("quiet_hours");
+    }
+    const day = await promotional(new Date("2026-08-10T08:30:00.000Z"));
+    expect(day.send, "14:00 IST is inside the window").toBe(true);
+  });
+
+  it("never applies quiet hours to a transactional message", async () => {
+    // The important asymmetry. With no deferral queue, refusing a decision
+    // notice at night would mean the person is never told at all — worse than a
+    // text at an awkward time.
+    const decision = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "money",
+      personId: plainId,
+      now: new Date("2026-08-10T20:30:00.000Z"),
+    });
+    expect(decision.send).toBe(true);
+  });
+});

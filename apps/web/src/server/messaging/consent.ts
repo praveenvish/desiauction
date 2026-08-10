@@ -34,7 +34,7 @@ export type SendDecision =
   | { readonly send: true }
   | {
       readonly send: false;
-      readonly reason: "suppressed" | "opted_out" | "no_consent" | "org_disabled";
+      readonly reason: "suppressed" | "opted_out" | "no_consent" | "org_disabled" | "quiet_hours";
     };
 
 /**
@@ -59,6 +59,8 @@ export async function maySend(
      * club's own topic settings, and nothing else changes.
      */
     orgId?: string;
+    /** Injected so quiet hours can be tested without waiting for 10pm. */
+    now?: Date;
   },
 ): Promise<SendDecision> {
   const blocked = await db
@@ -142,6 +144,27 @@ export async function maySend(
     // the absence of a STOP and of an explicit switch-off, both checked above.
     return { send: true };
   }
+  /*
+   * QUIET HOURS, and only for promotional.
+   *
+   * TRAI restricts promotional messaging to daytime hours; transactional is
+   * exempt, and rightly — somebody waiting to hear whether they got into a
+   * tournament should be told when the organizer decides, not the next morning.
+   *
+   * Refusing is the correct response for promotional because promotional is by
+   * definition not urgent. It would be the WRONG response for transactional:
+   * with no deferral queue for messages, "quiet hours" on a decision notice
+   * would mean the person is never told at all, which is worse than a text at
+   * an awkward time. Deferring transactional notices needs a scheduler this
+   * product does not have, and is named as such in the plan rather than faked.
+   *
+   * Inert today, like the promotional consent path beside it, because this
+   * product sends no promotional messages yet. It is here so that the day one
+   * ships it cannot go out at two in the morning.
+   */
+  if (!withinPromotionalHours(input.now ?? new Date())) {
+    return { send: false, reason: "quiet_hours" };
+  }
   if (input.personId === undefined) {
     // Promotional to a contact we cannot tie to a person is unsendable: there
     // is nobody whose consent we could have recorded.
@@ -162,6 +185,20 @@ export async function maySend(
     .orderBy(desc(consentRecords.createdAt))
     .limit(1);
   return latest?.granted === true ? { send: true } : { send: false, reason: "no_consent" };
+}
+
+/** IST, always. The window is a rule about the recipient's clock, and this
+ *  product's recipients are in India — reading the SERVER's timezone would make
+ *  the same message legal or illegal depending on where it was deployed. */
+const PROMOTIONAL_OPENS_HOUR = 9;
+const PROMOTIONAL_CLOSES_HOUR = 21;
+const IST_OFFSET_MINUTES = 5 * 60 + 30;
+
+export function withinPromotionalHours(at: Date): boolean {
+  const istHour = Math.floor(
+    ((((at.getTime() / 60_000 + IST_OFFSET_MINUTES) % 1440) + 1440) % 1440) / 60,
+  );
+  return istHour >= PROMOTIONAL_OPENS_HOUR && istHour < PROMOTIONAL_CLOSES_HOUR;
 }
 
 /**

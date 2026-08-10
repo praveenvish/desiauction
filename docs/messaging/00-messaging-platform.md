@@ -312,13 +312,41 @@ in-app adapter that writes a person-scoped row, which is what finally makes a
 receipt visible to the customer who paid. Provider callbacks and dispatch
 timestamps.
 
-**Phase 3 — configurability.**
-Platform template administration behind `messaging.manage`. Organizer topic and
-channel settings. Per-person preferences beyond the global switch.
+**Phase 3 — configurability.** *Shipped, with one deliberate reduction.*
+Organizer topic and channel settings (`org_messaging_settings`, migration 0024,
+the Notifications tab). Per-person preferences beyond the global switch
+(`notification_preferences`, the switches on `/account`).
 
-**Phase 4 — reach.**
-WhatsApp Business templates (the channel this market actually reads), `hi-IN`
-locale, quiet hours, and per-template delivery analytics.
+Platform template administration shipped as `/admin/messaging` and NOT behind a
+new `messaging.manage` capability. The name implied editing, and §9 below
+forbids editing template text on any surface — the gateway matches the
+registered sentence character for character. Strip the editing and what remains
+is observation, which is what `/admin` is for and needs no new grant. A
+capability whose only power is reading a table would be governance theatre, and
+this platform's capability partition is not decorative.
+
+**Phase 4 — reach.** *Two of four shipped; two are founder externals.*
+
+- **Per-template delivery analytics — shipped.** Derived from the audit rows the
+  sender already writes, so the numbers cannot drift from the evidence.
+  Suppressed is reported beside failed, never inside it: a suppressed message is
+  the gate working, and folding them together sends an operator chasing an
+  outage that is not happening.
+- **Quiet hours — shipped for promotional, and deliberately not for
+  transactional.** TRAI restricts promotional messaging to daytime; refusing is
+  the right response there because promotional is by definition not urgent. It
+  is the WRONG response for a decision notice: with no deferral queue for
+  messages, "quiet hours" would mean the person is never told at all. Deferring
+  transactional notices needs a scheduler this product does not have. Building
+  one is a real piece of work, not a wrapper, and it is not pretended here.
+- **WhatsApp Business templates — BLOCKED on a founder external.** It needs a
+  Meta Business account and per-template approval with its own lead time, and
+  §8 decision 3 (in or out of beta) is still open. An adapter written against
+  templates nobody has submitted would be a shell that reads like a capability.
+- **`hi-IN` locale — BLOCKED on the same class of external.** DLT registers
+  templates per language, so a Hindi message needs its own registration. The
+  template registry already carries `locale`; what is missing is the
+  registration, which is a founder action, not an engineering one.
 
 ---
 

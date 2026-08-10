@@ -347,7 +347,16 @@ export async function notifyDecision(
           subject: row.id,
           // Recorded so "why didn't they get it?" has an answer that is not a
           // shrug. A silent skip is indistinguishable from a bug.
-          meta: { channel: "sms", reason: decision.reason },
+          //
+          // The template is named here as well as on the sent and failed rows,
+          // so per-shape delivery can be counted across all three outcomes. A
+          // suppression rate that is only knowable in aggregate hides the case
+          // that matters — one shape being refused far more than the others.
+          meta: {
+            channel: "sms",
+            reason: decision.reason,
+            template: `${body.template.key}@${body.template.version}`,
+          },
         });
       } catch {
         // Same rule as below: evidence never fails a committed decision.
