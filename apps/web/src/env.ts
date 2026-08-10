@@ -57,6 +57,19 @@ const envSchema = z.object({
    * forgeries. Long, random, and set out of band on the operator's console.
    */
   SMS_INBOUND_SECRET: z.string().min(16).optional(),
+  /**
+   * Email over the provider's HTTP API. All three must be set together or the
+   * platform keeps the filesystem outbox — a half-configured mailer that
+   * silently drops documents is worse than one that visibly writes files.
+   *
+   * Any provider with an HTTP send endpoint works (SES, Postmark, Resend,
+   * Brevo, MSG91). The request shape is the intersection of all of them; a
+   * provider needing a different body overrides `buildRequest` at the call
+   * site rather than forking the adapter.
+   */
+  EMAIL_API_ENDPOINT: z.url().optional(),
+  EMAIL_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(3).optional(),
   // PX-5 SEO: absolute origin for canonical URLs, Open Graph and the sitemap.
   PUBLIC_BASE_URL: z.url().default("http://localhost:3000"),
   // PX-8: the finops artifact + outbox root (IP-6 §22 — everything injected).
