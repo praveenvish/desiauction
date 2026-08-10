@@ -20,6 +20,10 @@ const LABELS: Record<string, string> = {
   "auth.passkey.renamed": "Passkey renamed",
   "auth.passkey.removed": "Passkey removed",
   "auth.session.revoked": "A device was signed out",
+  // The first finance event a PAYER ever receives. Until the in-app adapter
+  // actually wrote a person-scoped row, a receipt was visible to the club's
+  // finance desk and to nobody else — the inbox had no finance writer at all.
+  "finance.document.issued": "A receipt was issued to your team",
   "profile.name.updated": "Name updated",
   // The first name is not an update — see `profile.name.set`.
   "profile.name.set": "Name added to your profile",
