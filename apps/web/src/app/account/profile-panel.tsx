@@ -7,6 +7,7 @@ import { useActionState, useEffect, useRef, type ReactNode } from "react";
 import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
 import { updateProfileAction } from "../../server/auth/actions";
+import { PhoneChange } from "./phone-change";
 
 export interface ProfilePanelProps {
   personId: string;
@@ -71,6 +72,10 @@ export function ProfilePanel({ personId, phone, name, passkeyCount, signOut }: P
         </div>
         <div className="profile-signout">{signOut}</div>
       </div>
+      {/* Beside the number it changes, and behind a disclosure. This is the one
+          change that can take an account away from somebody — it does not
+          belong in the same open form as the display name. */}
+      <PhoneChange current={phone} />
       <form action={formAction} className="profile-form">
         <Field
           label="Display name"

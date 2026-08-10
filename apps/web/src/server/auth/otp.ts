@@ -88,36 +88,17 @@ export async function requestOtp(
   return { ok: true };
 }
 
-export type VerifyOtpResult =
-  | { ok: true; personId: string; name: string | null }
-  /** No pending code for this phone — the ONE reason that must stay generic. */
-  | { ok: false; reason: "invalid"; attemptsLeft?: number }
-  | { ok: false; reason: "expired" }
-  | { ok: false; reason: "locked" };
-
 /**
- * Verification, with reasons the person on the other end can act on.
+ * Consume a pending code for a phone, without deciding what it means.
  *
- * The no-enumeration rule (IP-2 §6) is about what a STRANGER can learn from a
- * phone they do not own, and it still holds where it matters: a phone with no
- * pending code — never requested, already consumed, unknown to the platform —
- * returns the bare `invalid`, identical in every case. There is no signal to
- * mine there.
- *
- * `expired`, `locked` and the remaining-attempt count are only ever reachable
- * for a phone that HAS a live code, which means someone just asked for one and
- * the SMS went to the handset. Telling that person "this code is burned, get a
- * fresh one" leaks nothing they did not cause; withholding it is how the old
- * single message stranded a user holding the correct code and told them, five
- * times over, that they had typed it wrong.
+ * Extracted from `verifyOtp` so the phone-change flow can reuse it. That flow
+ * needs the identical attempt cap, expiry order and concurrent-guess race
+ * handling — all three are delicate — but it must NOT create or attach a
+ * person, which is exactly what `verifyOtp` does next. Copying the logic to get
+ * one different ending is how the cap quietly stops holding on one of the two
+ * paths.
  */
-export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise<VerifyOtpResult> {
-  const normalized = normalizePhone(rawPhone);
-  if (!normalized.ok) {
-    return { ok: false, reason: "invalid" };
-  }
-  const phone = normalized.phone;
-
+export async function consumeCode(db: Db, phone: string, code: string): Promise<ConsumeResult> {
   const [candidate] = await db
     .select()
     .from(otpCodes)
@@ -153,16 +134,62 @@ export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise
       return { ok: false, reason: "locked" };
     }
     if (bumped.attempts >= MAX_ATTEMPTS) {
+      return { ok: false, reason: "locked", lockedOut: true };
+    }
+    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - bumped.attempts };
+  }
+
+  await db.update(otpCodes).set({ consumedAt: new Date() }).where(eq(otpCodes.id, candidate.id));
+  return { ok: true };
+}
+
+export type ConsumeResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid"; attemptsLeft?: number }
+  | { ok: false; reason: "expired" }
+  | { ok: false; reason: "locked"; lockedOut?: boolean };
+
+export type VerifyOtpResult =
+  | { ok: true; personId: string; name: string | null }
+  /** No pending code for this phone — the ONE reason that must stay generic. */
+  | { ok: false; reason: "invalid"; attemptsLeft?: number }
+  | { ok: false; reason: "expired" }
+  | { ok: false; reason: "locked" };
+
+/**
+ * Verification, with reasons the person on the other end can act on.
+ *
+ * The no-enumeration rule (IP-2 §6) is about what a STRANGER can learn from a
+ * phone they do not own, and it still holds where it matters: a phone with no
+ * pending code — never requested, already consumed, unknown to the platform —
+ * returns the bare `invalid`, identical in every case. There is no signal to
+ * mine there.
+ *
+ * `expired`, `locked` and the remaining-attempt count are only ever reachable
+ * for a phone that HAS a live code, which means someone just asked for one and
+ * the SMS went to the handset. Telling that person "this code is burned, get a
+ * fresh one" leaks nothing they did not cause; withholding it is how the old
+ * single message stranded a user holding the correct code and told them, five
+ * times over, that they had typed it wrong.
+ */
+export async function verifyOtp(db: Db, rawPhone: string, code: string): Promise<VerifyOtpResult> {
+  const normalized = normalizePhone(rawPhone);
+  if (!normalized.ok) {
+    return { ok: false, reason: "invalid" };
+  }
+  const phone = normalized.phone;
+
+  const consumed = await consumeCode(db, phone, code);
+  if (!consumed.ok) {
+    if (consumed.reason === "locked" && consumed.lockedOut === true) {
       const [lockedPerson] = await db.select().from(people).where(eq(people.phone, phone)).limit(1);
       if (lockedPerson !== undefined) {
         await logSecurityEvent(lockedPerson.id, "auth.otp.lockout");
       }
       return { ok: false, reason: "locked" };
     }
-    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - bumped.attempts };
+    return consumed;
   }
-
-  await db.update(otpCodes).set({ consumedAt: new Date() }).where(eq(otpCodes.id, candidate.id));
 
   // The name rides back with the identity so the caller can route a nameless
   // account straight to /onboarding instead of bouncing it off /home first.

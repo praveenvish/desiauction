@@ -15,7 +15,11 @@ import { eq } from "drizzle-orm";
 
 import { env } from "../../env";
 import { db, dbHandle } from "../db";
+import { createPlayerSmsSender } from "../competition/registration-notify";
+import { maySend } from "../messaging/consent";
+import { SMS_TEMPLATES, renderTemplate } from "../messaging/templates";
 import { requestOtp, verifyOtp } from "./otp";
+import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
 import { safeNext } from "./redirect";
 import {
@@ -572,4 +576,144 @@ export async function updateProfileAction(
     redirect(safeNext(formString(formData, "next")));
   }
   return { saved: true, firstTime: isFirstName };
+}
+
+/**
+ * CHANGING THE MOBILE ON AN ACCOUNT.
+ *
+ * The product's one credential, and until now a permanent one: `people.phone`
+ * was written at first sign-in and no path ever changed it. That made losing a
+ * number an unrecoverable lockout, and made a carrier recycling a number an
+ * account takeover — see `phone-change.ts` for both, and for what this flow can
+ * and cannot fix.
+ *
+ * Two steps, mirroring sign-in: a code to the NEW number, then confirmation.
+ * The session proves the account; the code proves the handset.
+ */
+
+export interface PhoneChangeState {
+  step: "idle" | "code";
+  /** The number being moved to, normalized once the request is accepted. */
+  phone?: string;
+  error?: string;
+  done?: boolean;
+}
+
+export async function requestPhoneChangeAction(
+  previous: PhoneChangeState,
+  formData: FormData,
+): Promise<PhoneChangeState> {
+  const session = await currentSession();
+  if (session === null) {
+    redirect("/login?next=/account");
+  }
+  const phone = formString(formData, "phone");
+  let result: Awaited<ReturnType<typeof requestPhoneChange>>;
+  try {
+    result = await requestPhoneChange(db, sender, {
+      personId: session.personId,
+      newPhone: phone,
+      requestIp: await requestIp(),
+    });
+  } catch (error) {
+    // Same contract as the front door: a melted provider is a retryable state,
+    // never a crash screen — and here it is a crash screen on a settings page
+    // somebody reached while already worried about their account.
+    if (error instanceof OtpSendError) {
+      return { step: "idle", error: "We couldn't send the code right now. Try again in a minute." };
+    }
+    throw error;
+  }
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      "invalid-phone":
+        phone.trim() === ""
+          ? "Enter the new mobile number."
+          : "That doesn't look like an Indian mobile number — 10 digits starting 6–9.",
+      "same-number": "That is already the number on this account.",
+      cooldown: "Code already sent — wait 30 seconds before requesting another.",
+      "hourly-limit": "Too many codes for that number. Try again in an hour.",
+    };
+    return { step: previous.step, error: message[result.reason] };
+  }
+  const normalized = normalizePhone(phone);
+  return { step: "code", phone: normalized.ok ? normalized.phone : phone };
+}
+
+export async function confirmPhoneChangeAction(
+  previous: PhoneChangeState,
+  formData: FormData,
+): Promise<PhoneChangeState> {
+  const session = await currentSession();
+  if (session === null) {
+    redirect("/login?next=/account");
+  }
+  const target = previous.phone ?? "";
+  const result = await confirmPhoneChange(db, {
+    personId: session.personId,
+    newPhone: target,
+    code: formString(formData, "code"),
+  });
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      invalid:
+        result.attemptsLeft === undefined
+          ? "That code didn't match. Request a new one."
+          : `That code didn't match. ${String(result.attemptsLeft)} attempts left.`,
+      expired: "That code has expired. Request a new one.",
+      locked: "Too many attempts. Request a new code.",
+      // Named plainly rather than hidden behind "something went wrong": the
+      // person is holding the handset, so they have learned a fact about a
+      // number they control, and a vague refusal here is a support ticket.
+      taken: "That number already signs in to another account.",
+      "invalid-phone": "Start again — that number could not be read.",
+      "no-person": "Sign in again and retry.",
+    };
+    return { step: "code", phone: target, error: message[result.reason] };
+  }
+
+  await logSecurityEvent(session.personId, "auth.phone.changed");
+  /*
+   * Tell the OUTGOING number, and never fail the change on it.
+   *
+   * This is the compensating control for the one thing this flow does not
+   * verify: it does not ask for the old number, because requiring it would
+   * leave "I lost my phone" exactly as unrecoverable as before. So a stolen
+   * session could move a number — and the number it moved away from is told
+   * while somebody can still read it.
+   *
+   * Best effort by construction. The change has committed; a provider outage
+   * must cost a warning message, never leave the account half-moved.
+   */
+  try {
+    await notifyPhoneChanged(result.previousPhone, result.newPhone);
+  } catch {
+    // Deliberately swallowed. See above.
+  }
+  return { step: "idle", done: true };
+}
+
+async function notifyPhoneChanged(previousPhone: string, newPhone: string): Promise<void> {
+  const template = SMS_TEMPLATES["security.phone_changed"];
+  const rendered = renderTemplate(template, { last4: newPhone.slice(-4) });
+  if (!rendered.ok) {
+    return;
+  }
+  // The gate still applies. Somebody who texted STOP has said they want no
+  // messages, and a security notice does not outrank that — the change is on
+  // their security ledger either way, which is a place they can look.
+  const decision = await maySend(db, {
+    contact: previousPhone,
+    channel: "sms",
+    category: template.category,
+    scope: "security",
+  });
+  if (!decision.send) {
+    return;
+  }
+  await createPlayerSmsSender(db).send(previousPhone, {
+    template,
+    slots: rendered.slots,
+    body: rendered.body,
+  });
 }

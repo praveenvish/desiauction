@@ -49,6 +49,13 @@ const envSchema = z.object({
   MSG91_TEMPLATE_REGISTRATION_WITHDRAWN: z.string().min(1).optional(),
   MSG91_TEMPLATE_REGISTRATION_RESTORED: z.string().min(1).optional(),
   /**
+   * The notice sent to the OUTGOING number when somebody changes the mobile on
+   * their account. Unregistered means the change still happens and the old
+   * number is never told — so this one is worth registering before launch even
+   * though nothing refuses to start without it.
+   */
+  MSG91_TEMPLATE_SECURITY_PHONE_CHANGED: z.string().min(1).optional(),
+  /**
    * Shared secret on the inbound-SMS webhook, which is where a STOP lands.
    *
    * Unset means the endpoint is CLOSED (404), never open. A webhook that

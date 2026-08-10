@@ -282,3 +282,20 @@
   font-size: var(--text-sm-size);
   color: var(--text-heading);
 }
+
+/*
+ * CHANGE MOBILE NUMBER — a disclosure, not an open field.
+ *
+ * Separated from the profile form above it by a rule, because the two forms do
+ * very different things: one edits a display name, the other moves the
+ * credential this product signs people in with.
+ */
+.phone-change {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}

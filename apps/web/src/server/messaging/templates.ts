@@ -34,7 +34,8 @@ export type TemplateKey =
   | "registration.waitlisted"
   | "registration.rejected"
   | "registration.withdrawn"
-  | "registration.restored";
+  | "registration.restored"
+  | "security.phone_changed";
 
 /**
  * Transactional messages may be delivered to numbers on the DND registry;
@@ -73,7 +74,17 @@ export interface MessageTemplate {
   readonly providerTemplateEnv: string;
 }
 
-const SLOT = /\{([a-z_]+)\}/g;
+/*
+ * Digits are allowed in a slot name, and that is not cosmetic.
+ *
+ * This pattern was `[a-z_]+`, so `{last4}` in a body was not recognised as a
+ * slot at all: `renderTemplate` left the literal braces in the message and
+ * `slotsInBody` reported none. The suite caught it, which is the system working
+ * — but the failure mode is a message that ships with `{last4}` printed in it,
+ * and the next person to write a slot with a digit deserves the pattern to just
+ * work rather than the trap to be avoided by naming convention.
+ */
+const SLOT = /\{([a-z0-9_]+)\}/g;
 
 /**
  * The five decision notices, all transactional: each is the direct consequence
@@ -151,6 +162,31 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
       { name: "link", maxLength: 60 },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_RESTORED",
+  },
+  /*
+   * The one message that goes to a number the platform is about to STOP using.
+   *
+   * Changing the mobile on an account needs a live session plus possession of
+   * the new handset, and deliberately not the old one — requiring the old
+   * number would leave "I lost my phone" exactly as unrecoverable as it was.
+   * This text is the compensating control: the outgoing number is told what
+   * happened while it can still be read, so a session-theft takeover announces
+   * itself instead of completing in silence.
+   *
+   * The new number is NOT named in full. Somebody who has taken an account
+   * should not be handed a working contact for its owner, and "the last four
+   * digits changed to" is enough for the owner to recognise their own handset
+   * or fail to.
+   */
+  "security.phone_changed": {
+    key: "security.phone_changed",
+    version: "1",
+    channel: "sms",
+    locale: "en-IN",
+    category: "transactional",
+    body: "DesiAuction: The mobile number on your account was changed to one ending {last4}. If this was not you, reply to this message or contact your organizer now.",
+    slots: [{ name: "last4", maxLength: 4 }],
+    providerTemplateEnv: "MSG91_TEMPLATE_SECURITY_PHONE_CHANGED",
   },
 };
 

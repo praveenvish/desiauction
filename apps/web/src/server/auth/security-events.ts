@@ -24,6 +24,10 @@ export type SecurityAction =
   // opening sentence to a person, and it was wrong about the one thing that
   // had just happened. Same ledger, no new store; a different verb.
   | "profile.name.set"
+  // The account's ONE credential moving. Written for the person, not for us:
+  // sign-in is phone-first, so this row is the record of the single change that
+  // can take an account away from somebody.
+  | "auth.phone.changed"
   // DA-19: the decisions a PLAYER cares about. 48 people were approved and one
   // rejected during certification and not one of them was told — the inbox
   // carried sign-in events only, and its own empty state admitted it. These
