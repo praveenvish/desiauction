@@ -159,6 +159,35 @@ export const notificationPreferences = pgTable(
 );
 
 /**
+ * WHAT A CLUB CHOOSES TO SEND, PER TOPIC AND PER CHANNEL.
+ *
+ * The third layer of the same gate, and the only one that belongs to a TENANT
+ * rather than to a person. All three can subtract a message; none can cause one.
+ *
+ * An organizer switching a topic ON cannot override a person who switched it
+ * OFF — the person's answer is read first and independently. That is why this is
+ * a separate table and not a column on the preference: a club must never be able
+ * to write into somebody's consent.
+ *
+ * Absence means ON, so a club that has never opened the screen keeps sending
+ * exactly what it sends today. A new table that silently muted a live product
+ * would be a worse bug than the one it fixes.
+ */
+export const orgMessagingSettings = pgTable(
+  "org_messaging_settings",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    topic: text("topic").notNull(),
+    channel: text("channel", { enum: ["sms", "email", "in-app"] }).notNull(),
+    enabled: boolean("enabled").notNull(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    updatedBy: char("updated_by", { length: 26 }),
+  },
+  (table) => [uniqueIndex("org_messaging_settings_uq").on(table.orgId, table.topic, table.channel)],
+);
+
+/**
  * ADDRESSES WE MUST NOT SEND TO.
  *
  * Keyed by the CONTACT, not by a person, and that is the point: a STOP arrives

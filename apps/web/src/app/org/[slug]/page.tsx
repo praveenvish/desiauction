@@ -20,6 +20,7 @@ import { orgOverview, orgView, type OrgActivityRow } from "../../../server/orgs/
 import type { CompetitionSummary } from "../../../server/competition/competitions";
 import type { SeasonRow } from "../../../server/competition/tournament-actions";
 import { orgCatalogue } from "../../../server/orgs/catalogue";
+import { orgMessagingSettingsView } from "../../../server/messaging/actions";
 import { moneyAuthority } from "../../../server/settlement/actions";
 import { CreateCompetitionForm } from "../../seasons/create-competition-form";
 import { CreateTournamentForm } from "../../tournaments/create-tournament-form";
@@ -27,6 +28,7 @@ import { TournamentAccordion, type AccordionGroup } from "../../tournaments/tour
 import { FinanceAuthorityPanel } from "./finance-authority";
 import { JoinedToast } from "./joined-toast";
 import { MembersPanel } from "./members-panel";
+import { MessagingSwitches } from "./messaging-switches";
 import { MoneyAuthorityPanel } from "./money-authority";
 import "../../orgs/orgs.css";
 import "../../tournaments/tournaments.css";
@@ -203,11 +205,12 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     // Non-members and unknown slugs are indistinguishable (M-IP2-3 tenancy).
     notFound();
   }
-  const [authority, finance, catalogue, overview] = await Promise.all([
+  const [authority, finance, catalogue, overview, messaging] = await Promise.all([
     moneyAuthority(slug),
     financeAuthority(slug),
     orgCatalogue(slug),
     orgOverview(slug),
+    orgMessagingSettingsView(slug),
   ]);
 
   // Counts fold from the reads already in hand — no extra query.
@@ -478,6 +481,42 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       ),
     },
     { id: "members", label: "Members", content: <MembersPanel view={view} slug={slug} /> },
+    {
+      id: "notifications",
+      label: "Notifications",
+      content: (
+        <div className="od-notifications">
+          <Card>
+            <h2>What this club sends</h2>
+            {/* The honest framing, because the alternative invites an organizer
+                to believe this switch is more powerful than it is: it can stop
+                a message, and it can never start one for somebody who has
+                already said no. `maySend` reads the person first. */}
+            <p className="competitions-hint">
+              Text messages this club sends on your behalf. Switching one off stops it for everyone
+              here. Switching one on does not override anybody who has turned it off in their own
+              account — their answer always wins.
+            </p>
+            {messaging === null ? (
+              <p className="competitions-hint">Not available.</p>
+            ) : (
+              <>
+                <MessagingSwitches slug={slug} settings={messaging} />
+                {messaging.canManage ? null : (
+                  <p className="competitions-hint">
+                    Only an owner can change these. You are seeing what the club sends.
+                  </p>
+                )}
+              </>
+            )}
+            <p className="competitions-hint">
+              Sign-in codes are not listed and cannot be switched off — somebody who turns off SMS
+              and then cannot log in has been handed a worse problem than the one they avoided.
+            </p>
+          </Card>
+        </div>
+      ),
+    },
     {
       id: "money",
       label: "Money & roles",

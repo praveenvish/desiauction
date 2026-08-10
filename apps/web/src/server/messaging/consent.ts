@@ -2,6 +2,7 @@ import {
   consentRecords,
   newId,
   notificationPreferences,
+  orgMessagingSettings,
   suppressions,
   type Db,
 } from "@desiauction/db";
@@ -31,7 +32,10 @@ import type { MessageCategory } from "./templates";
 
 export type SendDecision =
   | { readonly send: true }
-  | { readonly send: false; readonly reason: "suppressed" | "opted_out" | "no_consent" };
+  | {
+      readonly send: false;
+      readonly reason: "suppressed" | "opted_out" | "no_consent" | "org_disabled";
+    };
 
 /**
  * May we send this category to this contact right now?
@@ -47,6 +51,14 @@ export async function maySend(
     category: MessageCategory;
     scope: string;
     personId?: string;
+    /**
+     * The club the message is sent ON BEHALF OF, when there is one.
+     *
+     * Omitted for platform-to-person messages (sign-in, account notices), which
+     * no club may switch off. Supplying it is what subjects the send to that
+     * club's own topic settings, and nothing else changes.
+     */
+    orgId?: string;
   },
 ): Promise<SendDecision> {
   const blocked = await db
@@ -95,6 +107,33 @@ export async function maySend(
       .limit(1);
     if (preference !== undefined && !preference.allowed) {
       return { send: false, reason: "opted_out" };
+    }
+  }
+  /*
+   * The club's own switch, checked AFTER the person's and never instead of it.
+   *
+   * An organizer can decide their club does not text people about registration
+   * decisions. They cannot decide that it does, for someone who said otherwise —
+   * the preference above has already returned by then.
+   *
+   * Absence means enabled, so this layer is inert until a club opens the screen.
+   * The read is tenant-scoped by RLS; `notifyDecision` runs inside the
+   * competition's org, which is what puts these rows in view.
+   */
+  if (input.orgId !== undefined) {
+    const [setting] = await db
+      .select({ enabled: orgMessagingSettings.enabled })
+      .from(orgMessagingSettings)
+      .where(
+        and(
+          eq(orgMessagingSettings.orgId, input.orgId),
+          eq(orgMessagingSettings.topic, input.scope),
+          eq(orgMessagingSettings.channel, input.channel),
+        ),
+      )
+      .limit(1);
+    if (setting !== undefined && !setting.enabled) {
+      return { send: false, reason: "org_disabled" };
     }
   }
   if (input.category === "transactional") {
@@ -257,6 +296,67 @@ export async function setPreference(
     source: "account",
     evidence: { via: "account notification settings" },
   });
+}
+
+/**
+ * The channels a club can switch a topic off on.
+ *
+ * SMS only, today, and that is a statement of fact rather than a limitation of
+ * this table: it is the one channel a club's messages actually go out on. Email
+ * has no address to send to and in-app writes to the person's own ledger, which
+ * is theirs and not a club's to silence.
+ */
+export const ORG_MESSAGING_CHANNELS = ["sms"] as const;
+
+/** Every topic's current answer for one club, defaulted to on where unset. */
+export async function orgMessagingSettingsFor(
+  db: Db,
+  orgId: string,
+  channel: "sms" | "email" | "in-app" = "sms",
+): Promise<Record<string, boolean>> {
+  const rows = await db
+    .select({ topic: orgMessagingSettings.topic, enabled: orgMessagingSettings.enabled })
+    .from(orgMessagingSettings)
+    .where(and(eq(orgMessagingSettings.orgId, orgId), eq(orgMessagingSettings.channel, channel)));
+  const set = new Map(rows.map((row) => [row.topic, row.enabled]));
+  return Object.fromEntries(
+    NOTIFICATION_TOPICS.map(({ topic }) => [topic, set.get(topic) ?? true]),
+  );
+}
+
+/**
+ * Set one club switch. Upserts — the club's current answer, not a record of
+ * what it once was. `updatedBy` keeps the change attributable without inventing
+ * a second audit stream.
+ */
+export async function setOrgMessagingSetting(
+  db: Db,
+  input: {
+    orgId: string;
+    topic: string;
+    channel: "sms" | "email" | "in-app";
+    enabled: boolean;
+    actorId: string;
+  },
+): Promise<void> {
+  await db
+    .insert(orgMessagingSettings)
+    .values({
+      id: newId(),
+      orgId: input.orgId,
+      topic: input.topic,
+      channel: input.channel,
+      enabled: input.enabled,
+      updatedBy: input.actorId,
+    })
+    .onConflictDoUpdate({
+      target: [
+        orgMessagingSettings.orgId,
+        orgMessagingSettings.topic,
+        orgMessagingSettings.channel,
+      ],
+      set: { enabled: input.enabled, updatedAt: new Date(), updatedBy: input.actorId },
+    });
 }
 
 /**

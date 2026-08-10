@@ -169,6 +169,13 @@
       "when": 1785686400000,
       "tag": "0023_notification_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785772800000,
+      "tag": "0024_org_messaging_settings",
+      "breakpoints": true
     }
   ]
 }

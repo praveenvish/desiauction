@@ -331,6 +331,9 @@ export async function notifyDecision(
       category: body.template.category,
       scope: "registration",
       personId: row.personId,
+      // The club's own switch. Passing it is what makes the organizer's
+      // Notifications tab do something rather than describe an intention.
+      orgId: input.orgId,
     });
     if (!decision.send) {
       suppressed += 1;

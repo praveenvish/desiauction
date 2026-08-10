@@ -3,8 +3,10 @@ import {
   createDb,
   newId,
   notificationPreferences,
+  orgMessagingSettings as orgMessagingSettingsTable,
   people,
   suppressions as suppressionsTable,
+  withTenantDb,
   type DbHandle,
 } from "@desiauction/db";
 import { and, eq, inArray, like } from "drizzle-orm";
@@ -14,8 +16,10 @@ import { env } from "../../env";
 import {
   liftSuppression,
   maySend,
+  orgMessagingSettingsFor,
   preferencesFor,
   recordConsent,
+  setOrgMessagingSetting,
   setPreference,
   suppress,
 } from "./consent";
@@ -42,6 +46,10 @@ const PHONES = [PHONE_PLAIN, PHONE_STOPPED, PHONE_TOPIC];
 
 let plainId = "";
 
+/** The club used by the org-settings block, hoisted so cleanup can find it. */
+const ORG = newId();
+const ACTOR = newId();
+
 beforeAll(async () => {
   await db.delete(people).where(inArray(people.phone, PHONES));
   plainId = newId();
@@ -52,6 +60,7 @@ afterAll(async () => {
   await db.delete(notificationPreferences).where(eq(notificationPreferences.personId, plainId));
   await db.delete(consentRecords).where(eq(consentRecords.personId, plainId));
   await db.delete(suppressionsTable).where(like(suppressionsTable.contact, `%${RUN}%`));
+  await db.delete(orgMessagingSettingsTable).where(eq(orgMessagingSettingsTable.updatedBy, ACTOR));
   await db.delete(people).where(inArray(people.phone, PHONES));
   await handle.sql.end({ timeout: 5 });
 });
@@ -274,6 +283,150 @@ describe("the per-topic switch on /account", () => {
         and(eq(consentRecords.personId, plainId), eq(consentRecords.purpose, "sms.registration")),
       );
     expect(evidence.length, "off and on both recorded").toBe(2);
+  });
+});
+
+describe("the club's own switch", () => {
+  /*
+   * The third layer of the gate, and the one that could most easily have been
+   * built wrong. A club deciding it does not text people is legitimate. A club
+   * being able to decide that it DOES, for someone who said otherwise, is not —
+   * so the ordering is asserted, not assumed.
+   *
+   * Tenant-scoped throughout, because unlike the other two tables this one is
+   * owned by an org and carries FORCE row level security. A bare handle cannot
+   * write it at all, which is the isolation working.
+   */
+  const tenant = { personId: ACTOR, orgId: ORG };
+
+  it("is inert until a club opens the screen", async () => {
+    const decision = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+      personId: plainId,
+      orgId: ORG,
+    });
+    expect(decision.send, "no row means the club sends what it sends today").toBe(true);
+  });
+
+  it("stops the topic it names for that club, and only that club", async () => {
+    await withTenantDb(handle, tenant, (tx) =>
+      setOrgMessagingSetting(tx, {
+        orgId: ORG,
+        topic: "registration",
+        channel: "sms",
+        enabled: false,
+        actorId: ACTOR,
+      }),
+    );
+    const off = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+      personId: plainId,
+      orgId: ORG,
+    });
+    expect(off.send).toBe(false);
+    if (!off.send) {
+      expect(off.reason).toBe("org_disabled");
+    }
+    const elsewhere = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+      personId: plainId,
+      orgId: newId(),
+    });
+    expect(elsewhere.send, "one club's silence is not another's").toBe(true);
+    const otherTopic = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "auction",
+      personId: plainId,
+      orgId: ORG,
+    });
+    expect(otherTopic.send, "switching off registrations must not silence auctions").toBe(true);
+  });
+
+  it("cannot switch a message back ON for a person who switched it OFF", async () => {
+    // The property this whole table is shaped around. A club must never be able
+    // to write into somebody's consent, so the person's answer is read first
+    // and independently — and the reason reported stays theirs.
+    await setPreference(db, {
+      personId: plainId,
+      topic: "auction",
+      channel: "sms",
+      allowed: false,
+    });
+    await withTenantDb(handle, tenant, (tx) =>
+      setOrgMessagingSetting(tx, {
+        orgId: ORG,
+        topic: "auction",
+        channel: "sms",
+        enabled: true,
+        actorId: ACTOR,
+      }),
+    );
+    const decision = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "auction",
+      personId: plainId,
+      orgId: ORG,
+    });
+    expect(decision.send, "the person outranks the club").toBe(false);
+    if (!decision.send) {
+      expect(decision.reason).toBe("opted_out");
+    }
+    await setPreference(db, {
+      personId: plainId,
+      topic: "auction",
+      channel: "sms",
+      allowed: true,
+    });
+  });
+
+  it("reads back defaulted, so an untouched topic shows as on", async () => {
+    const current = await withTenantDb(handle, tenant, (tx) =>
+      orgMessagingSettingsFor(tx, ORG, "sms"),
+    );
+    expect(current["registration"], "the one switched off stays off").toBe(false);
+    expect(current["money"], "a topic with no row is on").toBe(true);
+  });
+
+  it("upserts rather than accumulating, so a club has one live answer", async () => {
+    await withTenantDb(handle, tenant, async (tx) => {
+      await setOrgMessagingSetting(tx, {
+        orgId: ORG,
+        topic: "registration",
+        channel: "sms",
+        enabled: true,
+        actorId: ACTOR,
+      });
+      await setOrgMessagingSetting(tx, {
+        orgId: ORG,
+        topic: "registration",
+        channel: "sms",
+        enabled: false,
+        actorId: ACTOR,
+      });
+    });
+    const rows = await db
+      .select({ id: orgMessagingSettingsTable.id })
+      .from(orgMessagingSettingsTable)
+      .where(
+        and(
+          eq(orgMessagingSettingsTable.orgId, ORG),
+          eq(orgMessagingSettingsTable.topic, "registration"),
+        ),
+      );
+    expect(rows.length, "three writes, one row").toBe(1);
   });
 });
 
