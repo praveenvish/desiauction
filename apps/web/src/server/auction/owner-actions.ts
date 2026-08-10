@@ -72,6 +72,48 @@ export async function inviteOwnerAction(
 }
 
 /**
+ * WITHDRAW AN OWNER LINK.
+ *
+ * The gap the cockpit used to apologise for in copy: `revoked_at` was read in
+ * six places and written in none, so a link stayed live for its full seven days
+ * whatever happened after it was sent — a number typed wrong, an owner who
+ * pulled out, a link forwarded into a group chat.
+ *
+ * An ACCEPTED invitation is refused rather than revoked. Acceptance has already
+ * minted an org membership and a paddle grant; flipping the invite underneath
+ * them would leave both standing while the invite claimed otherwise, which is a
+ * worse state than the one this closes. Removing an owner who has accepted is a
+ * different operation on a different object.
+ */
+export async function revokeOwnerInviteAction(
+  slug: string,
+  inviteId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await liveGate(slug);
+  if (gate === null || !gate.canConduct) {
+    return { ok: false, error: "You can't conduct auctions here." };
+  }
+  const ack = await sendEngineCommand({
+    auctionId: gate.auction.id,
+    type: "RevokeOwnerInvite",
+    actor: gate.personId,
+    conduct: true,
+    payload: { inviteId },
+  });
+  if (!ack.accepted) {
+    const message: Record<string, string> = {
+      terminal_auction: "This auction has ended.",
+      unknown_invite: "That invitation is no longer here.",
+      already_accepted:
+        "That link has already been accepted — the owner is in. Remove their paddle grant instead.",
+      engine_unreachable: "The auction engine is offline.",
+    };
+    return { ok: false, error: message[ack.reason ?? ""] ?? "Refused." };
+  }
+  return { ok: true };
+}
+
+/**
  * Auction states in which an invitation is meaningless: the night is over.
  *
  * `inviteOwner` and `grantPaddle` both refuse these (the engine answers

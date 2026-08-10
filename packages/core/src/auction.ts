@@ -698,6 +698,11 @@ export type AuctionEventType =
   // claim) and the compensating undo (doc 41 `lot.reopen` — NEVER a back edge;
   // history stays immutable, the reversal is its own event).
   | "OwnerInvited"
+  // The link can be taken back. Its absence was a live gap the cockpit had to
+  // apologise for in copy: `revoked_at` was READ in six places and written in
+  // none, so anyone holding an owner link could accept it for seven days no
+  // matter who it was meant for or what had changed since.
+  | "OwnerRevoked"
   | "OwnerAccepted"
   | "PaddleGranted"
   | "LotReopened";
@@ -728,6 +733,7 @@ export const AUCTION_EVENT_TYPES: readonly AuctionEventType[] = [
   "TimerHeld",
   "TimerResumed",
   "OwnerInvited",
+  "OwnerRevoked",
   "OwnerAccepted",
   "PaddleGranted",
   "LotReopened",
@@ -793,6 +799,8 @@ export interface BidProjection {
 export interface OwnerInviteProjection {
   teamId: string;
   acceptedBy: string | null;
+  /** Withdrawn by the organizer. The row survives — history stays intact. */
+  revoked: boolean;
 }
 
 export interface PaddleGrantProjection {
@@ -1146,7 +1154,23 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
         if (inviteId === null || teamId === null) {
           return fail("malformed_invite");
         }
-        projection.ownerInvites[inviteId] = { teamId, acceptedBy: null };
+        projection.ownerInvites[inviteId] = { teamId, acceptedBy: null, revoked: false };
+        break;
+      }
+      case "OwnerRevoked": {
+        const inviteId = str(event.payload, "inviteId");
+        const invite = inviteId !== null ? projection.ownerInvites[inviteId] : undefined;
+        if (invite === undefined) {
+          return fail("unknown_invite");
+        }
+        /*
+         * The invite stays in the projection, revoked rather than deleted. An
+         * OwnerAccepted for it would already be refused by the aggregate's
+         * atomic claim, and removing the row here would make any historical
+         * event that references it unreplayable — the exact failure mode doc 41
+         * was written about.
+         */
+        invite.revoked = true;
         break;
       }
       case "OwnerAccepted": {

@@ -72,7 +72,11 @@ describe("owner workflow in replay", () => {
     if (!result.ok) {
       throw new Error(result.reason);
     }
-    expect(result.projection.ownerInvites["inv1"]).toEqual({ teamId: "t1", acceptedBy: "per1" });
+    expect(result.projection.ownerInvites["inv1"]).toEqual({
+      teamId: "t1",
+      acceptedBy: "per1",
+      revoked: false,
+    });
     expect(result.projection.paddleGrants["gr1"]).toEqual({ teamId: "t1", personId: "per1" });
   });
 

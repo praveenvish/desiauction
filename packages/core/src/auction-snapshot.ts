@@ -325,6 +325,7 @@ export type AuctionCommandType =
   | "RequeueLot"
   | "UndoLastAction"
   | "InviteOwner"
+  | "RevokeOwnerInvite"
   | "AcceptOwnerInvite"
   | "GrantPaddle";
 
@@ -347,6 +348,7 @@ export const AUCTION_COMMAND_TYPES: readonly AuctionCommandType[] = [
   "RequeueLot",
   "UndoLastAction",
   "InviteOwner",
+  "RevokeOwnerInvite",
   "AcceptOwnerInvite",
   "GrantPaddle",
 ];

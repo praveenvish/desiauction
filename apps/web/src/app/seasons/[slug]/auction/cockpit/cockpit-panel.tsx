@@ -14,7 +14,11 @@ import { formatDateTime } from "../../../../../lib/format-date";
 import { formatPhone } from "../../../../../lib/format-phone";
 import { GavelButton, type GavelHandle } from "./gavel-button";
 import type { CockpitView, OwnerAcceptance } from "../../../../../server/auction/conduct-actions";
-import { grantPaddleAction, inviteOwnerAction } from "../../../../../server/auction/owner-actions";
+import {
+  grantPaddleAction,
+  inviteOwnerAction,
+  revokeOwnerInviteAction,
+} from "../../../../../server/auction/owner-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
 import { PageStatus } from "../../../../../components/shell/page-status";
 import { AuctionAnnouncer } from "../auction-announcer";
@@ -186,6 +190,18 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       router.refresh();
     } else {
       toast({ title: result.error, tone: "danger" });
+    }
+  };
+
+  const revokeInvite = async (inviteId: string) => {
+    setPending(`revoke-${inviteId}`);
+    const result = await revokeOwnerInviteAction(slug, inviteId);
+    setPending(null);
+    if (result.ok) {
+      toast({ title: "Link withdrawn — it no longer works.", tone: "success" });
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Refused.", tone: "danger" });
     }
   };
 
@@ -702,16 +718,15 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             <p className="competitions-hint">
               Invitation → acceptance → grant → claim. No active paddle without an explicit grant.
             </p>
-            {/* P0-2, said where an organizer would look for the control that
-                does not exist. `auction_owner_invites.revoked_at` is READ in six
-                places and WRITTEN in none: there is no RevokeOwnerInvite command
-                in AUCTION_EVENT_TYPES, no engine handler and no control. Both
-                live in fenced packages, so this milestone states the gap rather
-                than papering over it. */}
-            <p className="competitions-hint" data-testid="owner-invite-irrevocable">
-              <strong>An owner link cannot be withdrawn once you send it.</strong> There is no
-              revoke for owner invitations today — anyone holding the link can accept it, and it
-              stays usable until it expires 7 days after minting. Check the number before you send.
+            {/* P0-2 CLOSED. This card used to carry an apology — "an owner link
+                cannot be withdrawn once you send it" — because `revoked_at` was
+                read in six places and written in none. The command, the event
+                and the control now exist, so the honest sentence is the one
+                about what revoking can and cannot reach. */}
+            <p className="competitions-hint" data-testid="owner-invite-revocable">
+              A pending link can be withdrawn below, and stops working the moment you do. Once
+              somebody has <strong>accepted</strong> it they are in the club and hold a paddle grant
+              — withdrawing the link no longer reaches them, and you remove the grant instead.
             </p>
             <div className="date-row">
               <Select
@@ -799,6 +814,21 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                       {who === undefined ? null : (
                         <span className="competitions-hint">{describeAcceptor(who)}</span>
                       )}
+                      {/* Only while it is still a link. An accepted invitation
+                          has already minted a membership and a paddle grant;
+                          offering Withdraw there would promise to undo two
+                          things it cannot touch. */}
+                      {entry.acceptedBy === null && !entry.expired ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void revokeInvite(entry.id)}
+                          loading={pending === `revoke-${entry.id}`}
+                          data-testid={`revoke-invite-${entry.id}`}
+                        >
+                          Withdraw link
+                        </Button>
+                      ) : null}
                     </div>
                   );
                 })}

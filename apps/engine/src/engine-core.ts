@@ -7,6 +7,7 @@ import {
   closeLot,
   grantPaddle,
   inviteOwner,
+  revokeOwnerInvite,
   issuePaddle,
   markLotClosingSoon,
   placeBid,
@@ -522,6 +523,17 @@ export class AuctionEngine {
         return result.ok ? accept() : rejected(result.reason);
       }
       // The owner workflow (M-IP4-3): invitation → acceptance → grant.
+      case "RevokeOwnerInvite": {
+        if (!envelope.conduct) {
+          return rejected("not_authorized");
+        }
+        const inviteId = this.str(envelope.payload, "inviteId");
+        if (inviteId === null) {
+          return rejected("invalid_payload");
+        }
+        const result = await revokeOwnerInvite(db, auction, actor, inviteId);
+        return result.ok ? accept({}) : rejected(result.reason);
+      }
       case "InviteOwner": {
         if (!envelope.conduct) {
           return rejected("not_authorized");

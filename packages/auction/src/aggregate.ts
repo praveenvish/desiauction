@@ -1514,6 +1514,83 @@ export async function inviteOwner(
   return { ok: true, inviteId };
 }
 
+export type RevokeOwnerInviteResult =
+  { ok: true } | { ok: false; reason: "unknown_invite" | "already_accepted" | "terminal_auction" };
+
+/**
+ * TAKE THE LINK BACK.
+ *
+ * `auction_owner_invites.revoked_at` was READ in six places and WRITTEN in
+ * none. There was no command, no event and no control, so an owner link stayed
+ * live for its full seven days no matter what happened after it was sent — a
+ * number typed wrong, a team owner who pulled out, a link forwarded into a
+ * group chat. The cockpit had to apologise for it in copy: "An owner link
+ * cannot be withdrawn once you send it."
+ *
+ * An ACCEPTED invitation is refused rather than revoked, and that distinction
+ * is the point. Acceptance has already minted an org membership and a paddle
+ * grant; quietly flipping `revoked_at` underneath would leave those standing
+ * while the invite claimed otherwise, which is worse than the gap this closes.
+ * Removing an owner who has accepted is a different operation on a different
+ * object, and it is not this one.
+ */
+export async function revokeOwnerInvite(
+  db: Db,
+  auction: AuctionRecord,
+  actorId: string,
+  inviteId: string,
+): Promise<RevokeOwnerInviteResult> {
+  if (
+    auction.status === "completed" ||
+    auction.status === "reconciled" ||
+    auction.status === "abandoned"
+  ) {
+    return { ok: false, reason: "terminal_auction" };
+  }
+  const [row] = await db
+    .select({ id: auctionOwnerInvites.id, acceptedAt: auctionOwnerInvites.acceptedAt })
+    .from(auctionOwnerInvites)
+    .where(and(eq(auctionOwnerInvites.id, inviteId), eq(auctionOwnerInvites.auctionId, auction.id)))
+    .limit(1);
+  if (row === undefined) {
+    return { ok: false, reason: "unknown_invite" };
+  }
+  if (row.acceptedAt !== null) {
+    return { ok: false, reason: "already_accepted" };
+  }
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  await db.transaction(async (tx) => {
+    /*
+     * Guarded on `revoked_at IS NULL`, so a double-click writes ONE event.
+     * The invite table is the claim; the event is the history. A second
+     * revocation event for the same link would be a lie about how many times
+     * an organizer acted.
+     */
+    const updated = await tx
+      .update(auctionOwnerInvites)
+      .set({ revokedAt: new Date(atMs) })
+      .where(and(eq(auctionOwnerInvites.id, inviteId), isNull(auctionOwnerInvites.revokedAt)))
+      .returning({ id: auctionOwnerInvites.id });
+    if (updated.length === 0) {
+      // Already revoked. A no-op, not an error: the organizer wanted the link
+      // dead and the link is dead.
+      return;
+    }
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "OwnerRevoked",
+      { inviteId },
+      inviteId,
+    );
+  });
+  return { ok: true };
+}
+
 export type AcceptOwnerInviteResult =
   | { ok: true; teamId: string; alreadyAccepted: boolean }
   | { ok: false; reason: "unknown_invite" | "expired" | "already_accepted" };

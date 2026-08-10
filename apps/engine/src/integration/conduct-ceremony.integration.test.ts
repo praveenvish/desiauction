@@ -240,6 +240,55 @@ describe("OWNER MODEL — invitation → acceptance → grant → claim", () => 
     expect(late).toMatchObject({ accepted: false, reason: "expired" });
   });
 
+  it("a WITHDRAWN link stops working, and an accepted one cannot be withdrawn", async () => {
+    /*
+     * P0-2. `auction_owner_invites.revoked_at` was read in six places and
+     * written in none: there was no command, no event and no control, so a link
+     * stayed live for its full seven days whatever happened after it was sent —
+     * a number typed wrong, an owner who pulled out, a link forwarded into a
+     * group chat. The cockpit had to apologise for it in copy.
+     */
+    const minted = await command(
+      "InviteOwner",
+      organizerId,
+      { teamId: teamIds[1], tokenHash: `h-${RUN}-rev`, expiresAtMs: Date.now() + 3_600_000 },
+      { conduct: true },
+    );
+    expect(minted.accepted).toBe(true);
+    const inviteId = (minted.reason ?? "").replace("invite:", "");
+
+    // Conduct only — a link somebody was SENT is not theirs to cancel.
+    const denied = await command("RevokeOwnerInvite", ownerB, { inviteId });
+    expect(denied).toMatchObject({ accepted: false, reason: "not_authorized" });
+
+    expect(
+      (await command("RevokeOwnerInvite", organizerId, { inviteId }, { conduct: true })).accepted,
+    ).toBe(true);
+
+    // The property the whole command exists for: the link is dead.
+    const late = await command("AcceptOwnerInvite", ownerB, { inviteId });
+    expect(late.accepted, "a withdrawn link must not enrol anybody").toBe(false);
+
+    // Idempotent — a double-click is not an error, and writes no second event.
+    expect(
+      (await command("RevokeOwnerInvite", organizerId, { inviteId }, { conduct: true })).accepted,
+    ).toBe(true);
+
+    /*
+     * An ACCEPTED invitation is refused rather than revoked. Acceptance has
+     * already minted an org membership and a paddle grant; flipping the invite
+     * underneath them would leave both standing while the invite claimed
+     * otherwise — a worse state than the gap this closes.
+     */
+    const tooLate = await command(
+      "RevokeOwnerInvite",
+      organizerId,
+      { inviteId: inviteA },
+      { conduct: true },
+    );
+    expect(tooLate).toMatchObject({ accepted: false, reason: "already_accepted" });
+  });
+
   it("grants require an ACCEPTED owner; claims require an ACTIVE grant", async () => {
     // Granting someone who never accepted is refused.
     const notOwner = await command(
