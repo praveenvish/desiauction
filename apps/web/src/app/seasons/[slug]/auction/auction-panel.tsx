@@ -20,6 +20,7 @@ import {
   type AuctionSetupFieldErrors,
 } from "../../../../server/auction/auction-setup";
 import { formatTime } from "../../../../lib/format-date";
+import { AbortDialog } from "./abort-dialog";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 
 // The auction desk: readiness gates, creation, lifecycle, paddles, the lot
@@ -361,20 +362,19 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 {view.auction.status !== "completed" &&
                 view.auction.status !== "reconciled" &&
                 view.auction.status !== "abandoned" ? (
-                  <Button
-                    variant="ghost"
-                    size="touch"
-                    onClick={() =>
+                  /* Behind a confirmation now. This is the catastrophic exit —
+                     `abandoned` is terminal and there is no command back — and
+                     it used to be a single tap beside Pause, with the reason
+                     hardcoded to "conductor abort" so the log never said why. */
+                  <AbortDialog
+                    busy={busy}
+                    onAbort={(reason) => {
                       void act(
-                        () => auctionLifecycleAction(slug, "abort", "conductor abort"),
+                        () => auctionLifecycleAction(slug, "abort", reason),
                         "Auction aborted",
-                      )
-                    }
-                    loading={busy}
-                    data-testid="auction-abort"
-                  >
-                    Abort
-                  </Button>
+                      );
+                    }}
+                  />
                 ) : null}
               </div>
             ) : null}
