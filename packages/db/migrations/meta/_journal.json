@@ -162,6 +162,13 @@
       "when": 1785600000000,
       "tag": "0022_messaging_consent",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785686400000,
+      "tag": "0023_notification_preferences",
+      "breakpoints": true
     }
   ]
 }

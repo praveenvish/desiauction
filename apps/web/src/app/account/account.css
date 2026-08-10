@@ -270,3 +270,65 @@
 .profile-hint {
   color: var(--text-muted);
 }
+
+/*
+ * The notification switches. This card used to carry a paragraph explaining
+ * that stopping registration SMS was handled by a person rather than a toggle,
+ * because there was no column to persist one. There is now, and `maySend`
+ * reads it before every send.
+ */
+.account-subhead {
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: var(--text-sm-size);
+  color: var(--text-heading);
+}
+
+.notify-switches {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+
+/* 44px, because this is the control the whole section exists for. */
+.notify-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.notify-switch:hover {
+  background: var(--surface-sunken);
+}
+
+.notify-switch input {
+  width: 20px;
+  height: 20px;
+  margin-top: var(--space-05);
+  flex: none;
+}
+
+.notify-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+}
+
+.notify-switch-label {
+  color: var(--text-primary);
+}
+
+.notify-switch-detail {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.notify-error {
+  margin: 0;
+  color: var(--danger-base);
+  font-size: var(--text-sm-size);
+}

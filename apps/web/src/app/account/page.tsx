@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { accountSecurity, currentSession, logoutAction } from "../../server/auth/actions";
+import { notificationSettings } from "../../server/messaging/actions";
+import { NotificationSwitches } from "./notification-switches";
 import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
 import { SignOutButton } from "./sign-out-button";
@@ -17,6 +19,7 @@ export default async function AccountPage() {
     redirect("/login?next=/account");
   }
   const security = await accountSecurity();
+  const settings = await notificationSettings();
   return (
     <ToastProvider>
       <main className="account">
@@ -43,18 +46,18 @@ export default async function AccountPage() {
           {security !== null ? <SecurityPanels security={security} /> : null}
 
           {/*
-            NOTIFICATIONS — disclosure, not a toggle.
+            NOTIFICATIONS — disclosure AND, now, real switches.
 
-            The product sends real SMS to non-organisers: an approve, reject or
-            waitlist decision texts every affected registrant
-            (server/competition/registration-notify.ts). There was no opt-in
-            record, no stated channel, no STOP handling and no mention of any of
-            it anywhere a user could find. Storing a preference needs a column,
-            and a migration is out of scope here — so this section states
-            exactly what is sent and how to stop it, and does NOT pretend to be
-            a switch. A toggle that cannot persist would be a worse lie than
-            silence. The real fix (a preference column, honoured by the sender)
-            is tracked and unbuilt.
+            This card used to say, honestly, that stopping registration SMS was
+            handled "by a person, not a switch — we would rather tell you that
+            than show you a toggle that does nothing", because storing a
+            preference needed a column nobody had written.
+
+            The column exists now (notification_preferences, migration 0023) and
+            `maySend` reads it before every send, so these switches stop
+            messages rather than recording an opinion. The disclosure stays
+            beside them: knowing what we send is not the same as being able to
+            stop it, and a person deserves both.
           */}
           <Card className="account-card" data-testid="notifications-panel">
             <h2>Notifications</h2>
@@ -68,21 +71,20 @@ export default async function AccountPage() {
                 By SMS, only when you ask for one. These cannot be turned off — they are how you get
                 into your account.
               </dd>
-              <dt>Registration decisions</dt>
-              <dd>
-                By SMS, when an organizer approves, waitlists or declines a season registration you
-                submitted. One message per decision.
-              </dd>
               <dt>Everything else</dt>
               <dd>
-                Stays in <Link href="/inbox">your notifications</Link> here in the app. No SMS, no
-                email.
+                Stays in <Link href="/inbox">your notifications</Link> here in the app.
               </dd>
             </dl>
+            <h3 className="account-subhead">What we may text you</h3>
             <p className="account-prose">
-              To stop registration SMS, <Link href="/support">contact support</Link> and we will
-              mark your number. During the beta this is handled by a person, not a switch — we would
-              rather tell you that than show you a toggle that does nothing.
+              Switch any of these off and we stop sending it. Sign-in codes are not on the list
+              because turning them off would lock you out of your own account.
+            </p>
+            {settings === null ? null : <NotificationSwitches settings={settings} />}
+            <p className="account-prose">
+              You can also reply <strong>STOP</strong> to any message to stop all of them at once,
+              and <strong>START</strong> to turn them back on.
             </p>
           </Card>
 

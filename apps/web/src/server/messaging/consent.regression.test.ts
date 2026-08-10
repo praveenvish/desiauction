@@ -2,15 +2,23 @@ import {
   consentRecords,
   createDb,
   newId,
+  notificationPreferences,
   people,
   suppressions as suppressionsTable,
   type DbHandle,
 } from "@desiauction/db";
-import { eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
-import { liftSuppression, maySend, recordConsent, suppress } from "./consent";
+import {
+  liftSuppression,
+  maySend,
+  preferencesFor,
+  recordConsent,
+  setPreference,
+  suppress,
+} from "./consent";
 import { applyInbound } from "./inbound";
 
 /**
@@ -41,6 +49,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(notificationPreferences).where(eq(notificationPreferences.personId, plainId));
+  await db.delete(consentRecords).where(eq(consentRecords.personId, plainId));
   await db.delete(suppressionsTable).where(like(suppressionsTable.contact, `%${RUN}%`));
   await db.delete(people).where(inArray(people.phone, PHONES));
   await handle.sql.end({ timeout: 5 });
@@ -201,6 +211,72 @@ describe("an inbound STOP closes the loop", () => {
   });
 });
 
+describe("the per-topic switch on /account", () => {
+  it("stops a transactional message for the topic it names, and nothing else", async () => {
+    // The correction to the original design: the plan said transactional
+    // ignores preferences, which would have made every switch on /account
+    // decorative, since transactional is all this product sends.
+    await setPreference(db, {
+      personId: plainId,
+      topic: "registration",
+      channel: "sms",
+      allowed: false,
+    });
+    const off = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+      personId: plainId,
+    });
+    const other = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "auction",
+      personId: plainId,
+    });
+    expect(off.send).toBe(false);
+    if (!off.send) {
+      expect(off.reason).toBe("opted_out");
+    }
+    expect(other.send, "switching off registrations must not silence auctions").toBe(true);
+  });
+
+  it("defaults to ON, so nobody has to opt in to their own decision", async () => {
+    const current = await preferencesFor(db, plainId, "sms");
+    expect(current["auction"], "a topic with no row is allowed").toBe(true);
+    expect(current["registration"], "the one switched off stays off").toBe(false);
+  });
+
+  it("turns back on, and leaves consent evidence for both changes", async () => {
+    await setPreference(db, {
+      personId: plainId,
+      topic: "registration",
+      channel: "sms",
+      allowed: true,
+    });
+    const back = await maySend(db, {
+      contact: PHONE_PLAIN,
+      channel: "sms",
+      category: "transactional",
+      scope: "registration",
+      personId: plainId,
+    });
+    expect(back.send).toBe(true);
+    // The setting is upserted — one row — but each change leaves its own
+    // consent record, because "when did they turn this off?" is a question
+    // about the past that a setting cannot answer.
+    const evidence = await db
+      .select({ granted: consentRecords.granted })
+      .from(consentRecords)
+      .where(
+        and(eq(consentRecords.personId, plainId), eq(consentRecords.purpose, "sms.registration")),
+      );
+    expect(evidence.length, "off and on both recorded").toBe(2);
+  });
+});
+
 describe("promotional needs a recorded opt-in", () => {
   it("refuses without one", async () => {
     const decision = await maySend(db, {
@@ -264,10 +340,15 @@ describe("promotional needs a recorded opt-in", () => {
   });
 
   it("keeps both rows, so what they agreed to and when stays answerable", async () => {
+    // Scoped to THIS purpose. It used to count every row for the person, which
+    // was only ever right by accident — the account switches write consent rows
+    // of their own, so an unscoped count measures unrelated agreements.
     const rows = await db
       .select({ granted: consentRecords.granted })
       .from(consentRecords)
-      .where(eq(consentRecords.personId, plainId));
+      .where(
+        and(eq(consentRecords.personId, plainId), eq(consentRecords.purpose, "sms.promotional")),
+      );
     expect(rows.length, "append-only: the grant and the withdrawal both survive").toBe(2);
   });
 });

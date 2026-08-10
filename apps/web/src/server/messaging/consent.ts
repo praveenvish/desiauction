@@ -1,4 +1,10 @@
-import { consentRecords, newId, suppressions, type Db } from "@desiauction/db";
+import {
+  consentRecords,
+  newId,
+  notificationPreferences,
+  suppressions,
+  type Db,
+} from "@desiauction/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import type { MessageCategory } from "./templates";
@@ -24,7 +30,8 @@ import type { MessageCategory } from "./templates";
  */
 
 export type SendDecision =
-  { readonly send: true } | { readonly send: false; readonly reason: "suppressed" | "no_consent" };
+  | { readonly send: true }
+  | { readonly send: false; readonly reason: "suppressed" | "opted_out" | "no_consent" };
 
 /**
  * May we send this category to this contact right now?
@@ -59,10 +66,41 @@ export async function maySend(
   if (blocked.length > 0) {
     return { send: false, reason: "suppressed" };
   }
+  /*
+   * The per-topic preference, and a correction to the original design.
+   *
+   * The plan said transactional messages ignore preferences entirely. That is
+   * right about CONSENT — you should not have to opt in to being told your own
+   * registration was approved — and wrong about CONTROL. It would mean the
+   * per-topic switches on /account did nothing for the only category this
+   * product actually sends, and the copy there already promises otherwise.
+   *
+   * So the preference is honoured for every category. What differs is the
+   * DEFAULT when no row exists: transactional is allowed until switched off,
+   * promotional refused until switched on.
+   *
+   * Sign-in codes are unaffected because they never reach this function.
+   */
+  if (input.personId !== undefined) {
+    const [preference] = await db
+      .select({ allowed: notificationPreferences.allowed })
+      .from(notificationPreferences)
+      .where(
+        and(
+          eq(notificationPreferences.personId, input.personId),
+          eq(notificationPreferences.topic, input.scope),
+          eq(notificationPreferences.channel, input.channel),
+        ),
+      )
+      .limit(1);
+    if (preference !== undefined && !preference.allowed) {
+      return { send: false, reason: "opted_out" };
+    }
+  }
   if (input.category === "transactional") {
-    // Transactional messages are the direct consequence of something the person
-    // did, and the DLT regime allows them to numbers on the DND registry. They
-    // need no opt-in — only the absence of a STOP, checked above.
+    // The direct consequence of something the person did, and the DLT regime
+    // allows these to numbers on the DND registry. No opt-in required — only
+    // the absence of a STOP and of an explicit switch-off, both checked above.
     return { send: true };
   }
   if (input.personId === undefined) {
@@ -137,6 +175,87 @@ export async function suppress(
     scope: input.scope ?? "global",
     reason: input.reason,
     note: input.note ?? null,
+  });
+}
+
+/** The topics a person can switch, in the order /account shows them. */
+export const NOTIFICATION_TOPICS = [
+  {
+    topic: "registration",
+    label: "Registration decisions",
+    detail: "When an organizer approves, waitlists or declines you.",
+  },
+  {
+    topic: "auction",
+    label: "Auction updates",
+    detail: "When an auction you are in is about to start, and how it went.",
+  },
+  {
+    topic: "money",
+    label: "Receipts and money",
+    detail: "When a club issues you a receipt or records a payment.",
+  },
+] as const;
+
+/** Every topic's current answer for one person, defaulted where unset. */
+export async function preferencesFor(
+  db: Db,
+  personId: string,
+  channel: "sms" | "email" | "in-app",
+): Promise<Record<string, boolean>> {
+  const rows = await db
+    .select({ topic: notificationPreferences.topic, allowed: notificationPreferences.allowed })
+    .from(notificationPreferences)
+    .where(
+      and(
+        eq(notificationPreferences.personId, personId),
+        eq(notificationPreferences.channel, channel),
+      ),
+    );
+  const set = new Map(rows.map((row) => [row.topic, row.allowed]));
+  // Absent means ON for these, all of which are transactional. See `maySend`.
+  return Object.fromEntries(
+    NOTIFICATION_TOPICS.map(({ topic }) => [topic, set.get(topic) ?? true]),
+  );
+}
+
+/**
+ * Set one switch. Upserts, because this is a SETTING — the person's current
+ * answer, not a record of what they once said. The evidence of the change goes
+ * to `consent_records`, which is where evidence belongs.
+ */
+export async function setPreference(
+  db: Db,
+  input: {
+    personId: string;
+    topic: string;
+    channel: "sms" | "email" | "in-app";
+    allowed: boolean;
+  },
+): Promise<void> {
+  await db
+    .insert(notificationPreferences)
+    .values({
+      id: newId(),
+      personId: input.personId,
+      topic: input.topic,
+      channel: input.channel,
+      allowed: input.allowed,
+    })
+    .onConflictDoUpdate({
+      target: [
+        notificationPreferences.personId,
+        notificationPreferences.topic,
+        notificationPreferences.channel,
+      ],
+      set: { allowed: input.allowed, updatedAt: new Date() },
+    });
+  await recordConsent(db, {
+    personId: input.personId,
+    purpose: `${input.channel}.${input.topic}`,
+    granted: input.allowed,
+    source: "account",
+    evidence: { via: "account notification settings" },
   });
 }
 

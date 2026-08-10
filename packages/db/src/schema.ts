@@ -123,6 +123,42 @@ export const consentRecords = pgTable(
 );
 
 /**
+ * WHAT A PERSON WANTS, PER TOPIC AND PER CHANNEL.
+ *
+ * Distinct from `suppressions`, which is a hard stop keyed by a contact and
+ * often arrives from someone with no account. This is the softer, per-account
+ * control: "tell me about registrations but not auction reminders."
+ *
+ * The absence of a row is NOT neutral, and the default differs by category:
+ * a transactional topic is allowed until someone turns it off, a promotional
+ * one is refused until someone turns it on. That asymmetry is the whole point —
+ * you should not have to opt in to being told your own registration was
+ * approved, and we should not be able to market at you because you never
+ * noticed a switch.
+ *
+ * Sign-in codes are absent on purpose. They do not pass the preference gate at
+ * all, because a person who switches off "SMS" and then cannot log in has been
+ * handed a worse outcome than the one they were avoiding.
+ */
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    /** `registration`, `auction`, `money`, `marketing`. */
+    topic: text("topic").notNull(),
+    channel: text("channel", { enum: ["sms", "email", "in-app"] }).notNull(),
+    allowed: boolean("allowed").notNull(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    // One live answer per person, per topic, per channel. Changing your mind
+    // updates the row — unlike consent, this is a setting and not evidence.
+    uniqueIndex("notification_pref_uq").on(table.personId, table.topic, table.channel),
+  ],
+);
+
+/**
  * ADDRESSES WE MUST NOT SEND TO.
  *
  * Keyed by the CONTACT, not by a person, and that is the point: a STOP arrives
