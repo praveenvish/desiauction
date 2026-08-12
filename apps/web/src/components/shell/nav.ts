@@ -264,6 +264,10 @@ export function competitionTabs(slug: string, canSettle = false): CompetitionTab
       testId: "open-dashboard",
     },
     { key: "fixtures", label: "Fixtures", href: `${base}/fixtures`, testId: "open-fixtures" },
+    // The table sits beside the fixtures it is derived from. It reads for
+    // everyone who can see the season, not just officers — a league table only
+    // officers can open is not a league table.
+    { key: "standings", label: "Table", href: `${base}/standings`, testId: "open-standings" },
     { key: "auction", label: "Auction", href: `${base}/auction`, testId: "open-auction" },
     ...(canSettle ? [{ key: "money", label: "Money", href: `${base}/money` }] : []),
   ];
@@ -315,6 +319,9 @@ export function activeCompetitionTab(pathname: string, slug: string): string {
   if (pathname.startsWith(`${base}/fixtures`)) {
     return "fixtures";
   }
+  if (pathname.startsWith(`${base}/standings`)) {
+    return "standings";
+  }
   if (pathname.startsWith(`${base}/auction`) || pathname.startsWith(`${base}/readiness`)) {
     return "auction";
   }
@@ -343,6 +350,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/fixtures\/calendar$/, "Calendar"],
   [/\/fixtures\/match-day$/, "Match day"],
   [/\/fixtures$/, "Fixtures"],
+  [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
   [/\/auction\/engine$/, "Engine"],
   [/\/auction$/, "Auction"],

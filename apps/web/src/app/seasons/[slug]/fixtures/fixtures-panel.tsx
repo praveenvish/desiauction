@@ -34,6 +34,7 @@ import {
   type FixtureLifecycleAction,
 } from "../../../../server/competition/fixture-actions";
 import { formatDateTime, formatKickoff, formatWallDate } from "../../../../lib/format-date";
+import { ResultsCard } from "./results-card";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
 
 type Snapshot = FixtureDashboard["page"]["rows"][number];
@@ -81,6 +82,7 @@ export function FixturesPanel({
   teams,
   grounds: groundsProp,
   conflicts: conflictsProp,
+  results,
   canManage,
   filters,
 }: {
@@ -92,6 +94,7 @@ export function FixturesPanel({
   teams: FixtureDashboard["teams"];
   grounds?: FixtureDashboard["grounds"];
   conflicts?: FixtureDashboard["conflicts"];
+  results: FixtureDashboard["results"];
   canManage: boolean;
   filters: { status: string; team: string; ground: string; q: string; sort: string };
 }) {
@@ -739,6 +742,11 @@ export function FixturesPanel({
           </div>
         </Dialog>
       ) : null}
+
+      {/* The worklist nothing else surfaces: matches that were played and never
+          scored. A season quietly accumulates them, and the table's "6 of 20
+          results in" is the symptom rather than the place to fix it. */}
+      <ResultsCard slug={slug} fixtures={page.rows} results={results} canManage={canManage} />
 
       <Card>
         <form

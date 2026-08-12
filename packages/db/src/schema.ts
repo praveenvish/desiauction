@@ -525,6 +525,54 @@ export const grounds = pgTable(
   ],
 );
 
+/**
+ * WHO WON.
+ *
+ * A fixture could be scheduled, published, started and marked `completed` while
+ * the product recorded nothing about how it went — `fixtures` carries a status
+ * and four timestamps and stops. A club could run a whole tournament here and
+ * nothing could say who had won a single match.
+ *
+ * There is no standings table. Everything a league table shows is DERIVED from
+ * these rows: a stored table drifts from the results beneath it the first time
+ * somebody amends a scorecard, and a derived one cannot.
+ *
+ * OVERS ARE BALLS. 4.5 overs is four overs and five balls, not 4.5 of anything,
+ * and a net run rate computed on that decimal is quietly wrong all season. An
+ * integer ball count has none of that; the display converts back at the edge.
+ */
+export const fixtureResults = pgTable(
+  "fixture_results",
+  {
+    fixtureId: char("fixture_id", { length: 26 }).primaryKey(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    /**
+     * `no_result` and `abandoned` are distinct on purpose. A washed-out match
+     * that started is a no-result and shares the points; one that never started
+     * is abandoned. Leagues treat them differently, and collapsing both into
+     * "cancelled" makes the table wrong.
+     */
+    outcome: text("outcome", {
+      enum: ["home_win", "away_win", "tie", "no_result", "abandoned"],
+    }).notNull(),
+    winnerTeamId: char("winner_team_id", { length: 26 }),
+    homeRuns: integer("home_runs"),
+    homeWickets: integer("home_wickets"),
+    homeBalls: integer("home_balls"),
+    awayRuns: integer("away_runs"),
+    awayWickets: integer("away_wickets"),
+    awayBalls: integer("away_balls"),
+    /** "DLS", "super over", "conceded" — how, when not simply the higher score. */
+    method: text("method"),
+    note: text("note"),
+    recordedBy: char("recorded_by", { length: 26 }).notNull(),
+    recordedAt: ts("recorded_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("fixture_results_competition_idx").on(table.competitionId)],
+);
+
 export const fixtures = pgTable(
   "fixtures",
   {

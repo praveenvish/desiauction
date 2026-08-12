@@ -70,6 +70,7 @@ export default async function FixturesPage({
             teams={dashboard.teams}
             grounds={dashboard.grounds}
             conflicts={dashboard.conflicts}
+            results={dashboard.results}
             canManage={dashboard.viewer.canManage}
             filters={{
               status: sp["status"] ?? "",

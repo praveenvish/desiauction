@@ -65,19 +65,22 @@ describe("rail", () => {
 });
 
 describe("competition tabs", () => {
-  it("builds the five organizer tabs and resolves the active one", () => {
+  it("builds the six organizer tabs and resolves the active one", () => {
     const tabs = competitionTabs("mpl");
     expect(tabs.map((tab) => tab.key)).toEqual([
       "overview",
       "teams",
       "registrations",
       "fixtures",
+      // The table sits beside the fixtures it is derived from.
+      "standings",
       "auction",
     ]);
     expect(activeCompetitionTab("/seasons/mpl", "mpl")).toBe("overview");
     expect(activeCompetitionTab("/seasons/mpl/teams", "mpl")).toBe("teams");
     expect(activeCompetitionTab("/seasons/mpl/registrations", "mpl")).toBe("registrations");
     expect(activeCompetitionTab("/seasons/mpl/fixtures/calendar", "mpl")).toBe("fixtures");
+    expect(activeCompetitionTab("/seasons/mpl/standings", "mpl")).toBe("standings");
     expect(activeCompetitionTab("/seasons/mpl/auction/ledger", "mpl")).toBe("auction");
     // Readiness lives with the auction preparation context.
     expect(activeCompetitionTab("/seasons/mpl/readiness", "mpl")).toBe("auction");
@@ -96,6 +99,7 @@ describe("competition tabs", () => {
       "teams",
       "registrations",
       "fixtures",
+      "standings",
       "auction",
       "money",
     ]);

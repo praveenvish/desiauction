@@ -1,8 +1,9 @@
 "use server";
 
-import { parseFixtureCsv, type FixtureStatus } from "@desiauction/core";
+import { ballsOf, parseFixtureCsv, type FixtureStatus } from "@desiauction/core";
 import { organizations, withTenantDb, type Db } from "@desiauction/db";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -10,6 +11,13 @@ import { dbHandle, systemDb } from "../db";
 import { can } from "../orgs/authz";
 import { resolveTenant } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
+import {
+  isResultOutcome,
+  recordFixtureResult,
+  resultsOf,
+  standingsOf,
+  type StandingsView,
+} from "./results";
 import {
   resolveCompetition,
   teamsOf,
@@ -302,6 +310,14 @@ export interface FixtureDashboard {
   grounds?: GroundOption[];
   /** Absent without fixture.manage — an unfinished schedule's problems. */
   conflicts?: LabelledConflict[];
+  /**
+   * Recorded results for the fixtures on this page, keyed by fixture.
+   *
+   * Carried so a row can show its score, and so the panel can name the matches
+   * that were played and never scored — the state a season quietly accumulates
+   * and nothing else surfaces.
+   */
+  results: Record<string, { outcome: string; homeRuns: number | null; awayRuns: number | null }>;
   viewer: { canManage: boolean };
 }
 
@@ -331,7 +347,7 @@ export async function fixtureDashboard(
     // The gate runs FIRST; every read below is shaped by its answer.
     const canManage = await canCompetition(db, session.personId, scope, "fixture.manage");
     const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
-    const [orgSlug, stats, page, teamList, groundList, conflicts] = await Promise.all([
+    const [orgSlug, stats, page, teamList, groundList, conflicts, resultMap] = await Promise.all([
       orgSlugOf(db, competition.orgId),
       fixtureStats(db, competition.id, visible),
       queryFixtures(db, competition.id, {
@@ -349,6 +365,7 @@ export async function fixtureDashboard(
       teamsOf(db, competition.id),
       canManage ? activeGroundsOf(db, competition.orgId) : Promise.resolve(undefined),
       canManage ? competitionConflicts(db, competition) : Promise.resolve(undefined),
+      resultsOf(db, competition.id),
     ]);
     return {
       competition,
@@ -358,6 +375,12 @@ export async function fixtureDashboard(
       teams: teamList,
       ...(groundList !== undefined ? { grounds: groundList } : {}),
       ...(conflicts !== undefined ? { conflicts } : {}),
+      results: Object.fromEntries(
+        [...resultMap.entries()].map(([fixtureId, row]) => [
+          fixtureId,
+          { outcome: row.outcome, homeRuns: row.homeRuns, awayRuns: row.awayRuns },
+        ]),
+      ),
       viewer: { canManage },
     };
   });
@@ -736,4 +759,141 @@ export async function exportFixturesAction(
     csv: serializeScheduleCsv(snapshot),
     filename: `${gate.competition.slug}-fixtures.csv`,
   };
+}
+
+// --- Results and standings ------------------------------------------------------------
+//
+// A fixture could be scheduled, published, started and marked `completed` while
+// the product recorded nothing about how it went. Everything below exists so a
+// season has an answer to "who won" and "who is top".
+
+export interface StandingsPageView {
+  readonly competition: CompetitionSummary;
+  readonly standings: StandingsView;
+  readonly viewer: { canManage: boolean };
+}
+
+/**
+ * The table. Public to anyone who can see the competition — a league table that
+ * only officers can read is not a league table.
+ */
+export async function standingsView(slug: string): Promise<StandingsPageView | null> {
+  const session = await requireSession();
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  if (competition === null) {
+    return null;
+  }
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [canManage, standings] = await Promise.all([
+      canCompetition(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "fixture.manage",
+      ),
+      standingsOf(db, competition.id),
+    ]);
+    return { competition, standings, viewer: { canManage } };
+  });
+}
+
+/**
+ * Record or amend a result.
+ *
+ * Overs arrive as the "18.3" a scorer writes and are converted to BALLS here,
+ * at the edge. `ballsOf` refuses `.6` rather than folding it to the next over:
+ * somebody typing 4.6 has made a mistake, and reading it as 5.0 buries that in
+ * a number nobody re-checks.
+ */
+export async function recordResultAction(
+  slug: string,
+  fixtureId: string,
+  input: {
+    outcome: string;
+    homeRuns?: string;
+    homeWickets?: string;
+    homeOvers?: string;
+    awayRuns?: string;
+    awayWickets?: string;
+    awayOvers?: string;
+    method?: string;
+    note?: string;
+  },
+): Promise<{ ok: boolean; error?: string | undefined; amended?: boolean | undefined }> {
+  const session = await requireSession();
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  const outcome = input.outcome;
+  if (!isResultOutcome(outcome)) {
+    return { ok: false, error: "Pick how the match ended." };
+  }
+  const number = (raw?: string): number | null | undefined => {
+    if (raw === undefined || raw.trim() === "") {
+      return null;
+    }
+    const value = Number(raw);
+    return Number.isSafeInteger(value) ? value : undefined;
+  };
+  const overs = (raw?: string): number | null | undefined => {
+    if (raw === undefined || raw.trim() === "") {
+      return null;
+    }
+    return ballsOf(raw) ?? undefined;
+  };
+  const fields = {
+    homeRuns: number(input.homeRuns),
+    homeWickets: number(input.homeWickets),
+    homeBalls: overs(input.homeOvers),
+    awayRuns: number(input.awayRuns),
+    awayWickets: number(input.awayWickets),
+    awayBalls: overs(input.awayOvers),
+  };
+  if (Object.values(fields).includes(undefined)) {
+    // Named specifically, because "invalid input" on a six-field form sends a
+    // scorer hunting. Overs are the field people get wrong.
+    return {
+      ok: false,
+      error: "Check the numbers — overs are written like 18.3, and .6 is not an over.",
+    };
+  }
+
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    try {
+      await requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "fixture.manage",
+      );
+    } catch {
+      return { ok: false, error: "You can't record results for this competition." };
+    }
+    const result = await recordFixtureResult(db, {
+      orgId: competition.orgId,
+      fixtureId,
+      actorId: session.personId,
+      result: {
+        outcome,
+        ...(fields as Record<string, number | null>),
+        method: input.method?.trim() === "" ? null : (input.method ?? null),
+        note: input.note?.trim() === "" ? null : (input.note ?? null),
+      },
+    });
+    if (!result.ok) {
+      const message: Record<typeof result.reason, string> = {
+        unknown_fixture: "That fixture is not in this competition.",
+        not_played:
+          "That match has not been played. Publish it, start it and complete it before recording a result.",
+        impossible_score: "That score cannot be right — check runs and wickets.",
+        winner_without_score:
+          "A result with a winner needs both scores. Use 'no result' if the match did not finish.",
+      };
+      return { ok: false, error: message[result.reason] };
+    }
+    revalidatePath(`/seasons/${slug}/fixtures`);
+    revalidatePath(`/seasons/${slug}/standings`);
+    return { ok: true, amended: result.amended };
+  });
 }

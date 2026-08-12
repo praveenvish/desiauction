@@ -32,6 +32,7 @@ import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { canCompetition } from "./authz";
+import { recordFixtureResult, resultOf, standingsOf } from "./results";
 import { createCompetition, createTeam, type CompetitionSummary } from "./competitions";
 import {
   cancelFixture,
@@ -840,5 +841,171 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
       pageSize: 25,
     });
     expect(beyond.rows.length).toBe(0);
+  });
+});
+
+describe("RESULTS — who won, and the table derived from it", () => {
+  /*
+   * A fixture could be scheduled, published, started and marked `completed`
+   * while the product recorded NOTHING about how it went. A club could run a
+   * whole season here and nothing could say who won a match.
+   *
+   * The table is derived on every read rather than stored. What is asserted
+   * here is that the derivation reads the FIXTURES as the authority on whether
+   * a match stands — a result whose fixture was cancelled must stop counting,
+   * which a stored table would get wrong until somebody rebuilt it.
+   */
+  let played = "";
+
+  it("refuses a result for a match that was not played", async () => {
+    const [draft] = await db
+      .select({ id: fixturesTable.id })
+      .from(fixturesTable)
+      .where(and(eq(fixturesTable.competitionId, comp.id), eq(fixturesTable.status, "published")))
+      .limit(1);
+    const target = draft?.id ?? "";
+    expect(target).not.toBe("");
+    // Published is not played. A score on a game nobody turned up to would go
+    // into the table exactly as if it had been.
+    await db.update(fixturesTable).set({ status: "scheduled" }).where(eq(fixturesTable.id, target));
+    expect(
+      await recordFixtureResult(db, {
+        orgId: org.id,
+        fixtureId: target,
+        actorId: owner,
+        result: { outcome: "home_win", homeRuns: 100, awayRuns: 90 },
+      }),
+    ).toEqual({ ok: false, reason: "not_played" });
+    await db.update(fixturesTable).set({ status: "completed" }).where(eq(fixturesTable.id, target));
+    played = target;
+  });
+
+  it("refuses a declared winner with no score behind it", async () => {
+    // Otherwise two points land on the table from a result that says nothing
+    // about how anybody played, and contributes nothing to run rate.
+    expect(
+      await recordFixtureResult(db, {
+        orgId: org.id,
+        fixtureId: played,
+        actorId: owner,
+        result: { outcome: "home_win" },
+      }),
+    ).toEqual({ ok: false, reason: "winner_without_score" });
+  });
+
+  it("refuses an impossible score rather than storing it", async () => {
+    expect(
+      await recordFixtureResult(db, {
+        orgId: org.id,
+        fixtureId: played,
+        actorId: owner,
+        result: { outcome: "home_win", homeRuns: 100, homeWickets: 11, awayRuns: 90 },
+      }),
+    ).toEqual({ ok: false, reason: "impossible_score" });
+  });
+
+  it("records a result, and AMENDING it replaces rather than accumulates", async () => {
+    const first = await recordFixtureResult(db, {
+      orgId: org.id,
+      fixtureId: played,
+      actorId: owner,
+      result: {
+        outcome: "home_win",
+        homeRuns: 180,
+        homeWickets: 4,
+        homeBalls: 120,
+        awayRuns: 150,
+        awayWickets: 8,
+        awayBalls: 120,
+      },
+    });
+    expect(first).toEqual({ ok: true, amended: false });
+
+    // A scorer correcting themselves — a misread board, a late penalty run.
+    const second = await recordFixtureResult(db, {
+      orgId: org.id,
+      fixtureId: played,
+      actorId: owner,
+      result: {
+        outcome: "home_win",
+        homeRuns: 181,
+        homeWickets: 4,
+        homeBalls: 120,
+        awayRuns: 150,
+        awayWickets: 8,
+        awayBalls: 120,
+      },
+    });
+    expect(second, "the second is an amendment, and says so").toEqual({ ok: true, amended: true });
+
+    const stored = await resultOf(db, played);
+    expect(stored?.homeRuns, "one row, the current truth").toBe(181);
+    // Named apart from the first recording: "who changed this afterwards" is
+    // the question an aggrieved club asks, and one action cannot answer it.
+    const actions = (
+      await db
+        .select({ action: auditLog.action })
+        .from(auditLog)
+        .where(eq(auditLog.subject, played))
+    ).map((row) => row.action);
+    expect(actions).toContain("fixture.result.recorded");
+    expect(actions).toContain("fixture.result.amended");
+  });
+
+  it("derives the table, and the FIXTURE decides whether a result still counts", async () => {
+    const before = await standingsOf(db, comp.id);
+    expect(before.recorded).toBe(1);
+    const leader = before.rows[0];
+    expect(leader?.played).toBe(1);
+    expect(leader?.points).toBe(2);
+    // Every team gets a row, including the four that have not played.
+    expect(before.rows.length).toBeGreaterThan(1);
+
+    /*
+     * The property a stored table would get wrong. Cancelling the fixture must
+     * remove its result from the standings immediately — the fixture is the
+     * authority on whether the match stands, and a stale result must not hold
+     * points open until somebody remembers to rebuild.
+     */
+    await db.update(fixturesTable).set({ status: "cancelled" }).where(eq(fixturesTable.id, played));
+    const after = await standingsOf(db, comp.id);
+    expect(after.recorded, "a cancelled fixture takes its result out of the table").toBe(0);
+    expect(after.rows.every((row) => row.played === 0)).toBe(true);
+    await db.update(fixturesTable).set({ status: "completed" }).where(eq(fixturesTable.id, played));
+  });
+
+  it("RLS: a rival tenant, and no tenant at all, read no results", async () => {
+    /*
+     * Through a real `nobypassrls` role, like the fixture proof above. The
+     * default handle in this suite is the database owner, so a query through it
+     * proves nothing about the policy — an earlier draft of this test passed a
+     * cross-tenant read and would have called an unprotected table protected.
+     */
+    const role = `res_rls_${RUN}`;
+    await handle.sql.unsafe(`drop role if exists ${role}`);
+    await handle.sql.unsafe(`create role ${role} login password 'probe' nosuperuser nobypassrls`);
+    await handle.sql.unsafe(`grant select on fixture_results to ${role}`);
+    const url = new URL(env.DATABASE_URL);
+    const probeHandle = createDb(
+      `postgres://${role}:probe@${url.hostname}:${url.port}${url.pathname}`,
+    );
+    const probe = probeHandle.sql;
+    try {
+      const mine = await probe.begin(async (tx) => {
+        await tx`select set_config('app.org_id', ${org.id}, true)`;
+        return tx`select * from fixture_results where fixture_id = ${played}`;
+      });
+      expect(mine.length, "the owning tenant sees its own result").toBe(1);
+      const cross = await probe.begin(async (tx) => {
+        await tx`select set_config('app.org_id', ${orgRival.id}, true)`;
+        return tx`select * from fixture_results where fixture_id = ${played}`;
+      });
+      expect(cross.length, "a rival club cannot read this club's scores").toBe(0);
+      expect((await probe`select * from fixture_results`).length, "no tenant, no rows").toBe(0);
+    } finally {
+      await probe.end();
+      await handle.sql.unsafe(`drop owned by ${role}`);
+      await handle.sql.unsafe(`drop role if exists ${role}`);
+    }
   });
 });

@@ -197,6 +197,8 @@ export type {
 } from "./auction";
 export { buildAuctionLedger } from "./auction-ledger";
 export type { AuctionLedgerRow } from "./auction-ledger";
+export { DEFAULT_POINTS, ballsOf, buildStandings, compareStandings, oversOf } from "./standings";
+export type { FixtureResultInput, PointsPolicy, ResultOutcome, StandingsRow } from "./standings";
 export { deriveCeremony } from "./auction-ceremony";
 export type { CeremonyPhase, CeremonyState } from "./auction-ceremony";
 export {
