@@ -32,19 +32,25 @@ export default defineConfig({
       url: "http://127.0.0.1:3050/healthz",
       reuseExistingServer: !process.env["CI"],
       timeout: 60_000,
-      // Raise the dev-server heap ceiling: across the full 25-spec suite the
-      // default heap fills and Next restarts the worker mid-test ("approaching
-      // memory threshold, restarting"), which ECONNRESETs in-flight requests and
-      // cascades into failures/flakes. A larger heap keeps one stable server for
-      // the whole run. (CI uses a pre-compiled server and is unaffected.)
+      // The dev-server heap ceiling, and it went the WRONG WAY twice.
       //
-      // 2026-07-25: 4096 was still not enough. A run observed FOUR
-      // "approaching the used memory threshold, restarting" events inside the
-      // first ~20 tests, so several failures in that run were the harness
-      // dropping in-flight requests rather than the product. Raised to 8192.
-      // If restarts reappear at this ceiling, stop raising it and look for a
-      // leak instead — the number is already well past what one dev server
-      // should need.
+      // It was raised 4096 -> 8192 chasing "Server is approaching the used
+      // memory threshold, restarting". Each restart drops in-flight requests,
+      // which surfaces as ECONNRESET and a form stuck mid-submit — and reads
+      // exactly like an application bug. Seven restarts were observed in one
+      // run at 8192.
+      //
+      // LOWERING IT WAS TRIED AND IS WORSE. 3072 was measured against 8192 on
+      // this machine: 8192 gave 7 restarts with tests progressing, 3072 gave 10
+      // restarts with nothing passing at all. V8 simply hits a lower ceiling
+      // sooner. The idea that a smaller heap would make GC keep up does not
+      // survive contact with the numbers, and the measurement is recorded here
+      // so nobody spends another afternoon on it.
+      //
+      // So 8192 stays, and it is a WORKAROUND, not a fix. The dev server really
+      // does grow past 8GB compiling ~40 routes across a 111-test run. The next
+      // move is not another number: it is the pre-compiled server CI already
+      // uses (see e2e/README or the `dev/inbox` note), or a real leak hunt.
       env: {
         ...process.env,
         NODE_OPTIONS: "--max-old-space-size=8192",

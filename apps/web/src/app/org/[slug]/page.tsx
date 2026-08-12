@@ -4,6 +4,7 @@ import {
   Card,
   Stat,
   StatRow,
+  AnnouncerProvider,
   ToastProvider,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -573,30 +574,36 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   // confidence. It says nothing now unless the database said it.
   const established = overview === null ? null : new Date(overview.createdAt).getFullYear();
 
+  /*
+   * The Notifications tab's switches announce their state changes to a screen
+   * reader, and `useAnnouncer` throws without this ancestor — a runtime-only
+   * error that neither the build nor the integration suite can see.
+   */
   return (
-    <ToastProvider>
-      {/* "You've joined X" — the confirmation acceptance never gave. */}
-      <JoinedToast />
-      <main className="org-detail">
-        {/* The org's name IS the shell's h1, one row up and sticky — the hero
+    <AnnouncerProvider>
+      <ToastProvider>
+        {/* "You've joined X" — the confirmation acceptance never gave. */}
+        <JoinedToast />
+        <main className="org-detail">
+          {/* The org's name IS the shell's h1, one row up and sticky — the hero
             keeps the identity that only it can show: mark, role, age, handle. */}
-        <PageTitle title={view.org.name} testId="org-name" />
-        <div className="od-stack">
-          <header className="od-hero">
-            <span className="od-monogram" aria-hidden>
-              {monogram(view.org.name)}
-            </span>
-            <div className="od-hero-id">
-              <div className="od-hero-title">
-                {overview !== null ? <Badge tone="info">{overview.role}</Badge> : null}
+          <PageTitle title={view.org.name} testId="org-name" />
+          <div className="od-stack">
+            <header className="od-hero">
+              <span className="od-monogram" aria-hidden>
+                {monogram(view.org.name)}
+              </span>
+              <div className="od-hero-id">
+                <div className="od-hero-title">
+                  {overview !== null ? <Badge tone="info">{overview.role}</Badge> : null}
+                </div>
+                <p className="od-hero-meta">
+                  {established === null ? null : <span>Est. {established}</span>}
+                  <span className="od-hero-slug">/{view.org.slug}</span>
+                </p>
               </div>
-              <p className="od-hero-meta">
-                {established === null ? null : <span>Est. {established}</span>}
-                <span className="od-hero-slug">/{view.org.slug}</span>
-              </p>
-            </div>
-            <div className="od-hero-actions">
-              {/* At the org level the thing you create is a TOURNAMENT — seasons
+              <div className="od-hero-actions">
+                {/* At the org level the thing you create is a TOURNAMENT — seasons
                   are added inside one. The Tournaments tab used to repeat this
                   button; now the hero owns it and the tab just lists.
 
@@ -605,22 +612,23 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                   organization." A button whose only outcome is a refusal is
                   worse than no button — four lines above, AboutBanner had been
                   taking `canManage` and doing exactly this all along. */}
-              {view.viewer.canCreateTournament ? (
-                <FormDialog
-                  title="New tournament"
-                  triggerLabel="+ New tournament"
-                  size="touch"
-                  triggerTestId="org-new-tournament"
-                >
-                  <CreateTournamentForm orgs={[{ id: view.org.id, name: view.org.name }]} />
-                </FormDialog>
-              ) : null}
-            </div>
-          </header>
+                {view.viewer.canCreateTournament ? (
+                  <FormDialog
+                    title="New tournament"
+                    triggerLabel="+ New tournament"
+                    size="touch"
+                    triggerTestId="org-new-tournament"
+                  >
+                    <CreateTournamentForm orgs={[{ id: view.org.id, name: view.org.name }]} />
+                  </FormDialog>
+                ) : null}
+              </div>
+            </header>
 
-          <OrgTabs tabs={tabs} />
-        </div>
-      </main>
-    </ToastProvider>
+            <OrgTabs tabs={tabs} />
+          </div>
+        </main>
+      </ToastProvider>
+    </AnnouncerProvider>
   );
 }

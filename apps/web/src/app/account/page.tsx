@@ -1,4 +1,4 @@
-import { Card, PageIntro, ToastProvider } from "@desiauction/ui";
+import { AnnouncerProvider, Card, PageIntro, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -27,11 +27,19 @@ export default async function AccountPage() {
   const security = await accountSecurity();
   const settings = await notificationSettings();
   const email = await accountEmail();
+  /*
+   * The switches below announce their own state changes to a screen reader, and
+   * `useAnnouncer` THROWS without this ancestor. That is a runtime error the
+   * build and the 600-test integration suite cannot see, because it only
+   * happens when the component actually renders in a browser — the e2e suite
+   * caught it, which is the whole argument for having one.
+   */
   return (
-    <ToastProvider>
-      <main className="account">
-        <div className="account-stack">
-          {/*
+    <AnnouncerProvider>
+      <ToastProvider>
+        <main className="account">
+          <div className="account-stack">
+            {/*
             The "Active session" badge that used to sit here consulted nothing:
             it was a constant, rendered beside a page you cannot reach without a
             session. The sessions panel below states the same fact from the
@@ -42,22 +50,22 @@ export default async function AccountPage() {
             two with no heading at all, so a screen-reader user met a definition
             list between the h1 and "Profile". One identity card now.
           */}
-          <PageIntro />
-          <ProfilePanel
-            personId={session.personId}
-            phone={session.phone}
-            name={session.name}
-            passkeyCount={security?.passkeys.length ?? 0}
-            signOut={<SignOutButton logout={logoutAction} />}
-          />
-          {/* Beside the identity it belongs to, and above Security: this is a
+            <PageIntro />
+            <ProfilePanel
+              personId={session.personId}
+              phone={session.phone}
+              name={session.name}
+              passkeyCount={security?.passkeys.length ?? 0}
+              signOut={<SignOutButton logout={logoutAction} />}
+            />
+            {/* Beside the identity it belongs to, and above Security: this is a
               contact route the product will actually use, not a credential. */}
-          <Card>
-            <EmailVerify current={email.email} verified={email.verified} />
-          </Card>
-          {security !== null ? <SecurityPanels security={security} /> : null}
+            <Card>
+              <EmailVerify current={email.email} verified={email.verified} />
+            </Card>
+            {security !== null ? <SecurityPanels security={security} /> : null}
 
-          {/*
+            {/*
             NOTIFICATIONS — disclosure AND, now, real switches.
 
             This card used to say, honestly, that stopping registration SMS was
@@ -71,36 +79,36 @@ export default async function AccountPage() {
             beside them: knowing what we send is not the same as being able to
             stop it, and a person deserves both.
           */}
-          <Card className="account-card" data-testid="notifications-panel">
-            <h2>Notifications</h2>
-            <p className="account-prose">
-              We use your mobile number for two things, and nothing else. We never sell it, and we
-              never use it for marketing.
-            </p>
-            <dl className="account-facts">
-              <dt>Sign-in codes</dt>
-              <dd>
-                By SMS, only when you ask for one. These cannot be turned off — they are how you get
-                into your account.
-              </dd>
-              <dt>Everything else</dt>
-              <dd>
-                Stays in <Link href="/inbox">your notifications</Link> here in the app.
-              </dd>
-            </dl>
-            <h3 className="account-subhead">What we may text you</h3>
-            <p className="account-prose">
-              Switch any of these off and we stop sending it. Sign-in codes are not on the list
-              because turning them off would lock you out of your own account.
-            </p>
-            {settings === null ? null : <NotificationSwitches settings={settings} />}
-            <p className="account-prose">
-              You can also reply <strong>STOP</strong> to any message to stop all of them at once,
-              and <strong>START</strong> to turn them back on.
-            </p>
-          </Card>
+            <Card className="account-card" data-testid="notifications-panel">
+              <h2>Notifications</h2>
+              <p className="account-prose">
+                We use your mobile number for two things, and nothing else. We never sell it, and we
+                never use it for marketing.
+              </p>
+              <dl className="account-facts">
+                <dt>Sign-in codes</dt>
+                <dd>
+                  By SMS, only when you ask for one. These cannot be turned off — they are how you
+                  get into your account.
+                </dd>
+                <dt>Everything else</dt>
+                <dd>
+                  Stays in <Link href="/inbox">your notifications</Link> here in the app.
+                </dd>
+              </dl>
+              <h3 className="account-subhead">What we may text you</h3>
+              <p className="account-prose">
+                Switch any of these off and we stop sending it. Sign-in codes are not on the list
+                because turning them off would lock you out of your own account.
+              </p>
+              {settings === null ? null : <NotificationSwitches settings={settings} />}
+              <p className="account-prose">
+                You can also reply <strong>STOP</strong> to any message to stop all of them at once,
+                and <strong>START</strong> to turn them back on.
+              </p>
+            </Card>
 
-          {/*
+            {/*
             YOUR DATA — the deletion path the product did not have.
 
             Zero hits for `deleteAccount|delete my account|erasure` across the
@@ -110,32 +118,33 @@ export default async function AccountPage() {
             page nobody opens. A manual, staffed process is defensible at beta
             scale. An undiscoverable one is not. This is the discoverable one.
           */}
-          <Card className="account-card" data-testid="your-data-panel">
-            <h2>Your data</h2>
-            <p className="account-prose">
-              You can ask us to delete your account. Where your data appears only in your own
-              profile, we delete it. Where it appears in a shared, permanent record — an auction you
-              bid in, a receipt issued to you — we anonymize your name and number instead of
-              destroying the record, so the tournament&rsquo;s history stays intact for everyone
-              else in it.
-            </p>
-            <p className="account-prose">
-              <strong>To ask:</strong> email{" "}
-              <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
-                privacy@desiauction.in
-              </a>{" "}
-              from the number on this account, or from an address we can verify against it. We reply
-              within seven days. You can also <Link href="/support">raise it through support</Link>{" "}
-              if you would rather not email.
-            </p>
-            <p className="account-prose account-links">
-              <Link href="/legal/data-retention">Data Retention policy</Link>
-              {" · "}
-              <Link href="/legal/privacy">Privacy Policy</Link>
-            </p>
-          </Card>
-        </div>
-      </main>
-    </ToastProvider>
+            <Card className="account-card" data-testid="your-data-panel">
+              <h2>Your data</h2>
+              <p className="account-prose">
+                You can ask us to delete your account. Where your data appears only in your own
+                profile, we delete it. Where it appears in a shared, permanent record — an auction
+                you bid in, a receipt issued to you — we anonymize your name and number instead of
+                destroying the record, so the tournament&rsquo;s history stays intact for everyone
+                else in it.
+              </p>
+              <p className="account-prose">
+                <strong>To ask:</strong> email{" "}
+                <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
+                  privacy@desiauction.in
+                </a>{" "}
+                from the number on this account, or from an address we can verify against it. We
+                reply within seven days. You can also{" "}
+                <Link href="/support">raise it through support</Link> if you would rather not email.
+              </p>
+              <p className="account-prose account-links">
+                <Link href="/legal/data-retention">Data Retention policy</Link>
+                {" · "}
+                <Link href="/legal/privacy">Privacy Policy</Link>
+              </p>
+            </Card>
+          </div>
+        </main>
+      </ToastProvider>
+    </AnnouncerProvider>
   );
 }
