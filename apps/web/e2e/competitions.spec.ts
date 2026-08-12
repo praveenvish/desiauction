@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { latestOtp } from "./otp";
 
 // M-IP3-1 founder journey: create an organization, create a competition, walk
 // its lifecycle to open registration, add a team, register a player from a
@@ -19,11 +20,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   // Await the send completing (data-step flips only after the action commits)
   // before reading the inbox — the login.spec idiom; a bare read races the mint.
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
-  const inbox = await page.context().newPage();
-  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
-  const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
-  await inbox.close();
-  await page.getByLabel("6-digit code").fill(code ?? "");
+  const code = await latestOtp(phone);
+  await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // Signed-in landing is never the login page itself (avoid matching /competitions
   // that appears inside a ?next= query string on a still-unauthenticated /login).

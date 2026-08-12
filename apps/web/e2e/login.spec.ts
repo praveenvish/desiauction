@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { latestOtp } from "./otp";
 
 // M-IP2-1 journey: phone → dev inbox → code → session → account → logout,
 // exactly as a founder demo runs it. Unique phone per run.
@@ -12,13 +13,10 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
 
-  const inbox = await page.context().newPage();
-  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${PHONE}`)}`);
-  const code = await inbox.getByTestId(`code-+91${PHONE}`).first().textContent();
-  await inbox.close();
+  const code = await latestOtp(PHONE);
   expect(code).toMatch(/^\d{6}$/);
 
-  await page.getByLabel("6-digit code").fill(code ?? "");
+  await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // PX-3: a brand-new (nameless) account is onboarded before the console —
   // and the name gate now guards every console route, /account included, so

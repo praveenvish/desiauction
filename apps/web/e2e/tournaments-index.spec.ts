@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { latestOtp } from "./otp";
 
 // The tournaments index: first run, the summary band, and the toolbar
 // (search / status / sort / layout) that filters the accordion.
@@ -23,11 +24,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 15_000,
   });
-  const inbox = await page.context().newPage();
-  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
-  const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
-  await inbox.close();
-  await page.getByLabel("6-digit code").fill(code ?? "");
+  const code = await latestOtp(phone);
+  await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
   // PX-3: the name gate now guards every console route, not just /home — a

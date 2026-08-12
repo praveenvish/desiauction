@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { formatPhone } from "../src/lib/format-phone";
+import { latestOtp } from "./otp";
 
 // PX-2 Product Shell verification: authenticated landing, rail navigation,
 // breadcrumbs + competition tabs, command palette, user menu, mobile chrome,
@@ -21,11 +22,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 15_000,
   });
-  const inbox = await page.context().newPage();
-  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
-  const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
-  await inbox.close();
-  await page.getByLabel("6-digit code").fill(code ?? "");
+  const code = await latestOtp(phone);
+  await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // First-time onboarding is one question (2026-07-24 collapse) — then /home.
   await expect(page).toHaveURL(/\/onboarding/);

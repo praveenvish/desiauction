@@ -54,7 +54,6 @@ const ROUTES = [
   "/admin/audit",
   "/admin/health",
   "/admin/messaging",
-  "/dev/inbox",
   "/gallery",
   "/",
 ];

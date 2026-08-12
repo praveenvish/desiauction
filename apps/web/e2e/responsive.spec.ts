@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { latestOtp } from "./otp";
 
 // RESPONSIVE CERTIFICATION (WS-9.1). The QA certification returned "Blocked"
 // for every breakpoint because the browser-automation surface it used rendered
@@ -37,11 +38,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 15_000,
   });
-  const inbox = await page.context().newPage();
-  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
-  const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
-  await inbox.close();
-  await page.getByLabel("6-digit code").fill(code ?? "");
+  const code = await latestOtp(phone);
+  await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Viewport Tester");

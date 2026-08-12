@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { latestOtp } from "./otp";
 
 // PX-3 Authentication & Onboarding — adversarial suite, updated for the
 // 2026-07-24 council collapse: onboarding is ONE question (the name), the org
@@ -20,10 +21,7 @@ async function requestCode(page: Page, phone: string): Promise<void> {
 }
 
 async function readCode(page: Page, phone: string): Promise<string> {
-  const inbox = await page.context().newPage();
-  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
-  const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
-  await inbox.close();
+  const code = await latestOtp(phone);
   return code ?? "";
 }
 

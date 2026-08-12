@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { latestOtp } from "./otp";
 
 // M-IP2-2 founder journey with a CDP virtual authenticator: OTP in, enroll a
 // named passkey, sign out, sign back in with ONLY the passkey, manage sessions.
@@ -12,11 +13,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   // Await the send completing (data-step flips only after the action commits)
   // before reading the inbox — the login.spec idiom; a bare read races the mint.
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
-  const inbox = await page.context().newPage();
-  await inbox.goto(`/dev/inbox?phone=${encodeURIComponent(`+91${phone}`)}`);
-  const code = await inbox.getByTestId(`code-+91${phone}`).first().textContent();
-  await inbox.close();
-  await page.getByLabel("6-digit code").fill(code ?? "");
+  const code = await latestOtp(phone);
+  await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // PX-3: new accounts land on onboarding; security panels live on /account.
   // The name gate now guards /account like every other console route, so a
