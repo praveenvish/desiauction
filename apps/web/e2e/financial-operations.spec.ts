@@ -100,7 +100,11 @@ test("founder demo: settle an auction → open Financial Operations → observe,
     .getByRole("listitem")
     .filter({ hasText: "Demo Admin" });
   if ((await adminRow.count()) > 0) {
+    // The row's own "Revoke" only opens a confirmation dialog — a money
+    // authority is not removed on one click. The dialog's own Revoke,
+    // testid `confirm-revoke-finance`, is the action.
     await adminRow.getByRole("button", { name: "Revoke" }).click();
+    await page.getByTestId("confirm-revoke-finance").click();
     await expect(adminRow).toHaveCount(0, { timeout: 20_000 });
   }
 
