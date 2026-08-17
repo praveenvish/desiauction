@@ -57,6 +57,11 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Public Organizer");
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/home/);
+  // The "Create your club" rung's form lives behind a dialog on /home
+  // (FormDialog) — the field is in the DOM but display:none until its
+  // trigger is clicked, which .filter({ visible: true }) correctly excludes.
+  await page.getByTestId("home-create-org").click();
   await page.getByLabel("Organization name").filter({ visible: true }).fill(`Public CC ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();

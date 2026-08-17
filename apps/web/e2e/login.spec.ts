@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { formatPhone } from "../src/lib/format-phone";
 import { latestOtp } from "./otp";
 
 // M-IP2-1 journey: phone → dev inbox → code → session → account → logout,
@@ -26,7 +27,9 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/home/);
   await page.goto("/account");
-  await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
+  // Grouped, not raw — formatPhone renders "+91 XXXXX XXXXX" everywhere a
+  // phone is shown to a human.
+  await expect(page.getByTestId("account-phone")).toHaveText(formatPhone(`+91${PHONE}`));
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);

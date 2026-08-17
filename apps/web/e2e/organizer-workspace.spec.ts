@@ -40,9 +40,28 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   }
 }
 
+/**
+ * A fresh account's FIRST login, choosing its own name.
+ *
+ * Deliberately not `otpLogin` + an onboarding assertion — `otpLogin` already
+ * consumes the onboarding step itself (auto-filling "E2E Tester") so every
+ * caller lands somewhere it can act on the console right away. Calling it here
+ * and then asserting `/onboarding` was asserting a URL `otpLogin` had already
+ * left; it could never pass. This is the bare sign-in sequence with the name
+ * gate answered by the caller instead of the helper.
+ */
 async function onboardWithName(page: Page, phone: string, name: string): Promise<void> {
-  await otpLogin(page, phone);
-  // A fresh account always lands on onboarding (await the redirect settling).
+  if (!page.url().includes("/login")) {
+    await page.goto("/login");
+  }
+  await page.getByLabel("Mobile number").fill(phone);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+    timeout: 30_000,
+  });
+  const code = await latestOtp(phone);
+  await page.getByLabel("6-digit code").fill(code);
+  await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill(name);
   await page.getByRole("button", { name: "Continue" }).click();
@@ -137,6 +156,9 @@ test("founder demo: org → competition → approve → team roster → venue �
     await playerPage.getByRole("button", { name: "Continue" }).click();
     await playerPage.getByLabel("Playing role").selectOption("batter");
     await playerPage.getByTestId("register-continue").click();
+    // The publication-consent checkbox is an affirmative act the register
+    // flow requires before Submit does anything — see register-flow.tsx.
+    await playerPage.getByTestId("register-consent").check();
     await playerPage.getByTestId("register-submit").click();
     await expect(playerPage.getByTestId("registration-submitted")).toBeVisible();
   });

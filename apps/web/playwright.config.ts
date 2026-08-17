@@ -2,14 +2,35 @@ import { defineConfig } from "@playwright/test";
 
 // The E2E harness (IP-0_DESIGN §22). The webServer loads the repo-root
 // .env.local (Next only auto-loads the app-dir one); CI provides env directly.
+//
+// PLAYWRIGHT_PRECOMPILED=1 swaps `next dev` for a `next build` + `next start`
+// server. This is the actual fix for the memory-threshold restarts documented
+// below — a comment here used to say "CI keeps Playwright's default
+// (pre-compiled service containers)", which was never true: there is no e2e
+// step in CI at all, so nothing has ever run this suite against a compiled
+// server. That claim is retracted; this flag is what makes it possible to.
+//
+// Run it with:
+//   NEXT_DIST_DIR=.next-e2e pnpm --filter @desiauction/web exec next build
+//   PLAYWRIGHT_PRECOMPILED=1 pnpm --filter @desiauction/web exec playwright test
+//
+// Requires OTP_PROVIDER=dev in the environment (or .env.local) so sign-in
+// still writes codes to otp_inbox for `e2e/otp.ts` to read — nothing here
+// depends on the dev-only `/dev/inbox` PAGE, only on the DEV OTP PROVIDER,
+// which is an independent setting from NODE_ENV.
+const PRECOMPILED = process.env["PLAYWRIGHT_PRECOMPILED"] === "1";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   // Local runs share one on-demand `next dev` compiler; more workers overload
   // it into moving 30s timeouts (M-IP2-4 sweep). At PX-5 the suite crossed 70
   // tests and even 2 workers rotate long-journey flakes (compiler + shared-DB
-  // contention); single-worker runs are ~6 min and fully deterministic.
-  // CI keeps Playwright's default (pre-compiled service containers).
+  // contention); single-worker runs are ~6 min and fully deterministic. A
+  // precompiled server has no shared-compiler contention, so it is not held to
+  // the same single-worker discipline — but nothing here raises workers for it
+  // yet; that is a separate, measured change once the precompiled path itself
+  // is proven stable.
   ...(process.env["CI"] ? {} : { workers: 1 }),
   // One retry absorbs first-hit dev-compile latency under parallel load (a fresh
   // retry hits an already-warm server). Not a mask for logic flakes — every spec
@@ -27,8 +48,17 @@ export default defineConfig({
   },
   webServer: [
     {
-      command:
-        "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3050",
+      command: PRECOMPILED
+        ? // The actual fix. `next start` serves what `next build` already
+          // compiled — there is no on-demand compiler to blow the heap, so the
+          // whole class of memory-threshold restarts below does not apply.
+          // Requires a build to already exist at NEXT_DIST_DIR=.next-e2e (see
+          // the flag's doc comment above); this config does not build it,
+          // because a webServer command's own timeout is far too short for a
+          // full production build and doing it here would hide that cost from
+          // whoever is running the suite.
+          "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next start --port 3050"
+        : "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3050",
       url: "http://127.0.0.1:3050/healthz",
       reuseExistingServer: !process.env["CI"],
       timeout: 60_000,
@@ -47,10 +77,9 @@ export default defineConfig({
       // survive contact with the numbers, and the measurement is recorded here
       // so nobody spends another afternoon on it.
       //
-      // So 8192 stays, and it is a WORKAROUND, not a fix. The dev server really
-      // does grow past 8GB compiling ~40 routes across a 111-test run. The next
-      // move is not another number: it is the pre-compiled server CI already
-      // uses (see e2e/README or the `dev/inbox` note), or a real leak hunt.
+      // This ceiling only matters for `next dev`, whose on-demand compiler is
+      // what grows the heap in the first place — PLAYWRIGHT_PRECOMPILED=1
+      // above is the real fix. 8192 stays as the default path's workaround.
       env: {
         ...process.env,
         NODE_OPTIONS: "--max-old-space-size=8192",

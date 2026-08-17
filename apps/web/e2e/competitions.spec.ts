@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { formatPhone } from "../src/lib/format-phone";
 import { latestOtp } from "./otp";
 
 // M-IP3-1 founder journey: create an organization, create a competition, walk
@@ -96,6 +97,9 @@ test("the competition journey: create, open, team, register, approve", async ({
     await playerPage.getByRole("button", { name: "Continue" }).click();
     await playerPage.getByLabel("Playing role").selectOption("all_rounder");
     await playerPage.getByTestId("register-continue").click();
+    // The publication-consent checkbox is an affirmative act the register
+    // flow requires before Submit does anything — see register-flow.tsx.
+    await playerPage.getByTestId("register-consent").check();
     await playerPage.getByTestId("register-submit").click();
     await expect(playerPage.getByTestId("registration-submitted")).toBeVisible();
   });
@@ -107,7 +111,9 @@ test("the competition journey: create, open, team, register, approve", async ({
     timeout: 30_000,
   });
   const triage = page.getByTestId("reg-table");
-  await expect(triage).toContainText(`+91${PHONE_PLAYER}`);
+  // Grouped, not raw — formatPhone renders "+91 XXXXX XXXXX" everywhere a
+  // phone is shown to a human; the shell spec asserts the same way.
+  await expect(triage).toContainText(formatPhone(`+91${PHONE_PLAYER}`));
   await expect(triage).toContainText("submitted");
   await triage.getByRole("button", { name: "Approve" }).first().click();
   await expect(triage).toContainText("approved");

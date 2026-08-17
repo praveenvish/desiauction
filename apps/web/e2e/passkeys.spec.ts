@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { formatPhone } from "../src/lib/format-phone";
 import { latestOtp } from "./otp";
 
 // M-IP2-2 founder journey with a CDP virtual authenticator: OTP in, enroll a
@@ -55,7 +56,7 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
   await page.getByTestId("passkey-login").click();
   await expect(page).toHaveURL(/\/(home|onboarding)/, { timeout: 10_000 });
   await page.goto("/account");
-  await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
+  await expect(page.getByTestId("account-phone")).toHaveText(formatPhone(`+91${PHONE}`));
   await expect(page.getByTestId("events-panel")).toContainText("auth.login.passkey");
 });
 

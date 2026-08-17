@@ -80,7 +80,7 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   await expect(page.getByTestId("shell-session-phone")).toHaveText(formatPhone(`+91${PHONE}`));
   await page.getByRole("menuitem", { name: "Account" }).click();
   await expect(page).toHaveURL(/\/account/);
-  await expect(page.getByTestId("account-phone")).toHaveText(`+91${PHONE}`);
+  await expect(page.getByTestId("account-phone")).toHaveText(formatPhone(`+91${PHONE}`));
 });
 
 test("search navigates; the identity bar names every surface consistently", async ({ page }) => {
