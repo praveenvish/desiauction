@@ -145,11 +145,11 @@ export function LotHero({
               : formatPaiseINR(paise(bid.amount))}
           </p>
           {bid === null ? (
-            <p className="lot-hero-lead lot-hero-lead--none">
+            <p className="lot-hero-lead lot-hero-lead--none" data-testid="leading-team">
               Opening ask · awaiting the first paddle…
             </p>
           ) : (
-            <p className="lot-hero-lead">
+            <p className="lot-hero-lead" data-testid="leading-team">
               <span
                 className="lot-hero-dot"
                 style={leadColor === null ? undefined : { background: leadColor }}

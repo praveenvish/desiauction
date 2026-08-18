@@ -226,10 +226,18 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   }
 
   // Bidder A bids the minimum; every window converges on the leader.
+  //
+  // The team name lives in its own paragraph (`leading-team`) beside the
+  // amount (`leading-bid`) — LotHero renders them as two siblings, "Leading ·
+  // <team>" separate from the currency figure. Asserting the name against
+  // `leading-bid` would only ever see a rupee amount; on an opening bid at the
+  // base price the amount coincidentally matches the base-price fallback text,
+  // which is what let this pass unnoticed as "no bid landed" instead of "wrong
+  // element" for as long as it did.
   const [bidderA, bidderB, bidderC] = bidders.map((b) => b.page) as [Page, Page, Page];
   await bidderA.getByTestId("bid-next").click();
   for (const page of everyone) {
-    await expect(page.getByTestId("leading-bid")).toContainText("Team Alpha", {
+    await expect(page.getByTestId("leading-team")).toContainText("Team Alpha", {
       timeout: 20_000,
     });
   }
@@ -240,7 +248,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   // by the extension counter appearing.
   await bidderB.getByTestId("bid-next").click();
   for (const page of everyone) {
-    await expect(page.getByTestId("leading-bid")).toContainText("Team Bravo", {
+    await expect(page.getByTestId("leading-team")).toContainText("Team Bravo", {
       timeout: 20_000,
     });
   }
@@ -257,7 +265,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     .toBe(true);
   await bidderC.getByTestId("bid-next").click();
   for (const page of everyone) {
-    await expect(page.getByTestId("leading-bid")).toContainText("Team Charlie", {
+    await expect(page.getByTestId("leading-team")).toContainText("Team Charlie", {
       timeout: 20_000,
     });
     // Anti-snipe executed: the extension counter shows on every window.
