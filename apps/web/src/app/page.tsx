@@ -10,7 +10,6 @@ import {
   IconBolt,
   IconCalendar,
   IconCheck,
-  IconFileCheck,
   IconGavel,
   IconGlobe,
   IconLedger,
@@ -80,8 +79,6 @@ const STAGE_ICONS = [
   IconPlay,
   IconRupee,
 ] as const;
-/** One glyph per certified-capability card, in LANDING.trust.items order. */
-const CERTIFIED_ICONS = [IconShieldCheck, IconLedger, IconReceipt, IconFileCheck] as const;
 
 /**
  * The landing page, rebuilt to the 2026-07-24 Product Creation Council
@@ -192,7 +189,7 @@ export default function LandingPage() {
         {/* --- 2 · The night in three beats -------------------------------- */}
         <section className="mk-band" data-theme="floodlight" id="how" aria-labelledby="how-heading">
           <div className="mk-container">
-            <div className="mk-panel" data-theme="daylight">
+            <div className="mk-panel">
               <div className="mk-band-head mk-band-head--center mk-center">
                 <p className="mk-kicker">{LANDING.beats.kicker}</p>
                 <h2 id="how-heading" className="mk-h2">
@@ -226,7 +223,11 @@ export default function LandingPage() {
         </section>
 
         {/* --- 3 · Built for the worst moment of the night ------------------ */}
-        <section className="mk-band" aria-labelledby="worst-heading">
+        <section
+          className="mk-band mk-band--dark"
+          data-theme="floodlight"
+          aria-labelledby="worst-heading"
+        >
           <div className="mk-container">
             <div className="mk-band-head mk-band-head--center mk-center">
               <p className="mk-kicker">{LANDING.worst.kicker}</p>
@@ -309,7 +310,7 @@ export default function LandingPage() {
         </section>
 
         {/* --- 4 · The morning after: the receipt -------------------------- */}
-        <section className="mk-band mk-band--sunken" aria-labelledby="money-heading">
+        <section className="mk-band" data-theme="floodlight" aria-labelledby="money-heading">
           <div className="mk-container">
             <div className="mk-show">
               <div>
@@ -343,7 +344,11 @@ export default function LandingPage() {
             Deliberately WITHOUT the pricing page's "Most popular" flag: with
             zero customers, popularity is precisely the kind of claim this page
             is not allowed to make. */}
-        <section className="mk-band" aria-labelledby="pricing-heading">
+        <section
+          className="mk-band mk-band--dark"
+          data-theme="floodlight"
+          aria-labelledby="pricing-heading"
+        >
           <div className="mk-container">
             <div className="mk-band-head mk-band-head--center mk-center">
               <p className="mk-kicker">{LANDING.pricingPreview.kicker}</p>
@@ -391,75 +396,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* --- 4c · Trust & beta candor -------------------------------------
-            The page carries no customer names by policy and, until now, paid
-            that price in silence — the absence read as a product with nothing
-            to show. This spends the constraint instead: says the beta truth
-            out loud, then lists what IS certified in its place. */}
-        <section className="mk-band mk-band--sunken" aria-labelledby="trust-heading">
-          <div className="mk-container">
-            <div className="mk-trust">
-              <div className="mk-trust-copy">
-                <p className="mk-kicker">{LANDING.trust.kicker}</p>
-                <h2 id="trust-heading" className="mk-h2">
-                  {LANDING.trust.h2}
-                </h2>
-                <p className="mk-money-body">{LANDING.trust.body}</p>
-                <p className="mk-panel-actions">
-                  <ButtonLink href={LANDING.trust.cta.href} variant="secondary">
-                    {LANDING.trust.cta.label}
-                    <IconArrowRight width={16} height={16} />
-                  </ButtonLink>
-                </p>
-              </div>
-              <ul className="mk-certified">
-                {LANDING.trust.items.map((item, index) => {
-                  const Icon = CERTIFIED_ICONS[index] ?? IconCheck;
-                  return (
-                    <li key={item.title}>
-                      <span className="mk-icon-tile">
-                        <Icon width={18} height={18} />
-                      </span>
-                      <h3>{item.title}</h3>
-                      <p>{item.body}</p>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* --- 4d · FAQ -----------------------------------------------------
-            Native <details>/<summary>: keyboard-operable and screen-reader
-            correct with no JS and no ARIA of our own to get wrong. Styling is
-            the same .mk-faq the pricing page uses, so the accordion the guest
-            meets here behaves identically to the one they meet there. */}
-        <section className="mk-band" aria-labelledby="faq-heading">
-          <div className="mk-container">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">{LANDING.faq.kicker}</p>
-              <h2 id="faq-heading" className="mk-h2">
-                {LANDING.faq.h2}
-              </h2>
-            </div>
-            <div className="mk-faq">
-              {LANDING.faq.items.map((item) => (
-                <details key={item.question} className="mk-faq-item">
-                  <summary>{item.question}</summary>
-                  <p>{item.answer}</p>
-                </details>
-              ))}
-              <p className="mk-center mk-panel-actions">
-                <ButtonLink href={LANDING.faq.cta.href} variant="ghost">
-                  {LANDING.faq.cta.label}
-                  <IconArrowRight width={16} height={16} />
-                </ButtonLink>
-              </p>
-            </div>
-          </div>
-        </section>
-
         {/* --- 5 · Closing CTA ---------------------------------------------- */}
         <section className="mk-band mk-cta-band" data-theme="floodlight" aria-labelledby="beta">
           <div className="mk-cta-photo" aria-hidden="true" />
@@ -489,11 +425,6 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-
-        {/* Back to top: scroll-revealed, targets the shell's skip anchor. */}
-        <a className="mk-top" href="#main-content" aria-label="Back to top">
-          <IconArrowRight />
-        </a>
       </main>
     </div>
   );

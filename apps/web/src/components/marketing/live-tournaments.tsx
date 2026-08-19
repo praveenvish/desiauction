@@ -11,6 +11,23 @@ import { IconArrowRight, IconCalendar, IconMapPin } from "./icons";
 const STRIP_SIZE = 3;
 
 /**
+ * THE SHOP WINDOW HAS A BAR.
+ *
+ * This strip is the page's only unsimulated proof, and it was showing whatever
+ * sat at the top of the directory — which on any real deployment includes
+ * seasons somebody published and then abandoned, and on a developer's machine
+ * meant three rows reading "NIGHT CC 11912016" with two players between them.
+ * Nothing costs a first impression more than obviously empty data in the
+ * section whose whole job is to say "this is real".
+ *
+ * A season with no squad is not evidence. Eight is roughly the smallest number
+ * that reads as a tournament rather than a test — and the /c directory is
+ * deliberately NOT filtered, because an organizer's own published season must
+ * always appear there, however small it is on its first day.
+ */
+const MIN_PLAYERS_TO_FEATURE = 8;
+
+/**
  * The landing page's only database read.
  *
  * The home page must render when Postgres is down — that was a P0 defect on
@@ -30,7 +47,9 @@ async function liveTournaments(): Promise<DirectoryEntry[]> {
     // Default sort is "opportunity": open and live competitions surface first,
     // which is also the order a visitor most wants to see them in.
     const directory = await publicCompetitionsDirectory({ page: 1 });
-    return directory.entries.slice(0, STRIP_SIZE);
+    return directory.entries
+      .filter((entry) => entry.playerCount >= MIN_PLAYERS_TO_FEATURE)
+      .slice(0, STRIP_SIZE);
   } catch (error) {
     unstable_rethrow(error);
     // `no-console` is on for apps/web; this is the same deliberate exception the

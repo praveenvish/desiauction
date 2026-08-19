@@ -230,10 +230,19 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
-/* The hero floor is a SINGLE stadium photo painted full-bleed by .mk-hero-photo
-   (below), so it fills the whole hero at every width — no dark void on the right,
-   no second copy, no seam. A left-weighted scrim keeps the copy column legible
-   while the floodlit glow, the trophy, and the far stands all stay lit. */
+/* THE HERO FLOOR IS LIGHT, NOT A PHOTOGRAPH.
+
+   It used to be a stock stadium plate with a gold trophy composited into it —
+   the single most template-looking thing on the site, and the same image every
+   cricket app in the store ships. A visitor cannot tell a product apart from
+   its competitors by its stock photography; they can tell it apart by seeing
+   the product work.
+   
+   So the plate is gone and the hero's own floodlight does the atmosphere: two
+   beams sweeping in from the top corners and a warm glow grounding the base.
+   That gradient stack was already here as the no-photo fallback — it is now
+   simply the design. The bytes it saves (462 KB JPEG, 128 KB AVIF) pay for the
+   product surface that replaced it. */
 
 .mk-hero::after {
   /* The boundary rope: a lit hairline that separates the night from the page. */
@@ -249,25 +258,15 @@ body:has(.landing.mk) .mk-hero {
   );
 }
 
-/* Background photo slot: a real photo file at /marketing/hero-stadium.jpg
-   paints first; the floodlit-night gradient (two beams sweeping in from the
-   top corners, a warm glow grounding the bottom) is a second background-image
-   layer so it shows through automatically whenever the photo layer is absent
-   or still 404ing — CSS simply skips a failed image layer and paints the next
-   one, no JS or :has() feature-detection required. A dark scrim keeps hero
-   text legible over any photo without touching text opacity (axe: WCAG
-   contrast must hold at every frame, not just the no-photo fallback). */
+/* The floodlit night itself: two beams sweeping in from the top corners and a
+   warm glow grounding the base. Text contrast is held by the scrim below rather
+   than by dimming type — axe measures WCAG at every frame of every animation,
+   so opacity on text is never the lever. */
 .mk-hero-photo {
   position: absolute;
   inset: 0;
   z-index: 0;
-  /* The photo layer is a custom property so the format/size negotiation below
-     can swap ONE layer without restating the four-gradient fallback stack
-     (which must stay byte-identical in every branch, or the no-photo fallback
-     drifts). */
-  --mk-hero-photo-src: url("/marketing/hero-stadium.jpg");
   background-image:
-    var(--mk-hero-photo-src),
     radial-gradient(
       70rem 32rem at 18% -18%,
       color-mix(in srgb, var(--accent) 24%, transparent),
@@ -284,73 +283,7 @@ body:has(.landing.mk) .mk-hero {
       transparent 58%
     ),
     linear-gradient(180deg, var(--surface-sunken) 0%, var(--surface) 100%);
-  background-size: cover, auto, auto, auto, auto;
-  /* Full-bleed cover, weighted so the trophy reads as the focal point. */
-  background-position: 64% center;
   background-repeat: no-repeat;
-}
-
-/* Format and size negotiation for the hero photo — the page's heaviest byte by
-   an order of magnitude. A CSS background gets no <picture>, no srcset and no
-   next/image, so image-set() does both jobs the browser would otherwise do:
-   it picks the first format the browser actually decodes (AVIF 128 KB → WebP
-   145 KB → the original JPEG 462 KB), and the media query hands phones a
-   1024px-wide cut (56 KB in AVIF) instead of the full 1717px desktop plate.
-   Guarded by @supports, because a browser that cannot parse image-set() would
-   throw away the WHOLE background-image declaration — gradients and all — and
-   leave the hero as a flat void. Inside the guard the custom property is
-   swapped; outside it, the plain JPEG above still paints. */
-@supports (background-image: image-set(url("/marketing/hero-stadium.avif") type("image/avif"))) {
-  .mk-hero-photo {
-    --mk-hero-photo-src: image-set(
-      url("/marketing/hero-stadium.avif") type("image/avif"),
-      url("/marketing/hero-stadium.webp") type("image/webp"),
-      url("/marketing/hero-stadium.jpg") type("image/jpeg")
-    );
-  }
-
-  /* Below the desktop breakpoint the pane is at most 1023 CSS px wide, so the
-     full plate is detail nobody can see — on a phone it was 462 KB of it. */
-  @media (max-width: 1023px) {
-    .mk-hero-photo {
-      --mk-hero-photo-src: image-set(
-        url("/marketing/hero-stadium-1024.avif") type("image/avif"),
-        url("/marketing/hero-stadium-1024.webp") type("image/webp"),
-        url("/marketing/hero-stadium-1024.jpg") type("image/jpeg")
-      );
-    }
-  }
-}
-
-/* Desktop: scale the photo up a touch beyond cover so there is horizontal room
-   to pan — that pulls the trophy in from the right edge toward the centre,
-   widening the gap to the corner card. The zoom stays large enough to keep full
-   height coverage down to the 1024px breakpoint. */
-@media (min-width: 1024px) {
-  .mk-hero-photo {
-    /* Cap the photo HEIGHT so the trophy is a fixed, consistent size at every
-       screen width instead of scaling up with the viewport (which pushed the
-       finial into the nav and cropped the plinth on wide monitors). Below
-       ~1440px the image still covers the full width; above it the stadium
-       becomes a centred band and the surrounding dark — where the copy and the
-       card already sit — takes over. The left edge is feathered into that dark
-       so the band never ends on a hard line. */
-    background-size:
-      auto min(53.3vw, 770px),
-      auto,
-      auto,
-      auto,
-      auto;
-    background-position: 42% 34%;
-    -webkit-mask-image: linear-gradient(
-      90deg,
-      transparent 0%,
-      #000 13%,
-      #000 87%,
-      transparent 100%
-    );
-    mask-image: linear-gradient(90deg, transparent 0%, #000 13%, #000 87%, transparent 100%);
-  }
 }
 
 /* A dark-light-dark valley across the pane: near-solid at the LEFT so the copy
@@ -360,38 +293,17 @@ body:has(.landing.mk) .mk-hero {
    own dark with no visible edge. A soft vertical wash anchors the top (under the
    nav) and the bottom boundary without dimming the cup. */
 .mk-hero-photo::after {
+  /* A soft valley: enough to hold type contrast at the left, clearing to let
+     the beams read across the middle. Tuned for a gradient, not a photograph. */
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--surface-sunken) 97%, transparent) 0%,
-      color-mix(in srgb, var(--surface-sunken) 93%, transparent) 22%,
-      color-mix(in srgb, var(--surface-sunken) 70%, transparent) 42%,
-      color-mix(in srgb, var(--surface-sunken) 34%, transparent) 58%,
-      color-mix(in srgb, var(--surface-sunken) 12%, transparent) 74%,
-      color-mix(in srgb, var(--surface-sunken) 8%, transparent) 100%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-sunken) 52%, transparent) 0%,
-      color-mix(in srgb, var(--surface-sunken) 16%, transparent) 22%,
-      color-mix(in srgb, var(--surface-sunken) 8%, transparent) 62%,
-      color-mix(in srgb, var(--surface-sunken) 26%, transparent) 100%
-    );
-}
-
-/* Narrow screens stack the copy over the photo: recentre on the trophy and
-   deepen the scrim to a flat wash so the text keeps contrast everywhere. */
-@media (max-width: 1023px) {
-  .mk-hero-photo {
-    background-position: 68% center;
-  }
-
-  .mk-hero-photo::after {
-    background: color-mix(in srgb, var(--surface-sunken) 66%, transparent);
-  }
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-sunken) 46%, transparent) 0%,
+    color-mix(in srgb, var(--surface-sunken) 10%, transparent) 34%,
+    color-mix(in srgb, var(--surface-sunken) 24%, transparent) 100%
+  );
 }
 
 .mk-hero > .mk-container {
@@ -595,10 +507,10 @@ body:has(.landing.mk) .mk-hero {
 
 @media (min-width: 1024px) {
   .mk-hero-grid {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    /* Kept tight: the photo pane is height-fit, so a shorter hero directly
-       shrinks the trophy and lets the proof-strip band ride up the fold. */
-    min-height: clamp(340px, 22vw, 420px);
+    /* The stage is the subject now, not a corner card beside a photograph, so
+       the columns even out and the hero is given room to be looked at. */
+    grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
+    min-height: clamp(420px, 30vw, 560px);
   }
 }
 
@@ -715,19 +627,22 @@ body:has(.landing.mk) .mk-hero {
 }
 
 @media (min-width: 1024px) {
+  /* THE STAGE IS THE SUBJECT.
+
+     All of this used to be about getting a small card out of a photograph's
+     way: scaled to 0.72, pinned to the bottom-right, nudged off the viewport
+     edge so it never covered the trophy. With the photo gone that choreography
+     left the card marooned in the corner of an empty hero.
+
+     It is now what the visitor is meant to look at — full width of its column,
+     centred, at its own size. A product proving itself in four seconds is worth
+     more than any image we could have put here. */
   .mk-hero-demo {
-    align-self: end;
-    justify-self: end;
+    align-self: center;
+    justify-self: stretch;
     width: 100%;
-    max-width: 360px;
-    --mk-stage-scale: 0.72;
-    transform: scale(var(--mk-stage-scale));
-    transform-origin: bottom right;
-    /* Pinned ~28px from the VIEWPORT's right edge (not the container's) so the
-       card never drifts back over the cup as the screen widens; clamped ≤ 0 so
-       narrow desktops keep it inside the column. */
-    margin-right: min(0px, calc(596px - 50vw));
-    translate: 0 -1.25rem;
+    max-width: 520px;
+    margin-inline: auto;
   }
 
   .mk-hero-visual {
@@ -756,20 +671,28 @@ body:has(.landing.mk) .mk-hero {
   z-index: 1;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-2xl);
-  /* Frosted glass over the stadium photo: enough translucency that the
-     trophy's gold glow reads through the panel, enough tint (plus the
-     backdrop blur) that the card's text keeps its contrast. */
+  /* A lit console, not frosted glass. The translucency existed so a photo could
+     glow through it; with the photo gone the panel is the only object in the
+     hero and has to read as solid, dense and switched on. */
+  /* OPAQUE. The panel used to be translucent so a photograph's glow could
+     travel through it; what actually travelled through at this size was the
+     rotating accent ring behind it, washing the whole console amber-to-blue and
+     dropping "LOT 23 · 18 SOLD" to unreadable. The ring belongs OUTSIDE the
+     glass, which is where it now stays. */
   background: linear-gradient(
     165deg,
-    color-mix(in srgb, var(--surface-overlay) 82%, transparent) 0%,
-    color-mix(in srgb, var(--surface-raised) 76%, transparent) 45%,
-    color-mix(in srgb, var(--surface) 80%, transparent) 100%
+    var(--surface-overlay) 0%,
+    var(--surface-raised) 48%,
+    var(--surface) 100%
   );
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  backdrop-filter: blur(10px) saturate(1.2);
+  /* No backdrop-filter: the panel is opaque now, so blurring what is behind it
+     buys nothing and costs a compositing layer on every scroll frame. */
   box-shadow:
-    0 24px 80px color-mix(in srgb, var(--surface-sunken) 55%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--text-heading) 7%, transparent);
+    /* Depth, then a warm floor-bounce from the accent so the console looks lit
+       from the room it is standing in. */
+    0 40px 120px -30px color-mix(in srgb, var(--surface-sunken) 92%, transparent),
+    0 0 90px -40px color-mix(in srgb, var(--accent) 55%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-heading) 10%, transparent);
   padding: var(--space-6);
   max-width: min(460px, 100%);
   width: 100%;
@@ -788,19 +711,40 @@ body:has(.landing.mk) .mk-hero {
 }
 
 .mk-stage::before {
+  /* A LIT RIM, NOT A WASH.
+
+     This is a rotating conic gradient meant to read as light catching the edge
+     of the console. It was drawn as a full rounded rect at `z-index: -1`, which
+     works only while the panel above it is translucent: a negative-z child
+     paints after its parent's BACKGROUND but before the parent's content, so
+     the moment the panel became opaque the gradient sat on top of it and washed
+     the whole card amber-to-blue — "LOT 23 · 18 SOLD" went to unreadable.
+
+     Masking the centre out turns it into what it was always describing: two
+     pixels of moving light around the edge, and nothing across the face. */
   content: "";
   position: absolute;
-  inset: -2px;
-  z-index: -1;
-  border-radius: calc(var(--radius-2xl) + 2px);
+  inset: -1px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: calc(var(--radius-2xl) + 1px);
+  padding: 1px;
   background: conic-gradient(
     from var(--mk-ring, 0deg),
-    color-mix(in srgb, var(--accent) 60%, transparent),
-    color-mix(in srgb, var(--info-base) 40%, transparent) 28%,
-    color-mix(in srgb, var(--accent) 10%, transparent) 52%,
-    color-mix(in srgb, var(--ceremony-gold) 50%, transparent) 78%,
-    color-mix(in srgb, var(--accent) 60%, transparent)
+    color-mix(in srgb, var(--accent) 85%, transparent),
+    color-mix(in srgb, var(--info-base) 45%, transparent) 28%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 52%,
+    color-mix(in srgb, var(--ceremony-gold) 70%, transparent) 78%,
+    color-mix(in srgb, var(--accent) 85%, transparent)
   );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 
 /* Screen reflection: a soft glass streak sweeping the panel every few beats.
@@ -825,7 +769,9 @@ body:has(.landing.mk) .mk-hero {
 
 @media (min-width: 1024px) {
   .mk-stage {
-    transform: rotate(2.6deg);
+    /* Barely there. A 2.6deg tilt was charming on a 360px card tucked into a
+       photo's corner; on a 520px console it just looks hung badly. */
+    transform: rotate(1.1deg);
   }
 }
 
@@ -1045,8 +991,11 @@ body:has(.landing.mk) .mk-hero {
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-4);
   transform: rotate(-6deg);
-  box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 45%, transparent);
-  animation: mk-stamp var(--duration-ceremony) var(--ease-out) both;
+  box-shadow:
+    0 6px 24px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent-sheen, var(--accent)) 40%, transparent);
+  /* A back-eased curve so it overshoots on the way in — the settle is the point. */
+  animation: mk-stamp var(--duration-ceremony) cubic-bezier(0.2, 1.5, 0.35, 1) both;
 }
 
 /* After the stamp lands, a shockwave ring keeps radiating from it — the SOLD
@@ -1071,12 +1020,12 @@ body:has(.landing.mk) .mk-hero {
 
 @keyframes mk-sold-ping {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
   }
 
   45%,
   100% {
-    box-shadow: 0 0 0 14px transparent;
+    box-shadow: 0 0 0 22px transparent;
   }
 }
 
@@ -3029,13 +2978,32 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
+/* THE ONE MOMENT THIS PAGE IS ALLOWED TO PERFORM.
+   
+   A gavel falling is a physical event: it arrives fast, overshoots, and settles.
+   The old curve came in at 1.6× and eased to 1 — correct, but weightless, the
+   motion of a tooltip rather than of a hammer. This drops further, lands harder,
+   rebounds once and settles, with a half-degree of rotation wobble so it reads
+   as an object rather than a resizing box.
+   
+   TRANSFORM ONLY, deliberately: axe measures contrast at every frame of every
+   animation, including inside aria-hidden subtrees, so animating opacity on
+   lettering fails WCAG mid-flight even when the end state passes. */
 @keyframes mk-stamp {
   0% {
-    transform: rotate(-6deg) scale(1.6);
+    transform: rotate(-14deg) scale(2.2);
   }
 
-  55% {
-    transform: rotate(-6deg) scale(0.94);
+  42% {
+    transform: rotate(-4deg) scale(0.88);
+  }
+
+  62% {
+    transform: rotate(-7.5deg) scale(1.07);
+  }
+
+  80% {
+    transform: rotate(-5.4deg) scale(0.98);
   }
 
   100% {

@@ -379,6 +379,13 @@ export interface DirectoryEntry {
    * account — was invisible one click above the page that offers it.
    */
   live: boolean;
+  /**
+   * Registered players. The directory shows every published season regardless —
+   * a new one legitimately has none. It is the LANDING rail that uses this, as
+   * a substance bar: an empty season is not evidence that the platform works,
+   * and the front page is where that evidence is supposed to be.
+   */
+  playerCount: number;
 }
 
 /** URL-backed facets. Anything else in `?filter=` / `?sort=` falls back to the
@@ -504,6 +511,8 @@ export async function publicCompetitionsDirectory(params: {
       orgName: organizations.name,
       logoKey: competitions.logoUrl,
       auctionStatus: latestAuctionStatus,
+      playerCount: sql<number>`(select count(*)::int from ${registrations}
+        where ${registrations.competitionId} = ${competitions.id})`,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -523,6 +532,7 @@ export async function publicCompetitionsDirectory(params: {
       logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
       auctionStatus: row.auctionStatus,
       live: row.auctionStatus === "live" || row.auctionStatus === "paused",
+      playerCount: row.playerCount,
     })),
     page,
     totalPages: Math.max(1, Math.ceil(total / DIRECTORY_PAGE_SIZE)),
