@@ -228,19 +228,13 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   // so the row is in the DOM (which is why the containsText above passes) while
   // being unreachable to role queries, exactly as it is unreachable to a person
   // until they open it. Open it the way they would.
-  // The seasons view still groups by tournament, and a group may be closed —
-  // which puts the row in the DOM (so the containsText above passes) while
-  // leaving it unreachable to a click, exactly as it is unreachable to a person
-  // until they open it. Open it if there is something to open, then click the
-  // row itself rather than guessing at its accessible name.
-  const season = page.getByTestId("tg-season").filter({ hasText: `Alpha One ${STAMP}` });
-  if (!(await season.isVisible().catch(() => false))) {
-    const toggle = page.getByTestId(`tg-toggle-${alpha}`);
-    if (await toggle.isVisible().catch(() => false)) {
-      await toggle.click();
-    }
-  }
-  await season.click();
+  // The SEASONS view renders season CARDS, not the accordion's grouped rows —
+  // `tg-season` belongs to the grouped view and does not exist here at all.
+  // Click the card's own link, scoped to the list so the toolbar cannot match.
+  await page
+    .getByTestId("competitions-list")
+    .getByRole("link", { name: new RegExp(`Alpha One ${STAMP}`) })
+    .click();
   await expect(page).toHaveURL(/\/seasons\/[^/?#]+$/, COLD);
 });
 

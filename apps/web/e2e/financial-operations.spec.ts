@@ -121,14 +121,11 @@ test("founder demo: settle an auction → open Financial Operations → observe,
 
   // Owning the organization confers NO finance power: no link, and the surface
   // itself 404s. That is the platform working, not a bug.
-  // Settlement and finance now share ONE door (`open-money-ops`), so "no
-  // finance power" is no longer "no link" — it is a link that goes to
-  // settlement instead of to the money operation. The 404 below is the
-  // load-bearing half of this assertion either way.
-  await expect(page.getByTestId("open-money-ops")).not.toHaveAttribute(
-    "href",
-    new RegExp(`/org/${orgSlug}/money$`),
-  );
+  // The 404 above IS the assertion. There used to be a second half — "and no
+  // link" — but settlement and finance now share one door whose destination is
+  // decided by the ORG's finance state, not the viewer's, so its href says
+  // nothing about this person's authority. Asserting on it tested the wrong
+  // thing; the surface refusing the request tests the right one.
   expect((await page.request.get(`/org/${orgSlug}/money`)).status()).toBe(404);
   await axeClean(page, "org · finance authority");
 

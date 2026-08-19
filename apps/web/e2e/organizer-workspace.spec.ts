@@ -230,7 +230,13 @@ test("permissions attack: a viewer sees, but cannot act", async ({ browser, page
   // The organizer from the founder demo invites a viewer.
   await otpLogin(page, ORGANIZER);
   await page.goto("/orgs");
-  await page.getByTestId("orgs-list").getByText(`Workspace CC ${STAMP}`).click();
+  // The card is a link; the name inside it is a span, and clicking the span
+  // navigates nowhere. Click the link.
+  await page
+    .getByTestId("orgs-list")
+    .getByRole("link", { name: new RegExp(`Workspace CC ${STAMP}`) })
+    .click();
+  await expect(page).toHaveURL(/\/org\//);
   // The invite form lives behind the Members tab, in a dialog. Reaching for its
   // Select from the org overview waits for something that is not on screen yet.
   await page.getByRole("tab", { name: "Members" }).click();
