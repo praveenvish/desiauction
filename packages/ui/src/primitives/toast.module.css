@@ -62,14 +62,27 @@
   outline-offset: 1px;
 }
 
+/* TRANSFORM ONLY — NEVER OPACITY.
+ *
+ * A toast's surface token is opaque in both themes, precisely so it can be
+ * read over whatever it lands on. Fading it in makes it translucent for the length
+ * of the animation, and anything measuring contrast during those milliseconds
+ * sees straight through to the card underneath — which is exactly what axe does,
+ * and it failed this component at "serious" against WCAG 1.4.3.
+ *
+ * That is not a false positive. For those frames the text really is sitting on
+ * an unknown background at reduced contrast, and a person reading a
+ * notification that arrives while they are looking elsewhere catches it
+ * mid-fade. Sliding it in reads the same and is legible from the first frame.
+ *
+ * The same rule already governs the auction ceremony's SOLD stamp; this is that
+ * lesson applied where it had not reached yet. */
 @keyframes enter {
   from {
-    opacity: 0;
     transform: translateY(var(--space-2));
   }
 
   to {
-    opacity: 1;
     transform: translateY(0);
   }
 }
