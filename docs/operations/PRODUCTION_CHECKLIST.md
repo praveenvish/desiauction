@@ -8,7 +8,8 @@ above them exist; ☑ are done and verified in-repo.
 
 - ☑ `withTenantDb` boundary (packages/db) — drizzle-typed, transaction-local GUCs
 - ☑ Role recipe `ops/db/create-app-role.sql` (app = non-BYPASSRLS, system = least-privilege BYPASSRLS for invite-token paths)
-- ☑ Runtime probe `pnpm rls:verify` (35 tables fail closed; live-data counts match in-boundary; cross-tenant invisible)
+- ☑ Runtime probe `pnpm rls:verify` (every RLS table fails closed; live-data counts match in-boundary; cross-tenant invisible). **37** tables carry `FORCE ROW LEVEL SECURITY` today, up from the 35 recorded here at RC-1 (`grep -c "force row level security" packages/db/migrations/*.sql`). The probe enumerates `pg_class.relrowsecurity` at runtime rather than checking a list, so the count is *descriptive of the schema on the day it ran* — it is not a gate and a changed number is not a failure. What gates is that every table it finds returns zero rows outside a tenant boundary.
+- ☑ Runtime probe `pnpm --filter @desiauction/web grants:verify` — asserts a declared grant manifest against the real four roles and exits 1 on drift. Added 2026-08-19 after the recipe was found twelve migrations behind the code: the engine had no `UPDATE` on `registrations`, so the first sale of an auction deadlocked under the production roles, and the app role had no privileges at all on six post-RC-1 tables (audit `docs/audits/FINAL-PRR/REPORT.md` P0-1). Now a CI gate.
 - ☑ Wired + certified under the app role: identity/auth (incl. security events), orgs (create/invite/accept/grants), sessions — 13/13 e2e green under `desiauction_app`
 - ☑ Full wiring sweep (Go-Live 2026-07-16): competition, fixtures/venues,
   registration ops, auction foundation, owner-join tokens, live auction,
@@ -32,13 +33,15 @@ above them exist; ☑ are done and verified in-repo.
 - ☐F Vercel project + domains (`RP_ID`/`RP_ORIGINS` must match the public domain — passkeys break otherwise)
 - ☐F Managed Postgres 17 (Mumbai, PITR + daily dumps to a separate credential/account)
 - ☐F S3-compatible object storage + durable storage roots (freeze §8.4)
-- ☐E Run the DB bootstrap (migrations → roles → `rls:verify`) per [DEPLOYMENT](DEPLOYMENT.md)
+- ☐E Run the DB bootstrap (migrations → **all four** roles → `grants:verify` → `rls:verify`) per [DEPLOYMENT](DEPLOYMENT.md). The role command needs four passwords; the two-password form printed in the runbook until 2026-08-19 aborted before creating the engine and runner roles.
 - ☑ Engine image builds (310 MB distroless) · ☑ Runner image builds + boot-smoked (244 MB)
 - ☐E First staging deploy of all three + smoke
 
 ## 3 · Providers (PRP-1 §3)
 
-- ☐F Razorpay production keys + webhook secret; one live staging transaction (order → webhook → capture → discharge)
+- ☐F Razorpay production keys + webhook secret; one live staging transaction (order → webhook → capture → discharge). The ingress route now exists at `apps/web/src/app/api/webhooks/razorpay/route.ts` — until it landed there was nothing for Razorpay to POST to and this gate was unrunnable as written (audit P1-5). Env, all three **required only if taking payments**, all optional otherwise:
+  - `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` — gateway credentials.
+  - `RAZORPAY_WEBHOOK_SECRET` (min 16 chars) — keys the HMAC. **Fail-closed: unset ⇒ the route 404s**, like the two SMS webhooks. Leave it unset and callbacks are refused rather than trusted; set it and payment capture can complete.
 - ☐F SMS provider account (go-live-critical: login is OTP-first; only DevInboxSender exists) → ☐E implement the `OtpSender` port adapter + SMS-pumping circuit-breaker (RC-4 condition 2)
 - ☐F Email provider · ☐F WhatsApp BSP → ☐E finops dispatch adapters (outbox + in-app are already first-class; SDKs are drop-ins per IP-6)
 - ☐E Provider health monitoring (poll provider status into the finops supervisor's component list)
@@ -55,8 +58,8 @@ above them exist; ☑ are done and verified in-repo.
 
 ## 5 · Operational automation (PRP-1 §5)
 
-- ☑ Nightly verification workflow (fresh migrations, integration, e2e, RLS probe, restore-verify)
-- ☑ Snapshot-consistent restore-verify (`pnpm db:restore-verify`) — drilled under concurrent writes, 43/43 exact
+- ☑ Nightly verification workflow (fresh migrations, integration, e2e, RLS probe, restore-verify). Its role-creation step passed two of the four required passwords and aborted under `ON_ERROR_STOP`, so the four-role recipe had never been exercised by it (audit P1-3); fixed 2026-08-19. The workflow also needs a git remote to run at all.
+- ⚠ Snapshot-consistent restore-verify (`pnpm db:restore-verify`) — drilled under concurrent writes, 43/43 exact **on 2026-07-16**. That measurement predates migrations 0015–0026, so the table count has moved and it must be re-drilled. Note also what it proves: `pg_dump` → `pg_restore` into a scratch database is row-count-lossless. It never reads a stored backup, replays no audit chain, and pages nobody — backup *restorability* remains unproven (audit P2-8, docs/62).
 - ☑ Secret rotation runbook + drilled ENGINE_SECRET cutover (1.29 s downtime, stale credentials refused)
 - ☑ Deployment + disaster-recovery runbooks
 - ☐E Settlement sweep scheduling (freeze §8.3) hosted beside settlement's writer once staging exists
@@ -124,8 +127,47 @@ Covers the PX-2…PX-10 web product this checklist predated. Full findings in
 - ☐E At deploy: run `preflight:production` (pass), the production smoke, and
   re-issue the PRP-1 report with staging numbers for the final GO.
 
+## 9 · Post-audit configuration (2026-08-19)
+
+New environment variables introduced by the remediation of the 2026-08-18 audit.
+Each app's `env.ts` is the authority for validation. **None of them has been
+added to `.env.example` yet** (verified 2026-08-19), so an operator copying that
+file will not discover them — ☐E add them. This list says which ones a
+**production** deploy must set. Full rationale in
+[DEPLOYMENT §Environment variables](DEPLOYMENT.md#environment-variables).
+
+- ☐E `ENGINE_ALLOWED_ORIGINS` (engine) — **required in production.**
+  Comma-separated browser origins allowed to open the spectate WebSocket
+  (e.g. `https://desiauction.in,https://www.desiauction.in`). A ticket
+  authorises an *auction*, not a *page*: unset means "do not check", so any
+  origin can open a socket with a scraped ticket. Unset is correct for local dev
+  and native clients only.
+- ☐E `ENGINE_SECRET` (web + engine) — **must be ≥ 32 characters in production**,
+  enforced at boot (`apps/engine/src/env.ts`). The repo's `dev-engine-secret`
+  default is refused outside `development`/`test` — staging is on the internet
+  too, and that default is published in this repository. 32 is the width of the
+  HMAC these secrets key, so a shorter value weakens the spectate ticket as well
+  as the header.
+- ☐E `WS_MAX_SOCKETS_PER_ROOM` (engine) — optional, default 2000. Per-auction
+  socket ceiling. A DoS bound, not a product limit; raise it only against a
+  measured spectator count.
+- ☐E `WS_MAX_SOCKETS_PER_IP` (engine) — optional, default 50. Per-client-address
+  socket ceiling.
+- ☑ Purse privacy is enforced server-side: the WS ticket binds a money scope and
+  the engine redacts rival purses per socket. Previously every subscriber
+  received `purseRemaining` for all teams and only the client filtered it, so a
+  bidder could read rival war-chests from the Network tab (audit P1-6). Nothing
+  to configure — recorded here because the operator-facing promise ("purses are
+  private") is now true of the wire, not just the UI.
+
 ## Go-live gate
 
 Every ☐ above closed, plus: production smoke (OTP login → auction → payment
 → receipt), one full founder scenario on production infra, and the PRP-1
 report re-issued with measured staging numbers and a GO.
+
+**Also blocking as of 2026-08-19:** the 2026-08-18 production-readiness audit
+(`docs/audits/FINAL-PRR/REPORT.md`) returned **NO-GO** with three reproduced
+blockers. Its §9 list is part of this gate; do not read the ☑ marks above as a
+GO on their own, since several of them were measured before migrations
+0015–0026 and before the audit re-tested the branch.

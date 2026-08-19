@@ -49,7 +49,19 @@ Workstream 4 is fully landed:
   zero RLS refusals, zero server errors, all journeys green (§4 caveat on
   one dev-harness race, fixed). The `rls:verify` probe passes: 35/35 tables
   fail closed outside a boundary, in-boundary counts exactly match owner
-  truth, cross-tenant rows invisible.
+  truth, cross-tenant rows invisible. *(2026-08-19: **37** tables carry
+  `FORCE ROW LEVEL SECURITY` today — the probe enumerates
+  `pg_class.relrowsecurity` at runtime, so the count describes the schema on the
+  day it ran and is not itself a gate. What gates is that every table found
+  returns zero rows outside a boundary.)*
+
+  The recipe this certification ran against later drifted: by 2026-08-18 the
+  engine had lost `UPDATE` on `registrations` and the app role had no privileges
+  on six post-RC-1 tables (audit P0-1). `pnpm --filter @desiauction/web
+  grants:verify` now gates that drift in CI. Read the certification below as
+  "the four-role model was proven sound", not "the four-role script is
+  currently correct" — those are different claims, and only the second one
+  needed the new probe.
 - Rotation policy + drilled procedure (PRP-1: 1.29 s hard cutover), secret
   management via platform stores, backup encryption = provider-managed
   at-rest (checklist), audit immutability proven by regression suite.
@@ -60,7 +72,10 @@ Runbooks: [DEPLOYMENT](../operations/DEPLOYMENT.md) ·
 [SECRET_ROTATION](../operations/SECRET_ROTATION.md) ·
 [DISASTER_RECOVERY](../operations/DISASTER_RECOVERY.md). Drilled this
 program: snapshot-consistent restore-verify (43/43 tables exact, run under
-concurrent write load), engine kill/restart mid-auction with browser
+concurrent write load — *a 2026-07-16 measurement that predates migrations
+0015–0026; the table count has moved and it must be re-drilled. It proves
+`pg_dump`→`pg_restore` is row-count-lossless, not that a stored backup is
+restorable*), engine kill/restart mid-auction with browser
 reconvergence (conduct spec, 45.5 s clean under production posture), runner
 kill-safety (SIGTERM smoke). Dashboards/alerts/synthetic monitoring are
 provisioning-time items (checklist §4) — alert validation cannot run without

@@ -13,6 +13,16 @@ changes, no business logic. It changed exactly two things at the repo level —
 the production **preflight validator** (`pnpm preflight:production`) and this
 release-engineering documentation set.
 
+> **Correction notice — 2026-08-19.** This report is a dated record of what was
+> measured at the `v1.0.0-rc.1` tag, and most of it stands as that. Four of its
+> claims stopped being true after the tag and have been corrected in place,
+> because operators read this document before a deploy: the **rollback posture**
+> (§2, §5, §7, §9, §10), the **migration and page counts** (§1, §2, §10), the
+> **restore-verify figure** (§4, §5) and the **role recipe** (§1). Twelve
+> migrations (0015–0026) landed after the tag, one of them destructive. Sources:
+> the 2026-08-18 production-readiness audit (`docs/audits/FINAL-PRR/REPORT.md`,
+> findings P1-2, P1-3, P0-1, P2-8) and `ls packages/db/migrations`.
+
 ---
 
 ## 1 · Production environment
@@ -22,10 +32,10 @@ software carries is complete and locally certified:
 
 | Component | Artifact | State |
 |-----------|----------|-------|
-| Web | Next production build (57 pages), Vercel flow | ✔ builds; `/healthz`+`/readyz`; security headers |
+| Web | Next production build (57 pages at RC-1; **75** on the current branch) | ✔ builds; `/healthz`+`/readyz`; security headers |
 | Engine | esbuild bundle (132 KB) + Dockerfile + fly.toml + deploy workflow | ✔ builds; boots in prod posture; `/healthz` DB+watchdog |
 | Runner | esbuild bundle (200 KB) + Dockerfile + fly.toml + deploy workflow | ✔ builds; boots + ticks + clean SIGTERM |
-| Database | 15 migrations, four-role recipe (`ops/db/create-app-role.sql`), `pnpm rls:verify` gate | ✔ applied; RLS proven under the app role |
+| Database | **27** migrations (15 at RC-1; 0015–0026 landed after the tag), four-role recipe (`ops/db/create-app-role.sql`), `pnpm rls:verify` + `pnpm grants:verify` gates | ✔ applied; RLS proven under the app role. The recipe itself had drifted twelve migrations behind the code — the engine had lost `UPDATE` on `registrations` (audit P0-1); `grants:verify` is the gate that now catches it |
 | Config | `pnpm preflight:production` — cross-service fail-closed gate | ✔ 12 blockers on empty env, 15/15 on a complete env |
 
 **Founder externals (☐F, roadmap PX-12a):** Fly + Vercel accounts, managed
@@ -41,10 +51,10 @@ Rehearsed against a local production-posture stack (prod builds, prod
 
 | Step | Result | Timing |
 |------|--------|--------|
-| Web prod build | ✔ 57 static pages | ~4 s compile |
+| Web prod build | ✔ 57 static pages (**75** on the current branch, audit 2026-08-18) | ~4 s compile |
 | Engine prod build (esbuild) | ✔ 132 KB bundle | ~1 s |
 | Runner prod build (esbuild) | ✔ 200 KB bundle | <1 s |
-| Migrations | ✔ 15/15 applied; re-run is a no-op (journal-tracked) | — |
+| Migrations | ✔ 15/15 applied at RC-1; **27/27** on the current branch. Re-run is a no-op (journal-tracked) | — |
 | Config preflight | ✔ fails closed on incomplete; passes on complete | <1 s |
 | Web health | ✔ `/healthz` 200 (liveness), `/readyz` 200 `db:ok` (readiness) | ready <10 s |
 | Engine health | ✔ `/healthz` `{db:ok, watchdog:ok}` under prod `NODE_ENV` | ready ~2 s |
@@ -53,10 +63,20 @@ Rehearsed against a local production-posture stack (prod builds, prod
 | Runner boot-smoke | ✔ started + ticking + clean SIGTERM | — |
 | Security headers | ✔ CSP/Referrer-Policy/Permissions-Policy/HSTS/X-Frame/X-Content-Type emitted | — |
 
-**Rollback**: PX-2…PX-11 added **zero migrations** — rollback is a pure
-app-image swap with **no schema step and no data migration to reverse**. This is
-the strongest possible rollback posture: zero data loss, zero manual DB
-intervention, by construction.
+**Rollback** *(corrected 2026-08-19)*: at this tag PX-2…PX-11 had added zero
+migrations, and rollback was a pure app-image swap. That property did **not**
+survive the tag. Twelve migrations (0015–0026) have shipped since, including
+`0019_tournaments.sql`, which renames `seasons` → `tournaments` and **drops**
+the `year` column. There are no down migrations and there never were —
+migrations are **forward-only** (`docs/auction/RUNBOOKS.md` §10, which was
+always right).
+
+The true posture: an app-image rollback is safe only for a release that ships
+**no** migration. When a release ships one, the plan is either (a) expand/
+contract, so the previous image still runs against the new schema, or (b) a
+restore to the pre-deploy restore point — which is founder-held and **not yet
+provisioned**. Operators follow the decision procedure in
+[DEPLOYMENT §Rollback](../operations/DEPLOYMENT.md#rollback).
 
 **Blue/green / rolling**: Fly rolling deploys (fly.toml auto-restart) + Vercel
 atomic deploys are the platform-native mechanisms; no custom orchestration.
@@ -83,7 +103,7 @@ founder action** (the accounts don't exist here):
 | Audit integrity | ✔ append-only, correlation IDs throughout; platform-admin audit explorer surfaces it read-only |
 | Log aggregation | ✔ structured pino JSON, PII-redacted; ☐F aggregation dashboards on Fly/Vercel |
 | Metrics / alerting / dashboards | ☐F provision at deploy; wire alert-on-silence (docs/56 SLOs) |
-| Backup / restore | ✔ `db:restore-verify` drilled 43/43 exact under concurrent writes; ☐F PITR on managed PG |
+| Backup / restore | ⚠ `db:restore-verify` drilled 43/43 exact under concurrent writes **on 2026-07-16, before migrations 0015–0026** — the table count has moved and the drill must be re-run. It compares row counts on a locally dumped database; it has never restored a stored backup. ☐F PITR on managed PG |
 | Config validation | ✔ `preflight:production` + per-app fail-closed boot env |
 
 ## 5 · Founder demonstration
@@ -103,8 +123,8 @@ is certified by the e2e suites (real web + real engine + real WebSockets):
 - Observe monitoring — ✔ structured logs + health; ☐F dashboards.
 - Restart services / verify recovery — ✔ engine + runner restart clean; recovery
   certified.
-- Rollback rehearsal — ✔ schema-free app-image swap.
-- Restore backups — ✔ restore-verify drilled 43/43.
+- Rollback rehearsal — ⚠ rehearsed as a schema-free app-image swap, which is valid only for a release that ships no migration. See §2 and [DEPLOYMENT §Rollback](../operations/DEPLOYMENT.md#rollback).
+- Restore backups — ⚠ `db:restore-verify` drilled 43/43 on 2026-07-16, pre-0015; must be re-drilled. It proves `pg_dump`→`pg_restore` is row-count-lossless locally, **not** that a stored backup is restorable — no real backup has ever been restored (audit P2-8).
 
 **Honest gap:** a single unbroken run on real production infra with live SMS,
 S3, and payments requires the founder externals and is the PX-12a cutover, not a
@@ -125,7 +145,7 @@ repo deliverable.
 
 ## 7 · Rollback criteria
 
-Roll back (previous app image; **no DB step**) if, after a deploy:
+Roll back if, after a deploy:
 
 - `/readyz` or engine `/healthz` does not go green within the deploy window;
 - a smoke-test step (OTP login → auction → settle → receipt) fails;
@@ -133,9 +153,13 @@ Roll back (previous app image; **no DB step**) if, after a deploy:
   platform-wide) is confirmed and not resolvable in place;
 - error rate or latency breaches the SLO envelope (docs/56) sustained.
 
-Because no migration ships across PX-2…PX-11, rollback is always safe: swap the
-image, no schema or data reversal. If a future change ever ships a migration,
-gate it as expand/contract and re-assess this criterion.
+**How to roll back is a separate question from whether to** — answer it with
+[DEPLOYMENT §Rollback](../operations/DEPLOYMENT.md#rollback), not from this
+list. The "swap the image, no schema step" shortcut recorded here held only
+while PX-2…PX-11 shipped no migration; 0015–0026 have shipped since, so a
+release must now be classified first (no migration / expand-only / destructive)
+and only the first two cases are an image swap. The third needs the recorded
+restore point.
 
 ## 8 · Success metrics (first beta window)
 
@@ -153,8 +177,13 @@ gate it as expand/contract and re-assess this criterion.
 green (typecheck, lint, prettier, dependency boundaries incl. no-circular,
 architecture/security/reliability/observability audits, unit, integration, e2e,
 accessibility, security headers, production build). The two PX-11 security
-defects are fixed with permanent coverage; rollback is schema-free; the preflight
-refuses a misconfigured deploy.
+defects are fixed with permanent coverage and the preflight refuses a
+misconfigured deploy.
+
+*This verdict is superseded.* It was true of the tag; the 2026-08-18
+production-readiness audit re-tested the branch and returned **NO-GO** on three
+reproduced blockers (`docs/audits/FINAL-PRR/REPORT.md`). The rollback clause in
+particular no longer holds: rollback is not schema-free (§2).
 
 **Launch: conditional GO — NO-GO until the founder-externals gate closes.**
 Blocking items are provisioning and measurement, not engineering: (1) SMS live
@@ -172,7 +201,7 @@ capture and the in-app inbox cover beta.
   registration, live auction, settlement, financial operations, platform
   administration, and the public help/legal/marketing surfaces — hardened
   (PX-11) and release-packaged (PX-12).
-- **Migrations**: 15 (0000–0014); none added since IP-6 — rollback-safe.
+- **Migrations**: 15 (0000–0014) at the tag; **27 (0000–0026) today** — 0015–0026 landed after it. Rollback is *not* free: migrations are forward-only, and `0019_tournaments.sql` renames a table and drops a column.
 - **Verification**: fresh full gate green (see the milestone reports).
 - **Docs**: [BETA_ONBOARDING](../operations/BETA_ONBOARDING.md),
   [KNOWN_LIMITATIONS](../operations/KNOWN_LIMITATIONS.md),

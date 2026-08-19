@@ -53,9 +53,13 @@ hand-picked organizers. No engineering assistance required.
 - **Support**: the in-product Support page (`/support`), Help centre (`/help`),
   and `support@desiauction.in`. Issue triage: [ISSUE_REPORTING](ISSUE_REPORTING.md).
 - **Recover**: worker restarts and deploys are self-healing (engine replays to a
-  snapshot; the finops follower/jobs are idempotent). Rollback is a pure
-  app-image swap — no schema step (PX-2…PX-11 added zero migrations). Restore
-  from backup: [DISASTER_RECOVERY](DISASTER_RECOVERY.md).
+  snapshot; the finops follower/jobs are idempotent). **Rollback depends on
+  whether the release shipped a migration**: no migration means an app-image
+  swap; a migration means expand/contract or a restore to the pre-deploy restore
+  point, because migrations are forward-only and there are no down migrations
+  (0015–0026 shipped after RC-1, one of them destructive). Procedure:
+  [DEPLOYMENT §Rollback](DEPLOYMENT.md#rollback). Restore from backup:
+  [DISASTER_RECOVERY](DISASTER_RECOVERY.md).
 
 ## What to tell beta organizers
 

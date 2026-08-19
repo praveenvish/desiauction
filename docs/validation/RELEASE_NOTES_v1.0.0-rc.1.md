@@ -54,15 +54,22 @@ platform:
 
 ## Rollback posture
 
-PX-2 through PX-12 added **zero database migrations** (schema stable at 15,
-0000–0014). Rollback is a pure app-image swap — no schema step, no data to
-reverse, zero data loss.
+At this tag, PX-2 through PX-12 had added **zero database migrations** (schema
+stable at 15, 0000–0014), so rollback to the previous image was a pure app-image
+swap.
+
+> **Superseded — 2026-08-19.** Do not carry this sentence forward to a later
+> release. Migrations 0015–0026 shipped after this tag (schema is at 27), and
+> `0019_tournaments.sql` renames a table and drops a column. Migrations are
+> forward-only; there are no down migrations. Rolling back a release that ships a
+> migration requires expand/contract or a restore point —
+> [DEPLOYMENT §Rollback](../operations/DEPLOYMENT.md#rollback).
 
 ## Verification (this RC)
 
 Fresh and green: TypeScript, lint, Prettier, dependency boundaries (incl.
 `no-circular`), package unit tests, web integration (419), engine integration
-(64), production build (57 static pages + engine/runner bundles), accessibility
+(64), production build (57 static pages at this tag; 75 on the current branch), accessibility
 (axe across all surfaces), security headers, and the production preflight (both
 directions).
 

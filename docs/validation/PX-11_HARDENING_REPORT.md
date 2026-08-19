@@ -87,14 +87,20 @@ config posture proven by the ENGINE_SECRET rotation drill (PRP-1 §5).
 
 - **Config validation:** `pnpm env:check` green for all three apps; each fails
   closed at boot on bad env.
-- **Migrations:** stable at 15 (0000–0014). **PX-2 through PX-11 added zero
-  migrations** — the "no schema change" discipline held across the entire
-  product build. Consequence: **rollback is a pure app-image swap with zero
-  schema risk** (no down-migration needed, no data migration to reverse), which
-  is exactly the "zero data loss, zero manual DB intervention" rollback the
-  founder demonstration requires.
-- **Backup/restore:** drilled (PVP-1 §5; `db:restore-verify` 43/43 exact under
-  concurrent writes). PITR + automated restore-verify are managed-PG deploy-time.
+- **Migrations:** 15 (0000–0014) at the time of this report. PX-2 through PX-11
+  added zero migrations, and the conclusion drawn from that — *"rollback is a
+  pure app-image swap with zero schema risk"* — was true then and is **no longer
+  true**. Migrations 0015–0026 shipped after the `v1.0.0-rc.1` tag; the schema is
+  at 27, and `0019_tournaments.sql` renames `seasons` → `tournaments` and drops a
+  column. Migrations are forward-only and there are no down migrations, so an
+  image swap does not undo a schema change. Current procedure:
+  [DEPLOYMENT §Rollback](../operations/DEPLOYMENT.md#rollback). *(Corrected
+  2026-08-19 per audit `docs/audits/FINAL-PRR/REPORT.md` P1-2.)*
+- **Backup/restore:** drilled 2026-07-16 (PVP-1 §5; `db:restore-verify` 43/43
+  exact under concurrent writes) — **that figure predates migrations 0015–0026
+  and must be re-drilled**. The script compares row counts on a database it dumps
+  itself; it has never restored a stored backup. PITR + automated restore-verify
+  are managed-PG deploy-time and remain unprovisioned.
 - **Runbooks:** [DEPLOYMENT](../operations/DEPLOYMENT.md),
   [DISASTER_RECOVERY](../operations/DISASTER_RECOVERY.md),
   [SECRET_ROTATION](../operations/SECRET_ROTATION.md),
@@ -126,9 +132,10 @@ The founder demonstration provisions real cloud infra (PX-12a founder
 externals). PX-11 rehearses the code-side of that flow against a local
 production-posture stack:
 
-1. **Deploy** — `pnpm --filter web build` (57 static pages) + `next start`
-   (NODE_ENV=production). ✔
-2. **Migrate** — 15/15 applied; re-run is a no-op (journal-tracked). ✔
+1. **Deploy** — `pnpm --filter web build` (57 static pages then; **75** on the
+   current branch) + `next start` (NODE_ENV=production). ✔
+2. **Migrate** — 15/15 applied then; **27/27** on the current branch. Re-run is a
+   no-op (journal-tracked). ✔
 3. **Validate config** — `env:check` green 3/3; app fails closed on bad env. ✔
 4. **Health** — `/healthz` 200 (liveness), `/readyz` 200 `db:ok` (readiness). ✔
 5. **Headers** — CSP + Referrer-Policy + Permissions-Policy + HSTS emitted. ✔
@@ -137,8 +144,10 @@ production-posture stack:
    the same server code serves the prod build). ✔
 7. **Restart workers / recovery** — engine restart-mid-auction convergence and
    finops follower/job recovery are certified; engine now also drains on SIGTERM. ✔
-8. **Rollback** — zero migrations across PX-2…PX-11 ⇒ app-image swap, no schema
-   step, no data loss. ✔
+8. **Rollback** — app-image swap, valid because PX-2…PX-11 shipped no migration.
+   ⚠ **Not generalisable:** 0015–0026 have shipped since, so a release must now be
+   classified before it can be rolled back
+   ([DEPLOYMENT §Rollback](../operations/DEPLOYMENT.md#rollback)).
 
 Real-infra deploy/rollback with live SMS/S3/payments and multi-browser is the
 PX-12a workstream (founder-held credentials), not a PX-11 code deliverable.
@@ -163,8 +172,9 @@ PX-12a workstream (founder-held credentials), not a PX-11 code deliverable.
 no cycles, no dead code, frozen domains intact), the two real security defects
 (open redirect, stored XSS) are fixed with permanent coverage, headers are
 hardened, readiness/liveness/graceful-shutdown are in place, logging is
-PII-safe, and rollback is schema-free. Every fix is verified and the full gate
-is green.
+PII-safe. Every fix is verified and the full gate is green. *(The "rollback is
+schema-free" clause that stood here has been removed: it was true of this
+milestone and false of the branch — see §5.)*
 
 **Overall: conditional GO, gated on the founder-externals track (PX-12a)** —
 SMS/S3/payments/DSNs/managed-Postgres provisioning and the staging perf run.
