@@ -45,10 +45,18 @@ jobs:
       - run: pnpm test:integration
 
       # RLS runtime verification under the production role recipe.
+      #
+      # The invocation passed TWO passwords to a script that requires FOUR and
+      # sets ON_ERROR_STOP — so it aborted at the engine-role statement and this
+      # step had never actually created desiauction_engine, desiauction_runner,
+      # or applied the append-only revokes. The four-role recipe was therefore
+      # never verified by anything (audit 2026-08-18, P1-3).
       - name: RLS probe under non-BYPASSRLS role
         run: |
           PGPASSWORD=desiauction psql -h localhost -p 5433 -U desiauction -d desiauction \
+            -v ON_ERROR_STOP=1 \
             -v app_password='nightly-app' -v system_password='nightly-system' \
+            -v engine_password='nightly-engine' -v runner_password='nightly-runner' \
             -f ops/db/create-app-role.sql
           APP_DATABASE_URL='postgres://desiauction_app:nightly-app@localhost:5433/desiauction' \
             pnpm --filter @desiauction/web rls:verify

@@ -64,6 +64,83 @@ jobs:
       - run: pnpm --filter @desiauction/engine db:migrate
       - run: pnpm test:integration
 
+      # THE PRODUCTION ROLE MODEL, PROVEN ON EVERY PR.
+      #
+      # Nothing here ever ran as anything but the database owner, so the
+      # four-role recipe rotted twelve migrations behind the code without a
+      # single test going red: the engine had no UPDATE on `registrations` (the
+      # table every sale writes) and the app role had no privileges at all on
+      # six newer tables. Under the documented production config the first sale
+      # of the first auction deadlocked. Audited 2026-08-18 (P0-1).
+      #
+      # `grants:verify` asserts a declared manifest against the real roles;
+      # `rls:verify` proves isolation is load-bearing under the non-BYPASSRLS
+      # app role. Both are seconds, and both belong on the PR gate — not only in
+      # a nightly that had never run.
+      - name: Create the four production roles
+        run: |
+          PGPASSWORD=desiauction psql -h localhost -p 5433 -U desiauction -d desiauction \
+            -v ON_ERROR_STOP=1 \
+            -v app_password='ci-app' -v system_password='ci-system' \
+            -v engine_password='ci-engine' -v runner_password='ci-runner' \
+            -f ops/db/create-app-role.sql
+      - name: Grant drift gate
+        run: pnpm --filter @desiauction/web grants:verify
+      - name: RLS probe under the non-BYPASSRLS app role
+        run: pnpm --filter @desiauction/web rls:verify
+        env:
+          APP_DATABASE_URL: postgres://desiauction_app:ci-app@localhost:5433/desiauction
+
+  # THE JOURNEY GATE. There was no e2e step in CI at all: the two proofs the
+  # release documents lean on (end-to-end journeys and tenant isolation) were
+  # both absent from the only gate that runs. It uses the PRECOMPILED server —
+  # `next start` over a real build — because the on-demand dev compiler is what
+  # exhausts the heap and produces restart flakes.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: desiauction
+          POSTGRES_PASSWORD: desiauction
+          POSTGRES_DB: desiauction
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U desiauction"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://desiauction:desiauction@localhost:5433/desiauction
+      OTP_PROVIDER: dev
+      PLAYWRIGHT_PRECOMPILED: "1"
+      NEXT_DIST_DIR: .next-e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @desiauction/db db:migrate
+      - run: pnpm --filter @desiauction/engine db:migrate
+      - run: pnpm seed:demo
+      - name: Build the server the suite will run against
+        run: pnpm --filter @desiauction/web exec next build
+      - run: pnpm --filter @desiauction/web exec playwright install --with-deps chromium
+      - name: End-to-end journeys
+        run: pnpm --filter @desiauction/web exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/test-results/
+          retention-days: 7
+
   secrets-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
