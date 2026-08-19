@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { completeAuction } from "./complete-auction";
 import { latestOtp } from "./otp";
 
 // PX-7 FOUNDER DEMONSTRATION: complete an auction → open the Settlement
@@ -176,20 +177,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // accept-short checkbox only exists while it is still scheduled — so clicking
   // it there is refused and the status simply stays "live".
   await page.goto(`/seasons/${slug}/auction/cockpit`);
-  await page.getByTestId("cockpit-complete").click();
-  // The reason goes in BEFORE the confirm, not after it: the dialog shows the
-  // short-squad warning and its reason field together, and the confirm is what
-  // commits both. Answering in the other order clicks a confirm that is not
-  // ready and then types into a dialog that has already gone.
-  if (
-    await page
-      .getByTestId("override-reason")
-      .isVisible()
-      .catch(() => false)
-  ) {
-    await page.getByTestId("override-reason").fill("test fixture: minimal squads");
-  }
-  await page.getByTestId("confirm-complete").click();
+  await completeAuction(page, "cockpit-complete");
   await page.goto(`/seasons/${slug}/auction`);
   await expect(page.getByTestId("auction-status")).toHaveText("completed", { timeout: 20_000 });
 
@@ -205,6 +193,10 @@ test("founder demo: complete an auction → settle it → close, prove and repla
 
   // --- Money authority: grant the founder a settlement role from the product --
   await page.goto(`/org/${orgSlug}`);
+  // The org page is tabbed; money authority lives under "Money & roles", not on
+  // the overview. Reaching for it straight off the landing tab waits for
+  // something that is rendered but not shown.
+  await page.getByRole("tab", { name: "Money & roles" }).click();
   await expect(page.getByTestId("money-authority")).toBeVisible();
   await expect(page.getByTestId("money-authority")).toContainText("Nobody can settle yet");
   await axeClean(page, "org · money authority");
@@ -362,7 +354,10 @@ test("case review: the audit surfaces, deep-linked", async ({ page }) => {
 test("settlement dashboard: stats, saved views, search and bulk navigation", async ({ page }) => {
   await otpLogin(page, OWNER);
   await page.goto(`/org/${orgSlug}`);
-  await page.getByTestId("open-settlement").click();
+  // Settlement and finance share one door now (`open-money-ops`); the separate
+  // `open-settlement` control is gone. It lives under "Money & roles".
+  await page.getByRole("tab", { name: "Money & roles" }).click();
+  await page.getByTestId("open-money-ops").click();
   await expect(page).toHaveURL(new RegExp(`/org/${orgSlug}/settlement`));
 
   await expect(page.getByTestId("stat-closed")).toHaveText("1");

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { clearNameGate } from "./onboarding";
+import { completeAuction } from "./complete-auction";
 import { latestOtp } from "./otp";
 
 /**
@@ -292,20 +293,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   await holdCloseLot(organizer);
   await expect(ownerB.page.getByTestId("my-slots")).toContainText("1/", { timeout: 20_000 });
 
-  await organizer.getByTestId("conduct-complete").click();
-  // DA-16: completing is irreversible, so it confirms. These fixtures run
-  // deliberately small squads, which DA-06 refuses without a reason on the
-  // record — the dialog asks for one and the run continues.
-  await organizer.getByTestId("confirm-complete").click();
-  if (
-    await organizer
-      .getByTestId("override-reason")
-      .isVisible()
-      .catch(() => false)
-  ) {
-    await organizer.getByTestId("override-reason").fill("test fixture: minimal squads");
-    await organizer.getByTestId("confirm-complete").click();
-  }
+  await completeAuction(organizer, "conduct-complete");
   for (const [page, who] of [
     [organizer, "organizer"],
     [ownerA.page, "ownerA"],
