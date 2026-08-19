@@ -432,6 +432,20 @@ export interface AuctionCommandEnvelope {
    * alone never suffices). Absent means false.
    */
   override?: boolean;
+  /**
+   * When the engine RECEIVED this command, not when it got round to running it.
+   *
+   * The two differ by however deep the per-auction queue is, and for one rule
+   * that difference is the whole game: a bid placed a heartbeat before the
+   * hammer is exactly the bid anti-snipe exists to honour. Judging it by
+   * processing time refuses it and the lot closes — which is the opposite of
+   * what the extension window is for.
+   *
+   * Stamped once, at the boundary, so a slow fold or a busy queue can never
+   * turn a bid that WAS in time into one that was not. Absent (internal
+   * commands, older callers) falls back to the processing clock.
+   */
+  receivedAtMs?: number;
   payload: Readonly<Record<string, unknown>>;
 }
 

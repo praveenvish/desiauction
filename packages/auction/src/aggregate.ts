@@ -714,6 +714,15 @@ export interface PlaceBidInput {
   amountRaw: number;
   /** True when the actor is the paddle holder or a conductor (manual mode). */
   bidderAuthorized: boolean;
+  /**
+   * When the engine RECEIVED the bid. Falls back to the processing clock.
+   *
+   * This is the timestamp the expiry rule is judged on, and it has to be, or
+   * anti-snipe stops working: the bid anti-snipe exists to honour is the one
+   * placed in the last moment before the hammer, and that is precisely the bid
+   * a deep queue delivers to the reducer AFTER the deadline.
+   */
+  receivedAtMs?: number;
 }
 
 export type PlaceBidResult =
@@ -813,9 +822,10 @@ export async function placeBid(
     minPossiblePrice: minPossiblePrice(auction.config),
     roleCount: roleCountRow?.count ?? 0,
     roleMax: auction.config.roleQuotas[role] ?? null,
-    // The lot's deadline is now a RULE, not just a scheduler input: a bid that
-    // arrives after it is refused here even if nothing has closed the lot yet.
-    nowMs: atMs,
+    // The lot's deadline is a RULE, not just a scheduler input — judged on when
+    // the bid ARRIVED, so queue depth can never turn a bid that was in time
+    // into one that was not.
+    nowMs: input.receivedAtMs ?? atMs,
     endsAtMs: lot.endsAtMs,
   });
 

@@ -250,7 +250,9 @@ export class AuctionEngine {
       this.deps.logger.warn({ actor: envelope.actor }, "actor rate limited");
       return this.reject(envelope, "rate_limited", 0);
     }
-    return this.enqueue(envelope);
+    // ARRIVAL TIME IS STAMPED HERE, at the boundary, and never again. Whatever
+    // the queue does next, a bid that beat the hammer keeps having beaten it.
+    return this.enqueue({ receivedAtMs: this.now(), ...envelope });
   }
 
   private enqueue(envelope: QueuedCommand): Promise<CommandAck> {
@@ -533,6 +535,7 @@ export class AuctionEngine {
           paddleId,
           amountRaw,
           bidderAuthorized: holder || envelope.conduct,
+          ...(envelope.receivedAtMs === undefined ? {} : { receivedAtMs: envelope.receivedAtMs }),
         });
         return result.ok
           ? accept({ bidId: result.bidId, amount: result.amount, extended: result.extended })
