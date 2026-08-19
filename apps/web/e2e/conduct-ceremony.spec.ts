@@ -223,7 +223,10 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
     timeout: 30_000,
   });
   await expect(bigScreen.getByTestId("status-ribbon")).toBeVisible();
-  await expect(bigScreen.getByTestId("ceremony")).toBeVisible();
+  // L001 is open and the auction isn't paused/finished: spectate shows the
+  // windowed LotHero, not the ceremony overlay (reserved for Big screen, the
+  // paused freeze, and between-lot moments — see spectate-panel.tsx).
+  await expect(bigScreen.getByTestId("spectate-lot")).toBeVisible();
   // Spectator isolation: no conduct surface exists on this page.
   await expect(bigScreen.getByTestId("conduct-panel")).toHaveCount(0);
   await expect(bigScreen.getByTestId("cockpit-panel")).toHaveCount(0);
@@ -287,9 +290,15 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
       async () => {
         const text = (await organizer.getByTestId("ribbon-timer").textContent()) ?? "";
         const seconds = Number.parseInt(text.replace("s", ""), 10);
-        // ≥6s of runway: under parallel-suite load the click → server-action →
-        // engine round trip must still land before expiry closes the lot.
-        return Number.isFinite(seconds) && seconds <= 14 && seconds > 6;
+        // RUNWAY, NOT A RACE. The extension window is 15s, so any bid landing
+        // under 15s remaining extends. The old band opened at 6s left, which
+        // gave the click → server action → engine round trip six seconds to
+        // complete under whatever load the suite is running — and when it did
+        // not, the lot expired and the ceremony went to "sold" instead of
+        // "extension". That failure looked like a broken anti-snipe and was
+        // actually a stopwatch. Ten seconds of runway inside a fifteen-second
+        // window keeps the assertion exactly as strict and stops it racing.
+        return Number.isFinite(seconds) && seconds <= 14 && seconds > 10;
       },
       { timeout: 40_000, intervals: [250] },
     )
