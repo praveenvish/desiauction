@@ -1,6 +1,23 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+/*
+ * THE COMPONENT GALLERY IS A DEV TOOL, AND STAYS ONE.
+ *
+ * `/gallery` is deliberately absent from a production build — it is a
+ * design-system showcase, not a product surface, and shipping it would widen
+ * the public attack surface for nobody's benefit. That is correct, and it means
+ * these specs cannot run against a precompiled (`next start`) server: at the
+ * audit they were 23 of the 41 red tests, which made the suite impossible to
+ * get green in the very mode that exists to stop the dev compiler exhausting
+ * its heap.
+ *
+ * Skipping when the route is structurally absent is the honest answer. The dev
+ * run still covers them, and CI runs them there.
+ */
+const GALLERY_IS_ABSENT = process.env["PLAYWRIGHT_PRECOMPILED"] === "1";
+test.skip(GALLERY_IS_ABSENT, "/gallery is dev-only; run this suite against `next dev`");
+
 // M-IP1-1 verification (IP-1_DESIGN §8): AA is measured, not asserted.
 // Text pairs >= 4.5:1; non-text UI tokens >= 3:1 (doc 08 contrast floors).
 

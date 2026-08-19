@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { clearNameGate } from "./onboarding";
 import { latestOtp } from "./otp";
 
 // M-IP2-3 founder journey: create org -> invite via link -> second person
@@ -70,6 +71,9 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
     await otpLogin(pageB, PHONE_B);
     await expect(pageB.getByTestId("join-card")).toContainText(`MPL ${STAMP}`);
     await pageB.getByTestId("accept-invite").click();
+    // A first-time member is asked their name once — and the invitation's
+    // destination survives it, so they land in the org they just joined.
+    await clearNameGate(pageB, "Invited Member");
     await expect(pageB.getByTestId("org-name")).toHaveText(`MPL ${STAMP}`);
     // B is staff: no invite panel, no grant buttons.
     await expect(pageB.getByTestId("open-invite")).not.toBeVisible();

@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { clearNameGate } from "./onboarding";
 import { latestOtp } from "./otp";
 
 /**
@@ -53,6 +54,7 @@ async function owner(browser: Browser, phone: string, joinUrl: string, team: str
   await otpLogin(page, phone);
   await page.goto(joinUrl);
   await page.getByTestId("accept-owner-invite").click();
+  await clearNameGate(page, "Night Owner");
   await expect(page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -71,6 +73,20 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(organizer).toHaveURL(/\/onboarding/);
   await organizer.getByLabel("What should we call you?").fill("Night Organizer");
   await organizer.getByRole("button", { name: "Continue" }).click();
+  // WAIT FOR THE NAME TO LAND BEFORE NAVIGATING. The gate on every console
+  // segment reads the session, so a `goto` that races the write is sent to
+  // /onboarding, which — by then finding a name — forwards to its default of
+  // /home. The spec then sits on /home waiting for a control that only exists
+  // on /orgs, and dies on the 5-minute test timeout rather than on an
+  // assertion. Every spec that does this correctly waits for /home first.
+  await expect(organizer).toHaveURL(/\/home/);
+  // Organizations are created where the work is (/orgs), not as an entry toll:
+  // the onboarding wizard stopped asking for one in the 2026-07-24 collapse.
+  // /home does carry a create dialog, but it is CLOSED, so its field is in the
+  // DOM and invisible — which is why reaching for it here hung instead of
+  // failing.
+  await organizer.goto("/orgs");
+  await organizer.getByTestId("new-org").click();
   await organizer
     .getByLabel("Organization name")
     .filter({ visible: true })

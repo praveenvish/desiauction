@@ -1,4 +1,4 @@
-import { createDb, otpInbox } from "@desiauction/db";
+import { createDb, otpCodes, otpInbox } from "@desiauction/db";
 import { desc, eq } from "drizzle-orm";
 
 /**
@@ -60,5 +60,35 @@ export async function latestOtp(phone: string, timeoutMs = 5000): Promise<string
     }
   } finally {
     await handle.sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * RESET THE SIGN-IN BUDGET FOR A FIXED DEMO IDENTITY.
+ *
+ * The product allows five sign-in codes per number per hour, which is right for
+ * a person and wrong for a 90-minute suite: two specs log in as the FIXED demo
+ * identities (`+919999000001`, `+919999000002`) rather than a fresh number, and
+ * across a full run those numbers ask for eight and five codes. The sixth is
+ * refused with "Too many codes for that number", the login form never leaves
+ * the phone step, and the journey that follows fails for a reason that has
+ * nothing to do with what it was testing. Measured during the 2026-08-18 audit:
+ * `select phone, count(*) from otp_codes … group by 1` → 8 and 5.
+ *
+ * This clears the HARNESS's own consumption of that budget. It does not weaken
+ * the control — the limit is untouched in the product, and its own behaviour is
+ * covered by `auth-onboarding.spec.ts` ("resend is timed, cooldown is enforced
+ * by the server"), which deliberately exercises the refusal on a fresh number.
+ *
+ * Only for the fixed demo identities. A spec that mints its own phone has a
+ * budget of five it will never approach, and should not call this.
+ */
+export async function resetOtpBudget(phone: string): Promise<void> {
+  const e164 = phone.startsWith("+") ? phone : `+91${phone}`;
+  const handle = createDb(DATABASE_URL);
+  try {
+    await handle.db.delete(otpCodes).where(eq(otpCodes.phone, e164));
+  } finally {
+    await handle.sql.end();
   }
 }

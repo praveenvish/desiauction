@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { latestOtp } from "./otp";
+import { latestOtp, resetOtpBudget } from "./otp";
 
 // PX-8 FOUNDER DEMONSTRATION: conduct an auction → complete settlement → open
 // Financial Operations → observe the new financial activity → review the
@@ -26,6 +26,12 @@ let orgSlug = "";
 let docUrl = "";
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
+  // These specs sign in as the FIXED demo identities, so across a long run they
+  // exhaust the product's five-codes-per-number-per-hour limit and the login
+  // form silently never leaves the phone step. Clearing the harness's own
+  // consumption keeps the limit intact where it matters (see otp.ts).
+  await resetOtpBudget(phone);
+
   if (!page.url().includes("/login")) {
     await page.goto("/login");
   }

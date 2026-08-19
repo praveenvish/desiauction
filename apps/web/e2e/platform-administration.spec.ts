@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { latestOtp } from "./otp";
+import { latestOtp, resetOtpBudget } from "./otp";
 
 // PX-9 FOUNDER DEMONSTRATION: a platform administrator signs in → views overall
 // platform health → finds an organization → inspects its competitions → views a
@@ -31,6 +31,12 @@ const ORG_OWNER = "9999000002";
 const ADMIN_ROUTES = ["/admin", "/admin/orgs", "/admin/users", "/admin/audit", "/admin/health"];
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
+  // These specs sign in as the FIXED demo identities, so across a long run they
+  // exhaust the product's five-codes-per-number-per-hour limit and the login
+  // form silently never leaves the phone step. Clearing the harness's own
+  // consumption keeps the limit intact where it matters (see otp.ts).
+  await resetOtpBudget(phone);
+
   if (!page.url().includes("/login")) {
     await page.goto("/login");
   }
