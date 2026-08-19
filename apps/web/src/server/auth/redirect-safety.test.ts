@@ -48,3 +48,19 @@ describe("PX-11 · safeNext (open-redirect guard)", () => {
     expect(safeNext("not-a-path")).toBe("/home");
   });
 });
+
+describe("dot segments (audit P3-8)", () => {
+  it("refuses paths whose dot segments the browser would resolve after the check", () => {
+    // Same-origin either way — the point is that the string we approved and the
+    // string the browser navigates to must be the same one.
+    expect(safeNext("/./evil")).toBe("/home");
+    expect(safeNext("/../evil")).toBe("/home");
+    expect(safeNext("/org/./secret")).toBe("/home");
+    expect(safeNext("/org/../../etc")).toBe("/home");
+  });
+
+  it("still allows ordinary paths containing dots", () => {
+    expect(safeNext("/help/what.is-this")).toBe("/help/what.is-this");
+    expect(safeNext("/seasons/spring-2026")).toBe("/seasons/spring-2026");
+  });
+});

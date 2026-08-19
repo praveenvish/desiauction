@@ -816,6 +816,27 @@ export async function registrationPreview(slug: string): Promise<RegistrationPre
  * Authorization is ownership, not capability: the registration must belong to
  * the caller. The state machine decides whether the transition is legal.
  */
+/**
+ * THE ROSTER IS THE ENGINE'S ONCE THE AUCTION STARTS (audit 2026-08-18, P2-3).
+ *
+ * `registrations.team_id` has two writers: this module (an organizer assigning
+ * a player by hand) and the auction aggregate (a sale stamping the buyer). Team
+ * CREATION was already locked once the auction leaves `scheduled`, but
+ * ASSIGNMENT was not — so an organizer could move a player between squads while
+ * the engine was selling them, and the engine's recovery pass, which heals
+ * auctions/lots/bids/paddles against the event log, never touches team_id and
+ * so could not put it back. The result is a roster that disagrees with the
+ * ledger, silently, with money already committed against it.
+ *
+ * The same sentence the team lock uses, for the same reason.
+ */
+async function auctionLocksRoster(competitionId: string): Promise<boolean> {
+  const auction = await auctionOf(systemDb, competitionId);
+  return auction !== null && auction.status !== "scheduled";
+}
+
+const ROSTER_LOCKED = "The auction has started — squads are set by the auction now, not by hand.";
+
 export async function withdrawMyRegistrationAction(
   slug: string,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -829,6 +850,14 @@ export async function withdrawMyRegistrationAction(
   );
   if (mine === null) {
     return { ok: false, error: "You don't have a registration for this season." };
+  }
+  // A player cannot withdraw themselves out from under a live auction: they may
+  // already be a lot, or already sold and paid for.
+  if (await auctionLocksRoster(competition.id)) {
+    return {
+      ok: false,
+      error: "The auction has started — ask the organizer to withdraw you.",
+    };
   }
   const result = await withTenantDb(
     dbHandle,
@@ -1150,6 +1179,9 @@ export async function assignTeamAction(
   } catch {
     return { ok: false, error: "You can't assign teams here." };
   }
+  if (await auctionLocksRoster(competition.id)) {
+    return { ok: false, error: ROSTER_LOCKED };
+  }
   await inCompetitionOrg(session.personId, competition, (db) =>
     assignTeam(
       db,
@@ -1188,6 +1220,11 @@ export async function markRegistrationAction(
     );
   } catch {
     return { ok: false, error: "You can't manage players here." };
+  }
+  // Icon and captain marks move a player into or out of the auction pool and
+  // change squad arithmetic the engine has already priced against.
+  if (await auctionLocksRoster(competition.id)) {
+    return { ok: false, error: ROSTER_LOCKED };
   }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
     setRegistrationMarks(

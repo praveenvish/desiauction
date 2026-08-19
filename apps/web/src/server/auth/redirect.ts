@@ -21,6 +21,15 @@ export function safeNext(value: string | undefined): string {
     return "/home";
   }
   if (/^\/(?![/\\])[A-Za-z0-9\-._~/?#[\]@!$&'()*+,;=%]*$/.test(value)) {
+    // Same-origin already, but "/./x" and "/../x" are dot segments the browser
+    // resolves before we ever see the result — so the destination the user
+    // reaches is not the string that was checked. Everything here stays on this
+    // origin either way; this keeps the value we approved and the value that is
+    // navigated to the SAME string, which is the property the allowlist is
+    // supposed to guarantee (audit 2026-08-18, P3-8).
+    if (value.split("/").some((segment) => segment === "." || segment === "..")) {
+      return "/home";
+    }
     return value;
   }
   return "/home";

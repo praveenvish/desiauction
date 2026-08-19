@@ -431,6 +431,18 @@ describe("the club's own switch", () => {
 });
 
 describe("promotional needs a recorded opt-in", () => {
+  /*
+   * A FIXED DAYTIME CLOCK.
+   *
+   * These cases are about CONSENT, but the promotional path checks quiet hours
+   * first, so without an injected clock their verdict depended on what time the
+   * suite happened to run: after 21:00 IST "refuses without one" got
+   * `quiet_hours` instead of `no_consent`, and "allows it once consent is
+   * recorded" refused outright. Two tests that pass all day and fail at night
+   * teach people to re-run rather than to look (audit 2026-08-18, P3-2).
+   * Quiet hours have their own tests below, which set the clock on purpose.
+   */
+  const DAYTIME = new Date("2026-08-18T08:30:00.000Z"); // 14:00 IST
   it("refuses without one", async () => {
     const decision = await maySend(db, {
       contact: PHONE_PLAIN,
@@ -438,6 +450,7 @@ describe("promotional needs a recorded opt-in", () => {
       category: "promotional",
       scope: "marketing",
       personId: plainId,
+      now: DAYTIME,
     });
     expect(decision.send).toBe(false);
     if (!decision.send) {
@@ -469,6 +482,7 @@ describe("promotional needs a recorded opt-in", () => {
       category: "promotional",
       scope: "marketing",
       personId: plainId,
+      now: DAYTIME,
     });
     expect(decision.send).toBe(true);
   });

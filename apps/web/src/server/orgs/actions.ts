@@ -667,7 +667,19 @@ export async function acceptInviteAction(token: string): Promise<void> {
       path: "/",
       sameSite: "lax",
     });
-    redirect(`/org/${result.orgSlug}`);
+    // KEEP THE DESTINATION ACROSS THE NAME GATE.
+    //
+    // A brand-new member accepting an invitation has no name yet, so the org
+    // layout's `requireOnboarded()` interrupts them — and it interrupts with no
+    // `next`, whose default is /home. So the one thing they were invited to do
+    // ended somewhere else entirely, with only a cookie hinting it had worked
+    // (audit 2026-08-18, P3-1). Handing the gate the destination up front means
+    // the interruption is exactly one question long and puts them back.
+    const destination = `/org/${result.orgSlug}`;
+    if (session.name === null || session.name.trim() === "") {
+      redirect(`/onboarding?next=${encodeURIComponent(destination)}`);
+    }
+    redirect(destination);
   }
   redirect("/orgs?invite=invalid");
 }
