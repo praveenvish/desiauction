@@ -83,6 +83,18 @@ const envSchema = z.object({
    * delivered, which is worse than never learning they were.
    */
   DELIVERY_CALLBACK_SECRET: z.string().min(16).optional(),
+  /**
+   * Razorpay. All three together or the gateway is simply absent and every
+   * payment stays on the manual adapters — a half-configured gateway that
+   * accepts orders it cannot reconcile is worse than no gateway.
+   *
+   * The webhook secret is what makes `/api/webhooks/razorpay` exist at all:
+   * unset means the route 404s rather than accepting unverifiable callbacks
+   * (the same fail-closed posture as the SMS and delivery webhooks).
+   */
+  RAZORPAY_KEY_ID: z.string().min(1).optional(),
+  RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().min(16).optional(),
   // PX-5 SEO: absolute origin for canonical URLs, Open Graph and the sitemap.
   PUBLIC_BASE_URL: z.url().default("http://localhost:3000"),
   // PX-8: the finops artifact + outbox root (IP-6 §22 — everything injected).

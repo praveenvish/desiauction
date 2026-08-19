@@ -6,7 +6,9 @@ import {
   type PaymentGatewayPort,
 } from "@desiauction/settlement";
 
+import { env } from "../../env";
 import { createManualAdapter, MANUAL_METHODS } from "./adapters/manual";
+import { createRazorpayAdapter } from "./adapters/razorpay";
 import {
   createAuctionSource,
   createSettlementStore,
@@ -43,10 +45,30 @@ export interface SettlementDepsOverrides {
   readonly gateways?: Readonly<Record<string, PaymentGatewayPort>>;
 }
 
+/**
+ * The real gateway, wired from validated env — or nothing at all.
+ *
+ * All three variables or none: a half-configured gateway would accept orders it
+ * could never reconcile. When absent, `gateway("gateway:razorpay")` returns null
+ * and the webhook route answers 503 `gateway_unconfigured`, which is the honest
+ * answer and the one the ingress already knew how to give.
+ */
+function configuredGateways(): Map<string, PaymentGatewayPort> {
+  const gateways = new Map<string, PaymentGatewayPort>();
+  const keyId = env.RAZORPAY_KEY_ID;
+  const keySecret = env.RAZORPAY_KEY_SECRET;
+  const webhookSecret = env.RAZORPAY_WEBHOOK_SECRET;
+  if (keyId !== undefined && keySecret !== undefined && webhookSecret !== undefined) {
+    gateways.set("gateway:razorpay", createRazorpayAdapter({ keyId, keySecret, webhookSecret }));
+  }
+  return gateways;
+}
+
 export function settlementDeps(db: Db, overrides: SettlementDepsOverrides = {}): SettlementDeps {
   const manual = new Map<string, PaymentGatewayPort>(
     MANUAL_METHODS.map((method) => [method, createManualAdapter(method)]),
   );
+  const configured = configuredGateways();
   const injected = new Map<string, PaymentGatewayPort>(Object.entries(overrides.gateways ?? {}));
   return {
     store: createSettlementStore(db),
@@ -55,6 +77,9 @@ export function settlementDeps(db: Db, overrides: SettlementDepsOverrides = {}):
     now: overrides.now ?? (() => Date.now()),
     newId: overrides.newId ?? newId,
     checkpointCadence: overrides.checkpointCadence ?? CHECKPOINT_CADENCE,
-    gateway: (method) => injected.get(method) ?? manual.get(method) ?? null,
+    // Tests inject first, then real configured gateways, then the manual
+    // adapters that are always available.
+    gateway: (method) =>
+      injected.get(method) ?? configured.get(method) ?? manual.get(method) ?? null,
   };
 }

@@ -1,4 +1,4 @@
-import { isValidMediaKey, validateUpload } from "@desiauction/core";
+import { bytesMatchImageType, isValidMediaKey, validateUpload } from "@desiauction/core";
 import { withTenantDb } from "@desiauction/db";
 import { NextResponse } from "next/server";
 
@@ -56,6 +56,15 @@ export async function PUT(request: Request): Promise<NextResponse> {
   const check = validateUpload({ contentType, byteSize: bytes.byteLength });
   if (!check.ok) {
     return NextResponse.json({ error: check.error }, { status: 400 });
+  }
+  // The declared type is the caller's claim; these are the file's own bytes.
+  // Without this a text file (or a script) was stored under a .png key and
+  // served from the media origin (P3-3).
+  if (!bytesMatchImageType(contentType, bytes)) {
+    return NextResponse.json(
+      { error: "That file is not the image type it claims to be." },
+      { status: 400 },
+    );
   }
   await localMediaStore.writeLocal(key, contentType, bytes);
   return NextResponse.json({ ok: true, key });
