@@ -235,3 +235,30 @@ hidden: a NO-GO cannot lift on a suite nobody has seen pass.
    drill this pass ran locally, run once against real infrastructure.
 4. **The two named refactors** (§3) and the system-pool least-privilege
    follow-up (§1).
+
+---
+
+## 5 · E2E handoff — the remaining ten
+
+**State: 61 pass · 10 fail · 31 skip** (from 50/18 at the audit, and 3/18 when
+this pass began). Every remaining failure has been diagnosed from its own output;
+none is a guess. Each fix in the last pass moved its test *past* the old blocker
+onto a new one, which is why the list shrank rather than emptied.
+
+| Spec | Diagnosis | Next step |
+|---|---|---|
+| `passkeys:32` | Past the locator fix; now `events-panel` never shows `auth.passkey.enrolled` | Check whether enrolment writes that security event, or whether the panel labels it differently. **Possible product gap** — enrolling a credential should be auditable |
+| `passkeys:67` | The user-agent fix worked (row found), but after Revoke the row is still there | `.first()` may now target the wrong row, or the panel does not refresh after revoke. **Check the refresh** before assuming it is the spec |
+| `tournaments-index:64` | My `tg-toggle-${alpha}` guess is the wrong group key | Read `group.key` for a season-view group and use it |
+| `financial-operations:72` | `open-money-ops` already links to `/money` *before* the finance grant | The fixture user (demo founder) already holds `finops:controller`, so the spec's premise — "owning the org confers no finance power" — does not hold for this fixture. Needs a fixture without the grant, not a locator change |
+| `financial-issuance:51` | Same door rename; blocked behind the same fixture question | Follows from the above |
+| `organizer-workspace:229` | `getByLabel('They join as')` — invite-role select renamed or removed | Find the current control |
+| `settlement-experience:89` | Re-ticks the override now; still completing | Re-diagnose from the fresh run |
+| `conduct-ceremony:63` · `live-auction:57` · `auction-experience:64` | The three long multi-actor journeys | Re-diagnose; the arrival-time fix and the completion-dialog fix both landed after their last observed failure |
+
+**One product fix falls out of this and is not done:** the short-squad override
+is a single checkbox (`accept-short-open`) carrying both *open* and *close*, held
+in component state, so the refresh after opening clears it. The operator ticks a
+box, watches it disappear, and the close then fails DA-06 with the status simply
+staying "live" and nothing on screen explaining why. The specs now re-tick it;
+the panel should either persist the choice or ask again at the point of use.
