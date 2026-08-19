@@ -316,6 +316,22 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await holdCloseLot(organizer);
   await expect(organizer.getByTestId("ceremony")).toBeVisible({ timeout: 20_000 });
   await organizer.getByTestId("conduct-complete").click();
+  // DA-16: completing is irreversible, so it confirms. And DA-06 refuses a
+  // completion whose squads are under the minimum unless the conductor puts a
+  // reason on the record — these fixtures run three deliberately tiny squads,
+  // so that is exactly the path. Without this the command was rejected, the
+  // status stayed "live", and the failure read as a broken lifecycle rather
+  // than an unanswered dialog. (Mirrors auction-experience.spec.)
+  await organizer.getByTestId("confirm-complete").click();
+  if (
+    await organizer
+      .getByTestId("override-reason")
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await organizer.getByTestId("override-reason").fill("test fixture: minimal squads");
+    await organizer.getByTestId("confirm-complete").click();
+  }
   for (const page of everyone) {
     await expect(page.getByTestId("live-status")).toHaveText("completed", { timeout: 20_000 });
   }

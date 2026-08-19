@@ -116,7 +116,14 @@ test("founder demo: settle an auction → open Financial Operations → observe,
 
   // Owning the organization confers NO finance power: no link, and the surface
   // itself 404s. That is the platform working, not a bug.
-  await expect(page.getByTestId("open-finance")).toHaveCount(0);
+  // Settlement and finance now share ONE door (`open-money-ops`), so "no
+  // finance power" is no longer "no link" — it is a link that goes to
+  // settlement instead of to the money operation. The 404 below is the
+  // load-bearing half of this assertion either way.
+  await expect(page.getByTestId("open-money-ops")).not.toHaveAttribute(
+    "href",
+    new RegExp(`/org/${orgSlug}/money$`),
+  );
   expect((await page.request.get(`/org/${orgSlug}/money`)).status()).toBe(404);
   await axeClean(page, "org · finance authority");
 
@@ -129,8 +136,11 @@ test("founder demo: settle an auction → open Financial Operations → observe,
   });
 
   // The door and the room agree the moment the grant lands.
-  await expect(page.getByTestId("open-finance")).toBeVisible();
-  await page.getByTestId("open-finance").click();
+  await expect(page.getByTestId("open-money-ops")).toHaveAttribute(
+    "href",
+    new RegExp(`/org/${orgSlug}/money$`),
+  );
+  await page.getByTestId("open-money-ops").click();
   await expect(page).toHaveURL(new RegExp(`/org/${orgSlug}/money`));
 
   // --- Observe the new financial activity ------------------------------------

@@ -223,7 +223,19 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await expect(page.getByTestId("competitions-list")).toContainText(`Alpha One ${STAMP}`);
 
   // The season WORKSPACE did not move.
-  await page.getByRole("link", { name: new RegExp(`Alpha One ${STAMP}`) }).click();
+  //
+  // Seasons live inside their tournament's group, and a group starts CLOSED —
+  // so the row is in the DOM (which is why the containsText above passes) while
+  // being unreachable to role queries, exactly as it is unreachable to a person
+  // until they open it. Open it the way they would.
+  const alphaToggle = page.getByTestId(`tg-toggle-${alpha}`);
+  if ((await alphaToggle.getAttribute("aria-expanded")) === "false") {
+    await alphaToggle.click();
+  }
+  await page
+    .getByTestId("tg-season")
+    .filter({ hasText: `Alpha One ${STAMP}` })
+    .click();
   await expect(page).toHaveURL(/\/seasons\/[^/?#]+$/, COLD);
 });
 

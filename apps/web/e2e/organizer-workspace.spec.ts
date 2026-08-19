@@ -84,6 +84,9 @@ test("founder demo: org → competition → approve → team roster → venue �
 }) => {
   test.setTimeout(120_000);
   await onboardWithName(page, ORGANIZER, "Priya Organizer");
+  // Organizations are born where the work is: /orgs, not the onboarding wizard.
+  await page.goto("/orgs");
+  await page.getByTestId("new-org").click();
   await page
     .getByLabel("Organization name")
     .filter({ visible: true })

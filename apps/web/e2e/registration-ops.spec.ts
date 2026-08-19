@@ -97,7 +97,10 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await expect(page.getByTestId("page-indicator")).toContainText("8 total");
 
   // Search narrows deterministically.
-  await page.getByLabel("Search").fill("Player 3");
+  // The SHELL gained a global search trigger whose aria-label is also "Search",
+  // so a bare label match now resolves to two elements. This one means the
+  // page's own filter box.
+  await page.getByRole("textbox", { name: "Search" }).fill("Player 3");
   await page.getByTestId("search-submit").click();
   await expect(page.getByTestId("page-indicator")).toContainText("1 total");
 
@@ -112,6 +115,23 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
 const PNG_1PX = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
+);
+
+/*
+ * MEDIA_STORAGE=local WRITES INTO public/, AND A BUILT SERVER DOES NOT SERVE
+ * WHAT WAS WRITTEN AFTER THE BUILD.
+ *
+ * `next start` serves public/ from the manifest it captured at build time, so a
+ * photo uploaded during the run 404s and the <img> never paints — the test fails
+ * on a property of the harness, not of the product. That local path is DEV/e2e
+ * only by design (ARCHITECTURE R4); production PUTs to a bucket and this whole
+ * class of problem does not exist there.
+ *
+ * Runs against `next dev`, where CI's nightly runs it.
+ */
+test.skip(
+  process.env["PLAYWRIGHT_PRECOMPILED"] === "1",
+  "local media is written after the build; a built server cannot serve it",
 );
 
 test("an organizer adds one player by hand, then imports their photo by filename", async ({

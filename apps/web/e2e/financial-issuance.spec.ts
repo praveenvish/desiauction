@@ -88,7 +88,10 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   });
 
   // --- NO FINANCE PROFILE: the lifecycle is shut ------------------------------
-  await page.getByTestId("open-finance").click();
+  // One door for the whole money operation now; it points at /money once the
+  // finance grant lands (testid was `open-finance` before settlement and
+  // finance were merged behind it).
+  await page.getByTestId("open-money-ops").click();
   await expect(page).toHaveURL(new RegExp(`/org/${orgSlug}/money`));
   await expect(page.getByTestId("profile-status")).toHaveText("not declared");
   await expect(page.getByText("Nothing can be issued yet")).toBeVisible();

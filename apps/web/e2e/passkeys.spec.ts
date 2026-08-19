@@ -47,7 +47,11 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
 
   await page.getByLabel("Device name").fill("Founder MacBook");
   await page.getByTestId("enroll-passkey").click();
-  await expect(page.getByText("Founder MacBook")).toBeVisible();
+  // Scoped to the NAME, not to every mention of it. The device row grew
+  // accessible controls — "Rename Founder MacBook", "Remove Founder MacBook" —
+  // so a bare text match now resolves to three elements and trips strict mode.
+  // That is the a11y work doing its job; the spec just has to be specific.
+  await expect(page.locator(".security-name", { hasText: "Founder MacBook" })).toBeVisible();
   await expect(page.getByTestId("events-panel")).toContainText("auth.passkey.enrolled");
 
   await page.getByRole("button", { name: "Sign out" }).click();
@@ -67,15 +71,22 @@ test("session management: a second device shows up and can be revoked", async ({
   const phone = `92${String(Date.now()).slice(-8)}`;
   await otpLogin(page, phone);
 
-  const other = await browser.newContext({ userAgent: "OtherDevice/1.0" });
+  // A REAL user-agent, because the panel no longer prints raw ones. Sessions
+  // are labelled "Firefox on Windows" now rather than the first 48 characters
+  // of a UA string — a person recognising their own device is the entire point
+  // of the screen. "OtherDevice/1.0" parses to "Unknown device", which would
+  // make this assertion pass for the wrong reason on any unparsed session.
+  const other = await browser.newContext({
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+  });
   const otherPage = await other.newPage();
   await otpLogin(otherPage, phone);
   await other.close();
 
   await page.reload();
   const panel = page.getByTestId("sessions-panel");
-  await expect(panel).toContainText("OtherDevice/1.0");
+  await expect(panel).toContainText("Firefox on Windows");
   await panel.getByRole("button", { name: "Revoke" }).first().click();
-  await expect(panel).not.toContainText("OtherDevice/1.0");
+  await expect(panel).not.toContainText("Firefox on Windows");
   await expect(page.getByTestId("events-panel")).toContainText("auth.session.revoked");
 });
