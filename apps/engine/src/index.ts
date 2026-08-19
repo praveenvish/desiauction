@@ -32,6 +32,8 @@ process.on("uncaughtException", (error) => {
 const engine = new AuctionEngine({
   db,
   logger,
+  rateBurst: env.ENGINE_RATE_BURST,
+  rateRefillPerSec: env.ENGINE_RATE_REFILL_PER_SEC,
   onSnapshot: (auctionId, serialized, version) => {
     hub.broadcast(auctionId, serialized, version);
   },
@@ -44,6 +46,9 @@ const { server, hub } = buildServer({
   engine,
   engineSecret: env.ENGINE_SECRET,
   nodeEnv: env.NODE_ENV,
+  allowedOrigins: env.ENGINE_ALLOWED_ORIGINS,
+  maxSocketsPerRoom: env.WS_MAX_SOCKETS_PER_ROOM,
+  maxSocketsPerIp: env.WS_MAX_SOCKETS_PER_IP,
 });
 
 // The watchdog cadence: 250ms timer authority (lot expiry, closing-soon),

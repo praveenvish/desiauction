@@ -46,6 +46,60 @@ export const ENGINE_ACTOR = "00000000000000000000000000";
 /** Internal, engine-enqueued command types — never accepted from transport. */
 type InternalCommandType = "_TimerClose" | "_ClosingSoon";
 
+/**
+ * PER-ACTOR RATE LIMIT (audit 2026-08-18, P2-2).
+ *
+ * There was no limit anywhere on the command path. Every command — including a
+ * REJECTED one — appends an event, writes an audit row, and makes the engine
+ * re-fold the entire event log and broadcast to every socket in the room. So a
+ * single participant sending junk made the night quadratically slower for
+ * everyone, and the per-auction FIFO queue meant their traffic sat in front of
+ * real bids.
+ *
+ * A token bucket, not a hard window: bidding genuinely IS bursty near the
+ * hammer, and a fixed window would refuse the exact moment the product exists
+ * for. BURST covers a flurry of legitimate taps; REFILL_PER_SEC is the
+ * sustained rate. The engine's own timer commands are never metered.
+ */
+/*
+ * The numbers, and why they are this generous.
+ *
+ * The limit exists to stop SUSTAINED abuse — the pattern where one participant
+ * makes the event log grow quadratically for everyone — not to police normal
+ * play. A real conductor issues a few commands a second at the gavel; a bidder
+ * in a frenzy taps maybe five. So the ceiling can sit an order of magnitude
+ * above human behaviour and still turn an unbounded spam loop into a bounded
+ * trickle, which is the whole point.
+ *
+ * Set too tight, this becomes its own outage: the first draft used 30/10 and
+ * refused a legitimate conductor sequence in the engine's own integration
+ * suite. A rate limit that fires on correct usage is worse than none, because
+ * it fails in the one hour the product exists for.
+ *
+ * Tunable without a deploy, because the right number is an operational fact we
+ * will only learn from a real auction night.
+ */
+const DEFAULT_RATE_BURST = 200;
+const DEFAULT_RATE_REFILL_PER_SEC = 50;
+
+interface Bucket {
+  tokens: number;
+  lastMs: number;
+}
+
+/**
+ * The idempotency key: actor AND command id.
+ *
+ * NUL separates the two so no actor/id pair can be spelled two ways. The
+ * engine's own commands are attributed to ENGINE_ACTOR, which the transport
+ * cannot claim (the web tier sets `actor` server-side from the session, and
+ * the id shape is pinned in server.ts), so the internal timer namespace is
+ * unaddressable from outside.
+ */
+function ackKeyOf(envelope: { actor: string; commandId: string }): string {
+  return `${envelope.actor}\u0000${envelope.commandId}`;
+}
+
 interface QueuedCommand extends Omit<AuctionCommandEnvelope, "type"> {
   type: AuctionCommandEnvelope["type"] | InternalCommandType;
 }
@@ -112,6 +166,9 @@ export interface EngineDeps {
   logger: FastifyBaseLogger;
   /** Broadcast hook — the WS hub subscribes; tests observe. */
   onSnapshot: (auctionId: string, serialized: string, version: number) => void;
+  /** Per-actor command rate limit; defaults are sized well above human play. */
+  rateBurst?: number;
+  rateRefillPerSec?: number;
   nowMs?: () => number;
 }
 
@@ -142,6 +199,9 @@ function sha256(value: string): string {
 
 export class AuctionEngine {
   private readonly states = new Map<string, AuctionState>();
+  private readonly buckets = new Map<string, Bucket>();
+  private readonly rateBurst: number;
+  private readonly rateRefillPerSec: number;
   private readonly queues = new Map<string, Promise<unknown>>();
   /** Commands enqueued but not yet finished — the diagnostics queue depth. */
   private readonly pending = new Map<string, number>();
@@ -153,12 +213,42 @@ export class AuctionEngine {
   constructor(deps: EngineDeps) {
     this.deps = deps;
     this.now = deps.nowMs ?? (() => Date.now());
+    this.rateBurst = deps.rateBurst ?? DEFAULT_RATE_BURST;
+    this.rateRefillPerSec = deps.rateRefillPerSec ?? DEFAULT_RATE_REFILL_PER_SEC;
   }
 
-  /** Submit a command: strictly serialized per auction (the command queue). */
+  /**
+   * Spend one token for this actor. Returns false when the actor is over their
+   * sustained rate — the command is refused BEFORE it reaches the queue, so it
+   * costs no fold, no broadcast and no head-of-line time.
+   */
+  private allow(actor: string): boolean {
+    const now = this.now();
+    const bucket = this.buckets.get(actor) ?? { tokens: this.rateBurst, lastMs: now };
+    const refilled = Math.min(
+      this.rateBurst,
+      bucket.tokens + ((now - bucket.lastMs) / 1000) * this.rateRefillPerSec,
+    );
+    bucket.lastMs = now;
+    if (refilled < 1) {
+      bucket.tokens = refilled;
+      this.buckets.set(actor, bucket);
+      return false;
+    }
+    bucket.tokens = refilled - 1;
+    this.buckets.set(actor, bucket);
+    return true;
+  }
+
   async submit(envelope: AuctionCommandEnvelope): Promise<CommandAck> {
     if (!isAuctionCommandType(envelope.type)) {
       return this.reject(envelope, "unknown_command", 0);
+    }
+    // Metered BEFORE the queue: a refused command must not cost a fold, a
+    // broadcast, or a place in front of somebody's bid.
+    if (!this.allow(envelope.actor)) {
+      this.deps.logger.warn({ actor: envelope.actor }, "actor rate limited");
+      return this.reject(envelope, "rate_limited", 0);
     }
     return this.enqueue(envelope);
   }
@@ -324,13 +414,21 @@ export class AuctionEngine {
     if (state === null) {
       return this.reject(envelope, "unknown_auction", 0);
     }
-    // Idempotency: the same commandId returns the ORIGINAL ack, never re-executes.
-    const cached = state.acks.get(envelope.commandId);
+    // Idempotency: the same commandId FROM THE SAME ACTOR returns the ORIGINAL
+    // ack, never re-executes.
+    //
+    // The key used to be the commandId alone, which made the cache a shared
+    // namespace between every participant and the engine's own timer commands.
+    // Scoping it to the actor means a retry still de-duplicates (same client,
+    // same id) while one actor's id can neither serve nor suppress another's —
+    // and ENGINE_ACTOR's internal ids are unreachable from transport (P0-2).
+    const ackKey = ackKeyOf(envelope);
+    const cached = state.acks.get(ackKey);
     if (cached !== undefined) {
       return cached;
     }
     if (state.halted !== null && envelope.type !== "RecoverAuction") {
-      return this.remember(state, this.reject(envelope, "engine_halted", state.version));
+      return this.remember(state, ackKey, this.reject(envelope, "engine_halted", state.version));
     }
 
     const started = performance.now();
@@ -350,11 +448,11 @@ export class AuctionEngine {
       stats.rejected += 1;
     }
     const finalAck: CommandAck = { ...ack, version: state.version };
-    return this.remember(state, finalAck);
+    return this.remember(state, ackKey, finalAck);
   }
 
-  private remember(state: AuctionState, ack: CommandAck): CommandAck {
-    state.acks.set(ack.commandId, ack);
+  private remember(state: AuctionState, ackKey: string, ack: CommandAck): CommandAck {
+    state.acks.set(ackKey, ack);
     if (state.acks.size > ACK_CACHE_LIMIT) {
       const oldest = state.acks.keys().next().value;
       if (oldest !== undefined) {
