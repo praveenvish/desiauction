@@ -141,6 +141,8 @@ export {
   serializeSnapshot,
   snapshotNextMinimumBid,
   isAuctionCommandType,
+  isTransportCommandId,
+  redactPurses,
   AUCTION_COMMAND_TYPES,
 } from "./auction-snapshot";
 
@@ -158,6 +160,7 @@ export type {
   AuctionCommandEnvelope,
   CommandAck,
   CommandRejectReason,
+  PurseScope,
 } from "./auction-snapshot";
 export type {
   AuctionStatus,
@@ -219,6 +222,7 @@ export {
   MAX_IMAGE_BYTES,
   isAllowedImageType,
   validateUpload,
+  bytesMatchImageType,
   deriveMediaKey,
   isValidMediaKey,
   mediaKeyBelongsTo,

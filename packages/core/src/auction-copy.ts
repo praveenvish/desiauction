@@ -15,6 +15,7 @@ import type { BidRejectionCode } from "./auction";
 
 const BID_REJECTION_COPY: Record<BidRejectionCode, string> = {
   LOT_NOT_OPEN: "That lot has already closed.",
+  LOT_EXPIRED: "Time ran out on that lot.",
   NOT_AUTHORIZED: "You need a paddle to bid on this lot.",
   ALREADY_LEADING: "You're already the highest bidder.",
   INVALID_AMOUNT: "That bid amount isn't valid.",
@@ -60,6 +61,8 @@ const COMMAND_REFUSAL_COPY: Record<string, string> = {
   unknown_command: "That action isn't available here.",
   unknown_auction: "This auction couldn't be found.",
   invalid_payload: "Something was missing from that request — try again.",
+  invalid_command_id: "Something was wrong with that request — try again.",
+  rate_limited: "You're going too fast — wait a moment and try again.",
 };
 
 /**

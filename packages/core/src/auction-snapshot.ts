@@ -68,9 +68,44 @@ export interface SnapshotPaddleEntry {
   readonly paddleNumber: string;
   readonly teamId: string;
   readonly teamName: string;
-  readonly committed: number;
-  readonly purseRemaining: number;
+  /**
+   * Money is `null` when the VIEWER may not see it.
+   *
+   * The engine's canonical snapshot always carries real numbers — that is what
+   * gets hashed and byte-compared for the determinism proof. These become null
+   * only on the wire, per socket, in `redactPurses` below. The server used to
+   * decide that bidders may not see rivals' purses and then broadcast every
+   * team's money to every socket anyway, leaving the client to hide it: the
+   * seal was a CSS-level promise that any bidder could break in the Network tab
+   * (audit 2026-08-18, P1-6).
+   */
+  readonly committed: number | null;
+  readonly purseRemaining: number | null;
   readonly released: boolean;
+}
+
+/**
+ * The viewer's money scope, bound into the WebSocket ticket so a client cannot
+ * widen its own: `null` = see every purse (the conductor's board), otherwise
+ * the set of team ids whose money this viewer owns.
+ */
+export type PurseScope = readonly string[] | null;
+
+/**
+ * Redact a snapshot for one viewer. Pure, so the transport can apply it per
+ * socket and the canonical snapshot stays untouched for hashing and replay.
+ */
+export function redactPurses(snapshot: AuctionSnapshot, scope: PurseScope): AuctionSnapshot {
+  if (scope === null) {
+    return snapshot;
+  }
+  const visible = new Set(scope);
+  return {
+    ...snapshot,
+    paddles: snapshot.paddles.map((paddle) =>
+      visible.has(paddle.teamId) ? paddle : { ...paddle, committed: null, purseRemaining: null },
+    ),
+  };
 }
 
 export interface AuctionSnapshot {
@@ -363,6 +398,28 @@ export function isAuctionCommandType(value: string): value is AuctionCommandType
  * a conductor-authorized actor (capability resolved by the web gate — the
  * engine trusts its authenticated caller, never the browser).
  */
+/**
+ * A command id the TRANSPORT is allowed to choose.
+ *
+ * `commandId` is the idempotency key, it originates in the browser, and it used
+ * to be any string at all. The engine keys its ack cache on it and enqueues its
+ * OWN timer commands into the same map under ids derived from values published
+ * in every snapshot — `timer-close-{lotId}-{endsAtMs}`. So a participant could
+ * pre-seed one, have the rejection cached, and the real close would then return
+ * that cached rejection and never fire. Verified live (audit 2026-08-18, P0-2):
+ * the gavel stopped and a bid 57 seconds past the deadline won the player.
+ *
+ * Pinning the shape makes the internal namespace unreachable by construction
+ * rather than by obscurity. Both id shapes this codebase mints are accepted:
+ * `crypto.randomUUID()` in the browser and `newId()` (ULID) on the server.
+ */
+const TRANSPORT_COMMAND_ID_RE =
+  /^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26})$/;
+
+export function isTransportCommandId(value: string): boolean {
+  return TRANSPORT_COMMAND_ID_RE.test(value);
+}
+
 export interface AuctionCommandEnvelope {
   commandId: string;
   auctionId: string;
@@ -392,6 +449,8 @@ export type CommandRejectReason =
   | "no_active_paddle"
   | "unknown_team"
   | "invalid_payload"
+  | "invalid_command_id"
+  | "rate_limited"
   | "replay_failed";
 
 export interface CommandAck {

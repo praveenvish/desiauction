@@ -407,6 +407,7 @@ export function nextMinimumBid(
 
 export type BidRejectionCode =
   | "LOT_NOT_OPEN"
+  | "LOT_EXPIRED"
   | "NOT_AUTHORIZED"
   | "ALREADY_LEADING"
   | "INVALID_AMOUNT"
@@ -443,6 +444,22 @@ export interface BidInput {
   /** Role quota for THIS lot's role: null = no quota. */
   roleCount: number;
   roleMax: number | null;
+  /**
+   * The lot's deadline and the server's clock, so expiry is a RULE and not
+   * merely a scheduling side effect.
+   *
+   * These were absent, which meant nothing in the gauntlet knew what time it
+   * was: the only thing that ended a lot was the engine's 250 ms tick landing
+   * a _TimerClose. Any delay to that tick — queue depth, a slow fold, or an
+   * attacker suppressing the close outright (audit 2026-08-18, P0-2) — left an
+   * expired lot accepting bids, and each late bid extended the deadline again.
+   * A bid 57 seconds past the hammer was accepted and won the player.
+   *
+   * Both optional so existing callers (and the pure reducer tests) keep their
+   * meaning; when either is absent the check is skipped exactly as before.
+   */
+  nowMs?: number;
+  endsAtMs?: number | null;
 }
 
 export type BidDecision = { ok: true; amount: Paise } | { ok: false; code: BidRejectionCode };
@@ -459,6 +476,17 @@ export function decideBid(input: BidInput): BidDecision {
     (input.lotStatus !== "on_block" && input.lotStatus !== "closing_soon")
   ) {
     return { ok: false, code: "LOT_NOT_OPEN" };
+  }
+  // 1b · the lot's own clock has not run out. Independent of the scheduler:
+  // if the deadline has passed the lot is closed, whether or not anything has
+  // got round to closing it yet.
+  if (
+    input.nowMs !== undefined &&
+    input.endsAtMs !== undefined &&
+    input.endsAtMs !== null &&
+    input.nowMs >= input.endsAtMs
+  ) {
+    return { ok: false, code: "LOT_EXPIRED" };
   }
   // 2 · actor may bid for this paddle
   if (!input.bidderAuthorized) {

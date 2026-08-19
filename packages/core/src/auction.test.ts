@@ -37,6 +37,62 @@ import { paise, comparePaise, multiplyPaise, parsePaise, serializePaise } from "
 
 const READY = { paddleCount: 2, queuedLots: 1, unresolvedLots: 0 };
 
+describe("bid gauntlet · lot expiry (audit P0-2)", () => {
+  // The gauntlet knew every rule except what time it was. The only thing that
+  // ended a lot was the engine's tick landing a _TimerClose — so any delay to
+  // it, including an attacker suppressing the close, left an expired lot taking
+  // bids, and each late bid extended the deadline again.
+  const open = {
+    auctionStatus: "live",
+    lotStatus: "on_block",
+    basePrice: paise(1_000_000),
+    leadingAmount: null,
+    leadingTeamId: null,
+    teamId: "team-a",
+    bidderAuthorized: true,
+    amountRaw: 1_000_000,
+    slabs: DEFAULT_AUCTION_CONFIG.slabs,
+    purseRemaining: paise(200_000_000),
+    squadSize: 0,
+    squadMin: 0,
+    squadMax: 15,
+    minPossiblePrice: paise(1_000_000),
+    roleCount: 0,
+    roleMax: null,
+  } as const;
+
+  it("refuses a bid at or after the deadline, whatever the lot status still says", () => {
+    expect(decideBid({ ...open, nowMs: 1_000, endsAtMs: 1_000 })).toEqual({
+      ok: false,
+      code: "LOT_EXPIRED",
+    });
+    expect(decideBid({ ...open, nowMs: 60_000, endsAtMs: 1_000 })).toEqual({
+      ok: false,
+      code: "LOT_EXPIRED",
+    });
+  });
+
+  it("accepts a bid before the deadline", () => {
+    expect(decideBid({ ...open, nowMs: 999, endsAtMs: 1_000 })).toEqual({
+      ok: true,
+      amount: paise(1_000_000),
+    });
+  });
+
+  it("skips the check when the lot carries no deadline", () => {
+    expect(decideBid({ ...open, nowMs: 10_000, endsAtMs: null })).toEqual({
+      ok: true,
+      amount: paise(1_000_000),
+    });
+  });
+
+  it("expiry outranks authorisation — an expired lot refuses everyone", () => {
+    expect(decideBid({ ...open, bidderAuthorized: false, nowMs: 60_000, endsAtMs: 1_000 })).toEqual(
+      { ok: false, code: "LOT_EXPIRED" },
+    );
+  });
+});
+
 describe("auction lifecycle machine", () => {
   it("walks the canonical path: scheduled → live ⇄ paused → completed → reconciled", () => {
     expect(auctionTransition("scheduled", "open", READY)).toEqual({ ok: true, next: "live" });

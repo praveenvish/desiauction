@@ -331,10 +331,15 @@ const AUCTION_EVENT_OF: Record<AuctionCommand, string> = {
 /** The readiness numbers behind every lifecycle guard — exported so the web
  * layer can say WHICH gate is red instead of listing them all (DA-25). */
 export async function auctionReadiness(db: Db, auctionId: string, auction?: AuctionRecord) {
+  // DISTINCT TEAMS, STILL HOLDING. The guard this feeds is "at least two teams
+  // are in the room", and it was counting PADDLE ROWS including released ones —
+  // so one team that claimed, released and claimed again satisfied a two-team
+  // requirement by itself, and an auction could go live with a single bidder
+  // (audit 2026-08-18, P3-4).
   const [paddleRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`count(distinct ${paddles.teamId})::int` })
     .from(paddles)
-    .where(eq(paddles.auctionId, auctionId));
+    .where(and(eq(paddles.auctionId, auctionId), isNull(paddles.releasedAt)));
   const [queuedRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(lots)
@@ -789,6 +794,7 @@ export async function placeBid(
       ),
     );
 
+  const atMs = serverNowMs();
   const decision = decideBid({
     auctionStatus: auction.status,
     lotStatus: lot.status,
@@ -807,10 +813,13 @@ export async function placeBid(
     minPossiblePrice: minPossiblePrice(auction.config),
     roleCount: roleCountRow?.count ?? 0,
     roleMax: auction.config.roleQuotas[role] ?? null,
+    // The lot's deadline is now a RULE, not just a scheduler input: a bid that
+    // arrives after it is refused here even if nothing has closed the lot yet.
+    nowMs: atMs,
+    endsAtMs: lot.endsAtMs,
   });
 
   const correlationId = newId();
-  const atMs = serverNowMs();
 
   if (!decision.ok) {
     // Rejected bids still produce audit evidence (directive): event + audit.
