@@ -25,6 +25,13 @@ export async function sendEngineCommand(input: EngineCommandInput): Promise<Comm
       },
       body: JSON.stringify(envelope),
       cache: "no-store",
+      // A CEILING ON WAITING. Without one, a stalled engine holds the server
+      // action open for as long as the socket stays up, and the organizer's
+      // click never comes back — the worst failure mode in the room, because it
+      // looks like the product hung rather than like a service being down.
+      // Two seconds is far above a healthy ack (single-digit ms) and far below
+      // anyone's patience.
+      signal: AbortSignal.timeout(2_000),
     });
     if (!response.ok) {
       return {
@@ -51,17 +58,47 @@ export async function sendEngineCommand(input: EngineCommandInput): Promise<Comm
 // duplicated deliberately, like the HMAC itself. MIN-2: bounds a leaked ticket.
 const TICKET_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * The viewer's MONEY SCOPE, canonicalised into the ticket.
+ *
+ * `null` means "every purse" — a conductor's board. An array means "only these
+ * teams'", which is what a bidder gets. Sorted so the same audience always
+ * produces the same token on both sides of the HMAC.
+ */
+export type PurseScopeInput = readonly string[] | null;
+
+function scopeToken(scope: PurseScopeInput): string {
+  if (scope === null) {
+    return "all";
+  }
+  return `t:${[...scope].sort().join("+")}`;
+}
+
 /** The spectate ticket the browser presents on the engine WebSocket. Windowed
- *  so a leaked ticket expires within two windows (see engine wsTicket). */
-export function engineWsTicket(auctionId: string): string {
+ *  so a leaked ticket expires within two windows (see engine wsTicket), and
+ *  BOUND TO THE SCOPE so a viewer cannot widen what money they receive. */
+export function engineWsTicket(auctionId: string, scope: PurseScopeInput = null): string {
   const window = Math.floor(Date.now() / TICKET_WINDOW_MS);
   return createHmac("sha256", env.ENGINE_SECRET)
-    .update(`${auctionId}.${String(window)}`)
+    .update(`${auctionId}.${String(window)}.${scopeToken(scope)}`)
     .digest("hex");
 }
 
-export function engineWsUrl(auctionId: string): string {
-  return `${env.ENGINE_PUBLIC_WS_URL}?auction=${encodeURIComponent(auctionId)}&ticket=${engineWsTicket(auctionId)}`;
+/**
+ * The socket URL for one viewer.
+ *
+ * The scope is what makes the purse seal real. The server already decided that
+ * a bidder may not see rivals' remaining money, and then broadcast every team's
+ * purse to every socket and asked the client to hide it — a seal anyone could
+ * break in the Network tab (audit 2026-08-18, P1-6). Now the engine redacts
+ * before the frame leaves, and the scope is inside the ticket's HMAC.
+ */
+export function engineWsUrl(auctionId: string, scope: PurseScopeInput = null): string {
+  const token = scopeToken(scope);
+  return (
+    `${env.ENGINE_PUBLIC_WS_URL}?auction=${encodeURIComponent(auctionId)}` +
+    `&ticket=${engineWsTicket(auctionId, scope)}&scope=${encodeURIComponent(token)}`
+  );
 }
 
 /**

@@ -164,7 +164,8 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionId: gate.auction.id,
     auctionName: gate.auction.name,
-    wsUrl: engineWsUrl(gate.auction.id),
+    // The conductor's board is the one audience that sees every purse.
+    wsUrl: engineWsUrl(gate.auction.id, null),
     view,
     owners,
     ownerAcceptances,
@@ -258,7 +259,9 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
     auctionStatus: gate.auction.status,
     orgName: org?.name ?? null,
     location: gate.competition.location,
-    wsUrl: engineWsUrl(gate.auction.id),
+    // A member watching is not a conductor: they receive their own teams'
+    // money and nobody else's (P1-6).
+    wsUrl: engineWsUrl(gate.auction.id, gate.canConduct ? null : gate.myTeamIds),
     resolved,
     teams: teamRows,
     rules: rulesOf(gate.auction.config),
@@ -311,7 +314,8 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
     auctionStatus: auction.status,
     orgName: competition.orgName,
     location: competition.location,
-    wsUrl: engineWsUrl(auction.id),
+    // Anonymous spectators get the spectacle, never the money.
+    wsUrl: engineWsUrl(auction.id, []),
     teams: teamRows,
     resolved,
     rules: rulesOf(auction.config),

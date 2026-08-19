@@ -72,9 +72,17 @@ export interface TeamPurseRow {
   team: TeamIdentity | undefined;
   /** Every paise this TEAM has committed — the sum over all its paddles. */
   committed: number;
-  purseRemaining: number;
-  /** committed + remaining = the purse per team. */
-  total: number;
+  /**
+   * null when this viewer is not entitled to this team's money.
+   *
+   * A bidder's socket carries their own teams' purses and nulls the rest, so a
+   * rival row renders "sealed" instead of a number the viewer was never meant
+   * to have (P1-6). It used to render the real figure, hidden only by a client
+   * filter anyone could bypass in devtools.
+   */
+  purseRemaining: number | null;
+  /** committed + remaining = the purse per team; null when sealed. */
+  total: number | null;
   /** Paddle numbers still in hand (released ones are not a live purse). */
   activePaddles: string[];
   /** True while any paddle of this team holds the leading bid. */
@@ -97,7 +105,8 @@ export function teamPurseRows(
   interface Group {
     teamName: string;
     committed: number;
-    purseRemaining: number;
+    /** null when the engine sealed this team's money for this viewer (P1-6). */
+    purseRemaining: number | null;
     activePaddles: string[];
     leading: boolean;
   }
@@ -113,7 +122,11 @@ export function teamPurseRows(
     };
     // A released paddle's SPEND still happened — the money does not come back
     // when the paddle does. Only its presence in the room ends.
-    group.committed += paddle.committed;
+    // Redacted money (a rival's, on a bidder's socket) contributes nothing and
+    // leaves the group's figures null, which the board renders as "sealed"
+    // rather than as a confident zero.
+    group.committed =
+      paddle.committed === null ? group.committed : group.committed + paddle.committed;
     group.purseRemaining = paddle.purseRemaining;
     if (!paddle.released) {
       group.activePaddles.push(paddle.paddleNumber);
@@ -127,9 +140,12 @@ export function teamPurseRows(
   // The purse per team is not on the wire, but it is recoverable exactly:
   // committed + remaining, for any team that has a paddle. Teams with none
   // borrow it — every team in an auction starts with the same purse.
+  // Derived only from teams whose money this viewer actually received.
   let pursePerTeam = 0;
   for (const group of groups.values()) {
-    pursePerTeam = Math.max(pursePerTeam, group.committed + group.purseRemaining);
+    if (group.purseRemaining !== null) {
+      pursePerTeam = Math.max(pursePerTeam, group.committed + group.purseRemaining);
+    }
   }
 
   const rows: TeamPurseRow[] = teams.map((team) => {
@@ -139,8 +155,13 @@ export function teamPurseRows(
       teamName: team.name,
       team,
       committed: group?.committed ?? 0,
-      purseRemaining: group?.purseRemaining ?? pursePerTeam,
-      total: group === undefined ? pursePerTeam : group.committed + group.purseRemaining,
+      purseRemaining: group === undefined ? pursePerTeam : group.purseRemaining,
+      total:
+        group === undefined
+          ? pursePerTeam
+          : group.purseRemaining === null
+            ? null
+            : group.committed + group.purseRemaining,
       activePaddles: group?.activePaddles ?? [],
       leading: group?.leading ?? false,
     };
@@ -155,7 +176,7 @@ export function teamPurseRows(
         team: undefined,
         committed: group.committed,
         purseRemaining: group.purseRemaining,
-        total: group.committed + group.purseRemaining,
+        total: group.purseRemaining === null ? null : group.committed + group.purseRemaining,
         activePaddles: group.activePaddles,
         leading: group.leading,
       });
@@ -221,7 +242,8 @@ export function PurseBoard({
       )}
       <ul className="purse-list">
         {rows.map((row) => {
-          const spentPct = row.total === 0 ? 0 : (row.committed / row.total) * 100;
+          const spentPct =
+            row.total === null || row.total === 0 ? 0 : (row.committed / row.total) * 100;
           const mine =
             myPaddleNumber !== null && row.activePaddles.includes(myPaddleNumber)
               ? "true"
@@ -248,12 +270,20 @@ export function PurseBoard({
                     Leading
                   </span>
                 ) : null}
-                <span className="purse-left">{formatPaiseINR(paise(row.purseRemaining))}</span>
+                <span className="purse-left">
+                  {row.purseRemaining === null
+                    ? "sealed"
+                    : formatPaiseINR(paise(row.purseRemaining))}
+                </span>
               </div>
               <div
                 className="purse-bar"
                 role="img"
-                aria-label={`${row.teamName}: ${formatPaiseINR(paise(row.committed))} spent of ${formatPaiseINR(paise(row.total))}`}
+                aria-label={
+                  row.total === null
+                    ? `${row.teamName}: purse sealed`
+                    : `${row.teamName}: ${formatPaiseINR(paise(row.committed))} spent of ${formatPaiseINR(paise(row.total))}`
+                }
               >
                 <span
                   className="purse-bar-fill"

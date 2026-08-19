@@ -202,7 +202,9 @@ function ReplayFrame({ snapshot }: { snapshot: AuctionSnapshot }) {
               <Badge tone={paddle.released ? "neutral" : "info"}>{paddle.paddleNumber}</Badge>
               <span>{paddle.teamName}</span>
               <span className="registration-phone">
-                {formatPaiseINR(paise(paddle.purseRemaining))} left
+                {paddle.purseRemaining === null
+                  ? "purse sealed"
+                  : `${formatPaiseINR(paise(paddle.purseRemaining))} left`}
               </span>
             </li>
           ))}

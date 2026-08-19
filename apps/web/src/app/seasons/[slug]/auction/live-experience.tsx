@@ -249,12 +249,19 @@ export function MyTeamCard({
       </div>
       {paddle !== null ? (
         <div className="stat-row live-team-stats">
+          {/* This is the viewer's OWN paddle, so the engine always sends its
+              money; the fallback exists because the type is honest about
+              redaction, not because a bidder is ever denied their own purse. */}
           <div className="stat-tile" data-testid="my-purse">
-            <span className="stat-value">{formatPaiseINR(paise(paddle.purseRemaining))}</span>
+            <span className="stat-value">
+              {paddle.purseRemaining === null ? "—" : formatPaiseINR(paise(paddle.purseRemaining))}
+            </span>
             <span className="stat-label">Purse remaining</span>
           </div>
           <div className="stat-tile" data-testid="my-spent">
-            <span className="stat-value">{formatPaiseINR(paise(paddle.committed))}</span>
+            <span className="stat-value">
+              {paddle.committed === null ? "—" : formatPaiseINR(paise(paddle.committed))}
+            </span>
             <span className="stat-label">Committed</span>
           </div>
           <div className="stat-tile" data-testid="my-slots">
@@ -313,8 +320,10 @@ export function AuctionSummaryCard({
     (best, lot) => (best === null || (lot.soldPrice ?? 0) > (best.soldPrice ?? 0) ? lot : best),
     null,
   );
-  const totalSpent = snapshot.paddles.reduce((sum, paddle) => sum + paddle.committed, 0);
-  const teams = [...snapshot.paddles].sort((a, b) => b.committed - a.committed);
+  // Redacted money sorts and sums as zero rather than throwing: the ceremony
+  // shows what this viewer was sent, and a sealed rival simply has no figure.
+  const totalSpent = snapshot.paddles.reduce((sum, paddle) => sum + (paddle.committed ?? 0), 0);
+  const teams = [...snapshot.paddles].sort((a, b) => (b.committed ?? 0) - (a.committed ?? 0));
   return (
     <Card data-testid="auction-summary">
       <h2>That&apos;s a wrap 🎉</h2>
@@ -352,8 +361,11 @@ export function AuctionSummaryCard({
             <Badge tone="info">{paddle.paddleNumber}</Badge>
             <span className="registration-name">{paddle.teamName}</span>
             <span className="registration-phone">
-              spent {formatPaiseINR(paise(paddle.committed))} · left{" "}
-              {formatPaiseINR(paise(paddle.purseRemaining))}
+              {paddle.committed === null || paddle.purseRemaining === null
+                ? "purse sealed"
+                : `spent ${formatPaiseINR(paise(paddle.committed))} · left ${formatPaiseINR(
+                    paise(paddle.purseRemaining),
+                  )}`}
             </span>
           </li>
         ))}

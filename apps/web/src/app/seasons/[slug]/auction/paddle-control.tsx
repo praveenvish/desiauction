@@ -163,12 +163,14 @@ export function PaddleControl({
           <div>
             <dt>Purse left</dt>
             <dd className="paddle-stat-remaining" data-testid="paddle-purse">
-              {formatPaiseINR(paise(paddle.purseRemaining))}
+              {paddle.purseRemaining === null ? "—" : formatPaiseINR(paise(paddle.purseRemaining))}
             </dd>
           </div>
           <div>
             <dt>Committed</dt>
-            <dd data-testid="paddle-committed">{formatPaiseINR(paise(paddle.committed))}</dd>
+            <dd data-testid="paddle-committed">
+              {paddle.committed === null ? "—" : formatPaiseINR(paise(paddle.committed))}
+            </dd>
           </div>
           <div>
             <dt>Signed</dt>

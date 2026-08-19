@@ -263,7 +263,10 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
         canConduct: conduct,
         rules: auction === null ? null : gateRules(rulesOf(auction.config), money),
         feasibility: feasibilityOf(readyProjection, config),
-        wsUrl: auction === null ? null : engineWsUrl(auction.id),
+        // DA-30: the dashboard's money surfaces are gated on `money`, and so is
+        // the socket it hands out — otherwise the ticket reopened everything
+        // the page had just withheld (P1-6).
+        wsUrl: auction === null ? null : engineWsUrl(auction.id, money ? null : []),
         overview:
           auction === null
             ? null

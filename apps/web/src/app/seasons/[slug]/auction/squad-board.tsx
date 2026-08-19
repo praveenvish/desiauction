@@ -151,7 +151,7 @@ export function SquadBoard({
                   {members.length}/{squadMax}
                 </span>
               </div>
-              {showPurse && remaining !== undefined ? (
+              {showPurse && remaining !== undefined && remaining !== null ? (
                 <p className="squad-team-purse">{formatPaiseINR(paise(remaining))} left</p>
               ) : null}
               {members.length === 0 ? (

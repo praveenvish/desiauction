@@ -445,8 +445,11 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
                 <Badge tone={paddle.released ? "neutral" : "info"}>{paddle.paddleNumber}</Badge>
                 <span>{paddle.teamName}</span>
                 <span className="registration-phone">
-                  purse {formatPaiseINR(paise(paddle.purseRemaining))} · committed{" "}
-                  {formatPaiseINR(paise(paddle.committed))}
+                  {paddle.purseRemaining === null || paddle.committed === null
+                    ? "purse sealed"
+                    : `purse ${formatPaiseINR(paise(paddle.purseRemaining))} · committed ${formatPaiseINR(
+                        paise(paddle.committed),
+                      )}`}
                   {paddle.released ? " · released" : ""}
                 </span>
               </li>

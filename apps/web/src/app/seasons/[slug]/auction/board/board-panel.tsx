@@ -71,8 +71,13 @@ export function BoardPanel({
 
   const soldLots = feed.resolved.filter((entry) => entry.status === "sold");
   const unsoldCount = feed.resolved.filter((entry) => entry.status === "unsold").length;
+  // Money the viewer may not see arrives as null (the engine redacts per
+  // audience — P1-6). A total over a redacted board would be a wrong number
+  // presented confidently, so it sums only what this viewer was actually sent.
   const totalSpend =
-    snapshot !== null ? snapshot.paddles.reduce((sum, paddle) => sum + paddle.committed, 0) : 0;
+    snapshot !== null
+      ? snapshot.paddles.reduce((sum, paddle) => sum + (paddle.committed ?? 0), 0)
+      : 0;
   const topBuy = soldLots.reduce<ResolvedLot | null>(
     (best, lot) => ((lot.soldPrice ?? 0) > (best?.soldPrice ?? -1) ? lot : best),
     null,
@@ -335,7 +340,9 @@ export function BoardPanel({
                 <h3 className="board-team-name">{team.teamName}</h3>
               </div>
               <div className="board-team-purse">
-                <span className="board-purse-value">{money(team.purseRemaining)}</span>
+                <span className="board-purse-value">
+                  {team.purseRemaining === null ? "sealed" : money(team.purseRemaining)}
+                </span>
                 <span className="board-purse-label">purse remaining</span>
               </div>
               <dl className="board-team-stats">

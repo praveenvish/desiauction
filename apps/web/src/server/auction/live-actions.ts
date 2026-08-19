@@ -1,7 +1,7 @@
 "use server";
 
 import { auctionOf, type AuctionRecord } from "@desiauction/auction";
-import { isAuctionCommandType, type CommandAck } from "@desiauction/core";
+import { isAuctionCommandType, isTransportCommandId, type CommandAck } from "@desiauction/core";
 import {
   auctionOwnerInvites,
   paddleGrants,
@@ -285,7 +285,9 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionId: gate.auction.id,
-    wsUrl: engineWsUrl(gate.auction.id),
+    // The seal, enforced at the source: a conductor's socket carries every
+    // purse, a bidder's carries only their own teams' (P1-6).
+    wsUrl: engineWsUrl(gate.auction.id, canSeeAll ? null : gate.myTeamIds),
     teams: teamRows,
     myPaddle: paddleRows[0] ?? null,
     myPaddles: paddleRows,
@@ -343,6 +345,13 @@ export async function submitAuctionCommand(
   type: string,
   payload: Record<string, unknown>,
 ): Promise<CommandAck> {
+  // The id is the idempotency key and it comes from the browser, so its SHAPE
+  // is part of the trust boundary: the engine keys its cache on it, and its own
+  // timer commands live in the same map (P0-2). The engine pins this too — this
+  // is the near end of the same fence, and it answers before a round trip.
+  if (!isTransportCommandId(commandId)) {
+    return { commandId, accepted: false, reason: "invalid_command_id", version: 0 };
+  }
   const gate = await liveGate(slug);
   if (gate === null) {
     return { commandId, accepted: false, reason: "unknown_auction", version: 0 };

@@ -1312,14 +1312,16 @@
   gap: var(--space-4);
 }
 
-@media (min-width: 901px) {
-  .cockpit-dock {
-    position: sticky;
-    /* Clears the ribbon, which sticks at the top of the same scroll box. */
-    top: 84px;
-    z-index: 1;
-  }
-}
+/* `.cockpit-dock` used to be `position: sticky` here — the idea being that
+   the lot and the controls that act on it travel down the page with you. But
+   the dock holds the WHOLE Conduct card (Open/Pause, Setup, Corrections —
+   commonly 700px+), while its containing column (dock + bid feed + queue) is
+   often barely taller than that. A sticky box that tall has almost nowhere
+   to "unstick" to: for most of the column's scroll range it sits pinned,
+   physically overlapping the bid feed and queue cards beneath it — not a
+   z-index illusion, a real layout overlap — and the auctioneer's click on a
+   lot's Open button in the queue landed on the dock instead. Static keeps
+   the controls reachable at the cost of the travel-with-you convenience. */
 
 .cockpit-queue {
   list-style: none;
