@@ -256,7 +256,34 @@ onto a new one, which is why the list shrank rather than emptied.
 | `settlement-experience:89` | Re-ticks the override now; still completing | Re-diagnose from the fresh run |
 | `conduct-ceremony:63` · `live-auction:57` · `auction-experience:64` | The three long multi-actor journeys | Re-diagnose; the arrival-time fix and the completion-dialog fix both landed after their last observed failure |
 
-**One product fix falls out of this and is not done:** the short-squad override
+### Update after the second pass
+
+**62 pass · 9 fail** at the last full run, and `passkeys` (both) went green after
+it. Five more root causes fixed — the account log renders prose not action keys,
+revoking a device asks first, the invite form lives behind a tab and a dialog,
+the seasons list groups into closable sections, and the money door's href is
+server-decided so it needs a reload after a grant changes.
+
+**Still open, with what is known about each:**
+
+| Spec | Where it now stops | Read |
+|---|---|---|
+| `settlement-experience:89` | Closes via the cockpit, answers the override dialog, auction still reads "live" | The cockpit's complete flow needs watching in a headed run — the dialog may gate its confirm on something else, or the command is refused for a reason the UI does not surface |
+| `financial-operations:72` · `financial-issuance:51` | Money door still hrefs `/money` before the finance grant | The reload did not change it, so the viewer genuinely has finance view. Check WHICH identity the spec runs as and what the demo seed grants it |
+| `tournaments-index:64` | No `tg-season` row matches in the seasons view | Observe what that view actually renders — it may not use season rows at all |
+| `organizer-workspace:229` | `org-name` is not the org the spec just created | Probably clicking the wrong row in a list full of similarly-named residue |
+| `auction-experience:64` · `conduct-ceremony:63` · `live-auction:57` | The three long multi-actor journeys | Each needs one headed run to watch; the arrival-time and dialog fixes landed after their last observed failure |
+
+**Two product findings from this pass, neither fixed:**
+
+1. **A short-squad auction cannot be closed from the auction panel.** The
+   `accept-short-open` checkbox only renders while the auction is `scheduled`,
+   but the panel keeps offering Close once it is live — and passes the now-false
+   override with it. DA-06 refuses, the status stays "live", and nothing on
+   screen says why. The banner points at the cockpit, so the capability exists;
+   the button that cannot work should not be there.
+
+2. **One product fix falls out of this and is not done:** the short-squad override
 is a single checkbox (`accept-short-open`) carrying both *open* and *close*, held
 in component state, so the refresh after opening clears it. The operator ticks a
 box, watches it disappear, and the close then fails DA-06 with the status simply
