@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "env:check": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/check-env.ts",
     "rls:verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/verify-rls.ts",
+    "grants:verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/verify-grants.ts",
     "db:restore-verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/restore-verify.ts",
     "seed:demo": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-demo.ts",
     "seed:admin": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-platform-admin.ts",
@@ -39,7 +40,7 @@
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
     "drizzle-orm": "^0.45.2",
-    "next": "^15.5.0",
+    "next": "^15.5.21",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^4.1.0"

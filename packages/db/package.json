@@ -9,8 +9,9 @@
   "scripts": {
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "db:generate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs generate",
-    "db:migrate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs migrate"
+    "db:generate": "node scripts/check-snapshots.mjs && node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --env-file-if-exists=../../.env.local node_modules/drizzle-kit/bin.cjs migrate",
+    "db:check-snapshots": "node scripts/check-snapshots.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
