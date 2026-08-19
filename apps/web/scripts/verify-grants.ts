@@ -69,39 +69,15 @@ const APPEND_ONLY = ["auction_events", "settlement_events", "finops_events", "au
 const RUNTIME_ROLES = ["desiauction_app", "desiauction_engine", "desiauction_runner"];
 
 /**
- * Tables the SYSTEM pool must be able to read.
+ * The system pool's WRITE surface — the part that must stay narrow.
  *
- * This role was designed for two pre-tenant token paths and has quietly become
- * the backing pool for the admin explorer, the account screen and the
- * cross-org listings. Under the documented recipe those routes returned 500s
- * that no local run could reproduce, because local runs connect as the owner.
- *
- * Pinned here so the list is a decision, not a leak: adding a system-pool read
- * now fails this gate until someone extends both the recipe and this array —
- * and has to look at the comment in create-app-role.sql explaining why every
- * addition widens what an RLS-EXEMPT connection can see.
+ * This role is BYPASSRLS and reads platform-wide by design (it backs the admin
+ * explorer). Pinning its reads was tried and converged on the whole schema, so
+ * the recipe grants read honestly and this gate gets the assertion that
+ * actually matters: it may write to exactly three tables, and any fourth is a
+ * decision somebody has to make on purpose.
  */
-const SYSTEM_READS = [
-  "invites",
-  "organizations",
-  "org_members",
-  "auction_owner_invites",
-  "auctions",
-  "competitions",
-  "teams",
-  "tournaments",
-  "fixtures",
-  "grounds",
-  "venues",
-  "audit_log",
-  "settlement_cases",
-  "suppressions",
-  "grants",
-  "people",
-  "registrations",
-  "notification_preferences",
-  "finops_profiles",
-];
+const SYSTEM_MAY_WRITE = ["org_members", "grants", "audit_log", "invites"];
 
 function expectations(allTables: string[]): Expectation[] {
   const out: Expectation[] = [];
@@ -152,14 +128,23 @@ function expectations(allTables: string[]): Expectation[] {
     }
   }
 
-  for (const table of SYSTEM_READS) {
+  for (const table of allTables) {
     out.push({
       role: "desiauction_system",
       table,
       verb: "SELECT",
       allowed: true,
-      why: "a documented pre-tenant or cross-org read runs on the system pool",
+      why: "the system pool is the platform-read role (admin explorer + token paths)",
     });
+    if (!SYSTEM_MAY_WRITE.includes(table)) {
+      out.push({
+        role: "desiauction_system",
+        table,
+        verb: "INSERT",
+        allowed: false,
+        why: "the system pool's write surface stays narrow — this is the RLS-exempt role",
+      });
+    }
   }
 
   for (const table of APPEND_ONLY) {

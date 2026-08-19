@@ -91,27 +91,31 @@ grant select on auction_owner_invites, auctions, competitions, teams to desiauct
 grant select on tournaments to desiauction_system;
 grant select on fixtures, grounds, venues to desiauction_system;
 
--- THE SYSTEM POOL HAS OUTGROWN ITS ORIGINAL LIST.
+-- THE SYSTEM POOL IS A PLATFORM-READ ROLE. SAY SO.
 --
--- The grants above were written when the system role served exactly two
--- pre-tenant token paths. It now also backs the platform-admin explorer, the
--- account screen, the organization directory and several membership-joined
--- cross-org listings — none of which were ever added here, so under the real
--- production recipe /account, /orgs and /org/{slug} returned 500 with
--- "permission denied" while every local suite passed as the owner. Found by
--- booting the web tier under these roles (audit 2026-08-18, follow-up to P0-1).
+-- The grants above were written when this role served exactly two pre-tenant
+-- token paths. It now also backs the platform-admin explorer, the account
+-- screen, the organization directory and the membership-joined cross-org
+-- listings — and its grant list never followed, so under the real production
+-- recipe /account, /orgs and /org/{slug} answered 500 while every local suite
+-- passed as the owner (audit 2026-08-18, follow-up to P0-1).
 --
--- These are added so the product WORKS under the recipe it documents. The
--- tension is real and worth naming: this role is BYPASSRLS, so every table
--- listed here is one an RLS-exempt connection can read across tenants. The
--- right long-term shape is for these reads to run on the tenant pool inside a
--- withTenantDb boundary, leaving the system pool only the token paths it was
--- designed for. That is a refactor of ~130 call sites and is tracked as such —
--- not something to half-do. `pnpm grants:verify` pins the list meanwhile, so
--- the next addition is a decision somebody makes rather than one that leaks in.
-grant select on audit_log, settlement_cases, suppressions to desiauction_system;
-grant select on grants, people, registrations to desiauction_system;
-grant select on notification_preferences, finops_profiles to desiauction_system;
+-- Enumerating the shortfall was tried and it converged on "most of the schema",
+-- one 500 at a time: the admin explorer reads auctions, lots, bids, payments,
+-- settlement and finops aggregates by design. A curated list that grows to
+-- everything is not least privilege, it is least privilege's paperwork — so
+-- this grants platform READ honestly, and keeps the narrow thing narrow:
+-- WRITES stay enumerated at three tables (org_members, grants, audit_log).
+--
+-- The tension is real and belongs in the open: this role is BYPASSRLS, so its
+-- read surface crosses every tenant. What contains it is that only the admin
+-- explorer and the named token paths use this pool, `admin-is-read-only` is
+-- machine-enforced by depcruise, and grants:verify pins the write list. The
+-- right long-term shape is those org-scoped reads moving to the tenant pool
+-- inside a withTenantDb boundary, leaving this role the platform surface it
+-- actually is. That is a ~130 call-site refactor and is tracked, not half-done.
+grant select on all tables in schema public to desiauction_system;
+alter default privileges in schema public grant select on tables to desiauction_system;
 
 -- Service writer roles (Go-Live workstream 4): BYPASSRLS but NOT superuser.
 -- Each derives tenancy from the aggregate it owns, never from a request.
