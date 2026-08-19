@@ -289,3 +289,46 @@ in component state, so the refresh after opening clears it. The operator ticks a
 box, watches it disappear, and the close then fails DA-06 with the status simply
 staying "live" and nothing on screen explaining why. The specs now re-tick it;
 the panel should either persist the choice or ask again at the point of use.
+
+
+---
+
+## 6 · E2E — final state of this pass
+
+**70+ passing · 4 failing · 31 skipped.** From **3 passing** when the repair
+began, and 50 at the audit. Everything below was diagnosed by dumping what the
+page actually contained, not by reasoning about what it ought to have.
+
+### Product bugs the tests caught (all fixed)
+
+1. **`sitemap.xml` was frozen at build time** — a tournament published after the
+   deploy never reached crawlers until the next release.
+2. **Anti-snipe could be lost to queue depth** — the expiry guard judged a bid by
+   when the reducer reached it, not when it arrived, so the last-second bid the
+   rule exists to honour was refused.
+3. **The success toast faded in, and for those frames it was unreadable.** axe
+   failed it at "serious" against WCAG 1.4.3 and was right: an opaque surface
+   made translucent by an animation is measured against whatever is behind it.
+   Transform only, never opacity, on anything carrying text.
+
+### Product bugs found and NOT fixed
+
+1. **A short-squad auction cannot be closed from the auction panel.** The
+   `accept-short-open` checkbox only renders while the auction is `scheduled`,
+   but the panel keeps offering Close once it is live and passes the now-false
+   override with it. DA-06 refuses, the status stays "live", nothing explains
+   why. The cockpit has the proper two-act dialog; the panel's button should
+   either carry the override or send the operator there.
+2. **The completion dialog's second act is invisible to the operator too.**
+   Confirm → engine refuses → the same dialog re-renders with a reason field.
+   That is a good design, but nothing announces the refusal, so a conductor who
+   looks away sees only that the dialog is still open.
+
+### Still failing
+
+| Spec | Where it stops |
+|---|---|
+| `conduct-ceremony:63` | Ceremony shows "sold" where "extension" is expected. The runway was widened to 10s inside a 15s window and it still races; the anti-snipe rule itself is proven deterministically in `live-engine.integration.test.ts` |
+| `financial-operations:72` | Past the door now; `ops-overall` is not "healthy". Likely genuine — finops health depends on the runner having drained jobs, and the runner does not run in e2e |
+| `financial-issuance:51` | Blocked behind the same finance fixture |
+| `organizer-workspace:229` | After clicking through to the org, `org-name` is not found at all — check whether that testid still lives on the org detail page or only on the list card |
