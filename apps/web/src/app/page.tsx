@@ -187,7 +187,7 @@ export default function LandingPage() {
         <LiveTournaments />
 
         {/* --- 2 · The night in three beats -------------------------------- */}
-        <section className="mk-band" data-theme="floodlight" id="how" aria-labelledby="how-heading">
+        <section className="mk-band" id="how" aria-labelledby="how-heading">
           <div className="mk-container">
             <div className="mk-panel">
               <div className="mk-band-head mk-band-head--center mk-center">
@@ -223,11 +223,7 @@ export default function LandingPage() {
         </section>
 
         {/* --- 3 · Built for the worst moment of the night ------------------ */}
-        <section
-          className="mk-band mk-band--dark"
-          data-theme="floodlight"
-          aria-labelledby="worst-heading"
-        >
+        <section className="mk-band mk-band--sunken" aria-labelledby="worst-heading">
           <div className="mk-container">
             <div className="mk-band-head mk-band-head--center mk-center">
               <p className="mk-kicker">{LANDING.worst.kicker}</p>
@@ -310,7 +306,7 @@ export default function LandingPage() {
         </section>
 
         {/* --- 4 · The morning after: the receipt -------------------------- */}
-        <section className="mk-band" data-theme="floodlight" aria-labelledby="money-heading">
+        <section className="mk-band" aria-labelledby="money-heading">
           <div className="mk-container">
             <div className="mk-show">
               <div>
@@ -344,11 +340,7 @@ export default function LandingPage() {
             Deliberately WITHOUT the pricing page's "Most popular" flag: with
             zero customers, popularity is precisely the kind of claim this page
             is not allowed to make. */}
-        <section
-          className="mk-band mk-band--dark"
-          data-theme="floodlight"
-          aria-labelledby="pricing-heading"
-        >
+        <section className="mk-band mk-band--sunken" aria-labelledby="pricing-heading">
           <div className="mk-container">
             <div className="mk-band-head mk-band-head--center mk-center">
               <p className="mk-kicker">{LANDING.pricingPreview.kicker}</p>
