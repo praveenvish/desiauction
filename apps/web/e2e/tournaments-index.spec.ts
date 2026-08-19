@@ -233,7 +233,8 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   // Click the card's own link, scoped to the list so the toolbar cannot match.
   await page
     .getByTestId("competitions-list")
-    .getByRole("link", { name: new RegExp(`Alpha One ${STAMP}`) })
+    .locator("a", { hasText: `Alpha One ${STAMP}` })
+    .first()
     .click();
   await expect(page).toHaveURL(/\/seasons\/[^/?#]+$/, COLD);
 });
