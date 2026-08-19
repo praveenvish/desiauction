@@ -112,6 +112,11 @@ test("founder demo: settle an auction → open Financial Operations → observe,
     await adminRow.getByRole("button", { name: "Revoke" }).click();
     await page.getByTestId("confirm-revoke-finance").click();
     await expect(adminRow).toHaveCount(0, { timeout: 20_000 });
+    // The money door's HREF is decided on the server from the viewer's finance
+    // capability, so it is whatever it was when this page was rendered — which
+    // was before the revoke. Reload, or the next assertion reads a stale link
+    // and reports a partition failure that is really a cache.
+    await page.reload();
   }
 
   // Owning the organization confers NO finance power: no link, and the surface

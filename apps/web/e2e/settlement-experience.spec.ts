@@ -168,14 +168,29 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await page.getByTestId("accept-short-open").check();
   await page.getByTestId("auction-open").click();
   await expect(page.getByTestId("auction-status")).toHaveText("live", { timeout: 20_000 });
-  // TICK IT AGAIN. One checkbox (`accept-short-open`) carries the short-squad
-  // override for BOTH open and close, and it is component state — the refresh
-  // after opening remounts the panel and clears it. So a close that needs the
-  // override arrives without one, DA-06 refuses it, and the status simply stays
-  // "live". (Worth fixing in the panel: the operator ticked a box, watched it
-  // vanish, and the next action failed for a reason the button does not say.)
-  await page.getByTestId("accept-short-open").check();
-  await page.getByTestId("auction-complete").click();
+  // CLOSE FROM THE COCKPIT, which is what the page itself says to do. These
+  // fixtures run deliberately short squads, and the auction panel's own banner
+  // states the rule: "Closing this auction will need the conductor's override on
+  // the cockpit (Close auction → 'Close short — on the record')." The panel's
+  // Close button carries no override once the auction is live — the
+  // accept-short checkbox only exists while it is still scheduled — so clicking
+  // it there is refused and the status simply stays "live".
+  await page.goto(`/seasons/${slug}/auction/cockpit`);
+  await page.getByTestId("cockpit-complete").click();
+  // The reason goes in BEFORE the confirm, not after it: the dialog shows the
+  // short-squad warning and its reason field together, and the confirm is what
+  // commits both. Answering in the other order clicks a confirm that is not
+  // ready and then types into a dialog that has already gone.
+  if (
+    await page
+      .getByTestId("override-reason")
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await page.getByTestId("override-reason").fill("test fixture: minimal squads");
+  }
+  await page.getByTestId("confirm-complete").click();
+  await page.goto(`/seasons/${slug}/auction`);
   await expect(page.getByTestId("auction-status")).toHaveText("completed", { timeout: 20_000 });
 
   // --- The partition: an org OWNER has no money power until it is granted -----

@@ -231,6 +231,10 @@ test("permissions attack: a viewer sees, but cannot act", async ({ browser, page
   await otpLogin(page, ORGANIZER);
   await page.goto("/orgs");
   await page.getByTestId("orgs-list").getByText(`Workspace CC ${STAMP}`).click();
+  // The invite form lives behind the Members tab, in a dialog. Reaching for its
+  // Select from the org overview waits for something that is not on screen yet.
+  await page.getByRole("tab", { name: "Members" }).click();
+  await page.getByTestId("open-invite").click();
   await page.getByLabel("They join as").selectOption("viewer");
   await page.getByTestId("create-invite").click();
   const inviteUrl = await page.getByTestId("invite-url").textContent();

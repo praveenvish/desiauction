@@ -228,14 +228,19 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   // so the row is in the DOM (which is why the containsText above passes) while
   // being unreachable to role queries, exactly as it is unreachable to a person
   // until they open it. Open it the way they would.
-  const alphaToggle = page.getByTestId(`tg-toggle-${alpha}`);
-  if ((await alphaToggle.getAttribute("aria-expanded")) === "false") {
-    await alphaToggle.click();
+  // The seasons view still groups by tournament, and a group may be closed —
+  // which puts the row in the DOM (so the containsText above passes) while
+  // leaving it unreachable to a click, exactly as it is unreachable to a person
+  // until they open it. Open it if there is something to open, then click the
+  // row itself rather than guessing at its accessible name.
+  const season = page.getByTestId("tg-season").filter({ hasText: `Alpha One ${STAMP}` });
+  if (!(await season.isVisible().catch(() => false))) {
+    const toggle = page.getByTestId(`tg-toggle-${alpha}`);
+    if (await toggle.isVisible().catch(() => false)) {
+      await toggle.click();
+    }
   }
-  await page
-    .getByTestId("tg-season")
-    .filter({ hasText: `Alpha One ${STAMP}` })
-    .click();
+  await season.click();
   await expect(page).toHaveURL(/\/seasons\/[^/?#]+$/, COLD);
 });
 

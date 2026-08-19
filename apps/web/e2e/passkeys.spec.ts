@@ -52,7 +52,11 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
   // so a bare text match now resolves to three elements and trips strict mode.
   // That is the a11y work doing its job; the spec just has to be specific.
   await expect(page.locator(".security-name", { hasText: "Founder MacBook" })).toBeVisible();
-  await expect(page.getByTestId("events-panel")).toContainText("auth.passkey.enrolled");
+  // The security log reads as prose now ("Passkey added"), not as the raw
+  // action key — a person reading their own account should not have to parse
+  // `auth.passkey.enrolled`. The key is still what gets stored; this is the
+  // rendering.
+  await expect(page.getByTestId("events-panel")).toContainText("Passkey added");
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
@@ -61,7 +65,7 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
   await expect(page).toHaveURL(/\/(home|onboarding)/, { timeout: 10_000 });
   await page.goto("/account");
   await expect(page.getByTestId("account-phone")).toHaveText(formatPhone(`+91${PHONE}`));
-  await expect(page.getByTestId("events-panel")).toContainText("auth.login.passkey");
+  await expect(page.getByTestId("events-panel")).toContainText("Signed in with a passkey");
 });
 
 test("session management: a second device shows up and can be revoked", async ({
@@ -87,6 +91,10 @@ test("session management: a second device shows up and can be revoked", async ({
   const panel = page.getByTestId("sessions-panel");
   await expect(panel).toContainText("Firefox on Windows");
   await panel.getByRole("button", { name: "Revoke" }).first().click();
+  // Signing another device out is irreversible, so it asks first. The click
+  // above only OPENS that dialog; without answering it the session was never
+  // revoked and the row stayed exactly where it was.
+  await page.getByTestId("confirm-security-action").click();
   await expect(panel).not.toContainText("Firefox on Windows");
-  await expect(page.getByTestId("events-panel")).toContainText("auth.session.revoked");
+  await expect(page.getByTestId("events-panel")).toContainText("A device was signed out");
 });
