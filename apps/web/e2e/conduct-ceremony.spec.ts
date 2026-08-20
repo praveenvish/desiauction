@@ -324,14 +324,12 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
     )
     .toBe(true);
   await ownerB.getByTestId("bid-next").click();
-  // 45s, and the number is measured rather than guessed. Recording the
-  // organizer's ceremony phase every 200ms after the bid, the extension
-  // announcement landed at ~17.4s — comfortably inside the lot's extended life,
-  // but right on the edge of a 20s assertion, which is why this test passed and
-  // failed by turns. The lot itself extends immediately; it is the CEREMONY
-  // that takes its time getting there, cycling through the night's earlier
-  // moments (bid → sold → hold → reopened) before it arrives. Worth a look:
-  // seventeen seconds is a long time to tell a room that the clock just moved.
+  // Generous on purpose. Measured from the click, the cockpit's ceremony
+  // banner spends ~2s flicking through the night's recent outcomes (sold →
+  // reopened → hold → opening) before it settles on what is happening NOW —
+  // `deriveCeremony` reads the snapshot's sticky `lastOutcome`, so a burst of
+  // snapshots re-announces resolutions that are already history. It arrives
+  // well inside this window; the timeout is headroom, not a workaround.
   await expect(organizer.getByTestId("ceremony")).toHaveAttribute("data-phase", "extension", {
     timeout: 45_000,
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast, Field } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast, Field, ButtonLink } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -340,25 +340,48 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             ) : null}
             {viewer.canConduct ? (
               <div className="date-row">
-                {(AUCTION_NEXT[view.auction.status] ?? []).map((step) => (
-                  <Button
-                    key={step.command}
-                    size="touch"
-                    onClick={() =>
-                      void act(
-                        () =>
-                          auctionLifecycleAction(slug, step.command, undefined, {
-                            acceptShortSquads: acceptShortOpen,
-                          }),
-                        step.label,
-                      )
-                    }
-                    loading={busy}
-                    data-testid={`auction-${step.command}`}
-                  >
-                    {step.label}
-                  </Button>
-                ))}
+                {(AUCTION_NEXT[view.auction.status] ?? []).map((step) =>
+                  // DO NOT OFFER WHAT THIS SCREEN CANNOT DO.
+                  //
+                  // Closing an auction whose squads are short needs a REASON on
+                  // the record (DA-06), and the place that asks for one is the
+                  // cockpit's two-act dialog. This panel has no such dialog, and
+                  // its Close passed no override at all — so for a short auction
+                  // the button could only ever produce a refusal. The refusal
+                  // was at least well-written (it names the cockpit and the
+                  // exact control), but a button whose only outcome is an error
+                  // is a worse thing to put in front of a conductor at 11pm than
+                  // a link to where the work happens.
+                  step.command === "complete" && !liveFeasibility.ok ? (
+                    <ButtonLink
+                      key={step.command}
+                      href={`/seasons/${slug}/auction/cockpit`}
+                      variant="secondary"
+                      size="touch"
+                      data-testid="auction-complete-on-cockpit"
+                    >
+                      Close short — on the cockpit
+                    </ButtonLink>
+                  ) : (
+                    <Button
+                      key={step.command}
+                      size="touch"
+                      onClick={() =>
+                        void act(
+                          () =>
+                            auctionLifecycleAction(slug, step.command, undefined, {
+                              acceptShortSquads: acceptShortOpen,
+                            }),
+                          step.label,
+                        )
+                      }
+                      loading={busy}
+                      data-testid={`auction-${step.command}`}
+                    >
+                      {step.label}
+                    </Button>
+                  ),
+                )}
                 {view.auction.status !== "completed" &&
                 view.auction.status !== "reconciled" &&
                 view.auction.status !== "abandoned" ? (
