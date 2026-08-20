@@ -371,3 +371,27 @@ assumed it was wrong about the test:
 2. ~~**A short-squad auction cannot be closed from the auction panel.**~~ **FIXED**, and my description of it was harsher than the truth. The panel's Close genuinely could not work for a short auction — it passes no override at all, so the command was always refused — but the refusal was NOT silent: it names the cockpit and the exact control to use. The fix is to stop offering the button: when the shortfall exists the panel now shows "Close short — on the cockpit", which is what its own banner already said.
 3. ~~**The completion dialog's second act is unannounced.**~~ **WITHDRAWN — not a gap.** On re-reading the component, the refusal retitles the dialog to "Close the auction short?", shows a warning naming the minimum squad size and that the override is recorded against the conductor's name for ever, and labels the button "Close short — on the record". That is a clear announcement; my note was wrong.
 4. ~~**The extension announcement takes ~17s to reach the room.**~~ **WITHDRAWN as stated — I misattributed my own measurement.** Re-measured with timestamped phase transitions from the moment the bid click returns: the announcement is prompt. The ~17s was the duration of the poll that waits for the lot clock to enter the extension window, not latency in the product. What IS real, and smaller: the cockpit's ceremony banner spends ~2s flicking through the night's recent outcomes (sold → reopened → hold → opening) before settling on the present, because `deriveCeremony` reads the snapshot's sticky `lastOutcome` and a burst of snapshots re-announces resolutions that are already history. Cosmetic, on the conductor's screen only.
+
+
+---
+
+## 8 · The last flake
+
+`auction-experience` was passing only on retry. Reproduced with `--repeat-each`,
+and the diagnostic at the moment of failure named the cause outright: the stage
+announced **"Sold. Star Bowler to Team Alpha"** while the spec waited for a toast
+about **Star Batter**.
+
+The auction's lot order is deterministic — the pool is registration-number sorted
+with stable tiebreaks — but the registration NUMBERS depend on the order the
+fixture's players were created in, which is not guaranteed run to run. The spec
+now reads the player off the block and asserts the toast, the squad and the
+public timeline all name that player.
+
+Worth recording as a method note: fixing the toast while leaving the timeline
+assertion hardcoded took the failure rate UP, from 1-in-5 to 4-in-8, because the
+two assertions then disagreed about who had been sold. A partial fix to a flake
+can look exactly like a regression.
+
+**8/8 with no retries** (7.7 min → 1.6 min, because nothing retries). Full suite
+**80 passed, exit 0.**
