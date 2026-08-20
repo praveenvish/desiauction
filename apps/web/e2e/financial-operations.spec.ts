@@ -227,7 +227,24 @@ test("founder demo: settle an auction → open Financial Operations → observe,
     timeout: 30_000,
   });
   // Re-derived from replay on this very read, twice — never a stored flag.
-  await expect(page.getByTestId("certification-verdict")).toHaveText("matched");
+  // Certification is re-derived by the RUNNER on its own cadence, and the last
+  // writes of this journey land moments before this read — so the first render
+  // can legitimately catch "not certified yet" or a pass taken mid-write.
+  // Reload until it settles; if it settles on "not matched" that is a real
+  // finding and this will still fail.
+  await expect
+    .poll(
+      async () => {
+        const verdict = await page.getByTestId("certification-verdict").textContent();
+        if (verdict === "matched") {
+          return verdict;
+        }
+        await page.reload();
+        return verdict;
+      },
+      { timeout: 60_000, intervals: [3_000] },
+    )
+    .toBe("matched");
   await expect(page.getByTestId("certification-checks")).toContainText(
     "Settlement's books balance",
   );

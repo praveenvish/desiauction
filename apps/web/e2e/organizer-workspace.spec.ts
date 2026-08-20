@@ -295,11 +295,17 @@ test("invalid workflows: bad team names are refused; unknown slugs 404", async (
 test("organizer search: palette reaches sections and venues", async ({ page }) => {
   await otpLogin(page, ORGANIZER);
   await page.goto(new URL(competitionUrl).pathname);
-  await page.keyboard.press("ControlOrMeta+k");
+  // Open by the icon rather than the shortcut. ⌘K is a document-level handler,
+  // so it only fires once something in the page has focus — after a bare
+  // `goto` the keypress goes nowhere and the combobox never renders. The
+  // comment in product-shell says it plainly: one search, two doors. This is
+  // the other door, and what the test is actually about is where the palette
+  // can take you.
+  await page.getByTestId("shell-search").click();
   await page.getByRole("combobox").fill("readiness");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/readiness$/);
-  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByTestId("shell-search").click();
   await page.getByRole("combobox").fill("venues");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/venues$/);

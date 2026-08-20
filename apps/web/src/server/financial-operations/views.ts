@@ -469,11 +469,20 @@ export async function reconciliationView(
       // The breadcrumb reads `<verdict> · <digest>`. Parse defensively: it is a
       // log line, not a contract, and an unreadable one must not break the desk.
       const [verdict, digest] = (row.reason ?? "").split(" · ");
+      // CASE-INSENSITIVE, because the writer shouts and this read whispered.
+      //
+      // governance.ts records `PASS · <digest>` / `FAIL · <digest>`; this parsed
+      // for lowercase, matched neither, and fell through to `null` — which the
+      // reconciliation panel renders as "not matched". So a certification that
+      // PASSED told the operator their books do not reconcile. On the one screen
+      // whose entire job is to say whether the money agrees with itself, that is
+      // the worst possible direction for a bug to point.
+      const outcome = verdict?.trim().toLowerCase();
       return {
         atMs: row.atMs,
         claim: row.reason,
         digest: digest === undefined || digest === "" ? null : digest,
-        pass: verdict === "pass" ? true : verdict === "fail" ? false : null,
+        pass: outcome === "pass" ? true : outcome === "fail" ? false : null,
       };
     })
     .reverse();
