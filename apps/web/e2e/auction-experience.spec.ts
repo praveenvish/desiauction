@@ -272,20 +272,38 @@ test("the full night: lobby → owners → bidding with notifications → public
 
   await ownerA.page.getByTestId("bid-next").click();
   await expect(ownerA.page.getByTestId("my-team-leading")).toBeVisible({ timeout: 20_000 });
+  // WHICHEVER PLAYER IS ACTUALLY ON THE BLOCK.
+  //
+  // This used to assert the winner's toast names "Star Batter", because the
+  // fixture adds that player first. The auction's lot order is deterministic
+  // for a given pool — registration-number sort with stable tiebreaks — but the
+  // registration NUMBERS depend on the order the fixture's players were created
+  // in, and that is not guaranteed run to run. So roughly one run in five put
+  // Star Bowler on the block instead, the assertion looked for a toast that was
+  // never going to be written, and the failure read as a broken notification.
+  //
+  // Reading the name off the block is also the better assertion: it proves the
+  // winner is told WHICH player they signed, rather than that a fixture happens
+  // to be ordered the way the spec remembers.
+  const signedPlayer =
+    (await ownerA.page.locator(".lot-hero-name").first().textContent())?.trim() ?? "";
+  expect(signedPlayer.length).toBeGreaterThan(0);
   // Winner hears it; the squad and the money move on the owner workspace.
   await Promise.all([
-    expect(ownerA.page.getByText(/You signed Star Batter/)).toBeVisible({ timeout: 45_000 }),
+    expect(ownerA.page.getByText(new RegExp(`You signed ${signedPlayer}`))).toBeVisible({
+      timeout: 45_000,
+    }),
     holdCloseLot(organizer),
-  ]).catch(async (error: unknown) => {
-    throw error;
-  });
-  await expect(ownerA.page.getByTestId("my-squad")).toContainText("Star Batter", {
+  ]);
+  await expect(ownerA.page.getByTestId("my-squad")).toContainText(signedPlayer, {
     timeout: 20_000,
   });
   await expect(ownerA.page.getByTestId("my-slots")).toContainText("1/");
   await expect(ownerA.page.getByTestId("my-spent")).not.toContainText("₹0", { timeout: 20_000 });
   // Every surface's timeline carries the SOLD moment — including the public one.
-  await expect(spectator.getByTestId("timeline-sold").first()).toContainText("Star Batter", {
+  // Same player, same reason: whoever was on the block, not whoever the fixture
+  // happened to number first.
+  await expect(spectator.getByTestId("timeline-sold").first()).toContainText(signedPlayer, {
     timeout: 30_000,
   });
   await expect(organizer.getByTestId("timeline-sold").first()).toBeVisible();
