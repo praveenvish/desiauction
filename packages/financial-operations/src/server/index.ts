@@ -75,6 +75,7 @@ export {
   type EvidenceReproduction,
 } from "./evidence";
 export {
+  CERTIFICATION_ACTION,
   certifyOperations,
   checklistInputsFrom,
   gatherObservations,

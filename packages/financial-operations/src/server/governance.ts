@@ -389,6 +389,16 @@ export interface Certification {
  * audit breadcrumb — the tamper-evident register a forged certificate is
  * checked against.
  */
+/**
+ * The audit action every certification is recorded under.
+ *
+ * One constant because this string is a contract between a writer and three
+ * readers, and the last time the two halves drifted — the writer shouting
+ * `PASS` while a reader looked for `pass` — a passing certification was
+ * rendered to operators as "not matched".
+ */
+export const CERTIFICATION_ACTION = "finops.CertificationDerived";
+
 export async function certifyOperations(deps: FinopsDeps, orgId: string): Promise<Certification> {
   const first = await deriveCertification(deps, orgId);
   const second = await deriveCertification(deps, orgId);
@@ -400,7 +410,7 @@ export async function certifyOperations(deps: FinopsDeps, orgId: string): Promis
   await deps.store.transact(async (tx) => {
     await tx.writeAudit({
       actor: FINOPS_SYSTEM_ACTOR,
-      action: "finops.CertificationDerived",
+      action: CERTIFICATION_ACTION,
       orgId,
       subject: orgId,
       source: "runner",

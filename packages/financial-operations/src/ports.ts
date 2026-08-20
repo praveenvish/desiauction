@@ -346,4 +346,13 @@ export interface FinopsStore {
     orgId: string,
     action: string,
   ): Promise<readonly { readonly atMs: number; readonly reason: string | null }[]>;
+  /**
+   * Does this org have ANY breadcrumb of this action? Existence only.
+   *
+   * `loadAuditBreadcrumbs` returns the whole history, which is the right shape
+   * for the register that renders it and the wrong one for a question asked on
+   * every runner tick — the history grows by a row a day for ever, and the
+   * runner only wants to know whether the first one exists yet.
+   */
+  hasAuditBreadcrumb(orgId: string, action: string): Promise<boolean>;
 }

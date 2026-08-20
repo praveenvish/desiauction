@@ -159,6 +159,16 @@ test("the full night: lobby → owners → bidding with notifications → public
   // which the setup screen now refuses until the shortfall is accepted on the
   // record (it is the state that used to become an unclosable auction).
   await organizer.getByTestId("accept-short-squads").check();
+  // A LONG LOT CLOCK, so the GAVEL ends lots and the timer never does.
+  //
+  // This journey drives four browser contexts through a whole night, and on the
+  // 30s default the lot could expire mid-assertion — auto-selling to whoever
+  // led, which fires the winner's toast before the spec starts watching for it.
+  // The toast is transient, so it was gone by the time anyone looked, and "the
+  // winner hears it" failed intermittently while being perfectly true. Ninety
+  // seconds puts the ending back in the auctioneer's hands, which is what every
+  // assertion here is written about.
+  await organizer.getByLabel("Lot timer (seconds)").fill("90");
   await organizer.getByTestId("create-auction").click();
   await expect(organizer.getByTestId("auction-status")).toHaveText("scheduled", {
     timeout: 20_000,

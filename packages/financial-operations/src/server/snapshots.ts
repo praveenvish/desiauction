@@ -26,6 +26,7 @@ import type { FinopsDeps } from "./deps";
 import { receiptCandidates, reproduceDocument, type ReceiptCandidate } from "./documents";
 import { reproduceFiscalEvidence, type EvidenceReproduction } from "./evidence";
 import {
+  CERTIFICATION_ACTION,
   certifyOperations,
   checklistInputsFrom,
   gatherObservations,
@@ -792,7 +793,7 @@ export async function certificationRegisterSnapshot(
   deps: FinopsDeps,
   orgId: string,
 ): Promise<CertificationRegisterSnapshot> {
-  const history = await deps.store.loadAuditBreadcrumbs(orgId, "finops.CertificationDerived");
+  const history = await deps.store.loadAuditBreadcrumbs(orgId, CERTIFICATION_ACTION);
   const latest = history[history.length - 1] ?? null;
   let latestClaimMatchesRederivation: boolean | null = null;
   if (latest !== null && latest.reason !== null) {

@@ -712,6 +712,29 @@ export function createFinopsStore(db: Db): FinopsStore {
       }));
     },
 
+    async hasAuditBreadcrumb(orgId, action) {
+      // `scopeType` is pinned so this rides `audit_scope_idx`
+      // (scope_type, scope_id, at) — that index LEADS on scope_type, so a
+      // query filtering only scope_id and action cannot use it and Postgres
+      // sequentially scans the whole audit log. Which would be a poor thing to
+      // put on a loop that asks once per org per tick, on a table that only
+      // ever grows. Every breadcrumb this asks about is written by
+      // `writeAudit` with scopeType "org"; the argument is named orgId for the
+      // same reason.
+      const [row] = await db
+        .select({ id: auditLog.id })
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.scopeType, "org"),
+            eq(auditLog.scopeId, orgId),
+            eq(auditLog.action, action),
+          ),
+        )
+        .limit(1);
+      return row !== undefined;
+    },
+
     async loadAuditBreadcrumbs(orgId, action) {
       const rows = await db
         .select({ at: auditLog.at, meta: auditLog.meta })

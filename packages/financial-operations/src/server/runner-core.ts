@@ -19,7 +19,13 @@ import {
 
 import type { FinopsDeps } from "./deps";
 import { runFollower } from "./follower";
-import { checklistInputsFrom, gatherObservations, verifyYearEnd } from "./governance";
+import {
+  CERTIFICATION_ACTION,
+  certifyOperations,
+  checklistInputsFrom,
+  gatherObservations,
+  verifyYearEnd,
+} from "./governance";
 import {
   enqueueDispatchSends,
   enqueueExportGenerations,
@@ -172,6 +178,25 @@ export async function runDailyOps(deps: FinopsDeps, job: JobRow): Promise<void> 
   const orgId = job.orgId;
 
   await runFollower(deps, orgId);
+  // CERTIFY, EVERY DAY, WHATEVER ELSE THIS JOB DECIDES.
+  //
+  // Before this line nothing in the platform ever derived a certification.
+  // `certificationSnapshot` is the only writer of the breadcrumb and it had no
+  // callers: the reconciliation view dropped it deliberately (it wrote an audit
+  // row on every page view), and nothing took its place — so every org created
+  // after the seed sat on "not certified yet" for ever, on the one desk whose
+  // job is to say whether the money agrees with itself.
+  //
+  // A schedule is where it belongs. Once a day per org is the same cadence the
+  // attestation runs on, it is bounded (one row, not one per reader), and it
+  // keeps the read path pure.
+  //
+  // Deliberately ABOVE the period gate below: certification asks whether the
+  // projections still fold out of the events, which is true or false whether or
+  // not the org has adopted period discipline. A failure here is recorded as
+  // the breadcrumb's own FAIL verdict and must not stop the attestation work
+  // that follows, so it is not allowed to throw the job.
+  await certifyOperations(deps, orgId);
   const checks = await evaluateChecklist(deps, orgId);
 
   const period = await deps.store.loadPeriodFor(orgId, fiscalYearOf(date));
@@ -343,8 +368,35 @@ export async function followAllOrgs(deps: FinopsDeps): Promise<number> {
   for (const orgId of await deps.orgs.listOrgIds()) {
     const run = await runFollower(deps, orgId);
     consumed += run.consumed;
+    await certifyFirstTime(deps, orgId);
   }
   return consumed;
+}
+
+/**
+ * An org's FIRST certification, derived as soon as the runner sees the org.
+ *
+ * The daily schedule above is what keeps certification current, but a new
+ * organization would then read "not certified yet" until the next daily fire —
+ * up to a day of a money desk saying it does not know. This closes that window
+ * without putting a write back on the read path: an existence check per org per
+ * tick, and exactly one certification per org, ever, after which the schedule
+ * owns it.
+ *
+ * Failure is swallowed on purpose. This is opportunistic work on the polling
+ * loop's back, and an org that cannot be certified yet — mid-write, or genuinely
+ * divergent — must not stop the follower serving every other org. The daily job
+ * will try again and record the verdict where an operator can see it.
+ */
+async function certifyFirstTime(deps: FinopsDeps, orgId: string): Promise<void> {
+  try {
+    if (await deps.store.hasAuditBreadcrumb(orgId, CERTIFICATION_ACTION)) {
+      return;
+    }
+    await certifyOperations(deps, orgId);
+  } catch {
+    // Opportunistic: the daily job is the one that must report.
+  }
 }
 
 export { attestationDateFor, istDateOf };

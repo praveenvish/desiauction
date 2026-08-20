@@ -272,22 +272,23 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   }
 
   await page.goto(`/org/${orgSlug}/money/reconciliation`);
-  // KNOWN GAP — this asserts what the platform DOES, and what it does is wrong.
-  //
-  // Nothing ever derives an organization's FIRST certification.
-  // `certificationSnapshot` is the only function that writes the
-  // `finops.CertificationDerived` breadcrumb, and it is called by nothing: the
-  // reconciliation view deliberately dropped it (an audit row per page view),
-  // the runner never certifies, and `certificationRegisterSnapshot` re-derives
-  // only when a breadcrumb already exists. So every org created after the seed
-  // sits on "not certified yet" for ever, on the one desk whose job is to say
-  // whether the books agree with themselves.
-  //
-  // Asserting "matched" here would be asserting a feature that does not exist,
-  // and quietly rewriting this to expect the broken state would bless it. So it
-  // asserts the truth and says loudly that the truth is wrong. Fix is to give
-  // certification a schedule (it cannot run per page view, which is why it was
-  // removed) and then this becomes `toBe("matched")`.
-  await expect(page.getByTestId("certification-verdict")).toHaveText("not certified yet");
-  await expect(page.getByTestId("certification-none")).toBeVisible();
+  // The runner derives an org's first certification as soon as it sees it, and
+  // re-derives daily after that — so this settles rather than being instant.
+  // It used to be a documented gap: nothing in the platform ever certified an
+  // organization, and every org created after the seed read "not certified yet"
+  // for ever. If this ever settles on "not matched" that is a real divergence
+  // and it should fail.
+  await expect
+    .poll(
+      async () => {
+        const verdict = await page.getByTestId("certification-verdict").textContent();
+        if (verdict === "matched") {
+          return verdict;
+        }
+        await page.reload();
+        return verdict;
+      },
+      { timeout: 90_000, intervals: [3_000] },
+    )
+    .toBe("matched");
 });

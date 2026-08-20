@@ -15,6 +15,7 @@ import {
 } from "@desiauction/financial-operations";
 import type { ProfileRow, SeriesRow } from "@desiauction/financial-operations";
 import {
+  CERTIFICATION_ACTION,
   complianceQueueSnapshot,
   complianceSnapshot,
   dispatchSnapshot,
@@ -461,7 +462,7 @@ export async function reconciliationView(
     watermarkSnapshot(deps, orgId),
     // Read-only. See the note on `certifications` — the two certification
     // snapshots that used to be here each wrote an audit row on every page view.
-    deps.store.loadAuditBreadcrumbs(orgId, "finops.CertificationDerived"),
+    deps.store.loadAuditBreadcrumbs(orgId, CERTIFICATION_ACTION),
     evidenceRegisterSnapshot(deps, orgId),
   ]);
   const certifications = breadcrumbs
