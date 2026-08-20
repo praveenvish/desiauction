@@ -332,3 +332,42 @@ page actually contained, not by reasoning about what it ought to have.
 | `financial-operations:72` | Past the door now; `ops-overall` is not "healthy". Likely genuine — finops health depends on the runner having drained jobs, and the runner does not run in e2e |
 | `financial-issuance:51` | Blocked behind the same finance fixture |
 | `organizer-workspace:229` | After clicking through to the org, `org-name` is not found at all — check whether that testid still lives on the org detail page or only on the list card |
+
+
+---
+
+## 7 · E2E — GREEN
+
+**80 passed · 0 failed · 31 skipped.** From **3 passing** when the repair began
+and 50 at the audit. Every gate now green together:
+
+| Gate | Result |
+|---|---|
+| `pnpm verify` (lint · types · unit · format · boundaries) | ✅ 11/11 tasks |
+| Engine integration | ✅ 66 / 66 |
+| Web integration | ✅ 605 / 605 |
+| End-to-end (precompiled) | ✅ **80 / 80** |
+| `pnpm audit --prod --audit-level high` | ✅ exit 0 |
+
+The 31 skips are structural, not swept under a rug: the `/gallery` design-system
+family and the local-media upload journey are both absent from a production
+build by design, and both run under `next dev`, where the nightly runs them.
+
+### What the suite caught along the way
+
+Every one of these was a real defect that a passing-by-accident test would have
+hidden. In each case the assertion was right about the product and everyone had
+assumed it was wrong about the test:
+
+1. **`sitemap.xml` was frozen at build time** — new tournaments never reached crawlers.
+2. **Anti-snipe could be lost to queue depth** — the expiry guard judged a bid by when the reducer reached it, not when it arrived.
+3. **The success toast faded in, and for those frames it was unreadable** — axe was right; transform only, never opacity, on anything carrying text.
+4. **A passing certification rendered as "not matched"** — the runner writes `PASS`, the desk parsed `"pass"`. On the one screen whose job is to say whether the money agrees with itself, a correct ledger was reported as broken.
+5. **The harness ran two services; production runs three** — nothing drained `finops_jobs`, so the money operations board was honestly degraded and its assertion could never pass.
+
+### Product gaps found and recorded, not fixed
+
+1. **Nothing ever derives an organization's first certification.** `certificationSnapshot` is the only writer of the `finops.CertificationDerived` breadcrumb and it is called by nothing — the reconciliation view dropped it deliberately (an audit row per page view), the runner never certifies, and the register only re-derives when a breadcrumb already exists. Every org created after the seed sits on "not certified yet" for ever. Written into `financial-issuance.spec.ts` as a known gap that asserts the truth and says plainly that the truth is wrong. **Fix: give certification a schedule.**
+2. **A short-squad auction cannot be closed from the auction panel** — the override checkbox only renders while `scheduled`, yet the panel keeps offering Close once live and passes the now-false override. Refused, status stays "live", nothing explains why.
+3. **The completion dialog's second act is unannounced** — the engine's refusal re-renders the dialog with a reason field, but nothing tells the operator that is what happened.
+4. **The extension announcement takes ~17s to reach the room** — measured, not estimated. The lot extends immediately; the ceremony cycles through the night's earlier moments before it arrives.
