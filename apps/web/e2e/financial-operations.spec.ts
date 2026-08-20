@@ -147,6 +147,30 @@ test("founder demo: settle an auction → open Financial Operations → observe,
 
   // --- Observe the new financial activity ------------------------------------
   await expect(page.getByTestId("health-row")).toBeVisible();
+  // Healthy because the finops RUNNER is running — globalSetup starts it now.
+  // Without it this board is honestly degraded ("settlement ingest 5 events
+  // behind", "job runner: nothing picked up for 26 days") and this assertion
+  // could never pass: production runs three services and the harness ran two.
+  // POLL, DO NOT SNAPSHOT. The runner ticks on its own clock, and this board is
+  // server-rendered — so the page can legitimately be a tick behind the world it
+  // is describing. Reload until every component agrees, then assert each one,
+  // rather than asserting once against whichever instant the render caught.
+  await expect
+    .poll(
+      async () => {
+        const statuses = await page
+          .getByTestId("health-row")
+          .locator("[data-status]")
+          .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-status")));
+        if (statuses.length > 0 && statuses.every((status) => status === "healthy")) {
+          return true;
+        }
+        await page.reload();
+        return false;
+      },
+      { timeout: 40_000, intervals: [2_000] },
+    )
+    .toBe(true);
   await expect(page.getByTestId("ops-overall")).toHaveText("healthy");
   // Every component the platform derives is shown — none dropped, none invented.
   for (const component of [

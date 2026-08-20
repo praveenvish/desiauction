@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { clearNameGate } from "./onboarding";
 import { latestOtp } from "./otp";
 
 // PX-4 Organizer Workspace: the founder demo (org → competition → approve →
@@ -251,12 +252,21 @@ test("permissions attack: a viewer sees, but cannot act", async ({ browser, page
     await viewerPage.goto(inviteUrl ?? "");
     await otpLogin(viewerPage, VIEWER);
     await viewerPage.getByTestId("accept-invite").click();
+    // A first-time member is asked their name once, and the invitation's
+    // destination survives it — so they land in the org they just joined
+    // rather than on /home.
+    await clearNameGate(viewerPage, "Workspace Viewer");
     await expect(viewerPage.getByTestId("org-name")).toHaveText(`Workspace CC ${STAMP}`);
 
     const base = new URL(competitionUrl).pathname;
     // Registrations: read is refused politely, never a crash.
     await viewerPage.goto(`${base}/registrations`);
-    await expect(viewerPage.getByRole("alert")).toContainText("permission");
+    // The page carries more than one live region — the refusal itself and the
+    // shell's (empty) toast region — so `getByRole("alert")` is ambiguous here.
+    // Assert the sentence the viewer actually reads.
+    await expect(
+      viewerPage.getByText(/don.t have permission to review registrations/i),
+    ).toBeVisible();
     // Teams: list visible, creation absent.
     await viewerPage.goto(`${base}/teams`);
     await expect(viewerPage.getByTestId("teams-list")).toBeVisible();

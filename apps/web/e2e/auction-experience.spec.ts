@@ -266,7 +266,9 @@ test("the full night: lobby → owners → bidding with notifications → public
   await Promise.all([
     expect(ownerA.page.getByText(/You signed Star Batter/)).toBeVisible({ timeout: 45_000 }),
     holdCloseLot(organizer),
-  ]);
+  ]).catch(async (error: unknown) => {
+    throw error;
+  });
   await expect(ownerA.page.getByTestId("my-squad")).toContainText("Star Batter", {
     timeout: 20_000,
   });

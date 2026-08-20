@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process";
+import { openSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 // Warm the dev server's on-demand compiler before parallel workers start —
 // first-hit route compiles otherwise inject 10s+ of jitter into early tests.
 // Production servers (CI option) are pre-compiled; warming is then a no-op.
@@ -121,8 +125,58 @@ async function warmSignIn(base: string): Promise<void> {
   }
 }
 
+/**
+ * THE THIRD SERVICE. Production runs web, engine AND the finops runner; the
+ * harness ran two.
+ *
+ * The runner is what drains `finops_jobs` and advances the follower cursor, so
+ * without it the money operations board is honestly degraded — "settlement
+ * ingest 5 events behind", "job runner: nothing picked up for 26 days" — and
+ * `financial-operations` asserting a healthy board could never pass. That was
+ * not a wrong assertion; it was a missing service, and the assertion is the
+ * only thing that noticed.
+ *
+ * It cannot go in `webServer` because it has no HTTP port to wait on, so it is
+ * spawned here and stopped in global-teardown. Detached + its own process group
+ * so the teardown can take the whole tree down; a fast tick because a test suite
+ * should not wait fifteen seconds to see a job move.
+ */
+function startFinopsRunner(): void {
+  // `--env-file-if-exists` exactly as the web and engine commands do: the
+  // Playwright process does not carry the repo's .env.local, and the runner
+  // validates its environment fail-closed at boot — so without this it exits
+  // instantly and, with stdio ignored, silently. Its output goes to a file for
+  // the same reason: a service that dies invisibly is why a correct assertion
+  // looked like a broken test.
+  const log = openSync(fileURLToPath(new URL("./.finops-runner.log", import.meta.url)), "a");
+  const runner = spawn(
+    process.execPath,
+    ["--env-file-if-exists=../../.env.local", "node_modules/tsx/dist/cli.mjs", "src/index.ts"],
+    {
+      cwd: fileURLToPath(new URL("../../finops-runner", import.meta.url)),
+      env: {
+        ...process.env,
+        RUNNER_TICK_MS: "1000",
+        DATABASE_URL:
+          process.env["DATABASE_URL"] ??
+          "postgres://desiauction:desiauction@localhost:5433/desiauction",
+      },
+      detached: true,
+      stdio: ["ignore", log, log],
+    },
+  );
+  runner.unref();
+  if (runner.pid !== undefined) {
+    writeFileSync(RUNNER_PID_FILE, String(runner.pid), "utf8");
+  }
+}
+
+/** Where the teardown looks for the runner it has to stop. */
+export const RUNNER_PID_FILE = fileURLToPath(new URL("./.finops-runner.pid", import.meta.url));
+
 export default async function globalSetup(): Promise<void> {
   const base = "http://localhost:3050";
+  startFinopsRunner();
   await warmRoutes(base);
   await warmSignIn(base);
 }

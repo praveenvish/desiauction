@@ -41,6 +41,8 @@ export default defineConfig({
   // 30s default under the shared dev compiler. Same jitter class as above.
   timeout: 60_000,
   globalSetup: "./e2e/global-setup.ts",
+  // Stops the finops runner that globalSetup starts (see its comment).
+  globalTeardown: "./e2e/global-teardown.ts",
   reporter: [["list"]],
   use: {
     // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.
