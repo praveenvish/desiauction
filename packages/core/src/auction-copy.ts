@@ -63,7 +63,34 @@ const COMMAND_REFUSAL_COPY: Record<string, string> = {
   invalid_payload: "Something was missing from that request — try again.",
   invalid_command_id: "Something was wrong with that request — try again.",
   rate_limited: "You're going too fast — wait a moment and try again.",
+  // TRANSPORT. These two are produced by engine-client, not by the aggregate,
+  // and they were the only refusals in the product with no sentence — so the
+  // two MOST LIKELY real failures in a hall both fell through to "That didn't
+  // go through. Try again.", which is not merely generic but wrong: when the
+  // engine is unreachable, trying again fails identically.
+  //
+  // NEITHER SENTENCE CLAIMS NOTHING WAS RECORDED, and that restraint is the
+  // point. `engine_unreachable` covers the 2-second AbortSignal timeout as well
+  // as a refused connection, and a timeout means the answer was late — not that
+  // the engine never got the command. Telling a bidder "nothing was recorded"
+  // when the bid may in fact be standing is how somebody bids against
+  // themselves. Both messages state what is actually known (no answer came
+  // back) and send the reader to the feed, which is server truth.
+  engine_unreachable:
+    "The auction service didn't answer. Check the bid feed before repeating that — it may still have landed.",
 };
+
+/**
+ * `engine_http_<status>` carries the status in its tail, so it cannot be a key.
+ * Same standard as the map above, and the same restraint: an error status is
+ * strong evidence the command was rejected, but not proof it was rejected
+ * before anything was written.
+ */
+function transportRefusal(reason: string): string | undefined {
+  return reason.startsWith("engine_http_")
+    ? "The auction service refused that. Check the bid feed before repeating it, and tell the auctioneer if it keeps happening."
+    : undefined;
+}
 
 /**
  * One entry point for every ack the live surfaces render, so a bid rejection
@@ -74,5 +101,10 @@ export function commandRefusalMessage(reason: string | null | undefined): string
     return "That didn't go through. Try again.";
   }
   const bids: Record<string, string | undefined> = BID_REJECTION_COPY;
-  return COMMAND_REFUSAL_COPY[reason] ?? bids[reason] ?? "That didn't go through. Try again.";
+  return (
+    COMMAND_REFUSAL_COPY[reason] ??
+    bids[reason] ??
+    transportRefusal(reason) ??
+    "That didn't go through. Try again."
+  );
 }

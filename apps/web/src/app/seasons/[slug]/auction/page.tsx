@@ -8,6 +8,14 @@ import { AuctionOverviewPanel } from "./auction-overview-panel";
 import { AuctionPanel } from "./auction-panel";
 import { BroadcastLinks } from "./broadcast-links";
 import "../../seasons.css";
+// The hub renders <BroadcastLinks>, and every rule that dresses it —
+// `.broadcast-row`, `.share-auction-button`, `.broadcast-url` — lives in
+// auction.css, which each of the eight SIBLING auction routes imports and this
+// one did not. Three separate defects were the same missing line: "Open board"
+// painted the user agent's #0000EE (1.92:1 on the floodlit surface), it was 19px
+// tall instead of the 44px its rule specifies, and the un-wrapped board URL
+// scrolled the whole page sideways at 320px.
+import "./auction.css";
 
 export const metadata = { title: "Auction · DesiAuction" };
 

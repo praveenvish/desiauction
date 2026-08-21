@@ -88,9 +88,27 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     payload: Record<string, unknown>,
     done?: string,
   ) => {
+    // The same repair as the live room's `send`: a REJECTED request (offline
+    // handset, server restart, proxy) skipped `setPending(null)` entirely, so
+    // the control it names — including the gavel — stayed disabled for the rest
+    // of the session with nothing said. See live-panel.tsx for the full note.
     setPending(key);
-    const ack = await submitAuctionCommand(slug, commandId(), type, payload);
-    setPending(null);
+    let ack;
+    try {
+      ack = await submitAuctionCommand(slug, commandId(), type, payload);
+    } catch {
+      // See live-panel.tsx: a rejected promise means the answer is missing, not
+      // that the command failed, so the message says only that and sends the
+      // conductor to server truth rather than asserting an outcome.
+      toast({
+        title:
+          "Lost the connection before the auction answered — check the bid feed before acting again.",
+        tone: "danger",
+      });
+      return false;
+    } finally {
+      setPending(null);
+    }
     if (ack.accepted) {
       if (done !== undefined) {
         toast({ title: done, tone: "success" });
@@ -121,8 +139,19 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       ? { overrideSquadMinimum: true, reason: overrideReason.trim() }
       : {};
     setPending("complete");
-    const ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
-    setPending(null);
+    let ack;
+    try {
+      ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
+    } catch {
+      toast({
+        title:
+          "Lost the connection before the auction answered — reload to see whether the night closed.",
+        tone: "danger",
+      });
+      return;
+    } finally {
+      setPending(null);
+    }
     if (ack.accepted) {
       setCompleteOpen(false);
       setShortSquads(false);
@@ -902,7 +931,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             ) : null}
           </Card>
 
-          {snapshot !== null ? <AuctionProgress snapshot={snapshot} /> : null}
+          {/* Same reason as the live room: the component renders its own
+              connecting state, and guarding it here reintroduces the re-flow. */}
+          <AuctionProgress snapshot={snapshot} />
 
           {/* The one purse treatment, shared with the owner room and the
               spectator board. */}

@@ -69,11 +69,47 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     setHydrated(true);
   }, []);
 
+  /**
+   * THE ROUND TRIP CAN FAIL, AND IT USED TO FAIL SILENTLY FOREVER.
+   *
+   * `submitAuctionCommand` is defended at its far end: engine-client gives the
+   * engine two seconds and answers `engine_unreachable` rather than throwing.
+   * The near end — the browser's request to the server action itself — was not.
+   * A phone that loses signal in the hall, a server restart, a proxy hiccup:
+   * the promise REJECTS, and with `setPending(null)` sitting on the happy path
+   * it never ran. The control stayed disabled for the rest of the session and
+   * nothing was said. On the raise button, whose only disabled treatment is
+   * `opacity: .55`, that is a bidder tapping a dimmed rectangle and never
+   * learning whether their money moved.
+   *
+   * `finally` gives the control back no matter what, and the catch says the one
+   * thing the bidder needs to know: the bid did NOT land.
+   */
   const send = useCallback(
     async (key: string, type: string, payload: Record<string, unknown>, done?: string) => {
       setPending(key);
-      const ack = await submitAuctionCommand(slug, commandId(), type, payload);
-      setPending(null);
+      let ack;
+      try {
+        ack = await submitAuctionCommand(slug, commandId(), type, payload);
+      } catch {
+        // DO NOT CLAIM THE COMMAND FAILED. A rejected promise means the ANSWER
+        // did not come back; it does not mean the request never arrived. The
+        // server action can reach the engine and have the reply lost on the way
+        // home, in which case the bid IS recorded. Telling a bidder "that didn't
+        // go through" there would invite them to bid against themselves.
+        //
+        // So the message states only what is known — the answer is missing — and
+        // points at the one thing that is authoritative: the bid feed, which is
+        // server truth streamed over the socket, not this optimistic client.
+        toast({
+          title:
+            "Lost the connection before the auction answered — check the bid feed before bidding again.",
+          tone: "danger",
+        });
+        return false;
+      } finally {
+        setPending(null);
+      }
       if (ack.accepted) {
         if (done !== undefined) {
           toast({ title: done, tone: "success" });
@@ -126,7 +162,19 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     const payload = shortSquads
       ? { overrideSquadMinimum: true, reason: overrideReason.trim() }
       : {};
-    const ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
+    let ack;
+    try {
+      ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
+    } catch {
+      // Same rule as `send` above: an unanswered request is not a failed one,
+      // and "the night is still open" would be a claim this code cannot make.
+      toast({
+        title:
+          "Lost the connection before the auction answered — reload to see whether the night closed.",
+        tone: "danger",
+      });
+      return;
+    }
     if (ack.accepted) {
       setCompleteOpen(false);
       setShortSquads(false);
@@ -326,7 +374,11 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               feed={feed}
             />
           ) : null}
-          {snapshot !== null ? <AuctionProgress snapshot={snapshot} /> : null}
+          {/* Unconditional now: AuctionProgress renders its own connecting state,
+              and the guard here was what made the column re-flow when the socket
+              answered — this component sits above the purse board, the pool
+              summary and the squad board, so its arrival moved all three. */}
+          <AuctionProgress snapshot={snapshot} />
           {/* THE SEAL. A bidder sees their own purse and committed spend, the
               lot on the block and the public bid feed — not every rival's
               remaining money. Decided on the server (`viewer.canSeeAllPurses`)

@@ -103,7 +103,14 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
             }}
             data-testid="replay-slider"
           />
-          {frame.ok ? (
+          {/* HYDRATION. `foldMs` comes from performance.now() inside the useMemo
+              above, which runs on the server AND on the client — two different
+              numbers for the same render, which is a hydration mismatch and made
+              React throw away and rebuild this subtree on every load. The
+              component already tracks `hydrated` for exactly this; the timing
+              readout simply was not behind it. It is a diagnostic, so waiting a
+              tick for it costs nothing. */}
+          {frame.ok && hydrated ? (
             <span className="competitions-hint" data-testid="replay-fold-time">
               fold {frame.foldMs.toFixed(1)} ms
             </span>
