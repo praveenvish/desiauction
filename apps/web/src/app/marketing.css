@@ -1395,17 +1395,40 @@ body:has(.landing.mk) .mk-hero {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  /* One column until the row can hold every beat. auto-fit at tablet width fit
+     exactly two tracks, which broke three steps into 2 + 1 — a sequence read
+     left-to-right, then orphaned. A stack is honest; a 2+1 grid is not. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
+}
+
+/* The row and its connectors arrive together: this is also the width at which
+   the rail is drawn, and the gutter widens to --space-8 because --space-4 left
+   the rail and its arrowhead 16px to share, which read as a stray glyph rather
+   than a line between two beats. */
+@media (min-width: 900px) {
+  .mk-steps {
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: var(--space-8);
+  }
 }
 
 .mk-steps li {
   position: relative;
   counter-increment: mkstep;
+  display: flex;
+  flex-direction: column;
   padding: var(--space-6);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
-  background: var(--surface-raised);
+  /* A whisper of accent at the top of the card, fading out by 40%: on a light
+     panel a flat --surface-raised card is white-on-near-white and the only
+     thing separating it from the band is a hairline. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 5%, var(--surface-raised)),
+    var(--surface-raised) 40%
+  );
   box-shadow: var(--shadow-1);
   transition:
     transform var(--duration-base) var(--ease-out),
@@ -1437,22 +1460,55 @@ body:has(.landing.mk) .mk-hero {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  /* The icon tile is 48px and the connector rail is pinned to its centre line
+     (card padding + half the tile); if this height changes, move the rail. */
+  min-height: 48px;
+  margin-bottom: var(--space-5);
 }
 
-/* The step number sits INSIDE the icon row (.mk-step-top is a flex row), so the
-   "01" badge and the icon tile share one line. */
+/* The step number used to be a solid gold chip sitting beside the icon tile:
+   two badges of near-identical weight competing on one line, neither winning.
+   It is now an editorial numeral set in the display face, tinted rather than
+   filled, anchored to the card's top-right corner. One chip, one numeral —
+   they read as different kinds of object, so they stop fighting. It stays a
+   pseudo-element (never in the accessibility tree) because the <ol> already
+   carries the ordering; the numeral is decoration, not information. */
 .mk-step-top::before {
   content: "0" counter(mkstep);
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm-size);
-  letter-spacing: 0.08em;
-  color: var(--text-on-accent);
-  background: var(--accent);
-  width: fit-content;
-  padding: var(--space-05) var(--space-2);
-  border-radius: var(--radius-sm);
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-5);
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(40px, 4.4vw, 56px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: color-mix(in srgb, var(--accent) 20%, transparent);
+  transition: color var(--duration-base) var(--ease-out);
+}
+
+/* The icon tile carries the card now, so it gets the extra 4px and a lit top
+   edge of its own — the same sheen the panels use, at tile scale. */
+.mk-steps .mk-icon-tile {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent) 20%, var(--surface-raised)),
+    var(--accent-subtle)
+  );
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 55%, transparent);
+}
+
+.mk-steps .mk-icon-tile svg {
+  width: 24px;
+  height: 24px;
+}
+
+.mk-steps li:hover .mk-step-top::before {
+  color: color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
 /* The three-beat ramp was 64 → 38 → 13: the step titles rendered SMALLER than
@@ -1472,29 +1528,96 @@ body:has(.landing.mk) .mk-hero {
   text-wrap: balance;
 }
 
+/* 18px title over 13px body was a five-point drop inside one card, and the
+   "worst moment" cards immediately below run their body at base. Matching them
+   keeps the two card rows reading as one family. */
 .mk-steps p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: 1.55;
+  font-size: var(--text-base-size);
+  line-height: 1.6;
 }
 
-/* Connector: an arrow between cards on wide screens, in the row's own gutter. */
+/* Connector: a rail between cards on wide screens, in the row's own gutter.
+   The old version was a bare 9px chevron pinned to `top: 50%` — the vertical
+   middle of the CARD, which lands in the middle of the body paragraph. It read
+   as a stray ">" floating in the whitespace rather than a line from one beat
+   to the next. The rail is now pinned to the icon tiles' centre line, so the
+   three icons and the two connectors form a single horizontal spine across the
+   row, and the arrowhead sits at the end of an actual line. */
 @media (min-width: 900px) {
   .mk-steps {
     position: relative;
   }
 
-  .mk-steps li:not(:last-child)::after {
+  /* Card padding (--space-6) + half the 48px tile. */
+  .mk-steps li:not(:last-child)::after,
+  .mk-steps li:not(:last-child) .mk-step-top::after {
     content: "";
     position: absolute;
-    right: calc(-1 * var(--space-3));
-    top: 50%;
-    width: 9px;
-    height: 9px;
-    border-top: 2px solid var(--border-strong);
-    border-right: 2px solid var(--border-strong);
+    top: calc(var(--space-6) + 24px);
+    transition: opacity var(--duration-base) var(--ease-out);
+  }
+
+  .mk-steps li:not(:last-child)::after {
+    left: 100%;
+    width: calc(var(--space-8) - 10px);
+    height: 2px;
+    border-radius: var(--radius-full);
+    transform: translateY(-1px);
+    transform-origin: left center;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 15%, transparent),
+      color-mix(in srgb, var(--accent) 48%, transparent)
+    );
+  }
+
+  /* The arrowhead rides on .mk-step-top's ::after because the <li> has already
+     spent both of its pseudo-elements (lit top edge, rail). .mk-step-top is
+     static, so this still positions against the <li>. */
+  .mk-steps li:not(:last-child) .mk-step-top::after {
+    left: calc(100% + var(--space-8) - 9px);
+    width: 7px;
+    height: 7px;
+    border-top: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
+    border-right: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
     transform: translateY(-50%) rotate(45deg);
+  }
+
+  /* Without this the three body paragraphs start at three different heights,
+     because the titles are one to three lines depending on the copy and the
+     column width, and the row loses its baseline.
+
+     Subgrid does it properly: every card hands its three bands — icon, title,
+     body — to the row's own tracks, so the title track is as tall as the
+     tallest title and the bodies start level at ANY width. A min-height floor
+     cannot do that; the first version guessed two lines and came apart at
+     exactly 900px, where "The gavel falls; the books write themselves" needs
+     three. That guess survives here only as the pre-subgrid fallback. */
+  .mk-steps h3 {
+    min-height: 2.6em;
+  }
+
+  @supports (grid-template-rows: subgrid) {
+    .mk-steps {
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .mk-steps li {
+      display: grid;
+      grid-template-rows: subgrid;
+      grid-row: span 3;
+      /* A subgrid inherits its parent's gutter, and the parent's is the 32px
+         COLUMN gutter between cards — which arrived as 32px of dead air
+         between the icon, the title and the body. A subgrid may declare its
+         own; the bands are spaced by their own margins. */
+      row-gap: 0;
+    }
+
+    .mk-steps h3 {
+      min-height: 0;
+    }
   }
 }
 
@@ -2908,12 +3031,21 @@ body:has(.landing.mk) .mk-hero {
       animation-range: entry 32% entry 92%;
     }
 
-    /* The workflow's connecting arrows draw in after their cards land. */
+    /* The workflow's connectors draw in after their cards land: the rail grows
+       out of the card it leaves, then the arrowhead slides up to meet it. Two
+       animations because they are two elements now — a rail that scales and a
+       head that travels. */
     @media (min-width: 900px) {
       .mk-steps li:not(:last-child)::after {
-        animation: mk-arrow-in linear both;
+        animation: mk-rail-draw linear both;
         animation-timeline: view();
         animation-range: entry 40% entry 90%;
+      }
+
+      .mk-steps li:not(:last-child) .mk-step-top::after {
+        animation: mk-arrow-in linear both;
+        animation-timeline: view();
+        animation-range: entry 55% entry 95%;
       }
     }
   }
@@ -2922,10 +3054,27 @@ body:has(.landing.mk) .mk-hero {
 @keyframes mk-arrow-in {
   from {
     transform: translateY(-50%) translateX(-8px) rotate(45deg);
+    opacity: 0;
   }
 
   to {
     transform: translateY(-50%) translateX(0) rotate(45deg);
+    opacity: 1;
+  }
+}
+
+/* The rail's own transform (translateY(-1px), to sit its 2px on the icon centre
+   line) has to be restated here: a running animation owns the whole transform
+   property, and the first version of this section lost that translate — and
+   gained the arrowhead's rotate(45deg) — because the connector kept using the
+   chevron's keyframes after it stopped being a chevron. */
+@keyframes mk-rail-draw {
+  from {
+    transform: translateY(-1px) scaleX(0);
+  }
+
+  to {
+    transform: translateY(-1px) scaleX(1);
   }
 }
 
