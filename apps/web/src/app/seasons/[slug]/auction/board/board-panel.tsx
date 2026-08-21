@@ -88,15 +88,46 @@ export function BoardPanel({
   // another appeared three times, each card repeating the team's whole purse
   // and its whole squad — the hall read three times the money and three times
   // the players. Released paddles rendered as live purses too.
-  const teams =
-    snapshot !== null
-      ? teamPurseRows(snapshot, teamIdentities)
-          .map((row) => ({
-            ...row,
-            squad: soldLots.filter((lot) => lot.teamName === row.teamName).length,
-          }))
-          .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName))
-      : [];
+  /**
+   * THE FRANCHISES ARE KNOWN BEFORE THE SOCKET IS.
+   *
+   * `teamIdentities` is a server prop, so the board has the team list in its
+   * first paint and only the NUMBERS have to wait for the snapshot. This used
+   * to fall back to `[]`, which meant the standings grid rendered zero cards
+   * until the socket answered ~400ms later and then four appeared at once —
+   * the largest part of a measured CLS of 0.751 on a screen that is projected
+   * in front of a hall.
+   *
+   * The repair is not a shimmer. A skeleton would reserve the space and say
+   * nothing; the real card with its real crest and an em dash where a figure
+   * will go reserves the same space AND tells a filling room which franchises
+   * are playing tonight. Same pixels, more information.
+   *
+   * Sorting is by committed spend, which is 0 for every row while connecting —
+   * so the tiebreak (name) is what orders them, and the order the room sees
+   * first is alphabetical rather than arbitrary.
+   */
+  const connecting = snapshot === null;
+  const teams = connecting
+    ? teamIdentities
+        .map((team) => ({
+          teamId: team.id,
+          teamName: team.name,
+          team,
+          committed: 0,
+          purseRemaining: null,
+          total: null,
+          activePaddles: [],
+          leading: false,
+          squad: 0,
+        }))
+        .sort((a, b) => a.teamName.localeCompare(b.teamName))
+    : teamPurseRows(snapshot, teamIdentities)
+        .map((row) => ({
+          ...row,
+          squad: soldLots.filter((lot) => lot.teamName === row.teamName).length,
+        }))
+        .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName));
 
   // A projector is ONE frame, so the board has to spend its height rather than
   // overflow it. When a player is under the hammer the room is watching the
@@ -170,26 +201,33 @@ export function BoardPanel({
             </p>
           ) : null}
         </div>
-        {snapshot !== null ? (
-          <div className="board-progress" data-testid="board-progress">
+        {/* Rendered while connecting too, with em dashes for the counts. It is
+            the right-hand half of the header: absent, the title block had the
+            whole width and re-flowed when the socket answered. */}
+        <div className="board-progress" data-testid="board-progress" data-connecting={connecting}>
+          {connecting ? (
+            <span className="board-progress-count">
+              &mdash;<span className="board-progress-total">/&mdash;</span>
+            </span>
+          ) : (
             <span className="board-progress-count">
               {snapshot.lotsResolved}
               <span className="board-progress-total">/{snapshot.lotsTotal}</span>
             </span>
-            <span className="board-progress-label">lots settled</span>
-            <span className="board-progress-bar" aria-hidden="true">
-              <i
-                style={{
-                  width: `${String(
-                    snapshot.lotsTotal > 0
-                      ? Math.round((snapshot.lotsResolved / snapshot.lotsTotal) * 100)
-                      : 0,
-                  )}%`,
-                }}
-              />
-            </span>
-          </div>
-        ) : null}
+          )}
+          <span className="board-progress-label">lots settled</span>
+          <span className="board-progress-bar" aria-hidden="true">
+            <i
+              style={{
+                width: `${String(
+                  snapshot !== null && snapshot.lotsTotal > 0
+                    ? Math.round((snapshot.lotsResolved / snapshot.lotsTotal) * 100)
+                    : 0,
+                )}%`,
+              }}
+            />
+          </span>
+        </div>
       </header>
 
       {/* THE STALENESS BANNER. Sized for the back of the room, not a 12px chip
@@ -341,18 +379,26 @@ export function BoardPanel({
               </div>
               <div className="board-team-purse">
                 <span className="board-purse-value">
-                  {team.purseRemaining === null ? "sealed" : money(team.purseRemaining)}
+                  {/* "sealed" means the engine withheld this team's money from
+                      this viewer. Before the socket answers, nothing has been
+                      withheld — it simply is not known yet, and saying "sealed"
+                      there would state a permission fact that is not true. */}
+                  {connecting
+                    ? "—"
+                    : team.purseRemaining === null
+                      ? "sealed"
+                      : money(team.purseRemaining)}
                 </span>
                 <span className="board-purse-label">purse remaining</span>
               </div>
               <dl className="board-team-stats">
                 <div>
                   <dt>Spent</dt>
-                  <dd>{money(team.committed)}</dd>
+                  <dd>{connecting ? "—" : money(team.committed)}</dd>
                 </div>
                 <div>
                   <dt>Squad</dt>
-                  <dd>{team.squad}</dd>
+                  <dd>{connecting ? "—" : team.squad}</dd>
                 </div>
               </dl>
             </article>

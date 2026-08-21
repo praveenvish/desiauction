@@ -44,6 +44,25 @@
   font-size: var(--text-sm-size);
 }
 
+/* THE RIBBON IS CHROME, AND CHROME MUST NOT CHANGE HEIGHT.
+ *
+ * It is a wrapping flex row whose cells arrive with the snapshot — a status
+ * badge, the auction's name, the lot, the bid, the clock. On a phone that tips
+ * it from one line to two the moment the socket answers, and because it sits
+ * above everything and is `position: sticky`, the whole page moved with it.
+ * Measured: 20px -> 52px at 390px and below, no change at 430px and up
+ * (`scripts/audit/ribbon-heights.mjs`).
+ *
+ * 52px is not padding added for the metric's sake — it is the ribbon's own
+ * settled height on those widths. Reserving it costs nothing after the first
+ * half-second and stops the page moving at it. */
+@media (max-width: 429px) {
+  .status-ribbon {
+    box-sizing: border-box;
+    min-height: 52px;
+  }
+}
+
 /* `min-width: 0` is load-bearing at 320px: a nowrap cell holding a long Indian
    team name beside a crore-scale figure refused to shrink and pushed 42px of
    the page off the right edge (WCAG 1.4.10 Reflow). The cell may now shrink;
@@ -190,7 +209,37 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 260px;
+  /* ONE HEIGHT, ACROSS EVERY PHASE — and the number is measured, not chosen.
+   *
+   * The stage swaps DOM subtrees as the night moves: connecting, waiting, a lot
+   * on the block, SOLD, unsold, complete. Each phase carries a different number
+   * of lines, so the stage resized on every one of those transitions — and
+   * because it sits at the top of the live room, everything below it moved with
+   * it. Measured on a production build at 390px, that was CLS 0.444, the last
+   * route in the product outside the good band. It is not only a load problem:
+   * the stage resized on EVERY sale, all night.
+   *
+   * Measured heights (production, `scripts/audit/stage-heights.mjs`):
+   *   connecting 326 · completed 326-354 · sold 366 (406 at 320px, name wraps)
+   * The tallest phase is a lot under the hammer, which is SOLD plus one
+   * `.ceremony-meta` line (18px) and one gap (12px) — 396px, or 436px where the
+   * player's name takes two lines. Reaching it means opening a lot and mutating
+   * the demo auction, so it is computed from the parts rather than observed
+   * (`scripts/audit/stage-parts.mjs`).
+   *
+   * 420px clears every phase at 400px and up, with ~24px of headroom for a
+   * longer name than the demo's; 460px clears the two-line name a narrow screen
+   * forces. Nothing is lost by the extra space: the phases that gain it —
+   * connecting, between lots, complete — are exactly the phases with NO bid
+   * control on screen, so the button a bidder reaches for is never pushed down
+   * by this. When a lot is live the stage is at its natural height anyway.
+   *
+   * `box-sizing` is stated because this file has no global reset and the
+   * default is content-box: without it the 64px of vertical padding lands ON
+   * TOP of the number above, and the stage renders 466px where the comment
+   * promises 400. Measured that way round the first time. */
+  box-sizing: border-box;
+  min-height: 420px;
   padding: 32px 24px;
   text-align: center;
   background: var(--surface-sunken);
@@ -200,6 +249,15 @@
 }
 
 /* The announced content always sits above the decorative SOLD celebration. */
+/* Below 400px the display-size player name wraps to two lines, which is 39px
+   the wider viewports do not spend. Measured: sold is 406px here against 366px
+   at 390px. */
+@media (max-width: 399px) {
+  .ceremony {
+    min-height: 460px;
+  }
+}
+
 .ceremony > *:not(.ceremony-celebration) {
   position: relative;
   z-index: 1;

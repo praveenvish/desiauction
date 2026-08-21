@@ -151,8 +151,18 @@ export function SquadBoard({
                   {members.length}/{squadMax}
                 </span>
               </div>
-              {showPurse && remaining !== undefined && remaining !== null ? (
-                <p className="squad-team-purse">{formatPaiseINR(paise(remaining))} left</p>
+              {/* The LINE is unconditional once purses are shown at all; only
+                  the figure waits. Rendered conditionally, it appeared per team
+                  when the socket answered — four teams, ~75px, and every squad
+                  below moved. `showPurse` still decides whether this viewer is
+                  entitled to see purses; that is a permission and stays a
+                  branch. Not knowing a number yet is not a permission. */}
+              {showPurse ? (
+                <p className="squad-team-purse">
+                  {remaining === undefined || remaining === null
+                    ? "\u2014"
+                    : `${formatPaiseINR(paise(remaining))} left`}
+                </p>
               ) : null}
               {members.length === 0 ? (
                 <p className="competitions-hint">No players signed yet.</p>

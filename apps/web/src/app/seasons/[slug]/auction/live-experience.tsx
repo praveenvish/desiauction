@@ -179,22 +179,39 @@ export function AuctionTimeline({ feed, limit = 12 }: { feed: LiveFeed; limit?: 
 }
 
 /** Progress + anti-snipe chips, derived from the snapshot alone. */
+/**
+ * RENDERS WHILE CONNECTING, rather than appearing when the socket answers.
+ *
+ * Returning `null` for a missing snapshot cost nothing to write and 0.564 CLS
+ * to use: this sits in the middle of the live room's right-hand column, so its
+ * arrival ~400ms after first paint pushed the purse board, the pool summary and
+ * the squad board down together — up to 842px of movement on the screen a
+ * bidder is about to tap.
+ *
+ * The bar is the same bar at 0%, and the counts are em dashes until they are
+ * known. Nothing is claimed that is not true, and the column does not move.
+ */
 export function AuctionProgress({ snapshot }: { snapshot: AuctionSnapshot | null }) {
-  if (snapshot === null) {
-    return null;
-  }
   const pct =
-    snapshot.lotsTotal === 0 ? 0 : Math.round((snapshot.lotsResolved / snapshot.lotsTotal) * 100);
-  const extensions = snapshot.currentLot?.extensions ?? 0;
+    snapshot === null || snapshot.lotsTotal === 0
+      ? 0
+      : Math.round((snapshot.lotsResolved / snapshot.lotsTotal) * 100);
+  const extensions = snapshot?.currentLot?.extensions ?? 0;
   return (
-    <div className="live-progress" data-testid="auction-progress">
+    <div
+      className="live-progress"
+      data-testid="auction-progress"
+      data-connecting={snapshot === null}
+    >
       <div className="live-progress-bar" role="presentation">
         <span style={{ width: `${String(pct)}%` }} />
       </div>
       <span className="competitions-hint">
-        {snapshot.lotsResolved}/{snapshot.lotsTotal} lots · {snapshot.queue.length} in queue
+        {snapshot === null
+          ? "— / — lots · — in queue"
+          : `${String(snapshot.lotsResolved)}/${String(snapshot.lotsTotal)} lots · ${String(snapshot.queue.length)} in queue`}
       </span>
-      {snapshot.currentLot?.status === "closing_soon" ? (
+      {snapshot?.currentLot?.status === "closing_soon" ? (
         <Badge tone="warning" data-testid="closing-soon">
           Closing soon
         </Badge>

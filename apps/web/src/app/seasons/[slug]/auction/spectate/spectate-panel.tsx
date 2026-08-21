@@ -394,11 +394,12 @@ export function SpectatePanel({
           </div>
           <UpNext snapshot={snapshot} />
           <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
-          {snapshot !== null ? (
-            <span data-testid="spectate-progress">
-              <AuctionProgress snapshot={snapshot} />
-            </span>
-          ) : null}
+          {/* Same reason as the live room and the cockpit: the component renders
+              its own connecting state, so guarding it here would move everything
+              below when the socket answers. */}
+          <span data-testid="spectate-progress">
+            <AuctionProgress snapshot={snapshot} />
+          </span>
           {/* The rules were already on the wire and read only for the lot window.
               "Why did that stop at ₹5L?" is answerable from here. */}
           <RulesCard rules={rules} />

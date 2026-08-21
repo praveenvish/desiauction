@@ -223,10 +223,40 @@ export function PurseBoard({
   visibleTeamIds?: readonly string[] | null;
   note?: string | null;
 }) {
-  if (snapshot === null) {
-    return null;
-  }
-  const all = teamPurseRows(snapshot, teams);
+  /**
+   * THE ROWS EXIST BEFORE THE SOCKET DOES.
+   *
+   * `teams` is a server prop, so this board knows its franchises in the first
+   * paint and only the FIGURES have to wait. Returning `null` here meant the
+   * card was 0px until the snapshot landed and then 289px — measured, and the
+   * single largest contributor to CLS 0.564 in the live auction room, because
+   * everything below it (the pool summary, the squad board, the whole second
+   * column) moved by that much on a screen a bidder is about to tap.
+   *
+   * A skeleton would hold the space and say nothing. Rendering the real rows
+   * with an em dash where each figure will go holds the same space and tells a
+   * bidder who else is in the room, which is worth knowing before the first lot.
+   *
+   * `connecting` is threaded down rather than inferred from `purseRemaining ===
+   * null`, because that already means something else and something important:
+   * the engine SEALED this team's money from this viewer. "Sealed" is a
+   * permission fact; before the socket answers nothing has been sealed, it is
+   * simply not known, and printing the wrong one of those two would be a lie
+   * about what the product is doing with a rival's money.
+   */
+  const connecting = snapshot === null;
+  const all = connecting
+    ? teams.map((team) => ({
+        teamId: team.id,
+        teamName: team.name,
+        team,
+        committed: 0,
+        purseRemaining: null,
+        total: null,
+        activePaddles: [] as string[],
+        leading: false,
+      }))
+    : teamPurseRows(snapshot, teams);
   // Filtered AFTER the fold, not before: `teamPurseRows` also appends rows for
   // paddles whose team is missing from the identity list, and filtering the
   // input alone would let a rival's purse back in through that arm.
@@ -263,7 +293,9 @@ export function PurseBoard({
                 {row.activePaddles.length > 0 ? (
                   <span className="purse-paddles">{row.activePaddles.join(" · ")}</span>
                 ) : (
-                  <span className="purse-paddles purse-paddles--none">no paddle yet</span>
+                  <span className="purse-paddles purse-paddles--none">
+                    {connecting ? "\u2014" : "no paddle yet"}
+                  </span>
                 )}
                 {row.leading ? (
                   <span className="purse-leading" data-testid={`leading-${handle}`}>
@@ -271,18 +303,22 @@ export function PurseBoard({
                   </span>
                 ) : null}
                 <span className="purse-left">
-                  {row.purseRemaining === null
-                    ? "sealed"
-                    : formatPaiseINR(paise(row.purseRemaining))}
+                  {connecting
+                    ? "\u2014"
+                    : row.purseRemaining === null
+                      ? "sealed"
+                      : formatPaiseINR(paise(row.purseRemaining))}
                 </span>
               </div>
               <div
                 className="purse-bar"
                 role="img"
                 aria-label={
-                  row.total === null
-                    ? `${row.teamName}: purse sealed`
-                    : `${row.teamName}: ${formatPaiseINR(paise(row.committed))} spent of ${formatPaiseINR(paise(row.total))}`
+                  connecting
+                    ? `${row.teamName}: purse not known yet`
+                    : row.total === null
+                      ? `${row.teamName}: purse sealed`
+                      : `${row.teamName}: ${formatPaiseINR(paise(row.committed))} spent of ${formatPaiseINR(paise(row.total))}`
                 }
               >
                 <span
