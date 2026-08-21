@@ -259,8 +259,11 @@
 .od-dot--info {
   background: var(--info-base);
 }
+/* Was #b48cff: the last untokenised hue in the product, in a list where every
+   other dot resolves from the system. Activity of this kind is informational,
+   which is the token that already exists for it. */
 .od-dot--violet {
-  background: #b48cff;
+  background: var(--info-base);
 }
 .od-dot--muted {
   background: var(--text-muted);

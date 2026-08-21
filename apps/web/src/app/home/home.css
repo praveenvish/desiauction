@@ -48,11 +48,22 @@
 .home-ic--warn {
   background: linear-gradient(140deg, var(--warning-base), var(--warning-strong));
 }
+/* These two were the only colours in the product with no token behind them —
+   #a25cf0/#7b45df and #2bc0b4/#149a8f — sitting in a block where every sibling
+   resolves from the system. They pass contrast; the problem is that they have
+   no second theme value and no meaning, so a chip that reads correctly on the
+   floodlit shell is a different relationship on the daylight one and no token
+   change can reach them.
+
+   Settlement is money reaching its end state, so it takes the ceremony pair —
+   the same gold the SOLD moment uses, one step deeper. The teal chip is spare
+   capacity with no current caller and takes `info`, which is what it was
+   standing in for. */
 .home-ic--violet {
-  background: linear-gradient(140deg, #a25cf0, #7b45df);
+  background: linear-gradient(140deg, var(--ceremony-gold), var(--ceremony-gold-deep));
 }
 .home-ic--teal {
-  background: linear-gradient(140deg, #2bc0b4, #149a8f);
+  background: linear-gradient(140deg, var(--info-base), var(--info-strong));
 }
 
 /* ---------- shared: crest ---------- */

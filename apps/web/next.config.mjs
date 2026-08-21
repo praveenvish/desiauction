@@ -55,7 +55,13 @@ export default {
     // (The public player link /c/[slug] is untouched — that is the one already
     // printed on QR codes and sent to registrants.)
     return Promise.resolve([
-      { source: "/competitions", destination: "/seasons", permanent: true },
+      // Straight to the final destination. /seasons is itself a redirect now
+      // (page.tsx: -> /tournaments?view=seasons), so pointing here at /seasons
+      // made the bare path a TWO-hop permanent chain — two round trips for a
+      // bookmark, and a chain search engines follow grudgingly. The :path*
+      // rule below must keep targeting /seasons/:path*, because those ARE the
+      // real pages.
+      { source: "/competitions", destination: "/tournaments?view=seasons", permanent: true },
       { source: "/competitions/:path*", destination: "/seasons/:path*", permanent: true },
     ]);
   },

@@ -59,11 +59,17 @@
   flex-wrap: wrap;
 }
 
+/* `min-width: 0` lets this column SHRINK, but a 26-character ULID has no break
+   opportunity in it, so the column shrank and its content did not — taking the
+   whole page 17px past a 320px viewport. Administration is the one area whose
+   content is machine identifiers by nature (ULIDs, dispatch keys, environment
+   variable names), so the rule belongs here rather than at each call site. */
 .admin-attention-subject {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .admin-attention-kind {
@@ -102,9 +108,13 @@
   word-break: break-word;
 }
 
+/* Same cause as `.admin-attention-subject` above: this renders environment
+   variable names — MSG91_TEMPLATE_REGISTRATION_WAITLISTED and its siblings —
+   which are single unbreakable tokens 38 characters long. */
 .admin-meta {
   font-size: var(--text-xs-size);
   color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 
 .admin-when {

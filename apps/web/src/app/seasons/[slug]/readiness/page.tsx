@@ -34,6 +34,19 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
   const base = `/seasons/${slug}`;
   const checks = auction?.ready.checks ?? [];
   const blockers = checks.filter((check) => !check.pass).length;
+  /**
+   * THE VERDICT MUST NOT CONTRADICT THE ROW UNDER IT.
+   *
+   * Squad feasibility is deliberately NOT a blocker (see the note on its row
+   * below: a league may knowingly run short, but must not find out at closing
+   * time). That decision is right and is unchanged here. What was wrong was the
+   * PRESENTATION: with no blockers the header showed a plain green "Ready for
+   * auction" while the card immediately beneath it read "Short — 2 players
+   * cannot fill 4 squads of at least 2". On the one screen whose entire job is
+   * to answer "can I start?", the summary and the detail disagreed and nothing
+   * reconciled them. The verdict now carries the caveat it was hiding.
+   */
+  const runningShort = auction !== null && !auction.feasibility.ok;
 
   return (
     <main className="registrations-dash">
@@ -42,8 +55,8 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
           subtitle="Every row links to the screen that changes it. Pass/fail comes from the platform's own auction-readiness checks."
           actions={
             auction !== null && blockers === 0 ? (
-              <Badge tone="success" data-testid="readiness-verdict">
-                Ready for auction
+              <Badge tone={runningShort ? "warning" : "success"} data-testid="readiness-verdict">
+                {runningShort ? "Ready — but running short" : "Ready for auction"}
               </Badge>
             ) : (
               <Badge tone="warning" data-testid="readiness-verdict">

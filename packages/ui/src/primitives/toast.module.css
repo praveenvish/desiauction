@@ -43,13 +43,27 @@
   color: var(--text-heading);
 }
 
+/* 24x24 IS THE FLOOR, and this control was 19x20.
+ *
+ * `padding: 0 var(--space-1)` gave it no vertical padding at all, so its box
+ * was whatever the glyph happened to be — below WCAG 2.2 SC 2.5.8 (AA) on the
+ * one control that clears a toast sitting over the bid area on a phone. axe
+ * cannot catch it: `target-size` is not in the wcag21aa tag set, which is why
+ * finance.css documents the same rule by hand for its document links.
+ *
+ * The box grows; the glyph does not. `place-items: center` keeps the mark
+ * optically where it was, so nothing beside it moves. */
 .dismiss {
   font: inherit;
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0 var(--space-1);
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
   border-radius: var(--radius-sm);
 }
 

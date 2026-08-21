@@ -224,7 +224,12 @@ test("founder demo: org → competition → approve → team roster → venue �
   await page.getByTestId("accept-short-squads").check();
   await page.getByTestId("create-auction").click();
   await page.goto(`${competitionUrl}/readiness`);
-  await expect(page.getByTestId("readiness-verdict")).toHaveText("Ready for auction");
+  // "Ready — but running short", not a plain "Ready for auction": this journey
+  // deliberately accepted a squad shortfall six lines above, and the verdict
+  // used to render green and unqualified while the feasibility row beside it
+  // said the squads could not be filled. The caveat IS the assertion — the
+  // summary now agrees with the detail it sits on top of.
+  await expect(page.getByTestId("readiness-verdict")).toHaveText("Ready — but running short");
 });
 
 test("permissions attack: a viewer sees, but cannot act", async ({ browser, page }) => {

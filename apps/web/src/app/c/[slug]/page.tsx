@@ -130,8 +130,26 @@ export default async function PublicCompetitionPage({
                 Register as a player
               </ButtonLink>
             ) : null}
+            {/* THE COMMON STATE HAD NOWHERE TO GO.
+                Live gets "Watch"; open gets "Register". Neither is true for a
+                closed tournament or a finished one — which is most of the
+                lifecycle, and includes every link people keep forwarding after
+                the night is over. The only control left was the ghost below,
+                which navigates AWAY. The squads and the pool are on this very
+                page, a scroll down, and nothing pointed at them. */}
+            {!live && !view.open && pool !== null && pool.total > 0 ? (
+              <ButtonLink href="#players-heading" size="lg" data-testid="public-squads-cta">
+                See the squads
+              </ButtonLink>
+            ) : null}
+            {/* "All seasons" pointed at a page headed <h1>Tournaments</h1>,
+                titled "Tournaments · DesiAuction", and called "Browse
+                tournaments" and "All tournaments" by the public header and
+                footer. One destination, four labels, and this was the only one
+                using the OTHER domain noun the product deliberately keeps
+                apart: a tournament recurs, a season is the edition that runs. */}
             <ButtonLink href="/c" variant="ghost" size="lg">
-              All seasons
+              All tournaments
             </ButtonLink>
           </div>
           {live ? (
