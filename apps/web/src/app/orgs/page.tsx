@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { FormDialog } from "../../components/form-dialog";
-import { PageAction } from "../../components/shell/page-action";
 import { currentSession } from "../../server/auth/actions";
 import { myOrgCards } from "../../server/orgs/actions";
 import { CreateOrgForm } from "./create-org-form";
@@ -103,16 +102,8 @@ export default async function OrgsPage({
   return (
     <main className="orgs">
       <div className="orgs-stack">
-        <PageAction>
-          <FormDialog
-            title="New organization"
-            triggerLabel="+ New organization"
-            size="touch"
-            triggerTestId="new-org"
-          >
-            <CreateOrgForm />
-          </FormDialog>
-        </PageAction>
+        {/* The primary action moved to `app/@action/orgs/page.tsx` — same
+            control, resolved by the router so it is in the server render. */}
         {params.invite === "invalid" ? (
           <p className="orgs-error" role="alert">
             That invite link is no longer valid — ask the organizer for a fresh one.

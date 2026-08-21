@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { env } from "../env";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
 import { adminNavVisible } from "../server/admin/actions";
@@ -19,15 +20,59 @@ import { finopsOrgIds } from "../server/financial-operations/actions";
 import { settlementOrgIds } from "../server/settlement/actions";
 
 export const metadata: Metadata = {
+  // WITHOUT metadataBase, Next resolves every relative metadata URL — including
+  // the file-based share cards — against a localhost default and says so in a
+  // build warning. The share card is the one asset whose whole job is to be
+  // fetched by somebody else's server, so the origin has to be real.
+  metadataBase: new URL(env.PUBLIC_BASE_URL),
   title: "DesiAuction",
   description: "Tournament auctions, taken seriously.",
+  // Defaults, inherited by every route that does not state its own. Pages with
+  // a richer card (a competition, a player, pricing) still win — a file lower
+  // in the tree, and an explicit `openGraph` on a page, both override this.
+  openGraph: {
+    siteName: "DesiAuction",
+    type: "website",
+    locale: "en_IN",
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 // Console default is Daylight; live surfaces pin floodlight per C-4 (doc 18).
 // PX-2: the root layout owns the Product Shell — session + the navigation
 // reads (orgs, competitions) feed the rail, switchers, context bar and
 // command palette. All reads are existing actions; anonymous renders skip them.
-export default async function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({
+  children,
+  action,
+}: {
+  children: ReactNode;
+  /**
+   * THE PAGE'S PRIMARY ACTION, RESOLVED BY THE ROUTER RATHER THAN PUBLISHED
+   * AFTER HYDRATION.
+   *
+   * `@action` is a parallel route: the router resolves it alongside `children`
+   * and hands both here, so the button is part of the SERVER render of the
+   * shell. It used to arrive through a React context that `PageAction`
+   * published from a `useEffect` — which never runs on the server, so the first
+   * paint had no action, hydration inserted one, and every console surface
+   * carrying an action shifted its content down by ~106px (CLS 0.123, and 0.15
+   * on /home). Routes with no action resolve to `@action/default.tsx`, which
+   * renders nothing.
+   *
+   * The context channel still exists and still wins when something publishes,
+   * because /tournaments swaps its action with a client-side view toggle. What
+   * it no longer has to do is deliver the FIRST one.
+   *
+   * REQUIRED, and the build enforces it: Next generates `LayoutProps` from the
+   * app directory, so once `@action` exists the slot is part of this layout's
+   * contract. Declaring it optional now fails the build — which is the right
+   * way round, and worth knowing if the first build after adding a slot errors
+   * the OTHER way (the generated type is still the pre-slot one until one build
+   * completes).
+   */
+  action: ReactNode;
+}) {
   // The session read is the ONE database call every page in the product makes,
   // including the marketing pages that need no database at all. Unguarded, a
   // Postgres blip turned `GET /` into a 500 — a landing page taken out by an
@@ -101,6 +146,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             canSettle: settlementOrgs.has(org.id),
           }))}
           competitions={competitions}
+          serverAction={action}
           isAdmin={isAdmin}
           latestEventAt={latestEventAt}
           logout={logoutAction}

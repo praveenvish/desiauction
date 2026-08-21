@@ -9,6 +9,7 @@ import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { orgsFor } from "../orgs/orgs";
+import { competitionsView } from "./actions";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   byEditionDate,
@@ -79,23 +80,63 @@ export type SeasonRow = CompetitionSummary & {
  * `competition.create`, so the two questions genuinely have different answers
  * and both have to be asked.
  */
-async function capabilitiesAcross(
-  personId: string,
-  orgs: { id: string; name: string }[],
-): Promise<{ creatable: { id: string; name: string }[]; reviewable: Set<string> }> {
-  const answers = await Promise.all(
-    orgs.map(async (org) =>
-      withTenantDb(dbHandle, { personId, orgId: org.id }, async (db) => ({
-        org,
-        create: await canCompetition(db, personId, { orgId: org.id }, "competition.create"),
-        review: await canCompetition(db, personId, { orgId: org.id }, "registration.review"),
-      })),
-    ),
-  );
-  return {
-    creatable: answers.filter((answer) => answer.create).map((answer) => answer.org),
-    reviewable: new Set(answers.filter((answer) => answer.review).map((answer) => answer.org.id)),
-  };
+/**
+ * Deduped per request, and that is now load-bearing rather than an optimisation.
+ *
+ * This is one capability read PER ORG, so it is the most expensive thing on the
+ * tournaments screen after the season union. Two callers want it in the same
+ * render — `tournamentsView` below, and the `@action` slot that renders the
+ * page's primary button during SSR — and without the cache the second caller
+ * would double the query count on the very screen that already pays the most.
+ *
+ * Membership comes from `competitionsView`, which is itself deduped, so this
+ * adds no read of its own beyond the capability checks.
+ */
+const capabilitiesOnce = cache(
+  async (): Promise<{
+    orgs: { id: string; name: string }[];
+    creatable: { id: string; name: string }[];
+    reviewable: Set<string>;
+  }> => {
+    const session = await requireSession();
+    const { orgs } = await competitionsView();
+    const answers = await Promise.all(
+      orgs.map(async (org) =>
+        withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => ({
+          org,
+          create: await canCompetition(
+            db,
+            session.personId,
+            { orgId: org.id },
+            "competition.create",
+          ),
+          review: await canCompetition(
+            db,
+            session.personId,
+            { orgId: org.id },
+            "registration.review",
+          ),
+        })),
+      ),
+    );
+    return {
+      orgs,
+      creatable: answers.filter((answer) => answer.create).map((answer) => answer.org),
+      reviewable: new Set(answers.filter((answer) => answer.review).map((answer) => answer.org.id)),
+    };
+  },
+);
+
+/**
+ * The orgs this person may actually open a season or tournament in.
+ *
+ * Membership is not permission: `org:staff` holds `registration.review` and not
+ * `competition.create`, so belonging to a club and being able to start a season
+ * in it are different facts. Exported because the `@action` slot needs exactly
+ * this one answer and nothing else on the tournaments view.
+ */
+export async function creatableOrgs(): Promise<{ id: string; name: string }[]> {
+  return (await capabilitiesOnce()).creatable;
 }
 
 export interface TournamentRow {
@@ -237,7 +278,7 @@ export async function tournamentsView(): Promise<TournamentsView> {
     running: isRunningNow(season, today),
   }));
   const plainOrgs = orgs.map((org) => ({ id: org.id, name: org.name }));
-  const { creatable, reviewable } = await capabilitiesAcross(session.personId, plainOrgs);
+  const { creatable, reviewable } = await capabilitiesOnce();
   const standalone = enriched.filter((season) => season.tournamentId === null);
   return {
     orgs: plainOrgs,

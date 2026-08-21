@@ -13,7 +13,6 @@ import { redirect } from "next/navigation";
 import { Fragment, Suspense, type ReactNode } from "react";
 
 import { FormDialog } from "../../components/form-dialog";
-import { PageAction } from "../../components/shell/page-action";
 import { PageTitle } from "../../components/shell/page-title";
 import { auctionDashboard } from "../../server/auction/actions";
 import { currentSession } from "../../server/auth/actions";
@@ -771,21 +770,10 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
           gives way to it — and the portfolio line is its lede, so both ride the
           identity bar and the page opens on the work. */}
       <PageTitle title={greeting} subtitle={headline} />
-      {view.orgs.length > 0 ? (
-        <PageAction>
-          {/* The page's ONE primary action, and it was 32px — at the width
-              where 44 matters most. `touch` is the 44px rung the product
-              standardised on. */}
-          <FormDialog
-            title="New tournament"
-            triggerLabel="+ New tournament"
-            size="touch"
-            triggerTestId="home-new-tournament"
-          >
-            <CreateTournamentForm orgs={view.orgs} />
-          </FormDialog>
-        </PageAction>
-      ) : null}
+      {/* The primary action moved to `app/@action/home/page.tsx`. It is the same
+          control with the same gate; what changed is that the ROUTER resolves
+          it alongside this page, so the shell's bar carries it in the server
+          render instead of growing a row once hydration published it here. */}
 
       {laddering ? <SetupLadder rungs={rungs} current={currentRung} /> : null}
 

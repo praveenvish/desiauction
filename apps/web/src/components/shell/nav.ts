@@ -217,8 +217,16 @@ export const PUBLIC_DESTINATIONS: readonly {
 
 /**
  * PX-9: Platform Administration's own tab row. Administration is NOT a rail
- * item — the rail is five, forever (canon docs/16) — so it navigates itself,
- * reached from the avatar menu by the few who hold the grant.
+ * item — the rail is short and fixed (see RAIL above, which is FOUR; the
+ * "five, forever" this comment used to assert was retracted there and the
+ * retraction had not reached here) — so it navigates itself, reached from the
+ * avatar menu by the few who hold the grant.
+ *
+ * Messaging was missing from this array while being linked from the admin
+ * overview and shipped. One omission, three symptoms: no tab to click,
+ * `activeAdminTab` falling through to "overview" so the strip lit the WRONG
+ * tab, and `pageIdentity` finding no section so the title rendered "Platform
+ * admin" directly under a breadcrumb reading "Platform admin".
  */
 export const ADMIN_TABS: CompetitionTab[] = [
   { key: "overview", label: "Overview", href: "/admin" },
@@ -226,6 +234,7 @@ export const ADMIN_TABS: CompetitionTab[] = [
   { key: "users", label: "Users", href: "/admin/users" },
   { key: "audit", label: "Audit", href: "/admin/audit" },
   { key: "health", label: "Health", href: "/admin/health" },
+  { key: "messaging", label: "Messaging", href: "/admin/messaging" },
 ];
 
 export function activeAdminTab(pathname: string): string {
@@ -240,6 +249,9 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/health")) {
     return "health";
+  }
+  if (pathname.startsWith("/admin/messaging")) {
+    return "messaging";
   }
   return "overview";
 }
@@ -336,6 +348,12 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/users$/, "Users"],
   [/^\/admin\/audit$/, "Audit"],
   [/^\/admin\/health$/, "Health"],
+  // Messaging was missing from BOTH admin lists — this one and ADMIN_TABS. The
+  // tab strip was the visible half; this is why the identity bar rendered the
+  // title "Platform admin" directly beneath a breadcrumb reading "Platform
+  // admin", since `pageIdentity` falls back to the surface name when a section
+  // has no label.
+  [/^\/admin\/messaging$/, "Messaging"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.

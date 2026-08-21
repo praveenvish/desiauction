@@ -109,7 +109,15 @@ export function AppShell({
       </span>
       <span className={styles["wordmark-stack"]}>
         <span className={styles["wordmark-text"]}>{wordmark}</span>
-        {tagline !== undefined ? <span className={styles["rail-tagline"]}>{tagline}</span> : null}
+        {/* aria-hidden: the wordmark above already names the product, so a
+            reader announcing "DesiAuction, Bid dot Build dot Win" on every page
+            is repeating the brand at the cost of the reader's time. It is a
+            mark, not information. */}
+        {tagline !== undefined ? (
+          <span className={styles["rail-tagline"]} aria-hidden>
+            {tagline}
+          </span>
+        ) : null}
       </span>
     </Link>
   );

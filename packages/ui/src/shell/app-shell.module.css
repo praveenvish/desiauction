@@ -242,6 +242,19 @@ a.wordmark:hover .wordmark-glyph {
   }
 }
 
+/* AN EMPTY SLOT MUST COST NOTHING.
+   The action arrives from a parallel route now, and a route slot is always a
+   node — `@action/default.tsx` renders nothing, but it is not `null`, so the
+   shell cannot tell "no action" from "an action that drew nothing" by looking
+   at the value. The wrapper is therefore always present on console routes, and
+   an empty flex item is not free: `.topbar-inner` has a `gap`, so a zero-width
+   child still pushes its neighbours by one gap step on every actionless page.
+   `:empty` is exact here — it matches only when the div has no child nodes at
+   all, which is precisely the render-nothing case. */
+.page-action:empty {
+  display: none;
+}
+
 .top-actions {
   margin-left: auto;
   /* Never absorb the overflow of a long neighbour: the icons are hit targets,
@@ -399,11 +412,23 @@ a.wordmark:hover .wordmark-glyph {
     /* Tracked as far as it can go while staying NARROWER than the wordmark —
        past that the column would size to the tagline and the edges would part.
        What is left for the justification to spread lands in the word gaps. */
-    font-size: 8px;
-    letter-spacing: 0.1em;
+    /* 8px AT 4.35:1, AND BOTH HALVES OF THAT WERE WRONG. The size sat below the
+       type scale's own floor (--text-xs is 12px) and the 45% mix measured
+       4.35:1 against the rail — under the 4.5 AA minimum for normal text,
+       confirmed twice (hand arithmetic 4.40, painted pixels 4.35). axe never saw
+       it: the rail is decorative chrome it treats as such.
+
+       The tagline is a brand mark, not information — the wordmark above already
+       says who this is — so the repair stops asking assistive technology and
+       contrast rules to carry it: `aria-hidden` in the markup removes it from
+       the accessible name, and 10px at 62% both lifts the ratio past AA and
+       stays narrower than the wordmark, which is the constraint the
+       justification trick depends on. */
+    font-size: 10px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     font-weight: var(--font-weight-semibold);
-    color: color-mix(in srgb, var(--identity-glyph) 45%, transparent);
+    color: color-mix(in srgb, var(--identity-glyph) 62%, transparent);
   }
 
   .body {

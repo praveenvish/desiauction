@@ -87,6 +87,13 @@ export interface ProductShellProps {
   session: ShellSession | null;
   orgs: ShellOrg[];
   competitions: ShellCompetition[];
+  /**
+   * The page's primary action as the SERVER rendered it, delivered by the
+   * `@action` parallel route (see app/layout.tsx). Present in the first paint,
+   * which is the whole point — the context channel below can only deliver one
+   * after hydration, and the bar changing height at that moment was CLS 0.123.
+   */
+  serverAction?: ReactNode;
   /** PX-9: holder of `platform.admin` — reveals the one door into administration. */
   isAdmin?: boolean;
   /** Newest person-scoped event timestamp (ISO) — drives the bell's unread dot. */
@@ -203,6 +210,7 @@ export function ProductShell({
   session,
   orgs,
   competitions,
+  serverAction,
   isAdmin = false,
   latestEventAt = null,
   logout,
@@ -212,7 +220,19 @@ export function ProductShell({
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
-  const [pageAction, setPageAction] = useState<ReactNode | null>(null);
+  /**
+   * The action a page PUBLISHES, which is now an override rather than the only
+   * source. `serverAction` (the `@action` parallel route) is what the server
+   * rendered, so the bar has its button at first paint; this channel exists for
+   * the one surface whose action follows client state — /tournaments swaps
+   * "New tournament" for "New season" when the view toggles — and it wins when
+   * it holds something.
+   *
+   * Null, not undefined, is meaningful: `retract` returns it to null and the
+   * server's action takes the slot back rather than the bar going empty.
+   */
+  const [publishedAction, setPublishedAction] = useState<ReactNode | null>(null);
+  const pageAction = publishedAction ?? serverAction ?? null;
   // The Live shell's status strip, published by the page that owns the socket.
   const [liveStatus, setLiveStatus] = useState<ReactNode | null>(null);
   const searchRef = useRef<InlineSearchHandle | null>(null);
@@ -254,9 +274,9 @@ export function ProductShell({
   );
   const actionChannel = useMemo(
     () => ({
-      publish: setPageAction,
+      publish: setPublishedAction,
       retract: (token: ReactNode) => {
-        setPageAction((current) => (current === token ? null : current));
+        setPublishedAction((current) => (current === token ? null : current));
       },
     }),
     [],

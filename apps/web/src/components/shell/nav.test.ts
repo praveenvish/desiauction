@@ -1,7 +1,11 @@
+import { existsSync, readdirSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
+  ADMIN_TABS,
   RAIL,
+  activeAdminTab,
   activeCompetitionTab,
   activeOrgMoneyTab,
   activeRailKey,
@@ -238,6 +242,72 @@ describe("pageIdentity", () => {
 
   it("frames no title for a route it cannot name", () => {
     expect(pageIdentity("/nowhere", ctx)).toEqual({ crumbs: [], title: null });
+  });
+});
+
+/**
+ * THE OMISSION THIS GUARDS AGAINST ALREADY HAPPENED.
+ *
+ * `/admin/messaging` shipped, was linked from the admin overview, and was in
+ * NEITHER admin list — not ADMIN_TABS and not SECTION_LABELS. One omission, three
+ * symptoms: no tab to click, `activeAdminTab` falling through to "overview" so
+ * the strip lit the wrong tab, and `pageIdentity` finding no section so the
+ * title rendered "Platform admin" directly beneath a breadcrumb that also read
+ * "Platform admin".
+ *
+ * None of that is visible to a type checker, and none of it failed a test —
+ * every list was internally consistent, they just did not agree with each other
+ * or with the routes on disk. So the invariant is asserted directly: every tab
+ * lights itself, and every tab can name itself.
+ */
+describe("the admin tab strip agrees with the routes on disk", () => {
+  /**
+   * READ FROM THE FILESYSTEM, NOT FROM THE ARRAY.
+   *
+   * The first draft of this test looped over ADMIN_TABS and asserted each entry
+   * lit itself — which passes trivially, because a route MISSING from the array
+   * is also missing from the loop. It was checked against the original bug and
+   * did not catch it. The defect was never an inconsistency inside the model; it
+   * was the model disagreeing with the app directory, so the app directory is
+   * what the model has to be compared against.
+   */
+  const adminDir = new URL("../../app/admin/", import.meta.url);
+  const routes = readdirSync(adminDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("["))
+    .filter((entry) => existsSync(new URL(`${entry.name}/page.tsx`, adminDir)))
+    .map((entry) => `/admin/${entry.name}`);
+
+  it("finds the admin routes it is meant to be checking", () => {
+    // A guard that silently checks nothing is worse than no guard.
+    expect(routes.length).toBeGreaterThan(3);
+    expect(routes).toContain("/admin/messaging");
+  });
+
+  it("gives every admin route a tab", () => {
+    for (const route of routes) {
+      expect(
+        ADMIN_TABS.some((tab) => tab.href === route),
+        `${route} ships but has no tab in ADMIN_TABS`,
+      ).toBe(true);
+    }
+  });
+
+  it("lights the tab you are actually on", () => {
+    for (const route of routes) {
+      const tab = ADMIN_TABS.find((entry) => entry.href === route);
+      expect(activeAdminTab(route), `${route} lights the wrong tab`).toBe(tab?.key);
+    }
+  });
+
+  it("names every route, so no title repeats its own breadcrumb", () => {
+    const ctx = { orgs: [], competitions: [], isAdmin: true };
+    for (const route of routes) {
+      expect(sectionLabel(route), `${route} has no section label`).not.toBeNull();
+      expect(
+        pageIdentity(route, ctx).title,
+        `${route} renders "Platform admin" beneath a "Platform admin" crumb`,
+      ).not.toBe("Platform admin");
+    }
   });
 });
 
