@@ -1,4 +1,5 @@
 import type { Block } from "./blocks";
+import { LEGAL_IDENTITY, legalIdentityPublished } from "./company";
 
 /**
  * PX-10 Legal Centre.
@@ -38,6 +39,44 @@ const DRAFT_NOTICE: Block = {
   tone: "warning",
   text: "This is a beta draft. DesiAuction is in beta; this document's wording is under legal review and may change before general availability. We will publish a new version here, with its date, whenever it does.",
 };
+
+/**
+ * WHO IS OFFERING THESE DOCUMENTS.
+ *
+ * Eight legal documents named no legal entity, no address and no grievance
+ * officer — the three things an India-facing platform is actually required to
+ * publish (see `company.ts` for the rules). Rather than a blank or a guess, the
+ * identity renders whatever is set and says plainly what is not, so the gap is
+ * visible on the page instead of only in a backlog. `preflight:production`
+ * refuses a deploy while anything required is still missing.
+ */
+function identityBlocks(): readonly Block[] {
+  const id = LEGAL_IDENTITY;
+  if (!legalIdentityPublished()) {
+    return [
+      {
+        kind: "callout",
+        tone: "warning",
+        text: "DesiAuction is in beta and its operating entity's registered details are not published here yet. Until they are, every question — legal, privacy or a complaint — goes to the addresses on this page, and we answer them ourselves. If you need our registered details before you can proceed, write to us and we will send them to you.",
+      },
+    ];
+  }
+  const items: { term: string; def: string }[] = [
+    { term: "Operator", def: id.legalName ?? "" },
+    ...(id.registrationNumber !== null
+      ? [{ term: "Registration", def: id.registrationNumber }]
+      : []),
+    { term: "Registered address", def: id.registeredAddress ?? "" },
+    ...(id.gstin !== null ? [{ term: "GSTIN", def: id.gstin }] : []),
+    {
+      term: "Grievance Officer",
+      def: `${id.grievanceOfficerName ?? ""}, ${id.grievanceOfficerEmail ?? ""}${
+        id.grievanceOfficerPhone !== null ? `, ${id.grievanceOfficerPhone}` : ""
+      }`,
+    },
+  ];
+  return [{ kind: "definitions", items }];
+}
 
 export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
   {
@@ -152,11 +191,48 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
         kind: "paragraph",
         text: "Financial ledgers are immutable and retained as a matter of record. You may request deletion of your account; where records must be retained, your personal identifiers are anonymized rather than the record destroyed. See our Data Retention policy for specifics.",
       },
+      // The policy described deletion and nothing else. The Digital Personal
+      // Data Protection Act 2023 gives a Data Principal four rights and a
+      // platform is expected to say what they are and how to use them — a
+      // policy that mentions only the one right we happened to build is not a
+      // rights section, it is a feature list.
+      { kind: "heading", level: 2, text: "Your rights over your data" },
+      {
+        kind: "paragraph",
+        text: "Under India's Digital Personal Data Protection Act, 2023 you have rights over the personal data we hold about you. You can use any of them by writing to the contact below; we will not ask you to explain why.",
+      },
+      {
+        kind: "list",
+        items: [
+          {
+            text: "Know what we hold. A summary of your personal data, what we do with it, and who else we have shared it with.",
+          },
+          {
+            text: "Correct it. Have anything inaccurate corrected, anything incomplete completed, and anything out of date updated.",
+          },
+          {
+            text: "Erase it. Have your personal data deleted where we are not required to keep it. Financial ledgers are immutable and stay as a record; where that applies we anonymize your identifiers rather than destroy the entry.",
+          },
+          {
+            text: "Nominate someone. Name a person to exercise these rights on your behalf if you die or become unable to.",
+          },
+          {
+            text: "Complain. Raise a grievance with us first, and take it to the Data Protection Board of India if we have not resolved it.",
+          },
+        ],
+      },
+      {
+        kind: "paragraph",
+        text: "We answer a rights request within thirty days. If we need longer, or we cannot do what you asked, we tell you why within that time rather than letting it lapse in silence.",
+      },
       { kind: "heading", level: 2, text: "Contact" },
       {
         kind: "paragraph",
-        text: "Questions about your data, or a deletion request? Email privacy@desiauction.in.",
+        text: "Questions about your data, a rights request, or a complaint about how we have handled either — email {0}. If you are not satisfied with our answer, our grievance process and the Grievance Officer's details are in the Grievance Redressal document, and you may escalate to the Data Protection Board of India.",
+        links: [{ text: "privacy@desiauction.in", href: "mailto:privacy@desiauction.in" }],
       },
+      { kind: "heading", level: 2, text: "Who we are" },
+      ...identityBlocks(),
     ],
   },
   {
@@ -318,6 +394,74 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
         kind: "paragraph",
         text: "During beta, the service is provided as-is. We work hard to keep it reliable, but we do not warrant uninterrupted or error-free operation.",
       },
+    ],
+  },
+  {
+    /*
+     * REQUIRED, AND ABSENT UNTIL NOW.
+     *
+     * IT (Intermediary Guidelines) Rules 2021 Rule 3(2) requires a platform to
+     * publish the name and contact of a Grievance Officer, the mechanism for
+     * making a complaint, an acknowledgement within 24 hours and a resolution
+     * within 15 days. The Consumer Protection (E-Commerce) Rules 2020 ask for
+     * the same officer plus the operator's legal name and address.
+     *
+     * The timelines and the mechanism are OURS to state and are stated here.
+     * The officer's name and the registered address are founder-held facts this
+     * repository cannot invent — `identityBlocks()` renders them when they are
+     * set and says plainly that they are not when they are not, and
+     * `preflight:production` refuses a deploy in the meantime.
+     */
+    slug: "grievances",
+    title: "Grievance Redressal",
+    summary: "How to complain, who handles it, and how long we take.",
+    effective: "23 Aug 2026",
+    versions: [BETA_DRAFT],
+    blocks: [
+      DRAFT_NOTICE,
+      {
+        kind: "paragraph",
+        text: "If something about DesiAuction has gone wrong for you — your data, a payment, another person's conduct, a decision an organizer made using the platform, or anything we have done — this is how to raise it and what we will do about it.",
+      },
+      { kind: "heading", level: 2, text: "How to raise a grievance" },
+      {
+        kind: "paragraph",
+        text: "Write to {0} with GRIEVANCE in the subject line. Tell us what happened, when, and which tournament it concerns — the season name is usually enough for us to find everything else. If it concerns your personal data specifically, {1} reaches the same people and keeps it in one thread.",
+        links: [
+          { text: "support@desiauction.in", href: "mailto:support@desiauction.in" },
+          { text: "privacy@desiauction.in", href: "mailto:privacy@desiauction.in" },
+        ],
+      },
+      { kind: "heading", level: 2, text: "What we commit to" },
+      {
+        kind: "list",
+        items: [
+          {
+            text: "We acknowledge your complaint within 24 hours of receiving it, with a reference you can quote.",
+          },
+          {
+            text: "We resolve it within 15 days, and tell you what we did. If we cannot, we tell you why and what happens next — within the same 15 days, not after them.",
+          },
+          {
+            text: "A request to take down content about you, where the law requires it, is acted on within 72 hours.",
+          },
+          {
+            text: "We keep a record of every grievance and its outcome. Nothing is closed by going quiet.",
+          },
+        ],
+      },
+      { kind: "heading", level: 2, text: "What we cannot resolve" },
+      {
+        kind: "paragraph",
+        text: "We record what happens on the platform; we do not run your tournament. A dispute about a bid your own auctioneer accepted, a payment between you and your organizer, or a selection decision, belongs with the people who made it — and the ledger will show you exactly what was recorded, which is usually what the argument needed. We will help you read it. We will not change it: nothing on the ledger is edited after the fact, by anyone, including us.",
+      },
+      { kind: "heading", level: 2, text: "If we have not resolved it" },
+      {
+        kind: "paragraph",
+        text: "A complaint about your personal data that we have not resolved to your satisfaction can be taken to the Data Protection Board of India, under the Digital Personal Data Protection Act, 2023. A consumer complaint can be taken to the National Consumer Helpline or the consumer commission with jurisdiction over you. Raising it with us first is not a condition of either, but it is usually faster.",
+      },
+      { kind: "heading", level: 2, text: "Grievance Officer" },
+      ...identityBlocks(),
     ],
   },
   {

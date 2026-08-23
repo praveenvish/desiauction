@@ -15,6 +15,11 @@
 // PRODUCTION_CHECKLIST. This is release engineering, not business logic — it
 // changes nothing at runtime.
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const env = process.env;
 const results = [];
 function check(id, ok, detail, fix) {
@@ -46,6 +51,34 @@ check(
   "the RLS-exempt system pool must be a DIFFERENT role from the app pool",
   "set SYSTEM_DATABASE_URL to the desiauction_system role (unset/equal = RLS four-role recipe is NOT in effect)",
 );
+
+// --- Legal identity ----------------------------------------------------------
+// The Legal Centre ships eight well-drafted documents and, until 2026-08-23,
+// named no legal entity, no registered address and no grievance officer. An
+// India-facing platform that processes personal data and takes payments must
+// publish all three — IT Rules 2021 Rule 3(2), DPDP Act 2023 s.13, and Consumer
+// Protection (E-Commerce) Rules 2020 Rule 4(3). None of it is derivable from
+// this repository, so `apps/web/src/content/company.ts` holds the slots and the
+// pages say plainly when they are empty. This is the gate that stops those
+// empty slots reaching real users.
+{
+  const source = readFileSync(join(root, "apps/web/src/content/company.ts"), "utf8");
+  const required = [
+    "legalName",
+    "registeredAddress",
+    "grievanceOfficerName",
+    "grievanceOfficerEmail",
+  ];
+  const unset = required.filter((field) => new RegExp(`^\\s*${field}:\\s*null,`, "m").test(source));
+  check(
+    "legal-identity-published",
+    unset.length === 0,
+    unset.length === 0
+      ? "operator identity and grievance officer are published"
+      : `unset: ${unset.join(", ")}`,
+    "fill LEGAL_IDENTITY in apps/web/src/content/company.ts — a named grievance officer, the registered legal name and a postal address are required before serving Indian users",
+  );
+}
 
 // --- The rehearsal escape must never reach a deploy --------------------------
 // `apps/web/src/env.ts` refuses to boot in production on any of the dev-only

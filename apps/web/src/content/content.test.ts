@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { plainTextOf } from "./blocks";
 import { FAQS, HELP_ARTICLES, HELP_CATEGORIES, helpArticle, helpCategory } from "./help";
 import { LEGAL_DOCUMENTS, legalDocument } from "./legal";
+import { legalIdentityPublished, missingLegalIdentity, type LegalIdentity } from "./company";
 import { FEATURE_GROUPS, LANDING, PRICING } from "./marketing";
 import { RELEASES } from "./releases";
 import { SEARCH_INDEX, allContentLinks, searchContent } from "./search";
@@ -465,5 +466,84 @@ describe("PX-10 · Search (navigation only)", () => {
     for (const doc of SEARCH_INDEX) {
       expect(doc.href.startsWith("/")).toBe(true);
     }
+  });
+});
+
+describe("legal identity — the gap the Legal Centre had, and its gate", () => {
+  /*
+   * Eight legal documents named no legal entity, no registered address and no
+   * grievance officer. An India-facing platform that processes personal data
+   * and takes payments must publish all three (IT Rules 2021 Rule 3(2), DPDP
+   * Act 2023 s.13, Consumer Protection (E-Commerce) Rules 2020 Rule 4(3)).
+   * None of it is derivable from this repository, so the slots exist, the
+   * pages say plainly when they are empty, and `preflight:production` refuses
+   * a deploy while they are.
+   */
+  const FILLED: LegalIdentity = {
+    legalName: "Example Sports Technologies Private Limited",
+    tradingName: "DesiAuction",
+    registrationNumber: "U72900MH2026PTC000000",
+    registeredAddress: "1 Example Road, Andheri East, Mumbai 400069, Maharashtra, India",
+    gstin: "27AAAAA0000A1Z5",
+    grievanceOfficerName: "A. Example",
+    grievanceOfficerEmail: "grievances@example.invalid",
+    grievanceOfficerPhone: "+91 22 0000 0000",
+    dataProtectionContactName: "A. Example",
+    dataProtectionContactEmail: "privacy@example.invalid",
+  };
+
+  it("reports exactly which required fields are unset, today", () => {
+    expect(missingLegalIdentity()).toEqual([
+      "legalName",
+      "registeredAddress",
+      "grievanceOfficerName",
+      "grievanceOfficerEmail",
+    ]);
+    expect(legalIdentityPublished()).toBe(false);
+  });
+
+  it("counts a filled identity as publishable", () => {
+    expect(missingLegalIdentity(FILLED)).toEqual([]);
+    expect(legalIdentityPublished(FILLED)).toBe(true);
+  });
+
+  it("treats whitespace as unset — a space is not an address", () => {
+    expect(missingLegalIdentity({ ...FILLED, registeredAddress: "   " })).toEqual([
+      "registeredAddress",
+    ]);
+  });
+
+  it("does not gate on the optional fields", () => {
+    expect(
+      missingLegalIdentity({
+        ...FILLED,
+        registrationNumber: null,
+        gstin: null,
+        grievanceOfficerPhone: null,
+        dataProtectionContactName: null,
+      }),
+    ).toEqual([]);
+  });
+
+  it("publishes a Grievance Redressal document with the statutory commitments", () => {
+    const doc = legalDocument("grievances");
+    expect(doc).toBeDefined();
+    const text = plainTextOf(doc?.blocks ?? []);
+    // Rule 3(2): acknowledge in 24h, resolve in 15 days, and a route onward.
+    expect(text).toContain("24 hours");
+    expect(text).toContain("15 days");
+    expect(text).toContain("Data Protection Board of India");
+  });
+
+  it("states the DPDP rights in the privacy policy, not just deletion", () => {
+    const text = plainTextOf(legalDocument("privacy")?.blocks ?? []);
+    for (const right of ["Know what we hold", "Correct it", "Erase it", "Nominate someone"]) {
+      expect(text).toContain(right);
+    }
+  });
+
+  it("says plainly that the identity is unpublished rather than rendering a blank", () => {
+    const text = plainTextOf(legalDocument("grievances")?.blocks ?? []);
+    expect(text).toContain("registered details are not published here yet");
   });
 });
