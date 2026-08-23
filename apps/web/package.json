@@ -16,7 +16,7 @@
     "seed:demo": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-demo.ts",
     "seed:admin": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-platform-admin.ts",
     "backfill:squads": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/backfill-auction-squads.ts",
-    "test:integration": "vitest run src/server src/components src/content",
+    "test:integration": "vitest run src",
     "demo:tournament-small": "playwright test e2e/competitions.spec.ts --headed --workers=1",
     "demo:tournament-medium": "playwright test e2e/registration-ops.spec.ts e2e/fixtures.spec.ts --headed --workers=1",
     "demo:auction-night": "playwright test e2e/auction-foundation.spec.ts e2e/live-auction.spec.ts e2e/conduct-ceremony.spec.ts --headed --workers=1",

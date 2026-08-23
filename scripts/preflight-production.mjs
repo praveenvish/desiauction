@@ -47,6 +47,21 @@ check(
   "set SYSTEM_DATABASE_URL to the desiauction_system role (unset/equal = RLS four-role recipe is NOT in effect)",
 );
 
+// --- The rehearsal escape must never reach a deploy --------------------------
+// `apps/web/src/env.ts` refuses to boot in production on any of the dev-only
+// defaults, and offers exactly one door out for the local production rehearsal
+// PRODUCTION_CHECKLIST §8 requires. That door is closed here: if this script is
+// being run against an environment that carries it, the environment is not a
+// production environment yet, whatever else it gets right.
+check(
+  "ALLOW_INSECURE_LOCAL_PRODUCTION-absent",
+  env.ALLOW_INSECURE_LOCAL_PRODUCTION === undefined ||
+    env.ALLOW_INSECURE_LOCAL_PRODUCTION === "" ||
+    env.ALLOW_INSECURE_LOCAL_PRODUCTION === "0",
+  "the local-rehearsal escape is not set",
+  "unset ALLOW_INSECURE_LOCAL_PRODUCTION — it disables every production boot check in apps/web",
+);
+
 // --- Engine trust ------------------------------------------------------------
 const secret = env.ENGINE_SECRET ?? "";
 check(

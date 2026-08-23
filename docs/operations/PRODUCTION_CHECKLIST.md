@@ -121,6 +121,19 @@ Covers the PX-2…PX-10 web product this checklist predated. Full findings in
 - ☑ Local production rehearsal (all three services in prod posture): builds,
   health/readiness, engine graceful shutdown, runner boot-smoke — see
   [PX-12_RELEASE_CANDIDATE](../validation/PX-12_RELEASE_CANDIDATE.md) §2.
+- ☑ **Boot-time enforcement of the same rules (2026-08-22).** `preflight:production`
+  is a script a human has to remember; `apps/web/src/env.ts` now refuses to
+  START in production — as `apps/engine/src/env.ts` already did — on any of
+  `OTP_PROVIDER=dev`, `MEDIA_STORAGE=local`, the default `ENGINE_SECRET`, a
+  localhost `PUBLIC_BASE_URL`, or localhost `RP_ID`/`RP_ORIGINS`. Each of those
+  defaults previously let a production web tier boot, report healthy and be
+  silently broken (no SMS could be sent, no photo survived a redeploy, every
+  canonical URL pointed at localhost). The checks are gated on
+  `NEXT_PHASE !== "phase-production-build"`, so `next build` — which runs with
+  `NODE_ENV=production` and none of the deployment's variables — is unaffected.
+  **Consequence for this checklist item:** a local production rehearsal must now
+  supply real-shaped values for those five variables, which is what "prod
+  posture" always meant.
 - ☑ Beta programme docs: [BETA_ONBOARDING](BETA_ONBOARDING.md),
   [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md), [ISSUE_REPORTING](ISSUE_REPORTING.md).
 - ☑ Rollback criteria + success metrics + risk register: RC report §6–8.
