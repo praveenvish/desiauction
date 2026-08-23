@@ -34,6 +34,7 @@ import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
+import { resolvePassRequest } from "./pass-grant";
 import { publicCompetitionsDirectory } from "./public";
 import {
   advanceCompetition,
@@ -269,6 +270,104 @@ describe("TIER LIMITS — the ceiling the pricing page has always described", ()
     await db
       .delete(passUpgradeRequestsTable)
       .where(eq(passUpgradeRequestsTable.competitionId, competition.id));
+  });
+
+  it("granting a request moves the tier, closes the request and lifts the ceiling", async () => {
+    const competition = await freeSeason("Granted");
+    for (const name of ["Alpha", "Bravo", "Charlie", "Delta"]) {
+      await createTeam(db, orgX.id, competition.id, owner, name);
+    }
+    expect((await createTeam(db, orgX.id, competition.id, owner, "Echo")).ok).toBe(false);
+
+    await db.insert(passUpgradeRequestsTable).values({
+      id: newId(),
+      orgId: orgX.id,
+      competitionId: competition.id,
+      fromTier: "free" as const,
+      requestedTier: "pro" as const,
+      requestedBy: owner,
+    });
+
+    const granted = await resolvePassRequest(db, {
+      slug: competition.slug,
+      outcome: "granted",
+      actorId: owner,
+    });
+    expect(granted).toEqual({
+      ok: true,
+      slug: competition.slug,
+      fromTier: "free",
+      toTier: "pro",
+      outcome: "granted",
+    });
+
+    // The ceiling moved with it — this is the whole point of the round trip.
+    expect((await createTeam(db, orgX.id, competition.id, owner, "Echo")).ok).toBe(true);
+
+    // The request is answered, so the season may ask again if it outgrows Pro.
+    const [row] = await db
+      .select({
+        outcome: passUpgradeRequestsTable.outcome,
+        resolvedBy: passUpgradeRequestsTable.resolvedBy,
+      })
+      .from(passUpgradeRequestsTable)
+      .where(eq(passUpgradeRequestsTable.competitionId, competition.id));
+    expect(row).toEqual({ outcome: "granted", resolvedBy: owner });
+
+    await db
+      .delete(passUpgradeRequestsTable)
+      .where(eq(passUpgradeRequestsTable.competitionId, competition.id));
+  });
+
+  it("declining answers the request and leaves the tier exactly where it was", async () => {
+    const competition = await freeSeason("Declined");
+    await db.insert(passUpgradeRequestsTable).values({
+      id: newId(),
+      orgId: orgX.id,
+      competitionId: competition.id,
+      fromTier: "free" as const,
+      requestedTier: "association" as const,
+      requestedBy: owner,
+    });
+    const declined = await resolvePassRequest(db, {
+      slug: competition.slug,
+      outcome: "declined",
+      actorId: owner,
+      note: "beta grant already covers this season",
+    });
+    expect(declined.ok).toBe(true);
+    if (!declined.ok) return;
+    expect(declined.toTier).toBe("free");
+
+    const [season] = await db
+      .select({ tier: competitionsTable.tier })
+      .from(competitionsTable)
+      .where(eq(competitionsTable.id, competition.id));
+    expect(season?.tier).toBe("free");
+    // A decline is an ANSWER: the organizer's card must stop saying "we're on it".
+    const [row] = await db
+      .select({ outcome: passUpgradeRequestsTable.outcome })
+      .from(passUpgradeRequestsTable)
+      .where(eq(passUpgradeRequestsTable.competitionId, competition.id));
+    expect(row?.outcome).toBe("declined");
+
+    await db
+      .delete(passUpgradeRequestsTable)
+      .where(eq(passUpgradeRequestsTable.competitionId, competition.id));
+  });
+
+  it("refuses to answer a season with nothing open, rather than inventing a change", async () => {
+    const competition = await freeSeason("Nothing");
+    expect(
+      await resolvePassRequest(db, {
+        slug: competition.slug,
+        outcome: "granted",
+        actorId: owner,
+      }),
+    ).toEqual(expect.objectContaining({ ok: false, reason: "no_open_request" }));
+    expect(
+      await resolvePassRequest(db, { slug: "no-such-season", outcome: "granted", actorId: owner }),
+    ).toEqual(expect.objectContaining({ ok: false, reason: "unknown_season" }));
   });
 
   it("never blocks a season created during beta — that promise is on the page", async () => {
