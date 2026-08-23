@@ -74,10 +74,22 @@ export function BoardPanel({
   // Money the viewer may not see arrives as null (the engine redacts per
   // audience — P1-6). A total over a redacted board would be a wrong number
   // presented confidently, so it sums only what this viewer was actually sent.
+  // Money the viewer may not see arrives as null (the engine redacts per
+  // audience — P1-6). A total over a redacted board would be a wrong number
+  // presented confidently, so it sums only what this viewer was actually sent —
+  // and when it was sent NOTHING, which is every anonymous watcher of this
+  // page, the answer is "sealed", not "₹0". The projector used to read
+  // "TOTAL SPEND ₹0" beside "PLAYERS SOLD 78" and "MOST EXPENSIVE ₹60,000".
+  const visibleCommitted =
+    snapshot === null
+      ? []
+      : snapshot.paddles
+          .map((paddle) => paddle.committed)
+          .filter((value): value is number => value !== null);
   const totalSpend =
-    snapshot !== null
-      ? snapshot.paddles.reduce((sum, paddle) => sum + (paddle.committed ?? 0), 0)
-      : 0;
+    snapshot === null || visibleCommitted.length === 0
+      ? null
+      : visibleCommitted.reduce((sum, value) => sum + value, 0);
   const topBuy = soldLots.reduce<ResolvedLot | null>(
     (best, lot) => ((lot.soldPrice ?? 0) > (best?.soldPrice ?? -1) ? lot : best),
     null,
@@ -127,7 +139,10 @@ export function BoardPanel({
           ...row,
           squad: soldLots.filter((lot) => lot.teamName === row.teamName).length,
         }))
-        .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName));
+        .sort(
+          (a, b) =>
+            (b.committed ?? -1) - (a.committed ?? -1) || a.teamName.localeCompare(b.teamName),
+        );
 
   // A projector is ONE frame, so the board has to spend its height rather than
   // overflow it. When a player is under the hammer the room is watching the
@@ -335,7 +350,13 @@ export function BoardPanel({
         <section className="board-tiles" aria-label="Auction headlines">
           <div className="board-tile">
             <span className="board-tile-label">Total spend</span>
-            <span className="board-tile-value">{money(totalSpend)}</span>
+            <span
+              className={
+                totalSpend === null ? "board-tile-value board-tile-muted" : "board-tile-value"
+              }
+            >
+              {totalSpend === null ? "sealed" : money(totalSpend)}
+            </span>
           </div>
           <div className="board-tile">
             <span className="board-tile-label">Players sold</span>
@@ -394,7 +415,9 @@ export function BoardPanel({
               <dl className="board-team-stats">
                 <div>
                   <dt>Spent</dt>
-                  <dd>{connecting ? "—" : money(team.committed)}</dd>
+                  <dd>
+                    {connecting ? "—" : team.committed === null ? "sealed" : money(team.committed)}
+                  </dd>
                 </div>
                 <div>
                   <dt>Squad</dt>

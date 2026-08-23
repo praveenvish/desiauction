@@ -70,8 +70,13 @@ export interface TeamPurseRow {
   teamId: string;
   teamName: string;
   team: TeamIdentity | undefined;
-  /** Every paise this TEAM has committed — the sum over all its paddles. */
-  committed: number;
+  /**
+   * Every paise this TEAM has committed — the sum over all its paddles.
+   *
+   * null when the engine sealed this team's money for this viewer, exactly as
+   * `purseRemaining` is. A zero would be a number the viewer was never sent.
+   */
+  committed: number | null;
   /**
    * null when this viewer is not entitled to this team's money.
    *
@@ -104,7 +109,15 @@ export function teamPurseRows(
 
   interface Group {
     teamName: string;
-    committed: number;
+    /**
+     * null when every paddle this team holds arrived redacted.
+     *
+     * It used to start at 0 and stay there, so a viewer who was sent NO money
+     * at all — every anonymous watcher of /board — read a confident "₹0 spent"
+     * beside a correct "78 players sold" and a correct "most expensive
+     * ₹60,000". Zero is a fact this viewer does not have; "sealed" is.
+     */
+    committed: number | null;
     /** null when the engine sealed this team's money for this viewer (P1-6). */
     purseRemaining: number | null;
     activePaddles: string[];
@@ -114,7 +127,7 @@ export function teamPurseRows(
   for (const paddle of snapshot.paddles) {
     const group = groups.get(paddle.teamId) ?? {
       teamName: paddle.teamName,
-      committed: 0,
+      committed: null,
       // Per-team already: identical on every paddle the team holds.
       purseRemaining: paddle.purseRemaining,
       activePaddles: [],
@@ -126,7 +139,7 @@ export function teamPurseRows(
     // leaves the group's figures null, which the board renders as "sealed"
     // rather than as a confident zero.
     group.committed =
-      paddle.committed === null ? group.committed : group.committed + paddle.committed;
+      paddle.committed === null ? group.committed : (group.committed ?? 0) + paddle.committed;
     group.purseRemaining = paddle.purseRemaining;
     if (!paddle.released) {
       group.activePaddles.push(paddle.paddleNumber);
@@ -143,7 +156,7 @@ export function teamPurseRows(
   // Derived only from teams whose money this viewer actually received.
   let pursePerTeam = 0;
   for (const group of groups.values()) {
-    if (group.purseRemaining !== null) {
+    if (group.purseRemaining !== null && group.committed !== null) {
       pursePerTeam = Math.max(pursePerTeam, group.committed + group.purseRemaining);
     }
   }
@@ -154,12 +167,14 @@ export function teamPurseRows(
       teamId: team.id,
       teamName: team.name,
       team,
-      committed: group?.committed ?? 0,
+      // A team with no paddle at all has genuinely spent nothing, and that is
+      // knowable; a team whose paddles came back redacted has not.
+      committed: group === undefined ? 0 : group.committed,
       purseRemaining: group === undefined ? pursePerTeam : group.purseRemaining,
       total:
         group === undefined
           ? pursePerTeam
-          : group.purseRemaining === null
+          : group.purseRemaining === null || group.committed === null
             ? null
             : group.committed + group.purseRemaining,
       activePaddles: group?.activePaddles ?? [],
@@ -176,7 +191,10 @@ export function teamPurseRows(
         team: undefined,
         committed: group.committed,
         purseRemaining: group.purseRemaining,
-        total: group.purseRemaining === null ? null : group.committed + group.purseRemaining,
+        total:
+          group.purseRemaining === null || group.committed === null
+            ? null
+            : group.committed + group.purseRemaining,
         activePaddles: group.activePaddles,
         leading: group.leading,
       });
@@ -273,7 +291,9 @@ export function PurseBoard({
       <ul className="purse-list">
         {rows.map((row) => {
           const spentPct =
-            row.total === null || row.total === 0 ? 0 : (row.committed / row.total) * 100;
+            row.total === null || row.total === 0 || row.committed === null
+              ? 0
+              : (row.committed / row.total) * 100;
           const mine =
             myPaddleNumber !== null && row.activePaddles.includes(myPaddleNumber)
               ? "true"
@@ -316,7 +336,7 @@ export function PurseBoard({
                 aria-label={
                   connecting
                     ? `${row.teamName}: purse not known yet`
-                    : row.total === null
+                    : row.total === null || row.committed === null
                       ? `${row.teamName}: purse sealed`
                       : `${row.teamName}: ${formatPaiseINR(paise(row.committed))} spent of ${formatPaiseINR(paise(row.total))}`
                 }
