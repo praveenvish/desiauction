@@ -417,7 +417,18 @@ async function main(): Promise<void> {
     const sold = await transitionLot(db, auction, lot.id, founder, "sell");
     if (!sold.ok) throw new Error(`sell: ${sold.reason}`);
   }
-  const completed = await transitionAuction(db, auction, founder, "complete");
+  // The settled exemplar is deliberately tiny (3 lots, 2 teams) so it seeds in
+  // milliseconds; every team therefore finishes below squadMin. That is the
+  // soft guard DA-06 added, and the honest answer is the same one a conductor
+  // gives at 11pm — override on the record, with the reason in the event log.
+  const completed = await transitionAuction(
+    db,
+    auction,
+    founder,
+    "complete",
+    "demo seed: deliberately small settled exemplar, squads intentionally short",
+    true,
+  );
   if (!completed.ok) throw new Error(`complete: ${completed.reason}`);
 
   // --- Settlement: case → obligations → manual payments → journal -------------
