@@ -56,6 +56,15 @@ const COMMAND_REFUSAL_COPY: Record<string, string> = {
   terminal_auction: "The auction has finished.",
   no_active_paddle: "You don't hold a paddle for that team.",
   no_grant: "You haven't been granted that team's paddle yet.",
+  // ENGINE HALTED. The single most serious state the runtime has — the ledger
+  // and the projections disagreed, or a replay failed, so the engine STOPPED
+  // rather than serve a state it cannot prove. Its ack reason is
+  // `engine_halted`, and it had no sentence here, so it fell through to "That
+  // didn't go through. Try again." — advice that is not merely generic but
+  // exactly wrong: every retry is refused identically until somebody runs
+  // Recover, and an auctioneer told "try again" will keep clicking instead.
+  engine_halted:
+    "The auction service has stopped itself because its record and its live state disagreed. Nothing more will be accepted until an organizer runs Recover engine from the cockpit.",
   // Gateway
   not_authorized: "You don't have permission to do that.",
   unknown_command: "That action isn't available here.",

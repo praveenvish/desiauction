@@ -737,6 +737,60 @@ describe("AUCTION FOUNDATION — events, audit, replay, recovery", () => {
   });
 });
 
+describe("AUCTION FOUNDATION — after the hammer, nothing moves", () => {
+  /**
+   * The 2026-08-22 production rehearsal found the one command family with no
+   * terminal guard. `issuePaddle`, `grantPaddle`, `inviteOwner` and
+   * `acceptOwnerInvite` all refuse a completed auction; `transitionLot` asked
+   * about the auction's status only for `open`. One click on the cockpit's
+   * still-enabled "Requeue" put an unsold lot back in the queue of a COMPLETED
+   * auction — leaving it carrying unresolved lots, which is exactly the state
+   * `complete` refuses to be entered with, reached by going through it.
+   */
+  it("refuses every lot command once the auction is terminal", async () => {
+    const comp3 = await createCompetition(db, org.id, owner, {
+      name: `Terminal League ${RUN}`,
+      location: "Malad",
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+    });
+    let current = must(await resolveCompetition(db, owner, comp3.slug), "comp3");
+    for (const to of ["setup", "registration_open", "registration_closed"] as const) {
+      expect((await advanceCompetition(db, current, owner, to)).ok).toBe(true);
+      current = must(await resolveCompetition(db, owner, comp3.slug), "comp3");
+    }
+    await seedApproved(comp3.id, org.id, "Terminal Player", "t01");
+    await createTeam(db, org.id, comp3.id, owner, "Terminal XI");
+    await createTeam(db, org.id, comp3.id, owner, "Terminal United");
+    const ready = await auctionReady(db, current);
+    expect((await createAuction(db, current, ready, owner, DEFAULT_AUCTION_CONFIG)).ok).toBe(true);
+    const auction3 = must(await auctionOf(db, comp3.id), "auction3");
+    const view = await auctionView(db, auction3);
+    const lot = must(view.lots[0], "a queued lot");
+
+    // Abort is the cheapest terminal state to reach; the guard names all three.
+    expect((await transitionAuction(db, auction3, owner, "abort", "rehearsal")).ok).toBe(true);
+    const terminal = must(await auctionOf(db, comp3.id), "auction3 terminal");
+    expect(terminal.status).toBe("abandoned");
+
+    for (const command of ["open", "requeue", "withdraw", "hold", "sell", "pass"] as const) {
+      expect(await transitionLot(db, terminal, lot.id, owner, command)).toEqual(
+        expect.objectContaining({ ok: false }),
+      );
+    }
+    // And specifically with the reason the copy already has a sentence for.
+    expect(await transitionLot(db, terminal, lot.id, owner, "requeue")).toEqual({
+      ok: false,
+      reason: "terminal_auction",
+    });
+    // A lot id from another auction is still `not_found`, not a state leak.
+    expect(await transitionLot(db, terminal, newId(), owner, "requeue")).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+  });
+});
+
 describe("AUCTION FOUNDATION — isolation", () => {
   it("capability: the owner conducts; the outsider cannot", async () => {
     const scope = { orgId: org.id, competitionId: comp.id };

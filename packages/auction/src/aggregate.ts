@@ -520,7 +520,8 @@ export type LotMutationResult =
         | "illegal_transition"
         | "guard_failed"
         | "auction_not_live"
-        | "another_lot_open";
+        | "another_lot_open"
+        | "terminal_auction";
     };
 
 const LOT_EVENT_OF: Record<LotCommand, string> = {
@@ -552,6 +553,31 @@ export async function transitionLot(
   const lot = await loadLot(db, auction.id, lotId);
   if (lot === undefined) {
     return { ok: false, reason: "not_found" };
+  }
+  // AFTER THE HAMMER, NOTHING MOVES.
+  //
+  // Only `open` used to ask what state the auction was in, so every OTHER lot
+  // command stayed live on a completed one. The cockpit's "Needs resolution"
+  // panel keeps its Requeue buttons enabled there — one click on a finished
+  // auction put an unsold lot back in the queue, which left a COMPLETED
+  // auction carrying unresolved lots: exactly the state `complete` refuses to
+  // be entered with (`unresolvedLots > 0`), reached by going through it. The
+  // same card then read "Auction complete. 79 of 80 lots resolved" above
+  // "78/80 LOTS RESOLVED" — two numbers for one night, and the record of who
+  // owns whom silently changed after everyone went home.
+  //
+  // `issuePaddle`, `grantPaddle`, `inviteOwner` and `acceptOwnerInvite` all
+  // already refuse a terminal auction. This is the same fence around the lots.
+  //
+  // It sits AFTER the lot lookup deliberately: a lot id that belongs to another
+  // auction is `not_found` whatever state this one is in, which is the answer
+  // that leaks least and the one the isolation suite pins.
+  if (
+    auction.status === "completed" ||
+    auction.status === "reconciled" ||
+    auction.status === "abandoned"
+  ) {
+    return { ok: false, reason: "terminal_auction" };
   }
   const leading = await leadingBidOf(db, lot.id);
   const guards = {
