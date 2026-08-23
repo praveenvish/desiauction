@@ -444,8 +444,24 @@ export const PRICING = {
   // me?", and the answer is: zero, permanently. It was previously the LAST
   // eleven words a reader would reach, styled as fine print.
   betaHeadline: "Tournaments started during beta stay free forever.",
+  // THE LIMITS ON THIS PAGE ARE NOT ENFORCED, AND THE PAGE HAS TO SAY SO.
+  //
+  // "Free · Up to 4 teams and 40 players" reads as a ceiling a reader will hit,
+  // and there is no ceiling: there is no tier column, no plan, no entitlement
+  // and no billing code anywhere in this repository — grep `tier`,
+  // `entitlement`, `planLimit` and the schema and you find nothing. Anyone can
+  // run sixteen teams on Free today and use the overlays. "Everything is free"
+  // was true about PRICE and silent about that, which is the half a reader
+  // fills in wrongly.
+  //
+  // TODO(founder): before the first rupee is charged, the limits below need
+  // something to enforce them, and that needs a decision this repository cannot
+  // make: at the ceiling, does the product BLOCK the fifth team, or warn and
+  // let the night run? Blocking an organizer at 9pm on auction night is a
+  // worse outcome than an unbilled team, so I have not guessed. Until it
+  // exists, the sentence below is what keeps this page honest.
   betaBanner:
-    "During beta, everything is free — every tier, every feature, no card. Paid Passes arrive with general availability, at the prices published on this page.",
+    "During beta, everything is free — every tier, every feature, no card, and no limit enforced: the team and player numbers below describe the Passes that arrive at general availability, not a ceiling you will hit today. Paid Passes arrive with GA, at the prices published on this page.",
   trustLine:
     "Trust is never premium: the immutable ledger, receipts, and audit are in every tier, including Free.",
   // Canon (docs/45 §Limit philosophy): "Free limits are honest capacity limits,

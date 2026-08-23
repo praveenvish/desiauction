@@ -547,3 +547,25 @@ describe("legal identity — the gap the Legal Centre had, and its gate", () => 
     expect(text).toContain("registered details are not published here yet");
   });
 });
+
+describe("pricing — the page may not promise a ceiling the product has no idea about", () => {
+  /*
+   * "Free · Up to 4 teams and 40 players" reads as a limit a reader will hit.
+   * There is no tier column, no plan, no entitlement and no billing code
+   * anywhere in this repository, so nothing stops a free organizer running
+   * sixteen teams. The tier table is a description of the Passes that arrive at
+   * GA, and the beta banner is the only thing that says so.
+   *
+   * When enforcement lands, this test should fail — and the sentence should
+   * change at the same time, which is the point of pinning it.
+   */
+  it("says plainly that no limit is enforced during beta", () => {
+    expect(PRICING.betaBanner).toContain("no limit enforced");
+  });
+
+  it("still quotes the tier numbers, so the promise itself is unchanged", () => {
+    const plain = `${PRICING.betaBanner} ${PRICING.tiers.map((tier) => `${tier.name} ${tier.limits}`).join(" ")}`;
+    expect(plain).toContain("Up to 4 teams and 40 players");
+    expect(plain).toContain("Up to 16 teams and 400 players");
+  });
+});
