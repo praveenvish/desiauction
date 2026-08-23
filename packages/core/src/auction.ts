@@ -664,6 +664,34 @@ export function validateAuctionConfig(config: AuctionConfig): ConfigValidation {
   return { ok: true };
 }
 
+/**
+ * THE HIGHEST BID THIS TEAM MAY LEGALLY PLACE, RIGHT NOW.
+ *
+ * Gauntlet checks 8 and 9 read backwards: instead of "is this amount refused?"
+ * it answers "what is the largest amount that would not be". Same arithmetic,
+ * same inputs, one source — so a surface can grey out a rung the engine is
+ * certain to refuse instead of offering it and apologising afterwards.
+ *
+ * Written because the bidder's own control never consulted money at all. A
+ * captain holding ₹45,000 with one squad place still to fill was shown
+ * "RAISE TO ₹95,000" in gold, enabled, for the whole lot; every press came
+ * back "That would take you past your remaining purse." The button already
+ * refuses to invite a refusal it can predict — paused, already leading, squad
+ * full — and money was the one it could predict best and did not.
+ *
+ * Returns 0 when the team cannot legally bid at all.
+ */
+export function maxAffordableBid(input: {
+  purseRemaining: number;
+  squadSize: number;
+  squadMin: number;
+  minPossiblePrice: number;
+}): Paise {
+  const stillNeeded = Math.max(0, input.squadMin - input.squadSize - 1);
+  const reserve = stillNeeded * input.minPossiblePrice;
+  return paise(Math.max(0, input.purseRemaining - reserve));
+}
+
 /** The reserve-rule floor: the cheapest any future lot can possibly open at. */
 export function minPossiblePrice(config: AuctionConfig): Paise {
   const bands = Object.values(config.basePriceBands);

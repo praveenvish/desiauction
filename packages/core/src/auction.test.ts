@@ -20,6 +20,7 @@ import {
   ladderStep,
   lotNumber,
   lotTransition,
+  maxAffordableBid,
   minPossiblePrice,
   nextMinimumBid,
   openLotTimer,
@@ -730,5 +731,94 @@ describe("replay reducer (the recovery spine)", () => {
         eventCount: 0,
       },
     });
+  });
+});
+
+describe("maxAffordableBid — the ceiling the bidder's button never knew", () => {
+  const min = 10_000 * 100; // ₹10,000 in paise
+
+  it("is the whole purse when this very bid completes the minimum squad", () => {
+    // One of two places filled, and the bid on the table fills the other — so
+    // nothing has to survive it. This is the case that catches people out.
+    expect(
+      maxAffordableBid({
+        purseRemaining: 45_000_00,
+        squadSize: 1,
+        squadMin: 2,
+        minPossiblePrice: min,
+      }),
+    ).toBe(45_000_00);
+    expect(
+      maxAffordableBid({
+        purseRemaining: 45_000_00,
+        squadSize: 2,
+        squadMin: 2,
+        minPossiblePrice: min,
+      }),
+    ).toBe(45_000_00);
+  });
+
+  it("holds back one floor price for every place the bid does NOT fill", () => {
+    // Empty squad, two places needed: this bid takes one, ₹10,000 must survive
+    // for the other.
+    expect(
+      maxAffordableBid({
+        purseRemaining: 100_000_00,
+        squadSize: 0,
+        squadMin: 2,
+        minPossiblePrice: min,
+      }),
+    ).toBe(90_000_00);
+    expect(
+      maxAffordableBid({
+        purseRemaining: 100_000_00,
+        squadSize: 0,
+        squadMin: 4,
+        minPossiblePrice: min,
+      }),
+    ).toBe(70_000_00);
+  });
+
+  it("never goes below zero", () => {
+    expect(
+      maxAffordableBid({
+        purseRemaining: 5_000_00,
+        squadSize: 0,
+        squadMin: 4,
+        minPossiblePrice: min,
+      }),
+    ).toBe(0);
+  });
+
+  it("agrees with the gauntlet it mirrors — the ceiling passes, one rung more does not", () => {
+    const base = {
+      auctionStatus: "live",
+      lotStatus: "on_block",
+      basePrice: paise(min),
+      leadingAmount: null,
+      leadingTeamId: null,
+      teamId: "team-a",
+      bidderAuthorized: true,
+      slabs: DEFAULT_AUCTION_CONFIG.slabs,
+      purseRemaining: paise(45_000_00),
+      squadSize: 0,
+      squadMin: 2,
+      squadMax: 4,
+      minPossiblePrice: paise(min),
+      roleCount: 0,
+      roleMax: null,
+      nowMs: 0,
+      endsAtMs: 1_000_000,
+    } as const;
+    const ceiling = Number(
+      maxAffordableBid({
+        purseRemaining: 45_000_00,
+        squadSize: 0,
+        squadMin: 2,
+        minPossiblePrice: min,
+      }),
+    );
+    expect(decideBid({ ...base, amountRaw: ceiling }).ok).toBe(true);
+    expect(decideBid({ ...base, amountRaw: ceiling + min }).ok).toBe(false);
   });
 });

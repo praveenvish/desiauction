@@ -1,4 +1,9 @@
-import { DEFAULT_AUCTION_CONFIG, type AuctionConfig, type IncrementSlab } from "@desiauction/core";
+import {
+  DEFAULT_AUCTION_CONFIG,
+  minPossiblePrice,
+  type AuctionConfig,
+  type IncrementSlab,
+} from "@desiauction/core";
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, inArray, or } from "drizzle-orm";
 
@@ -113,6 +118,12 @@ export interface AuctionRules {
   pursePerTeam: number;
   squadMin: number;
   squadMax: number;
+  /**
+   * The reserve-rule floor — the cheapest any remaining lot can open at.
+   * Carried to the client so the bidder's own control can work out the ceiling
+   * the engine will enforce, instead of offering rungs above it.
+   */
+  minPossiblePrice: number;
   initialSeconds: number;
   extensionSeconds: number;
   slabs: readonly { upTo: number | null; step: number }[];
@@ -127,6 +138,14 @@ export function rulesOf(config: unknown): AuctionRules {
     pursePerTeam: Number(parsed.pursePerTeam ?? DEFAULT_AUCTION_CONFIG.pursePerTeam),
     squadMin: parsed.squadMin ?? DEFAULT_AUCTION_CONFIG.squadMin,
     squadMax: parsed.squadMax ?? DEFAULT_AUCTION_CONFIG.squadMax,
+    minPossiblePrice: Number(
+      minPossiblePrice({
+        ...DEFAULT_AUCTION_CONFIG,
+        ...parsed,
+        slabs,
+        timer,
+      }),
+    ),
     initialSeconds: timer.initialSeconds,
     extensionSeconds: timer.extensionSeconds,
     slabs: slabs.map((slab) => ({

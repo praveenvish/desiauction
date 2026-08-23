@@ -158,6 +158,9 @@ function gateRules(rules: AuctionRules, money: boolean): GatedAuctionRules {
     : {
         squadMin: rules.squadMin,
         squadMax: rules.squadMax,
+        // Not money the gate is protecting: it is the cheapest BASE price in
+        // the config, and every base price is already printed beside its lot.
+        minPossiblePrice: rules.minPossiblePrice,
         initialSeconds: rules.initialSeconds,
         extensionSeconds: rules.extensionSeconds,
         slabs: rules.slabs,

@@ -1,6 +1,11 @@
 "use client";
 
-import { formatPaiseINR, nextMinimumBid as snapshotNextMinimumBid, paise } from "@desiauction/core";
+import {
+  formatPaiseINR,
+  maxAffordableBid,
+  nextMinimumBid as snapshotNextMinimumBid,
+  paise,
+} from "@desiauction/core";
 import { Card } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
@@ -80,6 +85,31 @@ export function PaddleControl({
   // state the button never consulted was the auction's own.
   const paused = snapshot !== null && snapshot.auctionStatus !== "live";
   const squadFull = squadSigned >= rules.squadMax;
+  // MONEY IS A REFUSAL THE ROOM CAN PREDICT, TOO.
+  //
+  // The list above covers paused, already-leading and squad-full — every state
+  // where the engine is certain to say no. It never covered the purse, which
+  // is the refusal that actually happens late in a night: a captain holding
+  // ₹45,000 was shown "RAISE TO ₹50,000" in gold, enabled, with three
+  // jump-ahead rungs above it, and every press came back "That would take you
+  // past your remaining purse." The ceiling is the engine's own arithmetic
+  // (gauntlet 8 + 9) read backwards, so the two cannot drift.
+  //
+  // `purseRemaining === null` means the money was sealed for this viewer, which
+  // never happens for their OWN paddle — but if it ever did, the honest answer
+  // is to gate nothing rather than to guess a ceiling.
+  const ceiling =
+    paddle?.purseRemaining == null
+      ? null
+      : Number(
+          maxAffordableBid({
+            purseRemaining: paddle.purseRemaining,
+            squadSize: squadSigned,
+            squadMin: rules.squadMin,
+            minPossiblePrice: rules.minPossiblePrice,
+          }),
+        );
+  const tooDear = ceiling !== null && raise !== undefined && raise > ceiling;
   const blocked = paused
     ? snapshot.auctionStatus === "paused"
       ? "The clock is stopped. Bidding resumes when the auctioneer restarts it."
@@ -88,7 +118,11 @@ export function PaddleControl({
       ? "You're already the highest bidder."
       : squadFull
         ? "Your squad is full."
-        : null;
+        : tooDear
+          ? ceiling === 0
+            ? "Your purse can't cover another signing at this price."
+            : `Beyond your purse. The most you can bid is ${formatPaiseINR(paise(ceiling))}.`
+          : null;
   const bidsDisabled = disabled || blocked !== null;
 
   return (
@@ -106,7 +140,9 @@ export function PaddleControl({
           className={paused ? "paddle-leading paddle-frozen" : "paddle-leading"}
           id="paddle-blocked"
           data-testid="paddle-leading"
-          data-reason={paused ? "paused" : iAmLeading ? "leading" : "squad-full"}
+          data-reason={
+            paused ? "paused" : iAmLeading ? "leading" : squadFull ? "squad-full" : "too-dear"
+          }
           role={paused ? "status" : undefined}
         >
           {paused || !iAmLeading ? blocked : "You're leading this lot."}
@@ -141,8 +177,15 @@ export function PaddleControl({
                 key={amount}
                 type="button"
                 className="paddle-jump-chip"
-                disabled={bidsDisabled}
-                title={blocked ?? undefined}
+                // Each rung answers for itself: the raise may be affordable and
+                // the third jump not, and offering it anyway is the same
+                // invitation-to-a-refusal in miniature.
+                disabled={bidsDisabled || (ceiling !== null && amount > ceiling)}
+                title={
+                  ceiling !== null && amount > ceiling && blocked === null
+                    ? `Beyond your purse — the most you can bid is ${formatPaiseINR(paise(ceiling))}.`
+                    : (blocked ?? undefined)
+                }
                 onClick={() => {
                   onBid(amount);
                 }}
