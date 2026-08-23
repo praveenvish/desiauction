@@ -601,9 +601,14 @@ export async function createTeamAction(
     return {
       ok: false,
       error:
-        result.reason === "duplicate_name"
-          ? "A team with that name already exists in this competition."
-          : `Team names run from 3 to ${String(NAME_MAX_LENGTH)} characters.`,
+        // The tier refusal carries its own sentence — the ceiling, the count and
+        // what to do — because "that didn't work" on a commercial limit sends
+        // the organizer looking for a bug that is not there.
+        result.reason === "tier_limit"
+          ? result.message
+          : result.reason === "duplicate_name"
+            ? "A team with that name already exists in this competition."
+            : `Team names run from 3 to ${String(NAME_MAX_LENGTH)} characters.`,
     };
   }
   return { ok: true };
@@ -676,7 +681,16 @@ export async function triageRegistrationAction(
     ),
   );
   if (!result.ok) {
-    return { ok: false, error: "That action isn't available for this registration." };
+    return {
+      ok: false,
+      // A pass ceiling is not "that action isn't available for this
+      // registration" — the registration is fine, the season is full. It
+      // carries its own sentence naming the ceiling and what to do.
+      error:
+        result.reason === "tier_limit"
+          ? result.message
+          : "That action isn't available for this registration.",
+    };
   }
   const notice = await notifyAffected(gate, [registrationId], event);
   return { ok: true, ...notice };

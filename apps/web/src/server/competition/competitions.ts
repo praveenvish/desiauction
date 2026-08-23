@@ -1,5 +1,8 @@
 import {
+  BETA_TIER,
+  checkTierLimit,
   competitionTransition,
+  limitRefusalMessage,
   nextSeasonName,
   slugifyName,
   validateName,
@@ -16,7 +19,7 @@ import {
   writeSurvivingConstraint,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import { storage } from "../media";
 
@@ -109,6 +112,11 @@ export async function createCompetition(
     ...(input.location !== undefined && input.location !== "" ? { location: input.location } : {}),
     ...(input.startsOn !== undefined && input.startsOn !== "" ? { startsOn: input.startsOn } : {}),
     ...(input.endsOn !== undefined && input.endsOn !== "" ? { endsOn: input.endsOn } : {}),
+    // The beta grant, explicit on the row rather than implied by a global flag:
+    // a season created today is covered by "tournaments started during beta
+    // stay free forever", and its tier is the evidence. Deleting BETA_TIER at
+    // GA is what turns the ceiling on for new tournaments.
+    tier: BETA_TIER,
     createdBy: personId,
   });
   await db.insert(auditLog).values({
@@ -471,7 +479,10 @@ export interface TeamSummary {
 }
 
 export type CreateTeamResult =
-  { ok: true; team: TeamSummary } | { ok: false; reason: "invalid_name" | "duplicate_name" };
+  | { ok: true; team: TeamSummary }
+  | { ok: false; reason: "invalid_name" | "duplicate_name" }
+  /** The season's pass covers fewer teams than this would make. */
+  | { ok: false; reason: "tier_limit"; message: string };
 
 export async function createTeam(
   db: Db,
@@ -485,6 +496,31 @@ export async function createTeam(
   const valid = validateName(name);
   if (!valid.ok) {
     return { ok: false, reason: "invalid_name" };
+  }
+  /*
+   * THE CEILING, WHERE IT BELONGS.
+   *
+   * The pricing page has said "Up to 4 teams and 40 players" since PX-10 and
+   * nothing enforced it. It is enforced here — at SETUP, by the organizer's own
+   * deliberate act — and nowhere on the auction path. A ceiling that can refuse
+   * something at 9pm on auction night is an outage, not a paywall.
+   *
+   * Read-then-insert is not atomic and does not need to be: two organizers
+   * racing the fourth team is not a threat model, and the cost of losing that
+   * race is one team over a soft commercial limit, not a corrupted auction.
+   */
+  const [row] = await db
+    .select({ tier: competitions.tier })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  const [{ count: teamCount } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(teams)
+    .where(eq(teams.competitionId, competitionId));
+  const decision = checkTierLimit(row?.tier ?? "free", "teams", teamCount);
+  if (!decision.ok) {
+    return { ok: false, reason: "tier_limit", message: limitRefusalMessage(decision) };
   }
   const id = newId();
   // Unique (competition_id, name) — team names are unique within a competition.

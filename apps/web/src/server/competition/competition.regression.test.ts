@@ -123,6 +123,116 @@ afterAll(async () => {
   await handle.sql.end();
 });
 
+describe("TIER LIMITS — the ceiling the pricing page has always described", () => {
+  /*
+   * "Up to 4 teams and 40 players" has been on the pricing page since PX-10 and
+   * nothing in the platform knew it. The answer chosen was BLOCK, not warn — so
+   * these tests are the contract: the fourth team is fine, the fifth is not,
+   * and a season on the beta grant never meets a ceiling at all.
+   */
+  const freeSeason = async (name: string) => {
+    const competition = await createCompetition(db, orgX.id, owner, { name: `${name} ${RUN}` });
+    await db
+      .update(competitionsTable)
+      .set({ tier: "free" })
+      .where(eq(competitionsTable.id, competition.id));
+    return competition;
+  };
+
+  it("lets a Free season fill its four teams, then refuses the fifth", async () => {
+    const competition = await freeSeason("Ceiling");
+    for (let n = 1; n <= 4; n += 1) {
+      const created = await createTeam(db, orgX.id, competition.id, owner, `Team ${String(n)}`);
+      expect(created.ok, `team ${String(n)} should be allowed`).toBe(true);
+    }
+    const fifth = await createTeam(db, orgX.id, competition.id, owner, "Team 5");
+    expect(fifth.ok).toBe(false);
+    if (fifth.ok) return;
+    expect(fifth.reason).toBe("tier_limit");
+    // The refusal is a sentence, not an enum — this is what the organizer reads.
+    const message = (fifth as { message?: string }).message ?? "";
+    expect(message).toContain("up to 4 teams");
+    expect(message).toContain("Upgrade");
+  });
+
+  it("counts what is already there, so the ceiling cannot be walked around", async () => {
+    const competition = await freeSeason("Counted");
+    for (const name of ["Alpha", "Bravo", "Charlie", "Delta"]) {
+      await createTeam(db, orgX.id, competition.id, owner, name);
+    }
+    expect((await createTeam(db, orgX.id, competition.id, owner, "Echo")).ok).toBe(false);
+    const teamRows = await db
+      .select({ id: teamsTable.id })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, competition.id));
+    expect(teamRows).toHaveLength(4);
+  });
+
+  it("refuses the forty-first approval, and only at approval", async () => {
+    const competition = await freeSeason("Pool");
+    await db
+      .update(competitionsTable)
+      .set({ status: "registration_open" })
+      .where(eq(competitionsTable.id, competition.id));
+    // Forty distinct people, because one registration per person per season is
+    // itself a rule — the ceiling has to be reached the way a real season
+    // reaches it.
+    const poolPeople = Array.from({ length: 40 }, (_, n) => ({
+      id: newId(),
+      phone: `+9190${RUN}${String(n).padStart(2, "0")}`,
+      name: `Pool Player ${String(n)}`,
+    }));
+    await db.insert(people).values(poolPeople);
+    await db.insert(registrationsTable).values(
+      poolPeople.map((person, n) => ({
+        id: newId(),
+        orgId: orgX.id,
+        competitionId: competition.id,
+        personId: person.id,
+        role: "batter" as const,
+        status: "approved" as const,
+        registrationNumber: `PL${RUN.slice(-3)}${String(n).padStart(3, "0")}`,
+      })),
+    );
+
+    // One more person applies — which must still be allowed. A season filling
+    // up is the organizer's commercial problem, not the player's.
+    const applied = await submitRegistration(db, competition.id, orgX.id, player, "bowler");
+    expect(applied.ok, "a player may always apply").toBe(true);
+    if (!applied.ok) {
+      return;
+    }
+    // Approving them is the act that costs, and it is refused.
+    const approved = await transition(db, orgX.id, competition.id, applied.registrationId, owner, {
+      type: "approve",
+    });
+    expect(approved.ok).toBe(false);
+    if (approved.ok) {
+      return;
+    }
+    expect(approved.reason).toBe("tier_limit");
+    expect((approved as { message?: string }).message ?? "").toContain("up to 40 players");
+
+    await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
+    await db.delete(people).where(
+      inArray(
+        people.id,
+        poolPeople.map((person) => person.id),
+      ),
+    );
+  });
+
+  it("never blocks a season created during beta — that promise is on the page", async () => {
+    // createCompetition stamps BETA_TIER, so this is the default path today.
+    const competition = await createCompetition(db, orgX.id, owner, { name: `Beta ${RUN}` });
+    for (let n = 1; n <= 6; n += 1) {
+      expect(
+        (await createTeam(db, orgX.id, competition.id, owner, `Beta Team ${String(n)}`)).ok,
+      ).toBe(true);
+    }
+  });
+});
+
 describe('PUBLIC DIRECTORY — "live" means something is happening', () => {
   /*
    * `live` was `auction.status in ('live','paused')` and nothing else, so an

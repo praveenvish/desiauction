@@ -368,6 +368,17 @@ export const competitions = pgTable(
     })
       .notNull()
       .default("draft"),
+    /**
+     * What this season's pass covers (RH-1e). Default `free` — the honest
+     * default for anything created from here on; every row that existed when
+     * the column landed was backfilled to `association`, because the pricing
+     * page promises that tournaments started during beta stay free forever
+     * with every tier, and a four-team ceiling applied retroactively would
+     * break that against the people who took it.
+     */
+    tier: text("tier", { enum: ["free", "pro", "association"] })
+      .notNull()
+      .default("free"),
     visibility: text("visibility", { enum: ["private", "public"] })
       .notNull()
       .default("private"),

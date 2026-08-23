@@ -250,3 +250,17 @@ export type {
   ShareCardStat,
   ShareCardTone,
 } from "./share-card";
+
+export {
+  BETA_TIER,
+  TIERS,
+  TIER_LIMITS,
+  checkTierLimit,
+  isTier,
+  limitRefusalMessage,
+  tierLabel,
+  type LimitDecision,
+  type LimitSubject,
+  type Tier,
+  type TierLimits,
+} from "./tiers";

@@ -1,12 +1,14 @@
 import {
+  checkTierLimit,
+  limitRefusalMessage,
   planRegistrationBatch,
   registrationTransition,
   type RegistrationBatchItem,
   type RegistrationEvent,
   type RegistrationStatus,
 } from "@desiauction/core";
-import { auditLog, newId, registrations, type Db } from "@desiauction/db";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { auditLog, competitions, newId, registrations, type Db } from "@desiauction/db";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { logSecurityEvent, type SecurityAction } from "../auth/security-events";
 
@@ -92,7 +94,31 @@ async function notifyPlayer(
 
 export type TransitionResult =
   | { ok: true; status: RegistrationStatus }
-  | { ok: false; reason: "not_found" | "illegal_transition" | "reason_required" };
+  | { ok: false; reason: "not_found" | "illegal_transition" | "reason_required" }
+  /** The season's pass covers fewer pool players than this approval would make. */
+  | { ok: false; reason: "tier_limit"; message: string };
+
+/**
+ * The pool ceiling for a competition, or null when there is room.
+ *
+ * Returns the sentence rather than a code: every caller renders it, and a
+ * commercial refusal that reads as an enum sends an organizer hunting for a bug.
+ */
+async function poolLimit(db: Db, competitionId: string): Promise<string | null> {
+  const [season] = await db
+    .select({ tier: competitions.tier })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  const [{ count: approved } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(registrations)
+    .where(
+      and(eq(registrations.competitionId, competitionId), eq(registrations.status, "approved")),
+    );
+  const decision = checkTierLimit(season?.tier ?? "free", "players", approved);
+  return decision.ok ? null : limitRefusalMessage(decision);
+}
 
 /** Single audited transition — the aggregate's atomic unit. */
 export async function transition(
@@ -116,6 +142,22 @@ export async function transition(
   const decision = registrationTransition(current.status, event);
   if (!decision.ok) {
     return { ok: false, reason: decision.reason };
+  }
+  /*
+   * THE POOL CEILING, AT THE ONE MOMENT THE POOL GROWS.
+   *
+   * The pricing page's other half — "40 players" on Free — is checked here and
+   * only here. NOT at submission: a season filling up is the organizer's
+   * commercial problem, and turning a player away at the registration form for
+   * it would punish the wrong person and lose a name the organizer may well
+   * want. A player may always apply; approving them into the pool is the
+   * organizer's act, and it is the act that costs.
+   */
+  if (decision.next === "approved" && current.status !== "approved") {
+    const limited = await poolLimit(db, competitionId);
+    if (limited !== null) {
+      return { ok: false, reason: "tier_limit", message: limited };
+    }
   }
   await db.transaction(async (tx) => {
     await tx
