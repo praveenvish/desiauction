@@ -23,7 +23,25 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capabilities.js";
 
-const SET = "platform:admin";
+/**
+ * WHICH PLATFORM GRANT.
+ *
+ * `platform:admin` sees the console. `platform:billing` answers a season's pass
+ * request — a different act of trust, deliberately not a superset, so nobody
+ * acquires the power to change what a customer is entitled to by being handed
+ * the power to look at them. Both are platform-scoped, and RLS makes both
+ * equally uninsertable by the application role: this script is the only route.
+ *
+ *   pnpm --filter @desiauction/web seed:admin -- <phone>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:billing <phone>
+ */
+const SETS = ["platform:admin", "platform:billing"] as const;
+const setFlagAt = process.argv.indexOf("--set");
+const requestedSet = setFlagAt === -1 ? "platform:admin" : process.argv[setFlagAt + 1];
+if (!(SETS as readonly string[]).includes(requestedSet ?? "")) {
+  throw new Error(`--set must be one of ${SETS.join(", ")}`);
+}
+const SET = requestedSet as (typeof SETS)[number];
 
 // The system pool: RLS-exempt, so it can write the one row RLS forbids the app
 // to write. Falls back to DATABASE_URL, which locally is the same superuser.
@@ -42,11 +60,19 @@ function normalizePhone(input: string): string {
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((arg) => arg !== "--");
   const revoke = args.includes("--revoke");
-  const phoneArg = args.find((arg) => !arg.startsWith("--"));
+  // `--set <value>` consumes its own argument, so the value must not be
+  // mistaken for the phone number. Guarded on the flag being PRESENT: an
+  // `indexOf` of -1 plus one is 0, which excluded the first argument — the
+  // phone — on every invocation that did not pass --set at all.
+  const setFlagIndex = args.indexOf("--set");
+  const phoneArg = args.find(
+    (arg, index) => !arg.startsWith("--") && (setFlagIndex === -1 || index !== setFlagIndex + 1),
+  );
   if (phoneArg === undefined) {
     throw new Error(
-      "Usage: pnpm --filter @desiauction/web seed:admin -- [--revoke] <phone>\n" +
-        "  e.g. pnpm --filter @desiauction/web seed:admin -- +919999000001",
+      "Usage: pnpm --filter @desiauction/web seed:admin -- [--revoke] [--set <set>] <phone>\n" +
+        "  e.g. pnpm --filter @desiauction/web seed:admin -- +919999000001\n" +
+        "       pnpm --filter @desiauction/web seed:admin -- --set platform:billing +919999000001",
     );
   }
   const phone = normalizePhone(phoneArg);

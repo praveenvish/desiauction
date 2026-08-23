@@ -320,3 +320,88 @@
     flex-direction: column;
   }
 }
+
+/* --- RH-1g · The pass queue ------------------------------------------------ */
+
+.pass-queue,
+.pass-recent {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pass-row {
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pass-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.pass-row-season {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+/* The deciding facts, weighted like facts rather than like chrome. */
+.pass-row-usage {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+}
+
+.pass-row-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--accent);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.pass-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.pass-recent li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pass-recent-season {
+  color: var(--text-primary);
+}
+
+/* The console is a phone job when something is wrong at 9pm, like everything
+   else here: a pair of buttons splits the row rather than stacking ragged. */
+@media (max-width: 640px) {
+  .pass-row-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .pass-row-actions > button {
+    width: 100%;
+    min-height: 44px;
+  }
+}

@@ -39,7 +39,7 @@ export const RELEASES: readonly ReleaseNote[] = [
     highlights: [
       "A read-only platform console for operators: organizations, users, auctions, settlements and finance at a glance.",
       "A platform audit explorer and a live health view across background workers and delivery.",
-      "Read-only by design — administration observes; every operational fix stays in the console that owns it.",
+      "Observation by default — every operational fix stays in the console that owns it. The one exception is answering a season's pass request, which no other console owns; it sits behind its own separate grant and lands on the audit log.",
     ],
   },
   {

@@ -30,20 +30,48 @@
 import type { GrantLike } from "@desiauction/core";
 
 /**
- * PX-1 01 §2.4 names exactly one: `platform.admin`. Administration is an
- * observation surface, so the vocabulary stays one word wide — there is no
- * write to tier, and inventing tiers here would be the "new governance model"
- * PX-9 puts out of scope.
+ * PX-1 01 §2.4 named exactly one: `platform.admin`.
+ *
+ * IT SAID TWO WORDS MORE THAN THAT, AND THEY ARE WORTH KEEPING ON THE RECORD.
+ * This comment used to read: "Administration is an observation surface, so the
+ * vocabulary stays one word wide — there is no write to tier, and inventing
+ * tiers here would be the new governance model PX-9 puts out of scope." That
+ * was correct when it was written, for the reason it gave: there were no tiers.
+ * 0027 introduced them, 0028 gave organizers a way to ask for a bigger pass,
+ * and somebody has to answer. The premise changed; the sentence had to.
+ *
+ * WHAT DID NOT CHANGE is why the console was read-only in the first place, so
+ * the answer is a SECOND SET rather than a second word in the first one:
+ *
+ *   · Seeing every organization's money and every person's phone, and changing
+ *     what a customer is entitled to, are different acts of trust. Nobody
+ *     should acquire the second by being handed the first.
+ *   · The projections stay read-only, and the runtime proof that holds them so
+ *     is untouched. Exactly one module in administration may write to a tier,
+ *     and it is not a view.
+ *
+ * `platform:billing` inherits the same two structural locks as `platform:admin`
+ * — singleton scope, and `grants_tenant`'s WITH CHECK, which admits only
+ * `scope_type = 'org'` and therefore makes EVERY platform-scoped grant
+ * uninsertable by the application role whatever its set. It is seeded
+ * out-of-band or it does not exist.
  */
-export type PlatformCapability = "platform.admin";
+export type PlatformCapability = "platform.admin" | "platform.pass";
 
-export type PlatformCapabilitySet = "platform:admin";
+export type PlatformCapabilitySet = "platform:admin" | "platform:billing";
 
 const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   "platform:admin": ["platform.admin"],
+  // Deliberately NOT a superset: answering a pass request does not need to read
+  // the platform, and reading the platform does not license answering one. An
+  // operator who does both holds both grants, on purpose, and the audit says so.
+  "platform:billing": ["platform.pass"],
 };
 
-export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = ["platform:admin"];
+export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
+  "platform:admin",
+  "platform:billing",
+];
 
 /** The singleton scope. `scope_id` is char(26); this is the nil ULID. */
 export const PLATFORM_SCOPE_TYPE = "platform";

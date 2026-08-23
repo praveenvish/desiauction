@@ -64,7 +64,9 @@ export type AdminSurface =
   | "user"
   | "audit"
   | "health"
-  | "messaging";
+  | "messaging"
+  /** The pass queue — the one surface behind `platform:billing`, not admin. */
+  | "passes";
 
 /**
  * Record that an administrator opened a surface.

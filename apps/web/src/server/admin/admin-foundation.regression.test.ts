@@ -61,6 +61,7 @@ import {
   userDetail,
   userDirectory,
 } from "./views";
+import { passQueue } from "./passes";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -115,6 +116,79 @@ afterAll(async () => {
   await db.delete(grantsTable).where(inArray(grantsTable.personId, [adminId, ownerId]));
   await db.delete(people).where(inArray(people.phone, TEST_PHONES));
   await handle.sql.end({ timeout: 5 });
+});
+
+describe("RH-1g · The platform engine's second set", () => {
+  /*
+   * Administration could only observe until a pass request needed answering.
+   * The answer is a SECOND SET, not a second word in the first one: seeing
+   * every organization's money and changing what a customer is entitled to are
+   * different acts of trust, and nobody should acquire the second by being
+   * handed the first.
+   */
+  const platformGrant = (set: string) => [
+    {
+      capabilitySet: set,
+      scopeType: PLATFORM_SCOPE_TYPE,
+      scopeId: PLATFORM_SCOPE_ID,
+      revokedAt: null,
+    },
+  ];
+
+  it("admin sees, and cannot answer", () => {
+    const grants = platformGrant("platform:admin");
+    expect(hasPlatformCapability(grants, "platform.admin")).toBe(true);
+    expect(hasPlatformCapability(grants, "platform.pass")).toBe(false);
+  });
+
+  it("billing answers, and cannot see", () => {
+    const grants = platformGrant("platform:billing");
+    expect(hasPlatformCapability(grants, "platform.pass")).toBe(true);
+    expect(hasPlatformCapability(grants, "platform.admin")).toBe(false);
+  });
+
+  it("an operator who does both holds both, on purpose", () => {
+    const grants = [...platformGrant("platform:admin"), ...platformGrant("platform:billing")];
+    expect(hasPlatformCapability(grants, "platform.admin")).toBe(true);
+    expect(hasPlatformCapability(grants, "platform.pass")).toBe(true);
+  });
+
+  it("no org, settlement or finops set reaches the new capability either", () => {
+    for (const set of ["org:owner", "org:staff", "settlement:controller", "finops:controller"]) {
+      expect(hasPlatformCapability(platformGrant(set), "platform.pass")).toBe(false);
+    }
+  });
+
+  it("a revoked or wrongly-scoped billing grant confers nothing", () => {
+    expect(
+      hasPlatformCapability(
+        [
+          {
+            capabilitySet: "platform:billing",
+            scopeType: PLATFORM_SCOPE_TYPE,
+            scopeId: PLATFORM_SCOPE_ID,
+            revokedAt: new Date(),
+          },
+        ],
+        "platform.pass",
+      ),
+    ).toBe(false);
+    // The singleton scope is pinned: an org-scoped row with the same set is
+    // structurally unable to match, which is what RLS relies on.
+    expect(
+      hasPlatformCapability(
+        [
+          {
+            capabilitySet: "platform:billing",
+            scopeType: "org",
+            scopeId: "01ABCDEFGHJKMNPQRSTVWXYZ00",
+            revokedAt: null,
+          },
+        ],
+        "platform.pass",
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("PX-9 · The fourth capability partition", () => {
@@ -348,6 +422,14 @@ describe("PX-9 · The read-only guarantee, proved at runtime", () => {
     expect(messaging.total).toBeGreaterThan(0);
     expect(messaging.configured).toBe(0);
     expect(Array.isArray(messaging.recent)).toBe(true);
+
+    // RH-1g: administration gained the power to answer a pass request, and the
+    // guarantee narrowed to exactly that — the WRITE lives in its own module
+    // behind its own grant, and the queue that feeds it is a projection like
+    // every other one. Driven here so it can never quietly start mutating.
+    const passes = await passQueue(ro);
+    expect(Array.isArray(passes.open)).toBe(true);
+    expect(Array.isArray(passes.recent)).toBe(true);
   }, 120_000);
 
   it("the proof harness itself has teeth — a write through it throws", () => {

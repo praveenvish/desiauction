@@ -44,6 +44,29 @@ export async function platformAdminGate(): Promise<AdminIdentity | null> {
   return { personId: session.personId, name: session.name, phone: session.phone };
 }
 
+/**
+ * THE SECOND DOOR — answering a pass request.
+ *
+ * Separate from `platformAdminGate` because `platform:billing` is a separate
+ * grant: seeing the whole platform does not license changing what a customer is
+ * entitled to, and an operator who does both holds both, on purpose. Returns
+ * null the same way, for the same reason — a locked door that announces itself
+ * is a map.
+ */
+export async function platformBillingGate(): Promise<AdminIdentity | null> {
+  const session = await currentSession();
+  if (session === null) {
+    return null;
+  }
+  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
+    hasPlatformCapability(await grantsFor(db, session.personId), "platform.pass"),
+  );
+  if (!allowed) {
+    return null;
+  }
+  return { personId: session.personId, name: session.name, phone: session.phone };
+}
+
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */
 export async function isPlatformAdmin(): Promise<boolean> {
   return (await platformAdminGate()) !== null;

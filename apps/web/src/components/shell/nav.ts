@@ -235,6 +235,12 @@ export const ADMIN_TABS: CompetitionTab[] = [
   { key: "audit", label: "Audit", href: "/admin/audit" },
   { key: "health", label: "Health", href: "/admin/health" },
   { key: "messaging", label: "Messaging", href: "/admin/messaging" },
+  // Passes is the one admin surface gated on `platform:billing` rather than
+  // `platform:admin`, so the tab is included for everyone and the PAGE returns
+  // not-found to anyone without it — the same posture the console takes to its
+  // own front door. A tab that appears only for some operators would leak who
+  // holds which grant to anyone comparing screens.
+  { key: "passes", label: "Passes", href: "/admin/passes" },
 ];
 
 export function activeAdminTab(pathname: string): string {
@@ -252,6 +258,9 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/messaging")) {
     return "messaging";
+  }
+  if (pathname.startsWith("/admin/passes")) {
+    return "passes";
   }
   return "overview";
 }
@@ -354,6 +363,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   // admin", since `pageIdentity` falls back to the surface name when a section
   // has no label.
   [/^\/admin\/messaging$/, "Messaging"],
+  [/^\/admin\/passes$/, "Passes"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.
