@@ -117,3 +117,74 @@ test("the primary navigation is reachable on a phone and on a desktop", async ({
     ).toBeVisible();
   }
 });
+
+/**
+ * ACTION ROWS ON A PHONE (RH-1b).
+ *
+ * No-horizontal-overflow is a floor, not a look. Every action group in this
+ * product was `display:flex; flex-wrap:wrap` and let each control size itself
+ * to its own label, which passes the overflow gate above and still read as
+ * unfinished at 390px: "Season details" (151px, borderless) beside "Fixtures"
+ * (89px, bordered); the registrations row's three actions staggered 1 + 2 at
+ * 52 / 74 / 70; the auction exits 3-up at ~80px and then 2-up at 94 / 74.
+ *
+ * The rule is now: below 640px an action group is a grid of EQUAL cells. This
+ * asserts the property rather than the pixels — controls sharing a row share a
+ * width, and every one is thumb-sized — so a flex-wrap creeping back in fails
+ * here instead of on somebody's phone.
+ *
+ * `/c` is the one PUBLIC route carrying such a group on every deployment
+ * regardless of seeded data. The console's groups (the registrations toolbar
+ * and its per-row actions, the season ladder, the auction exits) need a seeded
+ * season and are covered by the RH-1 rehearsal harness; they share this rule.
+ */
+const ACTION_GROUPS = [{ route: "/c", selector: ".showcase-filters" }] as const;
+
+test("action groups are equal-width, thumb-sized rows on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const group of ACTION_GROUPS) {
+    await page.goto(group.route);
+    await page.waitForLoadState("domcontentloaded");
+    const rows = page.locator(group.selector);
+    const count = await rows.count();
+    expect(count, `${group.route} has no ${group.selector} to assert on`).toBeGreaterThan(0);
+    let asserted = 0;
+    for (let index = 0; index < count; index += 1) {
+      const boxes = await rows.nth(index).evaluate((el) =>
+        Array.from(el.querySelectorAll(":scope > a, :scope > button"))
+          .map((child) => child.getBoundingClientRect())
+          .filter((rect) => rect.width > 0 && rect.height > 0)
+          .map((rect) => ({
+            w: Math.round(rect.width),
+            h: Math.round(rect.height),
+            top: Math.round(rect.top),
+          })),
+      );
+      if (boxes.length < 2) {
+        continue;
+      }
+      asserted += 1;
+      // Controls that share a row must share a width — that is the whole point.
+      const byRow = new Map<number, number[]>();
+      for (const box of boxes) {
+        byRow.set(box.top, [...(byRow.get(box.top) ?? []), box.w]);
+      }
+      for (const [top, widths] of byRow) {
+        expect(
+          new Set(widths).size,
+          `${group.route} ${group.selector}[${String(index)}] row@${String(top)} is ragged: ${widths.join("/")}`,
+        ).toBe(1);
+      }
+      for (const box of boxes) {
+        expect(
+          box.h,
+          `${group.route} ${group.selector}[${String(index)}] control is ${String(box.h)}px tall — under a thumb`,
+        ).toBeGreaterThanOrEqual(44);
+      }
+    }
+    // A test that silently asserts nothing is worse than no test at all.
+    expect(asserted, `no multi-control ${group.selector} found on ${group.route}`).toBeGreaterThan(
+      0,
+    );
+  }
+});

@@ -961,6 +961,42 @@ export function RegistrationDashboardPanel({
                     player was told this reason.
                   </p>
                 ) : null}
+                {/* HOW THEY PLAY.
+                    On a phone the row card drops the Role cell — role, age and
+                    the two playing styles — to keep the list scannable. That is
+                    only honest if the facts are somewhere, and this is where.
+                    They render at every width: a desktop reader who has the
+                    column anyway loses nothing by seeing it confirmed here, and
+                    a phone reader is one tap from the whole record rather than
+                    from a gap. */}
+                <dl className="details-facts" data-testid="details-facts">
+                  <div>
+                    <dt>Role</dt>
+                    <dd>{detail.role.replace(/_/g, " ")}</dd>
+                  </div>
+                  {detail.age !== null ? (
+                    <div>
+                      <dt>Age</dt>
+                      <dd>{detail.age} yrs</dd>
+                    </div>
+                  ) : null}
+                  {detail.battingStyle !== null ? (
+                    <div>
+                      <dt>Batting</dt>
+                      <dd>{detail.battingStyle.replace(/_/g, " ")}</dd>
+                    </div>
+                  ) : null}
+                  {detail.bowlingStyle !== null ? (
+                    <div>
+                      <dt>Bowling</dt>
+                      <dd>{detail.bowlingStyle.replace(/_/g, " ")}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt>Team</dt>
+                    <dd>{detail.teamName ?? "—"}</dd>
+                  </div>
+                </dl>
                 <div className="reg-photo-manage">
                   <PlayerPhotoUploader
                     slug={slug}
@@ -1541,8 +1577,12 @@ function RegRow({
       <td data-label="Role">
         {row.role.replace(/_/g, " ")}
         {row.age !== null ? <span className="reg-sub">{row.age} yrs</span> : null}
+        {/* Its own class because the phone hides THIS and not the role or the
+            age beside it: how somebody bats is what you read once you have
+            decided they are worth a second look, and it lives in Details there.
+            `.reg-sub` alone could not say which of the two sub-lines it was. */}
         {row.battingStyle !== null || row.bowlingStyle !== null ? (
-          <span className="reg-sub">
+          <span className="reg-sub reg-styles">
             {[row.battingStyle, row.bowlingStyle]
               .filter((s): s is string => s !== null)
               .map((s) => s.replace(/_/g, " "))

@@ -1011,3 +1011,71 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* --- RH-1b · Public surfaces on a phone ----------------------------------- */
+
+/*
+ * These are the pages a stranger meets first — a season link pasted into a
+ * WhatsApp group, and the player card the player themselves forwards. At 390px
+ * they were the same ragged-pair problem the console had:
+ *
+ *   · the hero's two calls to action sized themselves to their labels, so
+ *     "See the squads" (186px, filled) sat above "All tournaments" (a bare
+ *     ghost link) with a hole beside each;
+ *   · the pool filters measured 70 / 101 / 81 / 101 px and wrapped 3 + 1,
+ *     orphaning "Retained" on a line of its own;
+ *   · "Copy" and "Share" on a player's own page were 58×32 and 62×32 — under
+ *     the 44px a thumb needs, on the one control that page exists for.
+ *
+ * Same decision as the console: below 640px an action group is a grid of equal
+ * cells. A pair splits the row; a lone control takes it whole.
+ */
+@media (max-width: 640px) {
+  .public-cta-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    width: 100%;
+  }
+
+  .public-cta-row > :is(a, button, [role="button"]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 52px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  /* The pool filters are counted chips: equal cells beat four different widths
+     wrapping 3 + 1, and two columns keep "Available 2" on one line. */
+  .showcase-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(104px, 100%), 1fr));
+    width: 100%;
+  }
+
+  .showcase-filters > :is(a, button, [role="button"]) {
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Copy / Share sit under the URL field they act on, at a thumb's size. */
+  .public-share-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .public-share-row > .public-share-input {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .public-share-row > button {
+    min-height: 44px;
+    width: 100%;
+  }
+}

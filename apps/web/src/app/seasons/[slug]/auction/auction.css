@@ -590,6 +590,43 @@
   padding-top: var(--space-4);
 }
 
+/*
+ * RH-1b — the exits are five doors on a 390px phone, and they came out 3-up at
+ * 81/80/79px and then 2-up at 94/74: five different widths across two ragged
+ * rows under the one control an auctioneer needs to find in a hurry. The shared
+ * action-row rule lives in seasons.css, but this file is imported AFTER it on
+ * every auction page, so `display:flex` above won at equal specificity — the
+ * grid never applied here. Stated again, in the file that owns the class.
+ */
+@media (max-width: 640px) {
+  .live-exits {
+    /* TWO COLUMNS, NOT THREE. Five exits over three columns leaves the fourth
+       alone at a third of the width with a hole beside it; over two they fall
+       2 + 2 + 1, and the odd one out takes the full row. */
+    --action-min: 150px;
+
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--action-min), 100%), 1fr));
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .live-exits > :is(a, button, [role="button"]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .live-exits > :only-child,
+  .live-exits > :nth-child(odd):last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 .live-substatus-meta {
   display: inline-flex;
   align-items: center;

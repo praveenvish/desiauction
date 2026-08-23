@@ -2549,3 +2549,418 @@ p + .date-row {
   align-items: center;
   gap: var(--space-2);
 }
+
+/* --- RH-1b · Action rows on a phone --------------------------------------- */
+
+/*
+ * WHAT WAS WRONG, AND IT WAS WRONG EVERYWHERE.
+ *
+ * Every action group in the console is `display:flex; flex-wrap:wrap; gap` and
+ * lets each control size itself to its own label. On a 1440px desktop that is
+ * invisible. On a 390px phone it is the first thing you see, and it reads as
+ * unfinished:
+ *
+ *   · "Season details" (a borderless 133px link, transparent, padding 0 8px)
+ *     sits beside "Fixtures" (an 89px bordered button, padding 8px 16px) — two
+ *     different species of control on one row, at two different widths.
+ *   · "Review readiness" · "Run it again" · "Open settlement" measured
+ *     121 / 112 / 145 px and wrapped 2 + 1, leaving a ragged hole.
+ *   · The registrations table's own actions came out 1 + 2 (see the ::before
+ *     repair below) at 52 / 74 / 70 px.
+ *   · /live and /cockpit's exits went 3-up at ~80px each.
+ *
+ * The rule below is the design decision, stated once: BELOW 640px AN ACTION
+ * GROUP IS A GRID OF EQUAL CELLS, NOT A ROW OF CONTENT-SIZED CHIPS. Two
+ * controls share the row 50/50 — which is what a pair of buttons should look
+ * like on a phone — three fit 3-up where they are short, and an odd one out
+ * takes the full width rather than leaving a gap beside it. Every child gets
+ * the same 44px box, the same centring and the same horizontal padding, so a
+ * plain link and a filled button stop looking like a mistake next to each other.
+ *
+ * `--action-min` is the one knob: it decides how many fit per row. Groups whose
+ * labels are short (the table's Icon / Captain / Details) lower it and get 3-up.
+ */
+@media (max-width: 640px) {
+  .season-hero-actions,
+  .season-stepper-actions,
+  .season-publish-actions,
+  .reg-toolbar,
+  .live-exits {
+    --action-min: 140px;
+
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--action-min), 100%), 1fr));
+    gap: var(--space-2);
+    align-items: stretch;
+
+    /* THE GROUP MUST OWN THE ROW BEFORE IT CAN DIVIDE IT. These groups sit
+       inside flex parents, so a grid container here is shrink-to-fit by
+       default: `1fr` then resolves against the group's own content width and
+       two buttons stack at 140px each instead of splitting 358px. */
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* A lone control is a full-width control — never a button floating at 40% of
+     a phone screen with nothing beside it. */
+  .season-hero-actions > :only-child,
+  .season-stepper-actions > :only-child,
+  .season-publish-actions > :only-child,
+  .reg-toolbar > :only-child,
+  .live-exits > :only-child {
+    grid-column: 1 / -1;
+  }
+
+  /* An odd last child spans the row rather than sitting beside a hole. With
+     `auto-fit` the column count is not knowable in CSS, so this is scoped to
+     the two-column case by the same minmax that produced it. */
+  @media (max-width: 460px) {
+    .season-hero-actions > :nth-child(odd):last-child,
+    .season-stepper-actions > :nth-child(odd):last-child,
+    .season-publish-actions > :nth-child(odd):last-child,
+    .reg-toolbar > :nth-child(odd):last-child,
+    .live-exits > :nth-child(odd):last-child {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* ONE BOX FOR EVERY SPECIES. The bordered button already has this; the bare
+     link did not, which is the whole reason the pair looked broken. */
+  .season-hero-actions > :is(a, button, [role="button"]),
+  .season-stepper-actions > :is(a, button, [role="button"]),
+  .season-publish-actions > :is(a, button, [role="button"]),
+  .reg-toolbar > :is(a, button, [role="button"]),
+  .live-exits > :is(a, button, [role="button"]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    text-align: center;
+    box-sizing: border-box;
+    white-space: normal;
+  }
+}
+
+/* The registrations table's per-row actions: shorter labels, so they keep the
+   3-up that Icon / Captain / Details deserves before falling back to 2-up. */
+@media (max-width: 640px) {
+  .reg-table .reg-actions {
+    display: grid;
+
+    /* THREE FIXED COLUMNS THAT CAN SHRINK, not `auto-fit` over a hard minimum.
+       `minmax(72px, 1fr)` cannot go below 72px, so at 375px three columns plus
+       two gaps demanded 232px of a 227px cell and pushed the whole table into
+       a horizontal scroll — the exact defect this file's 1100px breakpoint
+       exists to prevent. `minmax(0, 1fr)` gives equal columns that yield.
+       A row with six actions (approve/waitlist/decline + icon/captain/details)
+       simply becomes two tidy rows of three. */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .reg-table .reg-actions > :is(a, button, [role="button"]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    box-sizing: border-box;
+
+    /* Tighter than the shared groups so all three fit one row at 390px: the
+       labels are one short word each, and a wrapped "Captain" costs more than
+       the padding buys. */
+    padding-inline: var(--space-2);
+
+    /* These are `ghost` buttons — transparent border, transparent background —
+       which is right on a desktop where hover reveals them and wrong on a
+       phone, where there is no hover and three tappable controls rendered as
+       bare gold words in a grey block read as text. The edge is the affordance. */
+    border-color: var(--border-subtle);
+    background: var(--surface);
+  }
+}
+
+/*
+ * THE LABEL THAT ASKED FOR A ROW AND WAS GIVEN 40% OF ONE.
+ *
+ * `.reg-table .reg-actions::before` sets `flex-basis: 100%` precisely so the
+ * "ACTIONS" label takes its own line and the buttons start clean underneath.
+ * It never did: `.reg-table td::before` sets `max-width: 40%` for the ordinary
+ * label/value cells, and a max-width caps a flex-basis. Measured on a 390px
+ * phone the label rendered 96.8px wide, the first button tucked in beside it at
+ * x=183, and the remaining two dropped to the next line at x=74 and x=160 — the
+ * 1 + 2 stagger that made this screen look unfinished.
+ */
+@media (max-width: 1100px) {
+  .reg-table .reg-actions::before {
+    max-width: none;
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+}
+
+/* Paging is a hand's job on a phone: 25 rows a page and 80 players means these
+   get tapped a lot, and they were the browser-small 32px. */
+@media (max-width: 640px) {
+  .pager {
+    gap: var(--space-2);
+  }
+
+  .pager > button {
+    min-height: 44px;
+    padding-inline: var(--space-3);
+  }
+}
+
+/* --- RH-1c · The registration row, as a card rather than a transposed table -- */
+
+/*
+ * WHAT IT WAS. Below 1100px each table row becomes a card and every cell
+ * carries its own label — a correct, honest responsive-table transform, and on
+ * a phone a literal one: seven label/value lines stacked vertically, SELECT and
+ * ACTIONS among them, measured at **363px per player**. Two and a third players
+ * fit a 390×844 screen, and triaging eighty of them meant scrolling thirty
+ * thousand pixels. The screen an organizer spends the most time in was the one
+ * that made them work hardest.
+ *
+ * WHAT IT IS NOW. The same seven cells, re-ordered into the three bands a
+ * person actually reads:
+ *
+ *   ┌──────────────────────────────────────────┐
+ *   │ ☐  (photo)  Aditya Sharma      APPROVED  │  WHO, and what state
+ *   │             +91 88020 10000              │
+ *   │ RV5DBZK · batter 34 yrs · Sunrise Rangers│  ENOUGH TO DECIDE
+ *   │ [  Icon  ][ Captain ][ Details ]         │  WHAT TO DO
+ *   └──────────────────────────────────────────┘
+ *
+ * Nothing is hidden and nothing is truncated — the same facts, in the order a
+ * triaging organizer wants them, on three lines instead of seven.
+ *
+ * ON THE LABELS. `thead` is display:none here, so each cell's `::before` is the
+ * only thing naming its column. The three that still need naming keep it
+ * (a bare "RV5DBZK" or "Sunrise Rangers" is ambiguous out of context). The
+ * three that do not are dropped deliberately: the checkbox already carries
+ * `aria-label="Select {name}"`, a person's name and phone need no field called
+ * PLAYER, and a badge reading "approved" needs no field called STATUS.
+ */
+@media (max-width: 640px) {
+  .reg-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3);
+  }
+
+  /* Band 1 — who, and what state. One line, the badge pinned to the right. */
+  .reg-table td[data-label="Select"] {
+    order: 1;
+    flex: 0 0 auto;
+    padding: 0;
+  }
+
+  .reg-table td[data-label="Player"] {
+    order: 2;
+
+    /* A NAME MUST NOT WRAP, AND THAT DECIDES THIS.
+       Flexbox breaks lines on base sizes before it shrinks anything, so an
+       `auto` basis measures the identity at its natural width (name + a nowrap
+       phone) and the status badge moves to the next line. A zero basis keeps
+       the badge up here — and leaves the name ~156px, which broke "Aditya
+       Sharma" into "Aditya / Sharma" on every row. Between a badge one line
+       higher and eighty player names each folded in half, the names win: they
+       are what an organizer is actually reading down this list. The badge
+       therefore leads band 2, where it is still the first thing after the
+       name and still scannable down the column. */
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    justify-content: flex-start;
+  }
+
+  /* Leads band 2, hard left, so the status of eighty players reads as one
+     column down the page rather than drifting with each name's length. */
+  .reg-table td[data-label="Status"] {
+    order: 3;
+    flex: 0 0 auto;
+    padding: 0;
+    justify-content: flex-start;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  /* Band 2 — the deciding facts, as one wrapped line of labelled chips. */
+  .reg-table td[data-label="Number"],
+  .reg-table td[data-label="Role"],
+  .reg-table td[data-label="Team"] {
+    order: 4;
+    flex: 0 1 auto;
+    padding: 0;
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: var(--space-1);
+    font-size: var(--text-sm-size);
+    color: var(--text-secondary);
+  }
+
+  /* Band 2 begins on a new line because band 1 already fills its own — the
+     status badge's auto margin pushes it to the right edge. Forcing a 100%
+     basis here instead put each fact on a line of its own, which is the very
+     stacking this card exists to undo. */
+  .reg-table td[data-label="Number"],
+  .reg-table td[data-label="Role"],
+  .reg-table td[data-label="Team"] {
+    align-items: center;
+  }
+
+  /* Sub-lines (age, playing styles, a decline reason, "Icon with no team")
+     stop being their own block and join the chip they belong to. */
+  .reg-table td[data-label="Role"] .reg-sub,
+  .reg-table td[data-label="Team"] .reg-sub {
+    display: inline;
+    margin-inline-start: var(--space-1);
+  }
+
+  /* Band 3 — what to do. Already an equal-cell grid (RH-1b); it just needs the
+     whole width and a rule off the facts above it. */
+  .reg-table td.reg-actions {
+    order: 5;
+    flex: 1 0 100%;
+    margin-top: 0;
+    padding-top: var(--space-2);
+  }
+
+  /* Labels that earn their place, and labels that do not. */
+  .reg-table td[data-label="Select"]::before,
+  .reg-table td[data-label="Player"]::before,
+  .reg-table td[data-label="Status"]::before,
+  .reg-table .reg-actions::before {
+    display: none;
+  }
+
+  .reg-table td[data-label="Number"]::before,
+  .reg-table td[data-label="Role"]::before,
+  .reg-table td[data-label="Team"]::before {
+    max-width: none;
+    flex: 0 0 auto;
+    padding-top: 0;
+    font-size: var(--text-2xs-size, 10px);
+    letter-spacing: 0.08em;
+  }
+
+  /* The identity block keeps its avatar beside the name rather than above it. */
+  .reg-table .reg-identity {
+    flex-wrap: nowrap;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .reg-table .reg-identity-text {
+    min-width: 0;
+  }
+
+  /* A PHONE NUMBER IS ONE WORD. It is read aloud, dialled and searched for as a
+     single run of digits; broken over three lines it is none of those things.
+     The name above it may wrap — that is what wrapping is for. */
+  .reg-table .registration-phone {
+    white-space: nowrap;
+  }
+}
+
+/*
+ * The filter bar, stacked. `flex-wrap` gives each control its content width, so
+ * on a phone the four filters came out 220 / 135 / 174 / 198px — four ragged
+ * left-aligned boxes down the card, and a search field too short to show its own
+ * placeholder ("name, phone, number or te…"). Stacked controls should be one
+ * width, and that width is the card's.
+ */
+@media (max-width: 640px) {
+  .filter-bar,
+  .bulk-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    width: 100%;
+  }
+
+  .filter-bar > *,
+  .bulk-bar > * {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .filter-bar input,
+  .filter-bar select,
+  .bulk-bar input,
+  .bulk-bar select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
+/*
+ * How a player plays, in the Details panel — the home for the facts the phone's
+ * row card gives up. A quiet two-up of labelled pairs, not a table: five short
+ * values do not need one.
+ */
+.details-facts {
+  display: grid;
+  /* 140px never fitted twice into the panel's 268px on a phone, so the "two-up"
+     this comment claimed was a single column four rows tall. 120 does. */
+  grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.details-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.details-facts dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.details-facts dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  text-transform: capitalize;
+}
+
+/*
+ * THE PLAYING STYLES MOVE BEHIND "DETAILS" ON A PHONE. THE ROLE DOES NOT.
+ *
+ * A first pass dropped the whole Role cell and took role and age with it. That
+ * was one step too far: a balanced pool needs bowlers and a keeper, so role is
+ * a fact an organizer scans DOWN the list while triaging, not one they open a
+ * panel for. Age rides with it at no cost ("batter 34 yrs" is one line either
+ * way). Only how somebody bats and bowls — read once you have already decided
+ * they are worth a second look — goes to the Details panel, which is reachable
+ * from a button in this very row and shows both at every width.
+ *
+ * `display: none` also removes the line from the accessibility tree, and that
+ * is the point rather than an oversight: on a phone there is no `thead` either,
+ * so a half-present value would be one nobody can reach. One place, one answer,
+ * one tap away.
+ */
+@media (max-width: 640px) {
+  /* Matched on the cell as well as the class: the band-2 rule above sets
+     `.reg-table td[data-label="Role"] .reg-sub { display: inline }`, which is
+     more specific than `.reg-table .reg-styles` and quietly won. */
+  .reg-table td[data-label="Role"] .reg-styles {
+    display: none;
+  }
+}
