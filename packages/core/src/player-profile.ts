@@ -79,6 +79,48 @@ const LABELS: Record<BattingStyle | BowlingStyle, string> = {
 };
 
 /**
+ * PARSE A STYLE THE WAY A PERSON WROTE IT.
+ *
+ * The stored values are snake_case tokens (`right_hand_opener`); every surface
+ * that shows a style shows its LABEL ("Right Hand Opener"). Nothing bridged the
+ * two on the way IN, so a CSV import carrying what the organizer could see —
+ * which is the only spelling they have ever been shown — silently stored
+ * nothing at all. Measured in the RH-1 rehearsal: 73 imported rows each carried
+ * a batting style, 0 were stored, and the preview reported "73 valid row(s) ·
+ * 0 errors".
+ *
+ * Accepts the canonical token, the human label, and either with any mixture of
+ * case, spaces, hyphens and underscores — so "Off-Break", "off break" and
+ * "off_break" are one answer. Returns null for anything it cannot place, which
+ * is the caller's cue to REPORT rather than to drop.
+ */
+function normalizeStyleKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_]+/g, "");
+}
+
+const STYLE_BY_NORMALIZED: ReadonlyMap<string, BattingStyle | BowlingStyle> = new Map(
+  (Object.keys(LABELS) as (BattingStyle | BowlingStyle)[]).flatMap((key) => [
+    [normalizeStyleKey(key), key] as const,
+    [normalizeStyleKey(LABELS[key]), key] as const,
+  ]),
+);
+
+/** The canonical batting style behind a token or a label, else null. */
+export function parseBattingStyle(value: string): BattingStyle | null {
+  const found = STYLE_BY_NORMALIZED.get(normalizeStyleKey(value));
+  return found !== undefined && isBattingStyle(found) ? found : null;
+}
+
+/** The canonical bowling style behind a token or a label, else null. */
+export function parseBowlingStyle(value: string): BowlingStyle | null {
+  const found = STYLE_BY_NORMALIZED.get(normalizeStyleKey(value));
+  return found !== undefined && isBowlingStyle(found) ? found : null;
+}
+
+/**
  * Label any batting OR bowling enum key (the two sets are disjoint), passing an
  * unknown/legacy value through unchanged and `null` through as `null`. The one
  * style formatter for the showcase, the player page, and the share card.

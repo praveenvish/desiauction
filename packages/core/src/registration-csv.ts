@@ -8,6 +8,7 @@
 
 import { isRegistrationRole, type RegistrationRole } from "./competition";
 import { normalizePhone } from "./phone";
+import { parseBattingStyle, parseBowlingStyle } from "./player-profile";
 
 export interface CsvRegistrationRow {
   line: number; // 1-based source line (header = line 1)
@@ -201,11 +202,33 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
     const battingStyle = optional("batting_style");
     const bowlingStyle = optional("bowling_style");
 
+    /*
+     * THE TWO COLUMNS NOBODY CHECKED.
+     *
+     * Every other column errors per line; these two were passed through raw,
+     * and `commitRegistrationImport` then dropped anything it did not
+     * recognise — `isBattingStyle(...) ? {...} : {}`. Since the stored values
+     * are snake_case tokens and every screen shows the LABEL, an organizer
+     * typing what they can see lost the column entirely and was told the file
+     * was clean. RH-1: 73 rows in, 73 styles carried, 0 stored, 0 errors shown.
+     *
+     * Now they are parsed the way a person writes them and REFUSED when they
+     * cannot be placed — the same contract the band got in DA-14.
+     */
+    const parsedBatting = battingStyle === "" ? null : parseBattingStyle(battingStyle);
+    const parsedBowling = bowlingStyle === "" ? null : parseBowlingStyle(bowlingStyle);
+
     const check = validateNewPlayer(
       { name: rawName, phone: rawPhone, role: rawRole, basePriceBand: band },
       knownBands,
     );
     const rowErrors = check.ok ? [] : check.errors.map((error) => error.message);
+    if (battingStyle !== "" && parsedBatting === null) {
+      rowErrors.push(`unknown batting style "${battingStyle}"`);
+    }
+    if (bowlingStyle !== "" && parsedBowling === null) {
+      rowErrors.push(`unknown bowling style "${bowlingStyle}"`);
+    }
     // The in-file duplicate check is the parser's alone (a form has no "file"),
     // and it needs the normalized phone even when another field failed — so a
     // repeat is still reported against the line that repeats it.
@@ -230,8 +253,9 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
       role: rawRole as RegistrationRole,
       basePriceBand: band === "" ? null : band,
       dateOfBirth: dateOfBirth === "" ? null : dateOfBirth,
-      battingStyle: battingStyle === "" ? null : battingStyle,
-      bowlingStyle: bowlingStyle === "" ? null : bowlingStyle,
+      // Canonical from here on, so the commit has nothing left to reject.
+      battingStyle: parsedBatting,
+      bowlingStyle: parsedBowling,
     });
   }
 

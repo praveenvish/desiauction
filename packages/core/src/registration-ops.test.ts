@@ -199,3 +199,72 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
     expect(tokenizeCsv('a,"line1\nline2",c')).toEqual([["a", "line1\nline2", "c"]]);
   });
 });
+
+describe("CSV import — playing styles are parsed, not silently dropped", () => {
+  /*
+   * RH-1: `batting_style` and `bowling_style` were the only columns nobody
+   * validated. The parser passed them through raw and the commit dropped
+   * anything it did not recognise, so an organizer importing eighty players
+   * with the spelling the product itself shows them ("Right Hand Opener")
+   * stored zero styles and was told the file was clean.
+   */
+  const header = "name,phone,role,base_price_band,batting_style,bowling_style";
+
+  it("accepts the label a person actually sees on screen", () => {
+    const result = parseRegistrationCsv(
+      `${header}\nAsha Rao,9876543210,batter,A,Right Hand Opener,Off-Break\n`,
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.battingStyle).toBe("right_hand_opener");
+    expect(result.rows[0]?.bowlingStyle).toBe("off_break");
+  });
+
+  it("accepts the canonical token, and any casing or separator between them", () => {
+    const result = parseRegistrationCsv(
+      `${header}\n` +
+        `A One,9876543211,batter,A,right_hand_opener,off_break\n` +
+        `B Two,9876543212,bowler,A,RIGHT HAND OPENER,OFF BREAK\n` +
+        `C Three,9876543213,bowler,A,Right-Hand-Opener,off-break\n`,
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.battingStyle)).toEqual([
+      "right_hand_opener",
+      "right_hand_opener",
+      "right_hand_opener",
+    ]);
+    expect(result.rows.map((row) => row.bowlingStyle)).toEqual([
+      "off_break",
+      "off_break",
+      "off_break",
+    ]);
+  });
+
+  it("REFUSES a style it cannot place, on the line that carries it", () => {
+    const result = parseRegistrationCsv(
+      `${header}\nDee Four,9876543214,batter,A,Switch Hitter,Doosra\n`,
+    );
+    expect(result.rows).toEqual([]);
+    expect(result.errors).toEqual([
+      {
+        line: 2,
+        message: 'unknown batting style "Switch Hitter"; unknown bowling style "Doosra"',
+      },
+    ]);
+  });
+
+  it("leaves the columns null when they are empty, and does not error", () => {
+    const result = parseRegistrationCsv(`${header}\nEmpty Ella,9876543215,batter,A,,\n`);
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.battingStyle).toBeNull();
+    expect(result.rows[0]?.bowlingStyle).toBeNull();
+  });
+
+  it("does not mistake a bowling style for a batting one, or the reverse", () => {
+    const result = parseRegistrationCsv(
+      `${header}\nCross Wires,9876543216,batter,A,Off-Break,Right Hand Opener\n`,
+    );
+    expect(result.rows).toEqual([]);
+    expect(result.errors[0]?.message).toContain('unknown batting style "Off-Break"');
+    expect(result.errors[0]?.message).toContain('unknown bowling style "Right Hand Opener"');
+  });
+});
