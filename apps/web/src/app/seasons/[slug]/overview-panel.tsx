@@ -59,11 +59,22 @@ const ADVANCE_ANNOUNCEMENT: Record<string, string> = {
   registration_closed: "Registration closed. The auction is next.",
 };
 
-/** Where the season actually goes next once intake is shut (DA-10). */
+/**
+ * Where the season actually goes next once intake is shut (DA-10).
+ *
+ * `canSettle` is the gate on the last two rungs and it is not optional. The
+ * settlement desk is `settlement.view`, which by design is NOT implied by
+ * `org:owner` or by `competition.manage` — the capability partition keeps money
+ * powers an explicit act of trust. Nothing here honoured that, so the organizer
+ * who had just conducted the auction was offered "Open settlement" as the
+ * page's primary action and taken to a bare 404. Where the door is locked the
+ * ladder now says who holds the key instead of pointing at it.
+ */
 function nextDestination(
   slug: string,
   auctionStatus: string | null,
-): { href: string; label: string } {
+  canSettle: boolean,
+): { href: string; label: string } | { locked: true } {
   if (auctionStatus === null) {
     return { href: `/seasons/${slug}/auction`, label: "Create the auction" };
   }
@@ -72,6 +83,9 @@ function nextDestination(
   }
   if (auctionStatus === "live" || auctionStatus === "paused") {
     return { href: `/seasons/${slug}/auction/cockpit`, label: "Enter the auction room" };
+  }
+  if (!canSettle) {
+    return { locked: true };
   }
   if (auctionStatus === "completed") {
     return { href: `/seasons/${slug}/money`, label: "Open settlement" };
@@ -220,7 +234,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
 
   const status = view.competition.status;
   const step = NEXT_STEP[status] ?? null;
-  const onward = nextDestination(slug, view.auctionStatus);
+  const onward = nextDestination(slug, view.auctionStatus, view.viewer.canSettle);
   const cleared = clearedRungs(view);
   const activeIndex = cleared.indexOf(false);
   const auctionDone = cleared[3] === true;
@@ -399,7 +413,9 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
               >
                 {step.label}
               </Button>
-            ) : view.viewer.canManage && status === "registration_closed" ? (
+            ) : view.viewer.canManage &&
+              status === "registration_closed" &&
+              !("locked" in onward) ? (
               <Button
                 size="touch"
                 onClick={() => {
@@ -409,6 +425,15 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
               >
                 {onward.label}
               </Button>
+            ) : null}
+            {view.viewer.canManage && status === "registration_closed" && "locked" in onward ? (
+              <p className="season-guard" data-testid="settlement-locked">
+                <span>
+                  The auction is done. Settling it needs money authority for{" "}
+                  {view.orgName === "" ? "this club" : view.orgName} — a separate grant from running
+                  the season. Ask an owner of the club to give you one under Money &amp; roles.
+                </span>
+              </p>
             ) : null}
           </div>
           {blocked && missing.length > 0 ? (

@@ -258,7 +258,13 @@ export interface CompetitionView {
 }
 
 export interface SeasonOverviewView extends SeasonOverview {
-  viewer: { canManage: boolean; canReview: boolean; canSeeMoney: boolean };
+  viewer: {
+    canManage: boolean;
+    canReview: boolean;
+    canSeeMoney: boolean;
+    /** `settlement.view` — whether /seasons/[slug]/money will actually open. */
+    canSettle: boolean;
+  };
   /** What still stands between this season and a public page (DA-12). */
   publishBlockers: PublishBlocker[];
 }
@@ -315,7 +321,14 @@ export async function seasonOverviewView(slug: string): Promise<SeasonOverviewVi
     const overview = await seasonOverview(db, competition, { money: canSeeMoney });
     return {
       ...overview,
-      viewer: { canManage, canReview, canSeeMoney },
+      // `canSeeMoney` and `canSettle` are NOT the same answer, and the overview
+      // needed both. Money SIGHT is running the season or keeping its books;
+      // the settlement DESK is the books alone. The ladder's final rung offered
+      // "Open settlement" on sight, so the person who had just conducted the
+      // whole auction — org owner, `competition.manage`, no settlement grant —
+      // was handed the page's primary call to action at the end of the night
+      // and taken to "LOST BALL · This page doesn't exist".
+      viewer: { canManage, canReview, canSeeMoney, canSettle },
       publishBlockers: publishBlockers(competition),
     };
   });

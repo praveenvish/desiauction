@@ -568,22 +568,50 @@ export function ConnectionCheck({ wsUrl }: { wsUrl: string }) {
   );
 }
 
-/** Inline connection quality: state, clock sync, read-only hint. */
+/**
+ * Inline connection quality: state, clock sync, read-only hint.
+ *
+ * `connection` is the socket's readyState, and a readyState of `open` survives
+ * the network dying — the browser does not learn otherwise until TCP gives up.
+ * So this line read "Live · clock ±20ms" for a device that had been offline for
+ * fifteen seconds, with the ribbon two inches away already saying OFFLINE and
+ * the raise button already disabled. It is the sentence somebody opens the
+ * diagnostics strip to read when bidding has stopped working, and it was the
+ * one thing on the page still claiming everything was fine.
+ *
+ * `stale` and `offline` come from the same hook the ribbon uses, so the two
+ * cannot disagree again.
+ */
 export function ConnectionQuality({
   connection,
   drift,
+  stale = false,
+  offline = false,
 }: {
   connection: "connecting" | "open" | "reconnecting";
   drift: number;
+  /** The feed has stopped confirming state, whatever the socket claims. */
+  stale?: boolean;
+  /** The device itself reports no network. */
+  offline?: boolean;
 }) {
-  return (
-    <span className="live-quality" data-testid="connection-quality" data-state={connection}>
-      <span className="live-quality-dot" aria-hidden />
-      {connection === "open"
+  const label = offline
+    ? "Offline — this device has no network"
+    : stale
+      ? "No answer from the auction — read-only"
+      : connection === "open"
         ? `Live · clock ±${String(Math.min(999, Math.abs(Math.round(drift))))}ms`
         : connection === "connecting"
           ? "Connecting…"
-          : "Reconnecting — read-only"}
+          : "Reconnecting — read-only";
+  return (
+    <span
+      className="live-quality"
+      data-testid="connection-quality"
+      data-state={offline ? "offline" : stale ? "stale" : connection}
+    >
+      <span className="live-quality-dot" aria-hidden />
+      {label}
     </span>
   );
 }

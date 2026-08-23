@@ -8,6 +8,7 @@ import {
 } from "@desiauction/db";
 import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
+import { formatPhone } from "../../lib/format-phone";
 import { resolvedLots, rulesOf } from "../auction/live-summary";
 import { registrationStats } from "./registrations";
 import { teamsOf, type CompetitionSummary } from "./competitions";
@@ -168,13 +169,13 @@ export async function teamsWorkspace(
       // claimed their paddles — the normal end state, and what the demo data is
       // — rendered every card as ownerless while two people were bidding.
       db
-        .select({ teamId: paddles.teamId, name: people.name })
+        .select({ teamId: paddles.teamId, name: people.name, phone: people.phone })
         .from(paddles)
         .innerJoin(people, eq(people.id, paddles.personId))
         .where(and(eq(paddles.auctionId, auction.id), isNull(paddles.releasedAt)))
         .orderBy(asc(paddles.paddleNumber)),
       db
-        .select({ teamId: auctionOwnerInvites.teamId, name: people.name })
+        .select({ teamId: auctionOwnerInvites.teamId, name: people.name, phone: people.phone })
         .from(auctionOwnerInvites)
         .innerJoin(people, eq(people.id, auctionOwnerInvites.acceptedBy))
         .where(
@@ -190,10 +191,17 @@ export async function teamsWorkspace(
       }
     }
     // Invites first, paddles second — the paddle wins where both exist.
+    //
+    // THE NAME IS NOT THE OWNERSHIP. The name gate fires AFTER an invitation is
+    // accepted (the acceptance redirects into /onboarding), so there is a real
+    // window — and for anyone who closes the tab there, a permanent one — in
+    // which a team has an accepted owner holding a ₹20L purse and no name. This
+    // loop used to drop those rows, and the card then read "No owner yet",
+    // which is the one sentence that makes an organizer mint a second link on
+    // auction night. The cockpit has always shown the phone; this now agrees.
     for (const owner of [...invited, ...paddleHolders]) {
-      if (owner.name !== null) {
-        ownerByTeam.set(owner.teamId, owner.name);
-      }
+      const label = owner.name ?? formatPhone(owner.phone);
+      ownerByTeam.set(owner.teamId, label);
     }
   }
 

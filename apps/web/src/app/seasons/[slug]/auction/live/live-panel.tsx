@@ -613,7 +613,12 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       <div className="live-diagnostics" data-testid="live-diagnostics">
         <span className="live-diagnostics-label">Feed diagnostics</span>
         <span className="live-substatus-meta">
-          <ConnectionQuality connection={connection} drift={drift} />
+          <ConnectionQuality
+            connection={connection}
+            drift={drift}
+            stale={stale}
+            offline={offline}
+          />
           <span className="competitions-hint" data-testid="snapshot-version">
             v{version}
           </span>
