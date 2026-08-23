@@ -1,5 +1,6 @@
 import { deriveAge } from "@desiauction/core";
 import {
+  auctionEvents,
   auctions,
   competitions,
   organizations,
@@ -441,9 +442,48 @@ const latestAuctionStatus = sql<string | null>`(
     limit 1
   )`;
 
-/** The same test the public competition page uses for its spectate door
- *  (`/c/[slug]`): a paused auction is mid-lot, not over, and still watchable. */
-const isLive = sql<boolean>`${latestAuctionStatus} in ('live', 'paused')`;
+/**
+ * How long an auction may go silent and still be called LIVE in public.
+ *
+ * An auction night runs a few hours; a paused one might sit through a dinner
+ * break or, at the outside, overnight while the hall is re-booked. Beyond a
+ * day, "live" is not a description of anything a visitor could watch.
+ */
+const LIVE_SILENCE_MS = 24 * 60 * 60 * 1000;
+
+/** When the engine last confirmed anything at all for this competition. */
+const latestAuctionEventMs = sql<number | null>`(
+    select max(${auctionEvents.atMs})
+    from ${auctionEvents}
+    join ${auctions} on ${auctions.id} = ${auctionEvents.auctionId}
+    where ${auctions.competitionId} = ${competitions.id}
+  )`;
+
+/**
+ * LIVE MEANS SOMETHING IS HAPPENING, NOT THAT A COLUMN SAYS SO.
+ *
+ * This was `status in ('live','paused')` and nothing else, so an auction that
+ * was opened and never closed — a laptop that died, a night that was abandoned,
+ * a test run — announced itself as LIVE NOW on the public directory for ever.
+ * Three consequences, all of them public: the badge is a false claim, the
+ * "Live now" facet count is a false number, and the default sort puts those
+ * seasons ABOVE the ones that really are live, which is the opposite of what
+ * that sort exists to do.
+ *
+ * The event log already knows. Every accepted command appends a row carrying
+ * the engine's own timestamp, so the last event IS the last sign of life. A
+ * status of live or paused with a day's silence behind it is a stalled auction,
+ * and a visitor is told nothing rather than told wrongly.
+ *
+ * A DISPLAY test and deliberately nothing more: the auction is untouched and a
+ * conductor can still resume a three-day-old pause. What changes is that the
+ * public stops advertising it as watchable.
+ */
+const isLive = sql<boolean>`(
+    ${latestAuctionStatus} in ('live', 'paused')
+    and ${latestAuctionEventMs} is not null
+    and ${latestAuctionEventMs} > ${sql.raw(String(Date.now() - LIVE_SILENCE_MS))}
+  )`;
 
 /** Competitions whose organizers PUBLISHED them (visibility='public'). */
 export async function publicCompetitionsDirectory(params: {
@@ -511,6 +551,9 @@ export async function publicCompetitionsDirectory(params: {
       orgName: organizations.name,
       logoKey: competitions.logoUrl,
       auctionStatus: latestAuctionStatus,
+      // The row's own badge must agree with the facet count and the sort that
+      // placed it — three renderings of one question, answered once.
+      live: isLive,
       playerCount: sql<number>`(select count(*)::int from ${registrations}
         where ${registrations.competitionId} = ${competitions.id})`,
     })
@@ -531,7 +574,7 @@ export async function publicCompetitionsDirectory(params: {
       open: row.status === "registration_open",
       logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
       auctionStatus: row.auctionStatus,
-      live: row.auctionStatus === "live" || row.auctionStatus === "paused",
+      live: row.live,
       playerCount: row.playerCount,
     })),
     page,

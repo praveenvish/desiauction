@@ -5,6 +5,8 @@
 // dedicated non-superuser role mirroring production (the RC-4 discipline).
 import {
   auditLog,
+  auctionEvents as auctionEventsTable,
+  auctions as auctionsTable,
   competitions as competitionsTable,
   createDb,
   grants as grantsTable,
@@ -24,11 +26,14 @@ import {
 import { desc, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { DEFAULT_AUCTION_CONFIG } from "@desiauction/core";
+
 import { env } from "../../env";
 import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
+import { publicCompetitionsDirectory } from "./public";
 import {
   advanceCompetition,
   cloneCompetition,
@@ -99,6 +104,8 @@ afterAll(async () => {
   if (orgIds.length > 0) {
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));
     await db.delete(teamsTable).where(inArray(teamsTable.orgId, orgIds));
+    await db.delete(auctionEventsTable).where(inArray(auctionEventsTable.orgId, orgIds));
+    await db.delete(auctionsTable).where(inArray(auctionsTable.orgId, orgIds));
     await db.delete(competitionsTable).where(inArray(competitionsTable.orgId, orgIds));
     await db.delete(tournamentsTable).where(inArray(tournamentsTable.orgId, orgIds));
     await db.delete(grantsTable).where(inArray(grantsTable.scopeId, orgIds));
@@ -114,6 +121,80 @@ afterAll(async () => {
   await db.delete(otpCodes).where(inArray(otpCodes.phone, TEST_PHONES));
   await db.delete(otpInbox).where(inArray(otpInbox.phone, TEST_PHONES));
   await handle.sql.end();
+});
+
+describe('PUBLIC DIRECTORY — "live" means something is happening', () => {
+  /*
+   * `live` was `auction.status in ('live','paused')` and nothing else, so an
+   * auction opened and never closed — a laptop that died, a night abandoned, a
+   * test run — announced itself as LIVE NOW on the public directory for ever.
+   * Measured on a dev database: 33 published seasons claiming to be live, the
+   * newest of them silent for three days, and the default sort putting all 33
+   * above anything genuinely live.
+   *
+   * The event log already knew. These three cases are the whole rule.
+   */
+  const seed = async (name: string, status: "live" | "paused", lastEventAgeMs: number | null) => {
+    const competition = await createCompetition(db, orgX.id, owner, { name: `${name} ${RUN}` });
+    await db
+      .update(competitionsTable)
+      .set({ visibility: "public" })
+      .where(eq(competitionsTable.id, competition.id));
+    const auctionId = newId();
+    await db.insert(auctionsTable).values({
+      id: auctionId,
+      orgId: orgX.id,
+      competitionId: competition.id,
+      name: `${name} auction`,
+      status,
+      config: DEFAULT_AUCTION_CONFIG,
+      createdBy: owner,
+    });
+    if (lastEventAgeMs !== null) {
+      await db.insert(auctionEventsTable).values({
+        id: newId(),
+        orgId: orgX.id,
+        auctionId,
+        seq: 1,
+        type: "AuctionOpened",
+        atMs: Date.now() - lastEventAgeMs,
+        actor: owner,
+        correlationId: newId(),
+        payload: {},
+      });
+    }
+    return competition;
+  };
+
+  const liveFlagOf = async (slug: string) => {
+    const page = await publicCompetitionsDirectory({ q: RUN, page: 1 });
+    return page.entries.find((entry) => entry.slug === slug)?.live;
+  };
+
+  it("a live auction that spoke a minute ago IS live", async () => {
+    const c = await seed("Fresh", "live", 60_000);
+    expect(await liveFlagOf(c.slug)).toBe(true);
+  });
+
+  it("a live auction silent for three days is NOT live", async () => {
+    const c = await seed("Stalled", "live", 3 * 24 * 60 * 60 * 1000);
+    expect(await liveFlagOf(c.slug)).toBe(false);
+  });
+
+  it("a live auction that never emitted an event is NOT live", async () => {
+    const c = await seed("Silent", "live", null);
+    expect(await liveFlagOf(c.slug)).toBe(false);
+  });
+
+  it("a PAUSED auction mid-night is still live — a break is not an abandonment", async () => {
+    const c = await seed("Paused", "paused", 30 * 60 * 1000);
+    expect(await liveFlagOf(c.slug)).toBe(true);
+  });
+
+  it("the facet count agrees with the badges, because it is the same test", async () => {
+    const page = await publicCompetitionsDirectory({ q: RUN, page: 1 });
+    expect(page.counts.live).toBe(page.entries.filter((entry) => entry.live).length);
+  });
 });
 
 describe("COMPETITION REGRESSION — domain contract", () => {
