@@ -13,6 +13,7 @@ import {
   newId,
   organizations,
   orgMembers,
+  passUpgradeRequests as passUpgradeRequestsTable,
   otpCodes,
   otpInbox,
   people,
@@ -102,6 +103,9 @@ afterAll(async () => {
   const ids = [owner, outsider, player].filter((id) => id !== "");
   const orgIds = [orgX.id, orgY.id].filter((id) => id !== "");
   if (orgIds.length > 0) {
+    await db
+      .delete(passUpgradeRequestsTable)
+      .where(inArray(passUpgradeRequestsTable.orgId, orgIds));
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));
     await db.delete(teamsTable).where(inArray(teamsTable.orgId, orgIds));
     await db.delete(auctionEventsTable).where(inArray(auctionEventsTable.orgId, orgIds));
@@ -220,6 +224,51 @@ describe("TIER LIMITS — the ceiling the pricing page has always described", ()
         poolPeople.map((person) => person.id),
       ),
     );
+  });
+
+  it("allows exactly one open upgrade request per season, and another once answered", async () => {
+    /*
+     * The refusal says "upgrade the season's pass"; 0028 is where that goes.
+     * The partial unique index is the whole rule: a season may ask again after
+     * it has been answered, but it cannot queue three asks while one is open —
+     * which is what an organizer hitting the ceiling repeatedly would otherwise
+     * do, and what would make the queue unreadable for whoever answers it.
+     */
+    const competition = await freeSeason("Upgrade");
+    const ask = (id: string) =>
+      db.insert(passUpgradeRequestsTable).values({
+        id,
+        orgId: orgX.id,
+        competitionId: competition.id,
+        fromTier: "free" as const,
+        requestedTier: "pro" as const,
+        requestedBy: owner,
+      });
+
+    const first = newId();
+    await ask(first);
+    await expect(ask(newId())).rejects.toThrow();
+
+    // Answered — and the season may ask again.
+    await db
+      .update(passUpgradeRequestsTable)
+      .set({ resolvedAt: new Date(), resolvedBy: owner, outcome: "granted" })
+      .where(eq(passUpgradeRequestsTable.id, first));
+    await expect(ask(newId())).resolves.toBeDefined();
+
+    // The answered one still explains what it moved them from.
+    const rows = await db
+      .select({
+        fromTier: passUpgradeRequestsTable.fromTier,
+        outcome: passUpgradeRequestsTable.outcome,
+      })
+      .from(passUpgradeRequestsTable)
+      .where(eq(passUpgradeRequestsTable.id, first));
+    expect(rows[0]).toEqual({ fromTier: "free", outcome: "granted" });
+
+    await db
+      .delete(passUpgradeRequestsTable)
+      .where(eq(passUpgradeRequestsTable.competitionId, competition.id));
   });
 
   it("never blocks a season created during beta — that promise is on the page", async () => {

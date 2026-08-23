@@ -354,6 +354,37 @@ export const tournaments = pgTable(
   (table) => [index("tournaments_org_idx").on(table.orgId)],
 );
 
+/**
+ * ASKING FOR MORE ROOM (0028).
+ *
+ * 0027 gave seasons a tier and the platform began refusing the fifth team on
+ * Free. A refusal saying "upgrade the season's pass" with nowhere to do it is a
+ * dead end; this is the somewhere.
+ *
+ * A REQUEST, NOT A PURCHASE. Pro and Association both read "Published at GA" on
+ * the pricing page — there is no price for either anywhere in this repository,
+ * so a checkout would have to invent the number a customer is charged. An
+ * organizer asks, somebody answers, and the answer is recorded. When prices
+ * exist, this is the row a payment attaches to.
+ */
+export const passUpgradeRequests = pgTable("pass_upgrade_requests", {
+  id: id(),
+  orgId: char("org_id", { length: 26 }).notNull(),
+  competitionId: char("competition_id", { length: 26 }).notNull(),
+  /** The tier as it stood when they asked — so a granted request still explains
+   *  what it moved them from, after the competition row has changed. */
+  fromTier: text("from_tier", { enum: ["free", "pro", "association"] }).notNull(),
+  requestedTier: text("requested_tier", { enum: ["free", "pro", "association"] }).notNull(),
+  /** Why they need it, in their words: the most useful field for whoever answers. */
+  note: text("note"),
+  requestedBy: char("requested_by", { length: 26 }).notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  /** Null resolution = still open. A partial unique index allows exactly one. */
+  resolvedAt: ts("resolved_at"),
+  resolvedBy: char("resolved_by", { length: 26 }),
+  outcome: text("outcome", { enum: ["granted", "declined"] }),
+});
+
 export const competitions = pgTable(
   "competitions",
   {

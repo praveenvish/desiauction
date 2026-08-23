@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import { PageTitle } from "../../../components/shell/page-title";
 import { requireOnboarded } from "../../../server/auth/onboarding-gate";
 import { seasonOverviewView } from "../../../server/competition/actions";
+import { seasonPass } from "../../../server/competition/pass";
 import { CreatedToast } from "./created-toast";
 import { OverviewPanel } from "./overview-panel";
+import { SeasonPassCard } from "./season-pass";
 import "../seasons.css";
 
 export const metadata = { title: "Season · DesiAuction" };
@@ -18,7 +20,7 @@ export default async function CompetitionHomePage({
   const { slug } = await params;
   // See /seasons: the public children under [slug] rule out a gate layout here.
   await requireOnboarded();
-  const view = await seasonOverviewView(slug);
+  const [view, pass] = await Promise.all([seasonOverviewView(slug), seasonPass(slug)]);
   if (view === null) {
     // Non-members and unknown slugs are indistinguishable (tenancy, IP-2 pattern).
     notFound();
@@ -34,6 +36,9 @@ export default async function CompetitionHomePage({
               details" trigger both depend on the panel's own state (DA-11). */}
           <PageTitle title={view.competition.name} testId="competition-name" />
           <OverviewPanel view={view} slug={slug} />
+          {/* What the season's pass covers, and how close it is — visible at 2
+              of 4 teams, not only at the refusal. */}
+          {pass === null ? null : <SeasonPassCard slug={slug} pass={pass} />}
         </div>
       </main>
     </ToastProvider>
