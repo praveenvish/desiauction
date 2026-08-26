@@ -57,7 +57,18 @@
   white-space: nowrap;
 }
 
+/* A bare inline link is only as tall as its text — this one measured 41x16px in
+   every header on every public page, under the 24x24 floor of WCAG 2.2 SC 2.5.8
+   and well under the 44px the rest of this codebase treats as house convention
+   (`.touch` in button.module.css). It sits beside a 40px CTA, so matching the
+   touch rung both fixes the target and stops the two actions from sitting on
+   different baselines. Padding is horizontal only: the min-height does the
+   vertical work, so the header's 64px row is unaffected. */
 .shell-header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
   color: var(--text-accent);
   text-decoration: none;
   font-family: var(--font-text);
