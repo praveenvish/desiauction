@@ -127,6 +127,27 @@
   background: var(--surface);
 }
 
+/* THE RHYTHM LARGE SCREENS WERE NOT GETTING.
+   The fluid clamp above tops out at 48px, which is right for a laptop and too
+   tight for a 1440px display: at that width every band carried identical, small
+   padding, so eight distinct sections read as one continuous column and the page
+   felt efficient rather than composed. Above 1280px the ceiling lifts one step
+   of the SAME scale — nothing here is a new value, and nothing below 1280px
+   moves, so the dense mobile and laptop layouts are exactly as they were. */
+@media (min-width: 1280px) {
+  .mk-band {
+    padding: var(--space-20) 0;
+  }
+
+  /* The lifecycle band is already the tallest thing on the page (ten stages);
+     giving it the full step would make it sprawl, so it takes the smaller one.
+     Varying this deliberately is the point — equal padding everywhere is what
+     flattened the rhythm in the first place. */
+  .mk-lifecycle-band {
+    padding: var(--space-16) 0;
+  }
+}
+
 .mk-band--sunken {
   background: var(--surface-sunken);
 }
@@ -192,26 +213,42 @@ body {
    padding to clear the floating bar. Browsers without :has() simply keep the
    default sticky glass header and the hero's normal padding — a clean fallback.
    Every other public page (pricing, help, …) is untouched. */
-body:has(.landing.mk) header[data-theme="floodlight"] {
-  position: fixed;
-  inset: 0 0 auto 0;
-  background-color: transparent;
-  background-image: none;
-  border-bottom-color: transparent;
-  box-shadow: none;
-}
-
 body:has(.landing.mk) .mk-hero {
-  padding-top: clamp(6.5rem, 5vw + 3.5rem, 9rem);
   padding-bottom: clamp(4rem, 4vw, 6rem);
 }
 
+/* THE TRANSPARENT HEADER MAY ONLY EXIST WHERE SOMETHING RESTORES IT.
+   This block used to strip the header's background, border and shadow
+   unconditionally, and hand the glass back ONLY through `mk-header-home` —
+   which lives behind both a reduced-motion check and a scroll-timeline
+   `@supports`. So for anyone who asks for less motion, and for every browser
+   without scroll-driven animations, nothing ever restored it: a FIXED header
+   carrying floodlight text tokens floated over the light bands for the rest of
+   the page. Measured on this branch at scroll 2200 with reduce set — header
+   background `rgba(0,0,0,0)`, wordmark still `#E8EEF9`, about 1.07:1 against
+   `--surface`. Invisible lettering, and invisible to the axe run too, which
+   scans at scroll 0 where the hero behind it is still dark.
+   The whole treatment now sits inside the same guard as its restore, so the
+   fallback is the shell's own glass header — which is what the comment below
+   always claimed happened. */
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: scroll()) {
     /* Keep the scroll-linked densify, but start it fully transparent so the
        photo shows through at the top; timeline + range cascade from .header. */
     body:has(.landing.mk) header[data-theme="floodlight"] {
+      position: fixed;
+      inset: 0 0 auto 0;
+      background-color: transparent;
+      background-image: none;
+      border-bottom-color: transparent;
+      box-shadow: none;
       animation-name: mk-header-home;
+    }
+
+    /* Only a FIXED header needs clearing; the sticky fallback occupies its own
+       space, so this padding belongs with the position that requires it. */
+    body:has(.landing.mk) .mk-hero {
+      padding-top: clamp(6.5rem, 5vw + 3.5rem, 9rem);
     }
   }
 }
@@ -590,6 +627,20 @@ body:has(.landing.mk) .mk-hero {
   height: 17px;
 }
 
+/* Five is prime, so every wrap leaves an uneven row — but 3 + 2 is a pair of
+   rows and 4 + 1 is a row with an orphan. At 160px minimum, four tiles started
+   fitting around 692px and the fifth dropped alone onto its own line for the
+   whole tablet range, which is the same arrangement this stylesheet rejects for
+   its card grids. Holding three columns until the desktop lock breaks it 3 + 2
+   instead. Below this the intrinsic wrap is left alone: forcing wider tracks
+   there would stack all five and make the strip taller on exactly the screens
+   with least room. */
+@media (min-width: 692px) and (max-width: 1023px) {
+  .mk-proof {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* Desktop: lock to a flush single row of five with hairline dividers. */
 @media (min-width: 1024px) {
   .mk-proof {
@@ -856,14 +907,20 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
+/* The rotation here must match the static tilt above (1.1deg), not lead a life
+   of its own. It was left at 2.6/2.8deg when that tilt was deliberately reduced
+   from 2.6 to 1.1 — and because a running animation outranks author
+   declarations, every desktop visitor without reduced motion saw the card at
+   the OLD angle: the comment explaining why 2.6deg "looks hung badly" was
+   describing exactly what still shipped. The float is the drift, not the tilt. */
 @keyframes mk-stage-float {
   0%,
   100% {
-    transform: rotate(2.6deg) translate3d(0, 0, 0);
+    transform: rotate(1.1deg) translate3d(0, 0, 0);
   }
 
   50% {
-    transform: rotate(2.8deg) translate3d(0, -7px, 0);
+    transform: rotate(1.3deg) translate3d(0, -7px, 0);
   }
 }
 
@@ -1179,10 +1236,22 @@ body:has(.landing.mk) .mk-hero {
 
 /* --- Cards ------------------------------------------------------------------ */
 
+/* One column until the row can hold all three — the same rule `.mk-steps` and
+   `.mk-tiers` already follow, and for the same reason. `auto-fit` fitted exactly
+   two 260px tracks from roughly 576px to 851px, so on every tablet in that band
+   these three cards rendered 2 + 1: two peers and an orphan, which this
+   stylesheet twice calls dishonest in writing while leaving this grid doing it.
+   Stacked below the breakpoint, three-up above it, never two-and-a-bit. */
 .mk-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .mk-cards {
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  }
 }
 
 /* Four-up inventory (the capabilities band): tighter minimum so four cards
@@ -2026,14 +2095,24 @@ body:has(.landing.mk) .mk-hero {
    landing-page load fired a request that 404'd, on a layer whose only visible
    result was the gradient underneath it. The url() is removed rather than the
    slot: drop the file in and restore the one line below to light it up. */
+/* THE CLOSING BAND IS A SECTION, NOT A FOOTNOTE.
+   It carried clamp(--space-4, 1.8vw, --space-6) — roughly half of every other
+   band — which rendered the page's final ask at 152px against ~600px siblings.
+   The last thing a visitor reads was structurally the least important thing on
+   the page. It now takes the band scale, one step down from the content bands
+   because its content is a single row rather than a grid. */
 .mk-cta-band {
   position: relative;
   overflow: hidden;
-  padding-block: clamp(var(--space-4), 1.8vw, var(--space-6));
+  padding-block: clamp(var(--space-10), 3.5vw, var(--space-16));
   background:
+    /* The accent wash sat at 86% — directly behind the action column, so the
+       gold primary button was lit from behind by its own colour and stopped
+       reading as the brightest thing in the band. Moved back over the copy and
+       softened; the atmosphere survives, the button separates from it. */
     radial-gradient(
-      46rem 30rem at 86% 45%,
-      color-mix(in srgb, var(--accent) 20%, transparent),
+      46rem 30rem at 62% 45%,
+      color-mix(in srgb, var(--accent) 13%, transparent),
       transparent 55%
     ),
     radial-gradient(
@@ -2090,11 +2169,16 @@ body:has(.landing.mk) .mk-hero {
   margin-bottom: var(--space-2);
 }
 
+/* The page's last ask was its only h2 set in the BODY face, at the smallest of
+   the three h2 sizes — so the closing headline read as a caption next to the
+   section headings above it. It takes the display face like every other h2, and
+   a size between the compact original and `.mk-h2`: the band is a single row,
+   and a full `.mk-h2` here would out-shout the buttons it exists to point at. */
 .mk-cta-title {
   margin: 0;
-  font-family: var(--font-text);
+  font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
-  font-size: clamp(var(--text-xl-size), 2.2vw, var(--text-2xl-size));
+  font-size: clamp(1.5rem, 2.8vw, var(--text-3xl-size));
   line-height: 1.1;
   letter-spacing: -0.015em;
   color: var(--text-heading);
@@ -2259,12 +2343,19 @@ body:has(.landing.mk) .mk-hero {
   box-shadow: var(--shadow-1);
   transition:
     transform var(--duration-base) var(--ease-out),
-    box-shadow var(--duration-base) var(--ease-out);
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
 }
 
+/* The border lift belongs here too. `.mk-card` and `.mk-steps li` — the other
+   two members of the "one physical language" set this file declares — both warm
+   their border on hover; the tier omitted it from the hover rule AND from its
+   transition list, so the one card family a visitor is deciding money against
+   answered the pointer more weakly than the ones that merely explain things. */
 .mk-tier:hover {
   transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
   box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
 }
 
 .mk-tier h2,
@@ -2844,6 +2935,20 @@ body:has(.landing.mk) .mk-hero {
   margin: 0 0 var(--space-4);
 }
 
+/* ONE SEMANTIC LEVEL, ONE SIZE — ON THE PAGE WHERE IT IS ONE.
+   `.mk-show` was built for /features, where several rows stack and each h2 is a
+   SUB-heading; the smaller size is right there. The landing renders exactly one
+   `.mk-show`, and its h2 is a top-level section heading standing beside six
+   `.mk-h2` peers — so at that size the money band silently read as a lesser
+   section than the ones around it. Scoped to `.landing` so /features keeps the
+   sub-heading scale it was designed for. */
+.landing .mk-show h2 {
+  font-size: clamp(1.75rem, 3.4vw, var(--display-sm-size));
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  word-spacing: 0.07em;
+}
+
 /* A product vignette frame: window chrome + content built from tokens. */
 .mk-vignette {
   border: 1px solid var(--border-subtle);
@@ -2995,12 +3100,21 @@ body:has(.landing.mk) .mk-hero {
   }
 
   @supports (animation-timeline: view()) {
+    /* `backwards`, NOT `both` — and the whole card hover system depends on it.
+       A filled animation wins over a plain declaration in the cascade, so while
+       these held `transform: translateY(0)` forwards, the `:hover` lift below
+       them could never apply: every card on the page was measurably inert on
+       hover (rest and hover both the identity matrix) on exactly the browsers
+       that support this timeline. `backwards` keeps the pre-roll offset that
+       makes the reveal read, then stops applying once the range is done, which
+       hands `transform` back to `:hover`. */
     .mk-card,
     .mk-tier,
+    .mk-live-card,
     .mk-steps li,
     .mk-stat,
     .mk-band-head {
-      animation: mk-drift linear both;
+      animation: mk-drift linear backwards;
       animation-timeline: view();
       animation-range: entry 0% entry 60%;
     }
@@ -3010,18 +3124,24 @@ body:has(.landing.mk) .mk-hero {
        slab. Range offsets, not delays — scroll-driven timelines ignore
        animation-delay. */
     .mk-card:nth-child(2),
+    .mk-tier:nth-child(2),
+    .mk-live-card:nth-child(2),
     .mk-steps li:nth-child(2),
     .mk-stat:nth-child(2) {
       animation-range: entry 8% entry 68%;
     }
 
     .mk-card:nth-child(3),
+    .mk-tier:nth-child(3),
+    .mk-live-card:nth-child(3),
     .mk-steps li:nth-child(3),
     .mk-stat:nth-child(3) {
       animation-range: entry 16% entry 76%;
     }
 
     .mk-card:nth-child(4),
+    .mk-tier:nth-child(4),
+    .mk-live-card:nth-child(4),
     .mk-steps li:nth-child(4),
     .mk-stat:nth-child(4) {
       animation-range: entry 24% entry 84%;
@@ -3253,10 +3373,18 @@ body:has(.landing.mk) .mk-hero {
   box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
-@supports (animation-timeline: scroll()) {
-  .mk-progress {
-    animation: mk-progress-grow linear both;
-    animation-timeline: scroll();
+/* Gated like every other movement in this file. It was declared in a bare
+   `@supports`, so the one animation that runs the entire length of the page
+   ignored a reader who had asked for less motion — the exact promise made at
+   the top of this stylesheet ("every movement collapses under
+   prefers-reduced-motion"). With the guard, the bar simply never grows and the
+   hairline stays at scaleX(0), which is invisible rather than broken. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .mk-progress {
+      animation: mk-progress-grow linear both;
+      animation-timeline: scroll();
+    }
   }
 }
 
@@ -3394,7 +3522,14 @@ body:has(.landing.mk) .mk-hero {
   justify-content: center;
 }
 
+/* `margin: 0` because there is no global `p` reset in this codebase, and every
+   other paragraph class in this file states it. Without it this one `<p>` kept
+   the UA's 1em top and bottom — and its bottom margin could not collapse away,
+   since `.mk-show > div` is a grid item with its own formatting context. The
+   result was a stray 16px of dead space under the copy column, visible as the
+   money band's text sitting higher than the receipt beside it. */
 .mk-money-body {
+  margin: 0;
   color: var(--text-secondary);
   max-width: 52ch;
   line-height: 1.6;
