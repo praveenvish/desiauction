@@ -28,6 +28,19 @@ import { and, eq, isNull } from "drizzle-orm";
 
 export type GrantOutcome = "granted" | "declined";
 
+/**
+ * Thrown inside the resolution transaction when another operator claimed the
+ * request first. It exists to roll the transaction back — a lost race must not
+ * move the tier — and is converted to a refusal by the caller below, never
+ * escaping this module.
+ */
+class RaceLost extends Error {
+  constructor() {
+    super("pass_request_already_resolved");
+    this.name = "RaceLost";
+  }
+}
+
 export type GrantPassResult =
   | { ok: true; slug: string; fromTier: Tier; toTier: Tier; outcome: GrantOutcome }
   | {
@@ -92,29 +105,49 @@ export async function resolvePassRequest(
   const fromTier: Tier = isTier(season.tier) ? season.tier : "free";
   const toTier: Tier = input.outcome === "granted" ? target : fromTier;
 
-  await db.transaction(async (tx) => {
-    if (input.outcome === "granted" && toTier !== fromTier) {
-      await tx.update(competitions).set({ tier: toTier }).where(eq(competitions.id, season.id));
-    }
-    await tx
-      .update(passUpgradeRequests)
-      .set({ resolvedAt: new Date(), resolvedBy: input.actorId, outcome: input.outcome })
-      .where(eq(passUpgradeRequests.id, request.id));
-    await tx.insert(auditLog).values({
-      id: newId(),
-      actor: input.actorId,
-      action: `competition.pass_upgrade_${input.outcome}`,
-      scopeType: "org",
-      scopeId: season.orgId,
-      subject: season.id,
-      meta: {
-        fromTier,
-        toTier,
-        requestedTier: request.requestedTier,
-        ...(input.note !== undefined && input.note !== "" ? { note: input.note } : {}),
-      },
+  // Two operators (script + console, or two consoles) can both read the same
+  // open request and both answer it. The resolution claims the request with a
+  // `resolved_at IS NULL` guard and rolls the whole transaction back if it lost
+  // the race, so a grant-then-decline can never leave the tier moved with the
+  // request recorded as declined.
+  try {
+    await db.transaction(async (tx) => {
+      const claimed = await tx
+        .update(passUpgradeRequests)
+        .set({ resolvedAt: new Date(), resolvedBy: input.actorId, outcome: input.outcome })
+        .where(and(eq(passUpgradeRequests.id, request.id), isNull(passUpgradeRequests.resolvedAt)))
+        .returning({ id: passUpgradeRequests.id });
+      if (claimed.length === 0) {
+        throw new RaceLost();
+      }
+      if (input.outcome === "granted" && toTier !== fromTier) {
+        await tx.update(competitions).set({ tier: toTier }).where(eq(competitions.id, season.id));
+      }
+      await tx.insert(auditLog).values({
+        id: newId(),
+        actor: input.actorId,
+        action: `competition.pass_upgrade_${input.outcome}`,
+        scopeType: "org",
+        scopeId: season.orgId,
+        subject: season.id,
+        meta: {
+          fromTier,
+          toTier,
+          requestedTier: request.requestedTier,
+          ...(input.note !== undefined && input.note !== "" ? { note: input.note } : {}),
+        },
+      });
     });
-  });
+  } catch (error) {
+    if (error instanceof RaceLost) {
+      return {
+        ok: false,
+        reason: "no_open_request",
+        detail: `${input.slug}'s pass request was already answered by someone else. Nothing to do.`,
+      };
+    }
+    throw error;
+  }
 
   return { ok: true, slug: input.slug, fromTier, toTier, outcome: input.outcome };
 }

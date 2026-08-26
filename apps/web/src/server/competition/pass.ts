@@ -14,7 +14,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
-import { dbHandle } from "../db";
+import { dbHandle, systemDb } from "../db";
 import { canCompetition } from "./authz";
 import { resolveCompetition } from "./competitions";
 
@@ -64,7 +64,12 @@ export async function seasonPass(slug: string): Promise<SeasonPassView | null> {
   if (session === null) {
     return null;
   }
-  const competition = await resolveCompetition(dbHandle.db, session.personId, slug);
+  // Membership is proven inside resolveCompetition's join; it must run on the
+  // system pool like every sibling caller, because under the production app
+  // role RLS closes `competitions` when no tenant context is set — which made
+  // the whole pass surface answer "not found" in production while passing
+  // locally as the DB owner.
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -133,6 +138,34 @@ export async function seasonPass(slug: string): Promise<SeasonPassView | null> {
 
 export type RequestPassResult = { ok: true } | { ok: false; error: string };
 
+/** The partial unique index behind "one open request per season" (migration 0028). */
+const OPEN_REQUEST_CONSTRAINT = "pass_upgrade_requests_open_uq";
+
+/**
+ * Postgres 23505 on that one constraint — the loud half of a lost race.
+ *
+ * Kept local on purpose. The same shape exists in the certified auction
+ * aggregate, but the web tier does not reach across that boundary for a
+ * utility; copying nine lines is cheaper than a dependency that dependency-
+ * cruiser would have to be taught to allow.
+ *
+ * `constraint_name` is the field postgres.js exposes; the message check is the
+ * fallback for anything that carries only the text.
+ */
+function isOpenRequestConflict(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const record = error as { code?: unknown; constraint_name?: unknown; message?: unknown };
+  if (record.code !== "23505") {
+    return false;
+  }
+  return (
+    record.constraint_name === OPEN_REQUEST_CONSTRAINT ||
+    (typeof record.message === "string" && record.message.includes(OPEN_REQUEST_CONSTRAINT))
+  );
+}
+
 /**
  * Ask for a bigger pass.
  *
@@ -153,7 +186,12 @@ export async function requestPassUpgrade(
   if (!isTier(requestedTier) || requestedTier === "free") {
     return { ok: false, error: "Choose the pass you need." };
   }
-  const competition = await resolveCompetition(dbHandle.db, session.personId, slug);
+  // Membership is proven inside resolveCompetition's join; it must run on the
+  // system pool like every sibling caller, because under the production app
+  // role RLS closes `competitions` when no tenant context is set — which made
+  // the whole pass surface answer "not found" in production while passing
+  // locally as the DB owner.
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Season not found." };
   }
@@ -198,9 +236,17 @@ export async function requestPassUpgrade(
             meta: { fromTier, requestedTier },
           });
         });
-      } catch {
-        // The partial unique index: exactly one open request per season.
-        return { ok: false, error: "This season already has a request open — we're on it." };
+      } catch (error) {
+        // ONLY the partial unique index means "already asked". A bare catch here
+        // told an organizer their season had a request open whenever the
+        // database so much as hiccuped — a lie about state, and one that sends
+        // them to support for the wrong thing while the real fault goes
+        // unreported. Everything else is a genuine failure and is allowed to be
+        // one.
+        if (isOpenRequestConflict(error)) {
+          return { ok: false, error: "This season already has a request open — we're on it." };
+        }
+        throw error;
       }
       revalidatePath(`/seasons/${slug}`);
       return { ok: true };

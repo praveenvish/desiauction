@@ -1,11 +1,14 @@
 import {
   checkTierLimit,
+  isTier,
   limitRefusalMessage,
   planRegistrationBatch,
   registrationTransition,
+  TIER_LIMITS,
   type RegistrationBatchItem,
   type RegistrationEvent,
   type RegistrationStatus,
+  type Tier,
 } from "@desiauction/core";
 import { auditLog, competitions, newId, registrations, type Db } from "@desiauction/db";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
@@ -120,6 +123,31 @@ async function poolLimit(db: Db, competitionId: string): Promise<string | null> 
   return decision.ok ? null : limitRefusalMessage(decision);
 }
 
+/**
+ * How many more pool players this season may approve, or `null` when the tier
+ * is uncounted. The batch path needs the NUMBER — a single boolean cannot say
+ * "you may approve 3 of these 50", which is what approving one-by-one would do.
+ */
+async function poolRemaining(db: Db, competitionId: string): Promise<number | null> {
+  const [season] = await db
+    .select({ tier: competitions.tier })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  const tier: Tier = isTier(season?.tier ?? "") ? (season?.tier as Tier) : "free";
+  const limit = TIER_LIMITS[tier].players;
+  if (limit === null) {
+    return null;
+  }
+  const [{ count: approved } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(registrations)
+    .where(
+      and(eq(registrations.competitionId, competitionId), eq(registrations.status, "approved")),
+    );
+  return Math.max(0, limit - approved);
+}
+
 /** Single audited transition — the aggregate's atomic unit. */
 export async function transition(
   db: Db,
@@ -180,7 +208,7 @@ export async function transition(
 
 export interface BatchResult {
   applied: string[];
-  skipped: { id: string; reason: "illegal_transition" | "reason_required" }[];
+  skipped: { id: string; reason: "illegal_transition" | "reason_required" | "tier_limit" }[];
 }
 
 /**
@@ -212,7 +240,7 @@ export async function transitionBatch(
   const items: RegistrationBatchItem[] = rows.map((r) => ({ id: r.id, status: r.status }));
   const plan = planRegistrationBatch(items, event);
   const known = new Set(rows.map((r) => r.id));
-  const skipped = [
+  const skipped: BatchResult["skipped"] = [
     ...plan.skip,
     // Ids not in this competition are silently not-applied (tenant safety).
     ...registrationIds
@@ -220,9 +248,28 @@ export async function transitionBatch(
       .map((id) => ({ id, reason: "illegal_transition" as const })),
   ];
 
-  if (plan.apply.length > 0) {
+  /*
+   * THE POOL CEILING, ON THE BATCH PATH TOO.
+   *
+   * `transition` (single) checks poolLimit before it grows the pool; the batch
+   * twin must behave identically to N single approvals — approve the ones that
+   * fit under the tier, refuse the rest. Approving fifty in one click must not
+   * sail a Free season past its forty. Only the approve event grows the pool.
+   */
+  let apply = plan.apply;
+  if (event.type === "approve") {
+    const remaining = await poolRemaining(db, competitionId);
+    if (remaining !== null && plan.apply.length > remaining) {
+      apply = plan.apply.slice(0, remaining);
+      for (const entry of plan.apply.slice(remaining)) {
+        skipped.push({ id: entry.id, reason: "tier_limit" });
+      }
+    }
+  }
+
+  if (apply.length > 0) {
     await db.transaction(async (tx) => {
-      for (const entry of plan.apply) {
+      for (const entry of apply) {
         await tx
           .update(registrations)
           .set(mutationFields(event, entry.next, reviewerId))
@@ -239,7 +286,7 @@ export async function transitionBatch(
       }
     });
   }
-  const applied = plan.apply.map((entry) => entry.id);
+  const applied = apply.map((entry) => entry.id);
   await notifyPlayer(db, applied, event);
   return { applied, skipped };
 }

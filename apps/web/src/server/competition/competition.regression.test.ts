@@ -24,7 +24,7 @@ import {
   withTenantDb,
   type DbHandle,
 } from "@desiauction/db";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { DEFAULT_AUCTION_CONFIG } from "@desiauction/core";
@@ -48,7 +48,7 @@ import {
   teamsOf,
 } from "./competitions";
 import { registrationsOf, submitRegistration } from "./registrations";
-import { transition } from "./registration-aggregate";
+import { transition, transitionBatch } from "./registration-aggregate";
 import { ForbiddenError } from "../orgs/authz";
 import { outcomesProjection } from "../admin/views";
 
@@ -223,6 +223,83 @@ describe("TIER LIMITS — the ceiling the pricing page has always described", ()
       inArray(
         people.id,
         poolPeople.map((person) => person.id),
+      ),
+    );
+  });
+
+  it("BULK approve cannot walk around the pool ceiling the single approval enforces", async () => {
+    /*
+     * The single-approval path checked the ceiling; its batch twin did not, so
+     * an organizer who selected the whole triage list and hit "approve" sailed
+     * a Free season straight past forty. The batch must behave exactly like N
+     * single approvals: fill the remaining room, refuse the rest.
+     */
+    const competition = await freeSeason("Bulk");
+    await db
+      .update(competitionsTable)
+      .set({ status: "registration_open" })
+      .where(eq(competitionsTable.id, competition.id));
+
+    // 38 already approved: two seats left under the Free ceiling of 40.
+    const seated = Array.from({ length: 38 }, (_, n) => ({
+      id: newId(),
+      phone: `+9192${RUN}${String(n).padStart(2, "0")}`,
+      name: `Seated ${String(n)}`,
+    }));
+    // 5 pending, so the batch is asked for more than the room that remains.
+    const pending = Array.from({ length: 5 }, (_, n) => ({
+      id: newId(),
+      phone: `+9193${RUN}${String(n).padStart(2, "0")}`,
+      name: `Pending ${String(n)}`,
+    }));
+    await db.insert(people).values([...seated, ...pending]);
+    const pendingIds = pending.map(() => newId());
+    await db.insert(registrationsTable).values([
+      ...seated.map((person, n) => ({
+        id: newId(),
+        orgId: orgX.id,
+        competitionId: competition.id,
+        personId: person.id,
+        role: "batter" as const,
+        status: "approved" as const,
+        registrationNumber: `BA${RUN.slice(-3)}${String(n).padStart(3, "0")}`,
+      })),
+      ...pending.map((person, n) => ({
+        id: pendingIds[n] as string,
+        orgId: orgX.id,
+        competitionId: competition.id,
+        personId: person.id,
+        role: "bowler" as const,
+        status: "submitted" as const,
+        registrationNumber: `BP${RUN.slice(-3)}${String(n).padStart(3, "0")}`,
+      })),
+    ]);
+
+    const result = await transitionBatch(db, orgX.id, competition.id, pendingIds, owner, {
+      type: "approve",
+    });
+
+    // Exactly the two that fit, and the other three refused for the tier.
+    expect(result.applied).toHaveLength(2);
+    expect(result.skipped.filter((s) => s.reason === "tier_limit")).toHaveLength(3);
+
+    // The database agrees: the pool sits ON the ceiling, never above it.
+    const [{ count: approvedNow } = { count: 0 }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(registrationsTable)
+      .where(
+        and(
+          eq(registrationsTable.competitionId, competition.id),
+          eq(registrationsTable.status, "approved"),
+        ),
+      );
+    expect(approvedNow).toBe(40);
+
+    await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
+    await db.delete(people).where(
+      inArray(
+        people.id,
+        [...seated, ...pending].map((person) => person.id),
       ),
     );
   });

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { systemDb } from "../db";
-import { resolvePassRequest } from "../competition/pass-grant";
+import { resolvePassRequest, type GrantOutcome } from "../competition/pass-grant";
 import { platformBillingGate } from "./authz";
 
 /**
@@ -28,9 +28,28 @@ import { platformBillingGate } from "./authz";
 
 export type AnswerPassResult = { ok: true; summary: string } | { ok: false; error: string };
 
+/**
+ * The two answers there are, kept in step with `GrantOutcome` by the `satisfies`
+ * — if the domain ever grows a third, this list stops compiling rather than
+ * silently refusing it.
+ */
+const OUTCOMES = ["granted", "declined"] as const satisfies readonly GrantOutcome[];
+
+function isGrantOutcome(value: string): value is GrantOutcome {
+  return (OUTCOMES as readonly string[]).includes(value);
+}
+
+/**
+ * `outcome` is typed at the call site but NOT trusted here: a server action's
+ * arguments arrive over the wire, so the parameter is widened to `string` on
+ * purpose. It used to travel unread all the way to
+ * `pass_upgrade_requests_outcome_check`, where anything else came back as an
+ * unhandled 500 — a stack trace where the surface has a refusal it knows how to
+ * render.
+ */
 export async function answerPassRequest(
   slug: string,
-  outcome: "granted" | "declined",
+  outcome: string,
   note: string,
 ): Promise<AnswerPassResult> {
   const operator = await platformBillingGate();
@@ -38,6 +57,9 @@ export async function answerPassRequest(
     // The same silence as the rest of the console: a locked door that announces
     // itself is a map.
     return { ok: false, error: "Not available." };
+  }
+  if (!isGrantOutcome(outcome)) {
+    return { ok: false, error: "Answer the request with a grant or a decline." };
   }
   const result = await resolvePassRequest(systemDb, {
     slug,
