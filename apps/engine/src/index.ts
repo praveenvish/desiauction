@@ -1,10 +1,11 @@
 import * as Sentry from "@sentry/node";
 
-import { checkDb, db } from "./db.js";
+import { checkDb, db, sql } from "./db.js";
 import { AuctionEngine } from "./engine-core.js";
 import { env } from "./env.js";
 import { logger } from "./logger.js";
 import { buildServer } from "./server.js";
+import { acquireSingleWriterLease, type SingleWriterLease } from "./single-writer.js";
 
 if (env.SENTRY_DSN !== undefined) {
   Sentry.init({
@@ -28,6 +29,18 @@ process.on("unhandledRejection", (error) => {
 process.on("uncaughtException", (error) => {
   void die("uncaught exception", error);
 });
+
+/*
+ * CLAIM THE SINGLE-WRITER LEASE BEFORE ANYTHING ELSE STARTS.
+ *
+ * Nothing below — not the watchdog, not the socket hub, not the HTTP listener —
+ * may run in a second instance, so the lease is taken before any of it exists.
+ * A refusal exits(1) with a named reason, which is exactly what an orchestrator
+ * should see when it has been asked to run a second writer.
+ */
+const lease: SingleWriterLease = await acquireSingleWriterLease(sql).catch((error: unknown) =>
+  die("refusing to start: the single-writer lease is held elsewhere", error),
+);
 
 const engine = new AuctionEngine({
   db,
@@ -66,9 +79,32 @@ const heartbeatTimer = setInterval(() => {
   hub.heartbeat();
 }, 10_000);
 
+/*
+ * THE LEASE IS RE-ASSERTED, NOT ASSUMED.
+ *
+ * Taking the lock at boot proves we were alone THEN. If the reserved connection
+ * drops and postgres.js reconnects underneath us, the advisory lock died with
+ * the old session and another instance could take it while this process happily
+ * keeps closing lots. A writer that cannot prove it is still the writer must
+ * stop being one: losing the lease is fatal, because the alternative is two
+ * gavels on one auction.
+ */
+const LEASE_CHECK_MS = 10_000;
+const leaseTimer = setInterval(() => {
+  void lease.verify().then((ok) => {
+    if (!ok) {
+      void die(
+        "single-writer lease lost — another instance may now hold it",
+        new Error("lease_lost"),
+      );
+    }
+  });
+}, LEASE_CHECK_MS);
+
 server.addHook("onClose", (_instance, done) => {
   clearInterval(tickTimer);
   clearInterval(heartbeatTimer);
+  clearInterval(leaseTimer);
   done();
 });
 
@@ -91,6 +127,9 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
       .catch((error: unknown) => {
         logger.error({ err: error }, "error during close");
       })
+      // Hand the lease back explicitly so the replacement instance can claim it
+      // immediately, instead of waiting for this process's session to die.
+      .finally(() => lease.release().catch(() => undefined))
       .finally(() => Sentry.flush(2000).catch(() => undefined))
       .finally(() => {
         process.exit(0);

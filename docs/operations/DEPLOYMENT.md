@@ -115,6 +115,32 @@ Never deploy the engine during a live auction window: the engine recovers all
 state from the event log (measured 29 ms replay at 2,500 lots), but spectator
 sockets drop and reconnect. The C-22 live-window check lands with IP-7.
 
+### The engine is ONE process, and the database now enforces it
+
+The engine is the single mutation authority, and that was previously guaranteed
+only by `fly.toml` (`min_machines_running = 1`, `auto_stop_machines = false`)
+plus the discipline not to scale it. As of the 2026-08-26 audit it is enforced:
+at boot the engine claims a **Postgres session-level advisory lock**
+(`apps/engine/src/single-writer.ts`) and **a second instance refuses to start**,
+exiting non-zero with `the single-writer lease is held elsewhere`.
+
+Operationally this means:
+
+- **`fly scale count 2` on the engine will not give you two engines.** The
+  second machine crash-loops on purpose. Scale the WEB tier for capacity; the
+  engine is deliberately not horizontally scalable.
+- **Rolling deploys still work.** The lock is released when the old process's
+  session ends — on graceful SIGTERM it is handed back explicitly, and on a hard
+  kill Postgres drops it with the session. A replacement claims it immediately;
+  no lease table, no expiry to wait out.
+- **A brief overlap window is normal** during a deploy: if the new instance
+  starts before the old one has exited, it exits 1 and the platform retries.
+  Persistent crash-looping with that message means an old machine is still
+  running — stop it rather than removing the lock.
+- **The lease is re-checked every 10s.** If the engine loses it (its connection
+  dropped and another instance took over), the process exits rather than keep
+  closing lots it may no longer own — a dead engine is safer than a second one.
+
 ## Rollback
 
 **Migrations are forward-only.** There are no down migrations in

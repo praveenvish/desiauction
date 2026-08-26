@@ -20,7 +20,12 @@
 | ~~Redis~~ | ~~Upstash Mumbai~~ | **Not used, by decision.** Rate limits and job queueing are Postgres-backed and there is no snapshot cache (ADR-3); no Redis dependency exists in any package, and PX-12 §1 lists it as explicitly *not* required to provision. Adding one would be a new architectural decision, not a provisioning step. | ✗ deliberately absent |
 
 **Cells (target).** Not built: the engine runs as a single instance per
-environment, and multi-instance safety has never been exercised (audit §8). The
+environment, and multi-instance safety has never been exercised (audit §8).
+Since 2026-08-26 that constraint is enforced rather than merely documented — an
+engine claims a Postgres advisory lock at boot and a second instance refuses to
+start (`apps/engine/src/single-writer.ts`, see DEPLOYMENT.md). Building cells
+therefore means giving the lease a per-cell key, so the enforcement scales with
+the design instead of being removed to make room for it. The
 design intent: an engine cell hosts many auctions; cells scale horizontally by auction assignment (a tournament pins to a cell). V1: one production cell + one canary cell — the architecture is cellular from day one so scaling is assignment, not re-architecture.
 
 ## Deploying the web
