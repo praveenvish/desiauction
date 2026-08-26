@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   char,
+  check,
   index,
   integer,
   jsonb,
@@ -501,7 +502,24 @@ export const registrations = pgTable(
     reviewedAt: ts("reviewed_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  // One registration per person per competition (doc 42 duplicate rule).
+  /*
+   * ONE REGISTRATION PER PERSON PER COMPETITION (doc 42 duplicate rule).
+   *
+   * TOTAL, not partial — including withdrawn rows, deliberately. A withdrawn
+   * registration used to be a life sentence: the index refused a second row and
+   * `submitRegistration` reported `duplicate`, so a player who withdrew by
+   * mistake could never rejoin the season. The fix is NOT to exempt withdrawn
+   * rows from the index. It is to REINSTATE the dormant row on re-registration
+   * (`withdrawn --restore--> submitted` is the machine's own and only exit from
+   * withdrawn), which is what apps/web/src/server/competition/registrations.ts
+   * now does.
+   *
+   * Weakening the index would have created the worse bug: `myRegistration`
+   * reads one row per (competition, person) with no ordering, so a player
+   * holding a withdrawn row AND a live one would see whichever Postgres
+   * returned. Reinstating keeps the registration number stable and keeps the
+   * whole history — apply, withdraw, rejoin — on ONE audit timeline.
+   */
   (table) => [
     uniqueIndex("registrations_competition_person_uq").on(table.competitionId, table.personId),
     index("registrations_competition_idx").on(table.competitionId),
@@ -514,6 +532,10 @@ export const registrations = pgTable(
     uniqueIndex("registrations_team_captain_uq")
       .on(table.teamId)
       .where(sql`${table.isCaptain} and ${table.teamId} is not null`),
+    check(
+      "registrations_status_check",
+      sql`${table.status} in ('draft', 'submitted', 'approved', 'rejected', 'waitlisted', 'withdrawn')`,
+    ),
   ],
 );
 
@@ -683,6 +705,25 @@ export const auctions = pgTable(
   (table) => [
     index("auctions_org_idx").on(table.orgId),
     index("auctions_competition_idx").on(table.competitionId),
+    // At most ONE non-abandoned auction per competition (0029). createAuction
+    // checks this too, but read-then-insert cannot stop a race; this can.
+    uniqueIndex("auctions_competition_active_uq")
+      .on(table.competitionId)
+      .where(sql`${table.status} <> 'abandoned'`),
+    /*
+     * THE `enum:` ABOVE IS A TYPE, NOT A COLUMN DEFINITION.
+     *
+     * drizzle emits plain `text` for it, so before 0030 any string at all was a
+     * valid auction status as far as Postgres was concerned. These checks are
+     * the same lists, stated where the database can enforce them. Adding a
+     * state to the machine in packages/core now means changing three places —
+     * deliberately: a state nobody thought about at the database is exactly the
+     * class of change worth slowing down.
+     */
+    check(
+      "auctions_status_check",
+      sql`${table.status} in ('scheduled', 'live', 'paused', 'completed', 'reconciled', 'abandoned')`,
+    ),
   ],
 );
 
@@ -747,6 +788,27 @@ export const lots = pgTable(
     uniqueIndex("lots_auction_number_uq").on(table.auctionId, table.lotNumber),
     uniqueIndex("lots_auction_registration_uq").on(table.auctionId, table.registrationId),
     index("lots_auction_status_idx").on(table.auctionId, table.status),
+    check(
+      "lots_status_check",
+      sql`${table.status} in ('prepared', 'queued', 'on_block', 'closing_soon', 'sold', 'unsold', 'frozen', 'withdrawn')`,
+    ),
+    /*
+     * A SOLD LOT HAS A WINNER AND A PRICE; AN UNSOLD ONE HAS NEITHER (0030).
+     *
+     * Both directions, because the machine is strict enough to allow both:
+     * `sold` is terminal, its only exit is the compensating undo, and every
+     * writer (sell, undo, recovery healing) moves status and the two sale
+     * columns in ONE statement. Money surfaces read these three fields with
+     * three different predicates and agree only while they agree with each
+     * other.
+     */
+    check(
+      "lots_sold_state_consistent",
+      sql`case when ${table.status} = 'sold'
+            then ${table.soldToPaddleId} is not null and ${table.soldPrice} is not null
+            else ${table.soldToPaddleId} is null and ${table.soldPrice} is null
+          end`,
+    ),
   ],
 );
 
@@ -771,6 +833,7 @@ export const bids = pgTable(
     uniqueIndex("bids_auction_event_uq").on(table.auctionId, table.eventSeq),
     index("bids_lot_idx").on(table.lotId, table.eventSeq),
     index("bids_auction_idx").on(table.auctionId),
+    check("bids_status_check", sql`${table.status} in ('accepted', 'outbid', 'invalidated')`),
   ],
 );
 

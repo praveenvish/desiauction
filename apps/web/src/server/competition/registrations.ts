@@ -6,6 +6,7 @@ import {
   nameKey,
   normalizeShareSource,
   registrationNumber,
+  registrationTransition,
   toCsv,
   type PhotoTarget,
   type RegistrationRole,
@@ -25,10 +26,12 @@ import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-o
 
 import { storage } from "../media";
 
-// Registration reads + creation (IP-3 §4, doc 42). STATE TRANSITIONS live only in
-// registration-aggregate.ts; this module never writes the `status` column. The
-// dashboard queries here are server-driven (search/filter/sort/pagination in SQL)
-// so the client never loads the whole dataset (M-IP3-2 performance target).
+// Registration reads + creation (IP-3 §4, doc 42). TRIAGE TRANSITIONS live only
+// in registration-aggregate.ts; this module owns ENTRY into the competition —
+// creating the row, and the one case where entry lands on a row that already
+// exists (`reinstateWithdrawn`, below). The dashboard queries here are
+// server-driven (search/filter/sort/pagination in SQL) so the client never loads
+// the whole dataset (M-IP3-2 performance target).
 
 export type SubmitResult =
   | { ok: true; registrationId: string }
@@ -64,9 +67,87 @@ function validProfile(profile: PlayerProfileInput | undefined): Partial<{
 }
 
 /**
+ * A WITHDRAWAL IS NOT A LIFE SENTENCE.
+ *
+ * `registrations_competition_person_uq` is a TOTAL unique index on (competition,
+ * person), so the second row a returning player needs cannot exist — and every
+ * entry path read that refusal as `duplicate`. A player who tapped Withdraw by
+ * mistake was then locked out of that season permanently, with the only exit
+ * being an organizer noticing and running an explicit `restore`.
+ *
+ * The fix is the dormant row, not a second one. Core's machine already names
+ * exactly one exit from `withdrawn` — `restore` → `submitted` — so a
+ * re-registration IS that edge, taken by the player instead of the organizer.
+ * The alternative (a partial index exempting withdrawn rows) would let one
+ * person hold several registrations in one season, which `myRegistration` and
+ * `registrationStats` both assume cannot happen; it would also scatter the
+ * player's history across rows, when `timelineOf` keys on the registration id.
+ *
+ * Returns null when there is nothing to reinstate — no row, or a row in any
+ * LIVE state. A live registration still refuses a second one: that refusal is
+ * the duplicate rule doing its job, and a rejected registration is the
+ * organizer's decision, which re-applying must never quietly overturn.
+ */
+async function reinstateWithdrawn(
+  db: Db,
+  competitionId: string,
+  personId: string,
+  fresh: {
+    role: RegistrationRole;
+    // Both callers always pass these, absent or not, so `| undefined` rather
+    // than optional (exactOptionalPropertyTypes).
+    basePriceBand: string | null | undefined;
+    profile: PlayerProfileInput | undefined;
+  },
+): Promise<{ id: string; number: string } | null> {
+  const [existing] = await db
+    .select({ id: registrations.id, status: registrations.status })
+    .from(registrations)
+    .where(
+      and(eq(registrations.competitionId, competitionId), eq(registrations.personId, personId)),
+    )
+    .limit(1);
+  if (existing === undefined || existing.status !== "withdrawn") {
+    return null;
+  }
+  // The machine decides, here as everywhere: if `withdrawn --restore-->` is ever
+  // removed from core, this stops reinstating rather than inventing an edge.
+  const decision = registrationTransition(existing.status, { type: "restore" });
+  if (!decision.ok) {
+    return null;
+  }
+  const [updated] = await db
+    .update(registrations)
+    .set({
+      status: decision.next,
+      role: fresh.role,
+      ...(fresh.basePriceBand !== undefined &&
+      fresh.basePriceBand !== null &&
+      fresh.basePriceBand !== ""
+        ? { basePriceBand: fresh.basePriceBand }
+        : {}),
+      ...validProfile(fresh.profile),
+      // Back in triage, unreviewed: stale rejection provenance and a stale
+      // reviewer would both describe a decision about a different application.
+      rejectionReason: null,
+      rejectionNote: null,
+      reviewedBy: null,
+      reviewedAt: null,
+    })
+    // Re-asserting `withdrawn` in the WHERE makes this a compare-and-set: an
+    // organizer restoring the same row between the read and the write wins, and
+    // this call reports the duplicate it now truly is.
+    .where(and(eq(registrations.id, existing.id), eq(registrations.status, "withdrawn")))
+    .returning({ id: registrations.id, number: registrations.registrationNumber });
+  return updated ?? null;
+}
+
+/**
  * A Person applies to a Competition. Any authenticated person may register while
  * intake is open (they need not be an org member — they are a player, doc 42).
- * Duplicate = same person in the same competition (unique index, invariant).
+ * Duplicate = same person in the same competition (unique index, invariant) —
+ * unless the row on the other side of that index was WITHDRAWN, in which case
+ * this is a rejoin and it reinstates.
  */
 export async function submitRegistration(
   db: Db,
@@ -105,8 +186,21 @@ export async function submitRegistration(
       ...validProfile(profile),
     }),
   );
+  // Insert first, ask questions second: the ordinary case stays one statement,
+  // and the extra reads happen only on the collision. writeSurvivingConstraint
+  // rolls the failed insert back to its savepoint, so the surrounding tenant
+  // transaction is still alive for the reinstatement below.
+  let registrationId = id;
   if (!inserted) {
-    return { ok: false, reason: "duplicate" };
+    const reinstated = await reinstateWithdrawn(db, competitionId, personId, {
+      role,
+      basePriceBand,
+      profile,
+    });
+    if (reinstated === null) {
+      return { ok: false, reason: "duplicate" };
+    }
+    registrationId = reinstated.id;
   }
   await db.insert(auditLog).values({
     id: newId(),
@@ -114,10 +208,17 @@ export async function submitRegistration(
     action: "registration.submitted",
     scopeType: "org",
     scopeId: orgId,
-    subject: id,
-    meta: { competitionId, role, source: normalizeShareSource(source) },
+    subject: registrationId,
+    meta: {
+      competitionId,
+      role,
+      source: normalizeShareSource(source),
+      // The timeline should read apply → withdraw → rejoin, not two identical
+      // applications with an unexplained withdrawal between them.
+      ...(inserted ? {} : { reinstated: "true" }),
+    },
   });
-  return { ok: true, registrationId: id };
+  return { ok: true, registrationId };
 }
 
 export type AddPlayerResult =
@@ -131,6 +232,10 @@ export type AddPlayerResult =
  * this is the same act performed one row at a time. The player lands in
  * `submitted` and passes the same human approval gate (invariant 5); status is
  * only ever moved afterwards by the aggregate, never written here.
+ *
+ * A player who previously withdrew is REINSTATED rather than refused, exactly as
+ * on the self-service path (see `reinstateWithdrawn`); the returned number is
+ * then their original one.
  *
  * DA-35 — DELIBERATE: unlike `submitRegistration`, this does NOT refuse when
  * intake is closed, and that asymmetry is the point. Closure closes the PUBLIC
@@ -188,7 +293,6 @@ export async function addPlayerByPhone(
   }
 
   const id = newId();
-  const number = registrationNumber(id);
   const created = await writeSurvivingConstraint(db, (tx) =>
     tx.insert(registrations).values({
       id,
@@ -197,13 +301,27 @@ export async function addPlayerByPhone(
       personId,
       role: player.role,
       status: "submitted",
-      registrationNumber: number,
+      registrationNumber: registrationNumber(id),
       ...(player.basePriceBand !== null ? { basePriceBand: player.basePriceBand } : {}),
       ...validProfile(player.profile),
     }),
   );
+  // A player the organizer is deliberately entering, who withdrew earlier, is a
+  // rejoin here too — the dead end is the same one whichever door you came in
+  // through, and the organizer's own act is the least ambiguous version of it.
+  let registrationId = id;
+  let number = registrationNumber(id);
   if (!created) {
-    return { ok: false, reason: "duplicate" };
+    const reinstated = await reinstateWithdrawn(db, competitionId, personId, {
+      role: player.role,
+      basePriceBand: player.basePriceBand,
+      profile: player.profile,
+    });
+    if (reinstated === null) {
+      return { ok: false, reason: "duplicate" };
+    }
+    registrationId = reinstated.id;
+    number = reinstated.number;
   }
   // Subject = the registration, so the player's timeline begins where they
   // entered the competition (the DA-27 lesson from the import path).
@@ -213,10 +331,15 @@ export async function addPlayerByPhone(
     action: "registration.added",
     scopeType: "org",
     scopeId: orgId,
-    subject: id,
-    meta: { competitionId, role: player.role, source: "organizer_manual" },
+    subject: registrationId,
+    meta: {
+      competitionId,
+      role: player.role,
+      source: "organizer_manual",
+      ...(created ? {} : { reinstated: "true" }),
+    },
   });
-  return { ok: true, registrationId: id, number, personId, personExisted };
+  return { ok: true, registrationId, number, personId, personExisted };
 }
 
 export interface RegistrationRow {

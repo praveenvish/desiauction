@@ -44,6 +44,7 @@ import {
   photoTargetsOf,
   queryRegistrations,
   registrationStats,
+  submitRegistration,
   timelineOf,
 } from "./registrations";
 
@@ -185,6 +186,98 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       .where(eq(registrationsTable.id, a))
       .limit(1);
     expect(row?.reason).toBeNull();
+  });
+
+  it("a withdrawn registration does not block a rejoin; a live one still does", async () => {
+    // Its own season, opened for intake, so the rest of the suite's competition
+    // keeps its state.
+    const season = await createCompetition(db, org.id, owner, { name: `Rejoin Cup ${RUN}` });
+    await db
+      .update(competitionsTable)
+      .set({ status: "registration_open" })
+      .where(eq(competitionsTable.id, season.id));
+    const personId = newId();
+    await db
+      .insert(people)
+      .values({ id: personId, phone: `${SEED_PHONE_PREFIX}j01`, name: "Rejoin Raju" });
+    seededPersonIds.push(personId);
+
+    const first = await submitRegistration(db, season.id, org.id, personId, "batter");
+    expect(first.ok).toBe(true);
+    const regId = first.ok ? first.registrationId : "";
+    const [before] = await db
+      .select({ number: registrationsTable.registrationNumber })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, regId))
+      .limit(1);
+
+    // A LIVE registration still refuses a second one — the duplicate rule stands.
+    expect(await submitRegistration(db, season.id, org.id, personId, "bowler")).toEqual({
+      ok: false,
+      reason: "duplicate",
+    });
+
+    // The player withdraws (by mistake, as far as the product knows) …
+    expect(await transition(db, org.id, season.id, regId, personId, { type: "withdraw" })).toEqual({
+      ok: true,
+      status: "withdrawn",
+    });
+
+    // … and may rejoin. The SAME row is reinstated: one registration per player
+    // per season is still true, and the registration number they quote is still
+    // the one they were given.
+    const rejoined = await submitRegistration(db, season.id, org.id, personId, "bowler");
+    expect(rejoined).toEqual({ ok: true, registrationId: regId });
+    const rows = await db
+      .select({
+        id: registrationsTable.id,
+        status: registrationsTable.status,
+        role: registrationsTable.role,
+        number: registrationsTable.registrationNumber,
+        reviewedBy: registrationsTable.reviewedBy,
+      })
+      .from(registrationsTable)
+      .where(
+        and(
+          eq(registrationsTable.competitionId, season.id),
+          eq(registrationsTable.personId, personId),
+        ),
+      );
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.status).toBe("submitted");
+    expect(rows[0]?.role).toBe("bowler"); // the fresh application's answers win
+    expect(rows[0]?.number).toBe(before?.number);
+    expect(rows[0]?.reviewedBy).toBeNull(); // back in triage, unreviewed
+
+    // Apply → withdraw → rejoin is ONE timeline, and the rejoin says what it is.
+    const timeline = await timelineOf(db, regId);
+    const actions = timeline.map((entry) => entry.action).sort();
+    expect(actions).toEqual([
+      "registration.submitted",
+      "registration.submitted",
+      "registration.withdraw",
+    ]);
+    expect(
+      timeline.some(
+        (entry) => (entry.meta as { reinstated?: string } | null)?.reinstated === "true",
+      ),
+    ).toBe(true);
+
+    // And the reinstated registration is live again, so it blocks the next one.
+    expect(await submitRegistration(db, season.id, org.id, personId, "batter")).toEqual({
+      ok: false,
+      reason: "duplicate",
+    });
+
+    // A REJECTED registration is the organizer's decision and is NOT overturned
+    // by re-applying — only withdrawal reinstates.
+    expect(
+      await transition(db, org.id, season.id, regId, owner, { type: "reject", reason: "capacity" }),
+    ).toEqual({ ok: true, status: "rejected" });
+    expect(await submitRegistration(db, season.id, org.id, personId, "batter")).toEqual({
+      ok: false,
+      reason: "duplicate",
+    });
   });
 
   it("BULK ROLLBACK SAFETY: a mid-batch failure leaves NO partial state", async () => {

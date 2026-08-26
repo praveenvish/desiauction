@@ -190,58 +190,84 @@ export async function createAuction(
   const correlationId = newId();
   const atMs = serverNowMs();
   const name = `${competition.name} Auction`;
-  await db.transaction(async (tx) => {
-    await tx.insert(auctions).values({
-      id: auctionId,
-      orgId: competition.orgId,
-      competitionId: competition.id,
-      name,
-      status: "scheduled",
-      config,
-      createdBy: actorId,
-    });
-    const scope = { id: auctionId, orgId: competition.orgId };
-    await appendEvent(
-      tx,
-      scope,
-      actorId,
-      correlationId,
-      atMs,
-      "AuctionCreated",
-      { competitionId: competition.id, lotCount: ready.pool.length, name },
-      auctionId,
-    );
-    for (let i = 0; i < ready.pool.length; i++) {
-      const entry = ready.pool[i];
-      if (entry === undefined) {
-        continue;
-      }
-      const lotId = newId();
-      const number = lotNumber(i + 1);
-      const base = basePriceFor(config, entry.basePriceBand);
-      await tx.insert(lots).values({
-        id: lotId,
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(auctions).values({
+        id: auctionId,
         orgId: competition.orgId,
-        auctionId,
-        registrationId: entry.registrationId,
-        lotNumber: number,
-        seq: i + 1,
-        basePrice: base,
-        status: "prepared",
+        competitionId: competition.id,
+        name,
+        status: "scheduled",
+        config,
+        createdBy: actorId,
       });
+      const scope = { id: auctionId, orgId: competition.orgId };
       await appendEvent(
         tx,
         scope,
         actorId,
         correlationId,
         atMs,
-        "LotPrepared",
-        { lotId, registrationId: entry.registrationId, lotNumber: number, basePrice: base },
-        lotId,
+        "AuctionCreated",
+        { competitionId: competition.id, lotCount: ready.pool.length, name },
+        auctionId,
       );
+      for (let i = 0; i < ready.pool.length; i++) {
+        const entry = ready.pool[i];
+        if (entry === undefined) {
+          continue;
+        }
+        const lotId = newId();
+        const number = lotNumber(i + 1);
+        const base = basePriceFor(config, entry.basePriceBand);
+        await tx.insert(lots).values({
+          id: lotId,
+          orgId: competition.orgId,
+          auctionId,
+          registrationId: entry.registrationId,
+          lotNumber: number,
+          seq: i + 1,
+          basePrice: base,
+          status: "prepared",
+        });
+        await appendEvent(
+          tx,
+          scope,
+          actorId,
+          correlationId,
+          atMs,
+          "LotPrepared",
+          { lotId, registrationId: entry.registrationId, lotNumber: number, basePrice: base },
+          lotId,
+        );
+      }
+    });
+  } catch (error) {
+    // `auctions_competition_active_uq` (0029) is the race the SELECT above
+    // cannot win: two creates for one competition both read "none" and both
+    // insert. The loser's whole transaction rolls back — nothing partial — and
+    // it reports the same refusal the pre-check would have given it.
+    if (isUniqueViolation(error, "auctions_competition_active_uq")) {
+      return { ok: false, reason: "auction_exists" };
     }
-  });
+    throw error;
+  }
   return { ok: true, auctionId, lotCount: ready.pool.length };
+}
+
+/** Postgres 23505 on a named constraint — the loud half of a lost race. */
+function isUniqueViolation(error: unknown, constraint: string): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const record = error as { code?: unknown; constraint_name?: unknown; message?: unknown };
+  if (record.code !== "23505") {
+    return false;
+  }
+  return (
+    record.constraint_name === constraint ||
+    (typeof record.message === "string" && record.message.includes(constraint))
+  );
 }
 
 // --- Paddles (immutable identity — issued once, never reused, never mutated) ----
@@ -875,6 +901,34 @@ export async function placeBid(
   }
 
   const bidId = newId();
+  /*
+   * THE EXTENSION IS MEASURED FROM THE PROCESSING CLOCK, DELIBERATELY.
+   *
+   * The two halves of anti-snipe read DIFFERENT clocks, and that asymmetry is
+   * correct rather than an oversight. WHETHER a bid is in time is judged on
+   * `receivedAtMs` (the gauntlet's LOT_EXPIRED check above) so queue depth can
+   * never turn a bid that WAS in time into one that was not — that is the
+   * generous direction, and it protects the bidder. HOW MUCH runway the bid
+   * buys is measured from `atMs`, the instant the single writer actually
+   * applied it.
+   *
+   * An audit (2026-08-26) proposed unifying them on arrival time, on the
+   * grounds that a queued bid otherwise buys its runway from a later instant.
+   * That change was made and REVERTED, because the arithmetic runs the other
+   * way: `extendOnBid` proposes
+   *   min(max(endsAt, now + extension), now + initial)
+   * and returns the timer UNTOUCHED when that proposal is <= the current
+   * endsAt. An earlier `now` therefore produces a SMALLER proposal, and past a
+   * certain queue depth it produces no extension at all — a genuine
+   * last-second bid would be accepted (the expiry gate is generous) and then
+   * the lot would close on top of it. That is precisely the snipe the rule
+   * exists to prevent, and the engine's own integration suite caught it: every
+   * TimerExtended event disappeared.
+   *
+   * So the later clock stands. It can only ever grant MORE runway, never less,
+   * it is still capped at one opening window, and it keeps the fairness rule
+   * from doc 41 that `serverNowMs` is the one clock the aggregate reads.
+   */
   const timer = { opensAtMs: 0, endsAtMs: lot.endsAtMs ?? atMs, extensions: lot.timerExtensions };
   const extension = extendOnBid(timer, atMs, auction.config.timer);
   await db.transaction(async (tx) => {
