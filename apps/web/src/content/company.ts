@@ -94,9 +94,30 @@ export const LEGAL_IDENTITY: LegalIdentity = {
   // Consumer Protection (E-Commerce) Rules 4(3) asks for that, and it is not
   // always the registered office.
   registeredAddress: "P.No. 21 B, Ganesh Vihar, Nirman Nagar, Jaipur, Rajasthan 302019, India",
-  // TODO(founder): DesiAuction's OWN GSTIN, if registered. The only GSTIN
-  // anywhere in the platform today belongs to the ORGANIZER, on
-  // `finops_profiles`, and is a different thing entirely.
+  /*
+   * NOT A GAP — Eventztree is not GST-registered (founder, 2026-08-26), so null
+   * is the correct value and the surfaces correctly omit the row. (The only
+   * GSTIN anywhere in the platform belongs to the ORGANIZER, on
+   * `finops_profiles`, and is a different thing entirely.)
+   *
+   * IT STOPS BEING CORRECT THE DAY PAYMENTS ARE SWITCHED ON, and somebody
+   * should get that checked before then rather than after. There is exactly one
+   * set of gateway credentials in this codebase — `RAZORPAY_KEY_ID` /
+   * `RAZORPAY_KEY_SECRET` read from the platform env (`server/settlement/deps.ts`)
+   * — and no per-organizer credential anywhere in the schema. So with payments
+   * enabled, every team's dues are collected into EVENTZTREE's account and owed
+   * onward to the organizer. Collecting money on behalf of third parties is the
+   * fact pattern that drives both the compulsory-registration question under GST
+   * (an operator who collects consideration for suppliers does not get to wait
+   * for a turnover threshold) and the RBI payment-aggregator question. Neither is
+   * a call this file can make: put it to a CA and to whoever advises on the
+   * gateway arrangement.
+   *
+   * It also contradicts the Terms this same Legal Centre publishes, which say
+   * "we do not run your tournament or handle your money for you". Either the
+   * money stops flowing through Eventztree (split settlement to the organizer),
+   * or that sentence has to change. They cannot both stand.
+   */
   gstin: null,
   // Appointed by the company (2026-08-26); also a director on the MCA record
   // (DIN 09662665). Rule 3(2) wants a NAME, and this is it.
