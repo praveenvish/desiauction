@@ -1,5 +1,6 @@
 "use server";
 
+import { isCapabilitySet } from "@desiauction/core";
 import {
   auctions,
   auditLog,
@@ -12,6 +13,8 @@ import {
   teams,
   withTenantDb,
 } from "@desiauction/db";
+import { isFinopsCapabilitySet } from "@desiauction/financial-operations";
+import { isSettlementCapabilitySet } from "@desiauction/settlement";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -514,6 +517,16 @@ export async function issueGrantAction(
   const session = await requireSession();
   const org = await resolveTenantScoped(session.personId, slug);
   if (org === null) {
+    return { ok: false };
+  }
+  // The capability set is client-supplied. It must name a real vocabulary —
+  // org, settlement or finops — or the grant is a row that expands to nothing
+  // and slips past each engine's own set validation and audit tagging.
+  if (
+    !isCapabilitySet(capabilitySet) &&
+    !isSettlementCapabilitySet(capabilitySet) &&
+    !isFinopsCapabilitySet(capabilitySet)
+  ) {
     return { ok: false };
   }
   try {

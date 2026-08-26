@@ -154,8 +154,23 @@ export type OwnerJoinLanding =
  * is returned ONLY when this viewer is the accepting person — telling somebody
  * a fact about themselves that they already know is not a disclosure, and
  * "no longer valid" was the wrong answer to the most likely repeat visit.
+ *
+ * MODULE-PRIVATE on purpose. `viewerId` used to be the first parameter of an
+ * EXPORTED function in a "use server" module — that is to say, an HTTP endpoint
+ * whose arguments the browser writes. Anyone holding a spent token could name
+ * the person who spent it and be handed the team, the season and the
+ * competition slug back through the `already-owner` branch. The token is the
+ * capability for the invitation; it was never a capability for somebody else's
+ * identity. Every exported route into this resolves the session for itself, so
+ * nothing crossing the wire gets to choose who the viewer is.
+ *
+ * A signed-out visitor (viewerId null) still gets the full token-based preview.
+ * They simply match no accepting person, which is true.
  */
-export async function ownerJoinLanding(personId: string, token: string): Promise<OwnerJoinLanding> {
+async function resolveOwnerJoinLanding(
+  viewerId: string | null,
+  token: string,
+): Promise<OwnerJoinLanding> {
   const [row] = await systemDb
     .select({
       acceptedAt: auctionOwnerInvites.acceptedAt,
@@ -183,7 +198,7 @@ export async function ownerJoinLanding(personId: string, token: string): Promise
   if (row === undefined) {
     return { state: "invalid" };
   }
-  if (row.acceptedBy !== null && row.acceptedBy === personId) {
+  if (viewerId !== null && row.acceptedBy === viewerId) {
     return {
       state: "already-owner",
       teamName: row.teamName,
@@ -242,9 +257,15 @@ export async function ownerJoinLanding(personId: string, token: string): Promise
   };
 }
 
+/** The landing for whoever is actually holding this browser (or nobody). */
+export async function ownerJoinLanding(token: string): Promise<OwnerJoinLanding> {
+  const session = await currentSession();
+  return resolveOwnerJoinLanding(session?.personId ?? null, token);
+}
+
 /** Look up a live owner invitation without consuming it (the landing view). */
 export async function ownerJoinPreview(token: string): Promise<OwnerJoinPreview | null> {
-  const landing = await ownerJoinLanding("", token);
+  const landing = await ownerJoinLanding(token);
   return landing.state === "valid" ? landing.preview : null;
 }
 
@@ -262,7 +283,9 @@ export async function ownerJoinLandingView(token: string): Promise<{
     return { landing: { state: "invalid" }, viewerPhone: "" };
   }
   return {
-    landing: await ownerJoinLanding(session.personId, token),
+    // The session is already in hand, so this goes straight to the private
+    // resolver rather than paying for a second cookie-and-session read.
+    landing: await resolveOwnerJoinLanding(session.personId, token),
     viewerPhone: session.phone,
   };
 }

@@ -105,6 +105,63 @@ describe("OTP login against real Postgres", () => {
     expect(await getSessionByToken(db, token)).toBeNull();
   });
 
+  // The sliding window renews `expires_at` on every visit, so before the
+  // absolute ceiling a session that was used once a month never expired at all.
+  // The row this test builds is the exact shape that used to survive: seen
+  // seconds ago, thirty days from expiry, and older than the product has any
+  // business trusting a single authentication for.
+  it("absolute lifetime: a session past the cap is refused however recently it was used", async () => {
+    const [person] = await db.select().from(people).where(eq(people.phone, PHONE_A));
+    expect(person).toBeDefined();
+    if (person === undefined) {
+      return;
+    }
+    const { token } = await createSession(db, person.id, "vitest-absolute");
+    const fresh = await getSessionByToken(db, token);
+    expect(fresh?.personId).toBe(person.id);
+    if (fresh === null) {
+      return;
+    }
+    const DAY = 24 * 60 * 60 * 1000;
+    await db
+      .update(sessions)
+      .set({
+        createdAt: new Date(Date.now() - 100 * DAY),
+        lastSeenAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * DAY),
+      })
+      .where(eq(sessions.id, fresh.sessionId));
+    expect(await getSessionByToken(db, token)).toBeNull();
+
+    // …and the ceiling is a ceiling, not a kill switch: a session inside it
+    // still authenticates, including one old enough that the read slides it.
+    const { token: current } = await createSession(db, person.id, "vitest-current");
+    const opened = await getSessionByToken(db, current);
+    expect(opened?.personId).toBe(person.id);
+    if (opened === null) {
+      return;
+    }
+    await db
+      .update(sessions)
+      .set({
+        // 80 days old and two days since the last visit: inside the ceiling, so
+        // it opens — and stale enough that the read slides it, so the clamp is
+        // the thing under test (an unclamped slide would ask for 30 more days
+        // when only 10 remain).
+        createdAt: new Date(Date.now() - 80 * DAY),
+        lastSeenAt: new Date(Date.now() - 2 * DAY),
+      })
+      .where(eq(sessions.id, opened.sessionId));
+    expect((await getSessionByToken(db, current))?.personId).toBe(person.id);
+    const [slid] = await db
+      .select({ expiresAt: sessions.expiresAt })
+      .from(sessions)
+      .where(eq(sessions.id, opened.sessionId));
+    expect(slid).toBeDefined();
+    expect(slid?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(slid?.expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 11 * DAY);
+  });
+
   it("garbage tokens never resolve", async () => {
     expect(await getSessionByToken(db, "not-a-real-token")).toBeNull();
   });

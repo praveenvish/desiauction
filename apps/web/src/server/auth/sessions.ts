@@ -21,8 +21,36 @@ export const RETURNING_COOKIE = "da_returning";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SLIDE_AFTER_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * The ceiling the sliding window never had.
+ *
+ * `expiresAt` slides forward on every visit, so a handset opened once a month
+ * held a session that was thirty days from expiry FOREVER — a token minted in
+ * year one still authenticating in year three, on a phone long since sold,
+ * lost, or handed to somebody else. The sliding window answers "is this device
+ * still in use"; nothing answered "how long may one authentication stand". This
+ * is that second question, measured from `created_at` and immune to renewal:
+ * ninety days after a person proved who they were, they prove it again.
+ *
+ * No migration and no forced sign-out: `created_at` is already on every row, so
+ * live sessions simply inherit their real age. Only the ones already older than
+ * the ceiling — the ones this exists to end — stop working.
+ */
+const SESSION_MAX_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
+
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * The oldest `created_at` that may still authenticate. Expressed as a floor in
+ * the WHERE rather than a check after the read, so every surface that filters
+ * on it — the token lookup AND the device list — refuses the same rows. A
+ * session the account page still offered to "sign out" but which no longer
+ * opened anything was a lie about state.
+ */
+function lifetimeFloor(): Date {
+  return new Date(Date.now() - SESSION_MAX_LIFETIME_MS);
 }
 
 export async function createSession(
@@ -54,6 +82,7 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
     .select({
       sessionId: sessions.id,
       personId: sessions.personId,
+      createdAt: sessions.createdAt,
       lastSeenAt: sessions.lastSeenAt,
       phone: people.phone,
       name: people.name,
@@ -65,6 +94,7 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
         eq(sessions.tokenHash, hashToken(token)),
         isNull(sessions.revokedAt),
         gt(sessions.expiresAt, new Date()),
+        gt(sessions.createdAt, lifetimeFloor()),
       ),
     )
     .limit(1);
@@ -72,9 +102,15 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
     return null;
   }
   if (Date.now() - row.lastSeenAt.getTime() > SLIDE_AFTER_MS) {
+    // The slide may not push past the ceiling. Without the clamp `expiresAt`
+    // would keep advertising thirty more days on a session the WHERE above has
+    // already stopped honouring, which reads as a bug in whichever surface
+    // shows the date.
+    const ceiling = row.createdAt.getTime() + SESSION_MAX_LIFETIME_MS;
+    const slid = Math.min(Date.now() + SESSION_TTL_MS, ceiling);
     await db
       .update(sessions)
-      .set({ lastSeenAt: new Date(), expiresAt: new Date(Date.now() + SESSION_TTL_MS) })
+      .set({ lastSeenAt: new Date(), expiresAt: new Date(slid) })
       .where(eq(sessions.id, row.sessionId));
   }
   return { sessionId: row.sessionId, personId: row.personId, phone: row.phone, name: row.name };
@@ -115,6 +151,7 @@ export async function listSessions(db: Db, personId: string): Promise<SessionSum
         eq(sessions.personId, personId),
         isNull(sessions.revokedAt),
         gt(sessions.expiresAt, new Date()),
+        gt(sessions.createdAt, lifetimeFloor()),
       ),
     )
     .orderBy(desc(sessions.lastSeenAt), desc(sessions.createdAt));

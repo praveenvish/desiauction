@@ -188,6 +188,22 @@ const ACTIVITY_MACHINE = new Set([
 const ACTIVITY_PERSONAL = new Set(["auth", "profile"]);
 
 /**
+ * Audit actions that describe the MONEY: what was collected, closed, attested
+ * or exported. Reading them is settlement/finops work.
+ *
+ * The same predicate the org Overview applies (orgs/actions.ts). Here it was
+ * missing entirely, so `settlement.CaseOpened`, `settlement.CaseSettled` and
+ * their subjects rode the feed to EVERY member of every org — including the
+ * team owners `acceptOwnerJoin` enrols as viewer-level members, who cannot open
+ * the books the rows describe. The figures on this page were already gated
+ * (DA-30); their audit trail was not, which is the same leak one surface later.
+ */
+function isMoneyAction(action: string): boolean {
+  const domain = action.split(".")[0] ?? "";
+  return domain === "finops" || domain === "settlement" || domain === "payment";
+}
+
+/**
  * Rank the feed for the person reading it.
  *
  * The raw table is dominated by finance: the finops follower emits far more
@@ -196,9 +212,21 @@ const ACTIVITY_PERSONAL = new Set(["auth", "profile"]);
  * settlement. Organizer-facing events take the rows; everything finance folds
  * into ONE summarised row so the work is still visible without owning the
  * panel.
+ *
+ * `canSeeMoney` answers, per audit scope, whether this reader holds the books
+ * that scope's money rows belong to. Money rows they may not hold are dropped
+ * before ranking — so they neither take a row nor swell the folded count, which
+ * would otherwise report the size of a panel they cannot see.
  */
 function foldActivity(
-  rows: { id: string; action: string; subject: string | null; at: Date | string }[],
+  rows: {
+    id: string;
+    action: string;
+    subject: string | null;
+    at: Date | string;
+    scopeId: string;
+  }[],
+  canSeeMoney: (scopeId: string) => boolean,
 ): HomeActivityRow[] {
   const iso = (at: Date | string) => (at instanceof Date ? at : new Date(at)).toISOString();
   const finance: typeof rows = [];
@@ -206,6 +234,9 @@ function foldActivity(
   for (const row of rows) {
     const domain = row.action.split(".")[0] ?? "";
     if (ACTIVITY_MACHINE.has(row.action) || ACTIVITY_PERSONAL.has(domain)) {
+      continue;
+    }
+    if (isMoneyAction(row.action) && !canSeeMoney(row.scopeId)) {
       continue;
     }
     (domain === "finops" ? finance : organizer).push(row);
@@ -244,7 +275,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
   // created their organization that nothing had ever happened — seconds after
   // the event that says otherwise was written.
   const scopeIds = [...competitionIds, ...orgIds];
-  const [activityRaw, tournamentRows] = await Promise.all([
+  const [activityRaw, tournamentRows, settleableOrgIds] = await Promise.all([
     scopeIds.length > 0
       ? systemDb
           .select({
@@ -252,6 +283,10 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
             action: auditLog.action,
             subject: auditLog.subject,
             at: auditLog.at,
+            // The scope the row was written against — a competition id or an
+            // org id, per `scopeIds` above. The money filter needs it to reach
+            // the org whose books the reader either holds or does not.
+            scopeId: auditLog.scopeId,
           })
           .from(auditLog)
           .where(inArray(auditLog.scopeId, scopeIds))
@@ -264,8 +299,33 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
           .from(tournaments)
           .where(inArray(tournaments.orgId, orgIds))
       : Promise.resolve([]),
+    // One grants read, expanded by settlement's own capability engine — the
+    // same answer the shell's Money tab is gated on, so the console can never
+    // offer a link the destination will 404, never fold a rupee the reader may
+    // not see, and now never name a settlement event they may not read.
+    //
+    // Resolved HERE rather than beside the money reads further down, because
+    // the feed is built before the "no competitions" early return and needs the
+    // same answer. It is request-cached, so asking early costs nothing.
+    settlementOrgIds(),
   ]);
-  const activity = foldActivity(activityRaw);
+  const settleable = new Set(settleableOrgIds);
+  // An audit scope resolves to its org: a competition through its own row, an
+  // org scope by being one. Anything that resolves to neither is not shown —
+  // the filter fails closed, which for a metadata leak is the only safe way to
+  // be wrong.
+  const scopeOrg = new Map<string, string>();
+  for (const competition of view.competitions) {
+    scopeOrg.set(competition.id, competition.orgId);
+  }
+  for (const org of view.orgs) {
+    scopeOrg.set(org.id, org.id);
+  }
+  const canSeeMoney = (scopeId: string): boolean => {
+    const orgId = scopeOrg.get(scopeId);
+    return orgId !== undefined && settleable.has(orgId);
+  };
+  const activity = foldActivity(activityRaw, canSeeMoney);
   const tournamentCount = tournamentRows[0]?.count ?? 0;
 
   if (competitionIds.length === 0) {
@@ -330,80 +390,68 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
   const caseCompetition = new Map(caseRows.map((row) => [row.id, row.competitionId]));
 
   const since = new Date(Date.now() - 14 * DAY_MS);
-  const [
-    registrationRows,
-    teamRows,
-    lotRows,
-    bidCountRows,
-    obligationRows,
-    paymentRows,
-    settleableOrgIds,
-  ] = await Promise.all([
-    systemDb
-      .select({
-        competitionId: registrations.competitionId,
-        status: registrations.status,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(registrations)
-      .where(inArray(registrations.competitionId, competitionIds))
-      .groupBy(registrations.competitionId, registrations.status),
-    systemDb
-      .select({ competitionId: teams.competitionId, count: sql<number>`count(*)::int` })
-      .from(teams)
-      .where(inArray(teams.competitionId, competitionIds))
-      .groupBy(teams.competitionId),
-    auctionIds.length > 0
-      ? systemDb
-          .select({
-            auctionId: lots.auctionId,
-            total: sql<number>`count(*)::int`,
-            sold: sql<number>`count(*) filter (where ${lots.status} = 'sold')::int`,
-            spend: sql<number>`coalesce(sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold'), 0)::double precision`,
-          })
-          .from(lots)
-          .where(inArray(lots.auctionId, auctionIds))
-          .groupBy(lots.auctionId)
-      : Promise.resolve([]),
-    // Grouped by auction, not totalled: the lifecycle strip reports bids for
-    // the competitions at auction stage, so the grain has to reach them.
-    auctionIds.length > 0
-      ? systemDb
-          .select({ auctionId: bids.auctionId, count: sql<number>`count(*)::int` })
-          .from(bids)
-          .where(inArray(bids.auctionId, auctionIds))
-          .groupBy(bids.auctionId)
-      : Promise.resolve([]),
-    caseIds.length > 0
-      ? systemDb
-          .select({
-            caseId: settlementObligations.caseId,
-            amount: sql<number>`coalesce(sum(${settlementObligations.amount}), 0)::double precision`,
-            discharged: sql<number>`coalesce(sum(${settlementObligations.discharged}), 0)::double precision`,
-            waived: sql<number>`coalesce(sum(${settlementObligations.waived}), 0)::double precision`,
-          })
-          .from(settlementObligations)
-          .where(inArray(settlementObligations.caseId, caseIds))
-          .groupBy(settlementObligations.caseId)
-      : Promise.resolve([]),
-    caseIds.length > 0
-      ? systemDb
-          // caseId travels so the weekly series can be filtered by whose books
-          // the viewer may open (DA-30) — the totals above already are.
-          .select({
-            caseId: payments.caseId,
-            at: payments.createdAt,
-            captured: payments.captured,
-          })
-          .from(payments)
-          .where(and(inArray(payments.caseId, caseIds), gte(payments.createdAt, since)))
-      : Promise.resolve([]),
-    // One grants read, expanded by settlement's own capability engine — the
-    // same answer the shell's Money tab is gated on, so the console can never
-    // offer a link the destination will 404.
-    settlementOrgIds(),
-  ]);
-  const settleable = new Set(settleableOrgIds);
+  const [registrationRows, teamRows, lotRows, bidCountRows, obligationRows, paymentRows] =
+    await Promise.all([
+      systemDb
+        .select({
+          competitionId: registrations.competitionId,
+          status: registrations.status,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(registrations)
+        .where(inArray(registrations.competitionId, competitionIds))
+        .groupBy(registrations.competitionId, registrations.status),
+      systemDb
+        .select({ competitionId: teams.competitionId, count: sql<number>`count(*)::int` })
+        .from(teams)
+        .where(inArray(teams.competitionId, competitionIds))
+        .groupBy(teams.competitionId),
+      auctionIds.length > 0
+        ? systemDb
+            .select({
+              auctionId: lots.auctionId,
+              total: sql<number>`count(*)::int`,
+              sold: sql<number>`count(*) filter (where ${lots.status} = 'sold')::int`,
+              spend: sql<number>`coalesce(sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold'), 0)::double precision`,
+            })
+            .from(lots)
+            .where(inArray(lots.auctionId, auctionIds))
+            .groupBy(lots.auctionId)
+        : Promise.resolve([]),
+      // Grouped by auction, not totalled: the lifecycle strip reports bids for
+      // the competitions at auction stage, so the grain has to reach them.
+      auctionIds.length > 0
+        ? systemDb
+            .select({ auctionId: bids.auctionId, count: sql<number>`count(*)::int` })
+            .from(bids)
+            .where(inArray(bids.auctionId, auctionIds))
+            .groupBy(bids.auctionId)
+        : Promise.resolve([]),
+      caseIds.length > 0
+        ? systemDb
+            .select({
+              caseId: settlementObligations.caseId,
+              amount: sql<number>`coalesce(sum(${settlementObligations.amount}), 0)::double precision`,
+              discharged: sql<number>`coalesce(sum(${settlementObligations.discharged}), 0)::double precision`,
+              waived: sql<number>`coalesce(sum(${settlementObligations.waived}), 0)::double precision`,
+            })
+            .from(settlementObligations)
+            .where(inArray(settlementObligations.caseId, caseIds))
+            .groupBy(settlementObligations.caseId)
+        : Promise.resolve([]),
+      caseIds.length > 0
+        ? systemDb
+            // caseId travels so the weekly series can be filtered by whose books
+            // the viewer may open (DA-30) — the totals above already are.
+            .select({
+              caseId: payments.caseId,
+              at: payments.createdAt,
+              captured: payments.captured,
+            })
+            .from(payments)
+            .where(and(inArray(payments.caseId, caseIds), gte(payments.createdAt, since)))
+        : Promise.resolve([]),
+    ]);
 
   // One grouped read gives the per-competition total, the approved pool per
   // competition, and the portfolio-wide approved count.

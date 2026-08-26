@@ -365,12 +365,32 @@ export async function tournamentHeader(slug: string): Promise<TournamentHeader |
  * read every season in every org the person belongs to and filter in JS, so a
  * person in thirty clubs paid for all thirty to render one page.
  *
- * Membership has already been proved by `tournamentHeader`; callers must not
- * reach this without it.
+ * Membership is normally proved by `tournamentHeader` before the page reaches
+ * here, but because this is an invokable "use server" export it re-proves it
+ * itself: a non-member (or anyone POSTing the action id with an arbitrary
+ * tournament ULID) gets an empty list, never another tenant's private seasons.
  */
 export async function tournamentSeasons(
   tournamentId: string,
 ): Promise<(CompetitionSummary & { orgName: string; running: boolean })[]> {
+  const session = await currentSession();
+  if (session === null) {
+    return [];
+  }
+  const [tournament] = await systemDb
+    .select({ orgId: tournaments.orgId })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (tournament === undefined) {
+    return [];
+  }
+  const orgs = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    orgsFor(db, session.personId),
+  );
+  if (!orgs.some((org) => org.id === tournament.orgId)) {
+    return [];
+  }
   const seasons = await competitionsOfTournament(systemDb, tournamentId);
   const today = isoToday();
   return byEditionDate(seasons).map((season) => ({
