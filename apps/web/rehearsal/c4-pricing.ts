@@ -13,4 +13,7 @@ async function main() {
   log("\nDIRECTORY: " + (d.match(/All \d+ Registration open \d+ Live now \d+/)?.[0] ?? "?"));
   await b.close();
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

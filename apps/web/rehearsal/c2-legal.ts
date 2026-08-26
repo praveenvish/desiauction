@@ -6,14 +6,25 @@ async function main() {
   for (const path of ["/legal", "/legal/grievances", "/legal/privacy"]) {
     const res = await p.goto(`${BASE}${path}`, { waitUntil: "networkidle" }).catch(() => null);
     await p.waitForTimeout(400);
-    const t = (await p.locator("main").innerText().catch(() => "")).replace(/\s+/g, " ");
+    const t = (
+      await p
+        .locator("main")
+        .innerText()
+        .catch(() => "")
+    ).replace(/\s+/g, " ");
     log(`\n### ${path} [${res?.status()}] ${t.split(" ").length} words`);
     log(t.slice(0, 1100));
   }
   // does search find the new document?
   await p.goto(`${BASE}/search?q=grievance`, { waitUntil: "networkidle" });
   await p.waitForTimeout(600);
-  log("\n### /search?q=grievance\n" + (await p.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 300));
+  log(
+    "\n### /search?q=grievance\n" +
+      (await p.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 300),
+  );
   await b.close();
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -11,4 +11,7 @@ async function main() {
   log("LIVE badges on page 1: " + (t.match(/LIVE NOW/g) ?? []).length);
   await b.close();
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -1,7 +1,9 @@
 import { launch, signIn, log, BASE, withDb } from "./lib";
 async function main() {
   const b = await launch(true);
-  const o = await signIn(b, "Demo Founder", "9999000001", { viewport: { width: 1280, height: 900 } });
+  const o = await signIn(b, "Demo Founder", "9999000001", {
+    viewport: { width: 1280, height: 900 },
+  });
   const p = o.page;
   // a fresh season, then put it on the Free tier as GA would
   await p.goto(`${BASE}/tournaments`, { waitUntil: "networkidle" });
@@ -25,14 +27,28 @@ async function main() {
     await dlg.getByLabel("Team name").fill(`Ceiling Team ${n}`);
     await dlg.getByTestId("add-team-workspace").click();
     await p.waitForTimeout(1800);
-    const err = await dlg.locator('[class*="error"], [role="alert"]').first().innerText().catch(() => "");
+    const err = await dlg
+      .locator('[class*="error"], [role="alert"]')
+      .first()
+      .innerText()
+      .catch(() => "");
     const stillOpen = await dlg.isVisible().catch(() => false);
-    log(`team ${n}: ${stillOpen ? "REFUSED" : "created"}${err ? ` — "${err.replace(/\n/g, " ")}"` : ""}`);
-    if (stillOpen) { await p.screenshot({ path: "rehearsal/mobile/f-tier-block.png" }); break; }
+    log(
+      `team ${n}: ${stillOpen ? "REFUSED" : "created"}${err ? ` — "${err.replace(/\n/g, " ")}"` : ""}`,
+    );
+    if (stillOpen) {
+      await p.screenshot({ path: "rehearsal/mobile/f-tier-block.png" });
+      break;
+    }
   }
-  const count = await withDb(async (h) => h.sql`
-    select count(*)::int as n from teams t join competitions c on c.id=t.competition_id where c.slug=${slug}`);
+  const count = await withDb(
+    async (h) => h.sql`
+    select count(*)::int as n from teams t join competitions c on c.id=t.competition_id where c.slug=${slug}`,
+  );
   log("teams in db:", JSON.stringify(count));
   await b.close();
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
