@@ -141,9 +141,16 @@ export function createRazorpayAdapter(config: RazorpayConfig): PaymentGatewayPor
         return { ok: false, reason: "malformed_envelope" };
       }
       const envelope: WebhookEnvelope = {
-        // Deterministic idempotency key: same provider event ⇒ same key, so a
-        // replayed webhook returns the original ack and appends nothing.
-        providerEventId: `${eventType}:${providerRef}`,
+        // Deterministic idempotency key: KIND (not the raw event) plus the
+        // provider entity ref. Razorpay emits BOTH `refund.created` and
+        // `refund.processed` for one refund entity; keying on the event type
+        // gave them distinct ids, so the same partial refund was booked twice
+        // (refundedTotal doubled, the obligation reinstated twice). Both map to
+        // kind `refunded`, so keying on the kind collapses them to one id while
+        // every other transition (authorized/captured/failed/disputed) keeps a
+        // distinct kind and stays independent. A replayed webhook — or the
+        // paired refund event — returns the original ack and appends nothing.
+        providerEventId: `${kind}:${providerRef}`,
         orderRef,
         paymentId,
         orgId,
@@ -192,6 +199,8 @@ const KIND_OF: Record<string, WebhookEnvelope["kind"]> = {
   "payment.authorized": "authorized",
   "payment.captured": "captured",
   "payment.failed": "failed",
+  // Both refund events map to one kind; the idempotency key (kind:providerRef)
+  // then collapses them so a single refund is booked exactly once.
   "refund.processed": "refunded",
   "refund.created": "refunded",
   "payment.dispute.created": "disputed",

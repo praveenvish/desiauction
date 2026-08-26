@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash } from "node:crypto";
+
 import { auctionOf, type AuctionRecord } from "@desiauction/auction";
 import { newId, withTenantDb, type Db } from "@desiauction/db";
 import {
@@ -661,12 +663,82 @@ export async function computeObligationsAction(
   return command(slug, (deps, actor) => computeCaseObligations(deps, actor, caseId, newId()));
 }
 
+/** Crockford base32 — the alphabet every `newId()` ULID in this product is written in. */
+const CROCKFORD32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/**
+ * A 26-character id derived from a string instead of from the clock.
+ *
+ * `payments.id` and `settlement_events.stream_id` are `char(26)` — the ULID
+ * shape — so an id that is not exactly that wide is rejected by the insert. The
+ * first 34 hex digits of the digest are 136 bits, comfortably more than the 130
+ * bits twenty-six base32 characters carry, so no character is short of entropy.
+ */
+function derivedId(fingerprint: string): string {
+  let value = BigInt(`0x${createHash("sha256").update(fingerprint).digest("hex").slice(0, 34)}`);
+  let out = "";
+  for (let i = 0; i < 26; i += 1) {
+    out = `${CROCKFORD32[Number(value % 32n)] ?? "0"}${out}`;
+    value /= 32n;
+  }
+  return out;
+}
+
+/**
+ * The idempotency anchor for one payment intent.
+ *
+ * The writer says it in its own words — "(paymentId, commandId) is the
+ * idempotency anchor" — and it looks a repeat up as
+ * `findByCommandId("payment", paymentId, commandId)`. The stream it searches IS
+ * the payment. So a stable command id beside a freshly minted `paymentId` would
+ * dedupe nothing: the retry would search an empty stream, find no duplicate,
+ * open a SECOND gateway order and write a second payment for one intent. Both
+ * halves therefore come out of one fingerprint, and the fingerprint IS the
+ * command id, so the two can never disagree about what "the same intent" means.
+ *
+ * What makes two submissions the same intent: the case, the team, the method
+ * and the exact paise — plus the caller's `intentKey`, which is the only thing
+ * that can tell "the browser resent my submit" apart from "the team is paying
+ * ₹5,000 a second time tonight". A caller that sends no key is therefore given
+ * a fresh one per call: this exists to stop money being duplicated, and it must
+ * never refuse a legitimate second payment that happens to look identical.
+ *
+ * With both halves derived, `settlement_events_command_uq` becomes the backstop
+ * for the two-retries-at-once race the lookup cannot see: the loser fails
+ * loudly instead of quietly buying a second order.
+ */
+function paymentIntent(
+  caseId: string,
+  teamId: string,
+  method: string,
+  paise: number,
+  intentKey: string,
+): { readonly paymentId: string; readonly commandId: string } {
+  // Client text ends up inside a stored command id, so it is reduced to a
+  // bounded printable key rather than carried through as it arrived.
+  const key = intentKey
+    .trim()
+    .replace(/[^A-Za-z0-9_.:-]/g, "")
+    .slice(0, 64);
+  const commandId = `createPayment:${caseId}:${teamId}:${method}:${String(paise)}:${
+    key === "" ? newId() : key
+  }`;
+  return { paymentId: derivedId(commandId), commandId };
+}
+
+/**
+ * `intentKey` is what makes a retry a retry. It is optional so that no caller
+ * is broken by its arrival, but a surface that can double-submit — every button
+ * in a browser — should send one stable value per intent and a new one only
+ * once the payment has been accepted.
+ */
 export async function recordPaymentAction(
   slug: string,
   caseId: string,
   teamId: string,
   method: string,
   amount: string,
+  intentKey = "",
 ): Promise<ActionResult> {
   if (!isPaymentMethod(method)) {
     return { ok: false, error: "Choose how the money arrived." };
@@ -678,10 +750,11 @@ export async function recordPaymentAction(
   if (!parsed.ok) {
     return { ok: false, error: RUPEE_PARSE_MESSAGES[parsed.reason] };
   }
+  const intent = paymentIntent(caseId, teamId, method, parsed.paise, intentKey);
   return command(slug, (deps, actor) =>
     createPayment(deps, actor, {
-      paymentId: newId(),
-      commandId: newId(),
+      paymentId: intent.paymentId,
+      commandId: intent.commandId,
       caseId,
       teamId,
       method,

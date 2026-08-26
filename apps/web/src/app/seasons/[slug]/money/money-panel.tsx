@@ -1135,6 +1135,17 @@ function Collect({
   const [teamId, setTeamId] = useState("");
   const [method, setMethod] = useState("manual:cash");
   const [amount, setAmount] = useState("");
+  /*
+   * THE INTENT KEY — one per payment the operator means to record.
+   *
+   * The server derives both the payment id and the command id from this key, so
+   * a double-click, a retried server action or a flaky network replays the SAME
+   * intent and the writer dedupes it instead of creating a second payment and a
+   * second gateway order. It is regenerated only AFTER a payment lands, which is
+   * what makes the next one genuinely new — recording two identical amounts for
+   * one team on purpose still works, because that is a fresh key.
+   */
+  const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
 
   if (!canCollect) {
     return null;
@@ -1195,12 +1206,16 @@ function Collect({
         <Button
           onClick={() => {
             void act(
-              () => recordPaymentAction(slug, settlementCase.caseId, teamId, method, amount),
+              () =>
+                recordPaymentAction(slug, settlementCase.caseId, teamId, method, amount, intentKey),
               "Payment recorded. Attest it once the money is in hand.",
             ).then((ok) => {
               if (ok) {
                 setAmount("");
                 setTeamId("");
+                // Only a payment that actually landed starts a new intent; a
+                // failed attempt keeps its key so retrying it stays idempotent.
+                setIntentKey(crypto.randomUUID());
               }
             });
           }}

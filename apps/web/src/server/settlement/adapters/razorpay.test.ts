@@ -46,7 +46,7 @@ describe("Razorpay adapter — webhook verification (the trusted-envelope core)"
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.envelope).toEqual({
-        providerEventId: "payment.captured:pay_ABC",
+        providerEventId: "captured:pay_ABC",
         orderRef: "order_XYZ",
         paymentId: PAYMENT,
         orgId: ORG,
@@ -85,6 +85,53 @@ describe("Razorpay adapter — webhook verification (the trusted-envelope core)"
     expect(a.ok && b.ok).toBe(true);
     if (a.ok && b.ok) {
       expect(a.envelope.providerEventId).toBe(b.envelope.providerEventId);
+    }
+  });
+
+  it("collapses refund.created and refund.processed for ONE refund to ONE key (no double refund)", () => {
+    // Razorpay emits both events for a single refund entity. Keying the
+    // idempotency id on the event type booked the same partial refund twice;
+    // keying on the KIND makes the second event dedupe against the first.
+    const refundBody = (event: string): string =>
+      JSON.stringify({
+        event,
+        created_at: Math.floor(NOW / 1000),
+        payload: {
+          refund: {
+            entity: {
+              id: "rfnd_ABC",
+              amount: 2_500,
+              currency: "INR",
+              notes: { paymentId: PAYMENT, orgId: ORG },
+            },
+          },
+        },
+      });
+    const created = adapter.verifyWebhook(
+      refundBody("refund.created"),
+      sign(refundBody("refund.created")),
+      NOW,
+    );
+    const processed = adapter.verifyWebhook(
+      refundBody("refund.processed"),
+      sign(refundBody("refund.processed")),
+      NOW + 1_000,
+    );
+    expect(created.ok && processed.ok).toBe(true);
+    if (created.ok && processed.ok) {
+      expect(created.envelope.providerEventId).toBe("refunded:rfnd_ABC");
+      // Same refund entity ⇒ same idempotency key ⇒ booked exactly once.
+      expect(created.envelope.providerEventId).toBe(processed.envelope.providerEventId);
+    }
+    // Two DISTINCT partial refunds on one payment still stay independent.
+    const second = adapter.verifyWebhook(
+      refundBody("refund.processed").replace("rfnd_ABC", "rfnd_DEF"),
+      sign(refundBody("refund.processed").replace("rfnd_ABC", "rfnd_DEF")),
+      NOW,
+    );
+    expect(second.ok).toBe(true);
+    if (second.ok && created.ok) {
+      expect(second.envelope.providerEventId).not.toBe(created.envelope.providerEventId);
     }
   });
 
