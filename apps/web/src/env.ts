@@ -8,6 +8,14 @@ const envSchema = z.object({
   // the system pool serves ONLY the named pre-tenant token paths (invite
   // preview/accept — ops/db/create-app-role.sql). Unset = same URL (local dev).
   SYSTEM_DATABASE_URL: z.string().startsWith("postgres").optional(),
+  /**
+   * Sockets per pool, per process. Unset keeps the driver default (10) — and on
+   * a fleet of warm serverless instances that default is multiplied by the
+   * instance count AND by the two pools each one opens, which is how a healthy
+   * database ends up refusing every connection at `max_connections` while the
+   * web tier 500s. Whoever sizes the fleet sizes this.
+   */
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).optional(),
   SENTRY_DSN: z.url().optional(),
   // WebAuthn relying party (M-IP2-2). Defaults serve local dev + e2e; deployed
   // environments set real values (rpID must suffix-match the browser host).

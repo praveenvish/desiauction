@@ -14,10 +14,33 @@ export interface DbHandle {
   sql: postgres.Sql;
 }
 
+/**
+ * Sockets one pool may hold, when the caller names no other number.
+ *
+ * Ten is right for a long-lived process and wrong for a fleet. On serverless it
+ * is ten per WARM INSTANCE, and the web tier opens a second (system) pool
+ * beside this one — twenty sockets per instance. Enough instances and a
+ * perfectly healthy managed Postgres starts refusing connections at
+ * `max_connections`, at which point every request 500s and nothing in the
+ * database's own metrics looks wrong. The number therefore has to be settable
+ * wherever the fleet is sized, not pinned in this file.
+ */
+const DEFAULT_POOL_MAX = 10;
+
+export interface DbPoolOptions {
+  /**
+   * Sockets this pool may hold. Omitted means DEFAULT_POOL_MAX, so an existing
+   * caller that passes nothing keeps exactly the pool it had. Apps read the
+   * operator's number through their own env.ts (§11) — this package never
+   * touches the environment itself.
+   */
+  max?: number | undefined;
+}
+
 /** One factory for every consumer; apps pass their validated env URL (§11). */
-export function createDb(url: string): DbHandle {
+export function createDb(url: string, options: DbPoolOptions = {}): DbHandle {
   const sql = postgres(url, {
-    max: 10,
+    max: options.max ?? DEFAULT_POOL_MAX,
     // Recycle connections so the pool can never hand out a dead socket. Without
     // these, a connection is held forever and a machine sleep, database
     // restart, or an idle cutoff upstream (managed Postgres, PgBouncer, a load

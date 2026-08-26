@@ -47,6 +47,54 @@ function commandId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * THE IDEMPOTENCY KEY BELONGS TO THE INTENT, NOT TO THE ATTEMPT.
+ *
+ * The engine de-duplicates on (actor, commandId): the same id from the same
+ * person returns the ORIGINAL ack and executes nothing twice. That guarantee
+ * was unreachable from here, because every attempt minted a fresh id — so the
+ * one case it exists for was exactly the case it did not cover.
+ *
+ * That case is the `catch` below, which says so in as many words: a rejected
+ * promise means the ANSWER was lost, not that the command failed, so the bid may
+ * well be recorded. A bidder who taps again after seeing that message was, with
+ * a new id each time, bidding against themselves.
+ *
+ * So an intent keeps its id until it gets a DEFINITIVE answer — accepted or
+ * refused, both of which are answers. Only then is the slot cleared and the next
+ * press a genuinely new intent.
+ *
+ * THE INTENT IS THE CONTROL *AND* WHAT IT WAS ASKED TO DO. Keying on the control
+ * alone would be wrong in the other direction: after an unanswered ₹100 bid, a
+ * ₹200 bid would inherit the id, and if the first HAD landed the engine would
+ * return its cached ack — the bidder would be told ₹200 succeeded while ₹100 is
+ * what stands. Folding the payload into the key makes "the same intent" mean
+ * what the words mean: same control, same request.
+ */
+function useIntentIds(): {
+  idFor: (key: string, payload?: Record<string, unknown>) => string;
+  settle: (key: string, payload?: Record<string, unknown>) => void;
+} {
+  const ids = useRef(new Map<string, string>());
+  const slot = (key: string, payload?: Record<string, unknown>): string =>
+    payload === undefined ? key : `${key}:${JSON.stringify(payload)}`;
+  return {
+    idFor: (key, payload) => {
+      const at = slot(key, payload);
+      const existing = ids.current.get(at);
+      if (existing !== undefined) {
+        return existing;
+      }
+      const minted = commandId();
+      ids.current.set(at, minted);
+      return minted;
+    },
+    settle: (key, payload) => {
+      ids.current.delete(slot(key, payload));
+    },
+  };
+}
+
 export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView }) {
   const router = useRouter();
   const toast = useToast();
@@ -64,6 +112,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
    * key names the ONE control that is actually working.
    */
   const [pending, setPending] = useState<string | null>(null);
+  const intents = useIntentIds();
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
@@ -90,7 +139,9 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       setPending(key);
       let ack;
       try {
-        ack = await submitAuctionCommand(slug, commandId(), type, payload);
+        // Reuses this intent's id if a previous attempt ended without an answer,
+        // so the retry is de-duplicated by the engine instead of re-executed.
+        ack = await submitAuctionCommand(slug, intents.idFor(key), type, payload);
       } catch {
         // DO NOT CLAIM THE COMMAND FAILED. A rejected promise means the ANSWER
         // did not come back; it does not mean the request never arrived. The
@@ -110,6 +161,9 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       } finally {
         setPending(null);
       }
+      // An ack — accepted OR refused — is a definitive answer, so this intent is
+      // over and the next press starts a new one.
+      intents.settle(key);
       if (ack.accepted) {
         if (done !== undefined) {
           toast({ title: done, tone: "success" });
@@ -119,7 +173,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
       return false;
     },
-    [slug, toast],
+    [slug, toast, intents],
   );
   const bidBusy = pending === "bid";
 
@@ -164,7 +218,10 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       : {};
     let ack;
     try {
-      ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
+      // Same intent discipline as `send`: closing the night twice because the
+      // first answer was lost is exactly the mistake the engine can prevent, but
+      // only if the retry carries the id the first attempt used.
+      ack = await submitAuctionCommand(slug, intents.idFor("complete"), "CompleteAuction", payload);
     } catch {
       // Same rule as `send` above: an unanswered request is not a failed one,
       // and "the night is still open" would be a claim this code cannot make.
@@ -175,6 +232,15 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       });
       return;
     }
+    /*
+     * An ack ends the intent — and here that matters twice over. A refusal for
+     * `squad_below_minimum` sends the conductor back into the dialog to record
+     * an override, and the command they then send carries a DIFFERENT payload.
+     * Reusing the id for it would hand back the cached refusal and the override
+     * could never take effect, so the slot is cleared on any answer, not just a
+     * successful one.
+     */
+    intents.settle("complete");
     if (ack.accepted) {
       setCompleteOpen(false);
       setShortSquads(false);
@@ -190,6 +256,13 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
   };
 
   const bid = async (amount: number) => {
+    // The button's `disabled` is the only thing that stopped a second tap, and
+    // it arrives a render late: `setPending` is asynchronous, so two taps inside
+    // one frame both got here. Guarding on the in-flight key closes that window
+    // in the click handler itself rather than relying on React having repainted.
+    if (bidBusy) {
+      return;
+    }
     if (myPaddle === null) {
       toast({ title: "Claim a paddle first.", tone: "danger" });
       return;
