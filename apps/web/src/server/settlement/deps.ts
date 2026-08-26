@@ -33,6 +33,12 @@ export interface SettlementDeps {
   readonly checkpointCadence: number;
   /** Resolve the gateway for a payment method — a port, never an SDK. */
   readonly gateway: (method: string) => PaymentGatewayPort | null;
+  /**
+   * The organizer's own account at the gateway, or null when they have not been
+   * onboarded to one. Null REFUSES the payment; it never falls back to the
+   * platform's account. See `settlementAccountRef` on GatewayOrderInput.
+   */
+  readonly settlementAccount: (orgId: string) => Promise<string | null>;
 }
 
 export interface SettlementDepsOverrides {
@@ -43,6 +49,8 @@ export interface SettlementDepsOverrides {
    * are always available. Tests inject fakes here; production wires the real
    * Razorpay adapter from validated env. */
   readonly gateways?: Readonly<Record<string, PaymentGatewayPort>>;
+  /** Tests and a future onboarding flow supply the organizer's gateway account. */
+  readonly settlementAccount?: (orgId: string) => Promise<string | null>;
 }
 
 /**
@@ -81,5 +89,20 @@ export function settlementDeps(db: Db, overrides: SettlementDepsOverrides = {}):
     // adapters that are always available.
     gateway: (method) =>
       injected.get(method) ?? configured.get(method) ?? manual.get(method) ?? null,
+    /*
+     * NOT BUILT YET, AND FAIL-CLOSED ON PURPOSE.
+     *
+     * Split settlement needs the organizer onboarded to a linked account at the
+     * gateway — a KYC'd business process, not a column someone can fill in. No
+     * organizer has one, so this resolves to null and every gateway payment is
+     * refused with `no_settlement_account`. Manual methods (cash, UPI, bank)
+     * are unaffected: nothing passes through the platform for those, which is
+     * why they are the only money path the product has ever actually run.
+     *
+     * The alternative default — the platform's own account — is exactly the
+     * behaviour the founder decision rejected, so it is not available even as a
+     * fallback. Wire this to real linked accounts when onboarding exists.
+     */
+    settlementAccount: overrides.settlementAccount ?? (() => Promise.resolve(null)),
   };
 }

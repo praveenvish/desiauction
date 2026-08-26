@@ -68,6 +68,23 @@ export function createRazorpayAdapter(config: RazorpayConfig): PaymentGatewayPor
           receipt: input.receipt,
           // THE trusted-envelope anchor: it rides every payment/refund webhook.
           notes: { paymentId: input.paymentId, orgId: input.orgId },
+          /*
+           * ROUTE THE FULL AMOUNT TO THE ORGANIZER'S OWN ACCOUNT.
+           *
+           * Without this the money settles to whoever owns the API key — the
+           * platform — and is then owed onward, which is the arrangement the
+           * founder decision rejected and the Terms deny. The transfer is for
+           * the WHOLE amount: the platform takes no cut here, so there is no
+           * second leg. If a commission is ever introduced it belongs as an
+           * explicit second entry, never as a silent shortfall in this one.
+           */
+          transfers: [
+            {
+              account: input.settlementAccountRef,
+              amount: input.amount,
+              currency: "INR",
+            },
+          ],
         }),
       });
       const order = parseJson(response.body);

@@ -162,15 +162,23 @@ describe("Razorpay adapter — REST via injected transport (no SDK, no live netw
       orgId: ORG,
       amount: 5_000,
       receipt: PAYMENT,
+      settlementAccountRef: "acc_ORGANIZER01",
     });
     expect(order.orderRef).toBe("order_NEW");
     expect(seen).not.toBeNull();
     const sent = JSON.parse((seen as unknown as { body: string }).body) as {
       amount: number;
       notes: { paymentId: string; orgId: string };
+      transfers: { account: string; amount: number; currency: string }[];
     };
     expect(sent.amount).toBe(5_000);
     expect(sent.notes).toEqual({ paymentId: PAYMENT, orgId: ORG });
+    // SPLIT SETTLEMENT: the money is routed to the ORGANIZER's account, not
+    // collected into the platform's. The whole amount goes — the platform takes
+    // no cut, so a shortfall here would be money quietly retained.
+    expect(sent.transfers).toEqual([
+      { account: "acc_ORGANIZER01", amount: 5_000, currency: "INR" },
+    ]);
   });
 
   it("fetches a payment (the sweep's port) and initiates a refund", async () => {
@@ -210,7 +218,13 @@ describe("Manual adapter — a first-class channel with no gateway operations", 
       reason: "manual method has no webhook",
     });
     expect(() =>
-      manual.createOrder({ paymentId: PAYMENT, orgId: ORG, amount: 1, receipt: "r" }),
+      manual.createOrder({
+        paymentId: PAYMENT,
+        orgId: ORG,
+        amount: 1,
+        receipt: "r",
+        settlementAccountRef: "acc_UNUSED",
+      }),
     ).toThrow(/no gateway operation/);
   });
 });

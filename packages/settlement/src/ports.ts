@@ -190,6 +190,23 @@ export interface GatewayOrderInput {
   readonly orgId: string;
   readonly amount: number;
   readonly receipt: string;
+  /**
+   * WHERE THE MONEY LANDS — the organizer's own account at the gateway, and a
+   * REQUIRED field rather than an optional one.
+   *
+   * The platform holds one set of gateway credentials, so an order created
+   * without a destination is collected into the PLATFORM's account and owed
+   * onward to the organizer. That is a different business (money collected on
+   * behalf of third parties, with the GST and payment-aggregator consequences
+   * that follow) and it contradicts the Terms this product publishes: "we do
+   * not run your tournament or handle your money for you".
+   *
+   * Founder decision 2026-08-26: split settlement, funds go to the organizer.
+   * Making this required is how that decision survives contact with a future
+   * change — an order cannot be built without answering the question, so simply
+   * adding gateway keys can never silently start collecting into the platform.
+   */
+  readonly settlementAccountRef: string;
 }
 
 export interface GatewayOrder {

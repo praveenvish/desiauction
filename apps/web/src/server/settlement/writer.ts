@@ -1171,11 +1171,30 @@ export async function createPayment(
     if (gateway === null) {
       return { ok: false, reason: "no_gateway" };
     }
+    /*
+     * SPLIT SETTLEMENT, OR NO ORDER AT ALL (founder decision 2026-08-26).
+     *
+     * The platform holds one set of gateway credentials, so an order with no
+     * destination collects the organizer's dues into the PLATFORM's account —
+     * money held on behalf of a third party, which is a different regulated
+     * business and contradicts the Terms ("we do not handle your money for
+     * you"). Refusing here is what keeps that from becoming true by accident
+     * the day somebody sets RAZORPAY_KEY_ID: the keys are no longer sufficient
+     * on their own, the organizer also has to have their own account.
+     *
+     * Manual methods never reach this branch — nothing passes through the
+     * platform for cash, UPI or a bank transfer.
+     */
+    const settlementAccountRef = await deps.settlementAccount(actor.orgId);
+    if (settlementAccountRef === null) {
+      return { ok: false, reason: "no_settlement_account" };
+    }
     const order = await gateway.createOrder({
       paymentId: command.paymentId,
       orgId: actor.orgId,
       amount: command.amount,
       receipt: command.paymentId,
+      settlementAccountRef,
     });
     orderRef = order.orderRef;
   }

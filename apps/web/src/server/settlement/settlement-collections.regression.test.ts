@@ -52,6 +52,7 @@ import {
   replayJournal,
   replayPayment,
   trialBalance,
+  type PaymentGatewayPort,
 } from "@desiauction/settlement";
 import { and, eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -298,6 +299,11 @@ beforeAll(async () => {
   deps = settlementDeps(db, {
     checkpointCadence: 3,
     gateways: { "gateway:razorpay": razorpay },
+    // The organizer is onboarded to their own account at the gateway, so the
+    // money routes to them. Without this every gateway order below is refused —
+    // which is the point of the split-settlement guard, and is asserted on its
+    // own further down.
+    settlementAccount: () => Promise.resolve("acc_ORGANIZER01"),
   });
   const granted = await issueSettlementGrant(db, owner, org.id, officer, "settlement:controller");
   if (!granted.ok) throw new Error("grant");
@@ -440,6 +446,70 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
     const row = await deps.store.loadPayment(lionsPaymentId);
     expect(row?.method).toBe("gateway:razorpay");
     expect(row?.status).toBe("created");
+  });
+
+  /*
+   * THE SPLIT-SETTLEMENT GUARD (founder decision 2026-08-26).
+   *
+   * The platform holds ONE set of gateway credentials, so an order created
+   * without a destination collects the organizer's dues into the platform's own
+   * account. That is money held on behalf of a third party, and it contradicts
+   * the Terms this product publishes. The guard makes gateway keys insufficient
+   * on their own: the organizer must also have an account of their own.
+   *
+   * Asserted here rather than trusted, because the failure mode is silent — it
+   * would look exactly like a working payment.
+   */
+  it("REFUSES a gateway payment when the organizer has no account of their own", async () => {
+    /*
+     * A gateway that THROWS if it is ever asked for an order. The assertion is
+     * not merely "the call was refused" but "no order was created at all" —
+     * reaching the provider is itself the failure here, because an order
+     * created against the platform's key is money on its way to the wrong
+     * account whatever the writer does with the result afterwards.
+     */
+    const mustNotBeCalled: PaymentGatewayPort = {
+      method: "gateway:razorpay",
+      createOrder: () => {
+        throw new Error("createOrder reached without a settlement destination");
+      },
+      verifyWebhook: () => ({ ok: false, reason: "unused" }),
+      fetchPayment: () => {
+        throw new Error("unused");
+      },
+      initiateRefund: () => {
+        throw new Error("unused");
+      },
+    };
+    const unrouted = settlementDeps(db, {
+      checkpointCadence: 3,
+      gateways: { "gateway:razorpay": mustNotBeCalled },
+      // No settlementAccount override: the production default, which is null.
+    });
+    const attempted = await createPayment(unrouted, actor, {
+      paymentId: newId(),
+      commandId: newId(),
+      caseId,
+      teamId: lions(),
+      method: "gateway:razorpay",
+      amount: 100_00,
+    });
+    expect(attempted).toEqual({ ok: false, reason: "no_settlement_account" });
+  });
+
+  it("still takes CASH with no gateway account — nothing passes through the platform", async () => {
+    const unrouted = settlementDeps(db, { checkpointCadence: 3 });
+    const cashId = newId();
+    const paid = await createPayment(unrouted, actor, {
+      paymentId: cashId,
+      commandId: newId(),
+      caseId,
+      teamId: lions(),
+      method: "manual:cash",
+      amount: 100_00,
+    });
+    expect(paid.ok).toBe(true);
+    expect((await unrouted.store.loadPayment(cashId))?.method).toBe("manual:cash");
   });
 
   it("a waiver RACES the capture: ₹5,000 of Lions' dues is forgiven before it lands", async () => {
