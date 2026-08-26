@@ -123,6 +123,21 @@ check(
   `ENGINE_PUBLIC_WS_URL=${env.ENGINE_PUBLIC_WS_URL ?? "(unset)"}`,
   "use a wss:// URL so browsers get a secure WebSocket",
 );
+// The engine only checks the WS Origin when this is non-empty; unset means
+// "accept any origin with a valid ticket", so a scraped ticket opens a socket
+// from a hostile page. Required (and https-only) in production.
+{
+  const origins = (env.ENGINE_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter((o) => o !== "");
+  check(
+    "ENGINE_ALLOWED_ORIGINS",
+    origins.length > 0 && origins.every((o) => o.startsWith("https://")),
+    `ENGINE_ALLOWED_ORIGINS=${env.ENGINE_ALLOWED_ORIGINS ?? "(unset)"}`,
+    "set ENGINE_ALLOWED_ORIGINS to the https browser origin(s) allowed to open a spectate socket",
+  );
+}
 
 // --- OTP (login is OTP-first; the dev inbox is gone in production) -----------
 check(

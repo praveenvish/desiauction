@@ -12,7 +12,7 @@ import {
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { WebSocketServer, type WebSocket } from "ws";
 
-import type { AuctionEngine } from "./engine-core.js";
+import { ENGINE_ACTOR, type AuctionEngine } from "./engine-core.js";
 
 // The engine transport (M-IP4-2). HTTP carries COMMANDS (from the web tier,
 // authenticated by the shared secret — browsers never talk here directly);
@@ -335,6 +335,12 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
     // it can never address the engine's internal timer namespace (P0-2).
     if (!isTransportCommandId(body.commandId)) {
       return reply.status(400).send({ error: "invalid_command_id" });
+    }
+    // The engine self-actor attributes timer-driven writes to "engine" in the
+    // audit trail. The transport may never claim it, or a secret-holder could
+    // forge engine-attributed history for a human action.
+    if (body.actor === ENGINE_ACTOR) {
+      return reply.status(400).send({ error: "invalid_actor" });
     }
     const ack = await deps.engine.submit({
       commandId: body.commandId,

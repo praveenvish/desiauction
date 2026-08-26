@@ -25,7 +25,13 @@ const envSchema = z
      * A ticket authorises an AUCTION, not a PAGE, so without this any origin
      * could open a socket with a ticket it scraped and keep it open. Unset
      * means "do not check", which is the right default for local dev and for
-     * native clients — production sets it, and the preflight requires it.
+     * native clients.
+     *
+     * In PRODUCTION it is mandatory and enforced twice: the refinement below
+     * refuses to boot without it, and `preflight:production` fails on it. Both
+     * were added after an audit found the doc claiming the preflight checked
+     * this when it did not — leaving the one hole the ticket scope exists to
+     * close open by default.
      */
     ENGINE_ALLOWED_ORIGINS: z
       .string()
@@ -65,6 +71,12 @@ const envSchema = z
   )
   .refine((value) => value.NODE_ENV !== "production" || value.ENGINE_SECRET.length >= 32, {
     message: "ENGINE_SECRET must be at least 32 characters in production",
+  })
+  // A ticket authorises an AUCTION, not a PAGE. Without an origin allowlist any
+  // page holding a scraped ticket can open a spectate socket, so production must
+  // pin the browser origins that may connect — matched by the preflight check.
+  .refine((value) => value.NODE_ENV !== "production" || value.ENGINE_ALLOWED_ORIGINS.length > 0, {
+    message: "ENGINE_ALLOWED_ORIGINS must list at least one origin in production",
   });
 
 export type Env = z.infer<typeof envSchema>;

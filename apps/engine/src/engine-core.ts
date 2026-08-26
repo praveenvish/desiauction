@@ -82,6 +82,38 @@ type InternalCommandType = "_TimerClose" | "_ClosingSoon";
 const DEFAULT_RATE_BURST = 200;
 const DEFAULT_RATE_REFILL_PER_SEC = 50;
 
+/**
+ * BOUNDED RESIDENCY (audit 2026-08-26, P3-1).
+ *
+ * Every one of the engine's maps grew and never shrank: one rate-limit bucket
+ * per distinct actor for the life of the process, one full snapshot per auction
+ * ever touched, and a queue/pending entry beside it. Only `reset()` — a test and
+ * ops surface — ever emptied them. On a long-lived host that is a slow leak
+ * measured in snapshots, and the biggest objects in it belong to auctions that
+ * finished weeks ago.
+ *
+ * Both sweeps are RESTART-EQUIVALENT: whatever they drop, the next touch
+ * rebuilds from the event log (auctions) or from a full bucket (actors), which
+ * is exactly the state a redeploy would leave behind. That is the safety
+ * argument the whole eviction rests on, and it is why the guards below are
+ * deliberately paranoid — a wrongly evicted auction mid-night is a P0, while a
+ * wrongly RETAINED one is only memory.
+ *
+ * No new timer: the sweep rides the watchdog tick that already runs, throttled
+ * to its own cadence, and `allow()` triggers it too so an engine whose tick is
+ * not running (tests, an idle process) still reclaims.
+ */
+const BUCKET_IDLE_TTL_MS = 10 * 60_000;
+const TERMINAL_RESIDENCY_TTL_MS = 15 * 60_000;
+const SWEEP_INTERVAL_MS = 60_000;
+
+/**
+ * The statuses after which nothing can legally change again. Note what is NOT
+ * here: `live` and `paused` (the auction is in progress) and `scheduled` (it is
+ * about to be) — those states are never evicted at any age.
+ */
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "reconciled", "abandoned"]);
+
 interface Bucket {
   tokens: number;
   lastMs: number;
@@ -135,6 +167,23 @@ export interface AuctionState {
   halted: string | null;
   acks: Map<string, CommandAck>;
   stats: EngineStats;
+  /**
+   * Last time anything asked for this auction — a command, a socket joining,
+   * a diagnostics read: every one of them goes through `ensureAuction`. Stamped
+   * on the ENGINE's clock (the injectable one), not the wall clock the stats
+   * use, so residency and diagnostics never compare across two time axes.
+   */
+  lastTouchMs: number;
+}
+
+/** What the engine is currently holding in memory (audit 2026-08-26, P3-1). */
+export interface EngineResidency {
+  /** Auctions resident right now. */
+  auctions: number;
+  /** Rate-limit buckets resident right now. */
+  buckets: number;
+  evictedAuctions: number;
+  evictedBuckets: number;
 }
 
 /** The read-only diagnostics view (never exposes snapshot payloads or secrets). */
@@ -207,6 +256,10 @@ export class AuctionEngine {
   private readonly pending = new Map<string, number>();
   private readonly deps: EngineDeps;
   private readonly now: () => number;
+  private lastBucketSweepMs = 0;
+  private lastStateSweepMs = 0;
+  private evictedAuctions = 0;
+  private evictedBuckets = 0;
   public lastTickMs = 0;
   public tickDriftMs = 0;
 
@@ -224,6 +277,7 @@ export class AuctionEngine {
    */
   private allow(actor: string): boolean {
     const now = this.now();
+    this.sweepBuckets(now);
     const bucket = this.buckets.get(actor) ?? { tokens: this.rateBurst, lastMs: now };
     const refilled = Math.min(
       this.rateBurst,
@@ -238,6 +292,110 @@ export class AuctionEngine {
     bucket.tokens = refilled - 1;
     this.buckets.set(actor, bucket);
     return true;
+  }
+
+  /** What the engine is holding, and what it has reclaimed (read-only). */
+  residency(): EngineResidency {
+    return {
+      auctions: this.states.size,
+      buckets: this.buckets.size,
+      evictedAuctions: this.evictedAuctions,
+      evictedBuckets: this.evictedBuckets,
+    };
+  }
+
+  /**
+   * Reclaim the meter for actors who have gone home. Amortized to once a
+   * minute however hot the command path is, and driven by the meter's own path
+   * plus the watchdog — never by a timer of its own.
+   *
+   * A bucket is dropped ONLY when it has refilled to the full burst, because a
+   * full bucket and a missing bucket are the same thing: `allow()` mints a
+   * missing one at exactly `rateBurst`. An actor who still owes tokens is
+   * therefore kept however long they idle — reclaiming them would hand a
+   * spammer their burst back, which is the one thing this must never do.
+   */
+  private sweepBuckets(nowMs: number): void {
+    if (nowMs - this.lastBucketSweepMs < SWEEP_INTERVAL_MS) {
+      return;
+    }
+    this.lastBucketSweepMs = nowMs;
+    for (const [actor, bucket] of this.buckets) {
+      const idleMs = nowMs - bucket.lastMs;
+      if (idleMs < BUCKET_IDLE_TTL_MS) {
+        continue;
+      }
+      const refilled = bucket.tokens + (idleMs / 1000) * this.rateRefillPerSec;
+      if (refilled < this.rateBurst) {
+        continue; // still in debt — keep metering them
+      }
+      this.buckets.delete(actor);
+      this.evictedBuckets += 1;
+    }
+  }
+
+  /**
+   * Reclaim finished auctions. Deleting while iterating a Map is well defined.
+   *
+   * The WATCHDOG drives this and nothing else does: sweeping from the command
+   * path would let a command evict the very auction it is a microsecond from
+   * loading — never wrong (the load rebuilds it) but a snapshot thrown away for
+   * nothing, and a needlessly confusing thing to read in a log.
+   */
+  private sweepStates(nowMs: number): void {
+    if (nowMs - this.lastStateSweepMs < SWEEP_INTERVAL_MS) {
+      return;
+    }
+    this.lastStateSweepMs = nowMs;
+    for (const [auctionId, state] of this.states) {
+      if (!this.evictable(auctionId, state, nowMs)) {
+        continue;
+      }
+      // Consistently, or not at all: the snapshot, the queue tail, the depth
+      // counter and the ack cache (which lives inside the state) go together.
+      // Half an eviction — a dropped state with a live queue tail behind it —
+      // would let the next command run beside the old one and break the single
+      // writer, so these four lines are one operation.
+      this.states.delete(auctionId);
+      this.queues.delete(auctionId);
+      this.pending.delete(auctionId);
+      this.evictedAuctions += 1;
+      this.deps.logger.info({ auctionId }, "auction evicted from memory — idle and terminal");
+    }
+  }
+
+  /**
+   * THE INVARIANT: an eviction must be indistinguishable from a restart.
+   *
+   * That holds only when nothing is in flight and nothing more can happen, so
+   * every one of these guards must pass:
+   *
+   *  1. Not halted, and holding a snapshot. A halted auction is EVIDENCE an
+   *     operator is looking at, and its recovery is still pending.
+   *  2. Terminal status. A `live` or `paused` auction is mid-night and may take
+   *     a command in the next millisecond; `scheduled` is about to be one.
+   *     This is the guard that makes a mid-auction eviction unreachable.
+   *  3. Nothing pending. A depth of zero means every enqueued command has run
+   *     its `finally`, so the queue tail is settled and dropping it cannot
+   *     orphan work or admit a second writer. `submit()` increments this depth
+   *     synchronously, before any await, so a command is either counted here or
+   *     has not been accepted yet — and one that arrives later simply reloads
+   *     the auction from the log.
+   *  4. Quiet for the TTL. Every command, socket join and diagnostics read
+   *     touches `lastTouchMs`, so a finished auction people are still watching
+   *     stays resident.
+   */
+  private evictable(auctionId: string, state: AuctionState, nowMs: number): boolean {
+    if (state.halted !== null || state.snapshot === null) {
+      return false;
+    }
+    if (!TERMINAL_STATUSES.has(state.snapshot.auctionStatus)) {
+      return false;
+    }
+    if ((this.pending.get(auctionId) ?? 0) > 0) {
+      return false;
+    }
+    return nowMs - state.lastTouchMs >= TERMINAL_RESIDENCY_TTL_MS;
   }
 
   async submit(envelope: AuctionCommandEnvelope): Promise<CommandAck> {
@@ -288,6 +446,9 @@ export class AuctionEngine {
   async ensureAuction(auctionId: string): Promise<AuctionState | null> {
     const existing = this.states.get(auctionId);
     if (existing !== undefined) {
+      // The single point every command, every socket join and every diagnostics
+      // read passes through — so it is the one place residency is stamped.
+      existing.lastTouchMs = this.now();
       return existing;
     }
     const record = await this.loadRecord(auctionId);
@@ -307,6 +468,7 @@ export class AuctionEngine {
         halted: `replay_failed:${built.reason}@${String(built.atSeq)}`,
         acks: new Map(),
         stats,
+        lastTouchMs: this.now(),
       };
       this.states.set(auctionId, state);
       this.deps.logger.error(
@@ -327,6 +489,7 @@ export class AuctionEngine {
         built.divergences.length > 0 ? `projection_mismatch:${built.divergences.join("; ")}` : null,
       acks: new Map(),
       stats,
+      lastTouchMs: this.now(),
     };
     if (state.halted !== null) {
       this.deps.logger.error(
@@ -359,14 +522,24 @@ export class AuctionEngine {
     await this.queues.get(auctionId);
   }
 
-  /** Drop in-memory state (test/ops surface — equivalent to a process restart). */
+  /**
+   * Drop in-memory state (test/ops surface — equivalent to a process restart).
+   *
+   * Every map that keys on the auction goes together, `pending` included: a
+   * depth counter left behind after its queue was dropped reports a phantom
+   * backlog to diagnostics for ever (audit 2026-08-26). A full reset also
+   * empties the meter, because a restart would.
+   */
   reset(auctionId?: string): void {
     if (auctionId !== undefined) {
       this.states.delete(auctionId);
       this.queues.delete(auctionId);
+      this.pending.delete(auctionId);
     } else {
       this.states.clear();
       this.queues.clear();
+      this.pending.clear();
+      this.buckets.clear();
     }
   }
 
@@ -752,6 +925,10 @@ export class AuctionEngine {
       this.tickDriftMs = Math.max(this.tickDriftMs, now - this.lastTickMs);
     }
     this.lastTickMs = now;
+    // Housekeeping rides the watchdog rather than a timer of its own; both
+    // sweeps throttle themselves, so a 250ms cadence costs nothing.
+    this.sweepBuckets(now);
+    this.sweepStates(now);
     for (const [auctionId, state] of this.states) {
       if (state.halted !== null || state.snapshot === null) {
         continue;
