@@ -31,6 +31,15 @@ above them exist; ☑ are done and verified in-repo.
 
 - ☐F Fly.io account + `FLY_API_TOKEN` org secret; apps `desiauction-engine-{staging,production}`, `desiauction-finops-runner-{staging,production}`
 - ☐F Vercel project + domains (`RP_ID`/`RP_ORIGINS` must match the public domain — passkeys break otherwise)
+- ⚠ **`desiauction.in` is REGISTERED but PARKED, and cannot receive mail.**
+  Checked 2026-08-27: `NS ns1/ns2.dns-parking.com`, `A 2.57.91.91`, **`MX` none**.
+  Three separate things are waiting on this one piece of DNS:
+  - the published Grievance Officer and privacy addresses (§10) currently
+    **bounce** — and publishing them started a statutory clock;
+  - `RP_ID`/`RP_ORIGINS` for passkeys must match this domain;
+  - `PUBLIC_BASE_URL`, which the web tier refuses to boot without in production.
+  Needs MX **plus SPF/DKIM/DMARC** — mail that arrives without them lands in
+  spam, which for a grievance address is the same as not arriving.
 - ☐F Managed Postgres 17 (Mumbai, PITR + daily dumps to a separate credential/account)
 - ☐F S3-compatible object storage + durable storage roots (freeze §8.4)
 - ☐E Run the DB bootstrap (migrations → **all four** roles → `grants:verify` → `rls:verify`) per [DEPLOYMENT](DEPLOYMENT.md). The role command needs four passwords; the two-password form printed in the runbook until 2026-08-19 aborted before creating the engine and runner roles.
@@ -42,6 +51,27 @@ above them exist; ☑ are done and verified in-repo.
 - ☐F Razorpay production keys + webhook secret; one live staging transaction (order → webhook → capture → discharge). The ingress route now exists at `apps/web/src/app/api/webhooks/razorpay/route.ts` — until it landed there was nothing for Razorpay to POST to and this gate was unrunnable as written (audit P1-5). Env, all three **required only if taking payments**, all optional otherwise:
   - `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` — gateway credentials.
   - `RAZORPAY_WEBHOOK_SECRET` (min 16 chars) — keys the HMAC. **Fail-closed: unset ⇒ the route 404s**, like the two SMS webhooks. Leave it unset and callbacks are refused rather than trusted; set it and payment capture can complete.
+- ☐F **Razorpay Route: a linked account per ORGANIZER — keys alone are no longer
+  enough to take a payment (2026-08-27).** The platform holds one set of gateway
+  credentials, so an order with no destination collects the organizer's dues into
+  **Eventztree's** account, to be owed onward. That is money held for third
+  parties — a different regulated business, and the opposite of what the Terms
+  say ("we do not run your tournament or handle your money for you"). Founder
+  decision: **split settlement**, funds go to the organizer.
+  This is now enforced in code, not by convention: `settlementAccountRef` is a
+  required field on `GatewayOrderInput`, the adapter emits Route `transfers[]`
+  for the full amount, and `deps.settlementAccount()` defaults to **null**, which
+  refuses every gateway payment with `no_settlement_account`. The platform's own
+  account is not available even as a fallback.
+  **What is still ☐F:** onboarding each organizer to a KYC'd linked account, and
+  the ☐E that follows — persisting the account ref and wiring
+  `settlementAccount()` to it. Until both exist, gateway payments refuse by
+  design. Manual methods (cash/UPI/bank) are unaffected and remain the only money
+  path this product has actually run.
+  Ask a CA and whoever advises on the gateway BEFORE the keys go in: collecting
+  on behalf of others is what drives compulsory GST registration for an operator
+  and the RBI payment-aggregator question, and neither waits for a turnover
+  threshold.
 - ☐F SMS provider account (go-live-critical: login is OTP-first; only DevInboxSender exists) → ☐E implement the `OtpSender` port adapter + SMS-pumping circuit-breaker (RC-4 condition 2)
 - ☐F Email provider · ☐F WhatsApp BSP → ☐E finops dispatch adapters (outbox + in-app are already first-class; SDKs are drop-ins per IP-6)
 - ☐E Provider health monitoring (poll provider status into the finops supervisor's component list)
@@ -173,6 +203,40 @@ file will not discover them — ☐E add them. This list says which ones a
   to configure — recorded here because the operator-facing promise ("purses are
   private") is now true of the wire, not just the UI.
 
+## 10 · Legal identity & commercial posture (2026-08-27)
+
+The Legal Centre shipped eight drafted documents that never said WHO was offering
+them. `apps/web/src/content/company.ts` held every field `null` on purpose —
+inventing a company name or an address is the worst line in this product to
+fabricate — and `preflight:production` failed on it by design.
+
+- ☑ **Operator published.** Eventztree Private Limited, CIN
+  `U92419RJ2022PTC082398`, registered office Jaipur, Rajasthan 302019.
+  Trading as DesiAuction. `legal-identity-published` now PASSES in
+  `preflight:production`.
+- ☑ **Grievance Officer** (IT Rules 2021, Rule 3(2)) and **data-protection
+  contact** (DPDP s.13): Navrangi Vishnoi — `navrangi@desiauction.in`,
+  +91 97849 84135. The Act permits one person to hold both at this size.
+- ☑ **Jurisdiction reconciled.** The Terms named Mumbai while the company is
+  registered in Jaipur; a forum clause that disagrees with the operator's own
+  published address is the first thing a defendant attacks. Now Jaipur in both.
+- ☐F **Confirm the registry fields against the certificate of incorporation.**
+  They were read from an aggregator (Tofler), not the register. Registered
+  offices in particular change without aggregators noticing. Check the
+  capitalisation too — the registry renders it "Eventztree", not "EventzTree".
+- ☐F **Confirm the registered office is also the PRINCIPAL place of business.**
+  Consumer Protection (E-Commerce) Rules 4(3) asks for the latter, and they are
+  not always the same address.
+- ☐F **Make the grievance mailbox deliverable — see the DNS item in §2.**
+  Publishing a named officer starts a clock: acknowledge in 24 hours, resolve in
+  15 days. An address that bounces is not a gap, it is a statutory duty visibly
+  not being performed, with a person's name attached to it.
+- ☑ **GSTIN is `null` by decision** — Eventztree is not GST-registered. The
+  surfaces correctly omit the row. ☐F **revisit before enabling payments**: an
+  operator collecting consideration on behalf of suppliers faces compulsory
+  registration regardless of turnover, which is why the Route item in §3 and this
+  one have to be answered together.
+
 ## Go-live gate
 
 Every ☐ above closed, plus: production smoke (OTP login → auction → payment
@@ -184,3 +248,24 @@ report re-issued with measured staging numbers and a GO.
 blockers. Its §9 list is part of this gate; do not read the ☑ marks above as a
 GO on their own, since several of them were measured before migrations
 0015–0026 and before the audit re-tested the branch.
+
+**And as of 2026-08-27 — the three hard stops, in the order they bite:**
+
+1. **Nobody can sign in.** Login is OTP-first and production refuses
+   `OTP_PROVIDER=dev`, so without the SMS account in §3 the front door is shut
+   for every user. This is the single largest gap between "deployable" and
+   "usable".
+2. **Nothing can be charged.** Both paid tiers read "Published at GA" — no price
+   exists, and the upgrade path is a request a human grants out-of-band. Launching
+   Free-only is a legitimate answer; launching with an undecided price is not.
+3. **No rollback exists.** Migrations are forward-only, `0019_tournaments.sql`
+   already dropped a column, and there is no provisioned PITR or restored
+   backup (§5). A bad release cannot be undone today.
+
+> **Read the ☑ marks against the branch you are deploying.** A second audit
+> (2026-08-26) found and fixed further defects — engine split-brain, a refund
+> booked twice, a payment intent that could buy two gateway orders, DB
+> constraints for a double-sell race — but that remediation lives on a
+> **review-only snapshot branch that cannot build** and is **not merged into the
+> deployable line**. Those defects are therefore still present in the code this
+> checklist describes. Merge it or redo it before reading any of §1–§9 as a GO.
