@@ -137,9 +137,15 @@ Covers the PX-2…PX-10 web product this checklist predated. Full findings in
   `audit_log` has no index on `actor` or on `scope_id` alone; the PX-9 audit
   explorer and admin org directory filter by these. Add indexes before
   large-tenant GA, after measuring on staging with a realistic log volume.
-- ⚠ Scale watch: web pool `max: 10`; the admin health page fans out one
-  snapshot set per finance-declared org in parallel. Fine at beta scale; size
-  the pool against the staging perf run (§6).
+- ⚠ Scale watch: web pool defaults to `max: 10`, and is now settable —
+  `DB_POOL_MAX` (web `env.ts`) feeds both the app and system pools, since both
+  spend the same `max_connections` budget. It was hardcoded, which is right for
+  a long-lived process and wrong for a fleet: on serverless it is ten per WARM
+  INSTANCE, twice over, so enough instances exhaust a perfectly healthy managed
+  Postgres and every request 500s while the database's own metrics look fine.
+  The admin health page also fans out one snapshot set per finance-declared org
+  in parallel. Size it against the staging perf run (§6), and provision a pooler
+  before the fleet grows.
 
 ## 8 · PX-12 release engineering (RC-1, 2026-07-17)
 
@@ -179,12 +185,19 @@ file will not discover them — ☐E add them. This list says which ones a
 **production** deploy must set. Full rationale in
 [DEPLOYMENT §Environment variables](DEPLOYMENT.md#environment-variables).
 
-- ☐E `ENGINE_ALLOWED_ORIGINS` (engine) — **required in production.**
-  Comma-separated browser origins allowed to open the spectate WebSocket
+- ☐E `ENGINE_ALLOWED_ORIGINS` (engine) — **required in production, and now
+  ENFORCED rather than merely documented (2026-08-26).** Comma-separated browser
+  origins allowed to open the spectate WebSocket
   (e.g. `https://desiauction.in,https://www.desiauction.in`). A ticket
   authorises an *auction*, not a *page*: unset means "do not check", so any
   origin can open a socket with a scraped ticket. Unset is correct for local dev
   and native clients only.
+  Two guards close it, because this line used to be the only thing standing
+  between production and an open door — and the audit found the runbook claiming
+  the preflight checked it when it did not: `apps/engine/src/env.ts` now REFUSES
+  TO BOOT in production without it, and `preflight:production` FAILS on it
+  (https origins only). Setting it is still an operator action; forgetting it is
+  no longer a silent one.
 - ☐E `ENGINE_SECRET` (web + engine) — **must be ≥ 32 characters in production**,
   enforced at boot (`apps/engine/src/env.ts`). The repo's `dev-engine-secret`
   default is refused outside `development`/`test` — staging is on the internet
@@ -237,6 +250,47 @@ fabricate — and `preflight:production` failed on it by design.
   registration regardless of turnover, which is why the Route item in §3 and this
   one have to be answered together.
 
+## 11 · Second-audit remediation (2026-08-26, merged 2026-08-27)
+
+A second production-readiness audit found defects the first one missed, all of
+them in code and all now **on the deployable line** — this section previously
+warned that they were stranded on an unmerged snapshot branch, which is no
+longer true. Verified after the merge: `pnpm verify` green, web integration
+**660/660**, engine integration **66/66**, all **31** migrations apply from an
+empty database.
+
+- ☑ **Engine split-brain closed.** The single-writer guarantee was `fly.toml`
+  plus discipline; a `fly scale 2`, a bluegreen strategy or an orchestrator
+  overlap put two timer authorities on one gavel. The engine now claims a
+  Postgres session-level advisory lock at boot and a second instance **refuses
+  to start** (exit 1), re-asserting every 10s and dying if it loses the lease.
+  Proven by booting two real engines. **Operational consequence: scaling the
+  engine past one machine will crash-loop the second, by design** — scale the
+  web tier for capacity (see DEPLOYMENT §"The engine is ONE process").
+- ☑ **A refund was booked twice.** Razorpay emits both `refund.created` and
+  `refund.processed` for one refund; the idempotency key used the event type, so
+  a partial refund doubled `refundedTotal` and reinstated the obligation twice.
+  Keyed on the kind now.
+- ☑ **A payment intent could buy two gateway orders.** The command id was minted
+  per invocation, so a double-submit or a retried action created two payments.
+  Both halves now derive from one fingerprint of the intent.
+- ☑ **Database invariants the application only assumed** (migrations 0029/0030):
+  a partial unique index closing the two-live-auctions/double-sell race,
+  non-negative money CHECKs, sold-state consistency, and the status enums
+  promoted from TypeScript — `text(..., {enum})` emits plain `text`, so any
+  string was a valid status as far as Postgres was concerned.
+- ☑ **Four authorization holes**, including two `"use server"` exports that
+  trusted a caller-supplied identity, plus an absolute session lifetime cap.
+- ☑ **The public landing page**: the header went fully transparent for
+  reduced-motion users and every non-Chromium browser (~1.07:1 contrast, and
+  invisible to the axe run, which scans at scroll 0 over a dark hero), and every
+  card's hover was inert because a filled scroll-timeline animation outranked it.
+- ☐E **Still open from that audit, deliberately:** the settlement expiry sweep
+  and coordination catch-up still have no scheduler (§5). It needs a new store
+  query **and a product decision on the expiry window** — `expirePayment` moves
+  real payments to a terminal failed state, so a wrong threshold destroys valid
+  records. Not shipped blind.
+
 ## Go-live gate
 
 Every ☐ above closed, plus: production smoke (OTP login → auction → payment
@@ -262,10 +316,7 @@ GO on their own, since several of them were measured before migrations
    already dropped a column, and there is no provisioned PITR or restored
    backup (§5). A bad release cannot be undone today.
 
-> **Read the ☑ marks against the branch you are deploying.** A second audit
-> (2026-08-26) found and fixed further defects — engine split-brain, a refund
-> booked twice, a payment intent that could buy two gateway orders, DB
-> constraints for a double-sell race — but that remediation lives on a
-> **review-only snapshot branch that cannot build** and is **not merged into the
-> deployable line**. Those defects are therefore still present in the code this
-> checklist describes. Merge it or redo it before reading any of §1–§9 as a GO.
+> **Read the ☑ marks against the branch you are deploying**, and note that
+> §1–§9 above still contain their own open items. Code readiness is not
+> deployment readiness: the three hard stops below are all infrastructure or
+> commercial, and none of them is closed by the work in this section.
