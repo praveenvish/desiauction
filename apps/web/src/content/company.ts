@@ -47,30 +47,71 @@ export interface LegalIdentity {
   readonly dataProtectionContactEmail: string;
 }
 
+/*
+ * SOURCE OF THE THREE REGISTRY FIELDS BELOW, AND WHAT STILL HAS TO BE CHECKED.
+ *
+ * Name, CIN and registered office were read from the MCA record as republished
+ * by Tofler (2026-08-26). That is an AGGREGATOR, not the register: the
+ * certificate of incorporation and the MCA master data are authoritative, and a
+ * registered office in particular changes without the aggregators noticing.
+ * Confirm all three against the certificate before this is served to real
+ * people — publishing a stale principal address is itself the compliance
+ * failure this file exists to prevent.
+ *
+ * AND THE CONTACTS HAVE TO ANSWER. Publishing a Grievance Officer starts a
+ * clock: Rule 3(2) requires acknowledgement within 24 hours and resolution
+ * within 15 days, and DPDP s.13 expects the privacy contact to answer a Data
+ * Principal at all.
+ *
+ * `desiauction.in` IS registered — and, checked 2026-08-26, it is parked and
+ * cannot receive mail:
+ *
+ *     NS  ns1.dns-parking.com / ns2.dns-parking.com
+ *     A   2.57.91.91
+ *     MX  (none)
+ *
+ * With no MX record every address on this domain bounces, so both contacts
+ * below are correct and undeliverable. That is the worse failure of the two: an
+ * unpublished address is a gap, a published one that bounces is a statutory
+ * duty the company is visibly not performing. Add MX (and SPF/DKIM/DMARC, or
+ * the mail that does get through lands in spam) BEFORE this identity is served
+ * to real people — it is now the only thing standing between these fields and
+ * being honest.
+ */
 export const LEGAL_IDENTITY: LegalIdentity = {
-  // TODO(founder): the registered name on the certificate of incorporation.
-  legalName: null,
+  // Eventztree Private Limited, incorporated 05 July 2022, status Active.
+  // TODO(founder): confirm the capitalisation against the certificate — the
+  // registry renders it "Eventztree", not "EventzTree".
+  legalName: "Eventztree Private Limited",
   tradingName: "DesiAuction",
-  // TODO(founder): CIN for a company, LLPIN for an LLP, or the registration
-  // number of whatever entity actually signs these terms.
-  registrationNumber: null,
-  // TODO(founder): the principal place of business. The Terms already put
-  // disputes before the courts of Mumbai, Maharashtra — the address should be
-  // consistent with that or the jurisdiction clause invites an argument.
-  registeredAddress: null,
+  // U92419RJ2022PTC082398 — RJ = Rajasthan, PTC = private limited company.
+  // A private limited company must display this under Companies Act s.12(3)(c).
+  registrationNumber: "U92419RJ2022PTC082398",
+  // The registered office as filed. The Terms named Mumbai when this company is
+  // registered in Jaipur; the forum was moved to Jaipur (founder decision,
+  // 2026-08-26) so the jurisdiction clause and the published identity agree.
+  // TODO(founder): confirm this is also the PRINCIPAL place of business —
+  // Consumer Protection (E-Commerce) Rules 4(3) asks for that, and it is not
+  // always the registered office.
+  registeredAddress: "P.No. 21 B, Ganesh Vihar, Nirman Nagar, Jaipur, Rajasthan 302019, India",
   // TODO(founder): DesiAuction's OWN GSTIN, if registered. The only GSTIN
   // anywhere in the platform today belongs to the ORGANIZER, on
   // `finops_profiles`, and is a different thing entirely.
   gstin: null,
-  // TODO(founder): a named person. "The support team" is not a Grievance
-  // Officer under Rule 3(2); the rule asks for a name.
-  grievanceOfficerName: null,
-  grievanceOfficerEmail: null,
-  // TODO(founder): a contact number answerable in business hours.
-  grievanceOfficerPhone: null,
-  // TODO(founder): may be the same person as the Grievance Officer for an
-  // organisation this size — but it has to be somebody, and named.
-  dataProtectionContactName: null,
+  // Appointed by the company (2026-08-26); also a director on the MCA record
+  // (DIN 09662665). Rule 3(2) wants a NAME, and this is it.
+  //
+  // Rule 3(2) also attaches obligations to publishing it: complaints
+  // acknowledged within 24 hours and resolved within 15 days. The address below
+  // therefore has to be a mailbox somebody actually reads — see the note above
+  // about `desiauction.in` needing to exist before any of this is served.
+  grievanceOfficerName: "Navrangi Vishnoi",
+  grievanceOfficerEmail: "navrangi@desiauction.in",
+  grievanceOfficerPhone: "+91 97849 84135",
+  // The same person as the Grievance Officer, which DPDP s.13 permits — the
+  // Act asks for someone able to answer a Data Principal, not for a separate
+  // office. Named, which is the part that matters.
+  dataProtectionContactName: "Navrangi Vishnoi",
   // The one contact that IS live and already published across the legal centre.
   dataProtectionContactEmail: "privacy@desiauction.in",
 };

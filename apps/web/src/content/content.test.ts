@@ -492,14 +492,26 @@ describe("legal identity — the gap the Legal Centre had, and its gate", () => 
     dataProtectionContactEmail: "privacy@example.invalid",
   };
 
+  /*
+   * A tripwire on the CURRENT state, not on the function — the two tests below
+   * cover the logic generically. It moves each time a field is genuinely
+   * published, which is the point: nobody gets to fill one of these quietly.
+   *
+   * 2026-08-26: the operator was named as Eventztree Private Limited
+   * (U92419RJ2022PTC082398), and Navrangi Vishnoi was appointed Grievance
+   * Officer. Every field the deploy gate requires is now set, so this flipped
+   * from "which four are missing" to "none are" — and the Legal Centre stops
+   * serving its "not published yet" callout.
+   *
+   * What this does NOT assert, deliberately: that the details are CORRECT. The
+   * registry fields came from an aggregator and want checking against the
+   * certificate, and the grievance mailbox is on a domain that does not exist
+   * yet. A green test here means the fields are filled, not that a complaint
+   * would reach anybody.
+   */
   it("reports exactly which required fields are unset, today", () => {
-    expect(missingLegalIdentity()).toEqual([
-      "legalName",
-      "registeredAddress",
-      "grievanceOfficerName",
-      "grievanceOfficerEmail",
-    ]);
-    expect(legalIdentityPublished()).toBe(false);
+    expect(missingLegalIdentity()).toEqual([]);
+    expect(legalIdentityPublished()).toBe(true);
   });
 
   it("counts a filled identity as publishable", () => {
@@ -542,9 +554,24 @@ describe("legal identity — the gap the Legal Centre had, and its gate", () => 
     }
   });
 
-  it("says plainly that the identity is unpublished rather than rendering a blank", () => {
+  /*
+   * Was: "says plainly that the identity is unpublished rather than rendering a
+   * blank" — the beta behaviour, correct while every field was null. The
+   * identity is published now, so the meaningful assertion is the opposite one,
+   * and it is a stronger test: the Legal Centre must NAME the operator and the
+   * Grievance Officer, because a page of well-drafted documents that never says
+   * who is offering them is the exact gap this file was added to close.
+   */
+  it("names the operator and the Grievance Officer, now that the identity is published", () => {
     const text = plainTextOf(legalDocument("grievances")?.blocks ?? []);
-    expect(text).toContain("registered details are not published here yet");
+    expect(text).toContain("Eventztree Private Limited");
+    expect(text).toContain("U92419RJ2022PTC082398");
+    expect(text).toContain("Jaipur");
+    // Rule 3(2) asks for a name AND a way to reach it.
+    expect(text).toContain("Navrangi Vishnoi");
+    expect(text).toContain("navrangi@desiauction.in");
+    // The beta placeholder must be gone, not merely outweighed.
+    expect(text).not.toContain("registered details are not published here yet");
   });
 });
 

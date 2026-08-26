@@ -124,7 +124,12 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       { kind: "heading", level: 2, text: "Governing law" },
       {
         kind: "paragraph",
-        text: "These terms are governed by the laws of India. Any dispute is subject to the exclusive jurisdiction of the courts of Mumbai, Maharashtra.",
+        // Jaipur, not Mumbai (founder decision, 2026-08-26). The operator is
+        // Eventztree Private Limited, registered at Jaipur, Rajasthan — a forum
+        // clause naming a city the company has no presence in is the first
+        // thing a defendant attacks, and it disagreed with the identity this
+        // same Legal Centre publishes. The two now say the same thing.
+        text: "These terms are governed by the laws of India. Any dispute is subject to the exclusive jurisdiction of the courts of Jaipur, Rajasthan.",
       },
     ],
   },
