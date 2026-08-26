@@ -1,0 +1,4026 @@
+/* ============================================================================
+   The public design layer (`mk-`) — the visual language of every marketing and
+   discovery surface: landing, features, pricing, directory, help and the
+   content pages that borrow its bands and cards.
+
+   Principles:
+   • Cinematic, not decorated — dark sections are real theme scopes
+     (data-theme="floodlight"), so every color pair inside them is a certified
+     token pair. No bespoke palettes, no hex.
+   • Show, don't explain — product vignettes are built from the same tokens the
+     product renders with, so the marketing "screenshot" can never drift from
+     the truth.
+   • Motion is transform-first: nothing scroll-driven ever animates opacity on
+     text (WCAG contrast is a constant, not a keyframe), and every movement
+     collapses under prefers-reduced-motion.
+   • Every layout survives 360px with zero horizontal scroll.
+   ========================================================================== */
+
+/* --- Scaffold ------------------------------------------------------------- */
+
+.mk {
+  font-family: var(--font-text);
+  color: var(--text-primary);
+}
+
+.mk-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: var(--space-5);
+  padding-right: var(--space-5);
+  box-sizing: border-box;
+}
+
+.mk-narrow {
+  max-width: 780px;
+}
+
+/* --- Type ------------------------------------------------------------------ */
+
+.mk-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.mk-kicker::before {
+  content: "";
+  width: var(--space-5);
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+.mk-h1 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(2.375rem, 6.5vw, var(--display-xl-size));
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  word-spacing: 0.08em;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-5);
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* Compact hero headline — sized to land in three lines, not four. */
+.mk-hero .mk-h1 {
+  font-size: clamp(2.25rem, 5vw, 64px);
+  line-height: 1.05;
+}
+
+/* A band heading sits BETWEEN the page h1 and the content h2s (.mk-show h2,
+   30px). At display-md it rendered 60% larger than the headings it introduces,
+   which inverts the hierarchy — a supporting band shouting over the content.
+   display-sm keeps the step legible: 64 -> 38 -> 30. */
+.mk-h2 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(1.75rem, 3.4vw, var(--display-sm-size));
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  word-spacing: 0.07em;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-3);
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.mk-lead {
+  font-size: clamp(var(--text-md-size), 2vw, var(--text-xl-size));
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-6);
+  max-width: 52ch;
+}
+
+.mk-center {
+  text-align: center;
+}
+
+.mk-center .mk-lead {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mk-center .mk-kicker::after {
+  content: "";
+  width: var(--space-5);
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+/* --- Bands: the section rhythm --------------------------------------------- */
+
+.mk-band {
+  padding: clamp(var(--space-8), 4vw, var(--space-12)) 0;
+  background: var(--surface);
+}
+
+/* THE RHYTHM LARGE SCREENS WERE NOT GETTING.
+   The fluid clamp above tops out at 48px, which is right for a laptop and too
+   tight for a 1440px display: at that width every band carried identical, small
+   padding, so eight distinct sections read as one continuous column and the page
+   felt efficient rather than composed. Above 1280px the ceiling lifts one step
+   of the SAME scale — nothing here is a new value, and nothing below 1280px
+   moves, so the dense mobile and laptop layouts are exactly as they were. */
+@media (min-width: 1280px) {
+  .mk-band {
+    padding: var(--space-20) 0;
+  }
+
+  /* The lifecycle band is already the tallest thing on the page (ten stages);
+     giving it the full step would make it sprawl, so it takes the smaller one.
+     Varying this deliberately is the point — equal padding everywhere is what
+     flattened the rhythm in the first place. */
+  .mk-lifecycle-band {
+    padding: var(--space-16) 0;
+  }
+}
+
+.mk-band--sunken {
+  background: var(--surface-sunken);
+}
+
+/* The proof strip's band: a thin dark shelf directly under the hero image,
+   flowing into the floodlit "how it works" band beneath it. */
+.mk-proof-band {
+  padding: var(--space-6) 0 0;
+  background: var(--surface-sunken);
+}
+
+.mk-proof-band .mk-proof {
+  margin-top: 0;
+}
+
+/* Dark bands carry the floodlight scope themselves; the gradient wash keeps
+   them from reading as flat panels. */
+.mk-band--dark {
+  background:
+    radial-gradient(
+      100% 130% at 85% -30%,
+      color-mix(in srgb, var(--accent) 7%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(180deg, var(--surface-sunken), var(--surface));
+}
+
+.mk-band-head {
+  max-width: 640px;
+  margin-bottom: clamp(var(--space-5), 3vw, var(--space-8));
+}
+
+.mk-band-head--center {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+/* --- Hero -------------------------------------------------------------------
+   A floodlit night: two beams sweep in from the top corners, the volt halo
+   sits behind the headline, and a hairline pitch arc grounds the bottom. All
+   gradient light is mixed from tokens. */
+
+/* Reset the browser's default 8px body margin — without it, the white page
+   canvas shows as a frame around full-bleed dark sections like the hero. */
+body {
+  margin: 0;
+}
+
+.mk-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface-sunken) 0%, var(--surface) 100%);
+  padding: clamp(var(--space-8), 3.5vw, var(--space-12)) 0
+    clamp(var(--space-6), 3vw, var(--space-8));
+}
+
+/* Home only (scoped by :has on the .landing wrapper): the public header floats
+   as a FIXED, transparent bar so the stadium photo is unbroken from the very top
+   of the page down through the hero — the nav sits on the stadium, not on a black
+   band above it. The header still densifies to opaque glass over the first scroll
+   (so it stays readable over the lower, light sections). The hero gains top
+   padding to clear the floating bar. Browsers without :has() simply keep the
+   default sticky glass header and the hero's normal padding — a clean fallback.
+   Every other public page (pricing, help, …) is untouched. */
+body:has(.landing.mk) .mk-hero {
+  padding-bottom: clamp(4rem, 4vw, 6rem);
+}
+
+/* THE TRANSPARENT HEADER MAY ONLY EXIST WHERE SOMETHING RESTORES IT.
+   This block used to strip the header's background, border and shadow
+   unconditionally, and hand the glass back ONLY through `mk-header-home` —
+   which lives behind both a reduced-motion check and a scroll-timeline
+   `@supports`. So for anyone who asks for less motion, and for every browser
+   without scroll-driven animations, nothing ever restored it: a FIXED header
+   carrying floodlight text tokens floated over the light bands for the rest of
+   the page. Measured on this branch at scroll 2200 with reduce set — header
+   background `rgba(0,0,0,0)`, wordmark still `#E8EEF9`, about 1.07:1 against
+   `--surface`. Invisible lettering, and invisible to the axe run too, which
+   scans at scroll 0 where the hero behind it is still dark.
+   The whole treatment now sits inside the same guard as its restore, so the
+   fallback is the shell's own glass header — which is what the comment below
+   always claimed happened. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    /* Keep the scroll-linked densify, but start it fully transparent so the
+       photo shows through at the top; timeline + range cascade from .header. */
+    body:has(.landing.mk) header[data-theme="floodlight"] {
+      position: fixed;
+      inset: 0 0 auto 0;
+      background-color: transparent;
+      background-image: none;
+      border-bottom-color: transparent;
+      box-shadow: none;
+      animation-name: mk-header-home;
+    }
+
+    /* Only a FIXED header needs clearing; the sticky fallback occupies its own
+       space, so this padding belongs with the position that requires it. */
+    body:has(.landing.mk) .mk-hero {
+      padding-top: clamp(6.5rem, 5vw + 3.5rem, 9rem);
+    }
+  }
+}
+
+@keyframes mk-header-home {
+  from {
+    background-color: transparent;
+    border-bottom-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+
+  to {
+    background-color: color-mix(in srgb, var(--surface) 92%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--border-subtle) 80%, transparent);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--surface-sunken) 40%, transparent);
+  }
+}
+
+/* THE HERO FLOOR IS LIGHT, NOT A PHOTOGRAPH.
+
+   It used to be a stock stadium plate with a gold trophy composited into it —
+   the single most template-looking thing on the site, and the same image every
+   cricket app in the store ships. A visitor cannot tell a product apart from
+   its competitors by its stock photography; they can tell it apart by seeing
+   the product work.
+   
+   So the plate is gone and the hero's own floodlight does the atmosphere: two
+   beams sweeping in from the top corners and a warm glow grounding the base.
+   That gradient stack was already here as the no-photo fallback — it is now
+   simply the design. The bytes it saves (462 KB JPEG, 128 KB AVIF) pay for the
+   product surface that replaced it. */
+
+.mk-hero::after {
+  /* The boundary rope: a lit hairline that separates the night from the page. */
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent) 50%,
+    transparent
+  );
+}
+
+/* The floodlit night itself: two beams sweeping in from the top corners and a
+   warm glow grounding the base. Text contrast is held by the scrim below rather
+   than by dimming type — axe measures WCAG at every frame of every animation,
+   so opacity on text is never the lever. */
+.mk-hero-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    radial-gradient(
+      70rem 32rem at 18% -18%,
+      color-mix(in srgb, var(--accent) 24%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      64rem 30rem at 88% -22%,
+      color-mix(in srgb, var(--info-base) 20%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      46rem 24rem at 50% 120%,
+      color-mix(in srgb, var(--accent) 16%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(180deg, var(--surface-sunken) 0%, var(--surface) 100%);
+  background-repeat: no-repeat;
+}
+
+/* A dark-light-dark valley across the pane: near-solid at the LEFT so the copy
+   column sits on clean page-dark (never a muddy stretch of dim stands), opening
+   to a clear window over the floodlit glow and the trophy in the middle, then
+   ramping back to near-solid at the RIGHT so the pane dissolves into the page's
+   own dark with no visible edge. A soft vertical wash anchors the top (under the
+   nav) and the bottom boundary without dimming the cup. */
+.mk-hero-photo::after {
+  /* A soft valley: enough to hold type contrast at the left, clearing to let
+     the beams read across the middle. Tuned for a gradient, not a photograph. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-sunken) 46%, transparent) 0%,
+    color-mix(in srgb, var(--surface-sunken) 10%, transparent) 34%,
+    color-mix(in srgb, var(--surface-sunken) 24%, transparent) 100%
+  );
+}
+
+.mk-hero > .mk-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Atmosphere (mk-fx) ------------------------------------------------------
+   The cinematic layer the dark bands share: two floodlight beams sweeping very
+   slowly from the top corners, a field of stadium dust drifting upward, and a
+   film-grain wash so no dark surface ever reads as flat pixels. Purely
+   decorative (the div is aria-hidden), all color mixed from tokens, and every
+   movement is transform-only so it composites on the GPU and freezes cleanly
+   under prefers-reduced-motion. */
+
+.mk-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Film grain: an inline feTurbulence tile at whisper opacity. */
+.mk-fx::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+  opacity: 0.07;
+}
+
+.mk-fx-beam {
+  position: absolute;
+  top: -30%;
+  height: 135%;
+  width: clamp(220px, 26vw, 420px);
+  transform-origin: 50% 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 17%, transparent),
+    transparent 72%
+  );
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 32% 68%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 32% 68%, transparent);
+}
+
+.mk-fx-beam--left {
+  left: 4%;
+  transform: rotate(14deg);
+}
+
+.mk-fx-beam--right {
+  right: 4%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--info-base) 15%, transparent),
+    transparent 72%
+  );
+  transform: rotate(-14deg);
+}
+
+/* Stadium dust: a repeating particle tile that climbs by exactly one tile per
+   loop, so the drift is seamless. The element overshoots the section by one
+   tile height; .mk-fx clips the overshoot. */
+.mk-fx-particles {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(100% + 480px);
+  opacity: 0.5;
+  background-repeat: repeat;
+  background-size: 480px 480px;
+  background-image:
+    radial-gradient(
+      circle at 11% 22%,
+      color-mix(in srgb, var(--accent) 60%, transparent) 0 1.5px,
+      transparent 2.5px
+    ),
+    radial-gradient(
+      circle at 34% 74%,
+      color-mix(in srgb, var(--ceremony-gold) 55%, transparent) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 58% 38%,
+      color-mix(in srgb, var(--text-heading) 40%, transparent) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 79% 61%,
+      color-mix(in srgb, var(--accent) 45%, transparent) 0 1.2px,
+      transparent 2.2px
+    ),
+    radial-gradient(
+      circle at 92% 14%,
+      color-mix(in srgb, var(--info-base) 45%, transparent) 0 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 22% 90%,
+      color-mix(in srgb, var(--ceremony-gold) 40%, transparent) 0 1px,
+      transparent 2px
+    );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-fx-beam--left {
+    animation: mk-beam-left 17s ease-in-out infinite alternate;
+  }
+
+  .mk-fx-beam--right {
+    animation: mk-beam-right 21s ease-in-out infinite alternate;
+  }
+
+  .mk-fx-particles {
+    animation: mk-drift-up 36s linear infinite;
+  }
+}
+
+@keyframes mk-beam-left {
+  from {
+    transform: rotate(11deg);
+  }
+
+  to {
+    transform: rotate(17deg);
+  }
+}
+
+@keyframes mk-beam-right {
+  from {
+    transform: rotate(-11deg);
+  }
+
+  to {
+    transform: rotate(-17deg);
+  }
+}
+
+@keyframes mk-drift-up {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, -480px, 0);
+  }
+}
+
+/* The highlighted word: solid token color (axe: gradient-clipped text can drop
+   below contrast mid-gradient, so the "gradient" lives in the glow and the
+   drawn underline instead — the glyphs themselves never move off a certified
+   pair). The underline draws in after the stagger settles. */
+.mk-hero-highlight {
+  position: relative;
+  color: var(--text-accent);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.mk-hero-highlight::after {
+  content: "";
+  position: absolute;
+  left: 0.02em;
+  right: 0.05em;
+  bottom: -0.08em;
+  height: 0.06em;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--ceremony-gold) 60%, var(--accent))
+  );
+  transform-origin: 0 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-hero-highlight::after {
+    animation: mk-underline var(--duration-slow) var(--ease-out) 0.7s both;
+  }
+}
+
+@keyframes mk-underline {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.mk-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-10), 6vw, var(--space-16));
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .mk-hero-grid {
+    /* The stage is the subject now, not a corner card beside a photograph, so
+       the columns even out and the hero is given room to be looked at. */
+    grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
+    min-height: clamp(420px, 30vw, 560px);
+  }
+}
+
+/* Grid, not a wrapping flex row: when both CTAs fit on one line each track is
+   its own max-content, exactly as a flex row rendered them; when only one fits,
+   the single track is as wide as the LONGER of the two labels and both buttons
+   stretch to fill it. Stacked CTAs of two different widths (the flex row's
+   behaviour) read as two unrelated controls — a primary action should not look
+   like a different species from the alternative under it. */
+.mk-hero-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), max-content));
+  gap: var(--space-3);
+  margin-bottom: var(--space-8);
+}
+
+/* Proof strip: one full-width rounded bar under the hero, five tiled capability
+   marks in a single line on desktop (dividers between), wrapping gracefully on
+   narrower screens. Not metrics — restatements of certified capabilities. */
+.mk-proof {
+  list-style: none;
+  margin: clamp(var(--space-6), 4vw, var(--space-10)) 0 0;
+  padding: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  gap: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+}
+
+.mk-proof li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.25;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
+}
+
+/* Each capability mark is touchable: the row lifts, the tile pops and glows —
+   the same micro-language as every card on the page. */
+.mk-proof li:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--surface-raised) 85%, transparent);
+}
+
+.mk-proof li:hover .mk-proof-tile {
+  transform: scale(1.1) rotate(-4deg);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.mk-proof-tile {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--text-accent);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.mk-proof-tile svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Five is prime, so every wrap leaves an uneven row — but 3 + 2 is a pair of
+   rows and 4 + 1 is a row with an orphan. At 160px minimum, four tiles started
+   fitting around 692px and the fifth dropped alone onto its own line for the
+   whole tablet range, which is the same arrangement this stylesheet rejects for
+   its card grids. Holding three columns until the desktop lock breaks it 3 + 2
+   instead. Below this the intrinsic wrap is left alone: forcing wider tracks
+   there would stack all five and make the strip taller on exactly the screens
+   with least room. */
+@media (min-width: 692px) and (max-width: 1023px) {
+  .mk-proof {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Desktop: lock to a flush single row of five with hairline dividers. */
+@media (min-width: 1024px) {
+  .mk-proof {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .mk-proof li + li {
+    border-left: 1px solid var(--border-subtle);
+  }
+}
+
+/* --- The stage visual --------------------------------------------------------
+   A live-auction frame built from product tokens: lot header, player, the
+   bid, the SOLD stamp, purse chips. Decorative (aria-hidden) but truthful —
+   it is the real information hierarchy of the live room. */
+
+.mk-hero-visual {
+  position: relative;
+  /* A grid item's default `min-width: auto` floors it at its content's
+     min-content width — which for the stage card is 401px, so this pane
+     measured 401px at EVERY viewport and pushed 30px of the auction card off
+     the right of a 390px phone. Zero lets it track its column; the card's own
+     rules below make the contents fit once it can. */
+  min-width: 0;
+}
+
+/* 2026-07-25: photo hero restored by founder call — the demo wrapper (stage +
+   truth label) takes the old card composition: docked small to the column's
+   top-right so the photo's cup rises to its left and the plinth stays visible. */
+.mk-hero-demo {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+}
+
+@media (min-width: 1024px) {
+  /* THE STAGE IS THE SUBJECT.
+
+     All of this used to be about getting a small card out of a photograph's
+     way: scaled to 0.72, pinned to the bottom-right, nudged off the viewport
+     edge so it never covered the trophy. With the photo gone that choreography
+     left the card marooned in the corner of an empty hero.
+
+     It is now what the visitor is meant to look at — full width of its column,
+     centred, at its own size. A product proving itself in four seconds is worth
+     more than any image we could have put here. */
+  .mk-hero-demo {
+    align-self: center;
+    justify-self: stretch;
+    width: 100%;
+    max-width: 520px;
+    margin-inline: auto;
+  }
+
+  .mk-hero-visual {
+    width: 100%;
+  }
+}
+
+/* The visible truth label under the simulated stage — NOT aria-hidden. Over
+   the stadium photo it rides a dark glass pill so it stays legible at any
+   brightness beneath it. */
+.mk-stage-note {
+  margin: 0;
+  max-width: 100%;
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+  text-align: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-sunken) 72%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.mk-stage {
+  position: relative;
+  z-index: 1;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  /* A lit console, not frosted glass. The translucency existed so a photo could
+     glow through it; with the photo gone the panel is the only object in the
+     hero and has to read as solid, dense and switched on. */
+  /* OPAQUE. The panel used to be translucent so a photograph's glow could
+     travel through it; what actually travelled through at this size was the
+     rotating accent ring behind it, washing the whole console amber-to-blue and
+     dropping "LOT 23 · 18 SOLD" to unreadable. The ring belongs OUTSIDE the
+     glass, which is where it now stays. */
+  background: linear-gradient(
+    165deg,
+    var(--surface-overlay) 0%,
+    var(--surface-raised) 48%,
+    var(--surface) 100%
+  );
+  /* No backdrop-filter: the panel is opaque now, so blurring what is behind it
+     buys nothing and costs a compositing layer on every scroll frame. */
+  box-shadow:
+    /* Depth, then a warm floor-bounce from the accent so the console looks lit
+       from the room it is standing in. */
+    0 40px 120px -30px color-mix(in srgb, var(--surface-sunken) 92%, transparent),
+    0 0 90px -40px color-mix(in srgb, var(--accent) 55%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-heading) 10%, transparent);
+  padding: var(--space-6);
+  max-width: min(460px, 100%);
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* The card's halo: a conic gradient rim, one hairline proud of the border, so
+   the glass panel reads as lit from the stadium around it. The angle is a
+   registered custom property so the light can circle the card at broadcast
+   pace; browsers without @property keep the static rim via the 0deg fallback. */
+@property --mk-ring {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.mk-stage::before {
+  /* A LIT RIM, NOT A WASH.
+
+     This is a rotating conic gradient meant to read as light catching the edge
+     of the console. It was drawn as a full rounded rect at `z-index: -1`, which
+     works only while the panel above it is translucent: a negative-z child
+     paints after its parent's BACKGROUND but before the parent's content, so
+     the moment the panel became opaque the gradient sat on top of it and washed
+     the whole card amber-to-blue — "LOT 23 · 18 SOLD" went to unreadable.
+
+     Masking the centre out turns it into what it was always describing: two
+     pixels of moving light around the edge, and nothing across the face. */
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: calc(var(--radius-2xl) + 1px);
+  padding: 1px;
+  background: conic-gradient(
+    from var(--mk-ring, 0deg),
+    color-mix(in srgb, var(--accent) 85%, transparent),
+    color-mix(in srgb, var(--info-base) 45%, transparent) 28%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 52%,
+    color-mix(in srgb, var(--ceremony-gold) 70%, transparent) 78%,
+    color-mix(in srgb, var(--accent) 85%, transparent)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* Screen reflection: a soft glass streak sweeping the panel every few beats.
+   It carries no text and never dips text opacity — it is a pseudo overlay at
+   7% of the heading tone, the token-mixed equivalent of studio glass. */
+.mk-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 42%,
+    color-mix(in srgb, var(--text-heading) 7%, transparent) 50%,
+    transparent 58%
+  );
+  background-size: 260% 100%;
+  background-position: 130% 0;
+}
+
+@media (min-width: 1024px) {
+  .mk-stage {
+    /* Barely there. A 2.6deg tilt was charming on a 360px card tucked into a
+       photo's corner; on a 520px console it just looks hung badly. */
+    transform: rotate(1.1deg);
+  }
+}
+
+/* Below the desktop breakpoint the layout stacks and the card lands squarely on
+   the brightest part of the stadium plate — the floodlit glow and the trophy's
+   gold. Frosted glass is a desktop luxury: there the card sits over the dark
+   left third, so 76–82% tint plus a blur is plenty. Over gold it is not, and
+   white-on-gold is exactly the pair that fails. The surface goes fully opaque —
+   the same three tokens, just undiluted — so the player's name, WINNING BID,
+   the rupees and the SOLD stamp keep the contrast they were certified at,
+   whatever the photo is doing underneath. Desktop is untouched.
+   The card also has to physically FIT a 320px phone here: its content's
+   min-content width was 401px (the rupee amount at display-sm beside the SOLD
+   stamp), which is what pushed the page into horizontal scroll. Letting the
+   rows wrap is enough — the money keeps its full display size. */
+@media (max-width: 1023px) {
+  .mk-stage {
+    background: linear-gradient(
+      165deg,
+      var(--surface-overlay) 0%,
+      var(--surface-raised) 45%,
+      var(--surface) 100%
+    );
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    padding: var(--space-5);
+  }
+
+  /* The halo is not the rim it looks like. `.mk-stage` is positioned WITH a
+     z-index, so it opens a stacking context — and inside one, a negative-z-index
+     child paints AFTER the parent's own background, not behind it. So this
+     conic gradient (accent at 60%, gold at 50%) washes the entire card face,
+     not the 2px it overhangs. On desktop that IS the frosted look, over the
+     dark left third of the photo. Here it would put white text back on gold and
+     undo the opaque surface above it, so the phone keeps the plain 1px border
+     and the card's own shadow instead. */
+  .mk-stage::before {
+    display: none;
+  }
+
+  /* The bid row is the widest thing in the card; letting the stamp drop to its
+     own line is what makes 320px possible without shrinking the money. */
+  .mk-stage-bid {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-stage::before {
+    animation: mk-ring-spin 16s linear infinite;
+  }
+
+  .mk-stage::after {
+    animation: mk-sheen 9s var(--ease-out) 1.4s infinite;
+  }
+
+  /* Idle float: the whole panel breathes, keeping its broadcast tilt. */
+  @media (min-width: 1024px) {
+    .mk-stage {
+      animation: mk-stage-float 9s ease-in-out infinite;
+    }
+  }
+}
+
+@keyframes mk-ring-spin {
+  to {
+    --mk-ring: 360deg;
+  }
+}
+
+@keyframes mk-sheen {
+  0% {
+    background-position: 130% 0;
+  }
+
+  24% {
+    background-position: -30% 0;
+  }
+
+  100% {
+    background-position: -30% 0;
+  }
+}
+
+/* The rotation here must match the static tilt above (1.1deg), not lead a life
+   of its own. It was left at 2.6/2.8deg when that tilt was deliberately reduced
+   from 2.6 to 1.1 — and because a running animation outranks author
+   declarations, every desktop visitor without reduced motion saw the card at
+   the OLD angle: the comment explaining why 2.6deg "looks hung badly" was
+   describing exactly what still shipped. The float is the drift, not the tilt. */
+@keyframes mk-stage-float {
+  0%,
+  100% {
+    transform: rotate(1.1deg) translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: rotate(1.3deg) translate3d(0, -7px, 0);
+  }
+}
+
+.mk-stage-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  /* "Live" and "Lot 23 · 18 sold" are a single unbreakable line on desktop; on
+     a narrow card the lot counter drops beneath the live dot rather than being
+     clipped to "18 SOL" at the card's edge. */
+  flex-wrap: wrap;
+}
+
+.mk-stage-live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.mk-stage-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--live);
+  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--live) 55%, transparent);
+  animation: mk-pulse 2s var(--ease-out) infinite;
+}
+
+.mk-stage-lot {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mk-stage-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.mk-stage-mark {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--identity-field), var(--identity-field-deep));
+  border: 1px solid var(--identity-line);
+  color: var(--identity-accent);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  letter-spacing: 0.02em;
+}
+
+.mk-stage-name {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  color: var(--text-heading);
+}
+
+.mk-stage-role {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.mk-stage-bid {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface-sunken) 78%, transparent);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-4);
+}
+
+.mk-stage-bid-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.mk-stage-amount {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--display-sm-size);
+  line-height: 1;
+  color: var(--money-value);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.mk-stage-sold {
+  position: relative;
+  flex: none;
+  align-self: center;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  letter-spacing: 0.16em;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  transform: rotate(-6deg);
+  box-shadow:
+    0 6px 24px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent-sheen, var(--accent)) 40%, transparent);
+  /* A back-eased curve so it overshoots on the way in — the settle is the point. */
+  animation: mk-stamp var(--duration-ceremony) cubic-bezier(0.2, 1.5, 0.35, 1) both;
+}
+
+/* After the stamp lands, a shockwave ring keeps radiating from it — the SOLD
+   moment stays an occasion. Shadow-only, so the lettering never flickers. */
+.mk-stage-sold::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-stage-sold::after {
+    animation: mk-sold-ping 3s var(--ease-out) var(--duration-ceremony) infinite;
+  }
+
+  /* The winning team's swatch pulses like the live dot: the current bidder. */
+  .mk-stage-team-a i {
+    animation: mk-pulse 2.4s var(--ease-out) infinite;
+  }
+}
+
+@keyframes mk-sold-ping {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  45%,
+  100% {
+    box-shadow: 0 0 0 22px transparent;
+  }
+}
+
+/* Bid momentum: a tiny broadcast sparkline under the amount — seven bars of a
+   bidding war climbing to the winning gold bar. Bars grow in on load, then the
+   winning bar keeps a heartbeat. Decorative (inside the aria-hidden stage). */
+.mk-stage-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  height: 28px;
+  margin-bottom: var(--space-4);
+  padding: 0 var(--space-1);
+}
+
+.mk-stage-spark i {
+  flex: 1;
+  border-radius: var(--radius-sm) var(--radius-sm) 1px 1px;
+  transform-origin: 50% 100%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 70%, transparent),
+    color-mix(in srgb, var(--accent) 20%, transparent)
+  );
+}
+
+.mk-stage-spark i:nth-child(1) {
+  height: 32%;
+}
+
+.mk-stage-spark i:nth-child(2) {
+  height: 52%;
+}
+
+.mk-stage-spark i:nth-child(3) {
+  height: 40%;
+}
+
+.mk-stage-spark i:nth-child(4) {
+  height: 64%;
+}
+
+.mk-stage-spark i:nth-child(5) {
+  height: 50%;
+}
+
+.mk-stage-spark i:nth-child(6) {
+  height: 78%;
+}
+
+.mk-stage-spark i:nth-child(7) {
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    var(--ceremony-gold),
+    color-mix(in srgb, var(--ceremony-gold) 30%, transparent)
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ceremony-gold) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-stage-spark i {
+    animation: mk-spark-grow var(--duration-slow) var(--ease-out) both;
+  }
+
+  .mk-stage-spark i:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .mk-stage-spark i:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  .mk-stage-spark i:nth-child(4) {
+    animation-delay: 180ms;
+  }
+
+  .mk-stage-spark i:nth-child(5) {
+    animation-delay: 240ms;
+  }
+
+  .mk-stage-spark i:nth-child(6) {
+    animation-delay: 300ms;
+  }
+
+  .mk-stage-spark i:nth-child(7) {
+    animation:
+      mk-spark-grow var(--duration-slow) var(--ease-out) 360ms both,
+      mk-spark-beat 2.2s ease-in-out 1.4s infinite alternate;
+  }
+}
+
+@keyframes mk-spark-grow {
+  from {
+    transform: scaleY(0);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes mk-spark-beat {
+  from {
+    transform: scaleY(1);
+  }
+
+  to {
+    transform: scaleY(1.08);
+  }
+}
+
+.mk-stage-teams {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.mk-stage-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-stage-team i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.mk-stage-team-a i {
+  background: var(--accent);
+}
+
+.mk-stage-team-b i {
+  background: var(--info-base);
+}
+
+.mk-stage-team-c i {
+  background: var(--ceremony-gold);
+}
+
+/* --- Cards ------------------------------------------------------------------ */
+
+/* One column until the row can hold all three — the same rule `.mk-steps` and
+   `.mk-tiers` already follow, and for the same reason. `auto-fit` fitted exactly
+   two 260px tracks from roughly 576px to 851px, so on every tablet in that band
+   these three cards rendered 2 + 1: two peers and an orphan, which this
+   stylesheet twice calls dishonest in writing while leaving this grid doing it.
+   Stacked below the breakpoint, three-up above it, never two-and-a-bit. */
+.mk-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .mk-cards {
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  }
+}
+
+/* Four-up inventory (the capabilities band): tighter minimum so four cards
+   share the row on desktop instead of orphaning the last one. */
+.mk-cards--4 {
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+}
+
+/* Five-up inventory (the capabilities band): auto-fit wraps 2–3-up on tablet,
+   then locks to a single flush row of five on desktop — no orphaned fifth card. */
+@media (min-width: 1080px) {
+  .mk-cards--5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Capability cards: icon and title share the top line; body spans beneath. */
+.mk-cards--5 .mk-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-3);
+  row-gap: var(--space-4);
+}
+
+.mk-cards--5 .mk-card h3 {
+  font-size: var(--text-md-size);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mk-cards--5 .mk-card p {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mk-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.mk-card:hover {
+  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+/* --- The premium card finish -------------------------------------------------
+   One physical language for every card on the public surfaces: a gradient
+   hairline along the top edge that brightens and widens on hover (light
+   catching the bevel), and — on capability cards — a soft ceiling spotlight
+   fading in above the icon. Both are pseudo layers with no text, so opacity
+   here is free. */
+
+.mk-card::before,
+.mk-steps li::before,
+.mk-tier::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: var(--space-6);
+  right: var(--space-6);
+  height: 1px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    transparent
+  );
+  opacity: 0.45;
+  transition:
+    opacity var(--duration-base) var(--ease-out),
+    left var(--duration-base) var(--ease-out),
+    right var(--duration-base) var(--ease-out);
+}
+
+.mk-card:hover::before,
+.mk-steps li:hover::before,
+.mk-tier:hover::before {
+  opacity: 1;
+  left: var(--space-3);
+  right: var(--space-3);
+}
+
+.mk-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    24rem 12rem at 50% -20%,
+    color-mix(in srgb, var(--accent) 9%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.mk-card:hover::after {
+  opacity: 1;
+}
+
+.mk-card h3 {
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.mk-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.mk-icon-tile {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text-accent);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.mk-icon-tile svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Title and body belong together; the icon is a separate beat above them. */
+.mk-card .mk-icon-tile {
+  margin-bottom: var(--space-2);
+}
+
+/* A small, consistent "pop" on every icon tile whenever its containing card
+   is hovered — the same micro-interaction wherever an mk-icon-tile appears
+   (capability cards, how-it-works steps), so hover feels like one system
+   rather than a one-off. Transform-only, so it's free to run under
+   prefers-reduced-motion too (no opacity/text involved). */
+.mk-card:hover .mk-icon-tile,
+.mk-steps li:hover .mk-icon-tile {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+/* Checklist inside cards and tiers */
+.mk-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mk-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+}
+
+.mk-checklist svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--text-accent);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.mk-checklist li:hover svg {
+  transform: scale(1.2);
+}
+
+/* --- Steps timeline ----------------------------------------------------------- */
+
+.mk-steps {
+  list-style: none;
+  counter-reset: mkstep;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* One column until the row can hold every beat. auto-fit at tablet width fit
+     exactly two tracks, which broke three steps into 2 + 1 — a sequence read
+     left-to-right, then orphaned. A stack is honest; a 2+1 grid is not. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+/* The row and its connectors arrive together: this is also the width at which
+   the rail is drawn, and the gutter widens to --space-8 because --space-4 left
+   the rail and its arrowhead 16px to share, which read as a stray glyph rather
+   than a line between two beats. */
+@media (min-width: 900px) {
+  .mk-steps {
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: var(--space-8);
+  }
+}
+
+.mk-steps li {
+  position: relative;
+  counter-increment: mkstep;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  /* A whisper of accent at the top of the card, fading out by 40%: on a light
+     panel a flat --surface-raised card is white-on-near-white and the only
+     thing separating it from the band is a hairline. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 5%, var(--surface-raised)),
+    var(--surface-raised) 40%
+  );
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.mk-steps li:hover {
+  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+/* Hovering a step makes its number badge pulse once — a tap on the shoulder,
+   not a siren. */
+@media (prefers-reduced-motion: no-preference) {
+  .mk-steps li:hover .mk-step-top::before {
+    animation: mk-num-pulse 0.55s var(--ease-out);
+  }
+}
+
+@keyframes mk-num-pulse {
+  45% {
+    transform: scale(1.14);
+  }
+}
+
+.mk-step-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  /* The icon tile is 48px and the connector rail is pinned to its centre line
+     (card padding + half the tile); if this height changes, move the rail. */
+  min-height: 48px;
+  margin-bottom: var(--space-5);
+}
+
+/* The step number used to be a solid gold chip sitting beside the icon tile:
+   two badges of near-identical weight competing on one line, neither winning.
+   It is now an editorial numeral set in the display face, tinted rather than
+   filled, anchored to the card's top-right corner. One chip, one numeral —
+   they read as different kinds of object, so they stop fighting. It stays a
+   pseudo-element (never in the accessibility tree) because the <ol> already
+   carries the ordering; the numeral is decoration, not information. */
+.mk-step-top::before {
+  content: "0" counter(mkstep);
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-5);
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(40px, 4.4vw, 56px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: color-mix(in srgb, var(--accent) 20%, transparent);
+  transition: color var(--duration-base) var(--ease-out);
+}
+
+/* The icon tile carries the card now, so it gets the extra 4px and a lit top
+   edge of its own — the same sheen the panels use, at tile scale. */
+.mk-steps .mk-icon-tile {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent) 20%, var(--surface-raised)),
+    var(--accent-subtle)
+  );
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 55%, transparent);
+}
+
+.mk-steps .mk-icon-tile svg {
+  width: 24px;
+  height: 24px;
+}
+
+.mk-steps li:hover .mk-step-top::before {
+  color: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+/* The three-beat ramp was 64 → 38 → 13: the step titles rendered SMALLER than
+   the body copy tier and read as labels, skipping a whole level of hierarchy.
+   text-lg restores the missing tier (64 → 38 → 18 → 13 body). The nowrap +
+   ellipsis went with the small size — at 18px "The gavel falls; the books write
+   themselves" cannot survive one line, and a heading truncated mid-sentence is
+   a worse outcome than a heading on two lines. */
+.mk-steps h3 {
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-lg-size);
+  line-height: 1.3;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-2);
+  text-wrap: balance;
+}
+
+/* 18px title over 13px body was a five-point drop inside one card, and the
+   "worst moment" cards immediately below run their body at base. Matching them
+   keeps the two card rows reading as one family. */
+.mk-steps p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-base-size);
+  line-height: 1.6;
+}
+
+/* Connector: a rail between cards on wide screens, in the row's own gutter.
+   The old version was a bare 9px chevron pinned to `top: 50%` — the vertical
+   middle of the CARD, which lands in the middle of the body paragraph. It read
+   as a stray ">" floating in the whitespace rather than a line from one beat
+   to the next. The rail is now pinned to the icon tiles' centre line, so the
+   three icons and the two connectors form a single horizontal spine across the
+   row, and the arrowhead sits at the end of an actual line. */
+@media (min-width: 900px) {
+  .mk-steps {
+    position: relative;
+  }
+
+  /* Card padding (--space-6) + half the 48px tile. */
+  .mk-steps li:not(:last-child)::after,
+  .mk-steps li:not(:last-child) .mk-step-top::after {
+    content: "";
+    position: absolute;
+    top: calc(var(--space-6) + 24px);
+    transition: opacity var(--duration-base) var(--ease-out);
+  }
+
+  .mk-steps li:not(:last-child)::after {
+    left: 100%;
+    width: calc(var(--space-8) - 10px);
+    height: 2px;
+    border-radius: var(--radius-full);
+    transform: translateY(-1px);
+    transform-origin: left center;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 15%, transparent),
+      color-mix(in srgb, var(--accent) 48%, transparent)
+    );
+  }
+
+  /* The arrowhead rides on .mk-step-top's ::after because the <li> has already
+     spent both of its pseudo-elements (lit top edge, rail). .mk-step-top is
+     static, so this still positions against the <li>. */
+  .mk-steps li:not(:last-child) .mk-step-top::after {
+    left: calc(100% + var(--space-8) - 9px);
+    width: 7px;
+    height: 7px;
+    border-top: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
+    border-right: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  /* Without this the three body paragraphs start at three different heights,
+     because the titles are one to three lines depending on the copy and the
+     column width, and the row loses its baseline.
+
+     Subgrid does it properly: every card hands its three bands — icon, title,
+     body — to the row's own tracks, so the title track is as tall as the
+     tallest title and the bodies start level at ANY width. A min-height floor
+     cannot do that; the first version guessed two lines and came apart at
+     exactly 900px, where "The gavel falls; the books write themselves" needs
+     three. That guess survives here only as the pre-subgrid fallback. */
+  .mk-steps h3 {
+    min-height: 2.6em;
+  }
+
+  @supports (grid-template-rows: subgrid) {
+    .mk-steps {
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .mk-steps li {
+      display: grid;
+      grid-template-rows: subgrid;
+      grid-row: span 3;
+      /* A subgrid inherits its parent's gutter, and the parent's is the 32px
+         COLUMN gutter between cards — which arrived as 32px of dead air
+         between the icon, the title and the body. A subgrid may declare its
+         own; the bands are spaced by their own margins. */
+      row-gap: 0;
+    }
+
+    .mk-steps h3 {
+      min-height: 0;
+    }
+  }
+}
+
+/* --- Stats panel ("One platform. Complete trust.") -------------------------- */
+
+.mk-stats-panel {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  padding: clamp(var(--space-6), 3vw, var(--space-8));
+  background:
+    radial-gradient(
+      40rem 20rem at 85% -25%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--surface-sunken), var(--surface));
+}
+
+/* The panel shares the cards' lit top edge — static here; it is a monument,
+   not a button. */
+.mk-stats-panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: var(--space-8);
+  right: var(--space-8);
+  height: 1px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 45%, transparent),
+    transparent
+  );
+}
+
+.mk-stat:hover .mk-icon-tile {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.mk-stats-head {
+  max-width: 640px;
+  margin: 0 auto clamp(var(--space-6), 4vw, var(--space-10));
+  text-align: center;
+}
+
+.mk-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: var(--space-6);
+}
+
+.mk-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.mk-stat-value {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  color: var(--text-heading);
+}
+
+.mk-stat-label {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+/* --- Contained panels: floating cards on the dark "night" band ------------
+   The top of the home page (How it works as a light panel, One platform as a
+   dark split panel) extends the hero's night into two framed cards, matching
+   the product screenshot. The band carries data-theme="floodlight"; the light
+   panel re-scopes to data-theme="daylight". */
+.mk-panel {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  padding: clamp(var(--space-6), 3.5vw, var(--space-10)) clamp(var(--space-6), 4vw, var(--space-10));
+}
+
+.mk-panel-actions {
+  margin: clamp(var(--space-4), 2vw, var(--space-6)) 0 0;
+}
+
+/* One platform: heading block on the left, the four assurances in a row on the
+   right — each an icon tile beside its stacked value/label. */
+.mk-stats-panel--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-12));
+  align-items: center;
+  text-align: left;
+}
+
+@media (min-width: 900px) {
+  .mk-stats-panel--split {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.8fr);
+  }
+}
+
+.mk-stats-lead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-4);
+  row-gap: var(--space-3);
+}
+
+.mk-stats-lead > div {
+  display: contents;
+}
+
+.mk-stats-lead .mk-icon-tile {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.mk-stats-lead .mk-h2 {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  font-size: clamp(var(--text-2xl-size), 2.6vw, var(--text-3xl-size));
+}
+
+.mk-stats-lead p {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 40ch;
+}
+
+.mk-icon-tile--lg {
+  width: 52px;
+  height: 52px;
+}
+
+.mk-icon-tile--lg svg {
+  width: 26px;
+  height: 26px;
+}
+
+.mk-stats-panel--split .mk-stats-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+}
+
+.mk-stats-panel--split .mk-stat-value {
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  white-space: nowrap;
+}
+
+/* Desktop: the four assurances in a single flush row beside the heading. */
+@media (min-width: 1080px) {
+  .mk-stats-panel--split .mk-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.mk-stats-panel--split .mk-stat {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.mk-stat-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  min-width: 0;
+}
+
+/* Compact the assurance tiles so four fit the row with real breathing room. */
+.mk-stats-panel--split .mk-stat .mk-icon-tile {
+  width: 36px;
+  height: 36px;
+}
+
+.mk-stats-panel--split .mk-stat .mk-icon-tile svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* --- Live experience split (video mock) -------------------------------------- */
+
+.mk-video-mock {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-subtle);
+  aspect-ratio: 4 / 3;
+  box-shadow: var(--shadow-2);
+}
+
+/* The broadcast frame's picture is its own layer so a very slow camera drift
+   (scale + pan, GPU transform only) can play beneath the chrome — the frame
+   never sits perfectly still, like any live feed. The photo-then-gradient
+   fallback stack is unchanged. */
+.mk-video-mock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    url("/marketing/live-video-bg.jpg"),
+    radial-gradient(
+      30rem 24rem at 18% 12%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      28rem 24rem at 88% 90%,
+      color-mix(in srgb, var(--info-base) 18%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(
+      165deg,
+      var(--surface-overlay) 0%,
+      var(--surface-sunken) 55%,
+      var(--surface) 100%
+    );
+  background-size: cover, auto, auto, auto;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-video-mock::before {
+    animation: mk-kenburns 26s ease-in-out infinite alternate;
+  }
+
+  /* The activity toast bobs gently — a notification treading water. */
+  .mk-video-activity {
+    animation: mk-bob 5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes mk-kenburns {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: scale(1.07) translate3d(-1.2%, 1%, 0);
+  }
+}
+
+@keyframes mk-bob {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+.mk-video-mock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-sunken) 25%, transparent) 0%,
+    color-mix(in srgb, var(--surface-sunken) 70%, transparent) 100%
+  );
+}
+
+.mk-video-badge {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-4);
+  left: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--live);
+  color: var(--text-on-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mk-video-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--text-on-accent);
+  animation: mk-pulse 2s var(--ease-out) infinite;
+}
+
+.mk-video-play {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  color: var(--text-heading);
+  box-shadow: var(--shadow-3);
+}
+
+.mk-video-play svg {
+  width: 26px;
+  height: 26px;
+  margin-left: 3px;
+}
+
+.mk-video-caption {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-4);
+  right: var(--space-4);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm-size);
+}
+
+.mk-video-activity {
+  position: absolute;
+  z-index: 1;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+}
+
+.mk-video-activity time {
+  color: var(--text-muted);
+}
+
+.mk-board {
+  position: absolute;
+  z-index: 1;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  box-shadow: var(--shadow-2);
+}
+
+.mk-board-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-size: var(--text-xs-size);
+  color: var(--text-primary);
+}
+
+.mk-board-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mk-board-team i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.mk-board-amount {
+  font-variant-numeric: tabular-nums;
+  color: var(--money-value);
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- CTA band ------------------------------------------------------------------ */
+
+/* Closing CTA: a full-bleed dark band that flows straight into the footer. The
+   player photo would bleed off the SECTION's right edge (masked into the band);
+   a green floodlit glow sits behind it as the token fallback.
+
+   The photo slot is currently EMPTY BY DESIGN. It used to name
+   /marketing/cta-player.png, but that asset was never committed — so every
+   landing-page load fired a request that 404'd, on a layer whose only visible
+   result was the gradient underneath it. The url() is removed rather than the
+   slot: drop the file in and restore the one line below to light it up. */
+/* THE CLOSING BAND IS A SECTION, NOT A FOOTNOTE.
+   It carried clamp(--space-4, 1.8vw, --space-6) — roughly half of every other
+   band — which rendered the page's final ask at 152px against ~600px siblings.
+   The last thing a visitor reads was structurally the least important thing on
+   the page. It now takes the band scale, one step down from the content bands
+   because its content is a single row rather than a grid. */
+.mk-cta-band {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(var(--space-10), 3.5vw, var(--space-16));
+  background:
+    /* The accent wash sat at 86% — directly behind the action column, so the
+       gold primary button was lit from behind by its own colour and stopped
+       reading as the brightest thing in the band. Moved back over the copy and
+       softened; the atmosphere survives, the button separates from it. */
+    radial-gradient(
+      46rem 30rem at 62% 45%,
+      color-mix(in srgb, var(--accent) 13%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      52rem 28rem at 6% 0%,
+      color-mix(in srgb, var(--info-base) 14%, transparent),
+      transparent 58%
+    ),
+    var(--surface);
+}
+
+.mk-cta-band > .mk-container {
+  position: relative;
+  z-index: 1;
+}
+
+.mk-cta-photo {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 0;
+  width: min(46%, 760px);
+  background-image:
+    /* url("/marketing/cta-player.png"), — restore when the asset ships */
+    radial-gradient(
+      32rem 32rem at 68% 42%,
+      color-mix(in srgb, var(--accent) 32%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      24rem 38rem at 100% 26%,
+      color-mix(in srgb, var(--ceremony-gold) 16%, transparent),
+      transparent 60%
+    );
+  background-size: cover, auto, auto;
+  background-position: center right;
+  background-repeat: no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 52%);
+  mask-image: linear-gradient(90deg, transparent, black 52%);
+}
+
+.mk-cta {
+  display: flex;
+  align-items: center;
+  gap: clamp(var(--space-6), 4vw, var(--space-12));
+  text-align: left;
+}
+
+.mk-cta-copy {
+  flex: 0 1 auto;
+  max-width: 40rem;
+}
+
+/* Tighter eyebrow spacing so the compact band stays low-profile. */
+.mk-cta-copy .mk-kicker {
+  margin-bottom: var(--space-2);
+}
+
+/* The page's last ask was its only h2 set in the BODY face, at the smallest of
+   the three h2 sizes — so the closing headline read as a caption next to the
+   section headings above it. It takes the display face like every other h2, and
+   a size between the compact original and `.mk-h2`: the band is a single row,
+   and a full `.mk-h2` here would out-shout the buttons it exists to point at. */
+.mk-cta-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(1.5rem, 2.8vw, var(--text-3xl-size));
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+
+.mk-cta-note {
+  margin: var(--space-2) 0 0;
+  max-width: 46ch;
+  font-size: clamp(var(--text-sm-size), 1.1vw, var(--text-md-size));
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.mk-cta-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 899px) {
+  .mk-cta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-6);
+    min-height: 0;
+  }
+
+  .mk-cta-photo {
+    width: 72%;
+    opacity: 0.5;
+  }
+}
+
+/* --- Pricing --------------------------------------------------------------------- */
+
+.mk-note {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  max-width: 720px;
+  margin: 0 auto var(--space-10);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+  border-radius: var(--radius-xl);
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  line-height: 1.55;
+  text-align: left;
+}
+
+.mk-note svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--text-accent);
+}
+
+/* --- The beta promise ---------------------------------------------------------
+   Replaces `.mk-note[role="note"]` on /pricing. Same accent panel, opposite
+   emphasis: the sentence that answers "what am I risking?" is set at display
+   scale and leads, and the mechanics that used to swallow it follow at body
+   size. Colours stay on `.mk-note`'s proven pairing (accent-subtle ground,
+   heading/primary ink) rather than dropping the body to `--text-secondary`,
+   which is not certified against this ground. */
+
+.mk-promise {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  box-sizing: border-box;
+  max-width: 760px;
+  margin: 0 auto var(--space-10);
+  padding: var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+  border-radius: var(--radius-2xl);
+  background: var(--accent-subtle);
+  text-align: left;
+}
+
+.mk-promise-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-accent);
+}
+
+.mk-promise-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Grid/flex child: without it the copy floors at its longest word and the panel
+   pushes the page sideways at 320px. */
+.mk-promise-copy {
+  min-width: 0;
+}
+
+/* Text face, not display: the scale tops out at 24px and the display face is
+   reserved for >=30px, brand lockups and numerals (src/components/type-scale.test.ts).
+   Weight and colour carry the promotion instead. */
+.mk-promise-headline {
+  margin: 0;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-lg-size), 2.4vw, var(--text-2xl-size));
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+
+.mk-promise-body {
+  margin: var(--space-3) 0 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+}
+
+/* THE 2-UP BAND IS GONE (2026-07-25). `auto-fit` with a 280px floor resolved to
+   exactly two columns from ~620px to ~939px, which put Free and Pro Pass side
+   by side and left Association alone on the next row beside a hole that grew
+   from 300px to 440px as the window widened. Choosing a price is a
+   read-ACROSS task, and 2+1 is the single arrangement that forbids it: the tier
+   you are comparing to is on a different line from the tiers you are comparing.
+   So the grid is explicit rather than opportunistic — one column until three
+   fit honestly, three from 960px (where each card lands at ~293px, clear of the
+   280px floor), and no state in between. Stacked, the grid is capped at one
+   card's width instead of letting a lone card sprawl to 860px on a tablet. */
+.mk-tiers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: stretch;
+  max-width: 560px;
+  margin: 0 auto var(--space-10);
+}
+
+@media (min-width: 960px) {
+  .mk-tiers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: none;
+  }
+}
+
+.mk-tier {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-6) var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+/* The border lift belongs here too. `.mk-card` and `.mk-steps li` — the other
+   two members of the "one physical language" set this file declares — both warm
+   their border on hover; the tier omitted it from the hover rule AND from its
+   transition list, so the one card family a visitor is deciding money against
+   answered the pointer more weakly than the ones that merely explain things. */
+.mk-tier:hover {
+  transform: translateY(calc(-1 * var(--space-2))) scale(1.01);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+.mk-tier h2,
+.mk-tier h3 {
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  color: var(--text-heading);
+  margin: 0;
+}
+
+.mk-tier-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.mk-tier-amount {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-3xl-size), 4vw, var(--display-sm-size));
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--money-value);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Not a number, so not set as one: text face at body scale reads as the
+   promise it is instead of shouting over the tiers that quote a real figure.
+   Must follow the base rule — same specificity, so source order decides. */
+.mk-tier-amount--note {
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  color: var(--text-secondary);
+  font-variant-numeric: normal;
+}
+
+.mk-tier-cadence {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.mk-tier-limits {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mk-tier--featured {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle));
+  background:
+    radial-gradient(
+      30rem 16rem at 50% -30%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 4px var(--accent-subtle);
+}
+
+/* The featured plan breathes: its halo swells and settles on a slow tide.
+   Shadow-only — the card's text never changes. */
+@media (prefers-reduced-motion: no-preference) {
+  .mk-tier--featured {
+    animation: mk-tier-glow 4.5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes mk-tier-glow {
+  from {
+    box-shadow:
+      var(--shadow-2),
+      0 0 0 4px var(--accent-subtle);
+  }
+
+  to {
+    box-shadow:
+      var(--shadow-3),
+      0 0 0 5px var(--accent-subtle),
+      0 16px 44px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+
+/* The tier's one action. `margin-top: auto` pushes it to the card's floor, so
+   three cards with different numbers of highlights still land their buttons on
+   one line — the row a reader's eye scans when comparing. Without it the CTA
+   floats up under the shortest list and the comparison reads ragged. */
+.mk-tier-action {
+  margin: auto 0 0;
+  padding-top: var(--space-2);
+}
+
+.mk-tier-flag {
+  position: absolute;
+  top: calc(-1 * var(--space-3));
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.mk-trustline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  max-width: 900px;
+  margin: 0 auto clamp(var(--space-10), 6vw, var(--space-16));
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+@media (min-width: 860px) {
+  .mk-trustline span {
+    white-space: nowrap;
+  }
+}
+
+.mk-trustline svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--text-accent);
+}
+
+/* --- Tier comparison table ------------------------------------------------------
+   The cards sell; the table decides. The wrapper — not the document — is what
+   scrolls, so a 640px-wide table can sit on a 320px phone without the page
+   moving sideways under the reader's thumb. */
+
+.mk-compare-wrap {
+  box-sizing: border-box;
+  max-width: 900px;
+  margin: 0 auto var(--space-3);
+  overflow-x: auto;
+  /* `overflow-x: auto` scrolls the table correctly but does NOT stop it
+     contributing to `document.documentElement.scrollWidth` — measured at 360px:
+     the wrapper is 320px with 322px of internal scroll, nothing paints outside
+     it, and yet the document still reported 615/360. It is a table-specific
+     Chromium layout-overflow quirk, and it matters because the responsive
+     certification (e2e/responsive.spec.ts) asserts on exactly that property, so
+     a page that never actually scrolls sideways would still have failed the
+     gate. `contain: paint` is the fix that holds: document scrollWidth returns
+     to 360 and the wrapper keeps all 322px of horizontal scroll. Nothing here
+     is positioned or overflows deliberately, so the containment costs nothing. */
+  contain: paint;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mk-compare-wrap:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mk-compare {
+  width: 100%;
+  /* Below this the row labels wrap to four lines each and the table stops being
+     readable at a glance, which is the only reason it exists. Scroll instead. */
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.mk-compare-caption {
+  padding: var(--space-4) var(--space-5);
+  text-align: left;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mk-compare th,
+.mk-compare td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: center;
+  vertical-align: middle;
+  color: var(--text-secondary);
+}
+
+.mk-compare thead th {
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.mk-compare th[scope="row"] {
+  min-width: 260px;
+  text-align: left;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-regular);
+}
+
+.mk-compare tbody tr:last-child th,
+.mk-compare tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mk-compare-yes {
+  color: var(--text-accent);
+  vertical-align: middle;
+}
+
+.mk-compare-no {
+  color: var(--text-muted);
+}
+
+/* The price row closes the table because it is the answer every other row was
+   qualifying. Shaded so the eye lands on it after scanning up the column. */
+.mk-compare-price th[scope="row"],
+.mk-compare-price td {
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-compare-cadence {
+  display: block;
+  margin-top: var(--space-05);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.mk-compare-note {
+  max-width: 900px;
+  margin: 0 auto var(--space-10);
+  text-align: center;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+/* --- The trust pledge -------------------------------------------------------
+   Was `.mk-trustline`: the load-bearing sentence of the entire pricing model,
+   set at 26px caption scale between two large blocks, where it read as a
+   footnote to the tiers rather than the reason they are shaped that way. On
+   /pricing it is a block with an accent edge; the landing page keeps the
+   caption treatment, where it genuinely is an aside under a preview. */
+
+.mk-pledge {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  box-sizing: border-box;
+  max-width: 900px;
+  margin: 0 auto clamp(var(--space-10), 6vw, var(--space-16));
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mk-pledge-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.mk-pledge-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mk-pledge-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-md-size), 1.8vw, var(--text-xl-size));
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  text-wrap: pretty;
+}
+
+.mk-pledge-note {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* --- Procurement -------------------------------------------------------------
+   The block an association, school or corporate league needs before it can put
+   this in front of a committee. Three evidenced points, then the honest gap in
+   a deliberately different frame — a dashed edge, because what it says is that
+   the answer is not finished. */
+
+.mk-procure {
+  max-width: 900px;
+  margin: 0 auto clamp(var(--space-10), 6vw, var(--space-16));
+}
+
+.mk-procure-head {
+  margin-bottom: var(--space-6);
+}
+
+.mk-procure-head .mk-lead {
+  margin-bottom: 0;
+}
+
+.mk-procure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .mk-procure-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.mk-procure-list li {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.mk-procure-list svg {
+  width: 22px;
+  height: 22px;
+  color: var(--text-accent);
+}
+
+.mk-procure-list h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: 1.35;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-procure-list p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.mk-procure-gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.mk-procure-gap p {
+  flex: 1 1 26rem;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* --- FAQ --------------------------------------------------------------------------- */
+
+.mk-faq {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.mk-faq-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  margin-bottom: var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.mk-faq-item[open] {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+.mk-faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-4) var(--space-5);
+  font-family: var(--font-text);
+  letter-spacing: -0.01em;
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-heading);
+  border-radius: var(--radius-lg);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.mk-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.mk-faq-item summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mk-faq-item summary:hover {
+  color: var(--text-accent);
+}
+
+/* True height-animated accordion where the platform can do it (interpolate-size
+   + ::details-content). Elsewhere the accordion opens instantly, exactly as
+   before — the enhancement costs nothing. */
+@supports (interpolate-size: allow-keywords) {
+  .mk-faq {
+    interpolate-size: allow-keywords;
+  }
+
+  .mk-faq-item::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--duration-slow) var(--ease-out),
+      content-visibility var(--duration-slow) allow-discrete;
+  }
+
+  .mk-faq-item[open]::details-content {
+    block-size: auto;
+  }
+}
+
+.mk-faq-item summary::after {
+  content: "+";
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xl-size);
+  line-height: 1;
+  color: var(--text-accent);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.mk-faq-item[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.mk-faq-item p {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-5);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* An FAQ answer that paraphrases a published policy owes the reader the policy.
+   The answer above it gives up its closing padding so the pair reads as one
+   block rather than two stacked paragraphs. */
+.mk-faq-item p:has(+ .mk-faq-link) {
+  padding-bottom: var(--space-2);
+}
+
+.mk-faq-link {
+  padding: 0 var(--space-5) var(--space-3);
+}
+
+.mk-faq-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* SC 2.5.5 (AAA) / platform convention: this is the one link inside a
+     disclosure a thumb has to find after the summary has moved under it. */
+  min-height: 44px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.mk-faq-link a:hover {
+  text-decoration: underline;
+}
+
+.mk-faq-link a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* --- Showcase rows (features page) --------------------------------------------------- */
+
+.mk-show {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-16));
+  align-items: center;
+  padding: clamp(var(--space-10), 6vw, var(--space-16)) 0;
+}
+
+.mk-show + .mk-show {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* This padding exists for /features, where four rows stack and each needs air
+   on both sides of its divider. The home page renders ONE row inside a band
+   that already supplies the section rhythm, so the two paddings compounded into
+   a 114px dead gap above "The morning after". A lone row needs none of its own. */
+.mk-show:only-child {
+  padding-block: 0;
+}
+
+/* Grid item: without this it floors at its vignette's min-content width and
+   pushes the page sideways, exactly as .mk-hero-visual did. */
+.mk-show-visual {
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .mk-show {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .mk-show--flip > .mk-show-visual {
+    order: -1;
+  }
+}
+
+.mk-show h2 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: clamp(var(--text-2xl-size), 3vw, var(--text-3xl-size));
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  word-spacing: 0.05em;
+  color: var(--text-heading);
+  margin: 0 0 var(--space-4);
+}
+
+/* ONE SEMANTIC LEVEL, ONE SIZE — ON THE PAGE WHERE IT IS ONE.
+   `.mk-show` was built for /features, where several rows stack and each h2 is a
+   SUB-heading; the smaller size is right there. The landing renders exactly one
+   `.mk-show`, and its h2 is a top-level section heading standing beside six
+   `.mk-h2` peers — so at that size the money band silently read as a lesser
+   section than the ones around it. Scoped to `.landing` so /features keeps the
+   sub-heading scale it was designed for. */
+.landing .mk-show h2 {
+  font-size: clamp(1.75rem, 3.4vw, var(--display-sm-size));
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  word-spacing: 0.07em;
+}
+
+/* A product vignette frame: window chrome + content built from tokens. */
+.mk-vignette {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+.mk-vignette-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.mk-vignette-bar i {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+}
+
+.mk-vignette-bar span {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.mk-vignette-body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mk-vrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+.mk-vrow strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.mk-vrow .mk-vmeta {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-vpill {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
+  padding: var(--space-05) var(--space-2);
+}
+
+.mk-vpill--ok {
+  color: var(--success-strong);
+  background: var(--success-subtle);
+}
+
+.mk-vpill--wait {
+  color: var(--warning-strong);
+  background: var(--warning-subtle);
+}
+
+.mk-vpill--info {
+  color: var(--info-strong);
+  background: var(--info-subtle);
+}
+
+.mk-vbar {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.mk-vbar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+}
+
+/* --- Honest placeholder (customer stories) -------------------------------------------- */
+
+.mk-placeholder {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-8);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-2xl);
+  text-align: center;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  background: color-mix(in srgb, var(--surface-raised) 60%, transparent);
+}
+
+/* --- Motion ------------------------------------------------------------------------------
+   Load-time hero entrance (short, ease-out, done before anyone reads); scroll
+   reveals are transform-only so contrast never varies mid-scroll. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-hero-copy > * {
+    animation: mk-rise var(--duration-slow) var(--ease-out) both;
+  }
+
+  .mk-hero-copy > *:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .mk-hero-copy > *:nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  .mk-hero-copy > *:nth-child(4) {
+    animation-delay: 180ms;
+  }
+
+  .mk-hero-copy > *:nth-child(5) {
+    animation-delay: 240ms;
+  }
+
+  .mk-hero-visual {
+    animation: mk-rise-stage 0.7s var(--ease-out) 160ms both;
+  }
+
+  .mk-proof {
+    animation: mk-rise var(--duration-slow) var(--ease-out) 260ms both;
+  }
+
+  @supports (animation-timeline: view()) {
+    /* `backwards`, NOT `both` — and the whole card hover system depends on it.
+       A filled animation wins over a plain declaration in the cascade, so while
+       these held `transform: translateY(0)` forwards, the `:hover` lift below
+       them could never apply: every card on the page was measurably inert on
+       hover (rest and hover both the identity matrix) on exactly the browsers
+       that support this timeline. `backwards` keeps the pre-roll offset that
+       makes the reveal read, then stops applying once the range is done, which
+       hands `transform` back to `:hover`. */
+    .mk-card,
+    .mk-tier,
+    .mk-live-card,
+    .mk-steps li,
+    .mk-stat,
+    .mk-band-head {
+      animation: mk-drift linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+
+    /* Sequential reveal: siblings finish progressively later in the viewport,
+       so a row of cards ripples in left-to-right instead of arriving as one
+       slab. Range offsets, not delays — scroll-driven timelines ignore
+       animation-delay. */
+    .mk-card:nth-child(2),
+    .mk-tier:nth-child(2),
+    .mk-live-card:nth-child(2),
+    .mk-steps li:nth-child(2),
+    .mk-stat:nth-child(2) {
+      animation-range: entry 8% entry 68%;
+    }
+
+    .mk-card:nth-child(3),
+    .mk-tier:nth-child(3),
+    .mk-live-card:nth-child(3),
+    .mk-steps li:nth-child(3),
+    .mk-stat:nth-child(3) {
+      animation-range: entry 16% entry 76%;
+    }
+
+    .mk-card:nth-child(4),
+    .mk-tier:nth-child(4),
+    .mk-live-card:nth-child(4),
+    .mk-steps li:nth-child(4),
+    .mk-stat:nth-child(4) {
+      animation-range: entry 24% entry 84%;
+    }
+
+    .mk-card:nth-child(5) {
+      animation-range: entry 32% entry 92%;
+    }
+
+    /* The workflow's connectors draw in after their cards land: the rail grows
+       out of the card it leaves, then the arrowhead slides up to meet it. Two
+       animations because they are two elements now — a rail that scales and a
+       head that travels. */
+    @media (min-width: 900px) {
+      .mk-steps li:not(:last-child)::after {
+        animation: mk-rail-draw linear both;
+        animation-timeline: view();
+        animation-range: entry 40% entry 90%;
+      }
+
+      .mk-steps li:not(:last-child) .mk-step-top::after {
+        animation: mk-arrow-in linear both;
+        animation-timeline: view();
+        animation-range: entry 55% entry 95%;
+      }
+    }
+  }
+}
+
+@keyframes mk-arrow-in {
+  from {
+    transform: translateY(-50%) translateX(-8px) rotate(45deg);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(-50%) translateX(0) rotate(45deg);
+    opacity: 1;
+  }
+}
+
+/* The rail's own transform (translateY(-1px), to sit its 2px on the icon centre
+   line) has to be restated here: a running animation owns the whole transform
+   property, and the first version of this section lost that translate — and
+   gained the arrowhead's rotate(45deg) — because the connector kept using the
+   chevron's keyframes after it stopped being a chevron. */
+@keyframes mk-rail-draw {
+  from {
+    transform: translateY(-1px) scaleX(0);
+  }
+
+  to {
+    transform: translateY(-1px) scaleX(1);
+  }
+}
+
+/* The stage rises with a breath of scale — the one entrance that may, because
+   the card is decorative imagery, not text. */
+/* The entrance lands on --mk-stage-scale (not a hard scale(1)) so the docked
+   desktop size survives the animation's fill-mode: both. */
+@keyframes mk-rise-stage {
+  from {
+    transform: translateY(var(--space-5)) scale(calc(var(--mk-stage-scale, 1) * 0.97));
+  }
+
+  to {
+    transform: translateY(0) scale(var(--mk-stage-scale, 1));
+  }
+}
+
+/* Transform-only: axe scans color-contrast on VISUAL content regardless of
+   aria-hidden, so no keyframe here may ever pass through a low-opacity text
+   state (the /features SOLD stamp taught us this the hard way). */
+@keyframes mk-rise {
+  from {
+    transform: translateY(var(--space-4));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Transform-only: text keeps full contrast at every scroll position. */
+@keyframes mk-drift {
+  from {
+    transform: translateY(var(--space-6));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes mk-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* THE ONE MOMENT THIS PAGE IS ALLOWED TO PERFORM.
+   
+   A gavel falling is a physical event: it arrives fast, overshoots, and settles.
+   The old curve came in at 1.6× and eased to 1 — correct, but weightless, the
+   motion of a tooltip rather than of a hammer. This drops further, lands harder,
+   rebounds once and settles, with a half-degree of rotation wobble so it reads
+   as an object rather than a resizing box.
+   
+   TRANSFORM ONLY, deliberately: axe measures contrast at every frame of every
+   animation, including inside aria-hidden subtrees, so animating opacity on
+   lettering fails WCAG mid-flight even when the end state passes. */
+@keyframes mk-stamp {
+  0% {
+    transform: rotate(-14deg) scale(2.2);
+  }
+
+  42% {
+    transform: rotate(-4deg) scale(0.88);
+  }
+
+  62% {
+    transform: rotate(-7.5deg) scale(1.07);
+  }
+
+  80% {
+    transform: rotate(-5.4deg) scale(0.98);
+  }
+
+  100% {
+    transform: rotate(-6deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-card,
+  .mk-tier,
+  .mk-steps li,
+  .mk-icon-tile,
+  .mk-proof li,
+  .mk-proof-tile,
+  .mk-checklist svg,
+  .mk-card:hover,
+  .mk-tier:hover,
+  .mk-steps li:hover,
+  .mk-proof li:hover,
+  .mk-checklist li:hover svg,
+  .mk-card:hover .mk-icon-tile,
+  .mk-steps li:hover .mk-icon-tile,
+  .mk-stat:hover .mk-icon-tile,
+  .mk-proof li:hover .mk-proof-tile {
+    transform: none;
+    transition: none;
+  }
+
+  .mk-stage-sold {
+    animation: none;
+  }
+
+  .mk-stage-live i,
+  .mk-video-badge i {
+    animation: none;
+  }
+
+  .mk-card::before,
+  .mk-steps li::before,
+  .mk-tier::before,
+  .mk-card::after,
+  .mk-faq-item summary {
+    transition: none;
+  }
+
+  @supports (interpolate-size: allow-keywords) {
+    .mk-faq-item::details-content {
+      transition: none;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .mk-stage {
+      transform: none;
+    }
+  }
+}
+
+/* --- Parallax hero layers (client: HeroStage) ------------------------------
+   The trophy plate and stage card are lifted into their own layers so a pointer
+   parallax can separate them for depth. JS sets the transform inline; the short
+   ease smooths tracking and lets the pointer-leave reset glide back. The stage
+   card keeps its own CSS tilt because the parallax translate lives on the
+   WRAPPER, not the card. */
+.mk-stage-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Page chrome: smooth scroll, reading progress, back-to-top ---------------
+   Marketing pages scroll like film dollies, show how far into the story the
+   reader is (a 2px accent hairline above the header), and offer a way back up
+   once the hero is long gone. The progress bar and the FAB reveal are driven
+   by scroll timelines — no JS, no scroll listeners — and simply don't appear
+   on browsers without animation-timeline support. */
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.mk) {
+    scroll-behavior: smooth;
+  }
+}
+
+.mk-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--ceremony-gold) 55%, var(--accent))
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Gated like every other movement in this file. It was declared in a bare
+   `@supports`, so the one animation that runs the entire length of the page
+   ignored a reader who had asked for less motion — the exact promise made at
+   the top of this stylesheet ("every movement collapses under
+   prefers-reduced-motion"). With the guard, the bar simply never grows and the
+   hairline stays at scaleX(0), which is invisible rather than broken. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .mk-progress {
+      animation: mk-progress-grow linear both;
+      animation-timeline: scroll();
+    }
+  }
+}
+
+@keyframes mk-progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.mk-top {
+  position: fixed;
+  right: clamp(var(--space-4), 3vw, var(--space-6));
+  bottom: clamp(var(--space-4), 3vw, var(--space-6));
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.mk-top svg {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-90deg);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.mk-top:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+  box-shadow:
+    var(--shadow-3),
+    0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* The icon's x-axis points up once rotated, so this nudges the arrow upward. */
+.mk-top:hover svg {
+  transform: rotate(-90deg) translateX(2px);
+}
+
+/* Keyboard users can reach the FAB at any scroll position; !important is the
+   one lever that outranks the scroll-timeline's animation fill, so focus can
+   never land on an invisible control. */
+.mk-top:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+@supports (animation-timeline: scroll()) {
+  .mk-top {
+    animation: mk-top-reveal linear both;
+    animation-timeline: scroll();
+    animation-range: 480px 800px;
+  }
+}
+
+@keyframes mk-top-reveal {
+  from {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+}
+
+/* --- 2026-07-24 council rebuild additions --------------------------------- */
+
+/* Scripted stage phases. During the bidding phase the stamp is withheld;
+   flipping data-phase to "sold" swaps `animation` from none to the stamp,
+   which restarts the ceremony for every player. Visibility (not opacity)
+   gates the text, so lettering never renders at partial contrast. */
+.mk-stage[data-phase="bidding"] .mk-stage-sold {
+  visibility: hidden;
+  animation: none;
+}
+
+.mk-stage[data-phase="bidding"] .mk-stage-sold::after {
+  animation: none;
+}
+
+/* Bid-momentum bars light up as the war climbs; unlit bars are dim coals.
+   Opacity here animates decorative BARS, never text. */
+.mk-stage-spark i {
+  opacity: 0.35;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.mk-stage-spark i[data-lit="true"] {
+  opacity: 1;
+}
+
+/* Risk-reducer microcopy directly under the hero CTAs. */
+.mk-hero-note {
+  margin: calc(-1 * var(--space-6)) 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* The rehearsal line closing the worst-moment band. The bottom margin is
+   zeroed: it was the <p> default (~18px) stacking under the band's own 48px of
+   padding, and it is the last thing in the band, so it separated the section
+   from nothing at all. */
+.mk-rehearse {
+  margin: clamp(var(--space-8), 4vw, var(--space-12)) 0 0;
+  font-size: var(--text-lg-size);
+  color: var(--text-primary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+/* `margin: 0` because there is no global `p` reset in this codebase, and every
+   other paragraph class in this file states it. Without it this one `<p>` kept
+   the UA's 1em top and bottom — and its bottom margin could not collapse away,
+   since `.mk-show > div` is a grid item with its own formatting context. The
+   result was a stray 16px of dead space under the copy column, visible as the
+   money band's text sitting higher than the receipt beside it. */
+.mk-money-body {
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 52ch;
+  line-height: 1.6;
+}
+
+/* The sample receipt — the artifact, rendered in receipt monospace. Ink, not
+   gold: gold stays sacred for SOLD and the primary CTA. */
+.mk-receipt {
+  margin: 0;
+  width: min(100%, 380px);
+  /* There is no global border-box reset in this codebase, so `width: 100%`
+     plus 24px of padding a side made this figure 50px WIDER than the column
+     that contains it — 400px inside a 350px phone, the second source of the
+     page's horizontal scroll. */
+  box-sizing: border-box;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  padding: var(--space-6);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  display: grid;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-2);
+}
+
+.mk-receipt-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* "RCP-0007" and "TEAM DUES — STRIKERS" are uppercase monospace with tracking
+     — together they are wider than a phone. They stack instead of overflowing. */
+  flex-wrap: wrap;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mk-receipt-amount {
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.mk-receipt-method,
+.mk-receipt-ledger {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mk-receipt-ledger {
+  border-top: 1px dashed var(--border-subtle);
+  padding-top: var(--space-2);
+}
+
+.mk-receipt-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs-size, 0.75rem);
+  color: var(--text-secondary);
+  font-family: var(--font-text);
+}
+
+/* ============================================================================
+   2026-07-25 — the five sections the home page was missing: live tournaments,
+   the lifecycle beyond auction night, a pricing preview, beta candor, and an
+   FAQ. Rules that govern every rule below:
+   • Tokens only. The space scale has NO --space-7 and NO --space-9; a
+     non-existent custom property voids the WHOLE shorthand it appears in, so a
+     single typo there silently removes a declaration rather than failing loud.
+   • There is no global border-box reset in this codebase (see .mk-receipt
+     above) — anything that pairs a width with padding sets it locally.
+   • Motion is transform-only and collapses under prefers-reduced-motion; the
+     axe contrast scan reads VISUAL pixels mid-keyframe, aria-hidden or not.
+   ========================================================================== */
+
+/* --- Live tournaments strip -------------------------------------------------
+   Sits on the floodlight directly under the capability shelf, which carries no
+   bottom padding by design (it is built to flow into a dark band). This band
+   supplies the gap from its own top padding, exactly as "How the night runs"
+   does when the strip is absent. */
+
+.mk-live-band {
+  padding-top: clamp(var(--space-8), 4vw, var(--space-12));
+}
+
+/* Heading left, the qualifying sentence right — the strip is the page's proof,
+   not its argument, so it does not get a full centred band head. */
+.mk-live-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: end;
+  max-width: none;
+}
+
+@media (min-width: 900px) {
+  .mk-live-head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+    gap: var(--space-8);
+  }
+}
+
+.mk-live-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+}
+
+.mk-live-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.mk-live-card {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.mk-live-card:hover {
+  transform: translateY(calc(-1 * var(--space-1)));
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+}
+
+.mk-live-org {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* The organizer's monogram. It is aria-hidden, which buys it NOTHING from the
+   contrast scanner — axe measures rendered pixels — so the pair here is a
+   certified one, not a decorative wash. */
+.mk-live-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.mk-live-name {
+  margin: 0;
+  /* Text face, not display: the type-scale guard reserves the display face for
+     >=30px, and a tournament name here is 18px. Weight carries the prominence
+     instead — which is also the right answer typographically, since these are
+     arbitrary user-entered strings and the display face is cut for headlines. */
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: 1.25;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  /* e2e residue and real life both produce very long, very similar names. Two
+     lines, then ellipsis — a third line would push one card taller than its
+     row-mates and break the strip's line. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mk-live-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The card is the hit area; the link keeps the accessible name. */
+.mk-live-name a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.mk-live-name a:focus-visible {
+  outline: none;
+}
+
+.mk-live-name a:focus-visible::after {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xl);
+}
+
+.mk-live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mk-live-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.mk-live-meta svg {
+  flex: none;
+  opacity: 0.75;
+}
+
+/* Only two statuses are ever shown, because `DirectoryEntry` only knows two.
+   Anything else (draft, setup, finished) is a state the row cannot tell apart,
+   and a card that guessed would be inventing. */
+.mk-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.mk-live-status i {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.mk-live-status--live {
+  color: var(--live);
+}
+
+/* The live dot breathes so the row reads as "now" without a text animation:
+   scale only, never opacity — the label beside it must hold full contrast at
+   every frame of the scan. */
+.mk-live-status--live i {
+  animation: mk-live-pulse 2.4s var(--ease-out) infinite;
+}
+
+@keyframes mk-live-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.45);
+  }
+}
+
+.mk-live-status--open {
+  color: var(--text-accent);
+}
+
+.mk-live-actions {
+  margin: var(--space-5) 0 0;
+}
+
+/* --- Beyond auction night: the lifecycle rail --------------------------------
+   Ten stages, name over one line of body, in two columns from tablet up. The
+   hairline above each row makes the set read as one continuous rail rather than
+   ten floating cards — the point of the section is that these connect. */
+
+.mk-lifecycle {
+  list-style: none;
+  margin: clamp(var(--space-5), 3vw, var(--space-8)) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: clamp(var(--space-6), 4vw, var(--space-12));
+}
+
+@media (min-width: 860px) {
+  .mk-lifecycle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.mk-lifecycle li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-3);
+  row-gap: var(--space-05);
+  align-items: start;
+  /* Rows in a 2-up grid are as tall as their tallest neighbour. Without this
+     the two implicit rows INSIDE a short item stretch to fill that height, and
+     a one-line stage ("Season") drifted its body 11px further from its title
+     than the two-line stage beside it — a ragged baseline across the rail. */
+  align-content: start;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mk-lifecycle-glyph {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.mk-lifecycle h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: 1.4;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-lifecycle p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* The candor footnote under the rail. A note, not a card: it must read as the
+   section telling on itself, not as an eleventh feature. */
+.mk-gap-note {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: clamp(var(--space-5), 3vw, var(--space-8)) 0 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.mk-gap-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-accent);
+}
+
+.mk-gap-note p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.mk-gap-note strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- Pricing preview ---------------------------------------------------------
+   The same tier cards /pricing renders, minus the feature checklist: this is a
+   glance, and the full comparison is one link away. Without the checklist the
+   cards are short enough to sit in one flush row on desktop. */
+
+.mk-tiers--preview {
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.mk-tiers--preview .mk-tier {
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+
+/* On /pricing the hairline under the limits line divides it from the feature
+   checklist beneath. There is no checklist in a preview, so the rule was
+   underlining nothing — a border with no job below it, which reads as a card
+   that failed to finish loading. */
+.mk-tiers--preview .mk-tier-limits {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* The pricing page ends on its trust line, so that line carries up to 64px of
+   closing air. Here it is the middle of a page and has a CTA directly under
+   it; the full-stop spacing left a hole between them. */
+.mk-tiers--preview + .mk-trustline {
+  margin-bottom: var(--space-5);
+}
+
+/* --- Trust & beta candor -----------------------------------------------------
+   Copy on the left, the four certified guarantees as a 2×2 on the right. The
+   split keeps the section under ~400px instead of stacking six blocks down the
+   page — the whole risk of adding five sections is that the page becomes a
+   slab, and every one of them is laid out against that. */
+
+.mk-trust {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-6), 4vw, var(--space-12));
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .mk-trust {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+}
+
+.mk-trust-copy .mk-h2 {
+  margin-bottom: var(--space-4);
+}
+
+.mk-certified {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.mk-certified li {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.mk-certified .mk-icon-tile {
+  inline-size: 34px;
+  block-size: 34px;
+}
+
+.mk-certified h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: 1.35;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-certified p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* --- Motion budget for the new sections -------------------------------------
+   Everything above animates transform only. This is the belt-and-braces: a
+   reader who asks for less motion gets a completely still page. */
+@media (prefers-reduced-motion: reduce) {
+  .mk-live-card,
+  .mk-live-status--live i {
+    transition: none;
+    animation: none;
+  }
+
+  .mk-live-card:hover {
+    transform: none;
+  }
+}
