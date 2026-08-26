@@ -1,0 +1,267 @@
+.shell-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.shell-icon-button:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.shell-icon-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.shell-bell {
+  position: relative;
+}
+
+.shell-bell-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  border: 1px solid var(--surface-raised);
+}
+
+.shell-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.shell-org-name {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A bare inline link is only as tall as its text — this one measured 41x16px in
+   every header on every public page, under the 24x24 floor of WCAG 2.2 SC 2.5.8
+   and well under the 44px the rest of this codebase treats as house convention
+   (`.touch` in button.module.css). It sits beside a 40px CTA, so matching the
+   touch rung both fixes the target and stops the two actions from sitting on
+   different baselines. Padding is horizontal only: the min-height does the
+   vertical work, so the header's 64px row is unaffected. */
+.shell-header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  color: var(--text-accent);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.shell-header-link:hover {
+  text-decoration: underline;
+}
+
+/* Without this the link fell back to the UA's default focus ring — a blue
+   1px outline, invisible against the floodlit header its sibling CTA is
+   already ringed in gold on. Same token, same offset as
+   `.shell-header-cta:focus-visible` below: one focus language for the header. */
+.shell-header-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* The public header's primary door: a compact accent button. */
+.shell-header-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background var(--duration-instant) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.shell-header-cta:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: translateY(-1px);
+}
+
+.shell-header-cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* At rest the door glows softly, like it's plugged in. Scoped to :not(:hover)
+   so the hover shadow (a transition) isn't overridden by the animation. */
+@media (prefers-reduced-motion: no-preference) {
+  .shell-header-cta:not(:hover) {
+    animation: shell-cta-glow 3.5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes shell-cta-glow {
+  from {
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+
+  to {
+    box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 36%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-header-cta,
+  .shell-header-cta:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+.shell-desktop-only {
+  display: none;
+}
+
+.shell-mobile-only {
+  display: inline-flex;
+}
+
+@media (min-width: 720px) {
+  .shell-desktop-only {
+    display: inline-flex;
+  }
+
+  .shell-mobile-only {
+    display: none;
+  }
+}
+
+.shell-drawer-session {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-2);
+}
+
+.shell-drawer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-drawer-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: var(--space-2) var(--space-1);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.shell-drawer-link:hover {
+  background: var(--surface-sunken);
+}
+
+.shell-drawer-danger {
+  color: var(--danger-strong);
+}
+
+/* A drawer line that carries a control rather than a destination. */
+.shell-drawer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1);
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  color: var(--text-primary);
+}
+
+/* ---- sidebar footer: the signed-in user (on navy chrome) ---- */
+.shell-railuser {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  border-top: 1px solid var(--identity-line-soft);
+}
+
+.shell-railuser:hover {
+  background: color-mix(in srgb, var(--identity-glyph) 10%, transparent);
+}
+
+.shell-railuser-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(140deg, var(--accent), var(--accent-pressed));
+  color: var(--text-on-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.shell-railuser-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-family: var(--font-text);
+}
+
+.shell-railuser-text strong {
+  font-size: var(--text-sm-size);
+  color: var(--identity-glyph);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-railuser-text span {
+  font-size: var(--text-xs-size);
+  color: color-mix(in srgb, var(--identity-glyph) 55%, transparent);
+}
