@@ -1,0 +1,50 @@
+{
+  "name": "desiauction-next",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node scripts/dev-banner.mjs && turbo run dev",
+    "setup:local": "node scripts/setup-local.mjs",
+    "health": "node scripts/health.mjs",
+    "seed:demo": "pnpm --filter @desiauction/web seed:demo",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "env:check": "turbo run env:check",
+    "preflight:production": "node scripts/preflight-production.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "depcruise": "depcruise apps packages",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check && pnpm depcruise",
+    "verify:local": "pnpm verify && pnpm build && pnpm test:integration && pnpm env:check && node scripts/health.mjs --no-apps"
+  },
+  "devDependencies": {
+    "@desiauction/config": "workspace:*",
+    "dependency-cruiser": "^16.10.0",
+    "eslint": "^9.39.0",
+    "prettier": "^3.6.0",
+    "turbo": "^2.5.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ],
+    "overrides": {
+      "postcss@<8.5.23": ">=8.5.23",
+      "nanoid@<3.3.18": ">=3.3.18",
+      "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1",
+      "find-my-way@<9.7.0": ">=9.7.0",
+      "sharp@<0.35.0": ">=0.35.0",
+      "fast-uri": ">=4.1.2",
+      "brace-expansion": ">=5.0.9",
+      "undici@>=7.0.0 <7.29.0": ">=7.29.0"
+    }
+  }
+}
