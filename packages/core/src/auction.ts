@@ -571,6 +571,15 @@ export function openLotTimer(nowMs: number, policy: TimerPolicy): LotTimer {
  * The timer never shrinks, and a bid can never buy more runway than a fresh
  * lot. Deterministic — no race: the single writer applies bids in seq order,
  * so the fold of (bid times) fully determines the final endsAt.
+ *
+ * `nowMs` is the instant the WRITER APPLIES the bid, not the instant it arrived
+ * — and callers must keep it that way. Passing the earlier arrival instant was
+ * tried and reverted (audit 2026-08-26): it shrinks `proposed`, and once the
+ * proposal falls to or below the current `endsAt` this returns `extended:
+ * false`, so a deep queue silently stops extending at all. The expiry GATE is
+ * judged on arrival (generous, protects the bidder); the extension MAGNITUDE is
+ * judged on application (also generous). Both directions favour the bidder,
+ * which is the property anti-snipe actually needs.
  */
 export function extendOnBid(
   timer: LotTimer,

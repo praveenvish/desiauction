@@ -549,6 +549,42 @@ describe("timer model + auto-extension (invariant 14)", () => {
     expect(capped.timer.endsAtMs).toBeLessThanOrEqual(T0 + 29_999 + 30_000);
   });
 
+  /*
+   * WHY THE EXTENSION READS THE PROCESSING CLOCK (audit 2026-08-26).
+   *
+   * An audit proposed measuring the extension from the bid's ARRIVAL instant,
+   * to match the expiry gate: a queued bid otherwise buys its runway from a
+   * later instant. The change was made and reverted, and this pins the reason
+   * so nobody re-derives the same "tidy-up" and reintroduces the bug.
+   *
+   * The earlier clock is not merely less generous — past a certain queue depth
+   * it stops extending AT ALL, because `proposed <= endsAtMs` hands the timer
+   * back untouched. A last-second bid would then be accepted (the expiry gate
+   * judges arrival, generously) and the lot would close on top of it: the exact
+   * snipe the rule exists to prevent.
+   */
+  it("an EARLIER clock can suppress the extension entirely — why arrival time was rejected", () => {
+    // A lot already extended out to T0+60s; the bid arrives while the queue is
+    // deep, so arrival and application straddle the proposal threshold.
+    const extended = { opensAtMs: T0, endsAtMs: T0 + 60_000, extensions: 2 };
+    const arrivedAt = T0 + 44_000;
+    const appliedAt = T0 + 46_000; // 2s behind a deep queue
+
+    // Judged on ARRIVAL: 44s + 15s = 59s <= 60s → NO extension at all.
+    const byArrival = extendOnBid(extended, arrivedAt, policy);
+    expect(byArrival.extended).toBe(false);
+    expect(byArrival.timer.endsAtMs).toBe(T0 + 60_000);
+
+    // Judged on APPLICATION: 46s + 15s = 61s > 60s → the timer extends, which
+    // is what anti-snipe is for.
+    const byApplication = extendOnBid(extended, appliedAt, policy);
+    expect(byApplication.extended).toBe(true);
+    expect(byApplication.timer.endsAtMs).toBe(T0 + 61_000);
+
+    // Both clocks still honour the cap — the later one buys no unbounded runway.
+    expect(byApplication.timer.endsAtMs).toBeLessThanOrEqual(appliedAt + 30_000);
+  });
+
   it("extension sequence is deterministic: folding the same bid times gives the same end", () => {
     const bids = [T0 + 20_000, T0 + 29_000, T0 + 41_000];
     const fold = (): number =>
