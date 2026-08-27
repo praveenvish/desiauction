@@ -1,5 +1,6 @@
 import {
   auctions,
+  competitions,
   fixtures,
   organizations,
   registrations,
@@ -10,6 +11,7 @@ import {
 import { and, eq, ne, sql } from "drizzle-orm";
 
 import { preSignedPlayers, resolvedLots, rulesOf } from "../auction/live-summary";
+import { storage } from "../media";
 import { teamsOf, type CompetitionSummary } from "./competitions";
 import { registrationStats } from "./registrations";
 
@@ -69,6 +71,14 @@ export interface SeasonOverview {
   competition: CompetitionSummary;
   orgName: string;
   orgSlug: string;
+  /**
+   * The season's own crest, resolved from its storage key to a readable URL —
+   * null when the organizer has never set one. It lives here rather than on
+   * `CompetitionSummary` because that type is assembled by a dozen callers and
+   * none of the others render a logo; the overview is the one surface that
+   * both shows the mark and offers to change it.
+   */
+  logoUrl: string | null;
   approvedPlayers: number;
   /**
    * Applications waiting on a human. The overview used to report only the
@@ -111,11 +121,20 @@ export async function seasonOverview(
   competition: CompetitionSummary,
   options: SeasonOverviewOptions,
 ): Promise<SeasonOverview> {
-  const [org, teams, stats, roleRows, auctionRows, fixtureRows, settlement] = await Promise.all([
+  const [head, teams, stats, roleRows, auctionRows, fixtureRows, settlement] = await Promise.all([
+    // The season's row joined to its org, so the crest costs no extra round
+    // trip: the organization name and slug were already being fetched here,
+    // and the logo key rides along on the join rather than in a query of its
+    // own. Same key→URL resolution the public page uses (public.ts).
     db
-      .select({ name: organizations.name, slug: organizations.slug })
-      .from(organizations)
-      .where(eq(organizations.id, competition.orgId))
+      .select({
+        orgName: organizations.name,
+        orgSlug: organizations.slug,
+        logoKey: competitions.logoUrl,
+      })
+      .from(competitions)
+      .innerJoin(organizations, eq(organizations.id, competitions.orgId))
+      .where(eq(competitions.id, competition.id))
       .limit(1),
     teamsOf(db, competition.id),
     registrationStats(db, competition.id),
@@ -138,10 +157,12 @@ export async function seasonOverview(
     seasonSettlement(db, competition.id, options.money),
   ]);
 
+  const logoKey = head[0]?.logoKey ?? null;
   const base = {
     competition,
-    orgName: org[0]?.name ?? "",
-    orgSlug: org[0]?.slug ?? "",
+    orgName: head[0]?.orgName ?? "",
+    orgSlug: head[0]?.orgSlug ?? "",
+    logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
     approvedPlayers: stats.approved,
     pendingPlayers: stats.submitted,
     teamCount: teams.length,

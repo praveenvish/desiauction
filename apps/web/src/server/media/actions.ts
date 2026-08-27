@@ -143,6 +143,9 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
       },
     );
     revalidatePath(`/c/${competition.slug}`);
+    // The season overview renders the competition's own crest and offers to
+    // replace it, so it is as stale after an attach as the tabs below it.
+    revalidatePath(`/seasons/${competition.slug}`);
     revalidatePath(`/seasons/${competition.slug}/teams`);
     revalidatePath(`/seasons/${competition.slug}/registrations`);
     return { ok: true, url: storage.readUrl(input.key) };

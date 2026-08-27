@@ -24,6 +24,7 @@ import {
 } from "../../../server/competition/actions";
 import { formatDate } from "../../../lib/format-date";
 import { track } from "../../../lib/telemetry";
+import { CompetitionLogoUploader } from "./competition-logo-uploader";
 import { ShareRegistration } from "./registrations/share-registration";
 
 /**
@@ -599,6 +600,31 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           )}
         </Card>
       </div>
+
+      {/* The season's own mark. `competitions.logo_url` has been readable since
+          the media platform shipped — the public directory renders it — but no
+          screen in the product could ever write it, so every tournament fell
+          back to a text monogram. It sits directly above the publish block
+          because this is the mark that block puts on the internet, and it is
+          one of the identity statements that earn a place on a dashboard: it
+          describes the season as a whole rather than any one tab. */}
+      {view.viewer.canManage ? (
+        <Card className="season-branding-card" data-testid="season-branding">
+          <div className="season-card-head">
+            <h2>Tournament logo</h2>
+          </div>
+          <p className="competitions-hint">
+            Shown beside this season on the public directory and on its public page. Without one,
+            players see the season&rsquo;s initials.
+          </p>
+          <CompetitionLogoUploader
+            slug={slug}
+            competitionId={view.competition.id}
+            competitionName={view.competition.name}
+            {...(view.logoUrl !== null ? { currentUrl: view.logoUrl } : {})}
+          />
+        </Card>
+      ) : null}
 
       {/* DA-12: publishing gets its own block. It used to be a ghost button in
           the footer of the pool card, one click from the public internet. */}
