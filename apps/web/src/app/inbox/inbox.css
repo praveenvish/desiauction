@@ -52,6 +52,19 @@
   font-size: var(--text-sm-size);
 }
 
+/*
+ * The two facts that carry the notice: the team and the price. Heavier than the
+ * subject line beneath it — this is what the reader came for, and a squad name
+ * set in the same muted grey as a competition label reads as chrome.
+ */
+.inbox-detail {
+  display: block;
+  margin-top: var(--space-05);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .inbox-when {
   margin-left: auto;
   color: var(--text-muted);

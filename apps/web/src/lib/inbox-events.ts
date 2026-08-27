@@ -24,6 +24,13 @@ const LABELS: Record<string, string> = {
   // actually wrote a person-scoped row, a receipt was visible to the club's
   // finance desk and to nobody else — the inbox had no finance writer at all.
   "finance.document.issued": "A receipt was issued to your team",
+  // The sentence a player waits all night for. The team and the price live in
+  // the row's meta; the label stays short because the inbox is a list.
+  "auction.sold": "You were sold at auction",
+  // Deliberately not "you went unsold". The fact is the same and the reader is
+  // a person who put their name in and waited — and by the time this is written
+  // the requeue rounds are spent, so it is final rather than a running score.
+  "auction.unsold": "The auction finished without a bid for you",
   "profile.name.updated": "Name updated",
   // The first name is not an update — see `profile.name.set`.
   "profile.name.set": "Name added to your profile",
@@ -82,4 +89,32 @@ export function clearInboxWatermarks(): void {
   for (const key of doomed) {
     window.localStorage.removeItem(key);
   }
+}
+
+/*
+ * WHAT A NOTICE SAYS BEYOND ITS HEADLINE.
+ *
+ * An ALLOWLIST, never a dump of `meta`. The person-scoped ledger carries
+ * security rows too, whose meta holds request-shaped facts (addresses, agents)
+ * that belong in an audit trail and not on a page; rendering the column
+ * wholesale would put them there the first time a new event type was added.
+ * Only these two keys are ever shown, in this order, and only as plain text.
+ */
+const DETAIL_KEYS = ["team", "price"] as const;
+
+export function detailOf(meta: unknown): string | null {
+  if (typeof meta !== "object" || meta === null) {
+    return null;
+  }
+  const parts: string[] = [];
+  for (const key of DETAIL_KEYS) {
+    if (!(key in meta)) {
+      continue;
+    }
+    const value: unknown = (meta as Record<string, unknown>)[key];
+    if (typeof value === "string" && value !== "") {
+      parts.push(value);
+    }
+  }
+  return parts.length === 0 ? null : parts.join(" · ");
 }

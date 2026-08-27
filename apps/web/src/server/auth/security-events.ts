@@ -37,7 +37,14 @@ export type SecurityAction =
   // ride the same person-scoped ledger; no notification store was invented.
   | "registration.approved"
   | "registration.rejected"
-  | "registration.waitlisted";
+  | "registration.waitlisted"
+  // The night itself. Being sold at auction is the moment this whole product
+  // exists for, and the player was the one person never told it had happened —
+  // the same hole DA-19 closed for registration decisions, reopened at the
+  // climax. Written at COMPLETION, not at the hammer: an unsold lot is requeued
+  // by default, so "unsold" mid-night is a verdict the auction has not reached.
+  | "auction.sold"
+  | "auction.unsold";
 
 export async function logSecurityEvent(
   personId: string,

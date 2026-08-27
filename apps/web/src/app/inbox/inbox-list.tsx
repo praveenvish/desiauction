@@ -11,6 +11,12 @@ export interface InboxEvent {
   at: string;
   /** What this notice is ABOUT — the competition, named and (if public) linked. */
   subject?: { name: string; href?: string };
+  /**
+   * The facts that make the headline worth reading — "Mumbai Indians · ₹55,000"
+   * under "You were sold at auction". Server-composed from an allowlist; this
+   * component renders it as text and never as markup.
+   */
+  detail?: string;
 }
 
 /**
@@ -101,6 +107,9 @@ export function InboxList({ personId, events }: { personId: string; events: Inbo
                     event.subject.name
                   )}
                 </span>
+              ) : null}
+              {event.detail !== undefined ? (
+                <span className="inbox-detail">{event.detail}</span>
               ) : null}
               {unread ? <VisuallyHidden> (new)</VisuallyHidden> : null}
             </span>

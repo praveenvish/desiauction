@@ -3,6 +3,7 @@ import { Card, EmptyState } from "@desiauction/ui";
 import { inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
+import { detailOf } from "../../lib/inbox-events";
 import { currentSession } from "../../server/auth/actions";
 import { systemDb } from "../../server/db";
 import { listSecurityEvents } from "../../server/auth/security-events";
@@ -91,9 +92,11 @@ export default async function InboxPage() {
             events={events.map((event) => {
               const competitionId = competitionIdOf(event.meta);
               const competition = competitionId === null ? undefined : named.get(competitionId);
+              const detail = detailOf(event.meta);
               return {
                 action: event.action,
                 at: event.at.toISOString(),
+                ...(detail === null ? {} : { detail }),
                 ...(competition !== undefined
                   ? {
                       subject: {

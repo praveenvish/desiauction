@@ -35,6 +35,7 @@ import { env } from "../../env";
 import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { canCompetition } from "../competition/authz";
+import { announceAuctionOutcomes } from "./auction-notify";
 import {
   advanceCompetition,
   createCompetition,
@@ -147,6 +148,18 @@ async function registrationTeamOf(auctionId: string, playerName: string) {
     .where(and(eq(lotsTable.auctionId, auctionId), eq(people.name, playerName)))
     .limit(1);
   return must(row, `registration for ${playerName}`).teamId;
+}
+
+/** The person behind a named player in this auction — the notification target. */
+async function personBehind(auctionId: string, playerName: string): Promise<string> {
+  const [row] = await db
+    .select({ personId: registrationsTable.personId })
+    .from(lotsTable)
+    .innerJoin(registrationsTable, eq(registrationsTable.id, lotsTable.registrationId))
+    .innerJoin(people, eq(people.id, registrationsTable.personId))
+    .where(and(eq(lotsTable.auctionId, auctionId), eq(people.name, playerName)))
+    .limit(1);
+  return must(row, `person for ${playerName}`).personId;
 }
 
 async function lotByPlayer(auctionId: string, playerName: string) {
@@ -461,6 +474,56 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
       status: "sold",
     });
     expect(await registrationTeamOf(auction.id, "Kohli Local")).toBe(teamIds[1]);
+  });
+
+  /*
+   * THE MESSAGE NOBODY EVER SENT.
+   *
+   * A night ends, every player is sold or not, and until this landed the player
+   * was the one party never told — the outcome reached the organizer's room and
+   * the stream and stopped there. Same hole DA-19 closed for registration
+   * decisions, reopened at the moment the product exists for.
+   */
+  it("DA: tells the player they were sold, with the team and the price", async () => {
+    const kohli = await personBehind(auction.id, "Kohli Local");
+    const sent = await announceAuctionOutcomes({
+      personId: owner,
+      orgId: org.id,
+      auctionId: auction.id,
+      competition: { id: comp.id, name: comp.name },
+    });
+    expect(sent).toBeGreaterThan(0);
+
+    const rows = await db
+      .select({ action: auditLog.action, meta: auditLog.meta })
+      .from(auditLog)
+      .where(and(eq(auditLog.scopeId, kohli), eq(auditLog.action, "auction.sold")));
+    expect(rows).toHaveLength(1);
+    // The two facts a player actually wants: who bought them, for how much —
+    // formatted, because the inbox is read by a person and not by a ledger.
+    // `competitionId` is asserted because it is the ONLY key /inbox reads to
+    // name and link the season; drop it and the notice points nowhere.
+    const [buyer] = await db
+      .select({ name: teamsTable.name })
+      .from(teamsTable)
+      .where(eq(teamsTable.id, teamIds[1] as string));
+    const meta = (rows[0]?.meta ?? {}) as Record<string, unknown>;
+    expect(meta["competitionId"]).toBe(comp.id);
+    expect(meta["team"]).toBe(must(buyer, "buying team").name);
+    expect(meta["price"]).toBe("₹55,000");
+
+    // A half-written sale is never announced: 0030 forbids sold-without-price at
+    // the database, so reaching that state means something is wrong, and "sold
+    // to undefined" is worse than silence.
+    const badly = await db
+      .select({ meta: auditLog.meta })
+      .from(auditLog)
+      .where(eq(auditLog.action, "auction.sold"));
+    for (const row of badly) {
+      const each = (row.meta ?? {}) as Record<string, unknown>;
+      expect(each["price"]).toBeTypeOf("string");
+      expect(each["team"]).toBeTypeOf("string");
+    }
   });
 
   it("pass requires NO leading bid; unsold requeues per policy until exhausted", async () => {
