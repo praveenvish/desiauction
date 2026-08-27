@@ -17,6 +17,7 @@ import { currentSession } from "../auth/actions";
 import { canCompetition } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
 import { dbHandle, systemDb } from "../db";
+import { storage } from "../media";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 import {
   preSignedPlayers,
@@ -25,6 +26,7 @@ import {
   type AuctionRules,
   type PreSignedPlayer,
   type ResolvedLot,
+  lotMediaOf,
 } from "./live-summary";
 
 // Live auction actions (M-IP4-2, extended M-IP4-3). The web tier
@@ -171,7 +173,31 @@ export interface LiveAuctionView {
   competition: { name: string; slug: string };
   auctionId: string;
   wsUrl: string;
-  teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
+  teams: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    primaryColor: string | null;
+    /** Signed crest URL, or null. Signed HERE, never on the snapshot — see below. */
+    logoUrl: string | null;
+  }[];
+  /**
+   * PLAYER FACE AND NUMBER, KEYED BY LOT — and deliberately NOT on the snapshot.
+   *
+   * The engine's snapshot is hashed and byte-compared across instances to prove
+   * the fold is deterministic (`deepVerify`). Media URLs are SIGNED AT READ and
+   * carry an expiry, so putting one on the wire would make two honest engines
+   * disagree about the same auction and halt it. The room needs a face on the
+   * block; the integrity check needs bytes that do not move. Both are satisfied
+   * by shipping the media beside the snapshot and joining on `lotId` in the
+   * client.
+   *
+   * `photoUrl` is consent-gated (DPDP §5): null unless the player set
+   * `photo_consent_at`. `number` is the REGISTRATION number — the identity a
+   * player already sees on their own public page — not the queue position the
+   * snapshot calls `lotNumber`.
+   */
+  lotMedia: Record<string, { photoUrl: string | null; number: string | null }>;
   /** The default paddle (first issued); the room may switch within myPaddles. */
   myPaddle: { paddleId: string; paddleNumber: string; teamId: string; teamName: string } | null;
   /** Every paddle this person holds — one per team they were issued for. */
@@ -243,7 +269,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   if (gate === null) {
     return null;
   }
-  const [teamRows, paddleRows, grantRows, resolved, preSigned] = await withTenantDb(
+  const [teamRows, paddleRows, grantRows, resolved, preSigned, lotMedia] = await withTenantDb(
     dbHandle,
     { personId: gate.personId, orgId: gate.competition.orgId },
     (db) =>
@@ -257,6 +283,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
             name: teams.name,
             shortName: teams.shortName,
             primaryColor: teams.primaryColor,
+            logoKey: teams.logoUrl,
           })
           .from(teams)
           .where(eq(teams.competitionId, gate.competition.id))
@@ -274,6 +301,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
           ),
         resolvedLots(db, gate.auction.id),
         preSignedPlayers(db, gate.competition.id),
+        lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
       ]),
   );
   // THE PARTITION. Everything below the gate is decided HERE, before the read
@@ -288,7 +316,11 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     // The seal, enforced at the source: a conductor's socket carries every
     // purse, a bidder's carries only their own teams' (P1-6).
     wsUrl: engineWsUrl(gate.auction.id, canSeeAll ? null : gate.myTeamIds),
-    teams: teamRows,
+    teams: teamRows.map(({ logoKey, ...team }) => ({
+      ...team,
+      logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
+    })),
+    lotMedia,
     myPaddle: paddleRows[0] ?? null,
     myPaddles: paddleRows,
     myGrantTeamIds: grantRows.map((row) => row.teamId),

@@ -23,6 +23,7 @@ import {
 import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
+import { storage } from "../media";
 import { engineWsUrl, fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-client";
 import { auctionMemberGate, liveGate } from "./live-actions";
 import {
@@ -32,6 +33,8 @@ import {
   type AuctionRules,
   type PreSignedPlayer,
   type ResolvedLot,
+  lotMediaOf,
+  type LotMedia,
 } from "./live-summary";
 
 function inGateOrg<T>(
@@ -52,7 +55,20 @@ const TEAM_IDENTITY = {
   name: teams.name,
   shortName: teams.shortName,
   primaryColor: teams.primaryColor,
+  // The crest is published branding — it already renders on `/c/<slug>` — and
+  // the hall screen is the one place a franchise most wants to be recognised.
+  logoKey: teams.logoUrl,
 };
+
+/** Storage keys become signed URLs at the view boundary, never on the wire. */
+function signCrests<T extends { logoKey: string | null }>(
+  rows: T[],
+): (Omit<T, "logoKey"> & { logoUrl: string | null })[] {
+  return rows.map(({ logoKey, ...rest }) => ({
+    ...rest,
+    logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
+  }));
+}
 
 export interface OwnerAcceptance {
   /** `auction_owner_invites.id` — the key back onto `owners.invites`. */
@@ -211,7 +227,21 @@ export interface SpectatorView {
    * broadcast on every lot, and a short name and a hex are published branding.
    * No person, no contact, no grant is reachable from here.
    */
-  teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
+  teams: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    primaryColor: string | null;
+    /** Signed crest URL. Signed here, never on the snapshot (see `lotMedia`). */
+    logoUrl: string | null;
+  }[];
+  /**
+   * The player's face and number for every lot, keyed by lot id — deliberately
+   * NOT on the snapshot, whose bytes must stay identical across engine
+   * instances for the determinism check. A signed URL expires; a hash must not
+   * move. Photos are consent-gated (DPDP §5) exactly as on `/c/<slug>`.
+   */
+  lotMedia: Record<string, LotMedia>;
   /**
    * The locked rules. Already public — the auction lobby prints them as "Rules
    * of the night" — and the spectator needs the lot window to draw a countdown
@@ -236,7 +266,7 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
   if (gate === null) {
     return null;
   }
-  const [resolved, teamRows, preSigned] = await inGateOrg(gate, (db) =>
+  const [resolved, teamRows, preSigned, lotMedia] = await inGateOrg(gate, (db) =>
     Promise.all([
       resolvedLots(db, gate.auction.id),
       db
@@ -245,6 +275,7 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
         .where(eq(teams.competitionId, gate.competition.id))
         .orderBy(asc(teams.name)),
       preSignedPlayers(db, gate.competition.id),
+      lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
     ]),
   );
   const [org] = await systemDb
@@ -263,7 +294,8 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
     // money and nobody else's (P1-6).
     wsUrl: engineWsUrl(gate.auction.id, gate.canConduct ? null : gate.myTeamIds),
     resolved,
-    teams: teamRows,
+    teams: signCrests(teamRows),
+    lotMedia,
     rules: rulesOf(gate.auction.config),
     preSigned,
   };
@@ -298,7 +330,7 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
   if (auction === null) {
     return null;
   }
-  const [resolved, teamRows, preSigned] = await Promise.all([
+  const [resolved, teamRows, preSigned, lotMedia] = await Promise.all([
     resolvedLots(systemDb, auction.id),
     systemDb
       .select(TEAM_IDENTITY)
@@ -306,6 +338,7 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
       .where(eq(teams.competitionId, competition.id))
       .orderBy(asc(teams.name)),
     preSignedPlayers(systemDb, competition.id),
+    lotMediaOf(systemDb, auction.id, (key) => storage.readUrl(key)),
   ]);
   return {
     competitionName: competition.name,
@@ -316,7 +349,8 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
     location: competition.location,
     // Anonymous spectators get the spectacle, never the money.
     wsUrl: engineWsUrl(auction.id, []),
-    teams: teamRows,
+    teams: signCrests(teamRows),
+    lotMedia,
     resolved,
     rules: rulesOf(auction.config),
     preSigned,

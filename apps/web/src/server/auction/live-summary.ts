@@ -31,6 +31,19 @@ export interface ResolvedLot {
   soldPrice: number | null;
   teamId: string | null;
   teamName: string | null;
+  /**
+   * Squad marks that survive the hammer.
+   *
+   * A captain bought in the room wore no badge anywhere: `isCaptain` reached
+   * the live views through `preSignedPlayers` alone, which filters
+   * `WHERE isIcon OR isRetained` — so a captain who is neither was in no
+   * payload the client held. These come off the `registrations` join this read
+   * ALREADY performs, so it is two columns on an existing select rather than a
+   * new query. Spectator-safe by the same argument as `role`: who leads a side
+   * is announced in the hall before the first lot opens.
+   */
+  isCaptain: boolean;
+  isViceCaptain: boolean;
 }
 
 export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedLot[]> {
@@ -46,6 +59,8 @@ export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedL
       soldPrice: lots.soldPrice,
       teamId: paddles.teamId,
       teamName: teams.name,
+      isCaptain: registrations.isCaptain,
+      isViceCaptain: registrations.isViceCaptain,
     })
     .from(lots)
     .innerJoin(registrations, eq(registrations.id, lots.registrationId))
@@ -60,6 +75,61 @@ export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedL
     ...row,
     status: row.status as ResolvedLot["status"],
   }));
+}
+
+export interface LotMedia {
+  /** Consent-gated (DPDP §5): null unless the player set `photo_consent_at`. */
+  photoUrl: string | null;
+  /** The REGISTRATION number — the identity the player already sees on their
+   *  own public page — not the queue position the snapshot calls `lotNumber`.
+   *  Text, not an integer: the column is `text` and carries formatting. */
+  number: string | null;
+}
+
+/**
+ * The face and the number for every lot in an auction, keyed by lot id.
+ *
+ * WHY THIS IS NOT ON THE SNAPSHOT. The engine hashes its snapshot and compares
+ * the bytes across instances to prove the fold is deterministic. A media URL is
+ * SIGNED AT READ and carries an expiry, so two honest engines folding the same
+ * log would produce different bytes and halt the auction. The room still needs
+ * a face on the block, so the media rides BESIDE the snapshot on the
+ * server-rendered view and the client joins it on `lotId`.
+ *
+ * Spectator-safe by the same rule as `resolvedLots`: a photo the player agreed
+ * to publish and the number already printed on their public page. Never a
+ * phone, never a person id.
+ *
+ * The signer is injected rather than imported so this module stays free of the
+ * storage adapter — the same reason `resolvedLots` takes a `Db`.
+ */
+export async function lotMediaOf(
+  db: Db,
+  auctionId: string,
+  readUrl: (key: string) => string,
+): Promise<Record<string, LotMedia>> {
+  const rows = await db
+    .select({
+      lotId: lots.id,
+      number: registrations.registrationNumber,
+      photoKey: people.photoUrl,
+      photoConsentAt: people.photoConsentAt,
+    })
+    .from(lots)
+    .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(eq(lots.auctionId, auctionId));
+  const media: Record<string, LotMedia> = {};
+  for (const row of rows) {
+    // Consent first, then signing: an unconsented photo is never signed, so a
+    // URL for it cannot exist to leak.
+    const consented = row.photoConsentAt !== null && row.photoKey !== null;
+    media[row.lotId] = {
+      photoUrl: consented && row.photoKey !== null ? readUrl(row.photoKey) : null,
+      number: row.number,
+    };
+  }
+  return media;
 }
 
 /**
