@@ -24,7 +24,7 @@ import { GavelButton } from "../cockpit/gavel-button";
 import { LotHero } from "../lot-hero";
 import { PaddleControl } from "../paddle-control";
 import { PurseBoard } from "../purse-board";
-import { PoolSummary, SquadBoard } from "../squad-board";
+import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 
@@ -321,11 +321,23 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
     ((lot?.extensions ?? 0) > 0 ? view.rules.extensionSeconds : view.rules.initialSeconds) * 1000;
   const leadColor =
     view.teams.find((team) => team.name === lot?.currentBid?.teamName)?.primaryColor ?? null;
-  const mySquadSigned = feed.resolved.filter(
-    (resolvedLot) =>
-      resolvedLot.status === "sold" &&
-      (resolvedLot.teamId === myPaddle?.teamId || resolvedLot.teamName === myPaddle?.teamName),
-  ).length;
+  // Squad sizes counted the way the ENGINE counts them — auction buys PLUS
+  // pre-signed players (aggregate.ts:835) — so every ceiling drawn from them is
+  // the amount the engine will actually accept.
+  const squadSizes = squadSizesOf(view.teams, view.preSigned, feed.resolved);
+  /*
+   * THE RAISE BUTTON COUNTS THE SAME SQUAD THE ENGINE DOES.
+   *
+   * This was auction buys only, so on any competition with icons or retained
+   * players the button believed the squad was smaller than it is — and a
+   * smaller squad means a HIGHER affordable ceiling, because less must be held
+   * back to fill the minimum. The button therefore offered raises the gauntlet
+   * would refuse: the same defect class as "the raise button ignores the
+   * bidder's purse" (RH-1 D-008), surviving in the one input that fix did not
+   * touch. It also disagreed with the "Max bid" now printed on the purse board
+   * beside it, which already counted the engine's way.
+   */
+  const mySquadSigned = myPaddle === null ? 0 : (squadSizes[myPaddle.teamId] ?? 0);
   /** The auction is not taking bids — paused, or over. */
   const notTakingBids = snapshot !== null && snapshot.auctionStatus !== "live";
   const finished =
@@ -385,6 +397,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
                 leadColor={leadColor}
                 frozen={notTakingBids}
                 clock={clock}
+                media={view.lotMedia[lot.lotId]}
               />
               {myPaddle !== null ? (
                 <PaddleControl
@@ -403,7 +416,12 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             </>
           ) : (
             /* Between lots the owner sees exactly what the room sees. */
-            <CeremonyStage snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
+            <CeremonyStage
+              snapshot={snapshot}
+              ceremony={ceremony}
+              remainingMs={remainingMs}
+              lotMedia={view.lotMedia}
+            />
           )}
 
           <Card data-testid="bid-feed">
@@ -462,6 +480,8 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             myPaddleNumber={myPaddle?.paddleNumber ?? null}
             visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
             heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
+            rules={view.rules}
+            squadSizes={squadSizes}
             note={
               view.viewer.canSeeAllPurses
                 ? null

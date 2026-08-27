@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatPaiseINR, maxAffordableBid, paise } from "@desiauction/core";
 import { Card, paintOnFill } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
@@ -14,6 +14,17 @@ export interface TeamIdentity {
   name: string;
   shortName: string | null;
   primaryColor: string | null;
+  /**
+   * The franchise's CREST, already signed at the view boundary (never on the
+   * snapshot — a signed URL expires and the snapshot's bytes are hashed for the
+   * determinism proof).
+   *
+   * OPTIONAL, not merely nullable: the cockpit's own view selects the identity
+   * columns without signing the crest, and a required field here would break
+   * the one surface that has always rendered this board. Absent and null mean
+   * the same thing to the chip below — fall back to the initials.
+   */
+  logoUrl?: string | null;
 }
 
 /**
@@ -45,7 +56,27 @@ function initialsOf(team: TeamIdentity | undefined, fallback: string): string {
     .toUpperCase();
 }
 
+/**
+ * THE CREST WHERE THERE IS ONE, THE INITIALS WHERE THERE IS NOT.
+ *
+ * A club that had uploaded its badge saw it on `/c/<slug>` and on the teams
+ * page, and then watched its own auction — the one night the franchise most
+ * wants to be recognised across a hall — represented by three grey letters,
+ * because the crest was signed onto the view and never rendered.
+ *
+ * The initials are not a placeholder to apologise for: they carry the
+ * franchise's own colour through `paintOnFill`, so a team with no badge still
+ * reads as itself. The two treatments occupy the same 30px box, so a squad
+ * board of eight teams does not reflow depending on who uploaded a file.
+ *
+ * Decorative either way — every caller prints the team's name beside it, so an
+ * alt text here would make a screen reader say the franchise twice.
+ */
 export function TeamChip({ team, fallback }: { team: TeamIdentity | undefined; fallback: string }) {
+  const crest = team?.logoUrl ?? null;
+  if (crest !== null && crest !== "") {
+    return <img className="purse-crest" src={crest} alt="" width={30} height={30} />;
+  }
   return (
     <span className="purse-chip" style={paintOf(team)} aria-hidden>
       {initialsOf(team, fallback)}
@@ -232,6 +263,21 @@ export function PurseBoard({
   visibleTeamIds = null,
   /** Said out loud when the board is partial, so it doesn't read as the truth. */
   note = null,
+  /**
+   * The reserve-rule inputs. Absent (the default) prints the remaining purse
+   * alone, exactly as this board always has.
+   */
+  rules = null,
+  /**
+   * How many players each franchise has already signed, keyed by team id.
+   *
+   * The ceiling below is a function of the purse AND the squad — a team one
+   * signing short of `squadMin` may not spend down to zero — so without this
+   * the figure would be wrong for precisely the teams late in the night, which
+   * is when anyone reads it. A team missing from the record counts as zero,
+   * which is what an empty squad is.
+   */
+  squadSizes = null,
 }: {
   snapshot: AuctionSnapshot | null;
   teams: TeamIdentity[];
@@ -240,6 +286,8 @@ export function PurseBoard({
   rowTestIdPrefix?: string;
   visibleTeamIds?: readonly string[] | null;
   note?: string | null;
+  rules?: { squadMin: number; minPossiblePrice: number } | null;
+  squadSizes?: Readonly<Record<string, number>> | null;
 }) {
   /**
    * THE ROWS EXIST BEFORE THE SOCKET DOES.
@@ -299,6 +347,52 @@ export function PurseBoard({
               ? "true"
               : undefined;
           const handle = purseRowKey(row);
+          /**
+           * MAX AND RESERVE — the two figures the engine already computes and
+           * this board never printed.
+           *
+           * "₹45,000 left" is not what a team can bid. The reserve rule (bid
+           * gauntlet 9) holds back enough to finish `squadMin` at the cheapest
+           * price any remaining lot can open at, so the real ceiling is lower —
+           * sometimes far lower — and the only surface that knew it was the
+           * bidder's own raise button, which greys out the rungs above it.
+           * Everyone else read the remaining purse and guessed.
+           *
+           * `maxAffordableBid` is the engine's own arithmetic read backwards,
+           * so the two cannot drift; the reserve is taken by SUBTRACTION from
+           * the same call rather than recomputed, so Max + Reserve always adds
+           * up to the purse on the row above it.
+           *
+           * SEALED IS SEALED. Both figures are derived from `purseRemaining`,
+           * which the engine nulls per socket for a rival's team (P1-6) — so a
+           * ceiling computed here would be money this viewer was never sent,
+           * reconstructed on their own screen. `remaining` carries that null
+           * through, and a sealed row prints neither. So does a row that is
+           * merely still connecting: not yet known is not the same as sealed,
+           * and neither one is a number.
+           *
+           * AN EMPTY PURSE HAS NOTHING TO SPLIT. "Max bid ₹0 · Reserved ₹0"
+           * says nothing the "₹0" on the row above has not already said, and
+           * this board reaches zero one way that is not a spent purse: a team
+           * that has claimed no paddle at all borrows the purse from teams
+           * whose money this viewer received, and an anonymous spectator
+           * received none — so before the first paddle is claimed every row is
+           * a borrowed zero. A team with money left and all of it reserved is
+           * the opposite case and still prints, which is the whole point.
+           */
+          const remaining = connecting || row.purseRemaining === 0 ? null : row.purseRemaining;
+          const ceiling =
+            rules === null || remaining === null
+              ? null
+              : Number(
+                  maxAffordableBid({
+                    purseRemaining: remaining,
+                    squadSize: squadSizes?.[row.teamId] ?? 0,
+                    squadMin: rules.squadMin,
+                    minPossiblePrice: rules.minPossiblePrice,
+                  }),
+                );
+          const reserved = ceiling === null || remaining === null ? null : remaining - ceiling;
           return (
             <li
               key={row.teamId}
@@ -349,6 +443,19 @@ export function PurseBoard({
                   }}
                 />
               </div>
+              {ceiling === null || reserved === null ? null : (
+                <p className="purse-ceiling" data-testid={`ceiling-${handle}`}>
+                  {/* Named in full, not as "Max / Res". The board is read by an
+                      owner deciding whether to raise, and an abbreviation they
+                      have to decode is the wrong thing to put next to money. */}
+                  <span>
+                    Max bid <b>{formatPaiseINR(paise(ceiling))}</b>
+                  </span>
+                  <span>
+                    Reserved <b>{formatPaiseINR(paise(reserved))}</b>
+                  </span>
+                </p>
+              )}
             </li>
           );
         })}

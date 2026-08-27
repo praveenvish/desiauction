@@ -258,9 +258,70 @@
   }
 }
 
-.ceremony > *:not(.ceremony-celebration) {
+.ceremony > *:not(.ceremony-celebration):not(.ceremony-backdrop) {
   position: relative;
   z-index: 1;
+}
+
+/* --- the face behind the name ---------------------------------------------- */
+/* The stage may not grow a row for a photo: its height is a measured contract
+   (see `.ceremony` above), every phase has to occupy the same box, and the one
+   that would gain the face is already the tallest. A backdrop costs it nothing.
+   Clipped and rounded the same way the celebration layer is, and sitting under
+   it, so confetti still falls in front of the player. */
+.ceremony-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.ceremony-backdrop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Faces sit high in a portrait; centring the crop puts the chin in the
+     middle of the stage and the forehead outside it. */
+  object-position: 50% 22%;
+  opacity: 0.32;
+}
+
+/* THE SCRIM IS WHAT KEEPS THE TEXT READABLE.
+   Every word on this stage is announced over a photograph nobody vetted — a
+   white kit, a floodlit sky, a dark stand — so the contrast of the title, the
+   name and the price cannot be allowed to depend on it. The wash is the
+   stage's own opaque surface at full strength across the centre column, where
+   the text lives, and thins only at the edges where the photo is allowed
+   through. Static: nothing here animates, so contrast holds at every frame
+   (doc 13 AA) with no motion query to write. */
+.ceremony-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 72% 62% at 50% 46%,
+    var(--surface-sunken) 0%,
+    var(--surface-sunken) 34%,
+    color-mix(in srgb, var(--surface-sunken) 74%, transparent) 66%,
+    color-mix(in srgb, var(--surface-sunken) 32%, transparent) 100%
+  );
+}
+
+/* The registration number, inline inside a line the stage already had. */
+.ceremony-number {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text-accent);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
 }
 
 .ceremony-title {
@@ -653,9 +714,58 @@
   flex-wrap: wrap;
 }
 
+/* The face and the name are ONE unit against the countdown, not two children
+   competing with it: `lot-hero-top` justifies its children apart, so a photo
+   dropped in as a third sibling would have left the ring floating in the
+   middle of the hero instead of holding its far edge. */
+.lot-hero-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex: 1;
+  min-width: 0;
+}
+
 .lot-hero-id {
   min-width: 0;
   flex: 1;
+}
+
+/* The frame is `PlayerImage`'s and is a fixed 96px square in BOTH states —
+   photo or branded monogram — so a consent-gated photo that is absent (DPDP
+   §5), still loading or broken never moves the name beside it. `relative`
+   only exists to anchor the number badge below. */
+/* `flex`, not `block`: PlayerImage's frame is an inline-block, so a block
+   wrapper would give it a line box and four stray pixels of descender space
+   under the photo — which the badge below anchors to, and would hang off. */
+.lot-hero-figure {
+  position: relative;
+  flex: none;
+  display: flex;
+}
+
+/* THE PLAYER'S OWN NUMBER — the one on the shirt and on their public page, not
+   the queue position in the kicker above. Absolutely positioned so a player
+   registered without a number costs the hero no space and leaves no gap. */
+.lot-hero-number {
+  position: absolute;
+  right: -6px;
+  bottom: -8px;
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  /* Ink on gold, never the reverse: `--text-on-accent` is the pinned pair that
+     clears AA on this accent (the gold is too light to carry white text). */
+  background: var(--accent);
+  color: var(--text-on-accent);
+  /* The ring of surface keeps the badge legible where it overlaps a photo of
+     unknown brightness. */
+  border: 2px solid var(--surface-overlay);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .lot-hero-kicker {
@@ -689,6 +799,11 @@
   font-size: var(--text-base-size);
 }
 
+/* No `text-transform` here any more. It existed to prettify a raw enum —
+   `all_rounder` with the underscores swapped out — and it capitalised each
+   hyphenated part, so the shared `roleLabel` formatter's "All-rounder" would
+   have been re-cased to "All-Rounder". The label arrives correct; CSS must not
+   have a second opinion about it. */
 .lot-hero-role {
   padding: 3px 10px;
   border-radius: var(--radius-full);
@@ -697,7 +812,6 @@
   color: var(--text-primary);
   font-size: var(--text-xs-size);
   font-weight: var(--font-weight-medium);
-  text-transform: capitalize;
 }
 
 .lot-hero-money {
@@ -1134,12 +1248,13 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* Same as `.lot-hero-role`: the shared `roleLabel` supplies the casing, and
+   `capitalize` would turn its "All-rounder" into "All-Rounder". */
 .squad-role {
   margin-left: auto;
   flex: none;
   color: var(--text-muted);
   font-size: var(--text-xs-size);
-  text-transform: capitalize;
 }
 
 .squad-price {
@@ -1275,6 +1390,19 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* The uploaded crest, in the SAME 30px box as the initials chip it replaces —
+   a board of eight teams must not reflow depending on which of them uploaded a
+   file. `cover` because organizers upload anything from a square PNG to a wide
+   banner, and a squashed badge reads worse than a cropped one. */
+.purse-crest {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--surface-sunken);
+}
+
 .purse-row[data-mine="true"] .purse-team {
   color: var(--text-heading);
   font-weight: var(--font-weight-semibold);
@@ -1339,6 +1467,27 @@
   height: 100%;
   background: var(--accent);
   transition: width var(--duration-base) var(--ease-out);
+}
+
+/* What the remaining purse actually BUYS. The figure on the row above is the
+   money in hand; the reserve rule holds part of it back to finish the squad,
+   so the two numbers here are the split the engine will enforce on the next
+   bid. Quiet by design — the purse stays the headline; this is the footnote
+   that stops an owner mis-reading it. */
+.purse-ceiling {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-4);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.purse-ceiling b {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
 }
 
 @media (prefers-reduced-motion: reduce) {

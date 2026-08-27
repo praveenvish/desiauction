@@ -16,7 +16,7 @@ import {
 } from "../live-experience";
 import { LotHero } from "../lot-hero";
 import { PurseBoard } from "../purse-board";
-import { PoolSummary, SquadBoard } from "../squad-board";
+import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { ShareAuction } from "./share-auction";
@@ -24,6 +24,7 @@ import { ShareAuction } from "./share-auction";
 import type { TeamIdentity } from "../purse-board";
 import type {
   AuctionRules,
+  LotMedia,
   PreSignedPlayer,
   ResolvedLot,
 } from "../../../../../server/auction/live-summary";
@@ -124,6 +125,7 @@ export function SpectatePanel({
   teams,
   rules,
   preSigned,
+  lotMedia,
   auctionName,
   auctionStatus,
   orgName,
@@ -135,6 +137,13 @@ export function SpectatePanel({
   teams: TeamIdentity[];
   rules: AuctionRules;
   preSigned: PreSignedPlayer[];
+  /**
+   * Faces and numbers, keyed by lot id — the spectator's half of what the room
+   * sees. Consent-gated (DPDP §5) and spectator-safe by the same rule as the
+   * resolved history: a photo the player agreed to publish and the number
+   * already printed on their own public page.
+   */
+  lotMedia: Readonly<Record<string, LotMedia>>;
   auctionName: string;
   /**
    * The auction's state as the SERVER knows it — the honest answer before the
@@ -292,7 +301,12 @@ export function SpectatePanel({
           windowed view; the ceremony is the big screen, the paused freeze, the
           completed wrap and the between-lot SOLD/UNSOLD splash. */}
       {showCeremony ? (
-        <CeremonyStage snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
+        <CeremonyStage
+          snapshot={snapshot}
+          ceremony={ceremony}
+          remainingMs={remainingMs}
+          lotMedia={lotMedia}
+        />
       ) : (
         <div className="stage-hide">
           <LotHero
@@ -301,6 +315,7 @@ export function SpectatePanel({
             lotDurationMs={lotDurationMs}
             leadColor={leadColor}
             clock={clock}
+            media={lotMedia[lot.lotId]}
             testId="spectate-lot"
           />
         </div>
@@ -390,6 +405,8 @@ export function SpectatePanel({
               teams={teams}
               heading="Teams"
               rowTestIdPrefix="spectate-team"
+              rules={rules}
+              squadSizes={squadSizesOf(teams, preSigned, feed.resolved)}
             />
           </div>
           <UpNext snapshot={snapshot} />

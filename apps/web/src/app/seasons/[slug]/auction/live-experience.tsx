@@ -70,6 +70,12 @@ export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | 
               // The snapshot outcome is spectator-safe and carries no
               // registration id; the next server read fills it in.
               registrationId: null,
+              // Nor does it carry the squad marks, for the same reason — so a
+              // captain sold seconds ago wears the badge from the next server
+              // read rather than from this optimistic row. False is the honest
+              // value here: absent, not "not a captain".
+              isCaptain: false,
+              isViceCaptain: false,
               lotNumber: outcome.lotNumber,
               seq: Number.MAX_SAFE_INTEGER - outcome.atSeq,
               playerName: outcome.playerName,

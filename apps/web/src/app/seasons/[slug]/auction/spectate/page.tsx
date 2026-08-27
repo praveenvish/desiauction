@@ -106,6 +106,7 @@ export default async function SpectatePage({ params }: { params: Promise<{ slug:
             teams={view.teams}
             rules={view.rules}
             preSigned={view.preSigned}
+            lotMedia={view.lotMedia}
             auctionName={view.auctionName}
             auctionStatus={view.auctionStatus}
             orgName={view.orgName}

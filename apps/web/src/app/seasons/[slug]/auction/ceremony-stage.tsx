@@ -3,11 +3,14 @@
 import {
   formatPaiseINR,
   paise,
+  roleLabel,
   type AuctionSnapshot,
   type CeremonyState,
   type LotOutcomeKind,
 } from "@desiauction/core";
 import { useEffect, useState, type CSSProperties } from "react";
+
+import type { LotMedia } from "../../../../server/auction/live-summary";
 
 // The FLOODLIGHT ceremony stage (M-IP4-3). Presentation ONLY: renders the
 // deterministic ceremony phase derived from consecutive AuctionSnapshots.
@@ -84,10 +87,21 @@ export function CeremonyStage({
   snapshot,
   ceremony,
   remainingMs,
+  /**
+   * Faces and numbers for every lot, keyed by lot id — the whole record rather
+   * than one entry, because this stage follows TWO subjects: the lot on the
+   * block and, between lots, the one that just resolved. Both carry a `lotId`,
+   * so the stage looks up whichever it is showing.
+   *
+   * Defaulted to empty so the cockpit — whose own view does not carry media —
+   * keeps rendering exactly the stage it always has.
+   */
+  lotMedia = {},
 }: {
   snapshot: AuctionSnapshot | null;
   ceremony: CeremonyState;
   remainingMs: number | null;
+  lotMedia?: Readonly<Record<string, LotMedia>>;
 }) {
   // "Waiting for the first snapshot…" told a guest, in the product's own
   // internals, that something they have no name for has not happened. Eight
@@ -131,6 +145,17 @@ export function CeremonyStage({
     snapshot.auctionStatus === "completed" ||
     snapshot.auctionStatus === "reconciled" ||
     snapshot.auctionStatus === "abandoned";
+  /**
+   * THE FACE OF WHOEVER THE STAGE IS ABOUT.
+   *
+   * A lot on the block owns the stage; between lots the last outcome does. The
+   * finished state is about the auction rather than a person, so it takes no
+   * face at all.
+   */
+  const subject = finished ? null : (lot?.lotId ?? outcome?.lotId ?? null);
+  const media = subject === null ? undefined : lotMedia[subject];
+  const photo = media?.photoUrl ?? null;
+  const number = media?.number ?? null;
 
   return (
     <section
@@ -139,6 +164,21 @@ export function CeremonyStage({
       data-testid="ceremony"
       data-phase={ceremony.phase}
     >
+      {/* THE PHOTO GOES BEHIND THE NAME, NOT ABOVE IT.
+          The stage's height is a measured contract (see `.ceremony` in
+          auction.css): every phase has to occupy the same box, or the live room
+          moves under it on every single sale — that was CLS 0.444 the last time
+          the phases disagreed. A row for a face would reopen exactly that, and
+          on the biggest phase. A backdrop costs the stage no height at all, and
+          a lot whose player never consented to a photo (DPDP §5) simply renders
+          the stage this file always drew.
+          Decorative: the player's name is announced in display type an inch
+          above it, so the image says nothing a reader is not already told. */}
+      {photo === null ? null : (
+        <span className="ceremony-backdrop" aria-hidden="true">
+          <img src={photo} alt="" />
+        </span>
+      )}
       {ceremony.phase === "sold" ? (
         <div className="ceremony-celebration" aria-hidden="true">
           <span className="ceremony-glow" />
@@ -162,9 +202,23 @@ export function CeremonyStage({
           <h2 className="ceremony-player" data-testid="ceremony-player">
             {lot.playerName ?? "Unnamed"}
           </h2>
+          {/* The player's REGISTRATION number rides inside the meta line rather
+              than on one of its own — same reason as the backdrop above: this
+              stage may not grow a row. `lotNumber` stays beside it because the
+              two answer different questions ("where in tonight's order" versus
+              "which player"), and the auctioneer calls both. */}
           <p className="ceremony-meta">
-            {lot.lotNumber} · {lot.role.replace(/_/g, " ")} · base{" "}
-            {formatPaiseINR(paise(lot.basePrice))}
+            {/* The separating space belongs to the badge, not to the line: left
+                outside the branch it survives a player with no number and pads
+                the centred line by a character. */}
+            {number === null ? null : (
+              <>
+                <span className="ceremony-number" data-testid="ceremony-player-number">
+                  #{number}
+                </span>{" "}
+              </>
+            )}
+            {lot.lotNumber} · {roleLabel(lot.role)} · base {formatPaiseINR(paise(lot.basePrice))}
           </p>
           {lot.currentBid !== null ? (
             <p className="ceremony-bid" data-testid="ceremony-bid">
@@ -213,7 +267,17 @@ export function CeremonyStage({
               ) : null}
             </p>
           ) : null}
+          {/* The number again on the outcome splash: the same person is still on
+              the big screen, and this is the line that names what happened to
+              them. Inline, for the same height reason as above. */}
           <p className="ceremony-frozen" data-testid="ceremony-outcome-reason">
+            {number === null ? null : (
+              <>
+                <span className="ceremony-number" data-testid="ceremony-player-number">
+                  #{number}
+                </span>{" "}
+              </>
+            )}
             {outcomeMeta(outcome)}
           </p>
         </div>

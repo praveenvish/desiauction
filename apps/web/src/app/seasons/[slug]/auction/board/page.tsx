@@ -29,7 +29,12 @@ export default async function BoardPage({ params }: { params: Promise<{ slug: st
     <main>
       {/* `orgName` and `location` were already on SpectatorView and this page
           simply dropped them, so a photograph of the projector six months later
-          had nothing on it naming whose night it was or where. */}
+          had nothing on it naming whose night it was or where.
+          `lotMedia` — the player's face and registration number — rides BESIDE
+          the snapshot rather than on it: the engine hashes the snapshot to
+          prove its fold is deterministic, and a URL signed at read would move
+          those bytes. It is keyed by lot id and joined on the client against
+          the live `currentLot`. */}
       <BoardPanel
         wsUrl={view.wsUrl}
         resolved={view.resolved}
@@ -39,6 +44,7 @@ export default async function BoardPage({ params }: { params: Promise<{ slug: st
         location={view.location}
         watchUrl={`${env.PUBLIC_BASE_URL}/c/${slug}`.replace(/^https?:\/\//, "")}
         teamIdentities={view.teams}
+        lotMedia={view.lotMedia}
       />
     </main>
   );

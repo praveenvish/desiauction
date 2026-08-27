@@ -217,7 +217,43 @@
   align-items: center;
   gap: 10px;
 }
+
+/* --- the franchise crest ---------------------------------------------------
+   A club is recognised across a hall by its colours and its badge, never by
+   11px of text — the standings grid had neither, so eight cards differed only
+   in the words on them. The crest is sized in vw for the same reason every
+   other figure on this board is: a venue screen may be 1366 wide or 3840, and a
+   fixed 40px badge is a different object on each of them. */
+.board-crest {
+  --board-crest: clamp(32px, 2.2vw, 46px);
+  flex: none;
+  width: var(--board-crest);
+  height: var(--board-crest);
+  border-radius: var(--radius-md, 12px);
+  /* A crest is a logo, not a photograph: `contain` keeps a wide wordmark whole
+     where `cover` would crop it to its middle third. */
+  object-fit: contain;
+  background: var(--surface-sunken);
+}
+/* The no-crest case is the MAJORITY case — most clubs upload nothing — so it
+   has to be a treatment rather than an empty square. `paintOnFill` picks the
+   monogram's colour from the organizer's own hex (the same contract the shared
+   purse chip uses), which is what keeps a mid-tone brand colour legible instead
+   of pinning near-black ink on top of whatever was typed. */
+.board-crest-mark {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(13px, 0.95vw, 19px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
 .board-paddle {
+  /* The paddle number is an administrative label, and it was holding the left
+     anchor of the card — the position the eye lands on first. The crest takes
+     that anchor and the paddle moves to the far edge, where it is still there
+     for the auctioneer without competing with the franchise's identity. */
+  margin-left: auto;
   flex: none;
   font-size: var(--text-md-size);
   display: inline-flex;
@@ -238,6 +274,9 @@
   font-weight: 700;
   color: var(--text-heading);
   line-height: 1.1;
+  /* A flex item's floor is its content, so a long franchise name would push the
+     paddle chip out of a 220px card rather than wrap inside it. */
+  min-width: 0;
 }
 .board-team-purse {
   display: flex;
@@ -315,7 +354,11 @@
    block on the wall because it is the reason the room is in the room. */
 .board-block {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  /* The face is a FIXED column and it is always rendered while a lot is open —
+     photo or branded mark, same box — so opening a lot cannot re-flow the three
+     columns beside it and a consent-gated null cannot resize the block halfway
+     through a bid. */
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: clamp(16px, 3vw, 40px);
   padding: clamp(16px, 2.4vw, 30px) clamp(18px, 2.6vw, 34px);
@@ -343,10 +386,64 @@
   letter-spacing: -0.02em;
   color: var(--text-heading);
 }
+/* `text-transform: capitalize` used to live here because the panel printed the
+   raw enum — "all rounder" — and the CSS was papering over it. The shared
+   `roleLabel` formatter supplies "All-rounder" already, and leaving the
+   transform on would have turned "base ₹10,000" into "Base ₹10,000": case is
+   decided once, in one place, and it is not this one. */
 .board-block-meta {
   font-size: var(--text-2xl-size);
   color: var(--text-secondary);
-  text-transform: capitalize;
+}
+
+/* --- the face on the block -------------------------------------------------
+   The largest photograph on the wall, because it is the person the room is
+   bidding on. */
+.board-block-face {
+  /* MEASURED FOR THE HALL, AND BUDGETED FOR THE FRAME. At 1920x1080 on a 100"
+     screen 1px is 1.151mm, so 8vw lands the frame at 154px ≈ 177mm tall — a
+     face that reads from the back of a 200-seat room. That figure is also, and
+     deliberately, about the height the name/role stack beside it already
+     occupies at that width, so the face costs the projector almost nothing: a
+     venue screen is ONE frame and the standings below it are not allowed to be
+     clipped to make room for a photograph. The floor keeps it usable on a
+     laptop; the ceiling stops it eating a 4K frame. */
+  --board-face: clamp(88px, 8vw, 184px);
+  position: relative;
+  /* A `figure` carries 1em/40px of user-agent margin, which on this grid would
+     silently push the whole block wider than the frame. */
+  margin: 0;
+  width: var(--board-face);
+  height: var(--board-face);
+}
+/* The shared `PlayerImage` owns the photo, the branded fallback mark and the
+   broken-source recovery, and it sizes itself from a fixed px scale whose
+   largest step is 160 — a PAGE unit. A projector is a viewport-scaled surface,
+   so the frame is restated here in vw. The px size is set inline by the
+   primitive, and inline styles are only reachable with `!important`; the
+   photo and the mark inside it are both 100% of the frame, so one override
+   scales the whole thing without touching the component. */
+.board-block-face [data-testid="player-image"] {
+  width: 100% !important;
+  height: 100% !important;
+}
+/* The registration number, over the corner of the frame rather than under it:
+   a badge in flow would add its own height to a block whose budget is one
+   projected frame, and the corner of a portrait is the one part of it that
+   carries no face. Opaque tokens, never a `color-mix(… transparent)` — a
+   contrast ratio over a photograph is only knowable if the ground is solid. */
+.board-block-number {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 2px 10px;
+  border-top-right-radius: var(--radius-md, 12px);
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font-size: clamp(var(--text-base-size), 1.3vw, var(--text-2xl-size));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 .board-block-money {
   display: flex;

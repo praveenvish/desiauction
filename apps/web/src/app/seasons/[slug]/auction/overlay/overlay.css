@@ -212,6 +212,44 @@ body:has(.obs-overlay) {
 .obs-lowerthird[data-tone="withdrawn"] .obs-accent {
   background: var(--text-muted);
 }
+/* --- who is on the block: face + words ------------------------------------
+   The face lives INSIDE the text side of the panel rather than beside it. The
+   lower third breaks into rows below 720px — vertical Reels/Shorts, the format
+   this market streams in — and a face pinned as a third sibling of the panel
+   would take a full row for itself there and roughly double the overlay's
+   height over the video. */
+.obs-lt-who {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.obs-lt-face {
+  position: relative;
+  flex: none;
+  /* `figure` carries 1em/40px of user-agent margin; the 18px here is the
+     panel's own left gutter, and `.obs-lt-main` keeps its 26px, which becomes
+     the gap. When there is no subject the figure is absent and the words sit
+     exactly where they always did. */
+  margin: 0 0 0 18px;
+}
+/* The registration number, over the corner of the frame rather than under it:
+   an overlay's height is the video it covers, so a badge in flow would cost
+   picture. Opaque tokens only — a ratio measured over an arbitrary photograph
+   is only knowable when the ground behind the text is solid, which is the same
+   rule the ticker and the panels above follow. */
+.obs-lt-number {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 1px 7px;
+  border-top-right-radius: var(--radius-md, 10px);
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
 .obs-lt-main {
   display: flex;
   flex-direction: column;
@@ -243,14 +281,15 @@ body:has(.obs-overlay) {
      standard overflow check passed while the money read `₹10,00`. */
   overflow-wrap: anywhere;
 }
+/* `text-transform: capitalize` used to sit here, first on the whole meta line —
+   which sent a sale to air as "To Team Bravo" — then on the role alone. Both
+   were CSS papering over a panel that printed the raw enum, "all rounder". The
+   shared `roleLabel` formatter supplies "All-rounder", and a transform left in
+   place would now capitalise "base ₹10,000" as well: the case of a label is
+   decided once, where the label is made. */
 .obs-lt-meta {
   font-size: 14px;
   color: var(--text-secondary);
-}
-/* `text-transform: capitalize` was on the whole meta line, so a sale went to
-   air as "To Team Bravo". Only the ROLE needs case-fixing. */
-.obs-lt-meta--role {
-  text-transform: capitalize;
 }
 .obs-lt-bid {
   box-sizing: border-box;
@@ -381,7 +420,11 @@ body:has(.obs-overlay) {
     width: 100%;
     height: 6px;
   }
-  .obs-lt-main,
+  /* `.obs-lt-who` is the flex child of the panel now, so it is the one that has
+     to claim the full row — the face and the words stay side by side inside it
+     rather than stacking, which is what keeps the stacked panel two rows tall
+     instead of three. */
+  .obs-lt-who,
   .obs-lt-bid {
     flex: 1 1 100%;
     min-width: 0;

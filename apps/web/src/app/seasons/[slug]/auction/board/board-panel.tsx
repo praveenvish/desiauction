@@ -1,13 +1,15 @@
 "use client";
 
-import { formatPaiseINR, paise, type AuctionStatus } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabel, type AuctionStatus } from "@desiauction/core";
+import { PlayerImage, paintOnFill } from "@desiauction/ui";
+import { useState } from "react";
 
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
 import { purseRowKey, teamPurseRows, type TeamIdentity } from "../purse-board";
 import { useAuctionSocket } from "../use-auction-socket";
 
-import type { ResolvedLot } from "../../../../../server/auction/live-summary";
+import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
 
 // The public live board: the lot on the block, standings, headline economy
 // tiles and recent sales, ALL derived from the read-only AuctionSnapshot. No
@@ -38,6 +40,67 @@ const BOARD_KICKER: Record<AuctionStatus, string> = {
   abandoned: "Auction abandoned",
 };
 
+/**
+ * The crest monogram: the organizer's short name if they set one, otherwise the
+ * initials of the franchise — the same rule the shared purse chip follows.
+ *
+ * Duplicated rather than imported because `purse-board` does not export it, and
+ * the board cannot simply render `TeamChip`: that is a 30px console element, and
+ * 30px on a hall projector is a smudge. Everything about this treatment except
+ * the SCALE is the shared one.
+ */
+function crestInitials(team: TeamIdentity | undefined, fallback: string): string {
+  if (team?.shortName != null && team.shortName !== "") {
+    return team.shortName.slice(0, 3).toUpperCase();
+  }
+  return (team?.name ?? fallback)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 3)
+    .map((word) => word.charAt(0))
+    .join("")
+    .toUpperCase();
+}
+
+/**
+ * A franchise's crest, or its colours when there is no crest to show.
+ *
+ * The fallback is NOT a spacer: `paintOnFill` picks a label colour from the
+ * organizer's own hex (the same contract the purse chip uses), so a club with
+ * no uploaded logo still owns its square in the standings grid in its own
+ * colour rather than going anonymous on the wall.
+ *
+ * `onError` matters more here than anywhere else in the product. This screen is
+ * projected unattended for three hours; an object the bucket cannot serve would
+ * otherwise print a browser's broken-image glyph in front of the whole hall,
+ * and the monogram is a better answer than a torn page icon.
+ */
+function BoardCrest({ team, fallback }: { team: TeamIdentity | undefined; fallback: string }) {
+  const [broken, setBroken] = useState(false);
+  const logoUrl = team?.logoUrl ?? null;
+  if (logoUrl !== null && logoUrl !== "" && !broken) {
+    return (
+      <img
+        className="board-crest"
+        src={logoUrl}
+        alt=""
+        onError={() => {
+          setBroken(true);
+        }}
+      />
+    );
+  }
+  return (
+    <span
+      className="board-crest board-crest-mark"
+      style={paintOnFill(team?.primaryColor)}
+      aria-hidden
+    >
+      {crestInitials(team, fallback)}
+    </span>
+  );
+}
+
 export function BoardPanel({
   wsUrl,
   resolved,
@@ -47,6 +110,7 @@ export function BoardPanel({
   location,
   watchUrl,
   teamIdentities,
+  lotMedia,
 }: {
   wsUrl: string;
   resolved: ResolvedLot[];
@@ -62,6 +126,15 @@ export function BoardPanel({
   /** Where the room can follow along on their phones. */
   watchUrl: string;
   teamIdentities: TeamIdentity[];
+  /**
+   * The face and the registration number for every lot, keyed by LOT ID and
+   * carried BESIDE the snapshot rather than on it: the engine hashes the
+   * snapshot to prove its fold is deterministic, and a media URL signed at read
+   * would make two honest engines disagree on the bytes. Photos are
+   * consent-gated (DPDP §5), so `photoUrl` is null far more often than not and
+   * the branded mark is the normal case, not the error case.
+   */
+  lotMedia: Record<string, LotMedia>;
 }) {
   // DA-20: the board read `connection !== "open"` and ignored `stale`/`offline`
   // entirely, so six seconds offline left the projector byte-identical to the
@@ -152,6 +225,13 @@ export function BoardPanel({
 
   const status = snapshot?.auctionStatus ?? null;
   const lot = snapshot?.currentLot ?? null;
+  // THE FACE ON THE BLOCK. `lotMedia` is keyed by lot id, which is the one key
+  // the live socket's `currentLot` and the server-rendered media both carry —
+  // the lot NUMBER is a queue position ("L001") and the registration number is
+  // the player's own identity, so neither can join the two.
+  const face = lot === null ? null : (lotMedia[lot.lotId] ?? null);
+  const facePhoto = face?.photoUrl ?? null;
+  const faceNumber = face?.number ?? null;
   const seconds = remainingMs === null ? null : Math.max(0, Math.ceil(remainingMs / 1000));
   // The clock is a memory the instant the feed goes quiet — never count down
   // over a snapshot the engine has stopped confirming.
@@ -271,6 +351,34 @@ export function BoardPanel({
           it led with aggregate spend and never named who was being sold. */}
       {lot !== null ? (
         <section className="board-block" aria-label="On the block" data-testid="board-block">
+          {/* THE FACE. The room was being asked to bid on a name in a font:
+              every rival projector opens a lot with the player's photograph and
+              this board had no face on it anywhere.
+              The frame is the SAME box whether a photo exists or not — the
+              primitive falls back to the branded mark — because a consent-gated
+              null is the ORDINARY case here (DPDP §5) and it must not resize a
+              projected frame halfway through a bid. */}
+          <figure className="board-block-face" data-testid="board-block-face">
+            <PlayerImage
+              name={lot.playerName ?? "Unnamed"}
+              /* The registration number is the player's identity across the
+                 whole product, so seeding the mark with it gives the same
+                 person the same monogram here, on /c and on their share card.
+                 The lot id is only the fallback for a lot with no number. */
+              seed={faceNumber ?? lot.lotId}
+              size="hero"
+              {...(facePhoto !== null ? { src: facePhoto } : {})}
+            />
+            {/* The REGISTRATION number, not `lot.lotNumber` — that one is the
+                queue position and it stays in the kicker above. This is the
+                number called out in the room and printed on the player's own
+                public page, so it is the badge the hall can act on. */}
+            {faceNumber !== null ? (
+              <figcaption className="board-block-number" data-testid="board-block-number">
+                #{faceNumber}
+              </figcaption>
+            ) : null}
+          </figure>
           <div className="board-block-who">
             <p className="board-block-kicker">
               On the block · {lot.lotNumber}
@@ -279,8 +387,11 @@ export function BoardPanel({
             <h2 className="board-block-name" data-testid="board-block-name">
               {lot.playerName ?? "Unnamed"}
             </h2>
+            {/* `role.replace(/_/g, " ")` printed "all rounder" and "wicket
+                keeper" to a room of two hundred people. The shared formatter
+                is the one place those labels are decided. */}
             <p className="board-block-meta">
-              {lot.role.replace(/_/g, " ")} · base {money(lot.basePrice)}
+              {roleLabel(lot.role)} · base {money(lot.basePrice)}
             </p>
           </div>
           <div className="board-block-money">
@@ -392,11 +503,16 @@ export function BoardPanel({
               className="board-team"
               data-testid={`board-team-${purseRowKey(team)}`}
             >
+              {/* CREST FIRST, PADDLE LAST. A franchise is recognised across a
+                  hall by its colours long before anyone reads its name, and the
+                  paddle number is an administrative label — it was holding the
+                  left anchor, which is the position the eye lands on. */}
               <div className="board-team-top">
+                <BoardCrest team={team.team} fallback={team.teamName} />
+                <h3 className="board-team-name">{team.teamName}</h3>
                 <span className="board-paddle">
                   {team.activePaddles.length > 0 ? team.activePaddles.join(" · ") : "—"}
                 </span>
-                <h3 className="board-team-name">{team.teamName}</h3>
               </div>
               <div className="board-team-purse">
                 <span className="board-purse-value">

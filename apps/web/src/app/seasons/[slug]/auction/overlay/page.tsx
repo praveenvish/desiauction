@@ -40,6 +40,9 @@ export default async function OverlayPage({
     // and the overlay was never brought along. The heading is off-screen
     // because the whole point of this surface is that it composites over video:
     // it must exist for orientation, and must not print to air.
+    // `lotMedia` — the face and the registration number — rides BESIDE the
+    // snapshot rather than on it: the engine hashes the snapshot to prove its
+    // fold is deterministic, and a URL signed at read would move those bytes.
     <main>
       <h1 className="auction-sr-only">{view.auctionName} — broadcast overlay</h1>
       <OverlayPanel
@@ -48,6 +51,7 @@ export default async function OverlayPage({
         auctionName={view.auctionName}
         sponsor={sponsorName}
         watchUrl={`${env.PUBLIC_BASE_URL}/c/${slug}`}
+        lotMedia={view.lotMedia}
       />
     </main>
   );

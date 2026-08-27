@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
 import { Card } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
@@ -45,6 +45,19 @@ export function squadsOf(
       lot.status === "sold" && lot.registrationId !== null ? [lot.registrationId] : [],
     ),
   );
+  /**
+   * The squad MARKERS for a player who went under the hammer anyway.
+   *
+   * Above: a pre-signed player can reach the block, because the pool projection
+   * excludes `isIcon` only while the schema documents `isRetained` as excluded
+   * too. When that happens the auction row wins the row — it is what actually
+   * happened — and it used to win the badges with it, hardcoding every marker
+   * to false. So a franchise's CAPTAIN, bought in the room, appeared as an
+   * ordinary signing while the captain of the team beside them wore the badge.
+   * The registration is the same registration either way, so the marks are read
+   * back off it.
+   */
+  const marksByRegistration = new Map(preSigned.map((player) => [player.registrationId, player]));
   return teams.map((team) => {
     const members: SquadMember[] = [
       ...preSigned
@@ -68,19 +81,59 @@ export function squadsOf(
         .filter(
           (lot) => lot.status === "sold" && (lot.teamId === team.id || lot.teamName === team.name),
         )
-        .map((lot) => ({
-          key: lot.lotId,
-          name: lot.playerName ?? "Unnamed",
-          role: lot.role,
-          price: lot.soldPrice,
-          icon: false,
-          retained: false,
-          captain: false,
-          viceCaptain: false,
-        })),
+        .map((lot) => {
+          const marks =
+            lot.registrationId === null ? undefined : marksByRegistration.get(lot.registrationId);
+          return {
+            key: lot.lotId,
+            name: lot.playerName ?? "Unnamed",
+            role: lot.role,
+            price: lot.soldPrice,
+            // Icon and Retained stay false whatever the registration says: they
+            // describe HOW a player joined a squad, and this player joined by
+            // being bid on. Printing "Icon" over a sale price would contradict
+            // the card's own header ("they were never bid on") on the one row
+            // where it is not true.
+            icon: false,
+            retained: false,
+            // Captaincy is not a route in — it is a job in the squad, true of
+            // the player whether the franchise kept them or bought them back.
+            //
+            // The resolved lot is now the FIRST source: it carries the marks
+            // straight off the registration it already joins, so a captain who
+            // is neither an icon nor retained — invisible here until the row
+            // gained these columns, because `preSigned` filters them out — wears
+            // the badge too. `marks` remains the fallback for a row the client
+            // synthesised from the snapshot mid-auction, which has no
+            // registration to read.
+            captain: lot.isCaptain || (marks?.isCaptain ?? false),
+            viceCaptain: lot.isViceCaptain || (marks?.isViceCaptain ?? false),
+          };
+        }),
     ];
     return { team, members };
   });
+}
+
+/**
+ * HOW MANY PLAYERS EACH FRANCHISE HAS ACTUALLY SIGNED, keyed by team id.
+ *
+ * This is the number the ENGINE counts when it applies the reserve rule —
+ * auction buys PLUS pre-signed players (aggregate.ts) — so a purse board that
+ * prints a ceiling from it prints the ceiling the engine will enforce, not a
+ * second opinion about the same money. Built on `squadsOf` so the de-duping
+ * lives in exactly one place.
+ */
+export function squadSizesOf(
+  teams: TeamIdentity[],
+  preSigned: PreSignedPlayer[],
+  resolved: ResolvedLot[],
+): Record<string, number> {
+  const sizes: Record<string, number> = {};
+  for (const squad of squadsOf(teams, preSigned, resolved)) {
+    sizes[squad.team.id] = squad.members.length;
+  }
+  return sizes;
 }
 
 function MemberBadges({ member }: { member: SquadMember }) {
@@ -172,7 +225,7 @@ export function SquadBoard({
                     <li key={member.key} className="squad-row">
                       <span className="squad-name">{member.name}</span>
                       <MemberBadges member={member} />
-                      <span className="squad-role">{member.role.replace(/_/g, " ")}</span>
+                      <span className="squad-role">{roleLabel(member.role)}</span>
                       <span className="squad-price">
                         {member.price === null ? (
                           <span className="squad-presigned">pre-signed</span>

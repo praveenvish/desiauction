@@ -1,13 +1,14 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
+import { PlayerImage } from "@desiauction/ui";
 import type { CSSProperties } from "react";
 
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
 import { useAuctionSocket } from "../use-auction-socket";
 
-import type { ResolvedLot } from "../../../../../server/auction/live-summary";
+import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
 
 // The broadcast overlay: ticker + lower-third + sponsor/watch cluster, ALL
 // derived from the read-only AuctionSnapshot. No command sender exists in this
@@ -29,12 +30,21 @@ export function OverlayPanel({
   auctionName,
   sponsor,
   watchUrl,
+  lotMedia,
 }: {
   wsUrl: string;
   resolved: ResolvedLot[];
   auctionName: string;
   sponsor: string | null;
   watchUrl: string;
+  /**
+   * The player's face and registration number for every lot, keyed by lot id
+   * and carried BESIDE the snapshot: the engine hashes the snapshot to prove
+   * its fold is deterministic, and a media URL signed at read would move the
+   * bytes. Photos are consent-gated (DPDP §5), so a null photo is the ordinary
+   * case and the branded mark — not an empty slot — is what goes to air.
+   */
+  lotMedia: Record<string, LotMedia>;
 }) {
   // DA-20: this read `connection !== "open"` and ignored `stale`/`offline`
   // outright, so a device that went offline mid-auction kept broadcasting a
@@ -67,6 +77,20 @@ export function OverlayPanel({
         ? "live"
         : (outcome?.kind ?? "idle");
   const nextUp = snapshot !== null && snapshot.queue.length > 0 ? snapshot.queue[0] : null;
+
+  // WHOSE FACE THE LOWER THIRD IS CARRYING. One subject, resolved ONCE — the lot
+  // on the block, else the lot that just resolved, else the one up next — so it
+  // cannot drift from the three-way choice the text below makes and put a
+  // photograph beside somebody else's name. Reading the id and the name from
+  // separate expressions is exactly how that drift happens: a lot with no name
+  // on it would fall through and borrow the previous player's face.
+  // `lotMedia` is keyed by lot id, the one key the socket's lot and the
+  // server-rendered media have in common — the lot NUMBER is a queue position
+  // and the registration number is the player's own identity.
+  const facing = lot ?? outcome ?? nextUp ?? null;
+  const face = facing === null ? null : (lotMedia[facing.lotId] ?? null);
+  const facePhoto = face?.photoUrl ?? null;
+  const faceNumber = face?.number ?? null;
 
   return (
     <div className="obs-overlay" data-theme="floodlight" data-testid="obs-overlay">
@@ -125,43 +149,73 @@ export function OverlayPanel({
       <div className="obs-foot">
         <div className="obs-lowerthird" data-tone={tone} data-testid="obs-lowerthird">
           <span className="obs-accent" aria-hidden="true" />
-          <div className="obs-lt-main">
-            {lot !== null ? (
-              <>
-                <span className="obs-lt-eyebrow">
-                  {paused ? "Paused" : "On the block"} · {lot.lotNumber}
-                </span>
-                <span className="obs-lt-name">{lot.playerName ?? "Unnamed"}</span>
-                <span className="obs-lt-meta obs-lt-meta--role">
-                  {lot.role.replace(/_/g, " ")} · base {money(lot.basePrice)}
-                </span>
-              </>
-            ) : outcome !== null ? (
-              <>
-                {/* This printed `outcome.kind` — the engine's own enum — to air:
-                    a frozen lot went out as "HELD", and an undone sale would
-                    have gone out as "REOPENED". The ceremony already owned the
-                    human words. */}
-                <span className="obs-lt-eyebrow">{OUTCOME_TITLE[outcome.kind]}</span>
-                <span className="obs-lt-name">{outcome.playerName ?? outcome.lotNumber}</span>
-                {/* And every non-sold outcome fell back to the AUCTION'S OWN
-                    NAME as its explanation, so the audience was told nothing
-                    about what had just happened. */}
-                <span className="obs-lt-meta">{outcomeMeta(outcome)}</span>
-              </>
-            ) : (
-              <>
-                <span className="obs-lt-eyebrow">{nextUp !== null ? "Up next" : "Auction"}</span>
-                <span className="obs-lt-name">
-                  {nextUp?.playerName ?? nextUp?.lotNumber ?? auctionName}
-                </span>
-                <span className="obs-lt-meta">
-                  {snapshot !== null
-                    ? `${String(snapshot.lotsResolved)}/${String(snapshot.lotsTotal)} lots settled`
-                    : "Connecting…"}
-                </span>
-              </>
-            )}
+          {/* The face and the words are ONE column-pair inside the lower third,
+              not two siblings of it: below 720px — vertical Reels/Shorts, the
+              dominant format here — the panel breaks into rows, and a face
+              pinned as a sibling would claim a row of its own and double the
+              height of the overlay on exactly the streams that can least afford
+              it. */}
+          <div className="obs-lt-who">
+            {facing !== null ? (
+              // Compact by design: a lower third is furniture at the bottom of
+              // someone else's video, so this is the 96px step, not the hall
+              // portrait /board carries. Photo or branded mark, same box.
+              <figure className="obs-lt-face" data-testid="obs-lt-face">
+                <PlayerImage
+                  name={facing.playerName ?? facing.lotNumber}
+                  seed={faceNumber ?? facing.lotId}
+                  size="xl"
+                  {...(facePhoto !== null ? { src: facePhoto } : {})}
+                />
+                {/* The REGISTRATION number — the identity the player already
+                    carries on their public page. The eyebrow above keeps
+                    `lotNumber`, which is only where in the queue we are. */}
+                {faceNumber !== null ? (
+                  <figcaption className="obs-lt-number">#{faceNumber}</figcaption>
+                ) : null}
+              </figure>
+            ) : null}
+            <div className="obs-lt-main">
+              {lot !== null ? (
+                <>
+                  <span className="obs-lt-eyebrow">
+                    {paused ? "Paused" : "On the block"} · {lot.lotNumber}
+                  </span>
+                  <span className="obs-lt-name">{lot.playerName ?? "Unnamed"}</span>
+                  {/* `role.replace(/_/g, " ")` put "all rounder" and "wicket
+                      keeper" on air. The shared formatter is the one place
+                      those labels are decided. */}
+                  <span className="obs-lt-meta">
+                    {roleLabel(lot.role)} · base {money(lot.basePrice)}
+                  </span>
+                </>
+              ) : outcome !== null ? (
+                <>
+                  {/* This printed `outcome.kind` — the engine's own enum — to
+                      air: a frozen lot went out as "HELD", and an undone sale
+                      would have gone out as "REOPENED". The ceremony already
+                      owned the human words. */}
+                  <span className="obs-lt-eyebrow">{OUTCOME_TITLE[outcome.kind]}</span>
+                  <span className="obs-lt-name">{outcome.playerName ?? outcome.lotNumber}</span>
+                  {/* And every non-sold outcome fell back to the AUCTION'S OWN
+                      NAME as its explanation, so the audience was told nothing
+                      about what had just happened. */}
+                  <span className="obs-lt-meta">{outcomeMeta(outcome)}</span>
+                </>
+              ) : (
+                <>
+                  <span className="obs-lt-eyebrow">{nextUp !== null ? "Up next" : "Auction"}</span>
+                  <span className="obs-lt-name">
+                    {nextUp?.playerName ?? nextUp?.lotNumber ?? auctionName}
+                  </span>
+                  <span className="obs-lt-meta">
+                    {snapshot !== null
+                      ? `${String(snapshot.lotsResolved)}/${String(snapshot.lotsTotal)} lots settled`
+                      : "Connecting…"}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Right block: the money — live bid, or the winning price on a sale. */}

@@ -1,9 +1,11 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
+import { PlayerImage } from "@desiauction/ui";
 import { useSyncExternalStore } from "react";
 
 import type { AuctionClock } from "./use-auction-socket";
+import type { LotMedia } from "../../../../server/auction/live-summary";
 import type { AuctionSnapshot } from "@desiauction/core";
 
 // THE LOT HERO — the one thing every live surface leads with: what is on the
@@ -82,6 +84,7 @@ export function LotHero({
   leadColor,
   frozen = false,
   clock,
+  media,
   testId = "current-lot",
 }: {
   lot: NonNullable<AuctionSnapshot["currentLot"]>;
@@ -99,6 +102,19 @@ export function LotHero({
    */
   frozen?: boolean;
   /**
+   * The face and the number for THIS lot, joined on `lotId` from the view that
+   * rides beside the snapshot.
+   *
+   * Optional because the join has to be allowed to miss: the media is read once
+   * per page load while lots arrive over a socket all night, so a lot queued
+   * after the page was served has no entry, and the hero must open on it
+   * regardless. `photoUrl` is consent-gated (DPDP §5) and null far more often
+   * than not — `PlayerImage` answers that with the branded monogram in the same
+   * fixed box, so a player who never agreed to a photo costs the hero nothing
+   * and shows nothing broken.
+   */
+  media?: LotMedia | undefined;
+  /**
    * `current-lot` is the long-standing handle for "the lot on the block", kept
    * as the default so the live-auction suites keep pointing at the thing they
    * were written against. Spectate overrides it: a suite there matches
@@ -108,18 +124,49 @@ export function LotHero({
   testId?: string;
 }) {
   const bid = lot.currentBid;
+  const name = lot.playerName ?? "Unnamed";
+  const photo = media?.photoUrl ?? null;
+  const number = media?.number ?? null;
   return (
     <section className="lot-hero" data-testid={testId} data-frozen={frozen ? "true" : undefined}>
       <div className="lot-hero-top">
-        <div className="lot-hero-id">
-          <p className="lot-hero-kicker">
-            {lot.lotNumber} · {frozen ? "clock stopped" : "on the block"}
-          </p>
-          <h2 className="lot-hero-name">{lot.playerName ?? "Unnamed"}</h2>
-          <p className="lot-hero-meta">
-            <span className="lot-hero-role">{lot.role.replace(/_/g, " ")}</span>
-            <span>Base {formatPaiseINR(paise(lot.basePrice))}</span>
-          </p>
+        {/* The face and the name travel together in their own row so the
+            countdown keeps the far edge of the hero, where it has always been —
+            `lot-hero-top` justifies its children apart, and dropping the photo
+            in as a third sibling would have pushed the ring into the middle. */}
+        <div className="lot-hero-identity">
+          <span className="lot-hero-figure">
+            <PlayerImage
+              name={name}
+              // The lot id, not the name: two players called Rohit Sharma must
+              // not be handed the same monogram pattern, and a player renamed
+              // mid-auction must not have theirs change under them.
+              seed={lot.lotId}
+              size="xl"
+              {...(photo === null ? {} : { src: photo })}
+            />
+            {/* THE PLAYER'S OWN NUMBER, which the room shouts and the kicker
+                above does not carry. `lotNumber` ("L001") is a QUEUE POSITION —
+                where this player happens to sit in tonight's running order —
+                and it moves when the order does. This is the registration
+                number printed on their public page and their shirt. Both are
+                worth showing and they are not the same fact. */}
+            {number === null ? null : (
+              <span className="lot-hero-number" data-testid="lot-player-number">
+                #{number}
+              </span>
+            )}
+          </span>
+          <div className="lot-hero-id">
+            <p className="lot-hero-kicker">
+              {lot.lotNumber} · {frozen ? "clock stopped" : "on the block"}
+            </p>
+            <h2 className="lot-hero-name">{name}</h2>
+            <p className="lot-hero-meta">
+              <span className="lot-hero-role">{roleLabel(lot.role)}</span>
+              <span>Base {formatPaiseINR(paise(lot.basePrice))}</span>
+            </p>
+          </div>
         </div>
         {frozen ? (
           <p className="lot-hero-paused" data-testid="lot-paused">

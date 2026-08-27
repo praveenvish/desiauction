@@ -25,7 +25,7 @@ import { AuctionAnnouncer } from "../auction-announcer";
 import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
-import { PoolSummary, SquadBoard } from "../squad-board";
+import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { AuctionProgress } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
@@ -937,7 +937,16 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
 
           {/* The one purse treatment, shared with the owner room and the
               spectator board. */}
-          <PurseBoard snapshot={snapshot} teams={view.teams} />
+          {/* The auctioneer's board carries every purse — and now the split
+              the engine will enforce on the next bid, which is the question
+              they are asked between lots ("can they still afford him?") and
+              had to answer by doing the reserve arithmetic in their head. */}
+          <PurseBoard
+            snapshot={snapshot}
+            teams={view.teams}
+            rules={view.rules}
+            squadSizes={squadSizesOf(view.teams, view.preSigned, view.resolved)}
+          />
 
           <PoolSummary snapshot={snapshot} resolved={view.resolved} preSigned={view.preSigned} />
         </div>
