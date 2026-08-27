@@ -107,6 +107,23 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     Review the night
                   </ButtonLink>
                 ) : null}
+                {/* The poster studio had the same problem the board and the
+                    overlay had: a finished surface with no door. It belongs
+                    here, beside "Review the night" — the squads are final, and
+                    the hour after the hammer is the only hour anyone wants to
+                    post them. Gated on `registration.review`, which is what the
+                    studio itself checks. */}
+                {(status === "completed" || status === "reconciled") &&
+                dashboard.viewer.canPoster ? (
+                  <ButtonLink
+                    href={`/seasons/${slug}/posters`}
+                    variant="secondary"
+                    size="touch"
+                    data-testid="open-posters"
+                  >
+                    Share the squads
+                  </ButtonLink>
+                ) : null}
               </span>
             </div>
           </header>

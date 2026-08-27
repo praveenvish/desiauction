@@ -573,6 +573,42 @@
   outline-offset: 2px;
 }
 
+/*
+ * "Get your card" — the player's own poster, under their own registration.
+ *
+ * Aligned to the row's TEXT rather than its edge (32px crest + the flex gap),
+ * so it reads as belonging to the season above it and not as a new item in the
+ * list. `min-height` is not decoration: this is a standalone tap target on the
+ * one screen a player opens on a phone, and WCAG 2.2 SC 2.5.8 wants 24px before
+ * spacing is counted.
+ */
+.home-own-poster {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-left: calc(32px + var(--space-3) + var(--space-2));
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  /* `--text-accent`, not `--accent`: the accent is a FILL, darkened for text
+     so it clears AA on the raised surface (5.85:1 daylight, 10.4:1
+     floodlight). `--accent-text` does not exist — the only other file that
+     reaches for that name guards it with a fallback. */
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.home-own-poster:hover {
+  background: var(--surface-sunken);
+  text-decoration: underline;
+}
+
+.home-own-poster:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .home-attn-text,
 .home-event-text,
 .home-feed-text {

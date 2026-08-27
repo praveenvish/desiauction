@@ -3,12 +3,13 @@ import {
   auctionEvents,
   auctions,
   competitions,
+  lots,
   organizations,
   people,
   registrations,
   teams,
 } from "@desiauction/db";
-import { and, asc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
 import { systemDb } from "../db";
@@ -618,6 +619,8 @@ function directoryOrder(sort: DirectorySort, istToday: string): SQL[] {
 }
 
 export interface MyRegistration {
+  /** The subject of this person's own poster — see `posterReady`. */
+  registrationId: string;
   competitionName: string;
   competitionSlug: string;
   orgName: string;
@@ -625,6 +628,16 @@ export interface MyRegistration {
   role: string;
   number: string;
   open: boolean;
+  /**
+   * Whether a card exists to be made of this registration.
+   *
+   * A poster asserts a VERDICT, so `playerPosterSource` refuses to draw one
+   * until the auction has reached one — sold, unsold, retained or icon. This
+   * mirrors that rule so /home offers the link only where the route would
+   * answer with a picture, rather than offering every player a door into a 404
+   * from the day they sign up.
+   */
+  posterReady: boolean;
 }
 
 /** The person's registrations across every competition — the player lens.
@@ -632,6 +645,7 @@ export interface MyRegistration {
 export async function myRegistrations(personId: string): Promise<MyRegistration[]> {
   const rows = await systemDb
     .select({
+      registrationId: registrations.id,
       competitionName: competitions.name,
       competitionSlug: competitions.slug,
       orgName: organizations.name,
@@ -639,14 +653,35 @@ export async function myRegistrations(personId: string): Promise<MyRegistration[
       role: registrations.role,
       number: registrations.registrationNumber,
       competitionStatus: competitions.status,
+      isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
+      lotStatus: lots.status,
     })
     .from(registrations)
     .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .innerJoin(people, eq(people.id, registrations.personId))
+    /*
+     * The lot is joined THROUGH its auction and only the one that counts.
+     * Migration 0029 permits at most one non-abandoned auction per competition
+     * but abandoned ones accumulate without limit, each carrying a lot per
+     * registration — so an unscoped join on `lots.registrationId` would list a
+     * season twice for anyone whose organizer aborted a night and started
+     * again, the second time carrying a verdict from an auction nobody ran to
+     * the end. (The poster picker documents the same trap.)
+     */
+    .leftJoin(
+      auctions,
+      and(
+        eq(auctions.competitionId, registrations.competitionId),
+        ne(auctions.status, "abandoned"),
+      ),
+    )
+    .leftJoin(lots, and(eq(lots.registrationId, registrations.id), eq(lots.auctionId, auctions.id)))
     .where(eq(registrations.personId, personId))
     .orderBy(asc(competitions.startsOn), asc(registrations.id));
   return rows.map((row) => ({
+    registrationId: row.registrationId,
     competitionName: row.competitionName,
     competitionSlug: row.competitionSlug,
     orgName: row.orgName,
@@ -654,6 +689,9 @@ export async function myRegistrations(personId: string): Promise<MyRegistration[
     role: row.role,
     number: row.number,
     open: row.competitionStatus === "registration_open",
+    posterReady:
+      row.status === "approved" &&
+      (row.isIcon || row.isRetained || row.lotStatus === "sold" || row.lotStatus === "unsold"),
   }));
 }
 

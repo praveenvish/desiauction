@@ -15,6 +15,7 @@ import {
   type TeamPosterMember,
 } from "@desiauction/core";
 import {
+  auctionOwnerInvites,
   auctions,
   auditLog,
   competitions,
@@ -27,14 +28,13 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
 import { storage } from "../media";
-import { ForbiddenError } from "../orgs/authz";
-import { requireCompetitionCapability } from "./authz";
-import { resolveCompetition } from "./competitions";
+import { canCompetition } from "./authz";
+import { competitionForRegistration, resolveCompetition } from "./competitions";
 
 /**
  * THE POSTER'S SERVER SIDE — the gate, the join, and the evidence.
@@ -77,61 +77,249 @@ interface PosterRequest {
   readonly size: PosterSize;
 }
 
+/**
+ * WHO MAY MAKE WHICH POSTER.
+ *
+ * Three ways in, and only the first is a capability. The other two are
+ * RELATIONSHIPS — the first authorization in this codebase that is not "what key
+ * do you hold" but "who are you to this row" — and they exist because the whole
+ * point of a poster is that the person on it posts it. `viewer` is the empty
+ * capability set (`packages/core/src/capabilities.ts`), so a player and a team
+ * owner hold nothing at all; gating posters on `registration.review` alone meant
+ * the sharing loop only ever worked if the organizer generated every card by
+ * hand and sent it on.
+ *
+ * A relationship grants ONE subject, never a category. A player earns their own
+ * card, an owner earns their own squad sheet, and neither earns anybody else's —
+ * which is why this is a list of ids rather than a boolean, and why every source
+ * function checks membership of that list rather than re-deriving the rule.
+ */
+interface PosterGrant {
+  /** `registration.review` over this season: every player, every team. */
+  readonly organizer: boolean;
+  /** Registrations this person IS. Their own card, and no other. */
+  readonly ownRegistrationIds: readonly string[];
+  /** Teams this person owns. Their own squad sheet, and no other. */
+  readonly ownTeamIds: readonly string[];
+}
+
 interface Gate {
   readonly personId: string;
   readonly competition: { id: string; orgId: string; slug: string; name: string };
   readonly logoKey: string | null;
   readonly showBranding: boolean;
+  readonly grant: PosterGrant;
 }
 
 /**
- * Session → membership → capability, in that order, and each one refuses
- * differently on purpose. A non-member gets 404 rather than 403: whether this
- * org runs a season called `mumbai-corporate-2026` is not a fact an outsider
- * gets to confirm by reading a status code.
+ * THE REGISTRATIONS THIS PERSON IS.
+ *
+ * Read under a tenant context carrying `personId` and NO org, on purpose. The
+ * `registrations_tenant` policy admits a row when `org_id` matches the session's
+ * org OR `person_id` matches the session's person; with no org set the first
+ * disjunct is NULL and the database itself returns nothing but this person's own
+ * rows. The `eq(person_id)` predicate below is therefore the second lock on the
+ * same door — if it were ever dropped in a refactor, RLS would still refuse.
+ */
+async function ownRegistrationsIn(personId: string, competitionId: string): Promise<string[]> {
+  const rows = await withTenantDb(dbHandle, { personId }, (db) =>
+    db
+      .select({ id: registrations.id })
+      .from(registrations)
+      .where(
+        and(
+          eq(registrations.competitionId, competitionId),
+          eq(registrations.personId, personId),
+          // A poster asserts a verdict about an accepted player. A withdrawn or
+          // rejected registration is not one, and its holder is not owed a card
+          // saying otherwise.
+          eq(registrations.status, "approved"),
+        ),
+      ),
+  );
+  return rows.map((row) => row.id);
+}
+
+/**
+ * THE TEAMS THIS PERSON OWNS.
+ *
+ * The same rule the Teams workspace prints under `ownerName` (DA-32): the owner
+ * of a team is whoever HOLDS ITS PADDLE, else whoever accepted its owner invite.
+ * One rule, read in two places — a product that answered "who owns this team"
+ * differently for a label and for an access decision would be answering it
+ * wrongly in one of them.
+ *
+ * It differs from the label in one respect, deliberately: a REVOKED invitation
+ * grants nothing. The card can afford to keep printing a name that was once
+ * real; an authorization cannot.
+ *
+ * Requires org context, because `paddles` and `auctions` are org-scoped with no
+ * person disjunct. That is not a limitation in practice — `acceptOwnerJoin`
+ * makes every accepted owner a viewer-level member of the org — and it buys the
+ * invariant that org context is never established for a non-member.
+ */
+export async function ownTeamsIn(
+  personId: string,
+  competition: { id: string; orgId: string },
+): Promise<string[]> {
+  return withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
+    ownedTeamIdsOn(db, personId, competition.id),
+  );
+}
+
+/**
+ * The query, on a connection the caller already holds.
+ *
+ * Separated because `withTenantDb` opens a TRANSACTION: a caller already inside
+ * one — the auction dashboard, deciding whether to offer the poster button —
+ * would otherwise hold a second pooled connection nested inside its first for
+ * the length of the outer read. The org context such a caller carries is the
+ * same one this would have set.
+ */
+export async function ownedTeamIdsOn(
+  db: Db,
+  personId: string,
+  competitionId: string,
+): Promise<string[]> {
+  const [held, accepted] = await Promise.all([
+    db
+      .select({ teamId: paddles.teamId })
+      .from(paddles)
+      .innerJoin(auctions, eq(auctions.id, paddles.auctionId))
+      .where(
+        and(
+          eq(paddles.personId, personId),
+          isNull(paddles.releasedAt),
+          eq(auctions.competitionId, competitionId),
+          ne(auctions.status, "abandoned"),
+        ),
+      ),
+    db
+      .select({ teamId: auctionOwnerInvites.teamId })
+      .from(auctionOwnerInvites)
+      .innerJoin(auctions, eq(auctions.id, auctionOwnerInvites.auctionId))
+      .where(
+        and(
+          eq(auctionOwnerInvites.acceptedBy, personId),
+          isNull(auctionOwnerInvites.revokedAt),
+          eq(auctions.competitionId, competitionId),
+          ne(auctions.status, "abandoned"),
+        ),
+      ),
+  ]);
+  return [...new Set([...held, ...accepted].map((row) => row.teamId))];
+}
+
+/**
+ * Session → who you are here → what that earns you.
+ *
+ * The refusals are deliberately unequal. A MEMBER who holds no key and owns
+ * nothing gets 403: they can already see this season exists on every other
+ * console surface, so a 404 would be a fiction. Everyone else gets 404 — whether
+ * this org runs a season called `mumbai-corporate-2026` is not a fact an
+ * outsider gets to confirm by reading a status code.
  */
 async function gate(slug: string): Promise<Gate | PosterRefusal> {
   const session = await currentSession();
   if (session === null) {
     return { ok: false, status: 401, message: "Sign in to generate posters." };
   }
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
-  if (competition === null) {
+  return posterGateFor(session.personId, slug);
+}
+
+/**
+ * The decision itself, given a person.
+ *
+ * Split from `gate` so the whole of it can be exercised without a cookie jar:
+ * `currentSession` reads `next/headers`, which exists only inside a request, and
+ * an authorization rule that can only be tested through an HTTP round trip is an
+ * authorization rule that does not get tested. Everything above this line is
+ * "who is asking"; everything below is "what may they have".
+ */
+export async function posterGateFor(personId: string, slug: string): Promise<Gate | PosterRefusal> {
+  /*
+   * A player need not be a member of the club whose season they played in, and
+   * most are not — `resolveCompetition` joins `org_members` and would 404 them
+   * out of their own card. So membership is looked up as a FACT here rather
+   * than used as the gate, and the slug is resolved without it when it is
+   * absent. `competitionForRegistration` is the existing no-membership lookup
+   * (it is what the public registration link already uses); nothing personal
+   * comes back from it, and what does is what /c/[slug] prints in public.
+   */
+  const member = await resolveCompetition(systemDb, personId, slug);
+  const open = member === null ? await competitionForRegistration(systemDb, slug) : null;
+  // Four fields, named one at a time. The two sources have different shapes and
+  // a spread-plus-cast would have compiled just as well the day one of them
+  // stopped carrying `orgId`.
+  const source = member ?? open;
+  if (source === null) {
     return { ok: false, status: 404, message: "Not available." };
   }
-  try {
-    return await withTenantDb(
-      dbHandle,
-      { personId: session.personId, orgId: competition.orgId },
-      async (db) => {
-        await requireCompetitionCapability(
-          db,
-          session.personId,
-          { orgId: competition.orgId, competitionId: competition.id },
-          "registration.review",
-        );
-        const [row] = await db
-          .select({ tier: competitions.tier, logoKey: competitions.logoUrl })
-          .from(competitions)
-          .where(eq(competitions.id, competition.id))
-          .limit(1);
-        return {
-          personId: session.personId,
-          competition,
-          logoKey: row?.logoKey ?? null,
-          // An unreadable tier falls back to `free`, which is the branded
-          // behaviour. Failing the other way would let one bad row silently
-          // strip the platform's own mark off every poster a season produces.
-          showBranding: row !== undefined && isTier(row.tier) ? row.tier === "free" : true,
-        };
-      },
-    );
-  } catch (error) {
-    if (error instanceof ForbiddenError) {
-      return { ok: false, status: 403, message: "You can't generate posters for this season." };
-    }
-    throw error;
+  const competition = { id: source.id, orgId: source.orgId, slug, name: source.name };
+
+  const organizer =
+    member !== null &&
+    (await withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
+      canCompetition(
+        db,
+        personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "registration.review",
+      ),
+    ));
+
+  // An organizer's grant already covers every subject, so the two relationship
+  // reads are skipped rather than computed and discarded.
+  const [ownRegistrationIds, ownTeamIds] = organizer
+    ? [[] as string[], [] as string[]]
+    : await Promise.all([
+        ownRegistrationsIn(personId, competition.id),
+        member === null ? Promise.resolve<string[]>([]) : ownTeamsIn(personId, competition),
+      ]);
+
+  if (!organizer && ownRegistrationIds.length === 0 && ownTeamIds.length === 0) {
+    return member !== null
+      ? { ok: false, status: 403, message: "You can't generate posters for this season." }
+      : { ok: false, status: 404, message: "Not available." };
   }
+
+  const [row] = await withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
+    db
+      .select({ tier: competitions.tier, logoKey: competitions.logoUrl })
+      .from(competitions)
+      .where(eq(competitions.id, competition.id))
+      .limit(1),
+  );
+  return {
+    personId,
+    competition,
+    logoKey: row?.logoKey ?? null,
+    // An unreadable tier falls back to `free`, which is the branded behaviour.
+    // Failing the other way would let one bad row silently strip the platform's
+    // own mark off every poster a season produces.
+    showBranding: row !== undefined && isTier(row.tier) ? row.tier === "free" : true,
+    grant: { organizer, ownRegistrationIds, ownTeamIds },
+  };
+}
+
+/**
+ * Does this grant cover THIS subject, and under which authority?
+ *
+ * Returns the provenance the audit row records, or null for a refusal. Written
+ * once so the player route and the team route cannot drift into two different
+ * answers — the shape of bug where one subject is checked and the other is
+ * merely assumed to have been.
+ */
+function posterVia(
+  grant: PosterGrant,
+  own: readonly string[],
+  subjectId: string,
+  mine: "self" | "owner",
+): "organizer" | "self" | "owner" | null {
+  if (grant.organizer) {
+    return "organizer";
+  }
+  return own.includes(subjectId) ? mine : null;
 }
 
 /**
@@ -157,6 +345,8 @@ async function recordPosterGenerated(
     size: PosterSize;
     photo?: "included" | "withheld";
     squadSize?: number;
+    /** How the actor earned it — see `PosterGrant`. */
+    via: "organizer" | "self" | "owner";
   },
 ): Promise<void> {
   await db.insert(auditLog).values({
@@ -170,6 +360,11 @@ async function recordPosterGenerated(
       competitionId: gated.competition.id,
       theme: detail.theme,
       size: detail.size,
+      // An officer taking a copy of a civilian's face and a civilian taking a
+      // copy of their own are the same row shape and NOT the same event. The
+      // audit trail says which, because the whole reason this row exists is for
+      // somebody reading it back later to be able to tell.
+      via: detail.via,
       ...(detail.photo !== undefined ? { photo: detail.photo } : {}),
       ...(detail.squadSize !== undefined ? { squadSize: String(detail.squadSize) } : {}),
     },
@@ -186,6 +381,41 @@ export async function playerPosterSource(
   const gated = await gate(slug);
   if ("ok" in gated) {
     return gated;
+  }
+  return playerPosterFrom(gated, registrationId, request);
+}
+
+/** The gated half, reachable from a test — see `posterGateFor`. */
+export async function playerPosterFor(
+  personId: string,
+  slug: string,
+  registrationId: string,
+  request: PosterRequest,
+): Promise<PosterResult<PlayerPosterInput>> {
+  const gated = await posterGateFor(personId, slug);
+  return "ok" in gated ? gated : playerPosterFrom(gated, registrationId, request);
+}
+
+async function playerPosterFrom(
+  gated: Gate,
+  registrationId: string,
+  request: PosterRequest,
+): Promise<PosterResult<PlayerPosterInput>> {
+  /*
+   * THE SUBJECT, CHECKED AGAINST THE GRANT.
+   *
+   * The gate proves the caller may make SOME poster here; this proves it is
+   * this one. A player who holds a card of their own must not be able to walk
+   * the registration ids of everyone else in the season — the id is in their
+   * own URL, and the next id is a guess away.
+   *
+   * 404, not 403: to a player, another player's registration id is a row they
+   * have no business knowing exists, and the refusal reads the same as one for
+   * an id that never existed.
+   */
+  const via = posterVia(gated.grant, gated.grant.ownRegistrationIds, registrationId, "self");
+  if (via === null) {
+    return { ok: false, status: 404, message: "Not available." };
   }
 
   const read = await withTenantDb(
@@ -271,6 +501,7 @@ export async function playerPosterSource(
         theme: request.theme,
         size: request.size,
         photo: photoKey === null ? "withheld" : "included",
+        via,
       });
 
       return {
@@ -366,6 +597,32 @@ export async function teamPosterSource(
   const gated = await gate(slug);
   if ("ok" in gated) {
     return gated;
+  }
+  return teamPosterFrom(gated, teamId, request);
+}
+
+/** The gated half, reachable from a test — see `posterGateFor`. */
+export async function teamPosterFor(
+  personId: string,
+  slug: string,
+  teamId: string,
+  request: PosterRequest,
+): Promise<PosterResult<TeamPosterInput>> {
+  const gated = await posterGateFor(personId, slug);
+  return "ok" in gated ? gated : teamPosterFrom(gated, teamId, request);
+}
+
+async function teamPosterFrom(
+  gated: Gate,
+  teamId: string,
+  request: PosterRequest,
+): Promise<PosterResult<TeamPosterInput>> {
+  // An owner earns their own squad sheet. A rival's roster and every price in
+  // it is exactly what DA-30 withholds from them everywhere else, and a poster
+  // route would hand it over rendered.
+  const via = posterVia(gated.grant, gated.grant.ownTeamIds, teamId, "owner");
+  if (via === null) {
+    return { ok: false, status: 404, message: "Not available." };
   }
 
   const read = await withTenantDb(
@@ -463,6 +720,7 @@ export async function teamPosterSource(
         theme: request.theme,
         size: request.size,
         squadSize: members.length,
+        via,
       });
 
       return {
@@ -597,15 +855,26 @@ export interface PosterPicker {
   readonly showBranding: boolean;
   readonly players: readonly PosterSubject[];
   readonly teams: readonly PosterSubject[];
+  /**
+   * WHY a list is empty, which is not a detail the screen can infer.
+   *
+   * `season` — these are all of them, and an empty side means the season has
+   * none yet ("add a franchise and its squad card appears here").
+   * `mine` — these are the subjects THIS person may make, and an empty side
+   * means it is not theirs to make. Telling a player to go add a franchise
+   * would be wrong about the season and impossible advice besides.
+   */
+  readonly scope: "season" | "mine";
 }
 
 /**
  * WHAT THERE IS TO MAKE A POSTER OF.
  *
- * The picker screen's only read. It reuses the SAME gate as the image routes —
- * a screen that listed players the routes would refuse to draw would be a menu
- * of 403s, and `registration.review` is the capability that governs seeing a
- * registration at all.
+ * The picker screen's only read. It reuses the SAME gate as the image routes,
+ * and — since a relationship grants one subject rather than a category — the
+ * SAME grant narrows the lists. A screen that offered a player the whole season
+ * would be a menu of 404s, and one that offered an owner the rival squads would
+ * be a menu of 404s that also named every rival's roster in its sublabels.
  *
  * Sold players lead, because the hour after the gavel is when anyone opens this
  * screen and the sale is the thing they came to post. Everyone approved is
@@ -614,9 +883,19 @@ export interface PosterPicker {
  */
 export async function posterPicker(slug: string): Promise<PosterPicker | PosterRefusal> {
   const gated = await gate(slug);
-  if ("ok" in gated) {
-    return gated;
-  }
+  return "ok" in gated ? gated : pickerFrom(gated);
+}
+
+/** The gated half, reachable from a test — see `posterGateFor`. */
+export async function posterPickerFor(
+  personId: string,
+  slug: string,
+): Promise<PosterPicker | PosterRefusal> {
+  const gated = await posterGateFor(personId, slug);
+  return "ok" in gated ? gated : pickerFrom(gated);
+}
+
+async function pickerFrom(gated: Gate): Promise<PosterPicker> {
   return withTenantDb(
     dbHandle,
     { personId: gated.personId, orgId: gated.competition.orgId },
@@ -640,44 +919,70 @@ export async function posterPicker(slug: string): Promise<PosterPicker | PosterR
         )
         .limit(1);
       const liveAuctionId = live?.id ?? null;
+      /*
+       * The narrowing is a PREDICATE, not a filter applied to the results.
+       * Reading every registration in the season and then dropping the ones
+       * that are not yours still reads them — into a query plan, a log, and the
+       * memory of a process serving somebody who may see exactly one row.
+       */
+      const mine = gated.grant.organizer
+        ? undefined
+        : {
+            players: gated.grant.ownRegistrationIds,
+            teams: gated.grant.ownTeamIds,
+          };
       const [playerRows, teamRows] = await Promise.all([
-        db
-          .select({
-            registrationId: registrations.id,
-            name: people.name,
-            number: registrations.registrationNumber,
-            soldPrice: lots.soldPrice,
-            teamName: teams.name,
-          })
-          .from(registrations)
-          .innerJoin(people, eq(people.id, registrations.personId))
-          .leftJoin(
-            lots,
-            liveAuctionId === null
-              ? // No auction has been created yet: every player is simply
-                // unsold, and a join that could match nothing says so.
-                sql`false`
-              : and(eq(lots.registrationId, registrations.id), eq(lots.auctionId, liveAuctionId)),
-          )
-          .leftJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
-          .leftJoin(teams, eq(teams.id, paddles.teamId))
-          .where(
-            and(
-              eq(registrations.competitionId, gated.competition.id),
-              eq(registrations.status, "approved"),
-            ),
-          )
-          // Sold first, then by the number the player already knows themselves by.
-          .orderBy(desc(lots.soldPrice), asc(registrations.registrationNumber)),
-        db
-          .select({ id: teams.id, name: teams.name, shortName: teams.shortName })
-          .from(teams)
-          .where(eq(teams.competitionId, gated.competition.id))
-          .orderBy(asc(teams.name)),
+        mine !== undefined && mine.players.length === 0
+          ? []
+          : db
+              .select({
+                registrationId: registrations.id,
+                name: people.name,
+                number: registrations.registrationNumber,
+                soldPrice: lots.soldPrice,
+                teamName: teams.name,
+              })
+              .from(registrations)
+              .innerJoin(people, eq(people.id, registrations.personId))
+              .leftJoin(
+                lots,
+                liveAuctionId === null
+                  ? // No auction has been created yet: every player is simply
+                    // unsold, and a join that could match nothing says so.
+                    sql`false`
+                  : and(
+                      eq(lots.registrationId, registrations.id),
+                      eq(lots.auctionId, liveAuctionId),
+                    ),
+              )
+              .leftJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+              .leftJoin(teams, eq(teams.id, paddles.teamId))
+              .where(
+                and(
+                  eq(registrations.competitionId, gated.competition.id),
+                  eq(registrations.status, "approved"),
+                  ...(mine === undefined ? [] : [inArray(registrations.id, mine.players)]),
+                ),
+              )
+              // Sold first, then by the number the player already knows themselves by.
+              .orderBy(desc(lots.soldPrice), asc(registrations.registrationNumber)),
+        mine !== undefined && mine.teams.length === 0
+          ? []
+          : db
+              .select({ id: teams.id, name: teams.name, shortName: teams.shortName })
+              .from(teams)
+              .where(
+                and(
+                  eq(teams.competitionId, gated.competition.id),
+                  ...(mine === undefined ? [] : [inArray(teams.id, mine.teams)]),
+                ),
+              )
+              .orderBy(asc(teams.name)),
       ]);
       return {
         competitionName: gated.competition.name,
         showBranding: gated.showBranding,
+        scope: gated.grant.organizer ? ("season" as const) : ("mine" as const),
         players: playerRows.map((row) => ({
           id: row.registrationId,
           label: row.name ?? "Unnamed",

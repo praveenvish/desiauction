@@ -19,6 +19,7 @@ import { withTenantDb, type Db } from "@desiauction/db";
 import { currentSession } from "../auth/actions";
 import { canCompetition, requireCompetitionCapability } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
+import { ownedTeamIdsOn } from "../competition/posters";
 import { dbHandle, systemDb } from "../db";
 import { auctionReadiness, createAuction, type AuctionRecord } from "@desiauction/auction";
 import { auctionOf, auctionView, type AuctionView, type PaddleView } from "@desiauction/auction";
@@ -177,7 +178,7 @@ export interface AuctionDashboard {
     bid: readonly MachineEdge<string, string>[];
   };
   timerDemo: { initialSeconds: number; extensionSeconds: number; steps: TimerDemoStep[] };
-  viewer: { canConduct: boolean };
+  viewer: { canConduct: boolean; canPoster: boolean };
   /** PX-6 lobby: the locked rules (doc 41), display-only. Null pre-creation. */
   rules: GatedAuctionRules | null;
   /**
@@ -245,15 +246,21 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const { ready, view, canConduct, rules, wsUrl, overview, feasibility } = await inCompetitionOrg(
-    session.personId,
-    competition,
-    async (db) => {
-      const [readyProjection, auction, conduct, manage] = await Promise.all([
+  const { ready, view, canConduct, canPoster, rules, wsUrl, overview, feasibility } =
+    await inCompetitionOrg(session.personId, competition, async (db) => {
+      const [readyProjection, auction, conduct, manage, review, ownTeams] = await Promise.all([
         auctionReady(db, competition),
         requireAuction(db, competition.id),
         canCompetition(db, session.personId, scope, "auction.conduct"),
         canCompetition(db, session.personId, scope, "competition.manage"),
+        // The organizer half of the poster gate. Evaluated rather than inferred
+        // from `conduct || manage`, because the studio was shipped with no link
+        // from anywhere in the product and the first link to it must not lead
+        // some of its holders to a 403 — nor hide the door from `org:staff`,
+        // who hold `registration.review` without holding either of the other
+        // two. The owner half is below.
+        canCompetition(db, session.personId, scope, "registration.review"),
+        ownedTeamIdsOn(db, session.personId, competition.id),
       ]);
       // DA-30: running the night, or running the season. Nothing else sees a
       // rival's remaining purse — least of all a team owner, whom
@@ -264,6 +271,15 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
         ready: readyProjection,
         view: auction === null ? null : gateAuctionView(await auctionView(db, auction), money),
         canConduct: conduct,
+        /*
+         * A TEAM OWNER MAY MAKE THEIR OWN SQUAD SHEET, so the button has to
+         * offer it to them. `registration.review` alone was this button's whole
+         * condition, which is the same mistake the poster gate itself used to
+         * make: `viewer` is the empty capability set, so the person with the
+         * most reason to post a squad held nothing and saw nothing. One extra
+         * read, and only when the capability is absent.
+         */
+        canPoster: review || ownTeams.length > 0,
         rules: auction === null ? null : gateRules(rulesOf(auction.config), money),
         feasibility: feasibilityOf(readyProjection, config),
         // DA-30: the dashboard's money surfaces are gated on `money`, and so is
@@ -275,15 +291,14 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
             ? null
             : await auctionOverview(db, auction.id, auction.config, { money }),
       };
-    },
-  );
+    });
   return {
     competition,
     ready,
     view,
     machines: { auction: AUCTION_MACHINE, lot: LOT_MACHINE, bid: BID_MACHINE },
     timerDemo: timerDemo(),
-    viewer: { canConduct },
+    viewer: { canConduct, canPoster },
     rules,
     feasibility,
     wsUrl,

@@ -1325,7 +1325,7 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
             <Card data-testid="home-registrations">
               <ul className="home-list">
                 {registrationsMine.map((registration) => (
-                  <li key={registration.competitionSlug}>
+                  <li key={registration.registrationId}>
                     <Link
                       href={`/seasons/${registration.competitionSlug}/register`}
                       className="home-attn"
@@ -1344,6 +1344,21 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                         {registration.status}
                       </Badge>
                     </Link>
+                    {/* The player's own card. A sibling of the row rather than
+                        something inside it: the row is already one big link,
+                        and an anchor nested in an anchor is invalid HTML that
+                        browsers repair by dropping one of them — usually not
+                        the one you meant. Offered only where a verdict exists,
+                        so it never leads to the route's "no poster yet". */}
+                    {registration.posterReady ? (
+                      <Link
+                        href={`/seasons/${registration.competitionSlug}/posters`}
+                        className="home-own-poster"
+                        data-testid="my-poster"
+                      >
+                        Get your card
+                      </Link>
+                    ) : null}
                   </li>
                 ))}
               </ul>

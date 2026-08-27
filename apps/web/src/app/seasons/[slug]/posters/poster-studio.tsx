@@ -26,7 +26,24 @@ const SIZES: { value: PosterSize; label: string; hint: string }[] = [
 type Kind = "player" | "team";
 
 export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker }) {
-  const [kind, setKind] = useState<Kind>("player");
+  /*
+   * WHAT THIS PERSON CAN ACTUALLY MAKE.
+   *
+   * An organizer sees both kinds always, empty sides included — "no teams yet"
+   * is a true statement about their season and the next thing for them to fix.
+   * A player or an owner holds ONE subject, so offering them the other kind is
+   * offering a control whose only outcome is a dead end that then blames them
+   * for a franchise they have no power to add.
+   */
+  const own = view.scope === "mine";
+  const onlyKind: Kind | null = !own
+    ? null
+    : view.teams.length === 0
+      ? "player"
+      : view.players.length === 0
+        ? "team"
+        : null;
+  const [kind, setKind] = useState<Kind>(onlyKind ?? "player");
   const subjects = kind === "player" ? view.players : view.teams;
   const [playerId, setPlayerId] = useState(view.players[0]?.id ?? "");
   const [teamId, setTeamId] = useState(view.teams[0]?.id ?? "");
@@ -45,23 +62,30 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   return (
     <>
       <Card>
-        <h1 className="dash-title">Posters</h1>
+        <h1 className="dash-title">{own ? "Your poster" : "Posters"}</h1>
         <p className="section-note">
-          A card for a player or a whole squad, ready to post. {view.competitionName}.
+          {own
+            ? onlyKind === "team"
+              ? "Your squad, ready to post."
+              : "Your card, ready to post."
+            : "A card for a player or a whole squad, ready to post."}{" "}
+          {view.competitionName}.
         </p>
 
         <div className="poster-controls">
-          <Select
-            label="What"
-            value={kind}
-            onChange={(event) => {
-              setKind(event.target.value === "team" ? "team" : "player");
-            }}
-            data-testid="poster-kind"
-          >
-            <option value="player">A player</option>
-            <option value="team">A squad</option>
-          </Select>
+          {onlyKind !== null ? null : (
+            <Select
+              label="What"
+              value={kind}
+              onChange={(event) => {
+                setKind(event.target.value === "team" ? "team" : "player");
+              }}
+              data-testid="poster-kind"
+            >
+              <option value="player">A player</option>
+              <option value="team">A squad</option>
+            </Select>
+          )}
 
           <Select
             label={kind === "player" ? "Player" : "Team"}
@@ -126,9 +150,11 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
       <Card>
         {previewSrc === null || downloadHref === null ? (
           <p className="section-note">
-            {kind === "player"
-              ? "No approved players yet — approve a registration and the cards appear here."
-              : "No teams yet — add a franchise and its squad card appears here."}
+            {own
+              ? "There is no card here for you yet — one appears once the auction reaches a verdict on your lot."
+              : kind === "player"
+                ? "No approved players yet — approve a registration and the cards appear here."
+                : "No teams yet — add a franchise and its squad card appears here."}
           </p>
         ) : (
           <div className="poster-preview" data-poster-size={size}>
