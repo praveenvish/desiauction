@@ -1600,7 +1600,10 @@ p + .date-row {
 /* --- Public page block ---------------------------------------------------- */
 
 /* Publishing used to ride in the footer of the pool card. It is a statement
-   about the whole season — and about the public internet — so it gets a block. */
+   about the whole season — and about the public internet — so it gets a block.
+   Branding is the same statement made one step earlier — the mark, then the
+   decision to show it — so the two cards stack identically. */
+.season-branding-card,
 .season-publish-card {
   display: flex;
   flex-direction: column;
@@ -3033,4 +3036,43 @@ p + .date-row {
 
 .season-pass-actions {
   margin-top: var(--space-4);
+}
+
+/* --- Poster studio ---------------------------------------------------------
+   The controls sit on one auto-fitting row so the four selects stay on a line
+   at desktop and stack honestly on a phone — an organizer opens this on the
+   same handset they are about to post from. */
+.poster-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.poster-brand-note {
+  margin-top: var(--space-4);
+}
+
+.poster-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+/* The preview is capped by HEIGHT, not width: a story poster is 1:1.9, and
+   sizing it by width would push the download button off a laptop screen — the
+   one control the whole page exists to reach. */
+.poster-preview-image {
+  max-width: 100%;
+  max-height: 62vh;
+  height: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.poster-actions {
+  display: flex;
+  justify-content: center;
 }
