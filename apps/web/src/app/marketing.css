@@ -1604,12 +1604,16 @@ body:has(.landing.mk) .mk-hero {
 }
 
 .mk-step-top {
+  /* DELIBERATELY NOT `position: relative`. The arrowhead rides on this
+     element's ::after and resolves against the <li>; making this a containing
+     block silently drops the arrowhead by the card's padding, which is exactly
+     what happened the first time the number chip was added here. */
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  /* The icon tile is 48px and the connector rail is pinned to its centre line
-     (card padding + half the tile); if this height changes, move the rail. */
-  min-height: 48px;
+  /* The badge is 56px and the connector rail is pinned to its centre line
+     (card padding + half the badge); if this height changes, move the rail. */
+  min-height: 56px;
   margin-bottom: var(--space-5);
 }
 
@@ -1620,33 +1624,95 @@ body:has(.landing.mk) .mk-hero {
    they read as different kinds of object, so they stop fighting. It stays a
    pseudo-element (never in the accessibility tree) because the <ol> already
    carries the ordering; the numeral is decoration, not information. */
+/*
+ * THE STEP NUMBER, ATTACHED TO ITS BADGE.
+ *
+ * It has been two other things. First a solid gold chip beside the icon tile —
+ * two badges of the same weight on one line, neither winning. Then an editorial
+ * numeral in the card's top-right at 20% accent, which solved the competition by
+ * making the number almost invisible: at that tint it reads as a watermark, and
+ * a sequence nobody can see is not a sequence. Three steps in a row with three
+ * faint corner numerals look like three unrelated cards.
+ *
+ * It is now a marker ON the badge — small, filled, high contrast, overlapping
+ * the ring at its top-right the way a step marker sits on a map pin. Attached
+ * rather than adjacent, so it cannot compete with the icon; filled rather than
+ * tinted, so it is read rather than sensed.
+ *
+ * Still a pseudo-element and still out of the accessibility tree: the <ol>
+ * already carries the ordering, so this is the visual restatement of a fact the
+ * markup states properly.
+ */
 .mk-step-top::before {
   content: "0" counter(mkstep);
   position: absolute;
-  top: var(--space-3);
-  right: var(--space-5);
+  z-index: 1;
+  /* Card padding + 40px along the 56px badge, so the chip overlaps its ring at
+     roughly one o'clock. Measured from the <li>, the same frame the rail uses. */
+  left: calc(var(--space-6) + 40px);
+  top: calc(var(--space-6) - 2px);
+  min-width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  box-sizing: border-box;
   pointer-events: none;
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-weight: var(--font-weight-semibold);
-  font-size: clamp(40px, 4.4vw, 56px);
+  font-size: 12px;
   line-height: 1;
-  letter-spacing: -0.04em;
-  color: color-mix(in srgb, var(--accent) 20%, transparent);
-  transition: color var(--duration-base) var(--ease-out);
+  letter-spacing: 0.02em;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 2px var(--surface-raised);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
 }
 
-/* The icon tile carries the card now, so it gets the extra 4px and a lit top
-   edge of its own — the same sheen the panels use, at tile scale. */
+/*
+ * THE BADGE.
+ *
+ * A rounded square at 48px read as a UI affordance — the same shape as every
+ * button and input on the page. A ring at 56px reads as an emblem, which is
+ * what a step marker in a three-beat sequence should be: the three of them and
+ * the rail between form one spine across the row.
+ *
+ * The ring is drawn with box-shadow rather than a border so the halo outside it
+ * can be a second shadow on the same element, and neither affects layout — the
+ * rail offset below is computed from the 56px box, so a border that changed the
+ * outer size would silently move the spine off the badges' centre line.
+ */
 .mk-steps .mk-icon-tile {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--accent) 20%, var(--surface-raised)),
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle at 50% 22%,
+    color-mix(in srgb, var(--accent) 24%, var(--surface-raised)),
     var(--accent-subtle)
   );
-  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 55%, transparent),
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 68%, transparent),
+    0 0 0 7px color-mix(in srgb, var(--accent) 10%, transparent);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+/* On hover the halo blooms outward and the emblem lifts. Shadow and transform
+   only — nothing here repaints the icon or its ground, so contrast holds at
+   every frame of the transition. */
+.mk-steps li:hover .mk-icon-tile {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 70%, transparent),
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 90%, transparent),
+    0 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .mk-steps .mk-icon-tile svg {
@@ -1654,8 +1720,11 @@ body:has(.landing.mk) .mk-hero {
   height: 24px;
 }
 
+/* The marker lifts with its badge rather than changing colour — a filled chip
+   has nowhere brighter to go, and recolouring it would cost the contrast that
+   makes it readable in the first place. */
 .mk-steps li:hover .mk-step-top::before {
-  color: color-mix(in srgb, var(--accent) 42%, transparent);
+  transform: translateY(-2px);
 }
 
 /* The three-beat ramp was 64 → 38 → 13: the step titles rendered SMALLER than
@@ -1697,12 +1766,13 @@ body:has(.landing.mk) .mk-hero {
     position: relative;
   }
 
-  /* Card padding (--space-6) + half the 48px tile. */
+  /* Card padding (--space-6) + half the 56px badge. Moved with the badge when
+     it grew from 48px; the note on `.mk-step-top` is the reason this is here. */
   .mk-steps li:not(:last-child)::after,
   .mk-steps li:not(:last-child) .mk-step-top::after {
     content: "";
     position: absolute;
-    top: calc(var(--space-6) + 24px);
+    top: calc(var(--space-6) + 28px);
     transition: opacity var(--duration-base) var(--ease-out);
   }
 
