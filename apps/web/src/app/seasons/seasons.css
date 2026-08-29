@@ -3076,3 +3076,39 @@ p + .date-row {
   display: flex;
   justify-content: center;
 }
+
+/*
+ * THE POSTER PREVIEW CROSSFADE (same-document view transition).
+ *
+ * Naming the frame hands the browser one element to morph between states
+ * instead of crossfading the whole page: the card keeps its position while its
+ * aspect ratio and its contents change together. A name must be UNIQUE per
+ * document — there is exactly one preview on this screen, so a static name is
+ * correct here and would not be on a list.
+ */
+.poster-preview {
+  view-transition-name: poster-preview;
+}
+
+/*
+ * `withViewTransition` already refuses to start one under reduced motion, so
+ * this is the second lock rather than the only one: a transition begun any
+ * other way (a future caller, a browser default) still resolves instantly.
+ * `!important` because ::view-transition pseudo-elements carry UA animations
+ * that ordinary specificity does not outrank.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(poster-preview),
+  ::view-transition-new(poster-preview) {
+    animation-duration: var(--duration-base);
+    animation-timing-function: var(--ease-out);
+  }
+}

@@ -4,6 +4,8 @@ import { POSTER_THEMES, type PosterSize, type PosterTheme } from "@desiauction/c
 import { ButtonLink, Card, Select } from "@desiauction/ui";
 import { useState } from "react";
 
+import { withViewTransition } from "../../../../lib/view-transition";
+
 import type { PosterPicker } from "../../../../server/competition/posters";
 
 /**
@@ -111,9 +113,20 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
             value={theme}
             onChange={(event) => {
               const next = event.target.value;
-              setTheme(
-                POSTER_THEMES.includes(next as PosterTheme) ? (next as PosterTheme) : "floodlight",
-              );
+              /*
+               * The preview is a 1080px PNG fetched from our own route, so it
+               * swaps in one step with nothing in between — the old card is
+               * there, then a different one is. A crossfade is the difference
+               * between "the picture changed" and "something went wrong and
+               * reloaded". Same-document only; see the helper.
+               */
+              withViewTransition(() => {
+                setTheme(
+                  POSTER_THEMES.includes(next as PosterTheme)
+                    ? (next as PosterTheme)
+                    : "floodlight",
+                );
+              });
             }}
             data-testid="poster-theme"
           >
@@ -128,7 +141,12 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
             label="Shape"
             value={size}
             onChange={(event) => {
-              setSize(event.target.value === "story" ? "story" : "square");
+              // Square to story changes the frame's aspect ratio as well as the
+              // image, so this is the one that most looks like a glitch without
+              // a transition: the card resizes AND its contents change at once.
+              withViewTransition(() => {
+                setSize(event.target.value === "story" ? "story" : "square");
+              });
             }}
             data-testid="poster-size"
           >
