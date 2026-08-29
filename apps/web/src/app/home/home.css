@@ -1166,7 +1166,7 @@
    the figures beside it hard to read, and text must not animate at all. */
 @media (prefers-reduced-motion: no-preference) {
   .home-live-badge i {
-    animation: home-live-pulse 2s ease-in-out infinite;
+    animation: home-live-pulse var(--duration-pulse) ease-in-out infinite;
   }
 }
 

@@ -26,7 +26,7 @@
   position: absolute;
   inset: 0;
   background: var(--identity-field);
-  animation: shimmer 1.6s var(--ease-out) infinite;
+  animation: shimmer var(--duration-shimmer) var(--ease-out) infinite;
 }
 
 .mark {

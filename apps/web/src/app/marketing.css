@@ -953,7 +953,7 @@ body:has(.landing.mk) .mk-hero {
   border-radius: var(--radius-full);
   background: var(--live);
   box-shadow: 0 0 12px 2px color-mix(in srgb, var(--live) 55%, transparent);
-  animation: mk-pulse 2s var(--ease-out) infinite;
+  animation: mk-pulse var(--duration-pulse) var(--ease-out) infinite;
 }
 
 .mk-stage-lot {
@@ -1071,7 +1071,7 @@ body:has(.landing.mk) .mk-hero {
 
   /* The winning team's swatch pulses like the live dot: the current bidder. */
   .mk-stage-team-a i {
-    animation: mk-pulse 2.4s var(--ease-out) infinite;
+    animation: mk-pulse var(--duration-pulse) var(--ease-out) infinite;
   }
 }
 
@@ -1515,7 +1515,7 @@ body:has(.landing.mk) .mk-hero {
    not a siren. */
 @media (prefers-reduced-motion: no-preference) {
   .mk-steps li:hover .mk-step-top::before {
-    animation: mk-num-pulse 0.55s var(--ease-out);
+    animation: mk-num-pulse var(--duration-emphatic) var(--ease-out);
   }
 }
 
@@ -1988,7 +1988,7 @@ body:has(.landing.mk) .mk-hero {
   height: 6px;
   border-radius: var(--radius-full);
   background: var(--text-on-accent);
-  animation: mk-pulse 2s var(--ease-out) infinite;
+  animation: mk-pulse var(--duration-pulse) var(--ease-out) infinite;
 }
 
 .mk-video-play {
@@ -3092,6 +3092,10 @@ body:has(.landing.mk) .mk-hero {
   }
 
   .mk-hero-visual {
+    /* OFF THE SCALE ON PURPOSE: the stage is the heavy object in this
+       stagger and rises at roughly twice the duration of the copy lines
+       above it (--duration-slow). The ratio is the effect; snapping this to
+       a rung would flatten it. */
     animation: mk-rise-stage 0.7s var(--ease-out) 160ms both;
   }
 
@@ -3797,7 +3801,7 @@ body:has(.landing.mk) .mk-hero {
    scale only, never opacity — the label beside it must hold full contrast at
    every frame of the scan. */
 .mk-live-status--live i {
-  animation: mk-live-pulse 2.4s var(--ease-out) infinite;
+  animation: mk-live-pulse var(--duration-pulse) var(--ease-out) infinite;
 }
 
 @keyframes mk-live-pulse {

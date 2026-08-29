@@ -170,7 +170,11 @@
     "fast": { "$value": "120ms", "$type": "duration" },
     "base": { "$value": "200ms", "$type": "duration" },
     "slow": { "$value": "320ms", "$type": "duration" },
-    "ceremony": { "$value": "1800ms", "$type": "duration" }
+    "emphatic": { "$value": "520ms", "$type": "duration" },
+    "dramatic": { "$value": "840ms", "$type": "duration" },
+    "ceremony": { "$value": "1800ms", "$type": "duration" },
+    "pulse": { "$value": "2s", "$type": "duration" },
+    "shimmer": { "$value": "1600ms", "$type": "duration" }
   },
   "ease": {
     "out": { "$value": "cubic-bezier(0.16, 1, 0.3, 1)", "$type": "cubicBezier" },

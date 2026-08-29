@@ -59,7 +59,11 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 320ms;
+  --duration-emphatic: 520ms;
+  --duration-dramatic: 840ms;
   --duration-ceremony: 1800ms;
+  --duration-pulse: 2s;
+  --duration-shimmer: 1600ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
 }

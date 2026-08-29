@@ -105,7 +105,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .ribbon-network-dot {
-    animation: ribbon-dot-pulse 2s var(--ease-out, ease-in-out) infinite;
+    animation: ribbon-dot-pulse var(--duration-pulse) var(--ease-out) infinite;
   }
 }
 
@@ -245,7 +245,7 @@
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  animation: ceremony-enter 300ms ease-out;
+  animation: ceremony-enter var(--duration-slow) var(--ease-out);
 }
 
 /* The announced content always sits above the decorative SOLD celebration. */
@@ -362,7 +362,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .ceremony-waiting-dot {
-    animation: ceremony-waiting-pulse 1.8s var(--ease-out, ease-in-out) infinite;
+    animation: ceremony-waiting-pulse var(--duration-pulse) var(--ease-out) infinite;
   }
 }
 
@@ -465,7 +465,11 @@
     transparent 62%
   );
   opacity: 0;
-  animation: ceremony-glow-pulse 1600ms var(--ease-out, ease-out) forwards;
+  /* OFF THE SCALE ON PURPOSE: 1600ms is tuned to outlast `ceremony-fall`
+     (1500ms + up to 660ms of per-piece stagger) so the glow is still there
+     when the last confetti lands. These two are a choreography, not drift —
+     moving either onto a token breaks the relationship between them. */
+  animation: ceremony-glow-pulse 1600ms var(--ease-out) forwards;
 }
 
 .ceremony-confetti {
@@ -480,7 +484,9 @@
   /* Deterministic drift: pieces near the left lean left, right lean right —
      a fountain spread, no randomness, identical on every surface. */
   --drift: calc((var(--i) - 14.5) * 3px);
-  animation: ceremony-fall 1500ms var(--ease-out, cubic-bezier(0.2, 0.6, 0.2, 1)) forwards;
+  /* Paired with `ceremony-glow-pulse` above — see the note there before
+     replacing this with a duration token. */
+  animation: ceremony-fall 1500ms var(--ease-out) forwards;
   animation-delay: calc(var(--i) * 22ms);
 }
 
@@ -1151,7 +1157,7 @@
   height: 8px;
   border-radius: var(--radius-full);
   background: var(--live);
-  animation: live-pulse 1.8s ease-in-out infinite;
+  animation: live-pulse var(--duration-pulse) ease-in-out infinite;
 }
 
 @keyframes live-pulse {
@@ -1786,7 +1792,7 @@
   display: block;
   height: 100%;
   background: var(--accent);
-  transition: width 300ms var(--ease-out);
+  transition: width var(--duration-slow) var(--ease-out);
 }
 
 .live-readonly {

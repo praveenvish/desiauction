@@ -796,7 +796,7 @@
     var(--surface-sunken)
   );
   background-size: 200% 100%;
-  animation: tg-shimmer 1.4s linear infinite;
+  animation: tg-shimmer var(--duration-shimmer) linear infinite;
 }
 
 .tg-skel-glyph {
