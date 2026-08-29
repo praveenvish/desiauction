@@ -235,12 +235,30 @@ export default function LandingPage() {
               {LANDING.worst.items.map((item, index) => {
                 const Icon = WORST_ICONS[index] ?? IconBolt;
                 return (
-                  <div key={item.title} className="mk-card">
-                    <span className="mk-icon-tile">
-                      <Icon />
-                    </span>
-                    <h3>{item.title}</h3>
-                    <p>{item.body}</p>
+                  /*
+                   * A FLIP CARD THAT HIDES NOTHING.
+                   *
+                   * Both faces are in the DOM and neither is aria-hidden, so a
+                   * screen reader reads the title and the mechanism as one
+                   * card — the reveal is a visual affordance, not a gate on the
+                   * content. `tabIndex` is what makes it operable without a
+                   * mouse: the flip fires on :focus-visible as well as :hover,
+                   * so a keyboard user reaches the back face the same way a
+                   * pointer does. Without it the card would be a hover-only
+                   * secret on a page most people open on a phone.
+                   */
+                  <div key={item.title} className="mk-card mk-flip" tabIndex={0}>
+                    <div className="mk-flip-inner">
+                      <div className="mk-flip-face mk-flip-front">
+                        <span className="mk-icon-tile">
+                          <Icon />
+                        </span>
+                        <h3>{item.title}</h3>
+                      </div>
+                      <div className="mk-flip-face mk-flip-back">
+                        <p>{item.body}</p>
+                      </div>
+                    </div>
                   </div>
                 );
               })}

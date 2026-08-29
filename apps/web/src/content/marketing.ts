@@ -88,18 +88,32 @@ export const LANDING = {
   worst: {
     kicker: "When things go wrong",
     h2: "Built for the worst moment of the night",
+    /*
+     * EVERY TITLE CARRIES ITS OWN ANSWER.
+     *
+     * They used to name only the fear — "A phone dies mid-auction", "A wrong
+     * sale", "A settlement argument" — and leave the reassurance to the body.
+     * That was survivable while both were on the card at once. It is not
+     * survivable now that the body sits on the back of a flip: a visitor who
+     * does not hover would read three reasons NOT to buy, in the one section
+     * whose entire job is reassurance.
+     *
+     * So the title states the outcome and the body explains the mechanism. The
+     * front of the card is now readable on its own, which is the test any
+     * progressive reveal has to pass.
+     */
     items: [
       {
-        title: "A phone dies mid-auction",
-        body: "The room lives on the server, not the device. Reconnect on any phone and land exactly where things are.",
+        title: "A dead phone doesn't stop the room",
+        body: "The auction lives on the server, not the device. Sign back in on any phone and land exactly where things are.",
       },
       {
-        title: "A wrong sale",
-        body: "Undo rewinds it — in front of everyone, on the record.",
+        title: "A wrong sale is undone, on the record",
+        body: "Undo rewinds it in front of everyone. Nothing is ever quietly corrected.",
       },
       {
-        title: "A settlement argument",
-        body: "Numbered receipts and an append-only ledger nobody — including us — can edit afterwards. The argument ends.",
+        title: "The settlement argument ends",
+        body: "Numbered receipts on an append-only ledger nobody — including us — can edit afterwards.",
       },
     ],
     rehearse: "Your auction has one take. Rehearse it tonight — free.",

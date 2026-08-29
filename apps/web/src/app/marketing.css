@@ -175,9 +175,13 @@
     linear-gradient(180deg, var(--surface-sunken), var(--surface));
 }
 
+/* The gap between a section's heading and its content, one step tighter. The
+   band padding above and below is a deliberate rhythm decision (see the 1200px
+   note) and is left alone; this is the space INSIDE a section, where the
+   heading and the cards belong to each other and were reading as separate. */
 .mk-band-head {
   max-width: 640px;
-  margin-bottom: clamp(var(--space-5), 3vw, var(--space-8));
+  margin-bottom: clamp(var(--space-4), 2.4vw, var(--space-6));
 }
 
 .mk-band-head--center {
@@ -1374,12 +1378,15 @@ body:has(.landing.mk) .mk-hero {
   overflow: hidden;
 }
 
+/* Padding stepped down one rung when the card's content did: a flip card shows
+   one face at a time, so the 24px that framed a title AND a paragraph now frames
+   only one of them and read as a hole. */
 .mk-card {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-6);
+  padding: var(--space-5);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   background: var(--surface-raised);
@@ -4176,4 +4183,69 @@ body:has(.landing.mk) .mk-hero {
   .mk-live-card:hover {
     transform: none;
   }
+}
+
+/* --- The flip cards -------------------------------------------------------
+ *
+ * BUILT SO THE FLIP IS NEVER THE ONLY WAY TO THE CONTENT.
+ *
+ * Default state — every device, every preference — is both faces stacked and
+ * readable, exactly what the card was before. The 3D reveal is switched on only
+ * where it can be operated and only where motion is welcome:
+ * `(hover: hover)` excludes touch, where there is no hover to give and a card
+ * that hides half itself is a card with half its content; `prefers-reduced-
+ * motion` excludes anyone who has asked for less. Both faces stay in the DOM
+ * and neither is aria-hidden, so assistive technology always reads the whole
+ * card.
+ *
+ * The two faces share ONE grid cell rather than the back being absolutely
+ * positioned. Absolute positioning takes the back out of flow, so the card's
+ * height comes from the front alone and a longer mechanism line overflows its
+ * own card. Stacked in a single cell, the taller face sets the height and both
+ * are always exactly the same size.
+ */
+.mk-flip-inner {
+  display: grid;
+}
+
+.mk-flip-face {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .mk-flip {
+    perspective: 1200px;
+  }
+
+  .mk-flip-inner {
+    transform-style: preserve-3d;
+    transition: transform var(--duration-emphatic) var(--ease-out);
+  }
+
+  .mk-flip:hover .mk-flip-inner,
+  .mk-flip:focus-visible .mk-flip-inner {
+    transform: rotateY(180deg);
+  }
+
+  /* `backface-visibility` is what makes one face hide the other. Without it
+     both render and the back reads as mirror-writing through the front. */
+  .mk-flip-face {
+    backface-visibility: hidden;
+  }
+
+  .mk-flip-back {
+    transform: rotateY(180deg);
+    justify-content: center;
+  }
+}
+
+/* The focus ring belongs to the CARD, not the rotating inner element — a ring
+   drawn on a face turns edge-on halfway through the flip and disappears at the
+   exact moment a keyboard user needs it most. */
+.mk-flip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
 }
