@@ -122,7 +122,7 @@ export const LANDING = {
   money: {
     kicker: "The morning after",
     h2: "No more “bhai, hisaab?”",
-    body: "When the gavel falls, the maths is already done. UPI, cash and bank collections are recorded against dues on numbered receipts, in a ledger that only ever grows — corrections are new entries that explain themselves.",
+    body: "When the gavel falls, the maths is already done. UPI, cash and bank collections land on numbered receipts, in a ledger that only ever grows — a correction is a new entry that explains itself.",
     receipt: {
       number: "RCP-0007",
       title: "Team dues — Strikers",
@@ -185,25 +185,25 @@ export const LANDING = {
     stages: [
       {
         name: "Organization",
-        body: "Your club, its members, and who is allowed anywhere near the money.",
+        body: "Your club, its members, and who touches the money.",
       },
       {
         name: "Tournament",
-        body: "The competition that comes back every year, kept as one thing across editions.",
+        body: "One competition, kept whole across every edition.",
       },
       {
         // Evidence: `competitions` rows carry an optional `tournamentId`, and
         // the org activity feed has a "Season cloned" phrase — cloning is real.
         name: "Season",
-        body: "This year's edition. Clone the last one and change the dates.",
+        body: "This year's edition. Clone the last one.",
       },
       {
         name: "Players",
-        body: "One registration link with saved drafts and approvals — or import the sheet you already keep.",
+        body: "One registration link, or import the sheet you keep.",
       },
       {
         name: "Auction",
-        body: "Paddles, the auctioneer's cockpit, the public stage, the board, and a replay of every call.",
+        body: "Paddles, the cockpit, the public stage, the replay.",
       },
       {
         // RESOLVED 2026-07-25 — this line is true on both screens; no founder
@@ -219,7 +219,7 @@ export const LANDING = {
         // data residue, not a defect — `pnpm --filter @desiauction/web
         // backfill:squads` repairs it (dry-run by default, `--apply` to write).
         name: "Teams",
-        body: "Every franchise's squad and what it paid, taken straight from the auction's own record.",
+        body: "Every squad and what it paid, from the auction's record.",
       },
       {
         // TODO(founder): confirm "Grounds" is presentable. Found create-venue,
@@ -229,11 +229,11 @@ export const LANDING = {
         // a line because fixtures schedule ONTO grounds; it would not survive
         // being called a feature of its own.
         name: "Grounds",
-        body: "Your venues and the grounds under them, marked available or not.",
+        body: "Your venues and grounds, marked available or not.",
       },
       {
         name: "Fixtures",
-        body: "Generate the round-robin, then work it as a list, a calendar, or one match day at a time.",
+        body: "Generate the round-robin; work it as list or calendar.",
       },
       {
         // TODO(founder): confirm "Match day" is presentable. Found
@@ -243,7 +243,7 @@ export const LANDING = {
         // why this line says only what the buttons do. If that reads as too
         // little to advertise, cut the stage and let "Fixtures" carry it.
         name: "Match day",
-        body: "Start, complete or call off each fixture as the day actually runs.",
+        body: "Start, complete or call off each fixture.",
       },
       {
         // Was "Dues, receipts, invoices, the ledger, Tally-ready exports and the
@@ -253,7 +253,7 @@ export const LANDING = {
         // no fiscal close. Dues, receipts and the ledger are real and carry the
         // line on their own.
         name: "Money",
-        body: "Dues computed when the gavel falls, numbered receipts, and an append-only ledger.",
+        body: "Dues at the gavel, numbered receipts, one ledger.",
       },
     ],
     // TODO(founder): confirm you want to say this out loud on the home page.

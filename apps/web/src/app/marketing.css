@@ -4034,15 +4034,24 @@ body:has(.landing.mk) .mk-hero {
   border-top: 1px solid var(--border-subtle);
 }
 
+/*
+ * The emblem language at list scale. Both card rows carry a ringed gold circle;
+ * a rounded square here made the page's three icon treatments look like three
+ * different products. It stays 32px rather than growing to the cards' 56px —
+ * ten of those would add height to the tallest section on the page to say the
+ * same thing, and a dense list wants a mark, not a medallion. Ring drawn with
+ * box-shadow so it does not change the 32px box the grid column is sized on.
+ */
 .mk-lifecycle-glyph {
   grid-row: 1 / span 2;
   display: grid;
   place-items: center;
   inline-size: 32px;
   block-size: 32px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  border: 0;
   background: var(--accent-subtle);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--text-accent);
 }
 
