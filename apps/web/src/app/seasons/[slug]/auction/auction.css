@@ -2366,3 +2366,47 @@
   gap: var(--space-2);
   flex: 0 0 auto;
 }
+
+/* --- The money arriving ----------------------------------------------------
+ *
+ * TRANSFORM ONLY, which is the same rule the SOLD celebration above states for
+ * itself: no colour and no opacity change, so contrast holds at every frame of
+ * every keyframe and an axe pass that samples mid-animation reads exactly what
+ * it reads at rest. That rule is why this is a lift rather than a fade, and why
+ * the sold figure tilts only far enough to read as a physical arrival — text
+ * turned edge-on is unreadable for a moment, and this is a money surface.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  /* The live bid, on every change. Short, because at a busy moment this fires
+     several times a minute and anything slower would still be running when the
+     next bid lands. */
+  .lot-hero-bid {
+    animation: bid-arrive var(--duration-base) var(--ease-out) both;
+  }
+
+  /* The hammer price. One per lot, so it can afford the weight the live figure
+     cannot — and `--duration-emphatic` is the rung that exists for exactly this
+     gap between a state change and a celebration. */
+  .ceremony-sold .ceremony-bid {
+    animation: sold-arrive var(--duration-emphatic) var(--ease-out) both;
+    transform-origin: 50% 100%;
+  }
+}
+
+@keyframes bid-arrive {
+  from {
+    transform: translateY(0.16em) scale(0.94);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes sold-arrive {
+  from {
+    transform: perspective(600px) rotateX(-38deg) translateY(0.22em) scale(0.9);
+  }
+  to {
+    transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
+  }
+}

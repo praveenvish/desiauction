@@ -184,6 +184,17 @@ export function LotHero({
               no-bid state shows the opening ask instead — the number the room is
               actually waiting on — clearly marked as not-yet-bid. */}
           <p
+            /*
+             * REMOUNT ON EVERY NEW AMOUNT so the arrival animation replays.
+             * This is the number the room is watching and it used to change
+             * with no event at all — one figure silently became another, which
+             * on a screen across a hall is a change you can miss entirely.
+             *
+             * Safe to remount: the announcements live in `auction-announcer`,
+             * which owns the only aria-live regions on this surface, so nothing
+             * here is re-read by a screen reader.
+             */
+            key={bid === null ? "ask" : String(bid.amount)}
             className={bid === null ? "lot-hero-bid lot-hero-bid--none" : "lot-hero-bid"}
             data-testid="leading-bid"
           >
