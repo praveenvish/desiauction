@@ -71,15 +71,15 @@ export const LANDING = {
     h2: "One link in. One ledger out.",
     steps: [
       {
-        title: "One link registers your players",
+        title: "One link registers players",
         body: "Share one link on WhatsApp. Players sign themselves up; you approve.",
       },
       {
-        title: "Owners bid; the hall watches the stage",
+        title: "Owners bid, the hall watches",
         body: "The server checks every bid before it counts — never the loudest voice.",
       },
       {
-        title: "The gavel falls; the books write themselves",
+        title: "The books write themselves",
         body: "Dues are computed the moment SOLD lands. Every payment gets a numbered receipt.",
       },
     ],
@@ -104,11 +104,11 @@ export const LANDING = {
      */
     items: [
       {
-        title: "A dead phone doesn't stop the room",
+        title: "A dead phone stops nothing",
         body: "The auction lives on the server, not the device. Sign back in on any phone and land exactly where things are.",
       },
       {
-        title: "A wrong sale is undone, on the record",
+        title: "A wrong sale is undone",
         body: "Undo rewinds it in front of everyone. Nothing is ever quietly corrected.",
       },
       {

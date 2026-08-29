@@ -1569,8 +1569,15 @@ body:has(.landing.mk) .mk-hero {
 /* The row and its connectors arrive together: this is also the width at which
    the rail is drawn, and the gutter widens to --space-8 because --space-4 left
    the rail and its arrowhead 16px to share, which read as a stray glyph rather
-   than a line between two beats. */
-@media (min-width: 900px) {
+   than a line between two beats.
+
+   MOVED FROM 900px TO 1024px when the card went horizontal. A stacked card gave
+   its title the full column; a horizontal one spends 56px on the emblem and its
+   gap first, so at 900px inside a panel the text column fell to about 130px and
+   every title ran to three lines. Going three-across later is the fix — and
+   2 + 1 is not an option, because these are numbered beats and an orphaned
+   third reads as a sequence that lost its end. */
+@media (min-width: 1024px) {
   .mk-steps {
     grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
     gap: var(--space-8);
@@ -1783,7 +1790,10 @@ body:has(.landing.mk) .mk-hero {
    to the next. The rail is now pinned to the icon tiles' centre line, so the
    three icons and the two connectors form a single horizontal spine across the
    row, and the arrowhead sits at the end of an actual line. */
-@media (min-width: 900px) {
+/* The spine follows the row. It drew from 900px while the row did; the row now
+   arrives at 1024px, and a connector between cards that are stacked is two
+   hairlines pointing into the margin. */
+@media (min-width: 1024px) {
   .mk-steps {
     position: relative;
   }
@@ -4221,51 +4231,35 @@ body:has(.landing.mk) .mk-hero {
   margin: 0;
 }
 
+/* A title that must wrap should wrap evenly rather than orphaning its last
+   word — at three cards across, the text column is about 260px and not every
+   title survives on one line without losing what it says. */
 .mk-swap > h3 {
   margin-bottom: var(--space-2);
+  text-wrap: balance;
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   /*
-   * One grid cell, two children. The taller of the two sets the height, so the
-   * card never resizes mid-transition — a card that grows as its text arrives
-   * is the "clip" this is built to avoid. Centred, so the shorter title sits in
-   * the middle of the space the longer body needs rather than clinging to the
-   * top of it.
+   * THE TITLE STAYS. The description arrives underneath it.
+   *
+   * Replacing the title with the body meant the one line a scanner actually
+   * reads vanished the moment they moved toward the card. Now the title is
+   * permanent and the description is additive — hovering ADDS information
+   * rather than trading one piece for another.
+   *
+   * The description stays IN FLOW at `opacity: 0` rather than being pulled out
+   * of it. That is the whole trick: its space is already reserved, so the card
+   * has one height in both states, the row never reflows, and the title cannot
+   * shift under the reader — the "hiccup" this is built to avoid. Absolute
+   * positioning or a height transition would each reintroduce it.
    */
-  .mk-swap {
-    display: grid;
-    align-items: center;
-  }
-
-  .mk-swap > * {
-    grid-area: 1 / 1;
-    margin-bottom: 0;
+  .mk-swap > p {
+    opacity: 0;
+    transform: translateY(-4px);
     transition:
       opacity var(--duration-slow) var(--ease-out),
       transform var(--duration-slow) var(--ease-out);
-  }
-
-  .mk-swap > p {
-    opacity: 0;
-    transform: translateY(6px);
-    /* The body waits for the title to be most of the way gone. Crossing both at
-       once double-exposes two blocks of text over each other, which is the
-       thing that reads as a glitch rather than a change. */
-    transition-delay: 90ms;
-  }
-
-  .mk-swap > h3 {
-    transition-delay: 0ms;
-  }
-
-  .mk-swapcard:hover .mk-swap > h3,
-  .mk-swapcard:focus-within .mk-swap > h3,
-  .mk-steps li:hover .mk-swap > h3,
-  .mk-steps li:focus-within .mk-swap > h3 {
-    opacity: 0;
-    transform: translateY(-6px);
-    transition-delay: 0ms;
   }
 
   .mk-swapcard:hover .mk-swap > p,
@@ -4274,6 +4268,5 @@ body:has(.landing.mk) .mk-hero {
   .mk-steps li:focus-within .mk-swap > p {
     opacity: 1;
     transform: none;
-    transition-delay: 90ms;
   }
 }
