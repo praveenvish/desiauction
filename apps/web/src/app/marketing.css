@@ -134,7 +134,7 @@
    felt efficient rather than composed. Above 1280px the ceiling lifts one step
    of the SAME scale — nothing here is a new value, and nothing below 1280px
    moves, so the dense mobile and laptop layouts are exactly as they were. */
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   .mk-band {
     padding: var(--space-20) 0;
   }
@@ -564,6 +564,32 @@ body:has(.landing.mk) .mk-hero {
   margin-bottom: var(--space-8);
 }
 
+/*
+ * ON A PHONE THE PAIR GOES FULL WIDTH.
+ *
+ * `auto-fit` already collapses to one column here — 375px leaves 335px of
+ * container and two 220px tracks plus the gap need 452px. The defect was the
+ * TRACK: sized to `max-content`, it came out 251px, so both buttons sat
+ * left-aligned with 84px of dead space beside them, ragged against the
+ * full-bleed headline above. Measured, not guessed.
+ *
+ * The fix is one word: the track becomes `1fr` instead of `max-content`, so it
+ * takes whatever width it is given. Below ~492px `auto-fit` yields one column
+ * and each button fills the container; above it two columns fit and the pair
+ * sits side by side at EQUAL width, which is also an improvement — at wider
+ * sizes they were 232px and 251px, ragged for no reason.
+ *
+ * Scoped to the phone tier because `max-content` is right on a desktop hero,
+ * where a button stretched across a 600px column would look absurd. A first
+ * attempt used `1fr` unconditionally up to 639px and produced exactly that:
+ * two 599px buttons, stacked, where they would have fitted side by side.
+ */
+@media (max-width: 639px) {
+  .mk-hero-actions {
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  }
+}
+
 /* Proof strip: one full-width rounded bar under the hero, five tiled capability
    marks in a single line on desktop (dividers between), wrapping gracefully on
    narrower screens. Not metrics — restatements of certified capabilities. */
@@ -635,7 +661,7 @@ body:has(.landing.mk) .mk-hero {
    instead. Below this the intrinsic wrap is left alone: forcing wider tracks
    there would stack all five and make the strip taller on exactly the screens
    with least room. */
-@media (min-width: 692px) and (max-width: 1023px) {
+@media (min-width: 640px) and (max-width: 1023px) {
   .mk-proof {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1262,7 +1288,7 @@ body:has(.landing.mk) .mk-hero {
 
 /* Five-up inventory (the capabilities band): auto-fit wraps 2–3-up on tablet,
    then locks to a single flush row of five on desktop — no orphaned fifth card. */
-@media (min-width: 1080px) {
+@media (min-width: 1024px) {
   .mk-cards--5 {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
@@ -1849,7 +1875,7 @@ body:has(.landing.mk) .mk-hero {
 }
 
 /* Desktop: the four assurances in a single flush row beside the heading. */
-@media (min-width: 1080px) {
+@media (min-width: 1024px) {
   .mk-stats-panel--split .mk-stats-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -2324,7 +2350,7 @@ body:has(.landing.mk) .mk-hero {
   margin: 0 auto var(--space-10);
 }
 
-@media (min-width: 960px) {
+@media (min-width: 900px) {
   .mk-tiers {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     max-width: none;
@@ -2487,7 +2513,7 @@ body:has(.landing.mk) .mk-hero {
   line-height: 1.6;
 }
 
-@media (min-width: 860px) {
+@media (min-width: 900px) {
   .mk-trustline span {
     white-space: nowrap;
   }
@@ -2914,7 +2940,7 @@ body:has(.landing.mk) .mk-hero {
   min-width: 0;
 }
 
-@media (min-width: 960px) {
+@media (min-width: 900px) {
   .mk-show {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -3837,7 +3863,7 @@ body:has(.landing.mk) .mk-hero {
   column-gap: clamp(var(--space-6), 4vw, var(--space-12));
 }
 
-@media (min-width: 860px) {
+@media (min-width: 900px) {
   .mk-lifecycle {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
