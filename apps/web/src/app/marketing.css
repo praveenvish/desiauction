@@ -1340,7 +1340,11 @@ body:has(.landing.mk) .mk-hero {
   gap: var(--space-4);
 }
 
-@media (min-width: 900px) {
+/* Three-across at 1024, not 900 — the same reason the steps row moved: a
+   horizontal card spends 56px on its emblem before the text starts, and at
+   900px that left the description wrapping to five lines, whose reserved height
+   pushed the title far off the emblem's line. */
+@media (min-width: 1024px) {
   .mk-cards {
     grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   }
@@ -1714,7 +1718,8 @@ body:has(.landing.mk) .mk-hero {
  * rail offset below is computed from the 56px box, so a border that changed the
  * outer size would silently move the spine off the badges' centre line.
  */
-.mk-steps .mk-icon-tile {
+.mk-steps .mk-icon-tile,
+.mk-swapcard .mk-icon-tile {
   width: 56px;
   height: 56px;
   border: 0;
@@ -1736,7 +1741,8 @@ body:has(.landing.mk) .mk-hero {
 /* On hover the halo blooms outward and the emblem lifts. Shadow and transform
    only — nothing here repaints the icon or its ground, so contrast holds at
    every frame of the transition. */
-.mk-steps li:hover .mk-icon-tile {
+.mk-steps li:hover .mk-icon-tile,
+.mk-swapcard:hover .mk-icon-tile {
   transform: translateY(-2px);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 70%, transparent),
@@ -1744,7 +1750,8 @@ body:has(.landing.mk) .mk-hero {
     0 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-.mk-steps .mk-icon-tile svg {
+.mk-steps .mk-icon-tile svg,
+.mk-swapcard .mk-icon-tile svg {
   width: 24px;
   height: 24px;
 }
@@ -4215,11 +4222,30 @@ body:has(.landing.mk) .mk-hero {
  * audience — the title and the body simply stack and both are read. Neither is
  * ever aria-hidden, so assistive technology gets the whole card in every mode.
  */
+/*
+ * THE EMBLEM ALIGNS TO THE TITLE, NOT TO THE CARD.
+ *
+ * `align-items: center` centred the emblem on the whole card while the title
+ * sat above centre — because the description below it holds its space even at
+ * opacity 0. The two then missed each other by up to 38px and the card read as
+ * badly aligned, which is exactly what it was.
+ *
+ * Both now start at the top and share one 56px band: the emblem IS 56px, and
+ * the title is given the same height with its own centring, so a one-line and a
+ * two-line title both centre against the emblem. The description sits under
+ * that band, where it was always going to appear.
+ */
 .mk-swapcard,
 .mk-steps li {
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-4);
+}
+
+.mk-swap > h3 {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
 }
 
 .mk-swap {
