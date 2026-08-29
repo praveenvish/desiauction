@@ -128,7 +128,7 @@
    height on padding around three short paragraphs. Composed is the goal; hollow
    is not. */
 .mk-band {
-  padding: clamp(var(--space-6), 3.4vw, var(--space-10)) 0;
+  padding: clamp(var(--space-5), 3vw, var(--space-8)) 0;
   background: var(--surface);
 }
 
@@ -139,14 +139,19 @@
    felt efficient rather than composed. Above 1200px the ceiling lifts one step
    of the SAME scale — nothing here is a new value.
 
-   That step was --space-20 (160px per band) until the audit above: seven bands
-   carrying it accounted for most of the page's empty height, and the effect at
-   1440px was less "composed" than "sparse". --space-16 keeps the lift — it is
-   still a clear step above the 40px laptop ceiling, so the rhythm the note
-   describes survives — at 20% less cost. */
+   That step was --space-20 (160px per band) and is now --space-12. Two audits
+   took it down: band padding was 23% of the page at the first and still 22% at
+   the second, on a page whose short sections were spending 37% and 44% of their
+   own height on the space around them.
+
+   The lift the note above argues for SURVIVES, at a third of its old size: 48px
+   here against the 32px ceiling below is a 16px step, where it used to be 32px
+   against 48px. That is the floor. Taking this to --space-10 would leave an 8px
+   difference, which is not a rhythm — it is the same padding everywhere, which
+   is the exact thing the note was written to prevent. */
 @media (min-width: 1200px) {
   .mk-band {
-    padding: var(--space-16) 0;
+    padding: var(--space-12) 0;
   }
 
   /* The lifecycle band is already the tallest thing on the page (ten stages);
