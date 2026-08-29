@@ -72,15 +72,15 @@ export const LANDING = {
     steps: [
       {
         title: "One link registers players",
-        body: "Share one link on WhatsApp. Players sign themselves up; you approve.",
+        body: "Players sign themselves up from one WhatsApp link.",
       },
       {
         title: "Owners bid, the hall watches",
-        body: "The server checks every bid before it counts — never the loudest voice.",
+        body: "The server checks every bid, not the loudest voice.",
       },
       {
         title: "The books write themselves",
-        body: "Dues are computed the moment SOLD lands. Every payment gets a numbered receipt.",
+        body: "Dues computed at SOLD, with numbered receipts.",
       },
     ],
   },
@@ -105,15 +105,15 @@ export const LANDING = {
     items: [
       {
         title: "A dead phone stops nothing",
-        body: "The auction lives on the server, not the device. Sign back in on any phone and land exactly where things are.",
+        body: "The auction lives on the server, not the phone.",
       },
       {
         title: "A wrong sale is undone",
-        body: "Undo rewinds it in front of everyone. Nothing is ever quietly corrected.",
+        body: "Undo rewinds it in front of everyone.",
       },
       {
         title: "The settlement argument ends",
-        body: "Numbered receipts on an append-only ledger nobody — including us — can edit afterwards.",
+        body: "Receipts on a ledger nobody can edit — including us.",
       },
     ],
     rehearse: "Your auction has one take. Rehearse it tonight — free.",

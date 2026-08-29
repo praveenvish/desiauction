@@ -4265,34 +4265,19 @@ body:has(.landing.mk) .mk-hero {
   text-wrap: balance;
 }
 
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  /*
-   * THE TITLE STAYS. The description arrives underneath it.
-   *
-   * Replacing the title with the body meant the one line a scanner actually
-   * reads vanished the moment they moved toward the card. Now the title is
-   * permanent and the description is additive — hovering ADDS information
-   * rather than trading one piece for another.
-   *
-   * The description stays IN FLOW at `opacity: 0` rather than being pulled out
-   * of it. That is the whole trick: its space is already reserved, so the card
-   * has one height in both states, the row never reflows, and the title cannot
-   * shift under the reader — the "hiccup" this is built to avoid. Absolute
-   * positioning or a height transition would each reintroduce it.
-   */
-  .mk-swap > p {
-    opacity: 0;
-    transform: translateY(-4px);
-    transition:
-      opacity var(--duration-slow) var(--ease-out),
-      transform var(--duration-slow) var(--ease-out);
-  }
-
-  .mk-swapcard:hover .mk-swap > p,
-  .mk-swapcard:focus-within .mk-swap > p,
-  .mk-steps li:hover .mk-swap > p,
-  .mk-steps li:focus-within .mk-swap > p {
-    opacity: 1;
-    transform: none;
-  }
-}
+/*
+ * NO REVEAL. The description is simply there.
+ *
+ * It was hidden at opacity 0 and faded in on hover — but its space was RESERVED
+ * the whole time, because reserving it is what stopped the card reflowing when
+ * it appeared. So the reveal bought no height at all: the card measured 159px
+ * either way, and all the hiding achieved was 45px of empty card at rest and a
+ * description that most visitors never read. The whitespace and the hidden text
+ * were the same 45px.
+ *
+ * With the copy cut to two lines the description costs what the emptiness cost.
+ * Showing it is strictly better: nothing is concealed on touch, on keyboard, or
+ * from anyone who simply does not hover, and the card is the same size. The
+ * hover state keeps the lift and the emblem's halo — polish that does not hide
+ * anything to earn itself.
+ */
