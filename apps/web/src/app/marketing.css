@@ -698,9 +698,61 @@ body:has(.landing.mk) .mk-hero {
    truth label) takes the old card composition: docked small to the column's
    top-right so the photo's cup rises to its left and the plinth stays visible. */
 .mk-hero-demo {
+  position: relative;
   display: grid;
   gap: var(--space-3);
   justify-items: center;
+}
+
+/*
+ * THE PEDESTAL.
+ *
+ * The console reads as a card floating on a dark field; the design direction
+ * puts it on a lit stage. Two ellipses do the whole job — a wide soft pool of
+ * accent under the panel and a tighter, brighter core inside it — so the card
+ * looks set down on something rather than pasted over it.
+ *
+ * Gradients, not a photograph: it costs no request, scales to any width, and
+ * carries none of the payload a stage plate would add to the one surface that
+ * has to open fast on a mid-range phone.
+ *
+ * `--accent-sheen` is deliberately absent. The pool is the ACCENT at low alpha;
+ * mixing white in lifted the whole hero toward grey the moment it overlapped
+ * the panel's own border glow.
+ */
+.mk-hero-demo::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  /* Anchored to the card's LOWER EDGE, not the container's. The panel is
+     opaque, so a pool centred behind it is a pool nobody sees — the first
+     attempt put 46% of the container's height back there and read as a smudge.
+     Straddling the edge is what makes it a floor rather than a backdrop. */
+  left: 50%;
+  top: 74%;
+  width: min(128%, 860px);
+  height: 42%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 50% 50% at 50% 50%,
+      color-mix(in srgb, var(--accent) 30%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 28% 60% at 50% 55%,
+      color-mix(in srgb, var(--accent) 42%, transparent),
+      transparent 74%
+    );
+  filter: blur(6px);
+  /* The pool belongs to the floodlit hero only. On a daylight surface the same
+     wash reads as a printing error. */
+  opacity: 0;
+}
+
+[data-theme="floodlight"] .mk-hero-demo::before {
+  opacity: 1;
 }
 
 @media (min-width: 1024px) {
