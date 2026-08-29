@@ -122,8 +122,13 @@
 
 /* --- Bands: the section rhythm --------------------------------------------- */
 
+/* Vertical rhythm. Both ends of this clamp came down one rung of the same scale
+   when a space audit showed band padding was 23% of the whole page — 1066px of
+   4539px at 1280px wide, with the "morning after" band spending 42% of its own
+   height on padding around three short paragraphs. Composed is the goal; hollow
+   is not. */
 .mk-band {
-  padding: clamp(var(--space-8), 4vw, var(--space-12)) 0;
+  padding: clamp(var(--space-6), 3.4vw, var(--space-10)) 0;
   background: var(--surface);
 }
 
@@ -131,12 +136,17 @@
    The fluid clamp above tops out at 48px, which is right for a laptop and too
    tight for a 1440px display: at that width every band carried identical, small
    padding, so eight distinct sections read as one continuous column and the page
-   felt efficient rather than composed. Above 1280px the ceiling lifts one step
-   of the SAME scale — nothing here is a new value, and nothing below 1280px
-   moves, so the dense mobile and laptop layouts are exactly as they were. */
+   felt efficient rather than composed. Above 1200px the ceiling lifts one step
+   of the SAME scale — nothing here is a new value.
+
+   That step was --space-20 (160px per band) until the audit above: seven bands
+   carrying it accounted for most of the page's empty height, and the effect at
+   1440px was less "composed" than "sparse". --space-16 keeps the lift — it is
+   still a clear step above the 40px laptop ceiling, so the rhythm the note
+   describes survives — at 20% less cost. */
 @media (min-width: 1200px) {
   .mk-band {
-    padding: var(--space-20) 0;
+    padding: var(--space-16) 0;
   }
 
   /* The lifecycle band is already the tallest thing on the page (ten stages);
@@ -1621,7 +1631,9 @@ body:has(.landing.mk) .mk-hero {
   /* The badge is 56px and the connector rail is pinned to its centre line
      (card padding + half the badge); if this height changes, move the rail. */
   min-height: 56px;
-  margin-bottom: var(--space-5);
+  /* No bottom margin: this is the row's left column now, not a band above the
+     text. */
+  margin-bottom: 0;
 }
 
 /* The step number used to be a solid gold chip sitting beside the icon tile:
@@ -1655,9 +1667,12 @@ body:has(.landing.mk) .mk-hero {
   position: absolute;
   z-index: 1;
   /* Card padding + 40px along the 56px badge, so the chip overlaps its ring at
-     roughly one o'clock. Measured from the <li>, the same frame the rail uses. */
+     roughly one o'clock. Measured from the <li>, the same frame the rail uses.
+     Vertical is now derived from the row's centre rather than the card's top,
+     because the badge is vertically centred in a horizontal card: half the card
+     minus half the badge, minus two more to sit on the ring. */
   left: calc(var(--space-6) + 40px);
-  top: calc(var(--space-6) - 2px);
+  top: calc(50% - 30px);
   min-width: 24px;
   height: 24px;
   display: grid;
@@ -1773,13 +1788,16 @@ body:has(.landing.mk) .mk-hero {
     position: relative;
   }
 
-  /* Card padding (--space-6) + half the 56px badge. Moved with the badge when
-     it grew from 48px; the note on `.mk-step-top` is the reason this is here. */
+  /* The badge is vertically centred in a horizontal card, and grid stretches
+     every card in the row to one height — so the three badges share a centre
+     line at exactly 50%, and so does the spine between them. This was
+     `--space-6 + 28px` while the badge sat at the card's top; if the card ever
+     goes back to a stacked layout, it goes back to that. */
   .mk-steps li:not(:last-child)::after,
   .mk-steps li:not(:last-child) .mk-step-top::after {
     content: "";
     position: absolute;
-    top: calc(var(--space-6) + 28px);
+    top: 50%;
     transition: opacity var(--duration-base) var(--ease-out);
   }
 
@@ -1809,40 +1827,21 @@ body:has(.landing.mk) .mk-hero {
     transform: translateY(-50%) rotate(45deg);
   }
 
-  /* Without this the three body paragraphs start at three different heights,
-     because the titles are one to three lines depending on the copy and the
-     column width, and the row loses its baseline.
-
-     Subgrid does it properly: every card hands its three bands — icon, title,
-     body — to the row's own tracks, so the title track is as tall as the
-     tallest title and the bodies start level at ANY width. A min-height floor
-     cannot do that; the first version guessed two lines and came apart at
-     exactly 900px, where "The gavel falls; the books write themselves" needs
-     three. That guess survives here only as the pre-subgrid fallback. */
-  .mk-steps h3 {
-    min-height: 2.6em;
-  }
-
-  @supports (grid-template-rows: subgrid) {
-    .mk-steps {
-      grid-template-rows: auto auto 1fr;
-    }
-
-    .mk-steps li {
-      display: grid;
-      grid-template-rows: subgrid;
-      grid-row: span 3;
-      /* A subgrid inherits its parent's gutter, and the parent's is the 32px
-         COLUMN gutter between cards — which arrived as 32px of dead air
-         between the icon, the title and the body. A subgrid may declare its
-         own; the bands are spaced by their own margins. */
-      row-gap: 0;
-    }
-
-    .mk-steps h3 {
-      min-height: 0;
-    }
-  }
+  /*
+   * SUPERSEDED BY THE HORIZONTAL CARD, kept as a note because the problem it
+   * solved is real and will come back if the layout does.
+   *
+   * While each card stacked icon / title / body, the three titles ran one to
+   * three lines depending on copy and column width, so the three bodies started
+   * at three different heights and the row lost its baseline. A subgrid fixed
+   * it properly: every card handed its three bands to the row's own tracks.
+   *
+   * Side by side there are no bands to align — the icon holds the left column,
+   * the text holds the right, and grid already stretches every card in the row
+   * to one height, so the text blocks centre on a shared line for free. Keeping
+   * the subgrid here pinned the badge to a top row and left the card half
+   * empty, which is what it looked like before this note replaced it.
+   */
 }
 
 /* --- Stats panel ("One platform. Complete trust.") -------------------------- */
@@ -1921,12 +1920,17 @@ body:has(.landing.mk) .mk-hero {
    dark split panel) extends the hero's night into two framed cards, matching
    the product screenshot. The band carries data-theme="floodlight"; the light
    panel re-scopes to data-theme="daylight". */
+/* A panel sits INSIDE a band, so its content is paid for twice: at 1280px the
+   band gave 128px and the panel another 80px, 208px of vertical padding around
+   one section. The horizontal padding is unchanged — that one holds the text
+   column off the border and has no second source. The vertical drops a rung,
+   because the band above and below is already doing that job. */
 .mk-panel {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-2xl);
   background: var(--surface);
   box-shadow: var(--shadow-2);
-  padding: clamp(var(--space-6), 3.5vw, var(--space-10)) clamp(var(--space-6), 4vw, var(--space-10));
+  padding: clamp(var(--space-5), 2.6vw, var(--space-8)) clamp(var(--space-6), 4vw, var(--space-10));
 }
 
 .mk-panel-actions {
@@ -4185,67 +4189,91 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
-/* --- The flip cards -------------------------------------------------------
+/* --- Icon left, words right, and the words trade places ---------------------
  *
- * BUILT SO THE FLIP IS NEVER THE ONLY WAY TO THE CONTENT.
+ * The stacked card put a 56px emblem alone on its own line with the width of
+ * the card empty beside it, and pushed a two-line title underneath. Side by
+ * side, the emblem anchors the row and the text gets the whole remaining
+ * column — the card gets shorter and reads in one movement instead of two.
  *
- * Default state — every device, every preference — is both faces stacked and
- * readable, exactly what the card was before. The 3D reveal is switched on only
- * where it can be operated and only where motion is welcome:
- * `(hover: hover)` excludes touch, where there is no hover to give and a card
- * that hides half itself is a card with half its content; `prefers-reduced-
- * motion` excludes anyone who has asked for less. Both faces stay in the DOM
- * and neither is aria-hidden, so assistive technology always reads the whole
- * card.
+ * THE ICON NEVER MOVES. A whole-card flip takes the one fixed landmark away at
+ * the moment the reader is trying to follow the text; keeping it still means
+ * only the words change, which is a much quieter thing to watch.
  *
- * The two faces share ONE grid cell rather than the back being absolutely
- * positioned. Absolute positioning takes the back out of flow, so the card's
- * height comes from the front alone and a longer mechanism line overflows its
- * own card. Stacked in a single cell, the taller face sets the height and both
- * are always exactly the same size.
+ * DEFAULT IS BOTH VISIBLE. The swap is enabled only behind `(hover: hover)`
+ * and `prefers-reduced-motion: no-preference`. On touch — most of this
+ * audience — the title and the body simply stack and both are read. Neither is
+ * ever aria-hidden, so assistive technology gets the whole card in every mode.
  */
-.mk-flip-inner {
-  display: grid;
+.mk-swapcard,
+.mk-steps li {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-4);
 }
 
-.mk-flip-face {
-  grid-area: 1 / 1;
-  display: flex;
-  flex-direction: column;
+.mk-swap {
+  flex: 1;
   min-width: 0;
 }
 
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .mk-flip {
-    perspective: 1200px;
-  }
-
-  .mk-flip-inner {
-    transform-style: preserve-3d;
-    transition: transform var(--duration-emphatic) var(--ease-out);
-  }
-
-  .mk-flip:hover .mk-flip-inner,
-  .mk-flip:focus-visible .mk-flip-inner {
-    transform: rotateY(180deg);
-  }
-
-  /* `backface-visibility` is what makes one face hide the other. Without it
-     both render and the back reads as mirror-writing through the front. */
-  .mk-flip-face {
-    backface-visibility: hidden;
-  }
-
-  .mk-flip-back {
-    transform: rotateY(180deg);
-    justify-content: center;
-  }
+.mk-swap > * {
+  margin: 0;
 }
 
-/* The focus ring belongs to the CARD, not the rotating inner element — a ring
-   drawn on a face turns edge-on halfway through the flip and disappears at the
-   exact moment a keyboard user needs it most. */
-.mk-flip:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 3px;
+.mk-swap > h3 {
+  margin-bottom: var(--space-2);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  /*
+   * One grid cell, two children. The taller of the two sets the height, so the
+   * card never resizes mid-transition — a card that grows as its text arrives
+   * is the "clip" this is built to avoid. Centred, so the shorter title sits in
+   * the middle of the space the longer body needs rather than clinging to the
+   * top of it.
+   */
+  .mk-swap {
+    display: grid;
+    align-items: center;
+  }
+
+  .mk-swap > * {
+    grid-area: 1 / 1;
+    margin-bottom: 0;
+    transition:
+      opacity var(--duration-slow) var(--ease-out),
+      transform var(--duration-slow) var(--ease-out);
+  }
+
+  .mk-swap > p {
+    opacity: 0;
+    transform: translateY(6px);
+    /* The body waits for the title to be most of the way gone. Crossing both at
+       once double-exposes two blocks of text over each other, which is the
+       thing that reads as a glitch rather than a change. */
+    transition-delay: 90ms;
+  }
+
+  .mk-swap > h3 {
+    transition-delay: 0ms;
+  }
+
+  .mk-swapcard:hover .mk-swap > h3,
+  .mk-swapcard:focus-within .mk-swap > h3,
+  .mk-steps li:hover .mk-swap > h3,
+  .mk-steps li:focus-within .mk-swap > h3 {
+    opacity: 0;
+    transform: translateY(-6px);
+    transition-delay: 0ms;
+  }
+
+  .mk-swapcard:hover .mk-swap > p,
+  .mk-swapcard:focus-within .mk-swap > p,
+  .mk-steps li:hover .mk-swap > p,
+  .mk-steps li:focus-within .mk-swap > p {
+    opacity: 1;
+    transform: none;
+    transition-delay: 90ms;
+  }
 }

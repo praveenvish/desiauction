@@ -72,15 +72,15 @@ export const LANDING = {
     steps: [
       {
         title: "One link registers your players",
-        body: "Share it on WhatsApp. Players sign themselves up; you approve. Already have a player sheet? It imports in minutes.",
+        body: "Share one link on WhatsApp. Players sign themselves up; you approve.",
       },
       {
         title: "Owners bid; the hall watches the stage",
-        body: "Every bid is checked by the server before it counts — never the loudest voice. The projector runs the show, no app required.",
+        body: "The server checks every bid before it counts — never the loudest voice.",
       },
       {
         title: "The gavel falls; the books write themselves",
-        body: "Dues are computed the moment SOLD lands. UPI, cash or bank — every payment gets a numbered receipt.",
+        body: "Dues are computed the moment SOLD lands. Every payment gets a numbered receipt.",
       },
     ],
   },
