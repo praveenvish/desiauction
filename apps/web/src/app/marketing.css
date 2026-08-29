@@ -232,8 +232,11 @@ body {
    padding to clear the floating bar. Browsers without :has() simply keep the
    default sticky glass header and the hero's normal padding — a clean fallback.
    Every other public page (pricing, help, …) is untouched. */
+/* The hero's own tail. 64-96px sat under the last line of the hero before the
+   capability strip, which has padding of its own directly beneath it — the two
+   were paying for the same gap twice. */
 body:has(.landing.mk) .mk-hero {
-  padding-bottom: clamp(4rem, 4vw, 6rem);
+  padding-bottom: clamp(2.5rem, 3vw, 4rem);
 }
 
 /* THE TRANSPARENT HEADER MAY ONLY EXIST WHERE SOMETHING RESTORES IT.
@@ -265,9 +268,16 @@ body:has(.landing.mk) .mk-hero {
     }
 
     /* Only a FIXED header needs clearing; the sticky fallback occupies its own
-       space, so this padding belongs with the position that requires it. */
+       space, so this padding belongs with the position that requires it.
+       
+       THE FLOOR IS FUNCTIONAL AND STAYS. The header is 73px, and at 390px this
+       clamp's floor leaves just 31px between it and the headline — there is
+       nothing to give there. The SLOPE was the surplus: it grew to 120px at
+       1280 and 128px at 1440, opening 72-86px under a header that needs none of
+       it, on the one screen a visitor judges first. Flattened, so wide screens
+       get the same clearance a phone does rather than more of it. */
     body:has(.landing.mk) .mk-hero {
-      padding-top: clamp(6.5rem, 5vw + 3.5rem, 9rem);
+      padding-top: clamp(6.5rem, 2vw + 4.5rem, 8rem);
     }
   }
 }
@@ -554,10 +564,16 @@ body:has(.landing.mk) .mk-hero {
   }
 }
 
+/* The gap between the pitch and the console. It is a COLUMN gutter at 1024px and
+   above, where 40-64px is right; below that the grid stacks and the same value
+   becomes vertical space in the middle of a hero that already runs past a phone
+   viewport. Row and column are set apart so each is the size its own axis
+   needs. */
 .mk-hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: clamp(var(--space-10), 6vw, var(--space-16));
+  column-gap: clamp(var(--space-10), 6vw, var(--space-16));
+  row-gap: var(--space-6);
   align-items: center;
 }
 
@@ -580,7 +596,11 @@ body:has(.landing.mk) .mk-hero {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), max-content));
   gap: var(--space-3);
-  margin-bottom: var(--space-8);
+  /* THE GAP TO THE NOTE BELOW, STATED ONCE. It used to be two numbers that only
+     worked together: --space-8 here against a -24px top margin on the note,
+     netting 8px. Nothing said so, so tightening this alone took the pair to -4px
+     and the caption sat on top of the button. */
+  margin-bottom: var(--space-2);
 }
 
 /*
@@ -3686,9 +3706,10 @@ body:has(.landing.mk) .mk-hero {
   opacity: 1;
 }
 
-/* Risk-reducer microcopy directly under the hero CTAs. */
+/* Risk-reducer microcopy directly under the hero CTAs. The pull-up is gone; the
+   spacing lives on `.mk-hero-actions` where it can be read. */
 .mk-hero-note {
-  margin: calc(-1 * var(--space-6)) 0 0;
+  margin: 0;
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
