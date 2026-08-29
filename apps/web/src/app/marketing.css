@@ -3095,7 +3095,8 @@ body:has(.landing.mk) .mk-hero {
     /* OFF THE SCALE ON PURPOSE: the stage is the heavy object in this
        stagger and rises at roughly twice the duration of the copy lines
        above it (--duration-slow). The ratio is the effect; snapping this to
-       a rung would flatten it. */
+       a rung would flatten it.
+       motion-ok: the ratio to --duration-slow above is the effect. */
     animation: mk-rise-stage 0.7s var(--ease-out) 160ms both;
   }
 

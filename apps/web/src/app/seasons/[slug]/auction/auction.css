@@ -468,7 +468,8 @@
   /* OFF THE SCALE ON PURPOSE: 1600ms is tuned to outlast `ceremony-fall`
      (1500ms + up to 660ms of per-piece stagger) so the glow is still there
      when the last confetti lands. These two are a choreography, not drift —
-     moving either onto a token breaks the relationship between them. */
+     moving either onto a token breaks the relationship between them.
+     motion-ok: paired with ceremony-fall; the numbers are a choreography. */
   animation: ceremony-glow-pulse 1600ms var(--ease-out) forwards;
 }
 
@@ -485,7 +486,8 @@
      a fountain spread, no randomness, identical on every surface. */
   --drift: calc((var(--i) - 14.5) * 3px);
   /* Paired with `ceremony-glow-pulse` above — see the note there before
-     replacing this with a duration token. */
+     replacing this with a duration token.
+     motion-ok: paired with ceremony-glow-pulse above. */
   animation: ceremony-fall 1500ms var(--ease-out) forwards;
   animation-delay: calc(var(--i) * 22ms);
 }

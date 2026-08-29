@@ -208,7 +208,8 @@
   border-radius: var(--radius-full);
   border: 2px solid var(--text-on-accent);
   border-top-color: transparent;
-  /* A spinner's rate is a convention, not a rung on this product's scale. */
+  /* A spinner's rate is a convention, not a rung on this product's scale.
+     motion-ok: 0.8s is the conventional spinner period. */
   animation: spin 0.8s linear infinite;
 }
 

@@ -18,10 +18,11 @@
     "test:integration": "turbo run test:integration",
     "env:check": "turbo run env:check",
     "preflight:production": "node scripts/preflight-production.mjs",
+    "check:motion": "node scripts/check-motion-tokens.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "depcruise": "depcruise apps packages",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check && pnpm depcruise",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check && pnpm depcruise && pnpm check:motion",
     "verify:local": "pnpm verify && pnpm build && pnpm test:integration && pnpm env:check && node scripts/health.mjs --no-apps"
   },
   "devDependencies": {
