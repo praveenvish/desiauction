@@ -73,11 +73,13 @@ with `pnpm env:check`). Web: `DATABASE_URL` (app role), `SYSTEM_DATABASE_URL`
 Engine: `DATABASE_URL` (writer credential), `ENGINE_SECRET`, `PORT`,
 `SENTRY_DSN`. Runner: `DATABASE_URL` (writer credential), `RUNNER_TICK_MS`.
 
-Added after RC-1. **None of these is in `.env.example` yet** (verified
-2026-08-19: `grep RAZORPAY .env.example` finds nothing), so this table and
-[PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md) §3/§9 are currently the only
-place they are written down — adding them to `.env.example` is an open item.
-Each app's `env.ts` remains the authority for validation.
+Added after RC-1. That open item is **closed** (re-verified 2026-08-30): every
+variable below now appears in `.env.example`, commented out and annotated with
+the reasoning that governs it, alongside this table and
+[PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md) §3/§9. The note that used to
+stand here — "none of these is in `.env.example` yet", dated 2026-08-19 — was
+true when written and is not any more. Each app's `env.ts` remains the authority
+for validation; `.env.example` documents, it does not enforce.
 
 | Variable | App | Required | Why |
 |---|---|---|---|
@@ -87,6 +89,10 @@ Each app's `env.ts` remains the authority for validation.
 | `ENGINE_ALLOWED_ORIGINS` | engine | **yes in production** | Comma-separated browser origins allowed to open the spectate WebSocket. A ticket authorises an *auction*, not a *page*, so unset means any origin can open a socket with a scraped ticket. Unset = "do not check", correct only for local dev and native clients. |
 | `WS_MAX_SOCKETS_PER_ROOM` | engine | optional (default 2000) | Per-auction socket ceiling; a DoS bound, not a product limit. |
 | `WS_MAX_SOCKETS_PER_IP` | engine | optional (default 50) | Per-client-address socket ceiling. |
+| `EMAIL_API_ENDPOINT` | web | **all three or none** | Provider send endpoint (`https://api.resend.com/emails`). |
+| `EMAIL_API_KEY` | web | **all three or none** | Provider key, sent as a bearer token. |
+| `EMAIL_FROM` | web | **all three or none** | Envelope sender, e.g. `DesiAuction <no-reply@mail.desiauction.in>`. On the **sending subdomain**, never the root — the root's reputation carries the statutory `privacy@` and `navrangi@` mailboxes. Miss any one of these three and `transactionalMailer()` returns `UnconfiguredMailer`, which reports `"unconfigured"` rather than pretending to send. |
+| `EMAIL_REPLY_TO` | web | optional | Where a human reply lands (`support@desiauction.in`). Deliberately outside the three-way check above: absent, someone replying to a receipt is talking to a wall, but the provider is still configured. See [EMAIL_SETUP](EMAIL_SETUP.md). |
 
 `ENGINE_SECRET` gained two boot-time rules (`apps/engine/src/env.ts`): it must be
 **≥ 32 characters in production**, and the repo's `dev-engine-secret` default is

@@ -9,6 +9,7 @@ Drilled locally 2026-07-16 against a live engine; measured results inline.
 | `ENGINE_SECRET` | web (mints commands + spectator tickets), engine (verifies) | HARD CUTOVER — see drill |
 | `SYSTEM_DATABASE_URL` / `DATABASE_URL` passwords | web, engine, finops-runner | Connection-pool refresh on restart |
 | Razorpay `key_secret` + `webhook_secret` | web (settlement adapter) | Razorpay dashboard supports dual active webhook secrets during transition |
+| `EMAIL_API_KEY` | web (transactional mailer) | Overlapping keys are allowed — create, deploy, then revoke; no cutover |
 | `SENTRY_DSN` | web, engine | Non-secret-ish; rotate at leisure |
 | Session tokens | user browsers | Self-rotating per login (identity/SESSIONS.md); nothing to do |
 
@@ -51,6 +52,21 @@ remains active on in-flight deliveries; deploy the new secret first, then
 switch the dashboard. A stale-signature webhook is refused 401 and Razorpay
 retries — no event is lost (settlement webhook ingress is idempotent and
 envelope-pinned).
+
+## Email provider API key
+
+Resend allows several live keys at once, so this rotates without a cutover:
+create the new key (sending access, scoped to `mail.desiauction.in`), deploy
+it, confirm one real send, then revoke the old one. Nothing to coordinate.
+
+Two things that are NOT rotations and must not be treated as one. Revoking a
+key does not stop mail failing closed and loud: with any of the three send
+settings absent the mailer becomes `UnconfiguredMailer` and reports
+`"unconfigured"`, so a botched rotation degrades to silence-with-a-signal
+rather than to dropped mail. And the DKIM private keys live at the providers —
+rotating those means regenerating a selector in the Zoho or Resend console and
+replacing the matching TXT record, which is a DNS change with propagation, not
+a secret swap. See `docs/operations/EMAIL_SETUP.md`.
 
 ## Cadence
 
