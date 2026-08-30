@@ -33,6 +33,14 @@ import { storage } from "../media";
 // server-driven (search/filter/sort/pagination in SQL) so the client never loads
 // the whole dataset (M-IP3-2 performance target).
 
+/**
+ * A pool handle or an open transaction. Entry runs on both: the self-service
+ * and single-player paths hold a pool, the CSV import commits every row inside
+ * ONE transaction and must reinstate through the same helper rather than
+ * growing a second copy of the rule.
+ */
+type Writer = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 export type SubmitResult =
   | { ok: true; registrationId: string }
   | { ok: false; reason: "invalid_role" | "not_open" | "duplicate" };
@@ -88,8 +96,8 @@ function validProfile(profile: PlayerProfileInput | undefined): Partial<{
  * the duplicate rule doing its job, and a rejected registration is the
  * organizer's decision, which re-applying must never quietly overturn.
  */
-async function reinstateWithdrawn(
-  db: Db,
+export async function reinstateWithdrawn(
+  db: Writer,
   competitionId: string,
   personId: string,
   fresh: {

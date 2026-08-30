@@ -43,6 +43,34 @@ function playersCsv(): string {
   return [header, ...rows].join("\n");
 }
 
+/*
+ * A GOOGLE FORM EXPORT, IN THE SHAPE ONE ARRIVES IN.
+ *
+ * Headers are the form's QUESTIONS, the first two columns are the form's own
+ * bookkeeping, roles are spelled the way people write them, and dates are
+ * dd/mm/yyyy. Before column mapping existed this file was refused at line 1
+ * with "Missing required column(s): name, phone, role" and imported nobody.
+ */
+function googleFormCsv(options: { withSizes?: boolean } = {}): string {
+  const header =
+    "Timestamp,Email Address,Player Name,Mobile Number,Which role do you play?,Date of Birth" +
+    (options.withSizes === true ? ",T-shirt size" : "");
+  const spellings = ["Batsman", "Fast Bowler", "All Rounder", "Wicket Keeper Batsman"];
+  const rows = Array.from({ length: 4 }, (_, i) => {
+    const phone = `7${STAMP}${i}`.slice(0, 10);
+    return [
+      "15/03/2026 14:32:11",
+      `player${String(i)}@example.com`,
+      `Form Player ${String(i)}`,
+      phone,
+      spellings[i % 4],
+      "15/03/1998",
+      ...(options.withSizes === true ? ["L"] : []),
+    ].join(",");
+  });
+  return [header, ...rows].join("\n");
+}
+
 test("the operations journey: import, dashboard, search, filter, bulk, export, audit", async ({
   page,
 }) => {
@@ -129,14 +157,23 @@ const PNG_1PX = Buffer.from(
  *
  * Runs against `next dev`, where CI's nightly runs it.
  */
-test.skip(
-  process.env["PLAYWRIGHT_PRECOMPILED"] === "1",
-  "local media is written after the build; a built server cannot serve it",
-);
-
 test("an organizer adds one player by hand, then imports their photo by filename", async ({
   page,
 }) => {
+  /*
+   * SCOPED TO THIS TEST, and that is the fix.
+   *
+   * This used to be a bare `test.skip(condition, reason)` at module scope,
+   * which is Playwright's FILE-level skip — so a flag meant to exclude one
+   * photo test silently excluded the whole file: the CSV import journey, the
+   * axe check, and the Google Form mapping test with them. Under
+   * PLAYWRIGHT_PRECOMPILED the suite reported "4 skipped" and read as though
+   * registration operations were covered.
+   */
+  test.skip(
+    process.env["PLAYWRIGHT_PRECOMPILED"] === "1",
+    "local media is written after the build; a built server cannot serve it",
+  );
   await otpLogin(page, `82${STAMP}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
@@ -195,4 +232,96 @@ test("registration operations dashboard: axe zero violations", async ({ page }) 
   await expect(page.getByTestId("stat-row")).toBeVisible();
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations, JSON.stringify(scan.violations, null, 2)).toEqual([]);
+});
+
+/*
+ * PHASE 1 — the file a club actually hands over goes in without anybody
+ * renaming a column in a spreadsheet first.
+ *
+ * This is the whole feature end to end: read the file, check the mapping the
+ * product guessed against the file's own sample values, preview, commit, and
+ * find the players on the dashboard under the roles the FORM spelled its own
+ * way.
+ */
+test("a Google Form export imports through the mapping step", async ({ page }) => {
+  const stamp = String(Date.now()).slice(-8);
+  await otpLogin(page, `76${stamp}`);
+
+  await page.goto("/orgs");
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Form Org ${stamp}`);
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page.getByTestId("org-name")).toBeVisible();
+
+  await page.goto("/seasons");
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Form Cup ${stamp}`);
+  await page.getByLabel("Location").fill("Malad");
+  await page.getByLabel("Starts on").fill("2026-08-01");
+  await page.getByLabel("Ends on").fill("2026-08-15");
+  await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page.getByTestId("competition-status")).toHaveText("draft");
+  await page.getByTestId("advance-status").click();
+  await page.getByTestId("advance-status").click();
+  await expect(page.getByTestId("competition-status")).toHaveText("registration open");
+
+  await page.getByTestId("open-dashboard").click();
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+
+  await page.getByTestId("open-import").click();
+  await page.getByTestId("import-textarea").evaluate((el, csv) => {
+    (el as HTMLTextAreaElement).value = csv;
+  }, googleFormCsv());
+
+  // One press reads the headers, maps them and validates. The mapper renders
+  // beside the preview, so the translation is on screen before any commit.
+  await page.getByTestId("import-preview-btn").click();
+  await expect(page.getByTestId("column-mapper")).toBeVisible({ timeout: 20_000 });
+
+  // The guess is right, and the screen SHOWS it rather than asserting it: the
+  // form's own question maps to our field, with its first value beside it.
+  await expect(page.getByTestId("mapping-select-2")).toHaveValue("name");
+  await expect(page.getByTestId("mapping-select-3")).toHaveValue("phone");
+  await expect(page.getByTestId("mapping-select-4")).toHaveValue("role");
+  await expect(page.getByTestId("mapping-select-5")).toHaveValue("date_of_birth");
+  // Timestamp and Email Address are the form's bookkeeping — imported nowhere.
+  await expect(page.getByTestId("mapping-select-0")).toHaveValue("");
+  await expect(page.getByTestId("mapping-select-1")).toHaveValue("");
+  // Nothing is outstanding, so the required-field warning is absent.
+  await expect(page.getByTestId("mapping-missing")).toHaveCount(0);
+
+  await expect(page.getByTestId("import-preview")).toContainText("4 valid", { timeout: 20_000 });
+  await page.getByTestId("import-commit").click();
+
+  await expect(page.getByTestId("stat-total")).toContainText("4");
+  // The roles the FORM spelled ("Batsman", "Wicket Keeper Batsman") arrived as
+  // the four the product understands. The table prints the stored token with
+  // its underscores swapped for spaces, so this asserts on what is on screen.
+  await expect(page.getByTestId("reg-table")).toContainText("all rounder");
+  await expect(page.getByTestId("reg-table")).toContainText("wicket keeper");
+
+  /*
+   * PHASE 3 — the SECOND file, which is how a club actually works: the roster
+   * comes once, then again with the corrections. Before this the re-import did
+   * nothing at all and called the whole squad duplicates.
+   */
+  await page.getByTestId("open-import").click();
+  await page.getByTestId("import-textarea").evaluate((el, csv) => {
+    (el as HTMLTextAreaElement).value = csv;
+  }, googleFormCsv({ withSizes: true }));
+  await page.getByTestId("import-preview-btn").click();
+
+  // The preview now states what committing would DO, not just how many rows
+  // parsed: everyone is already here, and four of them gain a size.
+  await expect(page.getByTestId("import-diff-counts")).toContainText("0 new", {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId("import-diff-counts")).toContainText("4 changed");
+  // ...and it shows the change itself, old value beside new, before any write.
+  await expect(page.getByTestId("import-diff-table")).toContainText("T-shirt size");
+  await expect(page.getByTestId("import-diff-table")).toContainText("(blank)");
+
+  await page.getByTestId("import-commit").click();
+  // Still four players — updated in place, never duplicated.
+  await expect(page.getByTestId("stat-total")).toContainText("4");
 });

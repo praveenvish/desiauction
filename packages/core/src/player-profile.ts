@@ -121,6 +121,87 @@ export function parseBowlingStyle(value: string): BowlingStyle | null {
 }
 
 /**
+ * THE COLUMN THE STYLE FIX LEFT BEHIND.
+ *
+ * `parseBattingStyle` was taught to read what a person actually writes; role was
+ * left on a bare enum match (`isRegistrationRole`), so every spelling a human
+ * uses on a registration form — "All Rounder", "Batsman", "Wicket Keeper" —
+ * failed line by line. Since the import refuses any file with errors, one
+ * ordinary Google Form export produced N errors and imported nobody.
+ *
+ * The aliases below are the vocabulary of a club registration form, not an
+ * attempt at natural language: each one is a spelling of one of the four roles
+ * we already have, and anything outside them still returns null so the caller
+ * REPORTS rather than guesses. Speciality spellings collapse to the role they
+ * are a kind of — a "leg spinner" is a bowler, an opener is a batter — because
+ * the finer detail already has its own columns in `batting_style` and
+ * `bowling_style`.
+ */
+/*
+ * Spelled out in the form a person types; punctuation and spacing are removed
+ * by `normalizeStyleKey` before lookup, so "All Rounder", "all-rounder" and
+ * "allrounder" are one entry here, not three.
+ */
+const ROLE_ALIASES: Record<PlayerRole, readonly string[]> = {
+  batter: [
+    "bat",
+    "batsman",
+    "batswoman",
+    "batting",
+    "opener",
+    "opening batsman",
+    "top order",
+    "top order batsman",
+    "middle order",
+    "middle order batsman",
+    "finisher",
+  ],
+  bowler: [
+    "bowl",
+    "bowling",
+    "pacer",
+    "pace bowler",
+    "fast",
+    "fast bowler",
+    "medium pacer",
+    "seamer",
+    "spin",
+    "spinner",
+    "spin bowler",
+    "off spinner",
+    "leg spinner",
+  ],
+  all_rounder: ["all rounder", "all round", "ar", "batting all rounder", "bowling all rounder"],
+  wicket_keeper: [
+    "wicket keeper",
+    "keeper",
+    "wk",
+    "wkt",
+    "wkt keeper",
+    "stumper",
+    "wicket keeper batsman",
+    "wk batsman",
+    "keeper batsman",
+  ],
+};
+
+const ROLE_BY_NORMALIZED: ReadonlyMap<string, PlayerRole> = new Map(
+  PLAYER_ROLES.flatMap((role) => [
+    [normalizeStyleKey(role), role] as const,
+    [normalizeStyleKey(ROLE_LABELS[role]), role] as const,
+    ...ROLE_ALIASES[role].map((alias) => [normalizeStyleKey(alias), role] as const),
+  ]),
+);
+
+/**
+ * The canonical role behind a token, a label or the way it is written on a
+ * registration form, else null — the caller's cue to report the value back.
+ */
+export function parseRole(value: string): PlayerRole | null {
+  return ROLE_BY_NORMALIZED.get(normalizeStyleKey(value)) ?? null;
+}
+
+/**
  * Label any batting OR bowling enum key (the two sets are disjoint), passing an
  * unknown/legacy value through unchanged and `null` through as `null`. The one
  * style formatter for the showcase, the player page, and the share card.

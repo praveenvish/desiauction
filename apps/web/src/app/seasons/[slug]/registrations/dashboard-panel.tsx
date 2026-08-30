@@ -1,6 +1,12 @@
 "use client";
 
-import { REJECTION_REASONS } from "@desiauction/core";
+import {
+  REJECTION_REASONS,
+  REQUIRED_IMPORT_FIELDS,
+  mappingOf,
+  type ColumnMapping,
+  type DateOrder,
+} from "@desiauction/core";
 import {
   Badge,
   Button,
@@ -22,16 +28,21 @@ import {
   bulkTriageAction,
   exportRegistrationsAction,
   importCommitAction,
+  importInspectAction,
   importPreviewAction,
+  saveImportMappingAction,
   markRegistrationAction,
   registrationTimelineAction,
   selectAllMatchingAction,
   triageRegistrationAction,
   type ImportPreview,
+  type ImportInspection,
+  type ImportShape,
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
 import { AddPlayerDialog } from "./add-player-dialog";
+import { ColumnMapper } from "./column-mapper";
 import { PhotoImportPanel } from "./photo-import";
 import { PlayerPhotoUploader } from "./player-photo-uploader";
 import { formatDateTime } from "../../../../lib/format-date";
@@ -151,6 +162,16 @@ export function RegistrationDashboardPanel({
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [noteText, setNoteText] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  /* The mapping step. `inspection` null = we have not read the file's headers
+     yet, which is the state the dialog opens in. */
+  const [inspection, setInspection] = useState<ImportInspection | null>(null);
+  const [mapping, setMapping] = useState<ColumnMapping>({});
+  const [dateOrder, setDateOrder] = useState<DateOrder>("dmy");
+  const [remember, setRemember] = useState(true);
+  /* Fill blanks by default — a re-import must not silently revert a correction
+     somebody made by hand in the app. `file-wins` is an explicit choice. */
+  const [fileWins, setFileWins] = useState(false);
+  const [usingSaved, setUsingSaved] = useState(false);
   const [ioOpen, setIoOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [confirmBulk, setConfirmBulk] = useState<TriageAction | null>(null);
@@ -402,41 +423,136 @@ export function RegistrationDashboardPanel({
     URL.revokeObjectURL(url);
   };
 
+  const resetImport = () => {
+    setPreview(null);
+    setInspection(null);
+    setMapping({});
+    setUsingSaved(false);
+  };
+
   const readCsvFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       if (csvRef.current) {
         csvRef.current.value = typeof reader.result === "string" ? reader.result : "";
       }
-      setPreview(null);
+      resetImport();
     };
     reader.readAsText(file);
   };
 
+  const shape = (): ImportShape => ({
+    mapping,
+    dateOrder,
+    policy: fileWins ? "file-wins" : "fill-blanks",
+  });
+
+  /**
+   * ONE BUTTON, AND THE MAPPING IS ALWAYS ON SCREEN BEFORE THE COMMIT IS.
+   *
+   * The first press reads the file's headers, settles on a mapping — one this
+   * club already confirmed for this exact layout if there is one, otherwise the
+   * detected guess — and validates under it. Later presses re-validate under
+   * whatever the organizer has since corrected.
+   *
+   * Deliberately not a separate "read the file" step. For a file whose headers
+   * are already ours (our own export, round-tripped) a mapping step would be
+   * pure friction, and for a foreign file the mapper renders right here beside
+   * the preview — so the translation is visible and correctable BEFORE anything
+   * is written, which is the property that actually matters.
+   */
   const runPreview = async () => {
     const text = csvRef.current?.value ?? "";
     if (text.trim() === "") {
       return;
     }
-    setPreview(await importPreviewAction(slug, text));
+    let active = mapping;
+    if (inspection === null) {
+      const read = await importInspectAction(slug, text);
+      setInspection(read);
+      if (!read.ok) {
+        setMapping({});
+        setPreview(null);
+        return;
+      }
+      if (read.saved !== undefined) {
+        active = read.saved.mapping;
+        setDateOrder(read.saved.dateOrder);
+        setUsingSaved(true);
+      } else {
+        active = read.detected === undefined ? {} : mappingOf(read.detected);
+        setUsingSaved(false);
+      }
+      setMapping(active);
+      // A file missing a required column cannot be previewed into anything
+      // useful; the mapper below says which, which is the actionable answer.
+      if (REQUIRED_IMPORT_FIELDS.some((field) => active[field] === undefined)) {
+        setPreview(null);
+        return;
+      }
+    }
+    setPreview(
+      await importPreviewAction(slug, text, {
+        mapping: active,
+        dateOrder,
+        policy: fileWins ? "file-wins" : "fill-blanks",
+      }),
+    );
   };
 
-  const commitImport = async () => {
+  /**
+   * `skipInvalid` is the organizer's explicit choice, taken on the button they
+   * pressed — never a default. A clean file commits whole; a file with errors
+   * commits only when they pressed the button that says how many it will leave
+   * behind, and those rows stay listed underneath by line number.
+   */
+  const commitImport = async (skipInvalid = false) => {
     const text = csvRef.current?.value ?? "";
     setBusy(true);
-    const result = await importCommitAction(slug, text);
+    const result = await importCommitAction(slug, text, { skipInvalid, shape: shape() });
+    // Remember the mapping only once the import it describes actually landed —
+    // a mapping saved beside a failed import is a mapping nobody validated.
+    if (result.ok && remember && inspection?.ok === true && Object.keys(mapping).length > 0) {
+      await saveImportMappingAction(slug, {
+        signature: inspection.signature,
+        label: null,
+        mapping,
+        valueMaps: {},
+        dateOrder,
+        scope: "org",
+      });
+    }
     setBusy(false);
     if (result.ok) {
-      toast({
-        title: `Imported ${String(result.imported ?? 0)} · ${String(result.duplicates ?? 0)} already registered`,
-        tone: "success",
-      });
-      setPreview(null);
+      // Only the outcomes that happened: a run with nothing reinstated should
+      // not report "0 rejoined" as though it were a finding.
+      const parts = [`Imported ${String(result.imported ?? 0)}`];
+      if ((result.updated ?? 0) > 0) {
+        parts.push(`${String(result.updated)} updated`);
+      }
+      if ((result.reinstated ?? 0) > 0) {
+        parts.push(`${String(result.reinstated)} rejoined`);
+      }
+      if ((result.unchanged ?? 0) > 0) {
+        parts.push(`${String(result.unchanged)} unchanged`);
+      }
+      if ((result.skipped ?? 0) > 0) {
+        parts.push(`${String(result.skipped)} skipped`);
+      }
+      toast({ title: parts.join(" · "), tone: "success" });
+      router.refresh();
+      if ((result.skipped ?? 0) > 0) {
+        // Rows were left behind on purpose. Closing the dialog and wiping the
+        // textarea would take away the only copy of WHICH rows, and the whole
+        // point of skipping is that the organizer comes back to them.
+        setPreview(await importPreviewAction(slug, text));
+        return;
+      }
+      resetImport();
       if (csvRef.current) {
         csvRef.current.value = "";
       }
       setIoOpen(false);
-      router.refresh();
     } else {
       toast({ title: result.error ?? "Import failed.", tone: "danger" });
     }
@@ -1376,15 +1492,147 @@ export function RegistrationDashboardPanel({
                         }
                       }}
                     />
-                    <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
+                    <Button
+                      onClick={() => void runPreview()}
+                      disabled={
+                        inspection !== null &&
+                        REQUIRED_IMPORT_FIELDS.some((field) => mapping[field] === undefined)
+                      }
+                      data-testid="import-preview-btn"
+                    >
                       Preview
                     </Button>
                   </div>
+
+                  {inspection !== null && !inspection.ok ? (
+                    <p role="alert" className="reg-warning">
+                      {inspection.error ?? "That file could not be read."}
+                    </p>
+                  ) : null}
+
+                  {inspection !== null && inspection.ok ? (
+                    <>
+                      {usingSaved ? (
+                        <p className="dash-hint" data-testid="mapping-saved-note">
+                          Using the mapping you saved for this form. Change anything below and the
+                          new version replaces it.
+                        </p>
+                      ) : null}
+                      <ColumnMapper
+                        inspection={inspection}
+                        mapping={mapping}
+                        onChange={(next) => {
+                          setMapping(next);
+                          // The preview describes the OLD mapping the moment
+                          // the mapping changes; showing it on would be a lie.
+                          setPreview(null);
+                        }}
+                      />
+                      <div className="io-row">
+                        <label className="io-inline" htmlFor="date-order">
+                          <span>Dates in this file read as</span>
+                          <select
+                            id="date-order"
+                            className="mapping-select"
+                            data-testid="date-order"
+                            value={dateOrder}
+                            onChange={(event) => {
+                              setDateOrder(event.target.value === "mdy" ? "mdy" : "dmy");
+                              setPreview(null);
+                            }}
+                          >
+                            <option value="dmy">day / month / year</option>
+                            <option value="mdy">month / day / year</option>
+                          </select>
+                        </label>
+                        <label className="io-inline" htmlFor="file-wins">
+                          <input
+                            id="file-wins"
+                            type="checkbox"
+                            data-testid="file-wins"
+                            checked={fileWins}
+                            onChange={(event) => {
+                              setFileWins(event.target.checked);
+                              // The preview described the other policy.
+                              setPreview(null);
+                            }}
+                          />
+                          <span>Let this file overwrite values already entered</span>
+                        </label>
+                        <label className="io-inline" htmlFor="remember-mapping">
+                          <input
+                            id="remember-mapping"
+                            type="checkbox"
+                            data-testid="remember-mapping"
+                            checked={remember}
+                            onChange={(event) => {
+                              setRemember(event.target.checked);
+                            }}
+                          />
+                          <span>Remember this mapping for next time</span>
+                        </label>
+                      </div>
+                    </>
+                  ) : null}
                   {preview !== null ? (
                     <div className="import-preview" data-testid="import-preview">
                       <p>
                         {preview.validCount} valid row(s) · {preview.errors.length} error(s)
                       </p>
+                      {/* WHAT COMMITTING WOULD ACTUALLY DO. "197 valid rows" said
+                          the same thing whether they were all new or all already
+                          here — and the commit then silently did nothing with the
+                          second case. */}
+                      {preview.diff !== undefined ? (
+                        <p data-testid="import-diff-counts">
+                          <strong>{preview.diff.counts.new} new</strong>
+                          {" · "}
+                          <strong>{preview.diff.counts.changed} changed</strong>
+                          {" · "}
+                          {preview.diff.counts.unchanged} unchanged
+                          {preview.diff.counts.reinstate > 0
+                            ? ` · ${String(preview.diff.counts.reinstate)} rejoining`
+                            : ""}
+                        </p>
+                      ) : null}
+                      {preview.diff !== undefined && preview.diff.changes.length > 0 ? (
+                        <div className="table-scroll">
+                          <table className="reg-table" data-testid="import-diff-table">
+                            <thead>
+                              <tr>
+                                <th>Player</th>
+                                <th>Field</th>
+                                <th>Now</th>
+                                <th>After import</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {preview.diff.changes.flatMap((row) =>
+                                row.fields.map((field, index) => (
+                                  <tr key={`${String(row.line)}-${field.label}`}>
+                                    <td data-label="Player">{index === 0 ? row.name : ""}</td>
+                                    <td data-label="Field">{field.label}</td>
+                                    <td data-label="Now" className="mapping-sample">
+                                      {field.from}
+                                    </td>
+                                    <td data-label="After import" className="mapping-sample">
+                                      {field.to}
+                                    </td>
+                                  </tr>
+                                )),
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null}
+                      {preview.diff !== undefined &&
+                      preview.diff.counts.changed + preview.diff.counts.reinstate >
+                        preview.diff.changes.length ? (
+                        <p className="dash-hint">
+                          Showing the first {preview.diff.changes.length}. The counts above cover
+                          every row.
+                        </p>
+                      ) : null}
                       {preview.errors.length > 0 ? (
                         <>
                           <ul className="import-errors">
@@ -1402,9 +1650,23 @@ export function RegistrationDashboardPanel({
                           ) : null}
                         </>
                       ) : null}
+                      {/* A file with errors AND valid rows now has a way forward.
+                          The button states the whole bargain — what lands and what
+                          is left — so "skip" is a choice the organizer read, not a
+                          default they were given. */}
+                      {preview.errors.length > 0 && preview.validCount > 0 ? (
+                        <Button
+                          onClick={() => void commitImport(true)}
+                          loading={busy}
+                          data-testid="import-commit-partial"
+                        >
+                          {`Import ${String(preview.validCount)} valid, skip ${String(preview.errors.length)}`}
+                        </Button>
+                      ) : null}
                       <Button
                         onClick={() => void commitImport()}
                         loading={busy}
+                        variant={preview.errors.length > 0 ? "ghost" : "primary"}
                         disabled={preview.errors.length > 0 || preview.validCount === 0}
                         data-testid="import-commit"
                       >
@@ -1412,7 +1674,7 @@ export function RegistrationDashboardPanel({
                             because four OTHER rows had errors, so it named the wrong
                             number and never said what was blocking it. */}
                         {preview.errors.length > 0
-                          ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import`
+                          ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import all`
                           : preview.validCount === 0
                             ? "Nothing to import"
                             : `Import ${String(preview.validCount)} player${preview.validCount === 1 ? "" : "s"}`}

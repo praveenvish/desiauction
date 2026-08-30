@@ -3,15 +3,26 @@
 import {
   NAME_MAX_LENGTH,
   DEFAULT_AUCTION_CONFIG,
+  applyMapping,
+  detectMapping,
   isRejectionReason,
-  parseRegistrationCsv,
+  parseRegistrationRecords,
+  planImport,
+  sampleRow,
+  signatureOf,
   slugifyName,
+  tokenizeCsv,
   validateNewPlayer,
+  type ColumnMapping,
   type CsvRowError,
+  type DateOrder,
+  type DetectedMapping,
+  type ImportPolicy,
   type PhotoTarget,
   type PlayerField,
   type RegistrationEvent,
   type RegistrationStatus,
+  type ValueMaps,
 } from "@desiauction/core";
 import { withTenantDb, type Db } from "@desiauction/db";
 import { cookies } from "next/headers";
@@ -53,7 +64,13 @@ import {
   transition,
   transitionBatch,
 } from "./registration-aggregate";
-import { commitRegistrationImport } from "./registration-import";
+import { commitRegistrationImport, existingForImport } from "./registration-import";
+import {
+  forgetImportMapping,
+  saveImportMapping,
+  savedMappingFor,
+  type SavedMapping,
+} from "./import-mappings";
 import { notifyDecision } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, type TeamsWorkspace } from "./team-workspace";
@@ -1444,6 +1461,53 @@ export async function photoTargetsAction(slug: string): Promise<PhotoTarget[]> {
 export interface ImportPreview {
   validCount: number;
   errors: CsvRowError[];
+  /**
+   * What committing would actually DO, against what is already stored. Absent
+   * only when the file could not be read at all.
+   *
+   * The second upload of a roster is the normal case, and before this the
+   * preview could not tell "197 players" from "197 players you already have" —
+   * it reported the same number either way and the commit then silently did
+   * nothing with them.
+   */
+  diff?: {
+    counts: { new: number; changed: number; unchanged: number; reinstate: number };
+    /** The changed rows, so the organizer sees old → new before committing. */
+    changes: { line: number; name: string; fields: { label: string; from: string; to: string }[] }[];
+  };
+}
+
+/*
+ * A BOUND ON WHAT ARRIVES.
+ *
+ * The file rides to the server as a STRING in a server-action payload and is
+ * held in memory whole, twice — once as text, once tokenized. Nothing capped
+ * it: a pasted spreadsheet with a runaway range was a memory event on a 4 GB
+ * container rather than a message anybody could act on. The limits are far
+ * above any real season (the largest tournament this product has run is in the
+ * low hundreds) and exist only to turn an accident into a sentence.
+ */
+const MAX_IMPORT_BYTES = 2_000_000;
+const MAX_IMPORT_ROWS = 5_000;
+
+/** The refusal message, or null when the file is within bounds. */
+function oversized(csv: string): string | null {
+  const bytes = new TextEncoder().encode(csv).length;
+  if (bytes > MAX_IMPORT_BYTES) {
+    return `That file is ${String(Math.round(bytes / 1000))} KB — the limit is ${String(
+      MAX_IMPORT_BYTES / 1000,
+    )} KB. Split it and import in parts.`;
+  }
+  // Cheap upper bound: every row occupies at least one line. Counting lines is
+  // not counting records (a quoted field may contain newlines), which is fine —
+  // it can only over-estimate, and it happens before the expensive tokenize.
+  const lines = csv.split("\n").length;
+  if (lines > MAX_IMPORT_ROWS) {
+    return `That file has about ${String(lines)} rows — the limit is ${String(
+      MAX_IMPORT_ROWS,
+    )}. Split it and import in parts.`;
+  }
+  return null;
 }
 
 /**
@@ -1456,31 +1520,259 @@ async function bandsFor(competitionId: string): Promise<readonly string[]> {
   return Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands);
 }
 
-/** Validate only — no writes. The organizer previews errors before committing. */
-export async function importPreviewAction(slug: string, csv: string): Promise<ImportPreview> {
-  const gate = await reviewGate(slug);
-  if (!gate.ok) {
-    return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
-  }
-  const result = parseRegistrationCsv(csv, await bandsFor(gate.competition.id));
-  return { validCount: result.rows.length, errors: result.errors };
+/**
+ * What the mapping screen needs to draw itself: the file's own headers, a real
+ * sample value under each, and our best guess at where each column goes.
+ *
+ * Reading a file is not writing one, but it IS reading a roster of civilians'
+ * names and phone numbers — so it sits behind the same review gate as the
+ * import it precedes.
+ */
+export interface ImportInspection {
+  ok: boolean;
+  error?: string;
+  headers: string[];
+  /** First row carrying data, aligned to `headers`. */
+  sample: string[];
+  detected?: DetectedMapping;
+  /** Fingerprint of this file's layout, for recognising the form again. */
+  signature: string;
+  /** Bands this competition accepts — the value-mapping targets for a band. */
+  bands: string[];
+  /**
+   * A mapping this club already confirmed for a file of this exact layout —
+   * the season's own override if there is one, else the org default. Present
+   * means the screen opens on "using your saved mapping" instead of a guess.
+   */
+  saved?: SavedMapping;
 }
 
-/** Re-validate and commit atomically. Refuses any file with errors (no partial corruption). */
-export async function importCommitAction(
+export async function importInspectAction(slug: string, csv: string): Promise<ImportInspection> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error, headers: [], sample: [], signature: "", bands: [] };
+  }
+  const tooBig = oversized(csv);
+  if (tooBig !== null) {
+    return { ok: false, error: tooBig, headers: [], sample: [], signature: "", bands: [] };
+  }
+  const records = tokenizeCsv(csv);
+  const headers = [...(records[0] ?? [])];
+  if (headers.length === 0) {
+    return {
+      ok: false,
+      error: "That file has no header row.",
+      headers: [],
+      sample: [],
+      signature: "",
+      bands: [],
+    };
+  }
+  const signature = signatureOf(headers);
+  const saved = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    savedMappingFor(db, gate.competition.orgId, gate.competition.id, signature),
+  );
+  return {
+    ok: true,
+    headers,
+    sample: sampleRow(records),
+    detected: detectMapping(headers),
+    signature,
+    bands: [...(await bandsFor(gate.competition.id))],
+    ...(saved !== null ? { saved } : {}),
+  };
+}
+
+/**
+ * Remember a confirmed mapping for next season.
+ *
+ * `scope` is the organizer's own choice and defaults to the CLUB, because a
+ * club reuses one form across seasons — that repetition is the whole point.
+ * "season" writes an override for this competition alone.
+ */
+export async function saveImportMappingAction(
   slug: string,
-  csv: string,
-): Promise<{ ok: boolean; imported?: number; duplicates?: number; error?: string }> {
+  input: {
+    signature: string;
+    label: string | null;
+    mapping: ColumnMapping;
+    valueMaps: ValueMaps;
+    dateOrder: DateOrder;
+    scope: "org" | "season";
+  },
+): Promise<{ ok: boolean; error?: string }> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const parsed = parseRegistrationCsv(csv, await bandsFor(gate.competition.id));
-  if (parsed.errors.length > 0) {
+  if (Object.keys(input.mapping).length === 0 || input.signature === "") {
+    return { ok: false, error: "There is no mapping to remember." };
+  }
+  await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    saveImportMapping(db, gate.competition.orgId, gate.personId, {
+      competitionId: input.scope === "season" ? gate.competition.id : null,
+      signature: input.signature,
+      label: input.label,
+      mapping: input.mapping,
+      valueMaps: input.valueMaps,
+      dateOrder: input.dateOrder,
+    }),
+  );
+  return { ok: true };
+}
+
+/** Drop a saved mapping — the way out of one that turned out to be wrong. */
+export async function forgetImportMappingAction(
+  slug: string,
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    forgetImportMapping(db, gate.competition.orgId, id),
+  );
+  return { ok: true };
+}
+
+/** How the organizer decided this file should be read. */
+export interface ImportShape {
+  mapping?: ColumnMapping;
+  valueMaps?: ValueMaps;
+  /** Which number leads an ambiguous numeric date in THIS file. */
+  dateOrder?: DateOrder;
+  /** How to treat a value the file and the record disagree about. */
+  policy?: ImportPolicy;
+}
+
+/**
+ * Parse under the organizer's mapping, or straight if there is none.
+ *
+ * NO MAPPING IS NOT A BROKEN MAPPING. A file whose headers are already ours
+ * (our own export, round-tripped) needs no translation and must keep working
+ * untouched — so an absent mapping means "read it as written", not "guess".
+ */
+function parseUnderShape(
+  csv: string,
+  bands: readonly string[],
+  shape: ImportShape | undefined,
+): ReturnType<typeof parseRegistrationRecords> {
+  const records = tokenizeCsv(csv);
+  const mapping = shape?.mapping;
+  const source =
+    mapping === undefined || Object.keys(mapping).length === 0
+      ? records
+      : applyMapping(records, mapping, shape?.valueMaps);
+  return parseRegistrationRecords(source, bands, {
+    now: new Date(),
+    ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
+  });
+}
+
+/** Validate only — no writes. The organizer previews errors before committing. */
+export async function importPreviewAction(
+  slug: string,
+  csv: string,
+  shape?: ImportShape,
+): Promise<ImportPreview> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
+  }
+  const tooBig = oversized(csv);
+  if (tooBig !== null) {
+    return { validCount: 0, errors: [{ line: 1, message: tooBig }] };
+  }
+  const result = parseUnderShape(csv, await bandsFor(gate.competition.id), shape);
+  if (result.rows.length === 0) {
+    return { validCount: 0, errors: result.errors };
+  }
+  const policy = shape?.policy ?? "fill-blanks";
+  const diff = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const stored = await existingForImport(
+      db,
+      gate.competition.id,
+      result.rows.map((row) => row.phone),
+    );
+    return planImport(result.rows, stored, policy);
+  });
+  return {
+    validCount: result.rows.length,
+    errors: result.errors,
+    diff: {
+      counts: diff.counts,
+      // Capped for the screen; the counts above are the whole truth and the
+      // note under the table says how many are not listed.
+      changes: diff.rows
+        .filter((entry) => entry.plan.kind === "changed" || entry.plan.kind === "reinstate")
+        .slice(0, 25)
+        .map((entry) => ({
+          line: entry.line,
+          name: entry.name,
+          fields:
+            entry.plan.kind === "changed" || entry.plan.kind === "reinstate"
+              ? entry.plan.changes.map((c) => ({
+                  label: c.label,
+                  from: c.from ?? "(blank)",
+                  to: c.to,
+                }))
+              : [],
+        })),
+    },
+  };
+}
+
+export interface ImportCommitResult {
+  ok: boolean;
+  imported?: number;
+  /** Existing registrations the file CHANGED — the second-file case. */
+  updated?: number;
+  /** Existing registrations the file agreed with entirely. */
+  unchanged?: number;
+  reinstated?: number;
+  named?: number;
+  /** Rows left behind because they had errors (only when `skipInvalid`). */
+  skipped?: number;
+  error?: string;
+}
+
+/**
+ * Re-validate and commit atomically.
+ *
+ * ALL-OR-NOTHING WAS THE WRONG DEFAULT AT THE WRONG MOMENT. Refusing a file
+ * with any error protects against partial corruption, which is right — but it
+ * was also the only option, and combined with the strict role vocabulary it
+ * meant an ordinary 200-player sheet imported NOBODY over three misspelt cells.
+ * `skipInvalid` keeps the guarantee where it matters (every row that lands is a
+ * row that fully validated, and the commit is still one transaction) while
+ * letting the organizer take the 197 and fix the 3. The rows left behind are
+ * still listed by line number, so "skip" never means "forget".
+ */
+export async function importCommitAction(
+  slug: string,
+  csv: string,
+  options?: { skipInvalid?: boolean; shape?: ImportShape; policy?: ImportPolicy },
+): Promise<ImportCommitResult> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const tooBig = oversized(csv);
+  if (tooBig !== null) {
+    return { ok: false, error: tooBig };
+  }
+  // Re-parsed under the SAME shape the preview used — the commit never trusts a
+  // row list the browser sent, only the file plus the mapping it approved.
+  const parsed = parseUnderShape(csv, await bandsFor(gate.competition.id), options?.shape);
+  if (parsed.errors.length > 0 && options?.skipInvalid !== true) {
     return {
       ok: false,
       error: `Fix ${String(parsed.errors.length)} row error(s) before importing.`,
     };
+  }
+  if (parsed.rows.length === 0) {
+    return { ok: false, error: "No valid rows to import." };
   }
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     commitRegistrationImport(
@@ -1489,9 +1781,18 @@ export async function importCommitAction(
       gate.competition.orgId,
       gate.personId,
       parsed.rows,
+      options?.shape?.policy ?? options?.policy ?? "fill-blanks",
     ),
   );
-  return { ok: true, imported: result.imported, duplicates: result.duplicates };
+  return {
+    ok: true,
+    imported: result.imported,
+    updated: result.updated,
+    unchanged: result.unchanged,
+    reinstated: result.reinstated,
+    named: result.named,
+    skipped: parsed.errors.length,
+  };
 }
 
 /** Export authorization = registration.review; deterministic, competition-scoped CSV. */

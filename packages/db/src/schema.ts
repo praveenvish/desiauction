@@ -498,6 +498,20 @@ export const registrations = pgTable(
     tshirtSize: text("tshirt_size"),
     trouserSize: text("trouser_size"),
     basePriceBand: text("base_price_band"),
+    // --- Registration desk (0034). NOT settlement money: an entry fee is desk
+    // bookkeeping and never posts to the finops ledger. See the migration.
+    feeStatus: text("fee_status", { enum: ["pending", "paid", "waived", "refunded"] })
+      .notNull()
+      .default("pending"),
+    /** Integer paise (C-7, no floats). NULL = no amount recorded, not zero. */
+    feeAmountPaise: bigint("fee_amount_paise", { mode: "number" }),
+    /** UTR / transaction reference as the player quoted it. */
+    feeReference: text("fee_reference"),
+    /**
+     * The organizer's own remark. DISTINCT from `rejectionNote`, which belongs
+     * to a triage decision; this one survives every status change.
+     */
+    note: text("note"),
     rejectionReason: text("rejection_reason"),
     rejectionNote: text("rejection_note"),
     reviewedBy: char("reviewed_by", { length: 26 }),
@@ -535,6 +549,10 @@ export const registrations = pgTable(
       .on(table.teamId)
       .where(sql`${table.isCaptain} and ${table.teamId} is not null`),
     check(
+      "registrations_fee_status_check",
+      sql`${table.feeStatus} in ('pending', 'paid', 'waived', 'refunded')`,
+    ),
+    check(
       "registrations_status_check",
       sql`${table.status} in ('draft', 'submitted', 'approved', 'rejected', 'waitlisted', 'withdrawn')`,
     ),
@@ -544,6 +562,46 @@ export const registrations = pgTable(
 // --- Fixtures & venues (M-IP3-3). Org-scoped; RLS read+write in migration 0007.
 // Venue → Ground is the physical hierarchy; fixtures reference GROUNDS only —
 // venue information is never duplicated onto a fixture row.
+
+/**
+ * HOW THIS CLUB'S REGISTRATION FORM IS READ (migration 0033).
+ *
+ * `competitionId` null = the org's default mapping; set = an override for one
+ * season. Two partial unique indexes keep each rule readable on its own rather
+ * than hiding both inside a COALESCE.
+ */
+export const orgImportMappings = pgTable(
+  "org_import_mappings",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }),
+    /** Normalized+sorted header fingerprint — a LAYOUT, never player data. */
+    signature: text("signature").notNull(),
+    label: text("label"),
+    /** core's `ColumnMapping`: field -> source column index. */
+    mapping: jsonb("mapping").notNull(),
+    /** core's `ValueMaps`: field -> { as written: as we understand it }. */
+    valueMaps: jsonb("value_maps").notNull().default({}),
+    dateOrder: text("date_order", { enum: ["dmy", "mdy"] })
+      .notNull()
+      .default("dmy"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    updatedBy: char("updated_by", { length: 26 }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("org_import_mappings_org_default_uq")
+      .on(table.orgId, table.signature)
+      .where(sql`${table.competitionId} is null`),
+    uniqueIndex("org_import_mappings_competition_uq")
+      .on(table.orgId, table.competitionId, table.signature)
+      .where(sql`${table.competitionId} is not null`),
+    index("org_import_mappings_org_idx").on(table.orgId),
+    check("org_import_mappings_date_order_check", sql`${table.dateOrder} in ('dmy', 'mdy')`),
+  ],
+);
 
 export const venues = pgTable(
   "venues",

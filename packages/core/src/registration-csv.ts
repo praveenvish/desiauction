@@ -6,9 +6,11 @@
  * embedded newlines inside quotes are all handled.
  */
 
-import { isRegistrationRole, type RegistrationRole } from "./competition";
+import { type RegistrationRole } from "./competition";
+import { parseCsvDate, type DateOrder } from "./csv-date";
 import { normalizePhone } from "./phone";
-import { parseBattingStyle, parseBowlingStyle } from "./player-profile";
+import { parseFeeStatus, parseRupeesToPaise, type FeeStatus } from "./money";
+import { deriveAge, parseBattingStyle, parseBowlingStyle, parseRole } from "./player-profile";
 
 export interface CsvRegistrationRow {
   line: number; // 1-based source line (header = line 1)
@@ -24,6 +26,20 @@ export interface CsvRegistrationRow {
   dateOfBirth: string | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
+  /**
+   * Registration-desk fields (0034). All optional: a club collecting none of
+   * this maps none of it and every one of these stays null.
+   */
+  feeStatus: FeeStatus | null;
+  /** Integer paise (C-7). Null = no amount recorded, which is not zero. */
+  feeAmountPaise: number | null;
+  feeReference: string | null;
+  note: string | null;
+  fatherName: string | null;
+  jerseyName: string | null;
+  jerseyNumber: string | null;
+  tshirtSize: string | null;
+  trouserSize: string | null;
 }
 
 export interface CsvRowError {
@@ -73,7 +89,7 @@ export function validateNewPlayer(
 ): NewPlayerCheck {
   const name = input.name.trim();
   const rawPhone = input.phone.trim();
-  const role = input.role.trim().toLowerCase();
+  const rawRole = input.role.trim();
   const band = (input.basePriceBand ?? "").trim();
 
   const errors: PlayerFieldError[] = [];
@@ -84,8 +100,13 @@ export function validateNewPlayer(
   if (!phone.ok) {
     errors.push({ field: "phone", message: `invalid phone "${rawPhone}"` });
   }
-  if (!isRegistrationRole(role)) {
-    errors.push({ field: "role", message: `invalid role "${role}"` });
+  // Read the way a registration form is filled in ("All Rounder", "Batsman"),
+  // not as a bare enum match — the same contract the styles got, and for the
+  // same reason: this is the ONE validation truth, so the dialog and the file
+  // now accept and refuse exactly the same vocabulary. See `parseRole`.
+  const role = parseRole(rawRole);
+  if (role === null) {
+    errors.push({ field: "role", message: `invalid role "${rawRole}"` });
   }
   if (
     band !== "" &&
@@ -105,6 +126,8 @@ export function validateNewPlayer(
     value: {
       name,
       phone: phone.ok ? phone.phone : rawPhone,
+      // Canonical from here on: the caller stores what the machine understands,
+      // never the spelling the file happened to use.
       role: role as RegistrationRole,
       basePriceBand: band === "" ? null : band,
     },
@@ -158,15 +181,53 @@ export function tokenizeCsv(text: string): string[][] {
 }
 
 /**
+ * How to read the file's own conventions.
+ *
+ * `now` is injected rather than read from the clock (house rule 2.1) AND is
+ * required for the future-date check to happen at all — a birthday in 2030
+ * parses as a perfectly real calendar date, and only a clock can say it is not
+ * a birthday. Callers on the web path pass `new Date()`; the tests pass a fixed
+ * instant so the suite does not change its mind next year.
+ */
+export interface CsvParseOptions {
+  /** Which number leads an ambiguous numeric date. Default day-first (India). */
+  dateOrder?: DateOrder;
+  /** Reference instant for the future-date check. Omit to skip that check. */
+  now?: Date;
+}
+
+/**
  * DA-14: an unknown band used to pass validation and fall back to the default
  * price, so a typo silently repriced a marquee player. Bands are declared by
  * the auction config; callers that know them pass them in, and every other
  * column already errors per line — this one now does too.
  */
-export function parseRegistrationCsv(text: string, knownBands?: readonly string[]): CsvParseResult {
-  const records = tokenizeCsv(text).filter(
-    (fields) => !(fields.length === 1 && fields[0]?.trim() === ""),
-  );
+export function parseRegistrationCsv(
+  text: string,
+  knownBands?: readonly string[],
+  options?: CsvParseOptions,
+): CsvParseResult {
+  return parseRegistrationRecords(tokenizeCsv(text), knownBands, options);
+}
+
+/**
+ * The parser, entered from already-tokenized records.
+ *
+ * Exists so COLUMN MAPPING has somewhere to hand its work. `import-mapping.ts`
+ * rewrites a foreign header row (a Google Form's "Which role do you play?")
+ * into this module's canonical one and returns records — not text — and those
+ * records land here, in the same validation the hand-written file goes through.
+ * One parser, one set of rules, whether the columns were named by us or
+ * translated on the way in.
+ */
+export function parseRegistrationRecords(
+  input: readonly (readonly string[])[],
+  knownBands?: readonly string[],
+  options?: CsvParseOptions,
+): CsvParseResult {
+  const dateOrder = options?.dateOrder ?? "dmy";
+  const now = options?.now;
+  const records = input.filter((fields) => !(fields.length === 1 && fields[0]?.trim() === ""));
   if (records.length === 0) {
     return { rows: [], errors: [{ line: 1, message: "The file is empty." }] };
   }
@@ -217,6 +278,32 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
      */
     const parsedBatting = battingStyle === "" ? null : parseBattingStyle(battingStyle);
     const parsedBowling = bowlingStyle === "" ? null : parseBowlingStyle(bowlingStyle);
+    /*
+     * AND THE THIRD ONE.
+     *
+     * The two columns above were fixed to refuse what they could not place;
+     * date of birth was left exactly as it had been — read raw, stored raw. The
+     * store is ISO text and `deriveAge` refuses anything else, so a `dd/mm/yyyy`
+     * birthday (which is what a form in this market produces) was written
+     * without complaint and then read as a blank age forever after. It now
+     * parses like a date and errors like a column.
+     */
+    const parsedDob = dateOfBirth === "" ? null : parseCsvDate(dateOfBirth, dateOrder);
+
+    /*
+     * The desk columns, held to the same contract as everything above: parsed
+     * the way a person writes them, and REFUSED by name when they cannot be
+     * placed. A fee that silently failed to parse would leave a player looking
+     * unpaid to a desk that had already taken their money.
+     */
+    const feeStatusRaw = optional("fee_status");
+    const parsedFeeStatus = feeStatusRaw === "" ? null : parseFeeStatus(feeStatusRaw);
+    const feeAmountRaw = optional("fee_amount");
+    const parsedFee = feeAmountRaw === "" ? null : parseRupeesToPaise(feeAmountRaw);
+    const capped = (column: string, limit: number): string | null => {
+      const value = optional(column).slice(0, limit);
+      return value === "" ? null : value;
+    };
 
     const check = validateNewPlayer(
       { name: rawName, phone: rawPhone, role: rawRole, basePriceBand: band },
@@ -228,6 +315,18 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
     }
     if (bowlingStyle !== "" && parsedBowling === null) {
       rowErrors.push(`unknown bowling style "${bowlingStyle}"`);
+    }
+    if (dateOfBirth !== "" && parsedDob === null) {
+      rowErrors.push(`unreadable date of birth "${dateOfBirth}" (use dd/mm/yyyy or yyyy-mm-dd)`);
+    }
+    if (parsedDob !== null && now !== undefined && deriveAge(parsedDob, now) === null) {
+      rowErrors.push(`date of birth "${dateOfBirth}" is in the future`);
+    }
+    if (feeStatusRaw !== "" && parsedFeeStatus === null) {
+      rowErrors.push(`unknown fee status "${feeStatusRaw}" (paid, pending, waived or refunded)`);
+    }
+    if (parsedFee !== null && !parsedFee.ok) {
+      rowErrors.push(`unreadable fee amount "${feeAmountRaw}"`);
     }
     // The in-file duplicate check is the parser's alone (a form has no "file"),
     // and it needs the normalized phone even when another field failed — so a
@@ -250,12 +349,23 @@ export function parseRegistrationCsv(text: string, knownBands?: readonly string[
       line,
       name: rawName,
       phone: phone.ok ? phone.phone : rawPhone,
-      role: rawRole as RegistrationRole,
+      // Canonical, not as written: `check.ok` means the row passed, so its
+      // parsed role is the one that reaches the database.
+      role: check.ok ? check.value.role : (rawRole as RegistrationRole),
       basePriceBand: band === "" ? null : band,
-      dateOfBirth: dateOfBirth === "" ? null : dateOfBirth,
+      dateOfBirth: parsedDob,
       // Canonical from here on, so the commit has nothing left to reject.
       battingStyle: parsedBatting,
       bowlingStyle: parsedBowling,
+      feeStatus: parsedFeeStatus,
+      feeAmountPaise: parsedFee !== null && parsedFee.ok ? parsedFee.value : null,
+      feeReference: capped("fee_reference", 200),
+      note: capped("note", 2000),
+      fatherName: capped("father_name", 120),
+      jerseyName: capped("jersey_name", 60),
+      jerseyNumber: capped("jersey_number", 10),
+      tshirtSize: capped("tshirt_size", 20),
+      trouserSize: capped("trouser_size", 20),
     });
   }
 

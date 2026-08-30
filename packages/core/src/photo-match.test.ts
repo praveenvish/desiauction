@@ -98,3 +98,93 @@ describe("fileStem", () => {
     expect(fileStem("two.dots.png")).toBe("two.dots");
   });
 });
+
+/*
+ * PHASE 4 — the folder a club actually hands over.
+ *
+ * A Google Form file-upload question stores the answer with the QUESTION
+ * appended, and adds a counter when a name repeats. Downloaded and dropped into
+ * the importer, almost none of these used to match.
+ */
+describe("matchPhotoFiles — filenames as a Drive export writes them", () => {
+  it("matches a name with the form's question appended", () => {
+    const [match] = matchPhotoFiles(["Rohit Sharma - Upload your photo.jpg"], TARGETS);
+    expect(match?.ok).toBe(true);
+    expect(match?.ok === true ? match.target.registrationId : null).toBe("reg_rohit");
+    expect(match?.ok === true ? match.rule : null).toBe("name");
+  });
+
+  it("matches through a copy counter", () => {
+    for (const file of ["Rohit Sharma (1).jpg", "Rohit Sharma(2).png"]) {
+      const [match] = matchPhotoFiles([file], TARGETS);
+      expect(match?.ok, file).toBe(true);
+    }
+  });
+
+  it("matches a counter and a question together", () => {
+    const [match] = matchPhotoFiles(["Rohit Sharma - Player Photo (3).jpg"], TARGETS);
+    expect(match?.ok).toBe(true);
+    expect(match?.ok === true ? match.target.registrationId : null).toBe("reg_rohit");
+  });
+
+  it("still matches a registration number or phone wearing the same suffix", () => {
+    const byNumber = matchPhotoFiles(["R7K2M9 - Upload your photo.jpg"], TARGETS)[0];
+    expect(byNumber?.ok === true ? byNumber.rule : null).toBe("number");
+    const byPhone = matchPhotoFiles(["9876543210 (1).jpg"], TARGETS)[0];
+    expect(byPhone?.ok === true ? byPhone.rule : null).toBe("phone");
+  });
+
+  /*
+   * The stripping must not reach past what it is for. A numbered roster puts
+   * the index FIRST, and the player is what follows — cutting a leading segment
+   * would turn "12 - Rohit Sharma" into "12" and match nobody, or worse, a
+   * player whose number happens to be 12.
+   */
+  it("does not strip a LEADING segment", () => {
+    const [match] = matchPhotoFiles(["12 - Rohit Sharma.jpg"], TARGETS);
+    expect(match?.ok).toBe(true);
+    expect(match?.ok === true ? match.target.registrationId : null).toBe("reg_rohit");
+  });
+
+  it("keeps a hyphenated name intact", () => {
+    const hyphen: PhotoTarget = {
+      registrationId: "reg_jp",
+      number: "RJP001",
+      name: "Jean-Paul Duminy",
+      phone: "+919000000009",
+      hasPhoto: false,
+    };
+    const [match] = matchPhotoFiles(["Jean-Paul Duminy.jpg"], [hyphen]);
+    expect(match?.ok).toBe(true);
+  });
+
+  /*
+   * AMBIGUITY STILL REFUSES. Loosening what a filename may look like must not
+   * loosen the rule that a file matching two players is never guessed at.
+   */
+  it("refuses a stripped form that matches two players", () => {
+    const [match] = matchPhotoFiles(
+      ["Rohit Sharma - Upload your photo.jpg"],
+      [ROHIT, OTHER_ROHIT],
+    );
+    expect(match?.ok).toBe(false);
+    expect(match?.ok === false ? match.reason : "").toMatch(/more than one/i);
+  });
+
+  /*
+   * An EXACT stem must beat another player's stripped form, or one badly named
+   * file could steal the photo of a correctly named one.
+   */
+  it("prefers the file named exactly after a player", () => {
+    const decoy: PhotoTarget = {
+      registrationId: "reg_decoy",
+      number: "RDEC01",
+      name: "Rohit Sharma - Upload your photo",
+      phone: "+919000000003",
+      hasPhoto: false,
+    };
+    const [match] = matchPhotoFiles(["Rohit Sharma - Upload your photo.jpg"], [ROHIT, decoy]);
+    expect(match?.ok).toBe(true);
+    expect(match?.ok === true ? match.target.registrationId : null).toBe("reg_decoy");
+  });
+});

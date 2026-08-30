@@ -335,7 +335,345 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const csv = `name,phone,role\nImport One,${IMPORT_PHONE_1},batter`;
     const parsed = parseRegistrationCsv(csv);
     const result = await commitRegistrationImport(db, compId, org.id, owner, parsed.rows);
-    expect(result).toEqual({ imported: 0, duplicates: 1 });
+    // The file agrees with what is stored, so the row is READ and left alone —
+    // not inserted again, and no longer reported as a nameless "duplicate".
+    expect(result).toEqual({ imported: 0, updated: 0, unchanged: 1, reinstated: 0, named: 0 });
+  });
+
+  /*
+   * PHASE 3 — the second file, which is the normal case. Before this the commit
+   * path only ever INSERTED: a corrected roster did nothing at all and reported
+   * the whole squad as duplicates, so every fix stayed in the spreadsheet.
+   */
+  it("a corrected re-import UPDATES the registration instead of doing nothing", async () => {
+    const phone = `98${RUN}9`;
+    const first = `name,phone,role,tshirt_size\nRe Import,${phone},batter,`;
+    await commitRegistrationImport(db, compId, org.id, owner, parseRegistrationCsv(first).rows);
+    const [person] = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(eq(people.phone, `+91${phone}`))
+      .limit(1);
+    if (person === undefined) {
+      throw new Error("the imported person should exist");
+    }
+    seededPersonIds.push(person.id);
+
+    // The club sends the sheet again, with the role fixed and a size added.
+    const second = `name,phone,role,tshirt_size\nRe Import,${phone},all_rounder,L`;
+    const result = await commitRegistrationImport(
+      db,
+      compId,
+      org.id,
+      owner,
+      parseRegistrationCsv(second).rows,
+    );
+    expect(result).toEqual({ imported: 0, updated: 1, unchanged: 0, reinstated: 0, named: 0 });
+
+    const read = async (): Promise<unknown> => {
+      const [row] = await db
+        .select({
+          role: registrationsTable.role,
+          tshirtSize: registrationsTable.tshirtSize,
+          status: registrationsTable.status,
+        })
+        .from(registrationsTable)
+        .where(
+          and(
+            eq(registrationsTable.competitionId, compId),
+            eq(registrationsTable.personId, person.id),
+          ),
+        )
+        .limit(1);
+      return row;
+    };
+    /*
+     * The BLANK was filled and the SET value was protected — which is the whole
+     * of rule 2. The size lands because nothing was there; the role does not,
+     * because a stale sheet must not quietly overturn a value already recorded.
+     * Correcting a role is what "let this file win" is for, below.
+     */
+    expect(await read()).toEqual({ role: "batter", tshirtSize: "L", status: "submitted" });
+
+    const forced = await commitRegistrationImport(
+      db,
+      compId,
+      org.id,
+      owner,
+      parseRegistrationCsv(second).rows,
+      "file-wins",
+    );
+    expect(forced.updated).toBe(1);
+    expect(await read()).toEqual({ role: "all_rounder", tshirtSize: "L", status: "submitted" });
+  });
+
+  it("a re-import does NOT revert a value the organizer edited by hand", async () => {
+    const phone = `94${RUN}1`;
+    const first = `name,phone,role,tshirt_size\nHand Edit,${phone},batter,M`;
+    await commitRegistrationImport(db, compId, org.id, owner, parseRegistrationCsv(first).rows);
+    const [person] = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(eq(people.phone, `+91${phone}`))
+      .limit(1);
+    if (person === undefined) {
+      throw new Error("the imported person should exist");
+    }
+    seededPersonIds.push(person.id);
+    // The organizer corrects the size in the app.
+    await db
+      .update(registrationsTable)
+      .set({ tshirtSize: "XL" })
+      .where(
+        and(
+          eq(registrationsTable.competitionId, compId),
+          eq(registrationsTable.personId, person.id),
+        ),
+      );
+
+    // The club's sheet still holds the OLD size. The default must not revert it.
+    const stale = `name,phone,role,tshirt_size\nHand Edit,${phone},batter,M`;
+    const kept = await commitRegistrationImport(
+      db,
+      compId,
+      org.id,
+      owner,
+      parseRegistrationCsv(stale).rows,
+    );
+    expect(kept.unchanged).toBe(1);
+    const sizeNow = async (): Promise<string | null> => {
+      const [row] = await db
+        .select({ tshirtSize: registrationsTable.tshirtSize })
+        .from(registrationsTable)
+        .where(
+          and(
+            eq(registrationsTable.competitionId, compId),
+            eq(registrationsTable.personId, person.id),
+          ),
+        )
+        .limit(1);
+      return row?.tshirtSize ?? null;
+    };
+    expect(await sizeNow()).toBe("XL");
+
+    // ...and DOES revert it when the organizer explicitly asks the file to win.
+    const forced = await commitRegistrationImport(
+      db,
+      compId,
+      org.id,
+      owner,
+      parseRegistrationCsv(stale).rows,
+      "file-wins",
+    );
+    expect(forced.updated).toBe(1);
+    expect(await sizeNow()).toBe("M");
+  });
+
+  it("a re-import never changes an approved player's status", async () => {
+    const phone = `94${RUN}2`;
+    const csv = `name,phone,role\nApproved Player,${phone},batter`;
+    await commitRegistrationImport(db, compId, org.id, owner, parseRegistrationCsv(csv).rows);
+    const [person] = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(eq(people.phone, `+91${phone}`))
+      .limit(1);
+    if (person === undefined) {
+      throw new Error("the imported person should exist");
+    }
+    seededPersonIds.push(person.id);
+    const [reg] = await db
+      .select({ id: registrationsTable.id })
+      .from(registrationsTable)
+      .where(
+        and(
+          eq(registrationsTable.competitionId, compId),
+          eq(registrationsTable.personId, person.id),
+        ),
+      )
+      .limit(1);
+    if (reg === undefined) {
+      throw new Error("the registration should exist");
+    }
+    await transition(db, org.id, compId, reg.id, owner, { type: "approve" });
+    expect(await statusOf(db, reg.id)).toBe("approved");
+
+    // The roster is uploaded again, with a corrected role.
+    const again = `name,phone,role\nApproved Player,${phone},bowler`;
+    await commitRegistrationImport(
+      db,
+      compId,
+      org.id,
+      owner,
+      parseRegistrationCsv(again).rows,
+      "file-wins",
+    );
+    // The ROLE moves; the decision an organizer made does not.
+    expect(await statusOf(db, reg.id)).toBe("approved");
+  });
+
+  /*
+   * PHASE 0 — the import path had drifted from the two paths it claims to
+   * mirror. Both cases below were silent: nothing errored, the counts looked
+   * plausible, and the organizer had no way to see what had not happened.
+   */
+  it("CSV import reinstates a withdrawn player instead of calling them a duplicate", async () => {
+    const [registration] = await db
+      .select({ id: registrationsTable.id, personId: registrationsTable.personId })
+      .from(registrationsTable)
+      .innerJoin(people, eq(people.id, registrationsTable.personId))
+      .where(
+        and(eq(registrationsTable.competitionId, compId), eq(people.phone, `+91${IMPORT_PHONE_1}`)),
+      )
+      .limit(1);
+    if (registration === undefined) {
+      throw new Error("the imported registration should exist by now");
+    }
+    const withdrawn = await transition(db, org.id, compId, registration.id, owner, {
+      type: "withdraw",
+    });
+    expect(withdrawn.ok).toBe(true);
+
+    // The organizer's final sheet still lists them — because they came back.
+    const csv = `name,phone,role\nImport One,${IMPORT_PHONE_1},all_rounder`;
+    const parsed = parseRegistrationCsv(csv);
+    const result = await commitRegistrationImport(db, compId, org.id, owner, parsed.rows);
+    expect(result).toEqual({ imported: 0, updated: 0, unchanged: 0, reinstated: 1, named: 0 });
+
+    const [after] = await db
+      .select({ status: registrationsTable.status, role: registrationsTable.role })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, registration.id))
+      .limit(1);
+    // Back in triage on their ORIGINAL row, carrying the file's fresh role —
+    // not a second registration, and not still withdrawn.
+    expect(after?.status).toBe("submitted");
+    expect(after?.role).toBe("all_rounder");
+  });
+
+  it("CSV import names an existing nameless stub, and never renames a named person", async () => {
+    const stubPhone = `+9198${RUN}5`;
+    const stubId = newId();
+    await db.insert(people).values({ id: stubId, phone: stubPhone, name: null });
+    seededPersonIds.push(stubId);
+
+    const csv = `name,phone,role\nNamed By File,98${RUN}5,batter`;
+    const first = await commitRegistrationImport(
+      db,
+      compId,
+      org.id,
+      owner,
+      parseRegistrationCsv(csv).rows,
+    );
+    expect(first).toEqual({ imported: 1, updated: 0, unchanged: 0, reinstated: 0, named: 1 });
+    const [named] = await db
+      .select({ name: people.name })
+      .from(people)
+      .where(eq(people.id, stubId))
+      .limit(1);
+    expect(named?.name).toBe("Named By File");
+
+    // A second file disagreeing about their name does NOT get to correct it.
+    const rename = `name,phone,role\nSomebody Else,98${RUN}5,batter`;
+    await commitRegistrationImport(db, compId, org.id, owner, parseRegistrationCsv(rename).rows);
+    const [unchanged] = await db
+      .select({ name: people.name })
+      .from(people)
+      .where(eq(people.id, stubId))
+      .limit(1);
+    expect(unchanged?.name).toBe("Named By File");
+  });
+
+  /*
+   * PHASE 2 — the desk columns a club's form already collects, which until
+   * migration 0034 had nowhere to land and stayed in the spreadsheet.
+   */
+  it("CSV import stores the fee, the reference and the organizer's note", async () => {
+    const phone = `98${RUN}6`;
+    const csv =
+      "name,phone,role,fee_status,fee_amount,fee_reference,note,tshirt_size\n" +
+      `Desk Player,${phone},batter,Yes,"1,500",UTR123456789,Paid at the ground in cash,L`;
+    const parsed = parseRegistrationCsv(csv);
+    expect(parsed.errors).toEqual([]);
+    // Rupees on the page become integer paise in the row (C-7, no floats).
+    expect(parsed.rows[0]?.feeAmountPaise).toBe(150000);
+    expect(parsed.rows[0]?.feeStatus).toBe("paid");
+
+    const result = await commitRegistrationImport(db, compId, org.id, owner, parsed.rows);
+    expect(result.imported).toBe(1);
+    const [person] = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(eq(people.phone, `+91${phone}`))
+      .limit(1);
+    if (person === undefined) {
+      throw new Error("the imported person should exist");
+    }
+    seededPersonIds.push(person.id);
+
+    const [stored] = await db
+      .select({
+        feeStatus: registrationsTable.feeStatus,
+        feeAmountPaise: registrationsTable.feeAmountPaise,
+        feeReference: registrationsTable.feeReference,
+        note: registrationsTable.note,
+        tshirtSize: registrationsTable.tshirtSize,
+      })
+      .from(registrationsTable)
+      .where(
+        and(
+          eq(registrationsTable.competitionId, compId),
+          eq(registrationsTable.personId, person.id),
+        ),
+      )
+      .limit(1);
+    expect(stored).toEqual({
+      feeStatus: "paid",
+      feeAmountPaise: 150000,
+      feeReference: "UTR123456789",
+      note: "Paid at the ground in cash",
+      tshirtSize: "L",
+    });
+  });
+
+  it("a fee column it cannot read is a line error, never a silent 'unpaid'", () => {
+    const csv =
+      "name,phone,role,fee_amount\n" + `Bad Fee,98${RUN}7,batter,about five hundred`;
+    const parsed = parseRegistrationCsv(csv);
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.errors[0]?.message).toMatch(/fee amount/i);
+  });
+
+  it("defaults a registration nobody priced to pending, not paid", async () => {
+    const phone = `98${RUN}8`;
+    const csv = `name,phone,role\nNo Fee Column,${phone},batter`;
+    const parsed = parseRegistrationCsv(csv);
+    await commitRegistrationImport(db, compId, org.id, owner, parsed.rows);
+    const [person] = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(eq(people.phone, `+91${phone}`))
+      .limit(1);
+    if (person === undefined) {
+      throw new Error("the imported person should exist");
+    }
+    seededPersonIds.push(person.id);
+    const [stored] = await db
+      .select({
+        feeStatus: registrationsTable.feeStatus,
+        feeAmountPaise: registrationsTable.feeAmountPaise,
+      })
+      .from(registrationsTable)
+      .where(
+        and(
+          eq(registrationsTable.competitionId, compId),
+          eq(registrationsTable.personId, person.id),
+        ),
+      )
+      .limit(1);
+    // No amount recorded is NOT zero — a waived fee and a fee of nothing are
+    // different facts and the column must let a reader tell them apart.
+    expect(stored).toEqual({ feeStatus: "pending", feeAmountPaise: null });
   });
 
   // Manual add = the import's semantics one row at a time (same stub, same gate).

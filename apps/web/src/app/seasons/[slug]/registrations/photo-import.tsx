@@ -141,7 +141,9 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
       <label className="io-file" htmlFor="photo-files">
         <span>
           Choose player photos — each file is matched to a player by its name: registration number
-          (R7K2M9.jpg), mobile (9876543210.jpg) or full name (Rohit Sharma.jpg).
+          (R7K2M9.jpg), mobile (9876543210.jpg) or full name (Rohit Sharma.jpg). Downloaded a
+          Google Form&apos;s folder from Drive? Drop it in as-is — the question and the copy number
+          it adds (&ldquo;Rohit Sharma - Upload your photo (1).jpg&rdquo;) are ignored.
         </span>
       </label>
       <div className="io-row">

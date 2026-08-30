@@ -7,8 +7,11 @@ export {
   serializePaise,
   parsePaise,
   formatPaiseINR,
+  parseFeeStatus,
+  parseRupeesToPaise,
+  FEE_STATUSES,
 } from "./money";
-export type { Paise, DeductResult, ParsePaiseResult } from "./money";
+export type { Paise, DeductResult, ParsePaiseResult, FeeStatus } from "./money";
 export type { Clock } from "./clock";
 export { normalizePhone } from "./phone";
 export type { NormalizedPhone, PhoneResult } from "./phone";
@@ -46,10 +49,46 @@ export type {
   TransitionResult,
   NameResult,
 } from "./competition";
-export { parseRegistrationCsv, tokenizeCsv, validateNewPlayer } from "./registration-csv";
+export {
+  parseRegistrationCsv,
+  parseRegistrationRecords,
+  tokenizeCsv,
+  validateNewPlayer,
+} from "./registration-csv";
+export { isAmbiguousDate, parseCsvDate } from "./csv-date";
+export { planImport, planImportRow } from "./import-diff";
+export type {
+  ExistingRegistration,
+  FieldChange,
+  ImportDiff,
+  ImportDiffRow,
+  ImportPolicy,
+  ImportRowPlan,
+} from "./import-diff";
+export {
+  IMPORT_FIELDS,
+  IMPORT_FIELD_LABELS,
+  REQUIRED_IMPORT_FIELDS,
+  applyMapping,
+  detectMapping,
+  mappingOf,
+  normalizeHeader,
+  sampleRow,
+  signatureOf,
+} from "./import-mapping";
+export type {
+  ColumnMapping,
+  DetectedMapping,
+  ImportField,
+  MappedColumn,
+  MappingConflict,
+  ValueMaps,
+} from "./import-mapping";
+export type { DateOrder } from "./csv-date";
 export type {
   CsvRegistrationRow,
   CsvRowError,
+  CsvParseOptions,
   CsvParseResult,
   NewPlayerCheck,
   NewPlayerInput,
@@ -212,6 +251,7 @@ export {
   isBattingStyle,
   parseBattingStyle,
   parseBowlingStyle,
+  parseRole,
   isBowlingStyle,
   battingStyleLabel,
   bowlingStyleLabel,

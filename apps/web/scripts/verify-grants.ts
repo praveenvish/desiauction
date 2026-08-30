@@ -93,6 +93,19 @@ const SYSTEM_MAY_WRITE = ["org_members", "grants", "audit_log", "invites"];
  * The system role is deliberately absent: it reads this queue and never writes
  * it, which is why `SYSTEM_MAY_WRITE` above is still four tables long.
  */
+/**
+ * Tenant tables the WEB TIER is the sole writer of, asserted by name.
+ *
+ * The app role's write reach comes from `ALTER DEFAULT PRIVILEGES`, which is
+ * invisible per-table — so a recipe rewrite that drops those defaults would
+ * surface first on a club's import screen in production rather than here. These
+ * are the tables where that would be worst: naming them makes the loss fail the
+ * gate instead.
+ *
+ * RLS still scopes the ROWS; this asserts only that the grant exists at all.
+ */
+const APP_WRITES_TENANT = ["org_import_mappings"];
+
 const APP_WRITES_UNPROTECTED = [
   "demo_requests",
   "demo_availability",
@@ -115,6 +128,18 @@ function expectations(allTables: string[]): Expectation[] {
       allowed: true,
       why: "the web tier reads every tenant table; RLS scopes the rows, not the grant",
     });
+  }
+
+  for (const table of APP_WRITES_TENANT) {
+    for (const verb of ["INSERT", "UPDATE", "DELETE"] as const) {
+      out.push({
+        role: "desiauction_app",
+        table,
+        verb,
+        allowed: true,
+        why: "the web tier is the only writer; RLS scopes the rows, the grant must exist",
+      });
+    }
   }
 
   for (const table of APP_WRITES_UNPROTECTED) {

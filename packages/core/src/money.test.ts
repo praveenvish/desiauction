@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { addPaise, deductPaise, formatPaiseINR, paise } from "./money.js";
+import {
+  addPaise,
+  deductPaise,
+  formatPaiseINR,
+  paise,
+  parseFeeStatus,
+  parsePaise,
+  parseRupeesToPaise,
+} from "./money.js";
 
 describe("paise", () => {
   it("accepts non-negative safe integers", () => {
@@ -43,5 +51,65 @@ describe("formatPaiseINR", () => {
   it("preserves exact paise remainders", () => {
     expect(formatPaiseINR(paise(150))).toBe("₹1.50");
     expect(formatPaiseINR(paise(100005))).toBe("₹1,000.05");
+  });
+});
+
+describe("parseRupeesToPaise — an entry fee as a club writes it", () => {
+  it("reads rupees into paise", () => {
+    expect(parseRupeesToPaise("500")).toEqual({ ok: true, value: 50000 });
+    expect(parseRupeesToPaise("1500.50")).toEqual({ ok: true, value: 150050 });
+    expect(parseRupeesToPaise("0")).toEqual({ ok: true, value: 0 });
+  });
+
+  it("tolerates the decoration a spreadsheet cell carries", () => {
+    for (const input of ["₹500", "Rs 500", "Rs. 500", "INR 500", "1,500", "500 /-", "  500  "]) {
+      const result = parseRupeesToPaise(input);
+      expect(result.ok).toBe(true);
+    }
+    expect(parseRupeesToPaise("1,500")).toEqual({ ok: true, value: 150000 });
+  });
+
+  it("pads a single decimal place rather than misreading it", () => {
+    // "500.5" is five hundred rupees fifty paise, not five paise.
+    expect(parseRupeesToPaise("500.5")).toEqual({ ok: true, value: 50050 });
+  });
+
+  /*
+   * A third decimal is a typo, and rounding money silently is the one failure
+   * nobody forgives — so it is refused and reported on its line.
+   */
+  it("refuses more precision than money has", () => {
+    expect(parseRupeesToPaise("500.123")).toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("refuses negatives and junk", () => {
+    for (const input of ["-500", "abc", "", "500rs", "5 0 0", "₹"]) {
+      expect(parseRupeesToPaise(input)).toEqual({ ok: false, reason: "invalid" });
+    }
+  });
+
+  it("stays separate from parsePaise, which reads OUR stored value", () => {
+    // The same string means different amounts through the two doors, which is
+    // exactly why they are two doors: "500" stored is 500 paise; "500" typed
+    // into a fee column is 500 rupees.
+    expect(parsePaise("500")).toEqual({ ok: true, value: 500 });
+    expect(parseRupeesToPaise("500")).toEqual({ ok: true, value: 50000 });
+  });
+});
+
+describe("parseFeeStatus — a 'Paid?' column answered by a human", () => {
+  it("reads the four states and the words people use for them", () => {
+    expect(parseFeeStatus("Paid")).toBe("paid");
+    expect(parseFeeStatus("YES")).toBe("paid");
+    expect(parseFeeStatus("Not Paid")).toBe("pending");
+    expect(parseFeeStatus("no")).toBe("pending");
+    expect(parseFeeStatus("Waived")).toBe("waived");
+    expect(parseFeeStatus("Refund")).toBe("refunded");
+  });
+
+  it("returns null rather than defaulting somebody to paid", () => {
+    for (const input of ["", "maybe", "partial", "half"]) {
+      expect(parseFeeStatus(input)).toBeNull();
+    }
   });
 });

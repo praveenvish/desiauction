@@ -112,6 +112,16 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         basePriceBand: "A",
         // DA-28: optional profile columns, absent from this file.
         dateOfBirth: null,
+        // 0034 desk + kit columns, likewise absent.
+        feeStatus: null,
+        feeAmountPaise: null,
+        feeReference: null,
+        note: null,
+        fatherName: null,
+        jerseyName: null,
+        jerseyNumber: null,
+        tshirtSize: null,
+        trouserSize: null,
         battingStyle: null,
         bowlingStyle: null,
       },
@@ -122,6 +132,15 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         role: "bowler",
         basePriceBand: null,
         dateOfBirth: null,
+        feeStatus: null,
+        feeAmountPaise: null,
+        feeReference: null,
+        note: null,
+        fatherName: null,
+        jerseyName: null,
+        jerseyNumber: null,
+        tshirtSize: null,
+        trouserSize: null,
         battingStyle: null,
         bowlingStyle: null,
       },
@@ -266,5 +285,88 @@ describe("CSV import — playing styles are parsed, not silently dropped", () =>
     expect(result.rows).toEqual([]);
     expect(result.errors[0]?.message).toContain('unknown batting style "Off-Break"');
     expect(result.errors[0]?.message).toContain('unknown bowling style "Right Hand Opener"');
+  });
+});
+
+/*
+ * PHASE 0 — THE FILE A GOOGLE FORM ACTUALLY PRODUCES.
+ *
+ * Every case below was a silent failure or a whole-file refusal before the
+ * parser was taught this vocabulary. The header is still ours (column mapping
+ * is phase 1); what changed is that the VALUES are now read the way a person
+ * writes them, and refused out loud when they cannot be placed.
+ */
+describe("parseRegistrationCsv — values as a person writes them", () => {
+  const HEADER = "name,phone,role,date_of_birth";
+  // Fixed instant: the suite must not change its mind next year.
+  const now = new Date("2026-08-30T00:00:00Z");
+
+  it("accepts the role spellings a form produces, and stores the canonical token", () => {
+    const csv = [
+      HEADER,
+      "Rohit Sharma,9876543210,All Rounder,",
+      "Jasprit Bumrah,9876543211,Fast Bowler,",
+      "Rishabh Pant,9876543212,Wicket Keeper Batsman,",
+      "Shubman Gill,9876543213,Batsman,",
+    ].join("\n");
+    const result = parseRegistrationCsv(csv, undefined, { now });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.role)).toEqual([
+      "all_rounder",
+      "bowler",
+      "wicket_keeper",
+      "batter",
+    ]);
+  });
+
+  it("reads a dd/mm/yyyy birthday into the ISO the store and deriveAge require", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/1998`;
+    const result = parseRegistrationCsv(csv, undefined, { now });
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.dateOfBirth).toBe("1998-03-15");
+  });
+
+  it("reads the timestamp shape a Form export writes into a date cell", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/1998 14:32:11`;
+    expect(parseRegistrationCsv(csv, undefined, { now }).rows[0]?.dateOfBirth).toBe("1998-03-15");
+  });
+
+  it("honours the caller's date order for a genuinely ambiguous value", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,03/04/1998`;
+    expect(
+      parseRegistrationCsv(csv, undefined, { now, dateOrder: "mdy" }).rows[0]?.dateOfBirth,
+    ).toBe("1998-03-04");
+    expect(
+      parseRegistrationCsv(csv, undefined, { now, dateOrder: "dmy" }).rows[0]?.dateOfBirth,
+    ).toBe("1998-04-03");
+  });
+
+  /*
+   * THE REGRESSION THIS EXISTS FOR. Before phase 0 this file parsed clean, the
+   * unreadable date was stored verbatim, and the player's age read blank on
+   * every screen for the rest of the season.
+   */
+  it("reports an unreadable birthday instead of storing it", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,not a date`;
+    const result = parseRegistrationCsv(csv, undefined, { now });
+    expect(result.rows).toEqual([]);
+    expect(result.errors[0]?.message).toMatch(/date of birth/i);
+  });
+
+  it("refuses a two-digit year rather than picking a century", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/98`;
+    expect(parseRegistrationCsv(csv, undefined, { now }).errors).toHaveLength(1);
+  });
+
+  it("refuses a birthday in the future when given a clock", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/2030`;
+    expect(parseRegistrationCsv(csv, undefined, { now }).errors[0]?.message).toMatch(/future/i);
+  });
+
+  it("still refuses a role it cannot place, naming the value", () => {
+    const csv = `${HEADER}\nRohit Sharma,9876543210,Team Manager,`;
+    const result = parseRegistrationCsv(csv, undefined, { now });
+    expect(result.rows).toEqual([]);
+    expect(result.errors[0]?.message).toMatch(/team manager/i);
   });
 });
