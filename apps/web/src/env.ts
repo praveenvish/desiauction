@@ -86,6 +86,14 @@ const envSchema = z.object({
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
   /**
+   * Where a human reply goes. The From address is a no-reply on the sending
+   * subdomain, which nobody reads; without this a club organiser hitting
+   * Reply on a registration receipt is talking to a wall. Optional, and
+   * deliberately NOT one of the three settings that decide whether a
+   * provider counts as configured.
+   */
+  EMAIL_REPLY_TO: z.email().optional(),
+  /**
    * Shared secret on the provider delivery-report webhook. Unset closes the
    * endpoint with a 404 — an open callback would let a stranger mark documents
    * delivered, which is worse than never learning they were.

@@ -53,11 +53,18 @@ const defaultTransport: EmailTransport = async (url, init) => {
   return { status: response.status, body: await response.text() };
 };
 
-const defaultBuildRequest = (mail: OutgoingMail, from: string): unknown => ({
+const defaultBuildRequest = (
+  mail: OutgoingMail,
+  from: string,
+  replyTo?: string,
+): unknown => ({
   from,
   to: [mail.to],
   subject: mail.subject,
   text: mail.text,
+  // Omitted rather than sent empty: a blank reply_to is a header some
+  // providers reject and every client renders badly.
+  ...(replyTo === undefined ? {} : { reply_to: replyTo }),
   ...(mail.attachment === undefined
     ? {}
     : {
@@ -75,8 +82,14 @@ export interface HttpMailerConfig {
   readonly endpoint: string;
   readonly apiKey: string;
   readonly from: string;
+  /** Reply-To. Absent means replies bounce off the no-reply From address. */
+  readonly replyTo?: string;
   readonly transport?: EmailTransport;
-  readonly buildRequest?: (mail: OutgoingMail, from: string) => unknown;
+  readonly buildRequest?: (
+    mail: OutgoingMail,
+    from: string,
+    replyTo?: string,
+  ) => unknown;
   readonly now?: () => number;
 }
 
@@ -106,7 +119,7 @@ export class HttpTransactionalMailer implements TransactionalMailer {
           "content-type": "application/json",
           authorization: `Bearer ${this.config.apiKey}`,
         },
-        body: JSON.stringify(build(mail, this.config.from)),
+        body: JSON.stringify(build(mail, this.config.from, this.config.replyTo)),
       });
       if (response.status >= 400) {
         this.breaker.recordFailure();
@@ -146,10 +159,20 @@ export function transactionalMailer(): TransactionalMailer {
   const endpoint = env.EMAIL_API_ENDPOINT;
   const apiKey = env.EMAIL_API_KEY;
   const from = env.EMAIL_FROM;
+  // Not part of the three-way check below: a missing Reply-To degrades the
+  // mail, it does not make the provider unconfigured.
+  const replyTo = env.EMAIL_REPLY_TO;
   cached =
     endpoint === undefined || apiKey === undefined || from === undefined
       ? new UnconfiguredMailer()
-      : new HttpTransactionalMailer({ endpoint, apiKey, from });
+      : new HttpTransactionalMailer({
+          endpoint,
+          apiKey,
+          from,
+          // Spread rather than passed as undefined: the repo runs
+          // exactOptionalPropertyTypes, so absent and undefined differ.
+          ...(replyTo === undefined ? {} : { replyTo }),
+        });
   return cached;
 }
 
