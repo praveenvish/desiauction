@@ -1,4 +1,34 @@
+import path from "node:path";
+
 import { defineConfig } from "@playwright/test";
+
+/**
+ * THE HALF OF THE SUITE THAT NEVER READ .env.local.
+ *
+ * The webServer command below loads the repo-root `.env.local` explicitly
+ * (`--env-file-if-exists`), and for a long time that looked like enough. It is
+ * not: the TEST processes are a different process tree, and they never loaded
+ * it. `e2e/otp.ts`, `e2e/global-setup.ts` and `e2e/demo-availability.ts` each
+ * fall back to a hardcoded `localhost:5433` when `DATABASE_URL` is unset — so
+ * the app under test talked to the database in `.env.local` while the tests
+ * talked to whatever happened to be answering on 5433.
+ *
+ * On a machine where another project had taken 5433, that was a FOREIGN
+ * DATABASE, and every spec died in under two seconds with `password
+ * authentication failed for user "desiauction"` — which reads like a broken
+ * credential and is actually a split-brain harness. Loading it here, before the
+ * config is built, makes `.env.local` the one local source of truth for both
+ * halves; the hardcoded fallbacks stay as the correct default for a fresh
+ * clone and for CI, which sets DATABASE_URL itself.
+ */
+try {
+  // `__dirname` under Playwright's transpiled config; cwd is the honest
+  // fallback if that ever changes. Missing file is not an error — CI has none.
+  const here = typeof __dirname === "string" ? __dirname : process.cwd();
+  process.loadEnvFile(path.resolve(here, "../../.env.local"));
+} catch {
+  // No .env.local (CI, or a clone that has not made one). The fallbacks apply.
+}
 
 // The E2E harness (IP-0_DESIGN §22). The webServer loads the repo-root
 // .env.local (Next only auto-loads the app-dir one); CI provides env directly.

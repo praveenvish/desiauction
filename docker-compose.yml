@@ -13,8 +13,16 @@ services:
   db:
     image: postgres:17-alpine
     container_name: desiauction-postgres
+    # 5433 is this project's port and stays the default — CI service containers,
+    # the docs and every test fallback name it. But a laptop runs more than one
+    # project, and when something else takes 5433 the answer must not be "stop
+    # the other thing" or "renumber ours everywhere". Set DB_PORT in the shell
+    # (or in a root `.env`, which compose reads) and point DATABASE_URL at the
+    # same number:
+    #
+    #   DB_PORT=5436 docker compose up -d
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     environment:
       POSTGRES_USER: desiauction
       POSTGRES_PASSWORD: desiauction
