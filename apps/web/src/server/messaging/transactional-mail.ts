@@ -53,11 +53,7 @@ const defaultTransport: EmailTransport = async (url, init) => {
   return { status: response.status, body: await response.text() };
 };
 
-const defaultBuildRequest = (
-  mail: OutgoingMail,
-  from: string,
-  replyTo?: string,
-): unknown => ({
+const defaultBuildRequest = (mail: OutgoingMail, from: string, replyTo?: string): unknown => ({
   from,
   to: [mail.to],
   subject: mail.subject,
@@ -85,11 +81,7 @@ export interface HttpMailerConfig {
   /** Reply-To. Absent means replies bounce off the no-reply From address. */
   readonly replyTo?: string;
   readonly transport?: EmailTransport;
-  readonly buildRequest?: (
-    mail: OutgoingMail,
-    from: string,
-    replyTo?: string,
-  ) => unknown;
+  readonly buildRequest?: (mail: OutgoingMail, from: string, replyTo?: string) => unknown;
   readonly now?: () => number;
 }
 
