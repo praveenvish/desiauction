@@ -171,7 +171,9 @@ export function matchPhotoFiles(
      * beaten by a stripped form of another.
      */
     const stems = strippedStems(stem);
-    const firstHit = <T>(pick: (candidate: string) => T | "ambiguous" | null): T | "ambiguous" | null => {
+    const firstHit = <T>(
+      pick: (candidate: string) => T | "ambiguous" | null,
+    ): T | "ambiguous" | null => {
       let sawAmbiguous = false;
       for (const candidate of stems) {
         const hit = pick(candidate);

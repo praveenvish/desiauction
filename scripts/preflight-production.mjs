@@ -198,13 +198,48 @@ check(
   `MEDIA_PUBLIC_BASE=${env.MEDIA_PUBLIC_BASE ?? "(unset)"}`,
   "set MEDIA_PUBLIC_BASE to the https CDN/bucket base that serves media keys",
 );
+// PRR P1-4: the filesystem finops store cannot be shared across web + runner on
+// separate hosts, so exports would verify unhealthy forever. Bucket required.
+check(
+  "FINOPS_ARTIFACT_STORE-bucket",
+  env.FINOPS_ARTIFACT_STORE === "bucket",
+  `FINOPS_ARTIFACT_STORE=${env.FINOPS_ARTIFACT_STORE ?? "(unset → defaults to filesystem)"}`,
+  "set FINOPS_ARTIFACT_STORE=bucket — the filesystem store cannot be read by the web tier when the runner is on a different host",
+);
+check(
+  "FINOPS_S3-config",
+  env.FINOPS_ARTIFACT_STORE !== "bucket" ||
+    [
+      env.FINOPS_S3_ENDPOINT,
+      env.FINOPS_S3_REGION,
+      env.FINOPS_S3_BUCKET,
+      env.FINOPS_S3_ACCESS_KEY_ID,
+      env.FINOPS_S3_SECRET_ACCESS_KEY,
+    ].every((v) => typeof v === "string" && v.length > 0),
+  "the S3/MinIO/R2 credentials the bucket store needs",
+  "set FINOPS_S3_ENDPOINT, FINOPS_S3_REGION, FINOPS_S3_BUCKET, FINOPS_S3_ACCESS_KEY_ID and FINOPS_S3_SECRET_ACCESS_KEY",
+);
 
 // --- Observability -----------------------------------------------------------
-warn(
+// PRR P1-6: a launch you cannot diagnose is not a launch. A missing DSN is a
+// silent no-op in every app, so this is a hard blocker, not a warning.
+check(
   "SENTRY_DSN",
   typeof env.SENTRY_DSN === "string" && env.SENTRY_DSN.length > 0,
   "error tracking",
-  "set SENTRY_DSN so errors are captured (a missing DSN is a silent no-op)",
+  "set SENTRY_DSN so errors are captured (a missing DSN is a silent no-op in every app)",
+);
+
+// --- Scheduled money repair (PRR P1-3) ---------------------------------------
+// The settlement catch-up sweep endpoint is fail-closed (404 without a secret),
+// so the platform is SAFE without it — but the case↔journal seam then has no
+// scheduled repair. A warn, not a blocker: set it and point a scheduler at
+// POST /api/jobs/settlement-coordination.
+warn(
+  "SETTLEMENT_JOB_SECRET",
+  typeof env.SETTLEMENT_JOB_SECRET === "string" && env.SETTLEMENT_JOB_SECRET.length >= 16,
+  "the settlement catch-up sweep is unreachable without it",
+  "set SETTLEMENT_JOB_SECRET (>=16 chars) and schedule POST /api/jobs/settlement-coordination so a lost journal effect self-heals",
 );
 
 // --- Payments (webhook ingress) ---------------------------------------------

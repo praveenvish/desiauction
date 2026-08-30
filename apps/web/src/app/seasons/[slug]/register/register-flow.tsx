@@ -3,6 +3,7 @@
 import {
   isBattingStyle,
   isBowlingStyle,
+  isMinor,
   BATTING_STYLES,
   BOWLING_STYLES,
   REGISTRATION_ROLES,
@@ -39,6 +40,14 @@ const draftKey = (slug: string) => `da:reg-draft:${slug}`;
  */
 const PUBLICATION_CONSENT_LABEL =
   "I understand that my name, playing role and the other details above will be published on public pages anyone with the link can read, and that my mobile number will not.";
+
+/**
+ * PRR P0-2 (DPDP Act 2023 §9): the guardian consent shown when the date of birth
+ * entered is under 18. Stored verbatim on the consent record, like the label
+ * above, so the wording a guardian agreed to survives this copy being edited.
+ */
+const GUARDIAN_CONSENT_LABEL =
+  "I am the parent or legal guardian of this player, who is under 18, and I consent to this registration and to their details being processed for this tournament. Their age and photo are never shown on public pages.";
 
 /**
  * DA-35: the draft persisted ONE of the four answers step 2 collects. Date of
@@ -102,6 +111,9 @@ export function RegisterFlow({
   const [dob, setDob] = useState("");
   const [batting, setBatting] = useState("");
   const [bowling, setBowling] = useState("");
+  // PRR P0-2: guardian consent, required only when the entered DOB is under 18.
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianConsent, setGuardianConsent] = useState(false);
   const [step, setStep] = useState<Step>(nameDone ? "role" : "profile");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -157,6 +169,11 @@ export function RegisterFlow({
     saveDraft({ role: value });
   };
 
+  // PRR P0-2: whether the entered date of birth makes this registrant a minor.
+  // `dob` is "" until the user types one (the draft loads client-side after
+  // mount), so this is false during SSR and cannot cause a hydration mismatch.
+  const dobIsMinor = dob !== "" && isMinor(dob, new Date());
+
   const submit = () => {
     setError(null);
     if (!consented) {
@@ -165,11 +182,22 @@ export function RegisterFlow({
       );
       return;
     }
+    if (dobIsMinor && (guardianName.trim() === "" || !guardianConsent)) {
+      setError(
+        "This player is under 18 — a parent or guardian must add their name and give consent below.",
+      );
+      return;
+    }
     startTransition(async () => {
       const formData = new FormData();
       formData.set("role", role);
       if (dob !== "") {
         formData.set("dateOfBirth", dob);
+      }
+      if (dobIsMinor) {
+        formData.set("guardianName", guardianName.trim());
+        formData.set("guardianConsent", "true");
+        formData.set("guardianConsentText", GUARDIAN_CONSENT_LABEL);
       }
       if (batting !== "") {
         formData.set("battingStyle", batting);
@@ -293,19 +321,10 @@ export function RegisterFlow({
               </option>
             ))}
           </Select>
-          {/* TODO(founder): this field accepts a date of birth from a minor
-              with no gate, no guardian step and no differential treatment, and
-              the derived age is then published on a public player page and on
-              the share card that goes into a WhatsApp group. Nothing in
-              apps/web or packages/core mentions a guardian, a minor or parental
-              consent — the concept does not exist in this product. Needs a
-              founder decision with legal advice, not an engineering guess:
-              whether anything at all may be published about an under-18
-              registrant, under what consent mechanism, how a guardian is
-              verified, whether age should be published for ANY registrant, and
-              whether profiles expire after the tournament. Deliberately not
-              decided here; the disclosure below is made honest for everyone in
-              the meantime. */}
+          {/* PRR P0-2 (DPDP Act 2023 §9): an under-18 date of birth now triggers
+              a guardian-consent step below, and a minor's age and photo are never
+              published on any public surface (server/competition/public.ts). An
+              adult's age is still published; the date itself never is. */}
           <Field
             label="Date of birth (optional)"
             name="dateOfBirth"
@@ -315,8 +334,41 @@ export function RegisterFlow({
               setDob(event.target.value);
               saveDraft({ dob: event.target.value });
             }}
-            help="Your AGE is published on your public player card and on shared link previews — the date itself never is. Leave this blank and no age is shown."
+            help="For an adult player, your AGE (not the date) is shown on your public player card. For an under-18 player, neither age nor photo is ever public, and a parent or guardian must consent below."
           />
+          {dobIsMinor ? (
+            <div className="register-guardian" data-testid="guardian-block">
+              <Field
+                label="Parent or guardian's name"
+                name="guardianName"
+                value={guardianName}
+                onChange={(event) => {
+                  setGuardianName(event.target.value);
+                  if (event.target.value.trim() !== "") {
+                    setError(null);
+                  }
+                }}
+                required
+                help="This player is under 18, so a parent or guardian must consent to the registration."
+                data-testid="guardian-name"
+              />
+              <label className="register-consent-check" htmlFor="guardian-consent-box">
+                <input
+                  id="guardian-consent-box"
+                  type="checkbox"
+                  checked={guardianConsent}
+                  data-testid="guardian-consent"
+                  onChange={(event) => {
+                    setGuardianConsent(event.target.checked);
+                    if (event.target.checked) {
+                      setError(null);
+                    }
+                  }}
+                />
+                <span>{GUARDIAN_CONSENT_LABEL}</span>
+              </label>
+            </div>
+          ) : null}
           <Select
             label="Batting style (optional)"
             name="battingStyle"

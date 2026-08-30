@@ -43,6 +43,8 @@ const ALLOW = [
   ".mk-stage-mark",
   ".glyph",
   // Numerals set for figure impact (money, counts, dates).
+  // The schedule-demo step counter — a figure in a circle, not a sentence.
+  ".demo-steps li::before",
   ".home-tile-value",
   ".home-date b",
   ".mk-stat-value",

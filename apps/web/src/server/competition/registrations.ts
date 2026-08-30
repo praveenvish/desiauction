@@ -707,8 +707,21 @@ export interface TimelineEntry {
   actorName: string | null;
 }
 
-/** A registration's audit timeline (transitions + notes), oldest→newest. */
-export async function timelineOf(db: Db, registrationId: string): Promise<TimelineEntry[]> {
+/**
+ * A registration's audit timeline (transitions + notes), oldest→newest.
+ *
+ * Object-level scoping (PRR P1-1): filtering on `auditLog.subject` alone trusts
+ * a caller-supplied id, so under an RLS-inert misconfiguration an organizer of
+ * competition A could read competition B's registration timeline by passing its
+ * id. The INNER join to `registrations` scoped by `competitionId` is the
+ * app-layer boundary that does not depend on RLS being live: a foreign id
+ * matches no row and yields an empty timeline.
+ */
+export async function timelineOf(
+  db: Db,
+  registrationId: string,
+  competitionId: string,
+): Promise<TimelineEntry[]> {
   return (
     db
       .select({
@@ -718,6 +731,12 @@ export async function timelineOf(db: Db, registrationId: string): Promise<Timeli
         actorName: people.name,
       })
       .from(auditLog)
+      // INNER join: the entry is returned only when its subject is a
+      // registration in THIS competition — the ownership check.
+      .innerJoin(
+        registrations,
+        and(eq(registrations.id, auditLog.subject), eq(registrations.competitionId, competitionId)),
+      )
       // LEFT join: a system actor (import runner, engine) has no people row, and
       // an entry with no name must still appear.
       .leftJoin(people, eq(people.id, auditLog.actor))

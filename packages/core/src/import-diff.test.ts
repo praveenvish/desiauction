@@ -54,10 +54,7 @@ describe("planImportRow — what the second file would actually do", () => {
   });
 
   it("fills a blank the record never had", () => {
-    const row = fileRow(
-      "Rohit Sharma,9876543210,batter,L",
-      "name,phone,role,tshirt_size",
-    );
+    const row = fileRow("Rohit Sharma,9876543210,batter,L", "name,phone,role,tshirt_size");
     const plan = planImportRow(row, stored(), "fill-blanks");
     expect(plan).toEqual({
       kind: "changed",
@@ -127,11 +124,7 @@ describe("planImportRow — what the second file would actually do", () => {
 
   it("carries the file's updates through a reinstatement", () => {
     const row = fileRow("Rohit Sharma,9876543210,all_rounder");
-    const plan = planImportRow(
-      row,
-      stored({ status: "withdrawn", role: "batter" }),
-      "file-wins",
-    );
+    const plan = planImportRow(row, stored({ status: "withdrawn", role: "batter" }), "file-wins");
     expect(plan).toEqual({
       kind: "reinstate",
       changes: [{ field: "role", label: "Playing role", from: "batter", to: "all_rounder" }],
@@ -168,12 +161,7 @@ describe("planImport — the whole file, counted", () => {
     ]);
     const diff = planImport(rows, existing, "file-wins");
     expect(diff.counts).toEqual({ new: 1, changed: 1, unchanged: 1, reinstate: 1 });
-    expect(diff.rows.map((r) => r.plan.kind)).toEqual([
-      "new",
-      "unchanged",
-      "changed",
-      "reinstate",
-    ]);
+    expect(diff.rows.map((r) => r.plan.kind)).toEqual(["new", "unchanged", "changed", "reinstate"]);
     // Every planned row still names its source line, so a preview can point at it.
     expect(diff.rows.map((r) => r.line)).toEqual([2, 3, 4, 5]);
   });

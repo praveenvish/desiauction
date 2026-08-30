@@ -15,9 +15,18 @@
 
 | Thing | Reality |
 |---|---|
-| `pnpm --filter @desiauction/web db:restore-verify` | Dumps the database it is pointed at, restores that dump into a scratch database, compares **row counts per table**, destroys the scratch (`apps/web/scripts/restore-verify.ts`). Source counts are taken inside a repeatable-read transaction exporting `pg_dump`'s snapshot, so concurrent writes cannot skew the compare — that part is genuinely careful. |
+| `pnpm backup` (`scripts/backup-database.mjs`) | **NEW (PRR P0-1).** Produces a real stored logical backup: `pg_dump -Fc --no-owner --no-acl` to `BACKUP_DIR`, prunes to `BACKUP_RETAIN`, exits non-zero on failure so a scheduler can gate on it. Reads `BACKUP_DATABASE_URL` (intended to be a distinct backup credential). This is a COMMAND, not a running system: it only becomes "backups exist" once the operator schedules it against production with an OFF-HOST `BACKUP_DIR` (mounted bucket / separate account). |
+| `docs/operations/RESTORE_RUNBOOK.md` | **NEW (PRR P0-1).** Step-by-step restore into a clean instance (dump → restore → migrate → roles/grants → RLS proof → cut over), with an RTO rehearsal record to fill in before launch. |
+| `pnpm --filter @desiauction/web db:restore-verify` | Dumps the database it is pointed at, restores that dump into a scratch database, compares **row counts per table**, destroys the scratch (`apps/web/scripts/restore-verify.ts`). Source counts are taken inside a repeatable-read transaction exporting `pg_dump`'s snapshot, so concurrent writes cannot skew the compare — that part is genuinely careful. It is a dump→restore integrity drill, NOT proof that a STORED off-site backup restores. |
 | Nightly execution | Runs in `.github/workflows/nightly-verify.yml` (which needs a git remote to run at all). |
 | Last measurement | 43/43 tables exact under concurrent write load, **2026-07-16** — before migrations 0015–0026. Stale; re-drill. |
+
+**Still operator-provisioned before this clears the P0-1 launch gate:** a
+scheduled `pnpm backup` against production writing to an off-host destination on
+a separate credential; a managed-Postgres instance with PITR (continuous WAL);
+and at least one rehearsed restore with the RTO recorded in the runbook. The
+tooling and procedure now exist in-repo; the running backups do not until the
+operator stands them up.
 
 What it therefore proves: `pg_dump` → `pg_restore` is row-count-lossless on this
 schema. What it does **not** prove, despite being cited as the backup evidence in

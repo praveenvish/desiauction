@@ -80,14 +80,15 @@ export async function existingForImport(
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
-    .where(
-      and(eq(registrations.competitionId, competitionId), inArray(people.phone, [...phones])),
-    );
+    .where(and(eq(registrations.competitionId, competitionId), inArray(people.phone, [...phones])));
   return new Map(rows.map(({ phone, ...rest }) => [phone, rest]));
 }
 
 /** The column set a planned change touches, as drizzle values. */
-function changedValues(changes: readonly FieldChange[], row: CsvRegistrationRow): Record<string, unknown> {
+function changedValues(
+  changes: readonly FieldChange[],
+  row: CsvRegistrationRow,
+): Record<string, unknown> {
   const all: Record<string, unknown> = {
     role: row.role,
     basePriceBand: row.basePriceBand,

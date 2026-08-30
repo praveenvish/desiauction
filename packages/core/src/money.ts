@@ -155,5 +155,12 @@ const FEE_STATUS_BY_KEY: ReadonlyMap<string, FeeStatus> = new Map(
  * reports rather than defaulting someone to `paid`.
  */
 export function parseFeeStatus(value: string): FeeStatus | null {
-  return FEE_STATUS_BY_KEY.get(value.trim().toLowerCase().replace(/[\s\-_]+/g, "")) ?? null;
+  return (
+    FEE_STATUS_BY_KEY.get(
+      value
+        .trim()
+        .toLowerCase()
+        .replace(/[\s\-_]+/g, ""),
+    ) ?? null
+  );
 }

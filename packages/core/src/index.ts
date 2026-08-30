@@ -258,6 +258,8 @@ export {
   roleLabel,
   styleLabel,
   deriveAge,
+  isMinor,
+  MINOR_AGE_THRESHOLD,
 } from "./player-profile";
 export type { BattingStyle, BowlingStyle, PlayerRole } from "./player-profile";
 export {

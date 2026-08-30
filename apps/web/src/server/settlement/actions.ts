@@ -727,6 +727,25 @@ function paymentIntent(
 }
 
 /**
+ * A deterministic command id for an OVERRIDE — a refund or a waiver (PRR P1-2).
+ *
+ * Unlike `paymentIntent`, the stream these write to already exists and is stable
+ * (the paymentId for a refund, the caseId for a waiver), so only the command id
+ * needs deriving. `refundManualPayment`/`waiveObligation` look a repeat up as
+ * `findByCommandId(stream, id, commandId)`, so a stable command id lets a
+ * timeout-then-retry dedupe, and `settlement_events_command_uq` catches the
+ * two-at-once race. An empty `intentKey` yields a fresh id per call — a genuine
+ * second identical override (same amount, same reason) is never wrongly refused.
+ */
+function overrideCommandId(prefix: string, parts: readonly string[], intentKey: string): string {
+  const key = intentKey
+    .trim()
+    .replace(/[^A-Za-z0-9_.:-]/g, "")
+    .slice(0, 64);
+  return `${prefix}:${parts.join(":")}:${key === "" ? newId() : key}`;
+}
+
+/**
  * `intentKey` is what makes a retry a retry. It is optional so that no caller
  * is broken by its arrival, but a surface that can double-submit — every button
  * in a browser — should send one stable value per intent and a new one only
@@ -787,6 +806,7 @@ export async function refundPaymentAction(
   paymentId: string,
   amount: string,
   reason: string,
+  intentKey = "",
 ): Promise<ActionResult> {
   const parsed = parseRupees(amount);
   if (!parsed.ok) {
@@ -795,8 +815,13 @@ export async function refundPaymentAction(
   if (reason.trim() === "") {
     return { ok: false, error: messageFor("reason_required") };
   }
+  const commandId = overrideCommandId(
+    "refundManualPayment",
+    [paymentId, String(parsed.paise)],
+    intentKey,
+  );
   return command(slug, (deps, actor) =>
-    refundManualPayment(deps, actor, paymentId, newId(), {
+    refundManualPayment(deps, actor, paymentId, commandId, {
       amount: parsed.paise,
       reason: reason.trim(),
     }),
@@ -809,6 +834,7 @@ export async function waiveObligationAction(
   teamId: string,
   amount: string,
   reason: string,
+  intentKey = "",
 ): Promise<ActionResult> {
   const parsed = parseRupees(amount);
   if (!parsed.ok) {
@@ -817,8 +843,13 @@ export async function waiveObligationAction(
   if (reason.trim() === "") {
     return { ok: false, error: messageFor("reason_required") };
   }
+  const commandId = overrideCommandId(
+    "waiveObligation",
+    [caseId, teamId, String(parsed.paise)],
+    intentKey,
+  );
   return command(slug, (deps, actor) =>
-    waiveObligation(deps, actor, caseId, newId(), {
+    waiveObligation(deps, actor, caseId, commandId, {
       teamId,
       amount: parsed.paise,
       reason: reason.trim(),

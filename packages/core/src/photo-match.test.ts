@@ -163,10 +163,7 @@ describe("matchPhotoFiles — filenames as a Drive export writes them", () => {
    * loosen the rule that a file matching two players is never guessed at.
    */
   it("refuses a stripped form that matches two players", () => {
-    const [match] = matchPhotoFiles(
-      ["Rohit Sharma - Upload your photo.jpg"],
-      [ROHIT, OTHER_ROHIT],
-    );
+    const [match] = matchPhotoFiles(["Rohit Sharma - Upload your photo.jpg"], [ROHIT, OTHER_ROHIT]);
     expect(match?.ok).toBe(false);
     expect(match?.ok === false ? match.reason : "").toMatch(/more than one/i);
   });

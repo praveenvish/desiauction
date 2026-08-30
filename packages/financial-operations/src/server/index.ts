@@ -148,6 +148,12 @@ export {
   createOutboxAdapter,
 } from "./adapters";
 export {
+  bucketArtifactStoreFromEnv,
+  createBucketArtifactStore,
+  type BucketArtifactConfig,
+  type BucketArtifactEnv,
+} from "./s3-artifact-store";
+export {
   assembleDispatchBody,
   enqueueDispatchSends,
   enqueueExportGenerations,

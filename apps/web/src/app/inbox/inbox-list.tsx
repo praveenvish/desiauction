@@ -46,6 +46,7 @@ function formatWhen(iso: string, now: number | null): string {
   // A notice from last August read exactly like one from this August.
   const sameYear = now !== null && date.getFullYear() === new Date(now).getFullYear();
   return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
     day: "2-digit",
     month: "short",
     ...(now === null || sameYear ? {} : { year: "numeric" }),

@@ -107,6 +107,15 @@ const DATABASE_URL = process.env["DATABASE_URL"];
 if (DATABASE_URL === undefined) {
   throw new Error("DATABASE_URL is required (run via pnpm seed:demo)");
 }
+// PRR P2/F34: this seed writes demo users, a demo org and a platform-admin
+// grant. Run against a production database by accident (a shell with the prod
+// DATABASE_URL still exported) it would pollute real data. Refuse under a
+// production NODE_ENV unless the operator deliberately opts in.
+if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_SEED_IN_PRODUCTION"] !== "1") {
+  throw new Error(
+    "refusing to run the demo seed with NODE_ENV=production — it writes demo users, an org and a platform-admin grant. Set ALLOW_SEED_IN_PRODUCTION=1 only if you truly mean to.",
+  );
+}
 const handle = createDb(DATABASE_URL);
 const db = handle.db;
 

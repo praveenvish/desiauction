@@ -5,6 +5,7 @@ import {
   DEFAULT_AUCTION_CONFIG,
   applyMapping,
   detectMapping,
+  isMinor,
   isRejectionReason,
   parseRegistrationRecords,
   planImport,
@@ -948,6 +949,22 @@ export async function submitRegistrationAction(
     battingStyle: formString(formData, "battingStyle"),
     bowlingStyle: formString(formData, "bowlingStyle"),
   };
+  /*
+   * PRR P0-2 (DPDP Act 2023 §9): a registrant under 18 is a child, and their
+   * data may not be processed without a parent/guardian's consent. Enforced HERE
+   * as well as in the browser, for the same reason publication consent is: a
+   * client gate is a courtesy. A minor with no guardian name + explicit consent
+   * is refused; the public read model additionally suppresses their age and
+   * photo from every public surface (server/competition/public.ts).
+   */
+  const minor = isMinor(profile.dateOfBirth === "" ? null : profile.dateOfBirth, new Date());
+  const guardianName = formString(formData, "guardianName").trim();
+  if (minor && (formString(formData, "guardianConsent") !== "true" || guardianName === "")) {
+    return {
+      error:
+        "A parent or guardian must consent for a player under 18 — add their name and tick the consent box.",
+    };
+  }
   const source = formString(formData, "source");
   const result = await withTenantDb(
     dbHandle,
@@ -1014,6 +1031,22 @@ export async function submitRegistrationAction(
         basis: "gave a mobile number to be told the outcome of this registration",
       },
     });
+    // PRR P0-2: the guardian consent record for a minor — timestamped, with the
+    // guardian's name and the wording actually shown, so "who consented, to
+    // what, when" is answerable later (DPDP §9 verifiable-consent evidence).
+    if (minor) {
+      await recordConsent(systemDb, {
+        personId: session.personId,
+        purpose: "guardian.consent",
+        granted: true,
+        source: "registration",
+        evidence: {
+          competition: slug,
+          guardianName,
+          wording: formString(formData, "guardianConsentText") || null,
+        },
+      });
+    }
   } catch {
     // Evidence must never be the thing that fails a registration that has
     // already committed — the same rule the decision notices follow.
@@ -1183,7 +1216,9 @@ export async function registrationTimelineAction(
   if (!gate.ok) {
     return [];
   }
-  return inCompetitionOrg(gate.personId, gate.competition, (db) => timelineOf(db, registrationId));
+  return inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    timelineOf(db, registrationId, gate.competition.id),
+  );
 }
 
 export async function addNoteAction(
@@ -1473,7 +1508,11 @@ export interface ImportPreview {
   diff?: {
     counts: { new: number; changed: number; unchanged: number; reinstate: number };
     /** The changed rows, so the organizer sees old → new before committing. */
-    changes: { line: number; name: string; fields: { label: string; from: string; to: string }[] }[];
+    changes: {
+      line: number;
+      name: string;
+      fields: { label: string; from: string; to: string }[];
+    }[];
   };
 }
 

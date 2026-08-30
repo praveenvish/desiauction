@@ -72,7 +72,11 @@ function waitedFor(ms: number): string {
 }
 
 function when(atMs: number): string {
-  return new Date(atMs).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(atMs).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export function DeliveriesPanel({

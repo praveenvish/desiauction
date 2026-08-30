@@ -1,4 +1,4 @@
-import { deriveAge } from "@desiauction/core";
+import { deriveAge, isMinor } from "@desiauction/core";
 import {
   auctionEvents,
   auctions,
@@ -191,14 +191,25 @@ interface ShowcaseRow {
  * team assignment only decides which name to print.
  */
 function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
+  // PRR P0-2 (DPDP Act 2023 §9): a minor's personal data may not be published on
+  // a public, unauthenticated surface. This is the one chokepoint the public
+  // player page AND the OG/Twitter share card both read, so suppressing the
+  // derived age and photo here removes a child's data from every public surface
+  // at once — regardless of any photo consent an adult would have given. The
+  // organizer still sees the full roster on the authenticated, capability-gated
+  // review screens; only public exposure is withheld.
+  const minor = isMinor(r.dateOfBirth, now);
   return {
     number: r.number,
     name: r.name ?? "Unnamed",
     role: r.role,
-    age: deriveAge(r.dateOfBirth, now),
+    age: minor ? null : deriveAge(r.dateOfBirth, now),
     battingStyle: r.battingStyle,
     bowlingStyle: r.bowlingStyle,
-    photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
+    photoUrl:
+      !minor && r.photoConsentAt !== null && r.photoKey !== null
+        ? storage.readUrl(r.photoKey)
+        : null,
     status: r.isIcon ? "retained" : r.teamId === null ? "available" : "sold",
     teamName: r.teamName,
   };

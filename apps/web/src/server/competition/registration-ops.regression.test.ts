@@ -250,7 +250,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(rows[0]?.reviewedBy).toBeNull(); // back in triage, unreviewed
 
     // Apply → withdraw → rejoin is ONE timeline, and the rejoin says what it is.
-    const timeline = await timelineOf(db, regId);
+    const timeline = await timelineOf(db, regId, season.id);
     const actions = timeline.map((entry) => entry.action).sort();
     expect(actions).toEqual([
       "registration.submitted",
@@ -298,7 +298,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     await transition(db, org.id, compId, a, owner, { type: "waitlist" });
     await transition(db, org.id, compId, a, owner, { type: "approve" });
     await addNote(db, org.id, a, owner, "checked ID");
-    const timeline = await timelineOf(db, a);
+    const timeline = await timelineOf(db, a, compId);
     const actions = timeline.map((t) => t.action);
     expect(actions).toContain("registration.waitlist");
     expect(actions).toContain("registration.approve");
@@ -637,8 +637,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
   });
 
   it("a fee column it cannot read is a line error, never a silent 'unpaid'", () => {
-    const csv =
-      "name,phone,role,fee_amount\n" + `Bad Fee,98${RUN}7,batter,about five hundred`;
+    const csv = "name,phone,role,fee_amount\n" + `Bad Fee,98${RUN}7,batter,about five hundred`;
     const parsed = parseRegistrationCsv(csv);
     expect(parsed.rows).toEqual([]);
     expect(parsed.errors[0]?.message).toMatch(/fee amount/i);
@@ -700,8 +699,13 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(page.rows.map((r) => r.id)).toContain(result.registrationId);
     expect(page.rows.find((r) => r.id === result.registrationId)?.status).toBe("submitted");
     // The DA-27 lesson: the timeline starts where the player entered.
-    const actions = (await timelineOf(db, result.registrationId)).map((t) => t.action);
+    const actions = (await timelineOf(db, result.registrationId, compId)).map((t) => t.action);
     expect(actions).toContain("registration.added");
+
+    // PRR P1-1: the same registration id, queried under a DIFFERENT competition,
+    // returns nothing — the object-level scope is the boundary, not RLS alone.
+    const foreign = await timelineOf(db, result.registrationId, newId());
+    expect(foreign).toEqual([]);
   });
 
   it("manual re-add of the same phone reuses the person and refuses the duplicate", async () => {

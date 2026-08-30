@@ -560,6 +560,17 @@ describe("M-IP6-2 · Receipts — proof of payment, quoted off the payment fold"
     ).toEqual({ ok: false, reason: "fiscal_year_mismatch" });
   });
 
+  it("OBJECT-LEVEL SCOPE (PRR P1-1): a series id that is not this org's is refused", async () => {
+    expect(
+      await issueReceipt(
+        deps,
+        { kind: "person", actor, capability: "finops.document" },
+        { seriesId: newId(), paymentId: payment1 },
+        newId(),
+      ),
+    ).toEqual({ ok: false, reason: "series_unknown" });
+  });
+
   it("WATERMARK COVERAGE: unconsumed history cannot be quoted; the follower closes the gap", async () => {
     // A fresh settlement fact the follower has not seen…
     payment2 = newId();

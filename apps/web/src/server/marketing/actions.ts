@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 
 import { newId, newsletterSubscribers } from "@desiauction/db";
 
+import { env } from "../../env";
+import { clientIp } from "../../lib/client-ip";
 import { db } from "../db";
 import { sendDemoRequestMail } from "./demo-mail";
 import {
@@ -66,8 +68,9 @@ export interface DemoRequestState {
 }
 
 async function requestIp(): Promise<string | null> {
-  const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip");
+  // PRR P2/F32: the same spoof-resistant client-IP resolution as the OTP throttle
+  // — never trust the leftmost, client-controlled x-forwarded-for entry.
+  return clientIp(await headers(), env.TRUSTED_PROXY_COUNT);
 }
 
 function field(formData: FormData, name: string): string {

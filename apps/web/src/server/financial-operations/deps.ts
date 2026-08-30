@@ -2,7 +2,11 @@ import { resolve } from "node:path";
 
 import type { Db } from "@desiauction/db";
 import type { DeliveryPort } from "@desiauction/financial-operations";
-import { finopsDeps, type FinopsDeps } from "@desiauction/financial-operations/server";
+import {
+  bucketArtifactStoreFromEnv,
+  finopsDeps,
+  type FinopsDeps,
+} from "@desiauction/financial-operations/server";
 
 import { env } from "../../env";
 import { createHttpEmailAdapter, type EmailResolver } from "../messaging/email-adapter";
@@ -81,9 +85,14 @@ const emailAdapter: ((db: Db) => DeliveryPort) | null =
         )
     : null;
 
+// PRR P1-4: the shared S3 store when configured, otherwise the filesystem store
+// (finopsDeps falls back to it when `artifacts` is undefined). Built once.
+const artifactStore = bucketArtifactStoreFromEnv(env) ?? undefined;
+
 export function webFinopsDeps(db: Db): FinopsDeps {
   return finopsDeps(db, {
     storageDir: FINOPS_STORAGE_DIR,
+    ...(artifactStore === undefined ? {} : { artifacts: artifactStore }),
     /*
      * The platform's own in-app adapter confirms every dispatch having done
      * nothing, on the reasoning that the dispatch register IS the delivery.

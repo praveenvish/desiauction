@@ -7,6 +7,7 @@ import {
   deriveAge,
   isBattingStyle,
   isBowlingStyle,
+  isMinor,
   parseRole,
   roleLabel,
 } from "./player-profile";
@@ -43,6 +44,25 @@ describe("deriveAge", () => {
     expect(deriveAge("22-07-2000", now)).toBeNull();
     expect(deriveAge("2020-13-40", now)).toBeNull();
     expect(deriveAge("2027-01-01", now)).toBeNull();
+  });
+});
+
+describe("isMinor (PRR P0-2 / DPDP §9)", () => {
+  const now = new Date(Date.UTC(2026, 6, 22)); // 2026-07-22
+
+  it("is true below 18 and false at or above 18", () => {
+    expect(isMinor("2009-07-21", now)).toBe(true); // just turned 17
+    expect(isMinor("2008-07-23", now)).toBe(true); // turns 18 tomorrow
+    expect(isMinor("2008-07-22", now)).toBe(false); // 18 exactly today
+    expect(isMinor("2000-01-01", now)).toBe(false);
+  });
+
+  it("does NOT treat an unknown or unparseable date of birth as a minor", () => {
+    // The gate cannot assert an age it does not have; a registrant with no DOB
+    // has no age published anyway, so there is nothing to suppress.
+    expect(isMinor(null, now)).toBe(false);
+    expect(isMinor("", now)).toBe(false);
+    expect(isMinor("not-a-date", now)).toBe(false);
   });
 });
 

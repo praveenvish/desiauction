@@ -16,6 +16,14 @@ const envSchema = z.object({
    * web tier 500s. Whoever sizes the fleet sizes this.
    */
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).optional(),
+  /**
+   * How many trusted reverse proxies sit in front of this app (PRR P2/F32). It
+   * decides which `x-forwarded-for` entry is the real client IP for per-IP
+   * throttles; the entries to the left of it are client-supplied and spoofable.
+   * 0 (the default) trusts no XFF entry — correct for local/direct. Behind a
+   * single Vercel/Fly ingress, set 1.
+   */
+  TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).max(10).default(0),
   SENTRY_DSN: z.url().optional(),
   // WebAuthn relying party (M-IP2-2). Defaults serve local dev + e2e; deployed
   // environments set real values (rpID must suffix-match the browser host).
@@ -111,6 +119,16 @@ const envSchema = z.object({
    */
   DEMO_JOB_SECRET: z.string().min(16).optional(),
   /**
+   * Shared secret on the settlement catch-up sweep (PRR P1-3), the same
+   * fail-closed door pattern as DEMO_JOB_SECRET. The sweep re-derives any
+   * journal effect lost in a crash between a case commit and its coordination —
+   * the repair the money system documents but had no scheduled caller for.
+   * Unset closes the endpoint with a 404; an open sweep would let a stranger
+   * drive settlement writes. A scheduler calls it; nothing schedules itself,
+   * and the certified finops runner stays out of the settlement write path.
+   */
+  SETTLEMENT_JOB_SECRET: z.string().min(16).optional(),
+  /**
    * The key demo booking links are DERIVED from (HMAC over the request id).
    *
    * A random token would be unrecoverable once hashed, which the reminder sweep
@@ -146,6 +164,19 @@ const envSchema = z.object({
   // seed, runner) starts one directory deep — so all three land on the same
   // repo-root `.local/finops-artifacts`. Deployments set an absolute path.
   FINOPS_STORAGE_DIR: z.string().min(1).default("../../.local/finops-artifacts"),
+  /**
+   * The finops artifact store (PRR P1-4). "filesystem" (default) writes to
+   * FINOPS_STORAGE_DIR — correct locally, WRONG across the deployed two-machine
+   * topology where web and the runner have separate disks. "bucket" is the
+   * shared S3/MinIO/R2 store both tiers read, and is required in production (a
+   * refinement below refuses the local default when serving, like MEDIA_STORAGE).
+   */
+  FINOPS_ARTIFACT_STORE: z.enum(["filesystem", "bucket"]).default("filesystem"),
+  FINOPS_S3_ENDPOINT: z.url().optional(),
+  FINOPS_S3_REGION: z.string().min(1).optional(),
+  FINOPS_S3_BUCKET: z.string().min(1).optional(),
+  FINOPS_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  FINOPS_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   // Player/team media (parity §3.1). "local" writes under public/_media and is
   // DEV/e2e ONLY (a built server does not serve runtime-written public files —
   // ARCHITECTURE R4); production sets "bucket" + an S3/R2 public base (D1).
@@ -216,6 +247,21 @@ function serving(v: z.infer<typeof envSchema>): boolean {
 }
 
 const productionSchema = envSchema
+  // PRR P1-1: the two-role recipe must be in effect in production. Unset
+  // SYSTEM_DATABASE_URL aliases the app pool (server/db.ts), so the ~130
+  // RLS-exempt system reads would run under the app role and fail; an equal URL
+  // means one role does both jobs and the isolation boundary is fictional. The
+  // app-role NOBYPASSRLS property itself is proven at boot by assertTenantIsolation.
+  .refine((v) => !serving(v) || v.SYSTEM_DATABASE_URL !== undefined, {
+    message:
+      "SYSTEM_DATABASE_URL must be set in production — unset aliases the app pool and collapses the two-role recipe",
+    path: ["SYSTEM_DATABASE_URL"],
+  })
+  .refine((v) => !serving(v) || v.SYSTEM_DATABASE_URL !== v.DATABASE_URL, {
+    message:
+      "SYSTEM_DATABASE_URL must be a DIFFERENT role from DATABASE_URL (app = NOBYPASSRLS, system = BYPASSRLS)",
+    path: ["SYSTEM_DATABASE_URL"],
+  })
   .refine((v) => !serving(v) || v.OTP_PROVIDER !== "dev", {
     message:
       "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=msg91 with credentials",
@@ -231,6 +277,28 @@ const productionSchema = envSchema
       "MEDIA_STORAGE=bucket needs MEDIA_PUBLIC_BASE — the public origin uploads are read from",
     path: ["MEDIA_PUBLIC_BASE"],
   })
+  // PRR P1-4: the filesystem artifact store cannot span web + runner on separate
+  // hosts, so exports would verify "unhealthy" forever. Production must use the
+  // shared bucket store.
+  .refine((v) => !serving(v) || v.FINOPS_ARTIFACT_STORE === "bucket", {
+    message:
+      "FINOPS_ARTIFACT_STORE=filesystem cannot be shared between web and the runner on separate hosts — set FINOPS_ARTIFACT_STORE=bucket",
+    path: ["FINOPS_ARTIFACT_STORE"],
+  })
+  .refine(
+    (v) =>
+      v.FINOPS_ARTIFACT_STORE !== "bucket" ||
+      (v.FINOPS_S3_ENDPOINT !== undefined &&
+        v.FINOPS_S3_REGION !== undefined &&
+        v.FINOPS_S3_BUCKET !== undefined &&
+        v.FINOPS_S3_ACCESS_KEY_ID !== undefined &&
+        v.FINOPS_S3_SECRET_ACCESS_KEY !== undefined),
+    {
+      message:
+        "FINOPS_ARTIFACT_STORE=bucket needs FINOPS_S3_ENDPOINT, FINOPS_S3_REGION, FINOPS_S3_BUCKET, FINOPS_S3_ACCESS_KEY_ID and FINOPS_S3_SECRET_ACCESS_KEY",
+      path: ["FINOPS_ARTIFACT_STORE"],
+    },
+  )
   .refine((v) => !serving(v) || v.ENGINE_SECRET !== "dev-engine-secret", {
     message:
       "ENGINE_SECRET must be set explicitly in production (the engine refuses this value too)",
@@ -261,6 +329,14 @@ const productionSchema = envSchema
   .refine((v) => !serving(v) || v.RP_ORIGINS.every((o) => !/localhost|127\.0\.0\.1/.test(o)), {
     message: "RP_ORIGINS still contains a localhost origin",
     path: ["RP_ORIGINS"],
+  })
+  // PRR P1-6: a production tier you cannot diagnose is not shippable. A missing
+  // DSN is a silent no-op, so this is the boot check that cannot be forgotten
+  // (preflight also fails on it). The rehearsal escape keeps serving() false.
+  .refine((v) => !serving(v) || (v.SENTRY_DSN !== undefined && v.SENTRY_DSN !== ""), {
+    message:
+      "SENTRY_DSN must be set in production so errors are captured (a missing DSN is silent)",
+    path: ["SENTRY_DSN"],
   });
 
 export type Env = z.infer<typeof envSchema>;

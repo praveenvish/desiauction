@@ -21,3 +21,14 @@ primary_region = "bom"
   interval = "15s"
   timeout = "5s"
   grace_period = "10s"
+
+# Routing gate (PRR P2): /readyz reflects DB reachability + a live watchdog tick,
+# so Fly stops sending commands to an engine that cannot serve a correct snapshot
+# (mid-replay, or DB unreachable) without killing it — /healthz above is the
+# liveness/watchdog check that must NOT depend on the DB (PRR F45).
+[[http_service.checks]]
+  method = "GET"
+  path = "/readyz"
+  interval = "10s"
+  timeout = "5s"
+  grace_period = "20s"

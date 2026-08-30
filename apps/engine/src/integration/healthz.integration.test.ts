@@ -26,10 +26,14 @@ afterAll(async () => {
 });
 
 describe("engine against real Postgres", () => {
-  it("healthz reports ok through a live connection", async () => {
+  it("boots against a live connection; healthz is watchdog-only, the DB is reachable", async () => {
     const response = await server.inject({ method: "GET", url: "/healthz" });
     expect(response.statusCode).toBe(200);
-    expect(healthResponseSchema.parse(response.json()).checks["db"]).toBe("ok");
+    // Liveness no longer probes the DB (PRR F45) — it must not let a DB blip kill
+    // a healthy engine. So assert the watchdog here, and the live DB connection
+    // directly; the DB gate now lives on /readyz (the routing probe).
+    expect(healthResponseSchema.parse(response.json()).checks["watchdog"]).toBe("ok");
+    expect(await checkDb()).toBe(true);
   });
 
   it("ws refuses a bad ticket (transport auth is fail-closed)", async () => {

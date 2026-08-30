@@ -35,7 +35,7 @@ import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import { resolvePassRequest } from "./pass-grant";
-import { publicCompetitionsDirectory } from "./public";
+import { publicCompetitionsDirectory, publicShowcase } from "./public";
 import {
   advanceCompetition,
   cloneCompetition,
@@ -822,5 +822,60 @@ describe("COMPETITION REGRESSION — domain contract", () => {
       await handle.sql.unsafe(`drop owned by ${role}`);
       await handle.sql.unsafe(`drop role if exists ${role}`);
     }
+  });
+});
+
+describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", () => {
+  it("suppresses age and photo for an under-18 player, keeps them for an adult", async () => {
+    const competition = await createCompetition(db, orgX.id, owner, { name: `Minors ${RUN}` });
+    await db
+      .update(competitionsTable)
+      .set({ visibility: "public" })
+      .where(eq(competitionsTable.id, competition.id));
+
+    // Two approved players, both with a photo AND photo consent on file, so the
+    // ONLY thing that can withhold the minor's photo is the age gate itself.
+    const minor = { id: newId(), phone: `+9193${RUN}01`, name: `Minor ${RUN}` };
+    const adult = { id: newId(), phone: `+9193${RUN}02`, name: `Adult ${RUN}` };
+    await db.insert(people).values([
+      { ...minor, photoUrl: `k/${minor.id}.jpg`, photoConsentAt: new Date() },
+      { ...adult, photoUrl: `k/${adult.id}.jpg`, photoConsentAt: new Date() },
+    ]);
+    await db.insert(registrationsTable).values([
+      {
+        id: newId(),
+        orgId: orgX.id,
+        competitionId: competition.id,
+        personId: minor.id,
+        role: "batter" as const,
+        status: "approved" as const,
+        registrationNumber: `MN${RUN.slice(-3)}001`,
+        dateOfBirth: "2015-01-01", // ~11 in 2026
+      },
+      {
+        id: newId(),
+        orgId: orgX.id,
+        competitionId: competition.id,
+        personId: adult.id,
+        role: "bowler" as const,
+        status: "approved" as const,
+        registrationNumber: `MN${RUN.slice(-3)}002`,
+        dateOfBirth: "1995-01-01", // ~31 in 2026
+      },
+    ]);
+
+    const pool = await publicShowcase(competition.slug);
+    const minorRow = pool?.players.find((p) => p.name === minor.name);
+    const adultRow = pool?.players.find((p) => p.name === adult.name);
+
+    // The minor: no age, no photo — even though consent is on file.
+    expect(minorRow?.age).toBeNull();
+    expect(minorRow?.photoUrl).toBeNull();
+    // The adult, as a control: age derived, photo published.
+    expect(adultRow?.age).toBeGreaterThanOrEqual(30);
+    expect(adultRow?.photoUrl).not.toBeNull();
+
+    await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
+    await db.delete(people).where(inArray(people.id, [minor.id, adult.id]));
   });
 });

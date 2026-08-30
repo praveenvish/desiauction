@@ -306,9 +306,12 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
    * nothing at all and called the whole squad duplicates.
    */
   await page.getByTestId("open-import").click();
-  await page.getByTestId("import-textarea").evaluate((el, csv) => {
-    (el as HTMLTextAreaElement).value = csv;
-  }, googleFormCsv({ withSizes: true }));
+  await page.getByTestId("import-textarea").evaluate(
+    (el, csv) => {
+      (el as HTMLTextAreaElement).value = csv;
+    },
+    googleFormCsv({ withSizes: true }),
+  );
   await page.getByTestId("import-preview-btn").click();
 
   // The preview now states what committing would DO, not just how many rows

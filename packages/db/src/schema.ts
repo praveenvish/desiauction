@@ -86,7 +86,14 @@ export const orgMembers = pgTable(
     personId: char("person_id", { length: 26 }).notNull(),
     joinedAt: ts("joined_at").notNull().defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.orgId, table.personId] })],
+  // PRR P2/F36: the composite PK indexes (org_id, person_id) — good for "who is
+  // in this org", useless for "which orgs is this person in", which the org
+  // switcher and every person-scoped membership read do. That lookup was a full
+  // scan; this index serves it.
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.personId] }),
+    index("org_members_person_idx").on(table.personId),
+  ],
 );
 
 export const sessions = pgTable(

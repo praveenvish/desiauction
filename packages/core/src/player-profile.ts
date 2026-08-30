@@ -252,3 +252,21 @@ export function deriveAge(dateOfBirth: string | null, now: Date): number | null 
   }
   return age < 0 ? null : age;
 }
+
+/** The age below which a registrant is treated as a child (DPDP Act 2023 §2(f)). */
+export const MINOR_AGE_THRESHOLD = 18;
+
+/**
+ * Is this registrant a minor? (PRR P0-2 — DPDP Act 2023 §9.)
+ *
+ * A child's personal data may not be published on a public, unauthenticated
+ * surface, and processing it needs verifiable guardian consent. This is the one
+ * predicate both the registration gate and the public read model derive that
+ * from. An unknown or unparseable date of birth is NOT treated as a minor: the
+ * age gate cannot assert a fact it does not have, and a registrant who gave no
+ * date has no age published anyway (there is nothing to suppress).
+ */
+export function isMinor(dateOfBirth: string | null, now: Date): boolean {
+  const age = deriveAge(dateOfBirth, now);
+  return age !== null && age < MINOR_AGE_THRESHOLD;
+}

@@ -181,13 +181,27 @@ export async function transition(
    * want. A player may always apply; approving them into the pool is the
    * organizer's act, and it is the act that costs.
    */
-  if (decision.next === "approved" && current.status !== "approved") {
-    const limited = await poolLimit(db, competitionId);
-    if (limited !== null) {
-      return { ok: false, reason: "tier_limit", message: limited };
+  const approving = decision.next === "approved" && current.status !== "approved";
+  const outcome = await db.transaction(async (tx): Promise<{ tierLimited: string } | null> => {
+    /*
+     * THE POOL CEILING, MADE ATOMIC (PRR P2/F37).
+     *
+     * The count was read BEFORE the transaction, so two organizers approving at
+     * once could both see "39 of 40", both pass, and both commit — 41 in a
+     * 40-player tier. A transaction-scoped advisory lock keyed on the
+     * competition serializes approvals for THAT season (others are unaffected),
+     * and the count-then-decide now happens inside the same transaction, so the
+     * ceiling holds under concurrency. The lock releases automatically on commit.
+     */
+    if (approving) {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext('registration-approval'), hashtext(${competitionId}))`,
+      );
+      const limited = await poolLimit(tx, competitionId);
+      if (limited !== null) {
+        return { tierLimited: limited };
+      }
     }
-  }
-  await db.transaction(async (tx) => {
     await tx
       .update(registrations)
       .set(mutationFields(event, decision.next, reviewerId))
@@ -201,7 +215,11 @@ export async function transition(
       subject: registrationId,
       meta: auditMeta(event),
     });
+    return null;
   });
+  if (outcome !== null) {
+    return { ok: false, reason: "tier_limit", message: outcome.tierLimited };
+  }
   await notifyPlayer(db, [registrationId], event);
   return { ok: true, status: decision.next };
 }
@@ -249,26 +267,30 @@ export async function transitionBatch(
   ];
 
   /*
-   * THE POOL CEILING, ON THE BATCH PATH TOO.
+   * THE POOL CEILING, ON THE BATCH PATH TOO — ATOMIC (PRR P2/F37 re-validation).
    *
-   * `transition` (single) checks poolLimit before it grows the pool; the batch
-   * twin must behave identically to N single approvals — approve the ones that
-   * fit under the tier, refuse the rest. Approving fifty in one click must not
-   * sail a Free season past its forty. Only the approve event grows the pool.
+   * `transition` (single) takes a per-competition advisory lock and counts the
+   * pool INSIDE the transaction so the ceiling holds under concurrency; the batch
+   * twin must do the same, or two bulk-approves reading the same "remaining"
+   * jointly sail a Free season past its forty. So the count-and-decide moves
+   * inside the same advisory-locked transaction, exactly like the single path.
+   * Only the approve event grows the pool.
    */
   let apply = plan.apply;
-  if (event.type === "approve") {
-    const remaining = await poolRemaining(db, competitionId);
-    if (remaining !== null && plan.apply.length > remaining) {
-      apply = plan.apply.slice(0, remaining);
-      for (const entry of plan.apply.slice(remaining)) {
-        skipped.push({ id: entry.id, reason: "tier_limit" });
-      }
-    }
-  }
-
   if (apply.length > 0) {
     await db.transaction(async (tx) => {
+      if (event.type === "approve") {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext('registration-approval'), hashtext(${competitionId}))`,
+        );
+        const remaining = await poolRemaining(tx, competitionId);
+        if (remaining !== null && apply.length > remaining) {
+          for (const entry of apply.slice(remaining)) {
+            skipped.push({ id: entry.id, reason: "tier_limit" });
+          }
+          apply = apply.slice(0, remaining);
+        }
+      }
       for (const entry of apply) {
         await tx
           .update(registrations)

@@ -29,12 +29,24 @@ const DEV: Raw = {
 const PROD_OK: Raw = {
   ...DEV,
   NODE_ENV: "production",
+  // PRR P1-1: the two-role recipe must be in effect and the roles distinct.
+  SYSTEM_DATABASE_URL: "postgres://system:pass@localhost:5433/desiauction",
   OTP_PROVIDER: "msg91",
   MSG91_AUTH_KEY: "key",
   MSG91_TEMPLATE_ID: "template",
   MEDIA_STORAGE: "bucket",
   MEDIA_PUBLIC_BASE: "https://media.desiauction.in",
+  // PRR P1-4: the shared finops artifact store, with its S3 credentials.
+  FINOPS_ARTIFACT_STORE: "bucket",
+  FINOPS_S3_ENDPOINT: "https://s3.ap-south-1.amazonaws.com",
+  FINOPS_S3_REGION: "ap-south-1",
+  FINOPS_S3_BUCKET: "desiauction-finops",
+  FINOPS_S3_ACCESS_KEY_ID: "AKIA",
+  FINOPS_S3_SECRET_ACCESS_KEY: "secret",
+  // PRR P1-6: error tracking is mandatory in production.
+  SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
   ENGINE_SECRET: "x".repeat(48),
+  DEMO_TOKEN_SECRET: "d".repeat(48),
   PUBLIC_BASE_URL: "https://desiauction.in",
   RP_ID: "desiauction.in",
   RP_ORIGINS: "https://desiauction.in",
@@ -67,6 +79,20 @@ describe("web env — production refuses every dev-only default", () => {
     ["PUBLIC_BASE_URL", { PUBLIC_BASE_URL: "http://localhost:3000" }, /localhost/],
     ["RP_ID", { RP_ID: "localhost" }, /RP_ID/],
     ["RP_ORIGINS", { RP_ORIGINS: "http://localhost:3000" }, /RP_ORIGINS/],
+    // PRR P1-1 / P1-4 / P1-6: the boot guards added in the remediation pass.
+    ["SYSTEM_DATABASE_URL unset", { SYSTEM_DATABASE_URL: undefined }, /SYSTEM_DATABASE_URL/],
+    [
+      "SYSTEM_DATABASE_URL equals app",
+      { SYSTEM_DATABASE_URL: "postgres://user:pass@localhost:5433/desiauction" },
+      /DIFFERENT role/,
+    ],
+    [
+      "FINOPS_ARTIFACT_STORE filesystem",
+      { FINOPS_ARTIFACT_STORE: "filesystem" },
+      /FINOPS_ARTIFACT_STORE/,
+    ],
+    ["FINOPS bucket missing config", { FINOPS_S3_BUCKET: undefined }, /FINOPS_S3/],
+    ["SENTRY_DSN unset", { SENTRY_DSN: undefined }, /SENTRY_DSN/],
   ];
 
   it.each(CASES)("refuses to serve production with %s", (_name, override, message) => {

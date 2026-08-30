@@ -40,9 +40,21 @@ export interface PublicShellProps {
   footerTagline?: ReactNode;
   /** Decorative row rendered under the footer tagline (e.g. social glyphs). */
   footerSocial?: ReactNode;
-  /** A 5th footer column slot (e.g. a newsletter signup form). */
+  /**
+   * Subscribe slot, rendered under the brand line rather than as a column of
+   * its own. A sixth column squeezed the four link columns and left the form
+   * stranded across the page from the sentence that motivates it; beneath the
+   * tagline it reads as part of the brand's pitch, which is what it is.
+   */
   footerNewsletter?: ReactNode;
   footerNote?: ReactNode;
+  /**
+   * The operator's own identity — legal name, registration, registered address
+   * — as fine print below the bottom bar. Content, so the app supplies it: this
+   * package holds no facts about the company shipping it. Absent until those
+   * facts are published (see the app's `company.ts`), never guessed.
+   */
+  footerLegal?: ReactNode;
   /** Small links rendered beside footerNote in the bottom bar (Privacy, Terms, …). */
   footerBottomLinks?: PublicShellLink[];
   /**
