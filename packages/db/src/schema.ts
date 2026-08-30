@@ -8,7 +8,9 @@ import {
   integer,
   jsonb,
   pgTable,
+  date,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -1363,3 +1365,119 @@ export const newsletterSubscribers = pgTable("newsletter_subscribers", {
   email: text("email").notNull().unique(),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
+
+/**
+ * SOMEBODY WANTS TO BE SHOWN (migration 0031).
+ *
+ * Platform-level, ZERO tenant data, no RLS — the same posture as
+ * `newsletter_subscribers` above and for the same reason: the person filling
+ * the form is a stranger with no session, no membership and no org to be scoped
+ * to. The migration states the exception at length so it can never be mistaken
+ * for one somebody forgot.
+ *
+ * The size band and the nullable date are deliberate. "How many teams?" asked
+ * of somebody who has not run the tournament yet produces a guess typed as
+ * fact, and a NOT NULL date makes them invent one.
+ */
+export const demoRequests = pgTable(
+  "demo_requests",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    /** E.164, via the same normaliser sign-in uses. */
+    phone: text("phone").notNull(),
+    /** Optional — needed only to receive the acknowledgement by mail. */
+    email: text("email"),
+    orgName: text("org_name").notNull(),
+    tournamentSize: text("tournament_size", {
+      enum: ["under-8", "8-16", "16-32", "over-32", "unsure"],
+    }).notNull(),
+    auctionOn: date("auction_on"),
+    preferredWindow: text("preferred_window", {
+      enum: ["weekday-evening", "weekend-morning", "weekend-evening", "any"],
+    }).notNull(),
+    /** Their words: the most useful column for whoever answers. */
+    note: text("note"),
+    source: text("source", {
+      enum: ["schedule-demo", "pricing", "landing", "help", "other"],
+    }).notNull(),
+    /** Throttling only; ages out with the row. */
+    requestIp: text("request_ip"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    /** Null contact = still open. Outcome and contact move together (CHECK). */
+    contactedAt: ts("contacted_at"),
+    contactedBy: char("contacted_by", { length: 26 }),
+    outcome: text("outcome", {
+      enum: ["scheduled", "showed", "no_show", "signed_up", "not_a_fit", "no_response"],
+    }),
+  },
+  (table) => [
+    index("demo_requests_created_idx").on(table.createdAt),
+    index("demo_requests_phone_idx").on(table.phone, table.createdAt),
+    index("demo_requests_ip_idx").on(table.requestIp, table.createdAt),
+  ],
+);
+
+/**
+ * WHAT IS ON OFFER (migration 0032) — recurring weekly windows in IST.
+ *
+ * Minutes past midnight rather than `time`, because the slot derivation does
+ * arithmetic on them and every dialect of `time` in every driver is a different
+ * shape. Weekday is 0 = Sunday, matching both `getDay()` and Postgres `DOW`.
+ */
+export const demoAvailability = pgTable(
+  "demo_availability",
+  {
+    id: id(),
+    weekday: smallint("weekday").notNull(),
+    startMinute: integer("start_minute").notNull(),
+    endMinute: integer("end_minute").notNull(),
+    slotMinutes: integer("slot_minutes").notNull().default(30),
+    effectiveFrom: date("effective_from"),
+    effectiveTo: date("effective_to"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+  },
+  (table) => [index("demo_availability_weekday_idx").on(table.weekday)],
+);
+
+/** Not this Thursday — a subtraction from the recurring pattern (0032). */
+export const demoBlackouts = pgTable("demo_blackouts", {
+  id: id(),
+  blackoutOn: date("blackout_on").notNull().unique(),
+  reason: text("reason"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+  createdBy: char("created_by", { length: 26 }).notNull(),
+});
+
+/**
+ * THE BOOKING (migration 0032).
+ *
+ * Double-booking is refused by `demo_bookings_slot_uq`, a UNIQUE index over
+ * live rows — not by a check-then-insert, which two people pressing at once
+ * step straight through. A reschedule is a NEW row pointing at the one it
+ * replaced, never an UPDATE of `slotStart`: "what time did we agree, and when
+ * did that change?" is a question about the past.
+ */
+export const demoBookings = pgTable(
+  "demo_bookings",
+  {
+    id: id(),
+    demoRequestId: char("demo_request_id", { length: 26 }).notNull(),
+    slotStart: ts("slot_start").notNull(),
+    slotEnd: ts("slot_end").notNull(),
+    /** SHA-256 of a base64url secret handed over once and never stored. */
+    tokenHash: text("token_hash").notNull().unique(),
+    confirmedAt: ts("confirmed_at"),
+    cancelledAt: ts("cancelled_at"),
+    cancelledBy: text("cancelled_by", { enum: ["requester", "organizer"] }),
+    rescheduledFrom: char("rescheduled_from", { length: 26 }),
+    reminder24hSentAt: ts("reminder_24h_sent_at"),
+    reminder1hSentAt: ts("reminder_1h_sent_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("demo_bookings_slot_idx").on(table.slotStart),
+    index("demo_bookings_request_idx").on(table.demoRequestId),
+  ],
+);

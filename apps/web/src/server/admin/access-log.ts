@@ -66,7 +66,11 @@ export type AdminSurface =
   | "health"
   | "messaging"
   /** The pass queue — the one surface behind `platform:billing`, not admin. */
-  | "passes";
+  | "passes"
+  /** The demo desk (DEMO-1), behind `platform:demo`. Opening it reads the name
+   *  and mobile number of somebody who is not a customer, which is precisely
+   *  the kind of read this log exists for. */
+  | "demos";
 
 /**
  * Record that an administrator opened a surface.

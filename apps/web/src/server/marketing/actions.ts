@@ -1,8 +1,17 @@
 "use server";
 
+import { headers } from "next/headers";
+
 import { newId, newsletterSubscribers } from "@desiauction/db";
 
 import { db } from "../db";
+import { sendDemoRequestMail } from "./demo-mail";
+import {
+  isThrottled,
+  recordDemoRequest,
+  validateDemoRequest,
+  type ValidationField,
+} from "./demo-requests";
 
 // Anonymous, unauthenticated capture — newsletter_subscribers carries no
 // tenant data and no RLS (schema.ts), so a plain pool write is correct here,
@@ -28,4 +37,90 @@ export async function subscribeNewsletterAction(
     return { success: true };
   }
   return { success: true };
+}
+
+/**
+ * A DEMO REQUEST — the form that replaced a mailto link.
+ *
+ * Same pool and same reasoning as the newsletter above: `demo_requests` carries
+ * no tenant data and no RLS (migration 0031), so a plain pool write is correct.
+ *
+ * THE ORDER OF WORK IS THE DESIGN.
+ *
+ *   honeypot → validate → throttle → INSERT → acknowledge
+ *
+ * The insert lands before anything is sent, so a mail provider that is down,
+ * unconfigured, or refusing cannot cost us a lead the person believes they have
+ * given us. The acknowledgement is awaited rather than floated — a server
+ * action's process may be frozen the moment it returns, and a dangling promise
+ * is how "we emailed you" becomes a coin flip — but its outcome cannot fail the
+ * submission. What the person is told on screen is the contract; the mail is a
+ * convenience layered on top of it.
+ */
+export interface DemoRequestState {
+  readonly error?: string;
+  readonly field?: ValidationField;
+  readonly success?: boolean;
+  /** Phase 2: the picker needs the id of the request it is booking against. */
+  readonly requestId?: string;
+}
+
+async function requestIp(): Promise<string | null> {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip");
+}
+
+function field(formData: FormData, name: string): string {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+}
+
+export async function requestDemoAction(
+  _previous: DemoRequestState,
+  formData: FormData,
+): Promise<DemoRequestState> {
+  // THE HONEYPOT. A field no human sees and every naive bot fills. The refusal
+  // is a plain success: telling a scraper which of its submissions were binned
+  // is telling it how to stop being binned. No captcha — the platform's CSP
+  // admits no third-party script, and that is worth more than this form is.
+  if (field(formData, "company_website").trim() !== "") {
+    return { success: true };
+  }
+
+  const validated = validateDemoRequest({
+    name: field(formData, "name"),
+    phone: field(formData, "phone"),
+    email: field(formData, "email"),
+    orgName: field(formData, "orgName"),
+    tournamentSize: field(formData, "tournamentSize"),
+    auctionOn: field(formData, "auctionOn"),
+    preferredWindow: field(formData, "preferredWindow"),
+    note: field(formData, "note"),
+    source: field(formData, "source"),
+    requestIp: await requestIp(),
+  });
+  if (!validated.ok) {
+    return { error: validated.message, field: validated.field };
+  }
+  const request = validated.value;
+
+  // Silent on refusal, deliberately: see `isThrottled`. Someone who has already
+  // asked three times today sees the same screen as someone who has asked once,
+  // and we do not learn about the fourth.
+  if (await isThrottled(db, request.phone, request.requestIp)) {
+    return { success: true };
+  }
+
+  const requestId = await recordDemoRequest(db, request);
+
+  const outcomes = await sendDemoRequestMail(request, requestId);
+  if (outcomes.founder === "failed" || outcomes.requester === "failed") {
+    // The lead is safe in the database and the person has been told on screen.
+    // This is an operational problem, and an operational problem that is not
+    // written down is one nobody fixes.
+    // eslint-disable-next-line no-console
+    console.error("demo request mail failed", { requestId, ...outcomes });
+  }
+
+  return { success: true, requestId };
 }

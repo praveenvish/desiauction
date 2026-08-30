@@ -60,6 +60,10 @@ export function shellKind(pathname: string): ShellKind {
     pathname.startsWith("/security") ||
     pathname.startsWith("/rules-guidelines") ||
     pathname.startsWith("/schedule-demo") ||
+    // A booking link opens in whatever browser the mail was read in, often
+    // with a live session — without this the person's own demo would arrive
+    // framed in the organizer console.
+    pathname.startsWith("/demo/") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/careers") ||
     pathname.startsWith("/case-studies") ||
@@ -241,6 +245,10 @@ export const ADMIN_TABS: CompetitionTab[] = [
   // own front door. A tab that appears only for some operators would leak who
   // holds which grant to anyone comparing screens.
   { key: "passes", label: "Passes", href: "/admin/passes" },
+  // Demos sits behind `platform:demo` and follows the same rule as Passes: the
+  // tab is present for everyone, the page 404s without the grant. Which tabs
+  // you can SEE must not be a map of which grants you hold.
+  { key: "demos", label: "Demos", href: "/admin/demos" },
 ];
 
 export function activeAdminTab(pathname: string): string {
@@ -261,6 +269,9 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/passes")) {
     return "passes";
+  }
+  if (pathname.startsWith("/admin/demos")) {
+    return "demos";
   }
   return "overview";
 }
@@ -364,6 +375,9 @@ const SECTION_LABELS: [RegExp, string][] = [
   // has no label.
   [/^\/admin\/messaging$/, "Messaging"],
   [/^\/admin\/passes$/, "Passes"],
+  // Longest-first: availability must not be labelled "Demos".
+  [/^\/admin\/demos\/availability$/, "Demo availability"],
+  [/^\/admin\/demos$/, "Demos"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.

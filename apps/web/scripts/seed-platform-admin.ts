@@ -29,13 +29,19 @@ import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capa
  * `platform:admin` sees the console. `platform:billing` answers a season's pass
  * request — a different act of trust, deliberately not a superset, so nobody
  * acquires the power to change what a customer is entitled to by being handed
- * the power to look at them. Both are platform-scoped, and RLS makes both
- * equally uninsertable by the application role: this script is the only route.
+ * the power to look at them. `platform:demo` answers the people who asked to be
+ * SHOWN the product: names and mobile numbers belonging to strangers with no
+ * account here, plus the power to publish, in the company's name, the hours
+ * somebody will pick up the phone. None of the three is a superset of another.
+ *
+ * All are platform-scoped, and RLS makes all equally uninsertable by the
+ * application role: this script is the only route.
  *
  *   pnpm --filter @desiauction/web seed:admin -- <phone>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:billing <phone>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:demo <phone>
  */
-const SETS = ["platform:admin", "platform:billing"] as const;
+const SETS = ["platform:admin", "platform:billing", "platform:demo"] as const;
 const setFlagAt = process.argv.indexOf("--set");
 const requestedSet = setFlagAt === -1 ? "platform:admin" : process.argv[setFlagAt + 1];
 if (!(SETS as readonly string[]).includes(requestedSet ?? "")) {

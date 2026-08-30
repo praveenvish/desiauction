@@ -218,6 +218,20 @@
       "when": 1786291200000,
       "tag": "0030_status_and_sale_invariants",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1786377600000,
+      "tag": "0031_demo_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786464000000,
+      "tag": "0032_demo_scheduling",
+      "breakpoints": true
     }
   ]
 }

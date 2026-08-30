@@ -79,6 +79,27 @@ const RUNTIME_ROLES = ["desiauction_app", "desiauction_engine", "desiauction_run
  */
 const SYSTEM_MAY_WRITE = ["org_members", "grants", "audit_log", "invites"];
 
+/**
+ * Tables the WEB TIER writes with no RLS underneath it (DEMO-1).
+ *
+ * `demo_requests` and the scheduling tables carry no `org_id` and no policies —
+ * the person filling the public form is a stranger with no tenant to be scoped
+ * to. That makes the app role's grant the ONLY thing standing between the
+ * feature and a 500 in production, where every other tenant table has RLS as a
+ * second signal that something is wrong. Default privileges cover them today;
+ * this states it so a recipe rewrite that drops those defaults fails here
+ * rather than on the public demo page.
+ *
+ * The system role is deliberately absent: it reads this queue and never writes
+ * it, which is why `SYSTEM_MAY_WRITE` above is still four tables long.
+ */
+const APP_WRITES_UNPROTECTED = [
+  "demo_requests",
+  "demo_availability",
+  "demo_blackouts",
+  "demo_bookings",
+];
+
 function expectations(allTables: string[]): Expectation[] {
   const out: Expectation[] = [];
 
@@ -94,6 +115,18 @@ function expectations(allTables: string[]): Expectation[] {
       allowed: true,
       why: "the web tier reads every tenant table; RLS scopes the rows, not the grant",
     });
+  }
+
+  for (const table of APP_WRITES_UNPROTECTED) {
+    for (const verb of ["INSERT", "UPDATE", "DELETE"] as const) {
+      out.push({
+        role: "desiauction_app",
+        table,
+        verb,
+        allowed: true,
+        why: "the public demo form and the operator desk both write on the app pool (no RLS to bypass)",
+      });
+    }
   }
 
   for (const table of ENGINE_WRITES) {

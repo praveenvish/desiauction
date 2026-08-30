@@ -92,6 +92,30 @@ const envSchema = z.object({
    */
   DELIVERY_CALLBACK_SECRET: z.string().min(16).optional(),
   /**
+   * DEMO-1 reminders. The web tier holds NO scheduler — the finops runner is
+   * the platform's one home for scheduled work, and demo reminders have no
+   * business inside a certified money process. So the sweep is an ENDPOINT that
+   * a scheduler calls, not a loop that runs itself.
+   *
+   * Unset closes it with a 404, the same fail-closed posture as the delivery
+   * and SMS callbacks: an open sweep endpoint would let a stranger burn through
+   * every pending reminder at once.
+   */
+  DEMO_JOB_SECRET: z.string().min(16).optional(),
+  /**
+   * The key demo booking links are DERIVED from (HMAC over the request id).
+   *
+   * A random token would be unrecoverable once hashed, which the reminder sweep
+   * needs — it has to rebuild a person's manage link a day later, and a
+   * plaintext token in the database would give a leaked backup working links to
+   * every booking. Deriving them keeps that property (the key lives in the
+   * environment, not the table) and makes the link reproducible.
+   *
+   * It has a development default like `ENGINE_SECRET`, and like `ENGINE_SECRET`
+   * that default is refused when actually serving — see the refinements below.
+   */
+  DEMO_TOKEN_SECRET: z.string().min(8).default("dev-demo-token-secret"),
+  /**
    * Razorpay. All three together or the gateway is simply absent and every
    * payment stays on the manual adapters — a half-configured gateway that
    * accepts orders it cannot reconcile is worse than no gateway.
@@ -203,6 +227,15 @@ const productionSchema = envSchema
     message:
       "ENGINE_SECRET must be set explicitly in production (the engine refuses this value too)",
     path: ["ENGINE_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.DEMO_TOKEN_SECRET !== "dev-demo-token-secret", {
+    message:
+      "DEMO_TOKEN_SECRET must be set explicitly in production (demo booking links are derived from it)",
+    path: ["DEMO_TOKEN_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.DEMO_TOKEN_SECRET.length >= 32, {
+    message: "DEMO_TOKEN_SECRET must be at least 32 characters in production",
+    path: ["DEMO_TOKEN_SECRET"],
   })
   .refine((v) => !serving(v) || v.ENGINE_SECRET.length >= 32, {
     message: "ENGINE_SECRET must be at least 32 characters in production",

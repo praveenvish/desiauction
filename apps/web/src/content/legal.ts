@@ -191,6 +191,20 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
         kind: "paragraph",
         text: "We use a small number of service providers to operate the platform — hosting, SMS delivery for sign-in codes, and error monitoring. Each is named, with its role, in the version of this policy published at launch. We share only what each provider needs to do its job.",
       },
+      // DEMO-1 added a collection point that has nothing to do with having an
+      // account: a public form that takes a name and a mobile number from
+      // somebody who may never sign up. A policy that describes only what it
+      // gathers from users would be silent about the one group who never
+      // became users, which is exactly the group with least recourse.
+      { kind: "heading", level: 2, text: "If you ask us for a demo" },
+      {
+        kind: "paragraph",
+        text: "You can ask for a demonstration without creating an account. When you do, we keep what you type on that form — your name, your mobile number, the name of your tournament, its rough size, when your auction is if you tell us, an email address if you give one, and anything you write in the notes — together with the time you asked and the address you asked from.",
+      },
+      {
+        kind: "paragraph",
+        text: "We use it to arrange and hold that one conversation, and for nothing else. It is not added to any mailing list, it is not used to advertise to you, and it is not shared or sold. If you book a time, we send you a confirmation and up to two reminders about that booking; you can cancel it at any point from the link in those messages, and cancelling stops the reminders.",
+      },
       { kind: "heading", level: 2, text: "Retention and deletion" },
       {
         kind: "paragraph",
@@ -363,6 +377,11 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       {
         kind: "paragraph",
         text: "Auction ledgers and financial records are immutable by design and retained as a permanent record of what happened. This is what makes an auction disputable-free and the books trustworthy — the record cannot be quietly changed or erased.",
+      },
+      { kind: "heading", level: 2, text: "Demo requests" },
+      {
+        kind: "paragraph",
+        text: "If you asked for a demonstration without opening an account, we keep that request for twenty-four months and then delete it. The network address it was sent from is kept for ninety days — it exists only to stop the form being abused — and is deleted after that whether or not the request itself is still held. Ask us sooner and we will delete it sooner; there is no record here we are required to keep.",
       },
       { kind: "heading", level: 2, text: "Account deletion" },
       {

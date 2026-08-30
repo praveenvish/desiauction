@@ -67,6 +67,30 @@ export async function platformBillingGate(): Promise<AdminIdentity | null> {
   return { personId: session.personId, name: session.name, phone: session.phone };
 }
 
+/**
+ * THE THIRD DOOR — the demo desk (DEMO-1).
+ *
+ * Separate from both gates above, and the reason is what is behind it: the
+ * names and mobile numbers of people who are not customers, have no account
+ * here, and typed them into a public form on the promise that we would ring
+ * once. Reading the platform does not license that, and neither does answering
+ * a pass request. Returns null the same way, for the same reason — a locked
+ * door that announces itself is a map.
+ */
+export async function platformDemoGate(): Promise<AdminIdentity | null> {
+  const session = await currentSession();
+  if (session === null) {
+    return null;
+  }
+  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
+    hasPlatformCapability(await grantsFor(db, session.personId), "platform.demo"),
+  );
+  if (!allowed) {
+    return null;
+  }
+  return { personId: session.personId, name: session.name, phone: session.phone };
+}
+
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */
 export async function isPlatformAdmin(): Promise<boolean> {
   return (await platformAdminGate()) !== null;

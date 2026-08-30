@@ -372,7 +372,12 @@ export const LANDING = {
     title: "Make your auction night unforgettable.",
     note: "Create the tournament, run the live auction, and settle every rupee — all in one place. Free through the beta.",
     ctaPrimary: { label: "Start your auction", href: "/login" },
-    ctaSecondary: { label: "Explore tournaments", href: "/c" },
+    // WAS "Explore tournaments" → /c, which is the same destination the HERO's
+    // secondary already offers: a closing band that repeats the opening one
+    // gives somebody who read the whole page nothing new to do. The people who
+    // reach the bottom and have not signed up are the ones who want to be shown
+    // it first, so that is what the last CTA on the page now offers.
+    ctaSecondary: { label: "Watch it run with us", href: "/schedule-demo?from=landing" },
   },
 } as const;
 
@@ -680,7 +685,10 @@ export const PRICING = {
     title: "Start free. Decide about paying later.",
     note: "Create the tournament, run the live auction and settle every rupee — free through the beta, and free forever for a tournament you start now.",
     ctaPrimary: { label: "Start your auction", href: "/login" },
-    ctaSecondary: { label: "See everything it does", href: "/features" },
+    // Somebody at the bottom of the PRICING page is weighing a decision, and
+    // the thing that settles it is seeing the product run on a tournament like
+    // theirs — not another feature list.
+    ctaSecondary: { label: "See it run first", href: "/schedule-demo?from=pricing" },
   },
 } as const;
 

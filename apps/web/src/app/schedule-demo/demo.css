@@ -1,0 +1,214 @@
+/* DEMO-1 — the scheduling surfaces. Loaded alongside content.css, which owns
+   the page frame; everything here is specific to booking. */
+
+.demo-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: demo-step;
+}
+
+.demo-steps li {
+  position: relative;
+  padding-left: var(--space-8);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+  counter-increment: demo-step;
+}
+
+.demo-steps li::before {
+  content: counter(demo-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-family: var(--font-display);
+  font-size: var(--text-xs-size);
+}
+
+.demo-steps li strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.demo-footnote {
+  margin-top: var(--space-8);
+  font-size: var(--text-sm-size);
+}
+
+/* ---- The picker ------------------------------------------------------- */
+
+.demo-day {
+  margin: 0 0 var(--space-6);
+}
+
+.demo-day-head {
+  margin: 0 0 var(--space-3);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-base-size);
+}
+
+.demo-day-head span {
+  color: var(--text-secondary);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+}
+
+.demo-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 44px minimum on both axes. Axe does not check target size, so this is
+   asserted by a computed-style test instead — the UX-1 audit's finding was
+   that every real defect hid in exactly this kind of verification gap. */
+.demo-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.demo-slot:hover {
+  border-color: var(--border-interactive);
+  background: var(--accent-subtle);
+}
+
+.demo-slot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Selection comes from the radio's own state — the input precedes its label in
+   the DOM, so the sibling combinator reaches it. Text on the accent fill is
+   ink, not white: the accent is gold, and the contrast maths only works one way
+   round. */
+.visually-hidden-input:checked + .demo-slot {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.demo-zone {
+  margin: 0 0 var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.demo-confirm-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.demo-chosen {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+}
+
+/* ---- The booking (token) page ----------------------------------------- */
+
+.demo-booking-card {
+  margin: var(--space-5) 0;
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.demo-when {
+  margin: 0 0 var(--space-2);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-xl-size);
+}
+
+.demo-when-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.demo-booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.demo-cancelled {
+  color: var(--danger-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-slot {
+    transition: none;
+  }
+}
+
+/* The radio behind each slot label: taken out of sight, left in the
+   accessibility tree. `display: none` would remove it from the tree and the
+   radio group would stop being a group. */
+.visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The focus ring belongs on the thing you can see, not on the 1px radio. */
+.visually-hidden-input:focus-visible + .demo-slot {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.demo-slot-error {
+  margin: var(--space-4) 0 0;
+  color: var(--danger-strong);
+  font-size: var(--text-sm-size);
+}
+
+.demo-day {
+  border: 0;
+  padding: 0;
+  min-inline-size: 0;
+}

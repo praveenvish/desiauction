@@ -156,8 +156,8 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "Schedule a demo",
     "/schedule-demo",
     "Marketing",
-    "See it with us",
-    "demo walkthrough call sales talk to us",
+    "Book a live walkthrough",
+    "demo walkthrough call sales talk to us book booking time slot appointment",
   ),
   doc("Blog", "/blog", "Marketing", "Writing", "blog posts articles news updates"),
   doc(

@@ -27,7 +27,17 @@ export type ProductEventName =
   | "register.photo_added"
   | "showcase.player_viewed"
   | "showcase.player_profile_opened"
-  | "showcase.exported";
+  | "showcase.exported"
+  // DEMO-1. The funnel, one event per step, no PII in any payload: `source`
+  // says which CTA sent them and nothing says who they are. Without these the
+  // question "is the pricing-page CTA worth anything?" has no answer but a
+  // guess, and the question "should the calendar exist at all?" has none either.
+  | "demo.form_viewed"
+  | "demo.requested"
+  | "demo.slot_picked"
+  | "demo.confirmed"
+  | "demo.cancelled"
+  | "demo.rescheduled";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

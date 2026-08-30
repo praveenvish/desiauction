@@ -56,9 +56,9 @@ import type { GrantLike } from "@desiauction/core";
  * uninsertable by the application role whatever its set. It is seeded
  * out-of-band or it does not exist.
  */
-export type PlatformCapability = "platform.admin" | "platform.pass";
+export type PlatformCapability = "platform.admin" | "platform.pass" | "platform.demo";
 
-export type PlatformCapabilitySet = "platform:admin" | "platform:billing";
+export type PlatformCapabilitySet = "platform:admin" | "platform:billing" | "platform:demo";
 
 const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   "platform:admin": ["platform.admin"],
@@ -66,11 +66,30 @@ const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   // the platform, and reading the platform does not license answering one. An
   // operator who does both holds both grants, on purpose, and the audit says so.
   "platform:billing": ["platform.pass"],
+  /**
+   * THE THIRD SET (DEMO-1), and it is a third set for the reason the second one
+   * was: answering a stranger who asked to be shown the product is a different
+   * act from seeing every organization's money, and neither should arrive as a
+   * side effect of the other.
+   *
+   * What sits behind it is a list of names, mobile numbers and clubs belonging
+   * to people who are not customers and have no account here — and the power to
+   * publish, in the company's name, the hours somebody will answer a call. That
+   * is a sales desk. It is not administration and it is not billing.
+   *
+   * It inherits both structural locks unchanged: the singleton scope pinned
+   * below, and `grants_tenant`'s WITH CHECK, which admits only
+   * `scope_type = 'org'` and therefore makes EVERY platform-scoped grant
+   * uninsertable by the application role whatever its set. Seeded out-of-band
+   * or it does not exist.
+   */
+  "platform:demo": ["platform.demo"],
 };
 
 export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
   "platform:admin",
   "platform:billing",
+  "platform:demo",
 ];
 
 /** The singleton scope. `scope_id` is char(26); this is the nil ULID. */
