@@ -399,10 +399,18 @@ export async function tournamentSeasons(
   }));
 }
 
+/**
+ * Returns the destination rather than redirecting — the same reason
+ * `createOrgAction` does. This form is rendered by the `@action` parallel slot
+ * on BOTH `/home` and `/tournaments`, and a server-action redirect away from a
+ * route whose action slot is matched is abandoned by the router: the write
+ * lands, the navigation never does, and the submit button stays disabled on a
+ * form that already succeeded. See `createOrgAction` for the measurements.
+ */
 export async function createTournamentAction(
-  _previous: { error?: string },
+  _previous: { error?: string; created?: string },
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; created?: string }> {
   const session = await requireSession();
   const orgId = formString(formData, "orgId");
   const name = formString(formData, "name");
@@ -432,5 +440,5 @@ export async function createTournamentAction(
     }
     return { error: "Give the tournament a name of at least 3 characters." };
   }
-  redirect(`/tournaments/${slug}`);
+  return { created: slug };
 }

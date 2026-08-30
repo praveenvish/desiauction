@@ -195,23 +195,48 @@ export async function updateOrgDescriptionAction(
   }
 }
 
+/**
+ * WHY THIS RETURNS A DESTINATION INSTEAD OF CALLING `redirect()`.
+ *
+ * It used to end in `redirect(`/org/${slug}`)`, which is the idiomatic shape
+ * and which DOES issue a correct 303 — the organization is created and the
+ * server names where to go. The client never got there.
+ *
+ * The form lives in a `FormDialog` rendered by the `@action` PARALLEL ROUTE
+ * slot (`app/@action/orgs/page.tsx`). Completing a server-action redirect away
+ * from `/orgs` requires that slot to swap to its `default`, which unmounts the
+ * component whose action is still awaiting the transition — and the router
+ * abandons the navigation instead. The RSC request for the destination is
+ * aborted, no error is raised on either side, and `useActionState` is left
+ * `pending` forever: a submit button disabled for good on a form whose write
+ * already succeeded.
+ *
+ * Measured, not guessed. With the slot's `page.tsx` removed the identical
+ * redirect completes; with it present it never does, whether the form sits in
+ * the slot or in the page's own children, whether the dialog is open or closed,
+ * and with `RedirectType.replace` as well as the default push. A segment-level
+ * `default.tsx` does not help either.
+ *
+ * So the navigation is handed to the client, which owns the router and is not
+ * torn down by its own transition. `createOrgAction` reports WHERE to go;
+ * `CreateOrgForm` goes there. Do the same for any other action that redirects
+ * off `/home`, `/orgs` or `/tournaments` — the three routes with an action slot.
+ */
 export async function createOrgAction(
-  _previous: { error?: string },
+  _previous: { error?: string; created?: string },
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; created?: string }> {
   const session = await requireSession();
   const name = formData.get("name");
   const orgId = newId();
-  let slug: string;
   try {
     const org = await withTenantDb(dbHandle, { personId: session.personId, orgId }, (db) =>
       createOrg(db, session.personId, typeof name === "string" ? name : "", orgId),
     );
-    slug = org.slug;
+    return { created: org.slug };
   } catch {
     return { error: "Give the organization a name of at least 3 characters." };
   }
-  redirect(`/org/${slug}`);
 }
 
 export interface OrgView {

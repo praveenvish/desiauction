@@ -81,11 +81,16 @@ export default async function OrgsPage({
                 tournaments, your teams, your money and who is allowed to touch it. Most people need
                 exactly one.
               </p>
+              {/* Its OWN test id. `new-org` belongs to the router-provided page
+                  action (app/@action/orgs) — and BOTH render when the list is
+                  empty, which is the state every new account starts in. Sharing
+                  the id made `getByTestId("new-org")` a strict-mode violation in
+                  every spec that creates an org, which is most of the suite. */}
               <FormDialog
                 title="New organization"
                 triggerLabel="Create your organization"
                 size="touch"
-                triggerTestId="new-org"
+                triggerTestId="new-org-empty"
               >
                 <CreateOrgForm />
               </FormDialog>
