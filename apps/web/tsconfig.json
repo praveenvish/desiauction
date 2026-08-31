@@ -12,6 +12,12 @@
       }
     ]
   },
-  "include": [".next/types/**/*.ts", "next-env.d.ts", "scripts", "src", ".next-e2e/types/**/*.ts"],
+  "include": [
+    ".next/types/**/*.ts",
+    "next-globals.d.ts",
+    "scripts",
+    "src",
+    ".next-e2e/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }

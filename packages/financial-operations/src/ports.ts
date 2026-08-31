@@ -326,6 +326,22 @@ export interface FinopsStore {
   loadDispatchesByStatus(orgId: string, status: DispatchStatus): Promise<readonly DispatchRow[]>;
   /** An org's export runs — pipeline scans and archive views (M-IP6-3). */
   loadExportsByOrg(orgId: string): Promise<readonly ExportRow[]>;
+  /*
+   * DISCOVERY, ACROSS EVERY TENANT, IN ONE ROUND TRIP.
+   *
+   * The enqueue pass asks "what work is waiting anywhere?". It used to answer
+   * that by enumerating every organization and querying each one — a cost that
+   * grew with the number of TENANTS rather than the amount of WORK, so an org
+   * that has never sent a document still cost a query on every tick. These two
+   * read the same rows with one indexed scan on `status`.
+   *
+   * Cross-tenant by design, exactly like the `listOrgIds()` sweep they replace:
+   * the runner's directory, source and store all share one handle (`deps.ts`),
+   * and enumerating organizations was always the wider read. Per-org scanning
+   * stays available above for the surfaces that genuinely want one tenant.
+   */
+  listRequestedDispatches(): Promise<readonly { dispatchId: string; orgId: string }[]>;
+  listRequestedExports(): Promise<readonly { exportId: string; orgId: string }[]>;
   loadCursors(orgId: string): Promise<readonly CursorRow[]>;
   /** Claim due queued jobs (and expired leases) — SKIP LOCKED semantics. An
    * `orgId` scopes the claim to one tenant (per-org draining, the sharding

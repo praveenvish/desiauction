@@ -605,6 +605,30 @@ export function createFinopsStore(db: Db): FinopsStore {
       }));
     },
 
+    /*
+     * The enqueue pass's discovery reads. One scan on `status` instead of one
+     * query per organization — see the port for why the tenant loop went.
+     * Only the two identifiers the pipelines actually enqueue on are selected;
+     * the handlers load the full row inside their own job.
+     */
+    async listRequestedDispatches() {
+      const rows = await db
+        .select({ dispatchId: finopsDispatches.id, orgId: finopsDispatches.orgId })
+        .from(finopsDispatches)
+        .where(eq(finopsDispatches.status, "requested"))
+        .orderBy(asc(finopsDispatches.id));
+      return rows;
+    },
+
+    async listRequestedExports() {
+      const rows = await db
+        .select({ exportId: finopsExports.id, orgId: finopsExports.orgId })
+        .from(finopsExports)
+        .where(eq(finopsExports.status, "requested"))
+        .orderBy(asc(finopsExports.id));
+      return rows;
+    },
+
     async loadExportsByOrg(orgId) {
       const rows = await db
         .select()

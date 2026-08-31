@@ -1072,4 +1072,43 @@ describe("M-IP6-3 · Rebuilds, replay & the boundary", () => {
     );
     expect((await verifyExport(deps, daily?.exportId ?? ""))?.verified).toBe(true);
   });
+
+  /*
+   * The enqueue pass used to answer "what work is waiting?" by enumerating
+   * every organization and querying each one — a cost that grew with the
+   * number of TENANTS rather than the amount of WORK. A dev database that had
+   * accumulated ~1,500 orgs from past runs made a five-call helper issue
+   * thousands of sequential round-trips and time out; in production the same
+   * shape charges a query per tick for every org that has never sent anything.
+   *
+   * The discovery reads are indexed on `status` now. This pins the property
+   * that made it wrong, not the timing that revealed it: discovery must not
+   * enumerate tenants. Counting the sweep is what keeps it honest — a future
+   * `listOrgIds()` loop reintroducing the N+1 fails here immediately.
+   */
+  it("DISCOVERY IS BY WORK, NOT BY TENANT: enqueueing never enumerates orgs", async () => {
+    fakeMode = "ok";
+    const dispatchId = await newDispatch("in-app");
+
+    let orgSweeps = 0;
+    const counted: FinopsDeps = {
+      ...deps,
+      orgs: {
+        listOrgIds: async () => {
+          orgSweeps += 1;
+          return deps.orgs.listOrgIds();
+        },
+      },
+    };
+
+    const enqueued = await enqueueDispatchSends(counted, Date.now());
+    await enqueueExportGenerations(counted, Date.now());
+
+    // The work was found...
+    expect(enqueued).toBeGreaterThanOrEqual(1);
+    const queued = (await deps.store.loadJobs(org.id)).map((job) => job.dedupeKey);
+    expect(queued).toContain(`dispatch.send:${dispatchId}`);
+    // ...without asking the directory who the tenants are, even once.
+    expect(orgSweeps).toBe(0);
+  });
 });
