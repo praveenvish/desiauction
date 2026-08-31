@@ -15,6 +15,17 @@
 > parity registration work** (same "column exists, capture pending" convention as
 > `people.name`). Rows added to §1; the photo-render consent gate is reaffirmed in §5.
 
+> **Amendment · 2026-08-30 · PI-1 (player identity programme).** Migration
+> `0036_player_profiles` adds the person-level profile: gender (optional,
+> five values + self-describe; NULL = never asked, `unspecified` = asked and
+> declined), date of birth, city-level location, and playing defaults. All
+> self-declared on the person's own account/profile surfaces; **gender and DOB
+> render on no org-facing or public surface** — the single decision consumer is
+> core's eligibility engine. Erasure nulls the row alongside `people`
+> anonymization. Rows added to §1. PI-1 P2 also lands the §2 signup notice +
+> consent record (`terms.privacy` in `consent_records`), closing that named
+> pre-GA obligation.
+
 ## 1 · Data map (implemented tables, personal-data columns)
 
 | Table · column                                   | Personal data                       | Purpose                                                        | Collected via                                | Retention (implemented)                                     |
@@ -24,6 +35,10 @@
 | `people.photo_consent_at` / `photo_consent_via`   | Consent fact (photo)                | DPDP consent evidence for player photos (C-25 × R-9)            | **Designed, not captured** — capture UX ships with IP-3 registration (§5) | as above                       |
 | `people.photo_url` / `photo_uploaded_at`          | Player photograph (storage key)     | Player card, showcase, Stage/Overlay display                    | **Column landed (0017); capture UX pending** — renders only when `photo_consent_at` set (§5) | Life of account; withdrawal = key deleted + consent nulled |
 | `registrations.date_of_birth`                     | Date of birth (age derived, not stored) | Age display on the player card (parity)                      | **Self-declared, optional** — the registration form (batting/bowling captured alongside) | Life of the registration; anonymize with `people` erasure (§4) |
+| `player_profiles.gender` / `gender_self_described` (PI-1) | Gender identity (optional; self-describable) | Competition entry-category eligibility (core engine only); never displayed org-facing or publicly | **Self-declared, optional** — /account profile form | Life of account; nulled with `people` erasure (§4) |
+| `player_profiles.date_of_birth` (PI-1)            | Date of birth (age derived, not stored) | Registration prefill; minor gate reads the per-season snapshot | **Self-declared, optional** — /account profile form; snapshotted onto the registration at submit | Life of account; nulled with `people` erasure (§4) |
+| `player_profiles.location` (PI-1)                 | City-level free text                    | Profile display to the person; registration prefill           | **Self-declared, optional** — /account profile form | Life of account; nulled with `people` erasure (§4) |
+| `player_profiles.default_*` / `preferred_jersey_*` (PI-1) | Playing defaults, kit preference | Registration prefill (the per-season fact stays on `registrations`) | **Self-declared, optional** — /account profile form + register write-back | Life of account; nulled with `people` erasure (§4) |
 | `registrations.father_name`                        | Parent name                         | Player identification on the card (parity)                      | **Column landed (0018); capture UX pending** — registration form         | Life of the registration; anonymize with `people` erasure (§4) |
 | `registrations.jersey_name/_number`, `tshirt_size`, `trouser_size` | Kit sizing + name on shirt | Optional kit/merchandise fulfilment for the competition          | **Column landed (0018); capture UX pending** — registration form         | Life of the registration                                     |
 | `otp_codes.phone` + `code_hash` + `request_ip`    | Phone, hashed code, requester IP    | Login codes; rate limiting (phone 5/h, IP 20/h)                 | OTP request                                   | Codes dead ≤ 5 min; **rows retained, no purge job** (R-6 manual SQL) |

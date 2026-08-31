@@ -270,3 +270,109 @@ export function isMinor(dateOfBirth: string | null, now: Date): boolean {
   const age = deriveAge(dateOfBirth, now);
   return age !== null && age < MINOR_AGE_THRESHOLD;
 }
+
+// --- Person-level profile (PI-1) ---------------------------------------------
+//
+// GENDER, MODELED ONCE AND ASKED GENTLY.
+//
+// Two different absences, and a reader must be able to tell them apart:
+// a NULL column means the question was never put to this person; `unspecified`
+// means it was, and they declined. Collapsing the two turns "we never asked"
+// into "they refused to say", which is a claim about a person we cannot make.
+//
+// `self_described` carries its own words in a separate column, because a fixed
+// list that ends in "other" without a voice is the list doing the describing.
+//
+// Never inferred from a name, never an authorization input, never rendered on
+// an org-facing or public surface (DPDP minimalism; C-23 spirit). The ONE
+// consumer of this value for decisions is `eligibility.ts` — a guardrail test
+// holds that boundary.
+export const GENDERS = ["male", "female", "non_binary", "self_described", "unspecified"] as const;
+
+export type Gender = (typeof GENDERS)[number];
+
+export function isGender(value: string): value is Gender {
+  return (GENDERS as readonly string[]).includes(value);
+}
+
+const GENDER_LABELS: Record<Gender, string> = {
+  male: "Male",
+  female: "Female",
+  non_binary: "Non-binary",
+  self_described: "Self-described",
+  unspecified: "Prefer not to say",
+};
+
+/**
+ * Human label for a gender. A self-described answer shows the person's own
+ * words when they gave any — that is the entire point of the option.
+ */
+export function genderLabel(gender: Gender, selfDescribed: string | null = null): string {
+  if (gender === "self_described" && selfDescribed !== null && selfDescribed.trim() !== "") {
+    return selfDescribed.trim();
+  }
+  return GENDER_LABELS[gender];
+}
+
+export const GENDER_SELF_DESCRIBED_MAX = 40;
+export const PROFILE_LOCATION_MAX = 80;
+export const JERSEY_NAME_MAX = 30;
+
+/**
+ * Validate an ISO `yyyy-mm-dd` date of birth against an injected clock.
+ * Distinct from `deriveAge`, which answers "how old" and folds every failure to
+ * null — a form needs to say WHY a value was refused. `null`/empty is valid
+ * (the field is optional everywhere it appears).
+ */
+export function validateDateOfBirth(
+  value: string | null,
+  now: Date,
+): { ok: true } | { ok: false; reason: "format" | "future" | "too_old" } {
+  if (value === null || value.trim() === "") {
+    return { ok: true };
+  }
+  const age = deriveAge(value, now);
+  if (age === null) {
+    // deriveAge rejects malformed strings, impossible calendar dates AND
+    // future dates (negative age) — a future date parses, so tell it apart.
+    const parses = /^(\d{4})-(\d{2})-(\d{2})$/.test(value);
+    return { ok: false, reason: parses && value > isoDateOf(now) ? "future" : "format" };
+  }
+  if (value < "1900-01-01") {
+    return { ok: false, reason: "too_old" };
+  }
+  return { ok: true };
+}
+
+function isoDateOf(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/**
+ * A city-level free-text location. No taxonomy: the platform is India-first
+ * (C-24) and a state/country picker would be a form asking for data no feature
+ * consumes. Control characters are refused, not stripped — a value that needed
+ * stripping is a value somebody should look at.
+ */
+export function validateProfileLocation(
+  value: string,
+): { ok: true; location: string } | { ok: false } {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  // eslint-disable-next-line no-control-regex
+  if (trimmed.length > PROFILE_LOCATION_MAX || /[ -]/.test(trimmed)) {
+    return { ok: false };
+  }
+  return { ok: true, location: trimmed };
+}
+
+/**
+ * Preferred jersey number: 1–3 digits, as the import path tolerates ("07" is a
+ * number somebody wears). Stored as text, like `registrations.jersey_number`.
+ */
+export function validateJerseyNumber(value: string): { ok: true; number: string } | { ok: false } {
+  const trimmed = value.trim();
+  if (!/^\d{1,3}$/.test(trimmed)) {
+    return { ok: false };
+  }
+  return { ok: true, number: trimmed };
+}

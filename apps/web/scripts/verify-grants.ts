@@ -113,6 +113,17 @@ const APP_WRITES_UNPROTECTED = [
   "demo_bookings",
 ];
 
+/**
+ * Person-scoped tables the WEB TIER writes with no RLS underneath (PI-1).
+ *
+ * `player_profiles` follows `people` and `sessions`: platform-to-person data,
+ * no org column, no policy — app-layer self-scoping is the lock. As with the
+ * demo tables above, the app role's grant is the ONLY thing between the
+ * account page's profile form and a 500 in production, so it is asserted by
+ * name rather than trusted to default privileges.
+ */
+const APP_WRITES_PERSON = ["player_profiles"];
+
 function expectations(allTables: string[]): Expectation[] {
   const out: Expectation[] = [];
 
@@ -150,6 +161,18 @@ function expectations(allTables: string[]): Expectation[] {
         verb,
         allowed: true,
         why: "the public demo form and the operator desk both write on the app pool (no RLS to bypass)",
+      });
+    }
+  }
+
+  for (const table of APP_WRITES_PERSON) {
+    for (const verb of ["INSERT", "UPDATE"] as const) {
+      out.push({
+        role: "desiauction_app",
+        table,
+        verb,
+        allowed: true,
+        why: "person-scoped profile writes ride the app pool; module self-scoping is the lock (PI-1)",
       });
     }
   }

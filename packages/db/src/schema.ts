@@ -47,6 +47,51 @@ export const people = pgTable("people", {
 });
 
 /**
+ * THE PERSON'S DURABLE CRICKET IDENTITY (PI-1).
+ *
+ * One row per person, created lazily on first profile write. This is the
+ * SOURCE OF DEFAULTS, not the record of fact: each registration still snapshots
+ * the values chosen for that season, so editing a profile never rewrites
+ * history and the auction pool keeps reading registrations alone.
+ *
+ * Gender is deliberately NOT snapshotted anywhere — eligibility reads it here
+ * at decision time, and historical rows never embed a fact a person is
+ * entitled to correct (DPDP correction right). NULL means "never asked";
+ * `unspecified` means "asked, declined" — two different absences.
+ *
+ * No RLS and no org column, deliberately: like `people`, `sessions` and
+ * `consent_records`, this is between the platform and a person, not a club.
+ * Every read and write is scoped to the session's own person id in the app
+ * layer, and a person-isolation regression test holds that boundary.
+ */
+export const playerProfiles = pgTable(
+  "player_profiles",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    gender: text("gender", {
+      enum: ["male", "female", "non_binary", "self_described", "unspecified"],
+    }),
+    /** The person's own words; only meaningful with gender = self_described. */
+    genderSelfDescribed: text("gender_self_described"),
+    /** ISO yyyy-mm-dd; age is DERIVED at read time, never stored (D2). */
+    dateOfBirth: text("date_of_birth"),
+    /** City-level free text — no taxonomy; no feature consumes more. */
+    location: text("location"),
+    defaultRole: text("default_role", {
+      enum: ["batter", "bowler", "all_rounder", "wicket_keeper"],
+    }),
+    defaultBattingStyle: text("default_batting_style"),
+    defaultBowlingStyle: text("default_bowling_style"),
+    preferredJerseyName: text("preferred_jersey_name"),
+    preferredJerseyNumber: text("preferred_jersey_number"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("player_profiles_person_uq").on(table.personId)],
+);
+
+/**
  * Codes that prove an address belongs to the person typing it.
  *
  * Separate from `otp_codes`, whose column is named `phone` and whose indexes
@@ -117,6 +162,16 @@ export const otpCodes = pgTable(
     id: id(),
     phone: text("phone").notNull(),
     codeHash: text("code_hash").notNull(),
+    /**
+     * What this code may prove (PI-1). Minted for one purpose, consumable for
+     * that purpose alone: before this column, the phone-change flow reused
+     * login codes by construction, so a code sent for sign-in could confirm a
+     * number change on the same phone. Purposes stay phone-shaped — email
+     * codes live in `email_verifications`, which says what it is.
+     */
+    purpose: text("purpose", { enum: ["login", "phone_change"] })
+      .notNull()
+      .default("login"),
     expiresAt: ts("expires_at").notNull(),
     attempts: integer("attempts").notNull().default(0),
     consumedAt: ts("consumed_at"),
@@ -423,6 +478,15 @@ export const competitions = pgTable(
     visibility: text("visibility", { enum: ["private", "public"] })
       .notNull()
       .default("private"),
+    /**
+     * Who this season is for (PI-1) — the competition-level half of the gender
+     * model. `open` is the honest default for every row that predates the
+     * column. Enforcement lives ONLY in core's eligibility engine; public
+     * surfaces read this for terminology ("Women's", "Open") and nothing else.
+     */
+    entryCategory: text("entry_category", { enum: ["open", "men", "women", "mixed"] })
+      .notNull()
+      .default("open"),
     // Storage KEY for the auction crest; signed at read time by the media port.
     logoUrl: text("logo_url"),
     location: text("location"),

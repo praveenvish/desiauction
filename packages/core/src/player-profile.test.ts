@@ -5,11 +5,16 @@ import {
   BOWLING_STYLES,
   PLAYER_ROLES,
   deriveAge,
+  genderLabel,
   isBattingStyle,
   isBowlingStyle,
+  isGender,
   isMinor,
   parseRole,
   roleLabel,
+  validateDateOfBirth,
+  validateJerseyNumber,
+  validateProfileLocation,
 } from "./player-profile";
 
 describe("player-profile styles", () => {
@@ -125,6 +130,75 @@ describe("parseRole — the vocabulary a registration form is actually filled in
     // one accepts is a spelling the other accepts.
     for (const spelling of ["All Rounder", "Batsman", "WK", "Fast Bowler"]) {
       expect(parseRole(spelling)).toBe(parseRole(spelling.toUpperCase()));
+    }
+  });
+});
+
+describe("gender model (PI-1)", () => {
+  it("accepts exactly the five declared values", () => {
+    for (const value of ["male", "female", "non_binary", "self_described", "unspecified"]) {
+      expect(isGender(value)).toBe(true);
+    }
+    for (const value of ["", "m", "MALE", "other", "prefer_not_to_say", "nonbinary"]) {
+      expect(isGender(value)).toBe(false);
+    }
+  });
+
+  it("labels a self-described answer with the person's own words", () => {
+    expect(genderLabel("self_described", "Hijra")).toBe("Hijra");
+    expect(genderLabel("self_described", "  ")).toBe("Self-described");
+    expect(genderLabel("self_described", null)).toBe("Self-described");
+  });
+
+  it("labels the declined answer as a preference, not a value", () => {
+    expect(genderLabel("unspecified")).toBe("Prefer not to say");
+    expect(genderLabel("female")).toBe("Female");
+  });
+});
+
+describe("validateDateOfBirth (PI-1)", () => {
+  const now = new Date("2026-08-30T12:00:00Z");
+
+  it("treats absence as valid — the field is optional everywhere", () => {
+    expect(validateDateOfBirth(null, now)).toEqual({ ok: true });
+    expect(validateDateOfBirth("  ", now)).toEqual({ ok: true });
+  });
+
+  it("accepts a plausible date", () => {
+    expect(validateDateOfBirth("1994-02-14", now)).toEqual({ ok: true });
+    expect(validateDateOfBirth("2010-12-31", now)).toEqual({ ok: true });
+  });
+
+  it("refuses the malformed and the impossible as format errors", () => {
+    for (const value of ["14-02-1994", "1994/02/14", "1994-13-01", "1994-02-30", "yesterday"]) {
+      expect(validateDateOfBirth(value, now)).toEqual({ ok: false, reason: "format" });
+    }
+  });
+
+  it("names a future date as future, not as a format mistake", () => {
+    expect(validateDateOfBirth("2027-01-01", now)).toEqual({ ok: false, reason: "future" });
+  });
+
+  it("refuses a pre-1900 date", () => {
+    expect(validateDateOfBirth("1899-12-31", now)).toEqual({ ok: false, reason: "too_old" });
+  });
+});
+
+describe("profile field validators (PI-1)", () => {
+  it("normalizes location whitespace and refuses control characters", () => {
+    expect(validateProfileLocation("  Kolkata,   West Bengal ")).toEqual({
+      ok: true,
+      location: "Kolkata, West Bengal",
+    });
+    expect(validateProfileLocation("a\u0007b")).toEqual({ ok: false });
+    expect(validateProfileLocation("x".repeat(81))).toEqual({ ok: false });
+  });
+
+  it("accepts 1-3 digit jersey numbers, leading zero included", () => {
+    expect(validateJerseyNumber(" 07 ")).toEqual({ ok: true, number: "07" });
+    expect(validateJerseyNumber("100")).toEqual({ ok: true, number: "100" });
+    for (const value of ["", "0007", "7a", "-1", "seven"]) {
+      expect(validateJerseyNumber(value)).toEqual({ ok: false });
     }
   });
 });

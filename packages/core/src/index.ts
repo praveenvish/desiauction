@@ -260,8 +260,17 @@ export {
   deriveAge,
   isMinor,
   MINOR_AGE_THRESHOLD,
+  GENDERS,
+  GENDER_SELF_DESCRIBED_MAX,
+  PROFILE_LOCATION_MAX,
+  JERSEY_NAME_MAX,
+  isGender,
+  genderLabel,
+  validateDateOfBirth,
+  validateProfileLocation,
+  validateJerseyNumber,
 } from "./player-profile";
-export type { BattingStyle, BowlingStyle, PlayerRole } from "./player-profile";
+export type { BattingStyle, BowlingStyle, Gender, PlayerRole } from "./player-profile";
 export {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
