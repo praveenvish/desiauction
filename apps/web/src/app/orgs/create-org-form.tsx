@@ -42,6 +42,10 @@ export function CreateOrgForm() {
       <Field
         label="Organization name"
         name="name"
+        // Survives a refusal: the form is uncontrolled, so React clears it when
+        // the action returns, and the rejected name vanished with the reason.
+        defaultValue={state.name ?? ""}
+        key={state.name ?? ""}
         placeholder="Malad Cricket Club"
         help="Your club's real name — 'Malad Cricket Club', not this year's league. You'll be its owner, and you can invite people once it exists."
         required

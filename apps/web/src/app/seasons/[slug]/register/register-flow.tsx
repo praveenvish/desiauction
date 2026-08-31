@@ -50,6 +50,13 @@ const GUARDIAN_CONSENT_LABEL =
   "I am the parent or legal guardian of this player, who is under 18, and I consent to this registration and to their details being processed for this tournament. Their age and photo are never shown on public pages.";
 
 /**
+ * Said where the fields are, so it never has to describe where they are. The
+ * old wording pointed "below" from a screen that did not carry them.
+ */
+const GUARDIAN_REQUIRED =
+  "This player is under 18. Add a parent or guardian's name and tick their consent to continue.";
+
+/**
  * DA-35: the draft persisted ONE of the four answers step 2 collects. Date of
  * birth and both playing styles were dropped on any refresh — and because the
  * review omits blank rows by design, the loss was presented as a completed
@@ -120,6 +127,11 @@ export function RegisterFlow({
   // PRR P0-2: guardian consent, required only when the entered DOB is under 18.
   const [guardianName, setGuardianName] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
+  /**
+   * Kept apart from `error`, which step 2 pipes into the Playing role field —
+   * a guardian message rendered under "Playing role" blames the wrong control.
+   */
+  const [guardianError, setGuardianError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(nameDone ? "role" : "profile");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -189,9 +201,14 @@ export function RegisterFlow({
       return;
     }
     if (dobIsMinor && (guardianName.trim() === "" || !guardianConsent)) {
-      setError(
-        "This player is under 18 — a parent or guardian must add their name and give consent below.",
-      );
+      /*
+       * The guardian fields live on "How you play", not here — so this refusal
+       * used to point at a box the reader could not see, on a screen with
+       * nothing on it that could satisfy the demand. Send them to the fields
+       * and mark them, rather than describing where they are.
+       */
+      setGuardianError(GUARDIAN_REQUIRED);
+      setStep("role");
       return;
     }
     startTransition(async () => {
@@ -355,6 +372,7 @@ export function RegisterFlow({
                   setGuardianName(event.target.value);
                   if (event.target.value.trim() !== "") {
                     setError(null);
+                    setGuardianError(null);
                   }
                 }}
                 required
@@ -371,11 +389,17 @@ export function RegisterFlow({
                     setGuardianConsent(event.target.checked);
                     if (event.target.checked) {
                       setError(null);
+                      setGuardianError(null);
                     }
                   }}
                 />
                 <span>{GUARDIAN_CONSENT_LABEL}</span>
               </label>
+              {guardianError !== null ? (
+                <p role="alert" className="register-error" data-testid="guardian-error">
+                  {guardianError}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <Select
@@ -425,7 +449,20 @@ export function RegisterFlow({
               disabled={role === ""}
               data-testid="register-continue"
               onClick={() => {
+                /*
+                 * The guardian block is required, and this step is where it is
+                 * collected — so this is where it is checked. Letting Continue
+                 * through carried an under-18 registration to a Review screen
+                 * that showed no guardian at all, and the refusal only arrived
+                 * on submit, from the server, pointing at fields two screens
+                 * back. The server check stays; it is no longer the first one.
+                 */
+                if (dobIsMinor && (guardianName.trim() === "" || !guardianConsent)) {
+                  setGuardianError(GUARDIAN_REQUIRED);
+                  return;
+                }
                 setError(null);
+                setGuardianError(null);
                 setStep("review");
               }}
             >

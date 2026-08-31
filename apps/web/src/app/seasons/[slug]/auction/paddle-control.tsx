@@ -137,7 +137,7 @@ export function PaddleControl({
 
       {blocked !== null ? (
         <p
-          className={paused ? "paddle-leading paddle-frozen" : "paddle-leading"}
+          className="paddle-leading"
           id="paddle-blocked"
           data-testid="paddle-leading"
           data-reason={

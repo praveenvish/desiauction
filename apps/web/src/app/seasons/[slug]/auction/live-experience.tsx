@@ -245,6 +245,7 @@ export function MyTeamCard({
   myPaddleNumber,
   rules,
   feed,
+  squadSize,
 }: {
   snapshot: AuctionSnapshot | null;
   myTeamId: string;
@@ -252,6 +253,15 @@ export function MyTeamCard({
   myPaddleNumber: string;
   rules: AuctionRules;
   feed: LiveFeed;
+  /**
+   * The WHOLE squad — pre-signed players plus auction buys, deduped by
+   * `squadSizesOf`. The list below this tile is the night's wins, which is a
+   * different number: a team with two icons and ten buys has won ten lots and
+   * signed twelve players. Counting the wins here printed "10/12 Squad" beside
+   * a "12/12" on the same screen, telling an owner they were two short of a
+   * squad the engine had already closed.
+   */
+  squadSize: number;
 }) {
   const paddle = snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null;
   const squad = feed.resolved.filter(
@@ -289,7 +299,7 @@ export function MyTeamCard({
           </div>
           <div className="stat-tile" data-testid="my-slots">
             <span className="stat-value">
-              {squad.length}/{rules.squadMax}
+              {squadSize}/{rules.squadMax}
             </span>
             <span className="stat-label">Squad (min {rules.squadMin})</span>
           </div>

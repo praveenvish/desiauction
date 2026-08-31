@@ -37,7 +37,7 @@ function statusText(player: {
     // bid for them — and "Retained" on its own implies a retaining team there
     // is no record of. Say the thing that is actually true of them.
     return player.teamName !== null
-      ? `Retained by ${player.teamName}`
+      ? `Icon player for ${player.teamName}`
       : "Icon player — not in the auction";
   }
   return player.teamName !== null ? `Sold to ${player.teamName}` : "Sold";

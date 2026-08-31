@@ -223,19 +223,25 @@ export async function updateOrgDescriptionAction(
  * off `/home`, `/orgs` or `/tournaments` — the three routes with an action slot.
  */
 export async function createOrgAction(
-  _previous: { error?: string; created?: string },
+  _previous: { error?: string; created?: string; name?: string },
   formData: FormData,
-): Promise<{ error?: string; created?: string }> {
+): Promise<{ error?: string; created?: string; name?: string }> {
   const session = await requireSession();
   const name = formData.get("name");
+  const typed = typeof name === "string" ? name : "";
   const orgId = newId();
   try {
     const org = await withTenantDb(dbHandle, { personId: session.personId, orgId }, (db) =>
-      createOrg(db, session.personId, typeof name === "string" ? name : "", orgId),
+      createOrg(db, session.personId, typed, orgId),
     );
     return { created: org.slug };
   } catch {
-    return { error: "Give the organization a name of at least 3 characters." };
+    /*
+     * The name comes back with the refusal. The field is uncontrolled, so React
+     * resets it when the action returns — a name typed and rejected was wiped,
+     * and the reader had to type it again to read what was wrong with it.
+     */
+    return { error: "Give the organization a name of at least 3 characters.", name: typed };
   }
 }
 

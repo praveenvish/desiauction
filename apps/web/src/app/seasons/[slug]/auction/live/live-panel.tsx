@@ -463,6 +463,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               myPaddleNumber={myPaddle.paddleNumber}
               rules={view.rules}
               feed={feed}
+              squadSize={squadSizes[myPaddle.teamId] ?? 0}
             />
           ) : null}
           {/* Unconditional now: AuctionProgress renders its own connecting state,

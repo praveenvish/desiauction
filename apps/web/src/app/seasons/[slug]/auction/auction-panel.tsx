@@ -166,7 +166,17 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             </span>
           </li>
         </ul>
-        {view === null && viewer.canConduct ? (
+        {/*
+            An abandoned auction is a season with no auction, not a season that
+            can never hold one: `createAuction` allows a replacement "unless the
+            previous one was abandoned" (packages/auction/src/aggregate.ts).
+            Gating this form on `view === null` alone contradicted that — an
+            abort left the organiser with no way back, and because intake cannot
+            be reopened either, the season was finished. The abort dialog says
+            THIS auction can never go live again; it is not a promise that the
+            season is over.
+        */}
+        {(view === null || view.auction.status === "abandoned") && viewer.canConduct ? (
           <div className="auction-setup" data-testid="auction-setup">
             {/* DA-05: these are the numbers a league negotiates, and until now
                 every auction took ₹2 Cr purses, 8–15 squads and three fixed

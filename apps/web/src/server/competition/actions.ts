@@ -71,6 +71,7 @@ import {
   transition,
   transitionBatch,
 } from "./registration-aggregate";
+import { marksFreezeWithRoster } from "./roster-lock";
 import { commitRegistrationImport, existingForImport } from "./registration-import";
 import {
   forgetImportMapping,
@@ -1436,9 +1437,8 @@ export async function markRegistrationAction(
   } catch {
     return { ok: false, error: "You can't manage players here." };
   }
-  // Icon and captain marks move a player into or out of the auction pool and
-  // change squad arithmetic the engine has already priced against.
-  if (await auctionLocksRoster(competition.id)) {
+  // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
+  if (marksFreezeWithRoster(marks) && (await auctionLocksRoster(competition.id))) {
     return { ok: false, error: ROSTER_LOCKED };
   }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
