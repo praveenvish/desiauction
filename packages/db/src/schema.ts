@@ -208,7 +208,7 @@ export const consentRecords = pgTable(
     granted: boolean("granted").notNull(),
     /** Where the agreement came from, so an audit can retrace it. */
     source: text("source", {
-      enum: ["registration", "account", "sms_stop", "sms_start", "import", "support"],
+      enum: ["registration", "account", "sms_stop", "sms_start", "import", "support", "login"],
     }).notNull(),
     /** The wording shown, the page, whatever proves what they actually saw. */
     evidence: jsonb("evidence").notNull().default({}),

@@ -13,6 +13,14 @@ export type SecurityAction =
   | "auth.login.otp"
   | "auth.login.passkey"
   | "auth.otp.lockout"
+  // PI-1 audit-gap closures. Requests, sign-outs and refused passkey
+  // ceremonies were invisible: the ledger showed only what SUCCEEDED, so the
+  // page a person checks after "did someone try to get in?" had no idea.
+  // Each is written only when a person exists to own the row — the audit
+  // substrate is person-scoped, and an unknown phone has no ledger.
+  | "auth.otp.requested"
+  | "auth.logout"
+  | "auth.passkey.failed"
   | "auth.passkey.enrolled"
   | "auth.passkey.renamed"
   | "auth.passkey.removed"

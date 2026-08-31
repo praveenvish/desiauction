@@ -30,6 +30,7 @@ import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
 import { safeNext } from "./redirect";
+import { ensureTermsConsent } from "./terms-consent";
 import {
   finishAuthentication,
   finishEnrollment,
@@ -244,6 +245,16 @@ export async function verifyOtpAction(
     };
   }
   await logSecurityEvent(result.personId, "auth.login.otp");
+  // PI-1 P2: the login form carries the terms/privacy notice; this records the
+  // acceptance once per person per notice version. The same try/catch
+  // discipline as registration's consent evidence — a recording hiccup must
+  // never fail a login that already happened.
+  try {
+    await ensureTermsConsent(db, result.personId);
+  } catch (error) {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.captureException(error, { tags: { area: "terms-consent" } });
+  }
   await issueSessionCookie(result.personId);
   const target = safeNext(previous.next);
   // A brand-new (nameless) account used to be verified, sent to /home, and
@@ -477,6 +488,9 @@ export async function logoutAction(): Promise<void> {
     const session = await getSessionByToken(db, token);
     if (session !== null) {
       await revokeSession(db, session.sessionId);
+      // PI-1 audit-gap closure: a sign-out is a security fact the person can
+      // check against — "I signed out at the café" belongs on their ledger.
+      await logSecurityEvent(session.personId, "auth.logout");
     }
   }
   store.delete(SESSION_COOKIE);
@@ -503,6 +517,7 @@ export async function logoutToAction(next: string): Promise<void> {
     const session = await getSessionByToken(db, token);
     if (session !== null) {
       await revokeSession(db, session.sessionId);
+      await logSecurityEvent(session.personId, "auth.logout");
     }
   }
   store.delete(SESSION_COOKIE);
