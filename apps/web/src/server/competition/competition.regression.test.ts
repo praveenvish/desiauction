@@ -9,6 +9,7 @@ import {
   auctions as auctionsTable,
   competitions as competitionsTable,
   createDb,
+  franchises as franchisesTable,
   grants as grantsTable,
   newId,
   organizations,
@@ -109,6 +110,7 @@ afterAll(async () => {
       .where(inArray(passUpgradeRequestsTable.orgId, orgIds));
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));
     await db.delete(teamsTable).where(inArray(teamsTable.orgId, orgIds));
+    await db.delete(franchisesTable).where(inArray(franchisesTable.orgId, orgIds));
     await db.delete(auctionEventsTable).where(inArray(auctionEventsTable.orgId, orgIds));
     await db.delete(auctionsTable).where(inArray(auctionsTable.orgId, orgIds));
     await db.delete(competitionsTable).where(inArray(competitionsTable.orgId, orgIds));
@@ -632,6 +634,26 @@ describe("COMPETITION REGRESSION — domain contract", () => {
       .from(auditLog)
       .where(eq(auditLog.subject, cloned.competition.id));
     expect(audit.some((a) => a.action === "competition.cloned")).toBe(true);
+
+    // PI-1 P6: the clone is the moment a team becomes a FRANCHISE — source and
+    // clone rows now share one durable identity, created on first clone and
+    // back-linked onto the source (so the FIRST edition joins the family too).
+    const sourceRows = await db
+      .select({ name: teamsTable.name, franchiseId: teamsTable.franchiseId })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, source.id));
+    const cloneRows = await db
+      .select({ name: teamsTable.name, franchiseId: teamsTable.franchiseId })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, cloned.competition.id));
+    for (const sourceRow of sourceRows) {
+      expect(sourceRow.franchiseId).not.toBeNull();
+      expect(cloneRows.find((t) => t.name === sourceRow.name)?.franchiseId).toBe(
+        sourceRow.franchiseId,
+      );
+    }
+    // Distinct teams stay distinct franchises.
+    expect(new Set(sourceRows.map((t) => t.franchiseId)).size).toBe(sourceRows.length);
   });
 
   it("the outcomes projection reads live audit events back (Outcome Governance)", async () => {

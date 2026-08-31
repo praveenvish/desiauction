@@ -501,12 +501,33 @@ export const competitions = pgTable(
   ],
 );
 
+/**
+ * THE TEAM THAT COMES BACK (PI-1 P6) — the 0019 tournaments pattern applied
+ * to teams: a durable org-scoped name that editions' team rows point at.
+ * Written only by the clone path; read only by career/grouping surfaces.
+ * Never an authority — the auction, rosters and money key on `teams` alone.
+ */
+export const franchises = pgTable(
+  "franchises",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    name: text("name").notNull(),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("franchises_org_idx").on(table.orgId)],
+);
+
 export const teams = pgTable(
   "teams",
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     competitionId: char("competition_id", { length: 26 }).notNull(),
+    /** PI-1 P6: the durable franchise this edition-team is an appearance of;
+     *  null for a one-off. Linked by the clone path, read for grouping only. */
+    franchiseId: char("franchise_id", { length: 26 }),
     name: text("name").notNull(),
     shortName: text("short_name"),
     primaryColor: text("primary_color"),
@@ -522,6 +543,7 @@ export const teams = pgTable(
   (table) => [
     uniqueIndex("teams_competition_name_uq").on(table.competitionId, table.name),
     index("teams_competition_idx").on(table.competitionId),
+    index("teams_franchise_idx").on(table.franchiseId),
   ],
 );
 

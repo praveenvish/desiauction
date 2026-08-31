@@ -8,6 +8,7 @@ import {
   organizations,
   orgMembers,
   people,
+  registrations,
   settlementCases,
   suppressions,
   type Db,
@@ -865,6 +866,9 @@ export interface UserDirectoryRow {
   readonly lastActivityAt: Date | null;
 }
 
+/** PI-1 P6: the directory's profile-aware facets. */
+export type UserDirectoryFilter = "all" | "players" | "profiled";
+
 export interface UserDirectory {
   readonly rows: readonly UserDirectoryRow[];
   /** How many people match the current query. */
@@ -872,6 +876,7 @@ export interface UserDirectory {
   /** How many exist at all. */
   readonly platformTotal: number;
   readonly query: string;
+  readonly filter: UserDirectoryFilter;
   readonly nextCursor: string | null;
 }
 
@@ -895,10 +900,24 @@ async function userCursor(db: Db, after: string | undefined): Promise<SQL | unde
   );
 }
 
-export async function userDirectory(db: Db, query = "", after?: string): Promise<UserDirectory> {
+export async function userDirectory(
+  db: Db,
+  query = "",
+  after?: string,
+  filter: UserDirectoryFilter = "all",
+): Promise<UserDirectory> {
   const term = query.trim();
-  const where =
+  const search =
     term === "" ? undefined : or(ilike(people.name, `%${term}%`), ilike(people.phone, `%${term}%`));
+  // PI-1 P6: profile-aware facets. EXISTS subqueries, so the directory stays
+  // one indexed pass (registrations_person_idx / player_profiles_person_uq).
+  const facet =
+    filter === "players"
+      ? sql`exists (select 1 from registrations r where r.person_id = ${people.id})`
+      : filter === "profiled"
+        ? sql`exists (select 1 from player_profiles pp where pp.person_id = ${people.id})`
+        : undefined;
+  const where = search === undefined ? facet : facet === undefined ? search : and(search, facet);
   const cursor = await userCursor(db, after);
   const pageWhere =
     cursor === undefined ? where : where === undefined ? cursor : and(where, cursor);
@@ -935,6 +954,7 @@ export async function userDirectory(db: Db, query = "", after?: string): Promise
     total: matching[0]?.n ?? 0,
     platformTotal: everything[0]?.n ?? 0,
     query: term,
+    filter,
     nextCursor: more ? (page[page.length - 1]?.id ?? null) : null,
   };
 }
@@ -989,6 +1009,16 @@ export interface UserDetail {
   readonly orgs: readonly { slug: string; name: string; joinedAt: Date }[];
   readonly grants: readonly UserGrantRow[];
   readonly activity: readonly ActivityRow[];
+  /** PI-1 P6: the person's participations, read-only — the platform-admin view
+   *  of the same projection the player sees on /me/cricket (no prices here;
+   *  money surfaces stay with the money capabilities). */
+  readonly seasons: readonly {
+    competitionName: string;
+    orgName: string;
+    startsOn: string | null;
+    role: string;
+    status: string;
+  }[];
 }
 
 export async function userDetail(db: Db, personId: string): Promise<UserDetail | null> {
@@ -1000,13 +1030,27 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
   if (person === undefined) {
     return null;
   }
-  const [orgRows, grantRows, activity] = await Promise.all([
+  const [orgRows, seasonRows, grantRows, activity] = await Promise.all([
     db
       .select({ slug: organizations.slug, name: organizations.name, joinedAt: orgMembers.joinedAt })
       .from(orgMembers)
       .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
       .where(eq(orgMembers.personId, personId))
       .orderBy(asc(orgMembers.joinedAt)),
+    db
+      .select({
+        competitionName: competitions.name,
+        orgName: organizations.name,
+        startsOn: competitions.startsOn,
+        role: registrations.role,
+        status: registrations.status,
+      })
+      .from(registrations)
+      .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+      .innerJoin(organizations, eq(organizations.id, competitions.orgId))
+      .where(eq(registrations.personId, personId))
+      .orderBy(asc(competitions.startsOn))
+      .limit(50),
     db
       .select({
         id: grants.id,
@@ -1056,6 +1100,7 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
       revokedAt: row.revokedAt,
     })),
     activity,
+    seasons: seasonRows,
   };
 }
 

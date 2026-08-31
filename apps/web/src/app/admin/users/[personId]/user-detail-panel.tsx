@@ -113,6 +113,28 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
         )}
       </Card>
 
+      {/* PI-1 P6: the person's participations — read-only, no prices (money
+          surfaces stay with the money capabilities). */}
+      <Card>
+        <h2 className="admin-section-title">Seasons played</h2>
+        {detail.seasons.length === 0 ? (
+          <EmptyState title="No registrations" description="This person has joined no season." />
+        ) : (
+          <ul className="admin-timeline" data-testid="admin-user-seasons">
+            {detail.seasons.map((season, index) => (
+              <li key={index}>
+                <span className="registration-name">{season.competitionName}</span>{" "}
+                <span className="admin-meta">
+                  {season.orgName}
+                  {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
+                  {season.role.replace(/_/g, " ")} · {season.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
       <div className="admin-grid">
         <Card>
           <h2 className="admin-section-title">Organizations</h2>

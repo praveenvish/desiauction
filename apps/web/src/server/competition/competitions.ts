@@ -12,6 +12,7 @@ import {
 import {
   auditLog,
   competitions,
+  franchises,
   newId,
   organizations,
   orgMembers,
@@ -619,6 +620,29 @@ export async function cloneCompetition(
     teamsCloned += 1;
     if (team.coachName !== null && team.coachName !== "") {
       await setTeamCoach(db, orgId, competition.id, created.team.id, team.coachName, personId);
+    }
+    /*
+     * PI-1 P6: the clone is the moment a team proves it is a FRANCHISE — the
+     * same name coming back for another season. The source team's franchise is
+     * reused when it has one; created and back-linked onto the source when it
+     * does not (so the first clone stitches both editions together, not just
+     * the new one). Grouping only — nothing in auction/roster/money reads it.
+     */
+    const [sourceTeam] = await db
+      .select({ id: teams.id, franchiseId: teams.franchiseId })
+      .from(teams)
+      .where(and(eq(teams.competitionId, source.id), eq(teams.name, team.name)))
+      .limit(1);
+    if (sourceTeam !== undefined) {
+      let franchiseId = sourceTeam.franchiseId;
+      if (franchiseId === null) {
+        franchiseId = newId();
+        await db
+          .insert(franchises)
+          .values({ id: franchiseId, orgId, name: team.name, createdBy: personId });
+        await db.update(teams).set({ franchiseId }).where(eq(teams.id, sourceTeam.id));
+      }
+      await db.update(teams).set({ franchiseId }).where(eq(teams.id, created.team.id));
     }
   }
   await db.insert(auditLog).values({

@@ -80,6 +80,7 @@ export async function playerCareer(personId: string): Promise<PlayerCareer> {
       isViceCaptain: registrations.isViceCaptain,
       jerseyNumber: registrations.jerseyNumber,
       teamName: teams.name,
+      teamFranchiseId: teams.franchiseId,
       lotStatus: lots.status,
       soldPrice: lots.soldPrice,
     })
@@ -131,10 +132,12 @@ export async function playerCareer(personId: string): Promise<PlayerCareer> {
     .map((season) => (season.auction?.kind === "sold" ? season.auction.soldPrice : null))
     .filter((price): price is number => price !== null);
 
+  // P6: the same franchise across seasons is ONE team; unlinked teams fall
+  // back to org·name, which is what a clone-by-name meant before franchises.
   const teamIdentities = new Set(
     rows
       .filter((row) => row.teamName !== null)
-      .map((row) => `${row.orgName}·${row.teamName ?? ""}`),
+      .map((row) => row.teamFranchiseId ?? `${row.orgName}·${row.teamName ?? ""}`),
   );
 
   return {
