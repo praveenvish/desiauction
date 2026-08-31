@@ -2,6 +2,16 @@
 
 ## Architecture review + implementation plan · v1.0 · 2026-08-30 · pre-code deliverable
 
+> **Status · 2026-08-31 · IMPLEMENTED (P1–P7).** Migrations 0036–0039 applied
+> and probed; core engines (`eligibility.ts`, `profile-completeness.ts`) +
+> profile/career modules + all surfaces (/account cricket profile, /home rail,
+> /me/cricket, category on organizer/public/register screens, admin facets +
+> seasons panel) landed; OTP purpose + audit closures + terms-consent record
+> live; D1 media signer built and cross-implementation-proven. Auth tripwire
+> suites passed UNMODIFIED. As-built deltas from the plan: none structural;
+> the wizard's "have you played before" self-attestation stayed deferred as
+> written. Amendments: AUTHENTICATION.md, doc 38, DPDP inventory.
+
 The brief: a production-grade registration, authentication, player-profile,
 tournament-history, team-history, and auction-participation architecture.
 Per the engineering rule that governs the brief (its §30), nothing here was
