@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../../../server/auth/actions";
+import { playerProfileFor } from "../../../../server/player/profile";
 import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
 import { RegisterFlow } from "./register-flow";
@@ -179,6 +180,8 @@ export default async function RegisterPage({
     );
   }
   const landing = await registrationLanding(slug);
+  // PI-1: the person-level defaults that prefill step 2 of the wizard.
+  const cricketProfile = await playerProfileFor(session.personId);
   return (
     <main className="register">
       <div className="register-panel">
@@ -276,6 +279,12 @@ export default async function RegisterPage({
             phone={session.phone}
             initialName={session.name ?? ""}
             source={source}
+            profileDefaults={{
+              role: cricketProfile.defaultRole ?? "",
+              dob: cricketProfile.dateOfBirth ?? "",
+              batting: cricketProfile.defaultBattingStyle ?? "",
+              bowling: cricketProfile.defaultBowlingStyle ?? "",
+            }}
           />
         )}
       </div>

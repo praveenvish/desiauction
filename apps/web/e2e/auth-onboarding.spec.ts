@@ -88,7 +88,9 @@ test("player-shaped users reach home directly; completion meter and notification
 
   // Profile completion: name yes, passkey no → 1/2.
   await page.goto("/account");
-  await expect(page.getByTestId("profile-completion")).toContainText("Profile 1/2 complete");
+  // PI-1: the checklist grew from 2 items to the 8 the product actually uses;
+  // a fresh onboarded account has exactly its name.
+  await expect(page.getByTestId("profile-completion")).toContainText("Profile 1/8 complete");
   await expect(page.getByTestId("account-name")).toHaveText("Vikram Iyer");
 
   // Bell shows unread; inbox lists the real sign-in event; read-state settles.

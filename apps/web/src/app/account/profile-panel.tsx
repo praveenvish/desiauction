@@ -1,5 +1,6 @@
 "use client";
 
+import { PROFILE_ITEMS, type ProfileCompleteness, type ProfileItem } from "@desiauction/core";
 import { Badge, Button, Card, Field, PlayerImage, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, type ReactNode } from "react";
@@ -13,10 +14,26 @@ export interface ProfilePanelProps {
   personId: string;
   phone: string;
   name: string | null;
-  passkeyCount: number;
+  /** PI-1: computed server-side by core's profileCompleteness — never stored. */
+  completeness: ProfileCompleteness;
   /** The sign-out form, which must be a client component to sweep localStorage. */
   signOut: ReactNode;
 }
+
+/**
+ * The checklist's words (codes come from core, copy lives with the surface —
+ * the publishBlockers pattern). Order mirrors PROFILE_ITEMS.
+ */
+const ITEM_LABELS: Record<ProfileItem, { label: string; hint?: string }> = {
+  name: { label: "Name set" },
+  photo: { label: "Profile photo", hint: "— added when you register for a season" },
+  role: { label: "Playing role", hint: "— in Cricket profile below" },
+  date_of_birth: { label: "Date of birth", hint: "— in Cricket profile below" },
+  style: { label: "Batting or bowling style", hint: "— in Cricket profile below" },
+  location: { label: "City", hint: "— in Cricket profile below" },
+  email: { label: "Verified email", hint: "— for receipts and documents" },
+  passkey: { label: "Passkey added", hint: "— fastest sign-in, below" },
+};
 
 /**
  * PX-3 profile: the existing identity, made visible and editable.
@@ -27,7 +44,7 @@ export interface ProfilePanelProps {
  * This is now the ONE identity card on the page: the headless <dl> that used to
  * sit above it repeated the same phone and name with no heading of its own.
  */
-export function ProfilePanel({ personId, phone, name, passkeyCount, signOut }: ProfilePanelProps) {
+export function ProfilePanel({ personId, phone, name, completeness, signOut }: ProfilePanelProps) {
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(updateProfileAction, {});
@@ -48,7 +65,7 @@ export function ProfilePanel({ personId, phone, name, passkeyCount, signOut }: P
   }, [state.saved, state.firstTime, router, toast]);
 
   const hasName = name !== null && name.trim() !== "";
-  const done = (hasName ? 1 : 0) + (passkeyCount > 0 ? 1 : 0);
+  const missing = new Set(completeness.missing);
 
   return (
     <Card className="profile-card" data-testid="profile-panel">
@@ -92,16 +109,25 @@ export function ProfilePanel({ personId, phone, name, passkeyCount, signOut }: P
           </Button>
         </div>
       </form>
+      {/* PI-1: the real checklist — everything the product actually uses,
+          derived per read by core's profileCompleteness. */}
       <div className="profile-completion" data-testid="profile-completion">
-        <span className="profile-completion-label">Profile {done}/2 complete</span>
+        <span className="profile-completion-label">
+          Profile {completeness.done}/{completeness.total} complete
+        </span>
         <ul>
-          <li data-done={hasName}>{hasName ? "✓" : "○"} Name set</li>
-          <li data-done={passkeyCount > 0}>
-            {passkeyCount > 0 ? "✓" : "○"} Passkey added{" "}
-            {passkeyCount === 0 ? (
-              <span className="profile-hint">— fastest sign-in, below</span>
-            ) : null}
-          </li>
+          {PROFILE_ITEMS.map((item) => {
+            const itemDone = !missing.has(item);
+            const { label, hint } = ITEM_LABELS[item];
+            return (
+              <li key={item} data-done={itemDone}>
+                {itemDone ? "✓" : "○"} {label}{" "}
+                {!itemDone && hint !== undefined ? (
+                  <span className="profile-hint">{hint}</span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </Card>

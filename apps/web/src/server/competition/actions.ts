@@ -10,6 +10,7 @@ import {
   isMinor,
   isRejectionReason,
   parseRegistrationRecords,
+  parseRole,
   planImport,
   sampleRow,
   signatureOf,
@@ -37,7 +38,7 @@ import { auctionOf } from "@desiauction/auction";
 import { recordConsent } from "../messaging/consent";
 
 import { currentSession } from "../auth/actions";
-import { playerProfileFor } from "../player/profile";
+import { playerProfileFor, upsertPlayerProfile } from "../player/profile";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { canSettlement } from "../settlement/authz";
@@ -1047,6 +1048,28 @@ export async function submitRegistrationAction(
    * the registration has committed, and losing the evidence must not lose the
    * registration. It is logged as a gap instead.
    */
+  /*
+   * PI-1 write-back: "remember these answers" ticked means the season's
+   * choices become the person-level defaults, so the NEXT form starts filled
+   * in. A convenience after the fact — like consent evidence, it must never
+   * fail the registration that already committed.
+   */
+  if (formString(formData, "rememberProfile") === "true") {
+    try {
+      const current = await playerProfileFor(session.personId);
+      await upsertPlayerProfile(session.personId, {
+        ...current,
+        defaultRole: parseRole(role) ?? current.defaultRole,
+        dateOfBirth: profile.dateOfBirth === "" ? current.dateOfBirth : profile.dateOfBirth,
+        defaultBattingStyle:
+          profile.battingStyle === "" ? current.defaultBattingStyle : profile.battingStyle,
+        defaultBowlingStyle:
+          profile.bowlingStyle === "" ? current.defaultBowlingStyle : profile.bowlingStyle,
+      });
+    } catch {
+      // The profile is a convenience; the registration is the fact.
+    }
+  }
   try {
     const consentText = formString(formData, "publicationConsentText");
     await recordConsent(systemDb, {

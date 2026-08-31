@@ -1,5 +1,10 @@
-import { newId, playerProfiles, withTenantDb } from "@desiauction/db";
-import type { Gender, PlayerRole } from "@desiauction/core";
+import { newId, passkeyCredentials, people, playerProfiles, withTenantDb } from "@desiauction/db";
+import {
+  profileCompleteness,
+  type Gender,
+  type PlayerRole,
+  type ProfileCompleteness,
+} from "@desiauction/core";
 import { eq } from "drizzle-orm";
 
 import { dbHandle } from "../db";
@@ -93,3 +98,54 @@ export async function upsertPlayerProfile(personId: string, next: PlayerProfile)
   });
 }
 
+/**
+ * The checklist, assembled from the rows the account page already stands on:
+ * identity facts from `people`, defaults from the profile, and the caller's
+ * passkey count (it has that read in hand — no second query here).
+ */
+export async function profileCompletenessFor(
+  personId: string,
+  passkeyCount?: number,
+): Promise<ProfileCompleteness> {
+  // Callers that already hold the passkey list pass its length; /home does not,
+  // so the count is one indexed read here.
+  const knownPasskeys =
+    passkeyCount ??
+    (
+      await dbHandle.db
+        .select({ id: passkeyCredentials.id })
+        .from(passkeyCredentials)
+        .where(eq(passkeyCredentials.personId, personId))
+    ).length;
+  const [person] = await dbHandle.db
+    .select({
+      name: people.name,
+      photoUrl: people.photoUrl,
+      emailVerifiedAt: people.emailVerifiedAt,
+    })
+    .from(people)
+    .where(eq(people.id, personId))
+    .limit(1);
+  const profile = await playerProfileFor(personId);
+  return profileCompleteness({
+    name: person?.name ?? null,
+    photoUrl: person?.photoUrl ?? null,
+    emailVerified: person?.emailVerifiedAt != null,
+    dateOfBirth: profile.dateOfBirth,
+    location: profile.location,
+    defaultRole: profile.defaultRole,
+    defaultBattingStyle: profile.defaultBattingStyle,
+    defaultBowlingStyle: profile.defaultBowlingStyle,
+    passkeyCount: knownPasskeys,
+  });
+}
+
+/** Whether a profile row exists at all — the /home nudge's "is this a player?" half. */
+export async function hasPlayerProfile(personId: string): Promise<boolean> {
+  const [row] = await dbHandle.db
+    .select({ id: playerProfiles.id })
+    .from(playerProfiles)
+    .where(eq(playerProfiles.personId, personId))
+    .limit(1);
+  return row !== undefined;
+}

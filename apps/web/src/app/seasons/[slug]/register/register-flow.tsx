@@ -96,6 +96,7 @@ export function RegisterFlow({
   phone,
   initialName,
   source,
+  profileDefaults,
 }: {
   slug: string;
   competitionName: string;
@@ -103,14 +104,19 @@ export function RegisterFlow({
   initialName: string;
   /** Share-attribution `?ref` from the landing URL; "" when direct. */
   source: string;
+  /** PI-1: the person-level cricket profile, prefilling step 2. A device-local
+   *  draft still wins over it — the draft is this season's newer intent. */
+  profileDefaults: { role: string; dob: string; batting: string; bowling: string } | null;
 }) {
   const [name, setName] = useState(initialName);
   const [nameDone, setNameDone] = useState(initialName.trim() !== "");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState(profileDefaults?.role ?? "");
   // Optional player profile (parity §3.2). Not gated — a bare role still submits.
-  const [dob, setDob] = useState("");
-  const [batting, setBatting] = useState("");
-  const [bowling, setBowling] = useState("");
+  const [dob, setDob] = useState(profileDefaults?.dob ?? "");
+  const [batting, setBatting] = useState(profileDefaults?.batting ?? "");
+  const [bowling, setBowling] = useState(profileDefaults?.bowling ?? "");
+  // PI-1 write-back: on by default, an act of the submit, never of the draft.
+  const [remember, setRemember] = useState(true);
   // PRR P0-2: guardian consent, required only when the entered DOB is under 18.
   const [guardianName, setGuardianName] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
@@ -221,6 +227,9 @@ export function RegisterFlow({
        */
       formData.set("publicationConsent", "true");
       formData.set("publicationConsentText", PUBLICATION_CONSENT_LABEL);
+      // PI-1: "remember for next time" — the server writes these answers back
+      // to the person-level profile so the NEXT season starts filled in.
+      formData.set("rememberProfile", remember ? "true" : "false");
       const result = await submitRegistrationAction(slug, {}, formData);
       if (result.done === true) {
         window.localStorage.removeItem(draftKey(slug));
@@ -540,6 +549,20 @@ export function RegisterFlow({
               }}
             />
             <span>{PUBLICATION_CONSENT_LABEL}</span>
+          </label>
+          {/* PI-1 write-back. A convenience, not a consent — so it sits apart
+              from the consent box above and defaults on. */}
+          <label className="register-consent-check" htmlFor="register-remember-box">
+            <input
+              id="register-remember-box"
+              type="checkbox"
+              checked={remember}
+              data-testid="register-remember"
+              onChange={(event) => {
+                setRemember(event.target.checked);
+              }}
+            />
+            <span>Remember these answers on my profile, so the next form starts filled in.</span>
           </label>
           {error !== null ? (
             <p role="alert" className="register-error">

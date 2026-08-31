@@ -284,6 +284,12 @@ export type {
   EntryCategory,
   RegistrationEligibilityInput,
 } from "./eligibility";
+export { PROFILE_ITEMS, profileCompleteness } from "./profile-completeness";
+export type {
+  ProfileCompleteness,
+  ProfileCompletenessInput,
+  ProfileItem,
+} from "./profile-completeness";
 export {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,

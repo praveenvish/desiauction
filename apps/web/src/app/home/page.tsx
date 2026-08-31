@@ -20,6 +20,7 @@ import { competitionsView, registrationDashboard } from "../../server/competitio
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { myRegistrations } from "../../server/competition/public";
 import { homeDashboard } from "../../server/home/dashboard";
+import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
 import type { HomeDashboardData, HomeStages } from "../../server/home/dashboard";
 import { CreateOrgForm } from "../orgs/create-org-form";
 import { CreateTournamentForm } from "../tournaments/create-tournament-form";
@@ -600,12 +601,18 @@ export default async function HomePage() {
 }
 
 async function HomeBody({ personId, name }: { personId: string; name: string }) {
-  const [view, schedule, registrationsMine, dash] = await Promise.all([
+  const [view, schedule, registrationsMine, dash, hasProfile, completeness] = await Promise.all([
     competitionsView(),
     organizerScheduleView(),
     myRegistrations(personId),
     homeDashboard(),
+    hasPlayerProfile(personId),
+    profileCompletenessFor(personId),
   ]);
+  // PI-1: nudge only someone the platform can see IS a player (a registration
+  // or a profile row); a pure organizer's home never asks for a bowling style.
+  const showProfileNudge =
+    (registrationsMine.length > 0 || hasProfile) && completeness.done < completeness.total;
 
   // The night in progress leads the page. One extra read, and only when there
   // IS one: the hero needs what the list row could not say — who is on the
@@ -1318,6 +1325,27 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
             orgName: competition.orgName,
           }))}
         />
+
+        {showProfileNudge ? (
+          <Card className="home-profile-nudge" data-testid="home-profile-nudge">
+            <div className="home-attn">
+              <span className="home-attn-text">
+                <strong>
+                  Complete your player profile — {completeness.done}/{completeness.total}
+                </strong>
+                <span>
+                  {completeness.missing.length === 1
+                    ? "One thing left"
+                    : `${String(completeness.missing.length)} things left`}{" "}
+                  — the next registration form starts filled in.
+                </span>
+              </span>
+              <Link href="/account" className="home-own-poster">
+                Finish it
+              </Link>
+            </div>
+          </Card>
+        ) : null}
 
         {registrationsMine.length > 0 ? (
           <>
