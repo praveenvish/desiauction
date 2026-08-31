@@ -1,4 +1,5 @@
 import { Badge, ButtonLink, EmptyState } from "@desiauction/ui";
+import { entryCategoryLabel } from "@desiauction/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -100,6 +101,13 @@ export default async function PublicCompetitionPage({
               <IconUsers />
               Organized by {view.orgName}
             </span>
+            {/* PI-1: the category, in words ("Women's tournament"); an Open
+                season says nothing rather than announcing the default. */}
+            {view.entryCategory !== "open" ? (
+              <span data-testid="public-category">
+                {entryCategoryLabel(view.entryCategory)} tournament
+              </span>
+            ) : null}
             {view.location !== null ? (
               <span>
                 <IconMapPin />

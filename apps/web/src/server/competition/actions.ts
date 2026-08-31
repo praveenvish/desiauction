@@ -5,6 +5,8 @@ import {
   DEFAULT_AUCTION_CONFIG,
   applyMapping,
   detectMapping,
+  evaluateRegistration,
+  isEntryCategory,
   isMinor,
   isRejectionReason,
   parseRegistrationRecords,
@@ -25,7 +27,8 @@ import {
   type RegistrationStatus,
   type ValueMaps,
 } from "@desiauction/core";
-import { withTenantDb, type Db } from "@desiauction/db";
+import { playerProfiles, withTenantDb, type Db } from "@desiauction/db";
+import { inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -34,6 +37,7 @@ import { auctionOf } from "@desiauction/auction";
 import { recordConsent } from "../messaging/consent";
 
 import { currentSession } from "../auth/actions";
+import { playerProfileFor } from "../player/profile";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { canSettlement } from "../settlement/authz";
@@ -535,7 +539,14 @@ export type DetailsField = "name" | "startsOn" | "endsOn" | "location" | "form";
  */
 export async function updateCompetitionDetailsAction(
   slug: string,
-  input: { name: string; location: string; startsOn: string; endsOn: string },
+  input: {
+    name: string;
+    location: string;
+    startsOn: string;
+    endsOn: string;
+    /** PI-1: "" leaves the category as it stands (older callers omit it). */
+    entryCategory?: string;
+  },
 ): Promise<{ ok: boolean; error?: string; field?: DetailsField }> {
   const session = await requireSession();
   const competition = await resolveCompetitionScoped(session.personId, slug);
@@ -554,12 +565,17 @@ export async function updateCompetitionDetailsAction(
   } catch {
     return { ok: false, error: "You can't manage this season.", field: "form" };
   }
+  const category = input.entryCategory ?? "";
+  if (category !== "" && !isEntryCategory(category)) {
+    return { ok: false, error: "Pick one of the listed categories.", field: "form" };
+  }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
     updateCompetitionDetails(db, competition, session.personId, {
       name: input.name,
       location: input.location.trim() === "" ? null : input.location.trim(),
       startsOn: input.startsOn === "" ? null : input.startsOn,
       endsOn: input.endsOn === "" ? null : input.endsOn,
+      ...(category !== "" && isEntryCategory(category) ? { entryCategory: category } : {}),
     }),
   );
   if (!result.ok) {
@@ -826,6 +842,8 @@ export async function registrationLanding(slug: string): Promise<RegistrationLan
 export interface RegistrationPreview {
   competitionName: string;
   open: boolean;
+  /** PI-1: stated on the preview so nobody signs in to find out. */
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -845,6 +863,7 @@ export async function registrationPreview(slug: string): Promise<RegistrationPre
   return {
     competitionName: facts.name,
     open: facts.status === "registration_open",
+    entryCategory: facts.entryCategory,
     location: facts.location,
     startsOn: facts.startsOn,
     endsOn: facts.endsOn,
@@ -949,20 +968,39 @@ export async function submitRegistrationAction(
     battingStyle: formString(formData, "battingStyle"),
     bowlingStyle: formString(formData, "bowlingStyle"),
   };
-  /*
-   * PRR P0-2 (DPDP Act 2023 §9): a registrant under 18 is a child, and their
-   * data may not be processed without a parent/guardian's consent. Enforced HERE
-   * as well as in the browser, for the same reason publication consent is: a
-   * client gate is a courtesy. A minor with no guardian name + explicit consent
-   * is refused; the public read model additionally suppresses their age and
-   * photo from every public surface (server/competition/public.ts).
-   */
   const minor = isMinor(profile.dateOfBirth === "" ? null : profile.dateOfBirth, new Date());
   const guardianName = formString(formData, "guardianName").trim();
-  if (minor && (formString(formData, "guardianConsent") !== "true" || guardianName === "")) {
+  /*
+   * ONE evaluator decides (PI-1 P3): intake, role, the PRR P0-2 minor gate
+   * (DPDP §9 — a registrant under 18 is a child and needs a named guardian's
+   * verifiable consent; the public read model additionally suppresses their
+   * age and photo everywhere public), and the entry category against the
+   * person's own profile. Enforced HERE as well as in the browser — a client
+   * gate is a courtesy. The writer below keeps its own not_open/role checks
+   * as defense-in-depth; the sentences for those two are unchanged.
+   */
+  const verdict = evaluateRegistration({
+    competitionStatus: competition.status,
+    entryCategory: competition.entryCategory,
+    role,
+    gender: (await playerProfileFor(session.personId)).gender,
+    dateOfBirth: profile.dateOfBirth === "" ? null : profile.dateOfBirth,
+    guardianConsent: formString(formData, "guardianConsent") === "true",
+    guardianName,
+    channel: "self",
+    now: new Date(),
+  });
+  if (!verdict.eligible) {
+    const reason = verdict.reasons[0];
     return {
       error:
-        "A parent or guardian must consent for a player under 18 — add their name and tick the consent box.",
+        reason === "intake_closed"
+          ? "Registration for this competition is not open."
+          : reason === "minor_missing_guardian"
+            ? "A parent or guardian must consent for a player under 18 — add their name and tick the consent box."
+            : reason === "category_mismatch"
+              ? "This season is listed as a gendered category that doesn't match your profile. If that's wrong, update your profile on the Account page — or contact the organizer, who can add you directly."
+              : "Choose a valid playing role.",
     };
   }
   const source = formString(formData, "source");
@@ -1085,6 +1123,15 @@ export interface RegistrationDashboard {
   /** Drives the closed-intake notice on the share block (DA-35). */
   registrationOpen: boolean;
   viewer: { canReview: boolean };
+  /**
+   * PI-1: rows whose person's own declared gender is directly contrary to the
+   * season's entry category — the ORGANIZER-channel advisory from the one
+   * eligibility evaluator (invariant 5: it flags, the human decides). Only
+   * declared opposites appear; an unanswered profile flags nothing, because a
+   * women's-season import of new phone numbers would otherwise flag every row.
+   * Review-gated like the rows it annotates. Keyed by registration id.
+   */
+  categoryFlags?: Record<string, "category_mismatch">;
 }
 
 const VALID_STATUS = new Set<RegistrationStatus>([
@@ -1137,6 +1184,37 @@ export async function registrationDashboard(
       teamsOf(db, competition.id),
       orphanIcons(db, competition.id),
     ]);
+    // PI-1: the organizer-channel category advisory, computed by THE evaluator
+    // (never by a second SQL copy of its rules) over just this page's people.
+    const categoryFlags: Record<string, "category_mismatch"> = {};
+    if (competition.entryCategory !== "open" && page.rows.length > 0) {
+      const genders = await db
+        .select({ personId: playerProfiles.personId, gender: playerProfiles.gender })
+        .from(playerProfiles)
+        .where(
+          inArray(
+            playerProfiles.personId,
+            page.rows.map((row) => row.personId),
+          ),
+        );
+      const genderOf = new Map(genders.map((entry) => [entry.personId, entry.gender]));
+      for (const row of page.rows) {
+        const verdict = evaluateRegistration({
+          competitionStatus: competition.status,
+          entryCategory: competition.entryCategory,
+          role: row.role,
+          gender: genderOf.get(row.personId) ?? null,
+          dateOfBirth: null,
+          guardianConsent: false,
+          guardianName: "",
+          channel: "organizer",
+          now: new Date(),
+        });
+        if (verdict.advisories.includes("category_mismatch")) {
+          categoryFlags[row.id] = "category_mismatch";
+        }
+      }
+    }
     return {
       competition,
       stats,
@@ -1145,6 +1223,7 @@ export async function registrationDashboard(
       orphanIcons: orphans,
       registrationOpen: competition.status === "registration_open",
       viewer: { canReview },
+      categoryFlags,
     };
   });
 }

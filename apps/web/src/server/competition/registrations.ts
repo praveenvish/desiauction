@@ -639,6 +639,7 @@ export async function publicRegistrationFacts(
 ): Promise<{
   name: string;
   status: string;
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -647,6 +648,7 @@ export async function publicRegistrationFacts(
     .select({
       name: competitions.name,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,

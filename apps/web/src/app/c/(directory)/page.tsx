@@ -1,4 +1,5 @@
 import { Badge, Button, ButtonLink, Card, EmptyState, Field } from "@desiauction/ui";
+import { entryCategoryLabel } from "@desiauction/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -372,6 +373,11 @@ export default async function DirectoryPage({
                             <Badge tone={entry.open ? "success" : "neutral"}>
                               {entry.open ? "Registration open" : "Registration closed"}
                             </Badge>
+                            {/* PI-1: category terminology; Open renders nothing
+                                — it is the unmarked case, not a badge. */}
+                            {entry.entryCategory !== "open" ? (
+                              <Badge tone="info">{entryCategoryLabel(entry.entryCategory)}</Badge>
+                            ) : null}
                           </span>
                           <span className="public-card-actions">
                             {action.note !== null ? (

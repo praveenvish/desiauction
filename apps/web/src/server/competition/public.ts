@@ -57,6 +57,8 @@ export interface PublicCompetitionView {
   name: string;
   slug: string;
   status: string;
+  /** PI-1: organizer-declared category, for terminology ("Women's") only. */
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -94,6 +96,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       visibility: competitions.visibility,
       location: competitions.location,
       startsOn: competitions.startsOn,
@@ -127,6 +130,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     name: row.name,
     slug: row.slug,
     status: row.status,
+    entryCategory: row.entryCategory,
     location: row.location,
     startsOn: row.startsOn,
     endsOn: row.endsOn,
@@ -324,6 +328,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   const [comp] = await systemDb
     .select({
       id: competitions.id,
+      orgId: competitions.orgId,
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
@@ -378,6 +383,8 @@ export interface DirectoryEntry {
   name: string;
   slug: string;
   orgName: string;
+  /** PI-1: organizer-declared category ("Women's" badge; `open` renders nothing). */
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -557,6 +564,7 @@ export async function publicCompetitionsDirectory(params: {
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -580,6 +588,7 @@ export async function publicCompetitionsDirectory(params: {
       name: row.name,
       slug: row.slug,
       orgName: row.orgName,
+      entryCategory: row.entryCategory,
       location: row.location,
       startsOn: row.startsOn,
       endsOn: row.endsOn,

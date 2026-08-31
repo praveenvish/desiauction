@@ -85,6 +85,7 @@ async function main(): Promise<void> {
     slug: `perf-fix-${RUN}`,
     status: "draft",
     visibility: "private" as const,
+    entryCategory: "open" as const,
     location: "Local",
     startsOn: "2026-01-01",
     endsOn: "2027-12-31",

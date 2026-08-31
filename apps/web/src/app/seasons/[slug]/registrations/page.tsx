@@ -60,6 +60,7 @@ export default async function RegistrationsPage({
             teams={dashboard.teams}
             orphanIcons={dashboard.orphanIcons ?? []}
             registrationOpen={dashboard.registrationOpen}
+            categoryFlags={dashboard.categoryFlags ?? {}}
             filters={{
               search: sp["q"] ?? "",
               status: sp["status"] ?? "",

@@ -7,6 +7,7 @@ import {
   slugifyName,
   validateName,
   type CompetitionStatus,
+  type EntryCategory,
 } from "@desiauction/core";
 import {
   auditLog,
@@ -76,6 +77,8 @@ export interface CompetitionSummary {
   status: CompetitionStatus;
   // PX-5: the public-page switch (existing column, now surfaced).
   visibility: "private" | "public";
+  // PI-1: the organizer-declared entry category (open | men | women | mixed).
+  entryCategory: EntryCategory;
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -135,6 +138,7 @@ export async function createCompetition(
     name: valid.value,
     slug,
     status: "draft",
+    entryCategory: "open",
     visibility: "private",
     location: input.location ?? null,
     startsOn: input.startsOn ?? null,
@@ -156,6 +160,7 @@ export async function competitionsForPerson(
       slug: competitions.slug,
       status: competitions.status,
       visibility: competitions.visibility,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -189,6 +194,7 @@ export async function competitionsOfTournament(
       slug: competitions.slug,
       status: competitions.status,
       visibility: competitions.visibility,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -258,6 +264,7 @@ export async function resolveCompetition(
       slug: competitions.slug,
       status: competitions.status,
       visibility: competitions.visibility,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -281,6 +288,9 @@ export async function competitionForRegistration(
   orgId: string;
   name: string;
   status: CompetitionStatus;
+  /** PI-1: the organizer-declared entry category, read by the eligibility
+   *  engine and by the register screens' terminology. */
+  entryCategory: "open" | "men" | "women" | "mixed";
   /** `visibility === 'public'` — whether /c/[slug] and the player pages exist
    *  for the public at all. Registration itself does NOT depend on this (a
    *  private season still takes sign-ups by direct link); the player-facing
@@ -293,6 +303,7 @@ export async function competitionForRegistration(
       orgId: competitions.orgId,
       name: competitions.name,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       visibility: competitions.visibility,
     })
     .from(competitions)
@@ -389,6 +400,8 @@ export interface CompetitionDetails {
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
+  /** PI-1: who the season is for. Absent = leave it as it stands. */
+  entryCategory?: EntryCategory;
 }
 
 export type UpdateDetailsResult =
@@ -422,6 +435,9 @@ export async function updateCompetitionDetails(
     location: input.location,
     startsOn: input.startsOn,
     endsOn: input.endsOn,
+    // PI-1: the category rides the same audited details write — declaring who
+    // a season is for is exactly as consequential as renaming it.
+    entryCategory: input.entryCategory ?? competition.entryCategory,
   };
   await db.update(competitions).set(next).where(eq(competitions.id, competition.id));
   await db.insert(auditLog).values({
@@ -437,6 +453,7 @@ export async function updateCompetitionDetails(
         location: competition.location,
         startsOn: competition.startsOn,
         endsOn: competition.endsOn,
+        entryCategory: competition.entryCategory,
       },
       to: next,
     },

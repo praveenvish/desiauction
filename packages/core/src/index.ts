@@ -272,6 +272,19 @@ export {
 } from "./player-profile";
 export type { BattingStyle, BowlingStyle, Gender, PlayerRole } from "./player-profile";
 export {
+  ENTRY_CATEGORIES,
+  entryCategoryLabel,
+  evaluateRegistration,
+  isEntryCategory,
+} from "./eligibility";
+export type {
+  EligibilityAdvisory,
+  EligibilityReason,
+  EligibilityVerdict,
+  EntryCategory,
+  RegistrationEligibilityInput,
+} from "./eligibility";
+export {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
   isAllowedImageType,

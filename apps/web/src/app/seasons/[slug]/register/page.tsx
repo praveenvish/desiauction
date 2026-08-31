@@ -1,4 +1,4 @@
-import { isRejectionReason } from "@desiauction/core";
+import { entryCategoryLabel, isRejectionReason } from "@desiauction/core";
 import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -103,6 +103,14 @@ export default async function RegisterPage({
             </p>
             {preview.open ? (
               <>
+                {/* PI-1: the category, before anyone signs in — a mismatch
+                    should never be discovered after an OTP. */}
+                {preview.entryCategory !== "open" ? (
+                  <p className="register-hint" data-testid="register-category">
+                    This is a {entryCategoryLabel(preview.entryCategory).toLowerCase()} season —
+                    registration checks your profile against it.
+                  </p>
+                ) : null}
                 <p className="register-hint">
                   Registering puts you in this season&apos;s player pool. On auction day, team
                   owners bid to sign you.

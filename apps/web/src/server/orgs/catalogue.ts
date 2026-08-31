@@ -35,6 +35,8 @@ export interface EditionRow {
   name: string;
   status: string;
   visibility: "private" | "public";
+  /** PI-1: the organizer-declared entry category. */
+  entryCategory: "open" | "men" | "women" | "mixed";
   startsOn: string | null;
   endsOn: string | null;
   location: string | null;
@@ -73,6 +75,7 @@ async function editionsFor(
       name: competitions.name,
       status: competitions.status,
       visibility: competitions.visibility,
+      entryCategory: competitions.entryCategory,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
       location: competitions.location,
@@ -135,6 +138,7 @@ async function editionsFor(
       name: row.name,
       status: row.status,
       visibility: row.visibility,
+      entryCategory: row.entryCategory,
       startsOn: row.startsOn,
       endsOn: row.endsOn,
       location: row.location,

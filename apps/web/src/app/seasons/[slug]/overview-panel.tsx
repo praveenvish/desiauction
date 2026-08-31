@@ -7,9 +7,11 @@ import {
   Card,
   Dialog,
   Field,
+  Select,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
+import { ENTRY_CATEGORIES, entryCategoryLabel } from "@desiauction/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -906,6 +908,7 @@ function SeasonSettingsDialog({
   const [location, setLocation] = useState(competition.location ?? "");
   const [startsOn, setStartsOn] = useState(competition.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(competition.endsOn ?? "");
+  const [entryCategory, setEntryCategory] = useState<string>(competition.entryCategory);
   const [error, setError] = useState<{ field: DetailsField; message: string } | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -914,7 +917,13 @@ function SeasonSettingsDialog({
 
   const save = async () => {
     setPending(true);
-    const result = await updateCompetitionDetailsAction(slug, { name, location, startsOn, endsOn });
+    const result = await updateCompetitionDetailsAction(slug, {
+      name,
+      location,
+      startsOn,
+      endsOn,
+      entryCategory,
+    });
     setPending(false);
     if (result.ok) {
       setError(null);
@@ -987,6 +996,24 @@ function SeasonSettingsDialog({
             {...errorFor("endsOn")}
           />
         </div>
+        {/* PI-1: who the season is for. Read by the register gate and the
+            public terminology; enforcement lives in core's eligibility engine. */}
+        <Select
+          label="Entry category"
+          name="season-entry-category"
+          value={entryCategory}
+          onChange={(event) => {
+            setEntryCategory(event.target.value);
+          }}
+          help="Open takes everyone. A gendered category is checked at self-registration; you can still add anyone directly."
+          data-testid="season-entry-category"
+        >
+          {ENTRY_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {entryCategoryLabel(category)}
+            </option>
+          ))}
+        </Select>
       </div>
     </Dialog>
   );

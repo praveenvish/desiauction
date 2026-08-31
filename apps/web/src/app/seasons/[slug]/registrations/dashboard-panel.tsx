@@ -140,6 +140,7 @@ export function RegistrationDashboardPanel({
   filters,
   orphanIcons,
   registrationOpen,
+  categoryFlags = {},
 }: {
   slug: string;
   stats: RegistrationStats;
@@ -148,6 +149,8 @@ export function RegistrationDashboardPanel({
   filters: { search: string; status: string; team: string; sort: string };
   orphanIcons: OrphanIcon[];
   registrationOpen: boolean;
+  /** PI-1: organizer-channel category advisories, keyed by registration id. */
+  categoryFlags?: NonNullable<RegistrationDashboard["categoryFlags"]>;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -954,6 +957,7 @@ export function RegistrationDashboardPanel({
                   row={row}
                   active={index === cursor}
                   checked={selected.has(row.id)}
+                  categoryFlagged={categoryFlags[row.id] !== undefined}
                   onToggle={() => {
                     toggle(row);
                   }}
@@ -1764,6 +1768,7 @@ function RegRow({
   row,
   active,
   checked,
+  categoryFlagged,
   onToggle,
   onDetails,
   onApprove,
@@ -1776,6 +1781,8 @@ function RegRow({
   row: Row;
   active: boolean;
   checked: boolean;
+  /** PI-1: the eligibility engine's organizer advisory — flag, never block. */
+  categoryFlagged: boolean;
   onToggle: () => void;
   onDetails: () => void;
   onApprove: () => void;
@@ -1831,6 +1838,14 @@ function RegRow({
             {row.duplicateName ? (
               <Badge tone="warning" data-testid="dup-flag">
                 possible duplicate
+              </Badge>
+            ) : null}
+            {categoryFlagged ? (
+              // PI-1: the season declares a gendered category and this
+              // person's own profile says otherwise. The engine flags; the
+              // organizer — who may know better — decides (invariant 5).
+              <Badge tone="warning" data-testid="category-flag">
+                check entry category
               </Badge>
             ) : null}
           </div>
