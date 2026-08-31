@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   acquireSingleWriterLease,
+  describeLeaseHolder,
+  LEASE_ORPHAN_AFTER_SECONDS,
   SingleWriterLeaseUnavailable,
   SINGLE_WRITER_LOCK_CLASS,
   SINGLE_WRITER_LOCK_KEY,
@@ -135,5 +137,88 @@ describe("single-writer lease", () => {
     // DIFFERENT locks and both believe they are the only writer.
     expect(SINGLE_WRITER_LOCK_CLASS).toBe(0x0de5_1a11);
     expect(SINGLE_WRITER_LOCK_KEY).toBe(1);
+  });
+});
+
+/*
+ * THE CORPSE CASE (2026-08-31).
+ *
+ * The header used to promise that a hard-killed engine "never wedges its
+ * replacement". It does: the process dies, the backend does not, and the lock
+ * is honoured by a session nobody is driving. These tests pin the part that is
+ * ours to get right — telling an operator WHICH of the two refusals they have.
+ */
+describe("single-writer lease · naming the holder", () => {
+  /** A stub whose `sql` is also callable as a tagged template (the holder query). */
+  function stubWithHolder(holderRows: unknown[], lockAnswer = false): Sql {
+    const reserved = Object.assign(() => Promise.resolve([{ ok: lockAnswer }]), {
+      release: () => undefined,
+    });
+    const sql = Object.assign(() => Promise.resolve(holderRows), {
+      reserve: () => Promise.resolve(reserved),
+    });
+    return sql as unknown as Sql;
+  }
+
+  it("names an ORPHANED backend and prints the command that recovers it", async () => {
+    const sql = stubWithHolder([
+      {
+        pid: 62,
+        application_name: "postgres.js",
+        state: "idle",
+        // numeric comes back from postgres.js as a string — the real shape.
+        idle_seconds: "14523.7",
+        client_addr: "192.168.65.1",
+      },
+    ]);
+    const error = await acquireSingleWriterLease(sql).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SingleWriterLeaseUnavailable);
+    const refusal = error as SingleWriterLeaseUnavailable;
+    expect(refusal.holder?.likelyOrphaned).toBe(true);
+    expect(refusal.message).toContain("ORPHANED");
+    // The operator must not have to look the recovery up.
+    expect(refusal.message).toContain("pg_terminate_backend(62)");
+  });
+
+  it("does NOT call a live second instance orphaned", async () => {
+    // Busy, or idle briefly — a running engine re-asserts every 10s.
+    const sql = stubWithHolder([
+      {
+        pid: 71,
+        application_name: "postgres.js",
+        state: "idle",
+        idle_seconds: String(LEASE_ORPHAN_AFTER_SECONDS - 1),
+        client_addr: null,
+      },
+    ]);
+    const error = await acquireSingleWriterLease(sql).catch((e: unknown) => e);
+    const refusal = error as SingleWriterLeaseUnavailable;
+    expect(refusal.holder?.likelyOrphaned).toBe(false);
+    expect(refusal.message).toContain("refusing to start a second writer");
+    // Telling an operator to terminate a LIVE writer would take the gavel out
+    // of a running auction. That advice must never appear here.
+    expect(refusal.message).not.toContain("pg_terminate_backend");
+  });
+
+  it("still refuses when the holder cannot be identified", async () => {
+    const sql = stubWithHolder([]);
+    const error = await acquireSingleWriterLease(sql).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SingleWriterLeaseUnavailable);
+    expect((error as SingleWriterLeaseUnavailable).holder).toBeNull();
+  });
+
+  it("NEVER throws its own error over the refusal it was sent to explain", async () => {
+    // The diagnostic query fails (no permission, catalog unavailable, whatever).
+    // The boot must still fail with SingleWriterLeaseUnavailable, not with this.
+    const reserved = Object.assign(() => Promise.resolve([{ ok: false }]), {
+      release: () => undefined,
+    });
+    const sql = Object.assign(() => Promise.reject(new Error("permission denied")), {
+      reserve: () => Promise.resolve(reserved),
+    }) as unknown as Sql;
+    await expect(describeLeaseHolder(sql)).resolves.toBeNull();
+    await expect(acquireSingleWriterLease(sql)).rejects.toBeInstanceOf(
+      SingleWriterLeaseUnavailable,
+    );
   });
 });

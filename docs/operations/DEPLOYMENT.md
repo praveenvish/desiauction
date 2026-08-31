@@ -136,13 +136,51 @@ Operationally this means:
   second machine crash-loops on purpose. Scale the WEB tier for capacity; the
   engine is deliberately not horizontally scalable.
 - **Rolling deploys still work.** The lock is released when the old process's
-  session ends — on graceful SIGTERM it is handed back explicitly, and on a hard
-  kill Postgres drops it with the session. A replacement claims it immediately;
-  no lease table, no expiry to wait out.
+  SESSION ends. On graceful SIGTERM it is handed back explicitly and a
+  replacement claims it immediately — no lease table, no expiry to wait out.
+- **A severed connection is different, and this page used to get it wrong.** It
+  claimed a hard kill is fine because "Postgres drops it with the session" — the
+  conclusion is right but the reason does not reach far enough. A killed process
+  has its sockets closed by the kernel, so `kill -9` genuinely does free the
+  lease at once (re-verified 2026-08-31: the replacement booted immediately).
+  What wedges the lease is a connection severed **without** a close — the
+  database host or VM restarting, a laptop sleeping, a NAT entry expiring, a
+  network partition. The server hears nothing, keeps the backend open, and keeps
+  honouring its lock. Observed 2026-08-31 after a Docker Desktop restart: the
+  backend held the lease **idle for four hours** and every replacement refused to
+  boot. Only the database can notice this, and only if told to probe:
+
+  ```
+  tcp_keepalives_idle = 30
+  tcp_keepalives_interval = 10
+  tcp_keepalives_count = 3
+  ```
+
+  Set on the local container (`docker-compose.yml`) and **required on every
+  deployed database**. With it a severed holder is reaped in ~60s; without it,
+  never. A managed Postgres that does not expose these settings needs the manual
+  recovery below kept to hand.
 - **A brief overlap window is normal** during a deploy: if the new instance
   starts before the old one has exited, it exits 1 and the platform retries.
-  Persistent crash-looping with that message means an old machine is still
-  running — stop it rather than removing the lock.
+- **Telling the two apart is the engine's job, not yours.** A refusal names the
+  holder and says which case it is. A live second instance reads
+  `another engine instance already holds the single-writer lease (pid N, active)`
+  — stop the old machine, never the lock. An orphan reads
+  `the single-writer lease is held by an ORPHANED postgres backend (pid N, idle
+  for Ns)` and prints the exact recovery. The threshold is 60s idle, six missed
+  re-assertions of a 10s cadence; a live engine can never reach it.
+- **Manual recovery from an orphaned lease.** Only after confirming no engine
+  process is running:
+
+  ```sql
+  select l.pid, a.state, a.backend_start
+    from pg_locks l join pg_stat_activity a using (pid)
+   where l.locktype = 'advisory' and l.classid = 233118225::oid and l.objid = 1::oid;
+  select pg_terminate_backend(<pid>);
+  ```
+
+  Terminating the backend of a **live** engine hands the gavel to a second
+  writer mid-auction. Confirm the process is gone first.
 - **The lease is re-checked every 10s.** If the engine loses it (its connection
   dropped and another instance took over), the process exits rather than keep
   closing lots it may no longer own — a dead engine is safer than a second one.
