@@ -1349,7 +1349,14 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
 
         {registrationsMine.length > 0 ? (
           <>
-            <SectionHeader title="My registrations" />
+            <SectionHeader
+              title="My registrations"
+              actions={
+                <Link href="/me/cricket" data-testid="home-career-link">
+                  My cricket →
+                </Link>
+              }
+            />
             <Card data-testid="home-registrations">
               <ul className="home-list">
                 {registrationsMine.map((registration) => (

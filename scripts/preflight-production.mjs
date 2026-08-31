@@ -198,6 +198,20 @@ check(
   `MEDIA_PUBLIC_BASE=${env.MEDIA_PUBLIC_BASE ?? "(unset)"}`,
   "set MEDIA_PUBLIC_BASE to the https CDN/bucket base that serves media keys",
 );
+// PI-1 P5 (D1 closed): the bucket adapter now constructs a real signer, and it
+// needs the credential set — without these five the web tier throws at the
+// first import of server/media, which reads as a mystery 500 on registration.
+check(
+  "MEDIA_S3-config",
+  env.MEDIA_STORAGE !== "bucket" ||
+    (env.MEDIA_S3_ENDPOINT !== undefined &&
+      env.MEDIA_S3_REGION !== undefined &&
+      env.MEDIA_S3_BUCKET !== undefined &&
+      env.MEDIA_S3_ACCESS_KEY_ID !== undefined &&
+      env.MEDIA_S3_SECRET_ACCESS_KEY !== undefined),
+  `MEDIA_S3_ENDPOINT=${env.MEDIA_S3_ENDPOINT ?? "(unset)"} MEDIA_S3_BUCKET=${env.MEDIA_S3_BUCKET ?? "(unset)"}`,
+  "set MEDIA_S3_ENDPOINT, MEDIA_S3_REGION, MEDIA_S3_BUCKET, MEDIA_S3_ACCESS_KEY_ID and MEDIA_S3_SECRET_ACCESS_KEY for the media bucket signer",
+);
 // PRR P1-4: the filesystem finops store cannot be shared across web + runner on
 // separate hosts, so exports would verify unhealthy forever. Bucket required.
 check(

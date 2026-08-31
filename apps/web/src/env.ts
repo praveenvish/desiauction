@@ -182,6 +182,15 @@ const envSchema = z.object({
   // ARCHITECTURE R4); production sets "bucket" + an S3/R2 public base (D1).
   MEDIA_STORAGE: z.enum(["local", "bucket"]).default("local"),
   MEDIA_PUBLIC_BASE: z.url().optional(),
+  // PI-1 P5 (D1 closed): the media bucket's own credential set, named like
+  // FINOPS_S3_* because they are the same kind of thing and may not be the
+  // same bucket — player photos are public-readable behind MEDIA_PUBLIC_BASE,
+  // finops artifacts are not.
+  MEDIA_S3_ENDPOINT: z.url().optional(),
+  MEDIA_S3_REGION: z.string().min(1).optional(),
+  MEDIA_S3_BUCKET: z.string().min(1).optional(),
+  MEDIA_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  MEDIA_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   /**
    * Next's own build/serve phase, read only so the checks below can tell the
    * two apart. `next build` runs with NODE_ENV=production but none of the
@@ -280,6 +289,20 @@ const productionSchema = envSchema
   // PRR P1-4: the filesystem artifact store cannot span web + runner on separate
   // hosts, so exports would verify "unhealthy" forever. Production must use the
   // shared bucket store.
+  .refine(
+    (v) =>
+      v.MEDIA_STORAGE !== "bucket" ||
+      (v.MEDIA_S3_ENDPOINT !== undefined &&
+        v.MEDIA_S3_REGION !== undefined &&
+        v.MEDIA_S3_BUCKET !== undefined &&
+        v.MEDIA_S3_ACCESS_KEY_ID !== undefined &&
+        v.MEDIA_S3_SECRET_ACCESS_KEY !== undefined),
+    {
+      message:
+        "MEDIA_STORAGE=bucket needs MEDIA_S3_ENDPOINT, MEDIA_S3_REGION, MEDIA_S3_BUCKET, MEDIA_S3_ACCESS_KEY_ID and MEDIA_S3_SECRET_ACCESS_KEY",
+      path: ["MEDIA_STORAGE"],
+    },
+  )
   .refine((v) => !serving(v) || v.FINOPS_ARTIFACT_STORE === "bucket", {
     message:
       "FINOPS_ARTIFACT_STORE=filesystem cannot be shared between web and the runner on separate hosts — set FINOPS_ARTIFACT_STORE=bucket",

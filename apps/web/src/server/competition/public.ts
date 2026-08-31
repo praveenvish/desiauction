@@ -9,7 +9,7 @@ import {
   registrations,
   teams,
 } from "@desiauction/db";
-import { and, asc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
 import { systemDb } from "../db";
@@ -315,6 +315,13 @@ export interface PublicPlayer extends ShowcasePlayer {
    *  friend's card had no way to join the same tournament — this is what lets
    *  the page offer one, and only when the door is actually open. */
   competitionOpen: boolean;
+  /**
+   * PI-1: the same person's other appearances — SAME ORG, PUBLISHED seasons,
+   * approved registrations only. Each season's own publication consent covers
+   * its own card (the consent is per-registration), and cross-ORG history
+   * stays off public pages entirely (doc 38: that needs the person's consent).
+   */
+  alsoPlayedIn: { competitionName: string; competitionSlug: string; playerNumber: string }[];
 }
 
 /**
@@ -345,6 +352,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   }
   const [row] = await systemDb
     .select({
+      personId: registrations.personId,
       number: registrations.registrationNumber,
       name: people.name,
       role: registrations.role,
@@ -371,11 +379,33 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   if (row === undefined) {
     return null;
   }
+  // PI-1: other published, approved appearances in the SAME org — newest
+  // seasons first, capped so a card stays a card.
+  const alsoPlayedIn = await systemDb
+    .select({
+      competitionName: competitions.name,
+      competitionSlug: competitions.slug,
+      playerNumber: registrations.registrationNumber,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .where(
+      and(
+        eq(registrations.personId, row.personId),
+        eq(competitions.orgId, comp.orgId),
+        eq(competitions.visibility, "public"),
+        eq(registrations.status, "approved"),
+        ne(registrations.competitionId, comp.id),
+      ),
+    )
+    .orderBy(desc(competitions.startsOn))
+    .limit(6);
   return {
     ...toShowcasePlayer(row, new Date()),
     competitionName: comp.name,
     competitionSlug: comp.slug,
     competitionOpen: comp.status === "registration_open",
+    alsoPlayedIn,
   };
 }
 

@@ -424,10 +424,12 @@ const RAIL_TITLES: Record<string, string> = {
   help: "Help",
 };
 
-/** The two console surfaces that sit outside the five-item rail. */
+/** The console surfaces that sit outside the five-item rail. */
 const OUTSIDE_RAIL: [string, string][] = [
   ["/inbox", "Notifications"],
   ["/account", "Account"],
+  // PI-1: the player's own career — self-scoped by identity, not by grant.
+  ["/me/cricket", "My cricket"],
 ];
 
 /**
@@ -451,6 +453,7 @@ const SURFACE_SUBTITLES: [string, string][] = [
   ["/money", "Your purses, dues and receipts across every season."],
   ["/inbox", "Account activity now; approvals, receipts and auction updates join during the beta."],
   ["/account", "Your sign-in, profile and security."],
+  ["/me/cricket", "Every season you've played, in one place."],
 ];
 
 export interface IdentityCrumb {

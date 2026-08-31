@@ -1,0 +1,92 @@
+/* PI-1: the player's own career surface. House spacing, card conventions. */
+
+.me-cricket {
+  padding: var(--space-4) 0 var(--space-6);
+}
+
+.me-cricket-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.me-cricket-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.me-cricket-id h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+}
+
+.me-cricket-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.me-cricket-complete {
+  margin-left: auto;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.me-cricket-h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md-size);
+}
+
+.me-cricket-seasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.me-cricket-seasons li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.me-cricket-season {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-1);
+  text-decoration: none;
+  color: inherit;
+  min-height: 44px;
+}
+
+.me-cricket-season:hover strong {
+  color: var(--text-accent);
+}
+
+.me-cricket-season-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.me-cricket-season-text span {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.me-cricket-season-badges {
+  flex-shrink: 0;
+}
+
+@media (max-width: 719px) {
+  .me-cricket-season {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

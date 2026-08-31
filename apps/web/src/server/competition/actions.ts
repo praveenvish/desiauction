@@ -28,8 +28,8 @@ import {
   type RegistrationStatus,
   type ValueMaps,
 } from "@desiauction/core";
-import { playerProfiles, withTenantDb, type Db } from "@desiauction/db";
-import { inArray } from "drizzle-orm";
+import { playerProfiles, registrations, withTenantDb, type Db } from "@desiauction/db";
+import { and, eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -39,6 +39,7 @@ import { recordConsent } from "../messaging/consent";
 
 import { currentSession } from "../auth/actions";
 import { playerProfileFor, upsertPlayerProfile } from "../player/profile";
+import { personSeasonsInOrg } from "../player/career";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { canSettlement } from "../settlement/authz";
@@ -1321,6 +1322,39 @@ export async function registrationTimelineAction(
   return inCompetitionOrg(gate.personId, gate.competition, (db) =>
     timelineOf(db, registrationId, gate.competition.id),
   );
+}
+
+/**
+ * PI-1: "seen before in your club" — the person's other seasons IN THIS ORG,
+ * for the triage drawer (duplicate-spotting and welcome-back context). Review-
+ * gated like everything else in the drawer; scoped to the org's own records,
+ * so an organizer learns nothing about a person's life in other clubs.
+ */
+export async function personHistoryAction(
+  slug: string,
+  registrationId: string,
+): Promise<{ competitionName: string; startsOn: string | null; status: string }[]> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return [];
+  }
+  const personId = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const [row] = await db
+      .select({ personId: registrations.personId })
+      .from(registrations)
+      .where(
+        and(
+          eq(registrations.id, registrationId),
+          eq(registrations.competitionId, gate.competition.id),
+        ),
+      )
+      .limit(1);
+    return row?.personId ?? null;
+  });
+  if (personId === null) {
+    return [];
+  }
+  return personSeasonsInOrg(personId, gate.competition.orgId, gate.competition.id);
 }
 
 export async function addNoteAction(

@@ -36,6 +36,12 @@ const PROD_OK: Raw = {
   MSG91_TEMPLATE_ID: "template",
   MEDIA_STORAGE: "bucket",
   MEDIA_PUBLIC_BASE: "https://media.desiauction.in",
+  // PI-1 P5 (D1): the media bucket signer's credential set.
+  MEDIA_S3_ENDPOINT: "https://s3.ap-south-1.amazonaws.com",
+  MEDIA_S3_REGION: "ap-south-1",
+  MEDIA_S3_BUCKET: "desiauction-media",
+  MEDIA_S3_ACCESS_KEY_ID: "AKIA",
+  MEDIA_S3_SECRET_ACCESS_KEY: "secret",
   // PRR P1-4: the shared finops artifact store, with its S3 credentials.
   FINOPS_ARTIFACT_STORE: "bucket",
   FINOPS_S3_ENDPOINT: "https://s3.ap-south-1.amazonaws.com",
@@ -74,6 +80,8 @@ describe("web env — production refuses every dev-only default", () => {
     ["OTP_PROVIDER", { OTP_PROVIDER: "dev" }, /OTP_PROVIDER=dev/],
     ["MEDIA_STORAGE", { MEDIA_STORAGE: "local" }, /MEDIA_STORAGE=local/],
     ["MEDIA_PUBLIC_BASE", { MEDIA_PUBLIC_BASE: undefined }, /MEDIA_PUBLIC_BASE/],
+    // PI-1 P5 (D1): bucket mode without its signer credentials must refuse.
+    ["MEDIA_S3 credentials", { MEDIA_S3_BUCKET: undefined }, /MEDIA_S3_BUCKET/],
     ["ENGINE_SECRET default", { ENGINE_SECRET: "dev-engine-secret" }, /ENGINE_SECRET/],
     ["ENGINE_SECRET short", { ENGINE_SECRET: "short-but-eight" }, /at least 32 characters/],
     ["PUBLIC_BASE_URL", { PUBLIC_BASE_URL: "http://localhost:3000" }, /localhost/],

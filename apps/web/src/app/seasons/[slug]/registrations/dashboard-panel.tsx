@@ -32,6 +32,7 @@ import {
   importPreviewAction,
   saveImportMappingAction,
   markRegistrationAction,
+  personHistoryAction,
   registrationTimelineAction,
   selectAllMatchingAction,
   triageRegistrationAction,
@@ -163,6 +164,10 @@ export function RegistrationDashboardPanel({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [assignTeamId, setAssignTeamId] = useState("");
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  // PI-1: the person's other seasons in this org, shown in the details drawer.
+  const [history, setHistory] = useState<
+    { competitionName: string; startsOn: string | null; status: string }[]
+  >([]);
   const [noteText, setNoteText] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   /* The mapping step. `inspection` null = we have not read the file's headers
@@ -398,7 +403,14 @@ export function RegistrationDashboardPanel({
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     setNoteText("");
-    setTimeline(await registrationTimelineAction(slug, id));
+    // PI-1: the timeline and the person's in-club history arrive together —
+    // two independent reads, one paint.
+    const [timelineRows, historyRows] = await Promise.all([
+      registrationTimelineAction(slug, id),
+      personHistoryAction(slug, id),
+    ]);
+    setTimeline(timelineRows);
+    setHistory(historyRows);
   };
 
   const submitNote = async (id: string) => {
@@ -1128,6 +1140,22 @@ export function RegistrationDashboardPanel({
               </>
             ) : null;
           })()}
+          {/* PI-1: welcome-back context — the club's own records only. */}
+          {history.length > 0 ? (
+            <>
+              <h3>Seen before in your club</h3>
+              <ul className="reg-person-history" data-testid="person-history">
+                {history.map((season, index) => (
+                  <li key={index}>
+                    {season.competitionName}
+                    {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""}
+                    {" · "}
+                    {season.status}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           <h3>Timeline</h3>
           <ol className="timeline">
             {timeline.map((entry, index) => (
