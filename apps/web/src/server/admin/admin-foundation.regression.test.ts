@@ -23,6 +23,7 @@ import {
   finopsProfiles,
   grants as grantsTable,
   newId,
+  orgMembers,
   people,
   type DbHandle,
 } from "@desiauction/db";
@@ -114,6 +115,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(grantsTable).where(inArray(grantsTable.personId, [adminId, ownerId]));
+  // createOrg() also writes an org_members row, which references `people`
+  // under RESTRICT (0040): the person cannot go while the membership stands.
+  await db.delete(orgMembers).where(inArray(orgMembers.personId, [adminId, ownerId]));
   await db.delete(people).where(inArray(people.phone, TEST_PHONES));
   await handle.sql.end({ timeout: 5 });
 });

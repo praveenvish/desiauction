@@ -68,7 +68,9 @@ export const playerProfiles = pgTable(
   "player_profiles",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     gender: text("gender", {
       enum: ["male", "female", "non_binary", "self_described", "unspecified"],
     }),
@@ -102,7 +104,9 @@ export const emailVerifications = pgTable(
   "email_verifications",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     codeHash: text("code_hash").notNull(),
     expiresAt: ts("expires_at").notNull(),
@@ -128,7 +132,9 @@ export const orgMembers = pgTable(
   "org_members",
   {
     orgId: char("org_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     joinedAt: ts("joined_at").notNull().defaultNow(),
   },
   // PRR P2/F36: the composite PK indexes (org_id, person_id) — good for "who is
@@ -145,7 +151,9 @@ export const sessions = pgTable(
   "sessions",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull().unique(),
     createdAt: ts("created_at").notNull().defaultNow(),
     lastSeenAt: ts("last_seen_at").notNull().defaultNow(),
@@ -202,7 +210,9 @@ export const consentRecords = pgTable(
   "consent_records",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     /** What they agreed to — "sms.transactional", "sms.promotional". */
     purpose: text("purpose").notNull(),
     granted: boolean("granted").notNull(),
@@ -241,7 +251,9 @@ export const notificationPreferences = pgTable(
   "notification_preferences",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     /** `registration`, `auction`, `money`, `marketing`. */
     topic: text("topic").notNull(),
     channel: text("channel", { enum: ["sms", "email", "in-app"] }).notNull(),
@@ -333,7 +345,9 @@ export const passkeyCredentials = pgTable(
   "passkey_credentials",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     credentialId: text("credential_id").notNull().unique(),
     publicKey: text("public_key").notNull(),
     counter: integer("counter").notNull().default(0),
@@ -350,7 +364,9 @@ export const grants = pgTable(
   "grants",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     // PX-9: "platform" joins the TYPE union — a type-only widening, not a schema
     // change. The column is and always was plain `text` (migration 0000; the
     // drizzle snapshot records no enum), so this emits no migration. It exists
@@ -553,7 +569,9 @@ export const registrations = pgTable(
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     competitionId: char("competition_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     role: text("role", {
       enum: ["batter", "bowler", "all_rounder", "wicket_keeper"],
     }).notNull(),
@@ -887,7 +905,9 @@ export const paddles = pgTable(
     orgId: char("org_id", { length: 26 }).notNull(),
     auctionId: char("auction_id", { length: 26 }).notNull(),
     teamId: char("team_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     paddleNumber: text("paddle_number").notNull(),
     issuedAt: ts("issued_at").notNull().defaultNow(),
     // M-IP4-2 claims: identity stays immutable; a release ENDS the claim. A
@@ -1042,7 +1062,9 @@ export const paddleGrants = pgTable(
     orgId: char("org_id", { length: 26 }).notNull(),
     auctionId: char("auction_id", { length: 26 }).notNull(),
     teamId: char("team_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     grantedBy: char("granted_by", { length: 26 }).notNull(),
     createdAt: ts("created_at").notNull().defaultNow(),
     revokedAt: ts("revoked_at"),
