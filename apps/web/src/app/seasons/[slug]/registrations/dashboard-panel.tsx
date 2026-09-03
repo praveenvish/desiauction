@@ -42,6 +42,7 @@ import {
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
+import { roleLabel } from "../../../../lib/playing-roles";
 import { AddPlayerDialog } from "./add-player-dialog";
 import { ColumnMapper } from "./column-mapper";
 import { PhotoImportPanel } from "./photo-import";
@@ -1016,8 +1017,25 @@ export function RegistrationDashboardPanel({
                     {/* DA-35: one string served two different situations — an
                         empty season and a filter that matched nothing. The
                         first is the START of this screen's life, and blaming a
-                        filter that has not been applied is a dead end. */}
-                    {filtersApplied || stats.total > 0 ? (
+                        filter that has not been applied is a dead end.
+
+                        THIRD situation, found in review: no filters applied,
+                        the tiles count registrations, and the table still has
+                        zero rows. `stats.total > 0` used to shove that case
+                        into the filter branch, whose "Clear the filters"
+                        recovery is a no-op — the mismatch is a data problem
+                        (rows whose person no longer resolves), not a filter
+                        problem, and the message must not lie about it. */}
+                    {!filtersApplied && stats.total > 0 ? (
+                      <>
+                        <strong>
+                          {stats.total} registration{stats.total === 1 ? "" : "s"} exist
+                          {stats.total === 1 ? "s" : ""} but none can be displayed.
+                        </strong>{" "}
+                        This usually means the underlying player records are incomplete — contact
+                        support with this season&rsquo;s name.
+                      </>
+                    ) : filtersApplied ? (
                       <>
                         <strong>No registrations match these filters.</strong>{" "}
                         <button
@@ -1104,7 +1122,7 @@ export function RegistrationDashboardPanel({
                 <dl className="details-facts" data-testid="details-facts">
                   <div>
                     <dt>Role</dt>
-                    <dd>{detail.role.replace(/_/g, " ")}</dd>
+                    <dd>{roleLabel(detail.role)}</dd>
                   </div>
                   {detail.age !== null ? (
                     <div>
@@ -1880,7 +1898,7 @@ function RegRow({
         </div>
       </td>
       <td data-label="Role">
-        {row.role.replace(/_/g, " ")}
+        {roleLabel(row.role)}
         {row.age !== null ? <span className="reg-sub">{row.age} yrs</span> : null}
         {/* Its own class because the phone hides THIS and not the role or the
             age beside it: how somebody bats is what you read once you have

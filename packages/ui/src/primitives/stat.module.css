@@ -7,6 +7,16 @@
   gap: var(--space-3);
 }
 
+/* On a phone the 160px floor resolves to ONE column, so a four-tile band
+   stacked to a full screen of tiles before the content began. Two-up keeps
+   the band to two rows; `.body` already carries min-width:0 so long labels
+   wrap inside their tile instead of forcing the track wider. */
+@media (max-width: 479px) {
+  .row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .stat {
   box-sizing: border-box;
   display: flex;

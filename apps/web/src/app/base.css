@@ -27,6 +27,13 @@ body {
   margin: 0;
   background: var(--surface);
   color: var(--text-primary);
+  /* No element set a document-level face, so anything the design system had
+     not explicitly dressed — the footer newsletter captions, the EmptyState
+     primitive on /money and /me/cricket — fell through to the UA serif and
+     rendered in Times on a Geist product. Set once here, every unstyled
+     element is on-brand before anyone styles it; classes that declare their
+     own face (display, mono) are untouched. */
+  font-family: var(--font-text);
 }
 
 /**

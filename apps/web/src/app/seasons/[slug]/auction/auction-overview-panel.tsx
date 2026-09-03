@@ -1,5 +1,6 @@
 import { Card } from "@desiauction/ui";
 
+import { roleLabel } from "../../../../lib/playing-roles";
 import type { AuctionOverview } from "../../../../server/auction/auction-overview";
 
 /**
@@ -21,13 +22,6 @@ function compactINR(paise: number): string {
   if (rupees >= 100_000) return `₹${String(Math.round((rupees / 100_000) * 100) / 100)} L`;
   return `₹${rupees.toLocaleString("en-IN")}`;
 }
-
-const ROLE_LABEL: Record<string, string> = {
-  batter: "Batter",
-  bowler: "Bowler",
-  all_rounder: "All rounder",
-  wicket_keeper: "Wicket-keeper",
-};
 
 function initials(name: string | null): string {
   if (name === null || name.trim() === "") return "—";
@@ -112,7 +106,7 @@ export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }
                 <span className="roster-person">
                   <span className="roster-name">{onBlock.playerName ?? "Unnamed"}</span>
                   <span className="competitions-hint">
-                    {ROLE_LABEL[onBlock.role] ?? onBlock.role} · base {exactINR(onBlock.basePrice)}
+                    {roleLabel(onBlock.role)} · base {exactINR(onBlock.basePrice)}
                   </span>
                 </span>
               </div>

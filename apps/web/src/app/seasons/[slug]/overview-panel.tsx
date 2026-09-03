@@ -25,6 +25,7 @@ import {
   type SeasonOverviewView,
 } from "../../../server/competition/actions";
 import { formatDate } from "../../../lib/format-date";
+import { roleLabel } from "../../../lib/playing-roles";
 import { track } from "../../../lib/telemetry";
 import { CompetitionLogoUploader } from "./competition-logo-uploader";
 import { ShareRegistration } from "./registrations/share-registration";
@@ -96,16 +97,8 @@ function nextDestination(
   return { href: `/seasons/${slug}/money`, label: "Review settlement" };
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  batter: "Batter",
-  bowler: "Bowler",
-  all_rounder: "All rounder",
-  wicket_keeper: "Wicket-keeper",
-};
-
-function roleLabel(role: string): string {
-  return ROLE_LABEL[role] ?? role.replace(/_/g, " ");
-}
+// Third consumer moved the map to lib/playing-roles — one prose name per role,
+// shared with the auction overview and the registration desk.
 
 /**
  * Money the way the tiles show it: crores and lakhs, because a purse reads as
@@ -860,12 +853,17 @@ function Retrospective({
         </dl>
       </div>
       <div className="season-stepper-actions">
+        {/* This card is the FINISHED season. "Review readiness" sent an
+            organizer to the auction-readiness gates, where a season whose
+            auction is long over reads as a wall of failures — the gates
+            describe a night that already happened. The record of what
+            happened is the useful destination. */}
         <Link
-          href={`/seasons/${slug}/readiness`}
+          href={`/seasons/${slug}/auction/replay`}
           className="season-inline-link"
-          data-testid="open-readiness"
+          data-testid="open-replay"
         >
-          Review readiness
+          Replay the auction
         </Link>
         {view.viewer.canSeeMoney ? (
           <ButtonLink href={`/seasons/${slug}/money`} variant="secondary">
