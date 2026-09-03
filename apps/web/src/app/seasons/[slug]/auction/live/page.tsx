@@ -5,6 +5,7 @@ import { liveAuctionView } from "../../../../../server/auction/live-actions";
 import { LivePanel } from "./live-panel";
 import "../../../seasons.css";
 import "../auction.css";
+import "../plan/plan.css";
 
 export const metadata = { title: "Live auction · DesiAuction" };
 
@@ -36,6 +37,17 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
             {view.viewer.canConduct ? (
               <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="open-cockpit">
                 Cockpit
+              </ButtonLink>
+            ) : null}
+            {/* WR-1: the owner's plan — a door only for someone who holds a team
+                here while planning is on; /auction/plan 404s for everyone else. */}
+            {view.planAvailable ? (
+              <ButtonLink
+                href={`/seasons//auction/plan`}
+                variant="secondary"
+                data-testid="open-plan"
+              >
+                My plan
               </ButtonLink>
             ) : null}
             <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="ghost">

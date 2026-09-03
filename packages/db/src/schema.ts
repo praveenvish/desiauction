@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -1076,6 +1077,157 @@ export const paddleGrants = pgTable(
       .where(sql`revoked_at is null`),
     index("paddle_grants_auction_idx").on(table.auctionId),
     index("paddle_grants_person_idx").on(table.personId),
+  ],
+);
+
+// --- My plan (WR-1, M1). Purely additive: nothing above this line changes.
+//
+// A team owner's PRIVATE pre-auction plan: the players they mean to bid for,
+// the most they mean to pay, and who they fall back to. It is NOT auction
+// truth. The engine never reads it, the snapshot never carries it, and no rule
+// derived from it can place or refuse a bid. It is compared against engine
+// truth on the owner's own screen and nowhere else.
+//
+// WHY THE POLICY HAS A SECOND ARM. Every other auction table is org-scoped at
+// RLS and participation-gated in the read model (`liveGate`). That is enough
+// for data every participant may see. A plan is the one thing in this schema
+// that one org member must never read about another: organizer, rival owner
+// and plain member alike. So the two plan tables carry the org floor AND a
+// participant arm in the policy itself (migration 0041): the same three
+// sources `participantTeamIds` unions in the web tier, evaluated by Postgres
+// against `app.person_id`. A read model that forgets to filter by team still
+// receives nothing it should not, and `rls:verify` proves it per table.
+//
+// Keyed by REGISTRATION, not lot: a lot id dies with an abandoned auction and
+// the registration survives into the recreated one. Money is integer paise.
+// `max_bid` NULL means "no cap": the row is a target, not a price.
+
+export const auctionTeamTargets = pgTable(
+  "auction_team_targets",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 })
+      .notNull()
+      .references(() => auctions.id, { onDelete: "cascade" }),
+    teamId: char("team_id", { length: 26 })
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    registrationId: char("registration_id", { length: 26 })
+      .notNull()
+      .references(() => registrations.id, { onDelete: "cascade" }),
+    /** Integer paise. NULL = no cap set; the target is counted at base price. */
+    maxBid: bigint("max_bid", { mode: "number" }),
+    /** 1 must have · 2 high · 3 target (the default). */
+    priority: smallint("priority").notNull().default(3),
+    /** The player to turn to if this one is lost. Chains by following pointers. */
+    fallbackRegistrationId: char("fallback_registration_id", { length: 26 }),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    updatedBy: char("updated_by", { length: 26 }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("auction_team_targets_uq").on(table.auctionId, table.teamId, table.registrationId),
+    index("auction_team_targets_team_idx").on(table.orgId, table.auctionId, table.teamId),
+    // Named explicitly: drizzle's generated name for this one exceeds Postgres's
+    // 63-character identifier limit and would be silently truncated (0041).
+    foreignKey({
+      name: "auction_team_targets_fallback_registrations_id_fk",
+      columns: [table.fallbackRegistrationId],
+      foreignColumns: [registrations.id],
+    }).onDelete("set null"),
+    check(
+      "auction_team_targets_max_bid_check",
+      sql`${table.maxBid} is null or ${table.maxBid} > 0`,
+    ),
+    check("auction_team_targets_priority_check", sql`${table.priority} in (1, 2, 3)`),
+    check(
+      "auction_team_targets_fallback_check",
+      sql`${table.fallbackRegistrationId} is null or ${table.fallbackRegistrationId} <> ${table.registrationId}`,
+    ),
+  ],
+);
+
+/**
+ * WHAT THE PLAN LOOKED LIKE, EVERY TIME IT CHANGED.
+ *
+ * Append-only. One row per add / update / remove, written in the SAME
+ * transaction as the change, carrying the target's state AFTER it. This is
+ * what lets a later "plan vs actual" say what the owner's ceiling WAS when the
+ * hammer fell, rather than what it became afterwards. `at_seq` is the auction
+ * snapshot version the owner was looking at when they edited, when the client
+ * knew it: it places the edit on the auction's own timeline without touching
+ * the auction's ledger.
+ *
+ * No foreign key to the target row: removing a target deletes that row and the
+ * history must outlive it. Same participant-arm policy as the targets.
+ */
+export const auctionTeamTargetRevisions = pgTable(
+  "auction_team_target_revisions",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    targetId: char("target_id", { length: 26 }).notNull(),
+    kind: text("kind", { enum: ["added", "updated", "removed"] }).notNull(),
+    registrationId: char("registration_id", { length: 26 }).notNull(),
+    maxBid: bigint("max_bid", { mode: "number" }),
+    priority: smallint("priority").notNull(),
+    fallbackRegistrationId: char("fallback_registration_id", { length: 26 }),
+    atSeq: integer("at_seq"),
+    by: char("by", { length: 26 }).notNull(),
+    at: ts("at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("auction_team_target_revisions_team_idx").on(table.orgId, table.auctionId, table.teamId),
+    check(
+      "auction_team_target_revisions_kind_check",
+      sql`${table.kind} in ('added', 'updated', 'removed')`,
+    ),
+  ],
+);
+
+/**
+ * WHICH FEATURES ARE SWITCHED OFF, AND WHERE.
+ *
+ * The first feature-flag table in the platform (docs/63 asked for one from day
+ * one; nothing was built). Modelled on `org_messaging_settings`: a row per
+ * (scope, feature), absence means the code default, and LAYERS CAN ONLY
+ * SUBTRACT. A platform row, an org row and an auction row are ANDed together,
+ * so any layer can turn a feature off and none can force it on over a higher
+ * layer's no.
+ *
+ * `org_id` is the tenant floor for RLS, present on org and auction rows and
+ * NULL on platform rows (which only the system pool reads). `auctions.config`
+ * was deliberately NOT used: it locks at creation and a switch an organizer
+ * flips mid-season does not belong in a locked contract.
+ */
+export const featureSettings = pgTable(
+  "feature_settings",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }),
+    scopeType: text("scope_type", { enum: ["platform", "org", "auction"] }).notNull(),
+    scopeId: char("scope_id", { length: 26 }).notNull(),
+    feature: text("feature").notNull(),
+    enabled: boolean("enabled").notNull(),
+    updatedBy: char("updated_by", { length: 26 }),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("feature_settings_uq").on(table.scopeType, table.scopeId, table.feature),
+    index("feature_settings_org_idx").on(table.orgId),
+    check(
+      "feature_settings_scope_type_check",
+      sql`${table.scopeType} in ('platform', 'org', 'auction')`,
+    ),
+    // Platform rows have no tenant; every other row must name one.
+    check(
+      "feature_settings_org_check",
+      sql`(${table.scopeType} = 'platform') = (${table.orgId} is null)`,
+    ),
   ],
 );
 

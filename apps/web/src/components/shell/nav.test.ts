@@ -37,6 +37,8 @@ describe("shellKind", () => {
     expect(shellKind("/seasons/mpl-2026/auction/cockpit")).toBe("live");
     expect(shellKind("/seasons/mpl-2026/auction/spectate")).toBe("live");
     expect(shellKind("/seasons/mpl-2026/auction/replay")).toBe("live");
+    // WR-1: the owner's plan is an Owner Room surface.
+    expect(shellKind("/seasons/mpl-2026/auction/plan")).toBe("live");
     expect(shellKind("/gallery")).toBe("bare");
     expect(shellKind("/dev/inbox")).toBe("bare");
     // The OBS overlay and public live board are chrome-free, never Live-framed.

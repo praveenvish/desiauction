@@ -217,6 +217,17 @@ const envSchema = z.object({
     .enum(["1", "true"])
     .optional()
     .transform((value) => value !== undefined),
+  /**
+   * DEPLOY-TIME KILL SWITCH for "My plan" (WR-1), the owner's private auction
+   * plan. Unset = on. Set to `1` to make the plan page 404, the live card
+   * vanish and every plan write refuse, everywhere, without a migration or a
+   * database row. The per-auction and per-org switches live in
+   * `feature_settings`; this is the layer above them (`resolveFeature`).
+   */
+  MY_PLAN_DISABLED: z
+    .enum(["1", "true"])
+    .optional()
+    .transform((value) => value !== undefined),
 });
 
 /**

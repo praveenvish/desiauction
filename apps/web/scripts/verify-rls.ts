@@ -85,6 +85,10 @@ async function main(): Promise<void> {
       `\nload-bearing proof (org ${subject.orgId}) across ${String(orgTables.length)} org-scoped tables:`,
     );
     for (const { relname } of orgTables) {
+      if (PARTICIPANT_SCOPED.has(relname)) {
+        await participantProof(relname);
+        continue;
+      }
       const [expected] = await owner.sql<
         { count: number }[]
       >`select count(*)::int as count from ${owner.sql(relname)} where org_id = ${subject.orgId}`;
@@ -129,6 +133,99 @@ async function main(): Promise<void> {
   }
 
   report();
+}
+
+/**
+ * PARTICIPANT-SCOPED TABLES (WR-1, migration 0041).
+ *
+ * A team owner's private plan carries the org floor AND a participant arm in
+ * its policy: only a person holding a live paddle grant, a held paddle or an
+ * accepted owner invite for THAT team of THAT auction sees the rows. So the
+ * org-count equality above is the wrong proof here — a plain member is
+ * supposed to see less than the owner. The right proof is the one below: a
+ * participant sees exactly their team's rows, and a member of the same org who
+ * does not participate in that team sees none.
+ */
+const PARTICIPANT_SCOPED = new Set(["auction_team_targets", "auction_team_target_revisions"]);
+
+async function participantProof(relname: string): Promise<void> {
+  const [sample] = await owner.sql<{ orgId: string; auctionId: string; teamId: string }[]>`
+    select org_id as "orgId", auction_id as "auctionId", team_id as "teamId"
+    from ${owner.sql(relname)} limit 1`;
+  if (sample === undefined) {
+    console.log(`  · ${relname}: no rows — participant proof skipped (add a plan first)`);
+    return;
+  }
+  const [expected] = await owner.sql<{ count: number }[]>`
+    select count(*)::int as count from ${owner.sql(relname)}
+    where auction_id = ${sample.auctionId} and team_id = ${sample.teamId}`;
+  const [participant] = await owner.sql<{ personId: string }[]>`
+    select person_id as "personId" from paddle_grants
+      where auction_id = ${sample.auctionId} and team_id = ${sample.teamId} and revoked_at is null
+    union
+    select person_id from paddles
+      where auction_id = ${sample.auctionId} and team_id = ${sample.teamId} and released_at is null
+    union
+    select accepted_by from auction_owner_invites
+      where auction_id = ${sample.auctionId} and team_id = ${sample.teamId}
+        and accepted_by is not null and revoked_at is null
+    limit 1`;
+  if (participant === undefined) {
+    fail(`${relname}: rows exist for a team with no participant — nobody can read them`);
+    return;
+  }
+  const seenByParticipant = await withTenant(
+    app,
+    { personId: participant.personId, orgId: sample.orgId },
+    async (tx) => {
+      const [r] = await tx<{ count: number }[]>`
+        select count(*)::int as count from ${tx(relname)}
+        where auction_id = ${sample.auctionId} and team_id = ${sample.teamId}`;
+      return r?.count ?? -1;
+    },
+  );
+  if (seenByParticipant === (expected?.count ?? -2)) {
+    ok(
+      `${relname}: participant sees ${String(seenByParticipant)} rows of their team (matches owner)`,
+    );
+  } else {
+    fail(
+      `${relname}: participant sees ${String(seenByParticipant)}, owner sees ${String(expected?.count ?? 0)}`,
+    );
+  }
+
+  const [bystander] = await owner.sql<{ personId: string }[]>`
+    select m.person_id as "personId" from org_members m
+    where m.org_id = ${sample.orgId}
+      and not exists (select 1 from paddle_grants g where g.auction_id = ${sample.auctionId}
+        and g.team_id = ${sample.teamId} and g.person_id = m.person_id and g.revoked_at is null)
+      and not exists (select 1 from paddles p where p.auction_id = ${sample.auctionId}
+        and p.team_id = ${sample.teamId} and p.person_id = m.person_id and p.released_at is null)
+      and not exists (select 1 from auction_owner_invites i where i.auction_id = ${sample.auctionId}
+        and i.team_id = ${sample.teamId} and i.accepted_by = m.person_id and i.revoked_at is null)
+    limit 1`;
+  if (bystander === undefined) {
+    console.log(
+      `  · ${relname}: every member of the org participates in that team — bystander proof skipped`,
+    );
+    return;
+  }
+  const seenByBystander = await withTenant(
+    app,
+    { personId: bystander.personId, orgId: sample.orgId },
+    async (tx) => {
+      const [r] = await tx<{ count: number }[]>`
+        select count(*)::int as count from ${tx(relname)}`;
+      return r?.count ?? -1;
+    },
+  );
+  if (seenByBystander === 0) {
+    ok(`${relname}: a same-org non-participant sees 0 rows`);
+  } else {
+    fail(
+      `${relname}: PRIVACY LEAK — a same-org non-participant sees ${String(seenByBystander)} rows`,
+    );
+  }
 }
 
 function report(): void {

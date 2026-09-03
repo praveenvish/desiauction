@@ -64,7 +64,13 @@ const RUNNER_WRITES = [
  * these are what the projections are rebuilt FROM, so a role that can edit them
  * can make the replay agree with a lie.
  */
-const APPEND_ONLY = ["auction_events", "settlement_events", "finops_events", "audit_log"];
+const APPEND_ONLY = [
+  "auction_events",
+  "settlement_events",
+  "finops_events",
+  "audit_log",
+  "auction_team_target_revisions",
+];
 
 const RUNTIME_ROLES = ["desiauction_app", "desiauction_engine", "desiauction_runner"];
 
@@ -104,7 +110,21 @@ const SYSTEM_MAY_WRITE = ["org_members", "grants", "audit_log", "invites"];
  *
  * RLS still scopes the ROWS; this asserts only that the grant exists at all.
  */
-const APP_WRITES_TENANT = ["org_import_mappings"];
+const APP_WRITES_TENANT = ["org_import_mappings", "auction_team_targets", "feature_settings"];
+
+/**
+ * PRIVATE PER-TEAM PLANS (WR-1 "My plan", migration 0041).
+ *
+ * The web tier is the only writer and the only intended reader. The engine and
+ * runner would inherit SELECT from default privileges and must not have it: a
+ * service credential that can read every owner's ceiling is a leak waiting
+ * for a bug, and nothing either service folds reads a plan. The system pool
+ * keeps its platform read by the same reasoning as the rest of the schema;
+ * what contains it there is that no admin projection imports these tables.
+ *
+ * Revisions are evidence: the app appends them and no role rewrites them.
+ */
+const PRIVATE_PLAN_TABLES = ["auction_team_targets", "auction_team_target_revisions"];
 
 const APP_WRITES_UNPROTECTED = [
   "demo_requests",
@@ -261,6 +281,25 @@ function expectations(allTables: string[]): Expectation[] {
     verb: "INSERT",
     allowed: false,
     why: "freeze §8.2: the web tier cannot write finops truth",
+  });
+
+  for (const table of PRIVATE_PLAN_TABLES) {
+    for (const role of ["desiauction_engine", "desiauction_runner"]) {
+      out.push({
+        role,
+        table,
+        verb: "SELECT",
+        allowed: false,
+        why: "a private plan is not auction or finops truth; service writers must not even read it (WR-1)",
+      });
+    }
+  }
+  out.push({
+    role: "desiauction_app",
+    table: "auction_team_target_revisions",
+    verb: "INSERT",
+    allowed: true,
+    why: "the web tier appends plan history in the same transaction as each edit (WR-1)",
   });
 
   return out;

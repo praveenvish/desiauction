@@ -17,6 +17,7 @@ import { currentSession } from "../auth/actions";
 import { canCompetition } from "../competition/authz";
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
 import { dbHandle, systemDb } from "../db";
+import { featureEnabled } from "../feature-settings";
 import { storage } from "../media";
 import { announceAuctionOutcomes } from "./auction-notify";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
@@ -29,6 +30,7 @@ import {
   type ResolvedLot,
   lotMediaOf,
 } from "./live-summary";
+import { planLots, planRulesOf, targetsOf, toLivePlanLot, type LivePlan } from "./owner-plan";
 
 // Live auction actions (M-IP4-2, extended M-IP4-3). The web tier
 // authenticates, resolves the tenant and capabilities, then SUBMITS A COMMAND
@@ -233,6 +235,19 @@ export interface LiveAuctionView {
   resolved: ResolvedLot[];
   /** Icons and retained players: on a squad, never in the pool. */
   preSigned: PreSignedPlayer[];
+  /**
+   * WR-1: may this person open /auction/plan here? Holds a team in this
+   * auction AND planning is switched on. The door, not the data.
+   */
+  planAvailable: boolean;
+  /**
+   * WR-1: THIS PERSON'S plan, for the teams they are in the room for — and
+   * nobody else's. Omitted (not nulled) when planning is off, when they hold
+   * no team, and when they have added nothing yet, so an owner with no plan
+   * receives the room exactly as before. Served beside the snapshot, never in
+   * it (see `lotMedia`): the client folds it against each frame.
+   */
+  plan?: LivePlan;
 }
 
 /**
@@ -244,6 +259,44 @@ export interface LiveAuctionView {
  * and no way to hand one back. Three of four teams simply could not bid, and
  * Abort was the only exit. The room now picks from this list.
  */
+/**
+ * The viewer's plan and whether the door to it exists. One feature read, one
+ * pool read, one targets read per team the viewer holds (usually one).
+ */
+async function livePlanFor(
+  db: Db,
+  gate: LiveGate,
+): Promise<{ available: boolean; plan: LivePlan | null }> {
+  if (gate.myTeamIds.length === 0) {
+    return { available: false, plan: null };
+  }
+  const feature = await featureEnabled(db, "my_plan", {
+    orgId: gate.competition.orgId,
+    auctionId: gate.auction.id,
+  });
+  if (!feature.enabled) {
+    return { available: false, plan: null };
+  }
+  const [lotRows, ...targetLists] = await Promise.all([
+    planLots(db, gate.auction.id),
+    ...gate.myTeamIds.map((teamId) => targetsOf(db, gate.auction.id, teamId)),
+  ]);
+  const targetsByTeam = Object.fromEntries(
+    gate.myTeamIds.map((teamId, index) => [teamId, targetLists[index] ?? []]),
+  );
+  const anyTargets = Object.values(targetsByTeam).some((list) => list.length > 0);
+  return {
+    available: true,
+    plan: anyTargets
+      ? {
+          lots: lotRows.map(toLivePlanLot),
+          planRules: planRulesOf(rulesOf(gate.auction.config)),
+          targetsByTeam,
+        }
+      : null,
+  };
+}
+
 async function myPaddles(dbc: Db, auctionId: string, personId: string) {
   const rows = await dbc
     .select({
@@ -270,10 +323,8 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   if (gate === null) {
     return null;
   }
-  const [teamRows, paddleRows, grantRows, resolved, preSigned, lotMedia] = await withTenantDb(
-    dbHandle,
-    { personId: gate.personId, orgId: gate.competition.orgId },
-    (db) =>
+  const [teamRows, paddleRows, grantRows, resolved, preSigned, lotMedia, planning] =
+    await withTenantDb(dbHandle, { personId: gate.personId, orgId: gate.competition.orgId }, (db) =>
       Promise.all([
         db
           // shortName/primaryColor are franchise IDENTITY, not decoration: the
@@ -303,8 +354,9 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
         resolvedLots(db, gate.auction.id),
         preSignedPlayers(db, gate.competition.id),
         lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
+        livePlanFor(db, gate),
       ]),
-  );
+    );
   // THE PARTITION. Everything below the gate is decided HERE, before the read
   // leaves the server — the payload gate that /seasons/…/money has always had
   // and this room never did. Hiding a rival's squad in the markup does not hide
@@ -340,6 +392,8 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     // announced, and the aggregated purse figures (see the client).
     resolved,
     preSigned: canSeeAll ? preSigned : preSigned.filter((player) => mine.has(player.teamId)),
+    planAvailable: planning.available,
+    ...(planning.plan === null ? {} : { plan: planning.plan }),
   };
 }
 

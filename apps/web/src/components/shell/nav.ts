@@ -7,12 +7,14 @@
 
 export type ShellKind = "public" | "console" | "live" | "bare";
 
-const LIVE_SEGMENTS = new Set(["live", "cockpit", "spectate", "replay"]);
+// "plan" is the owner's private plan (WR-1): an Owner Room surface, framed like
+// the room it belongs to, with the same one door out.
+const LIVE_SEGMENTS = new Set(["live", "cockpit", "spectate", "replay", "plan"]);
 
 /** Chrome-free auction surfaces: the OBS overlay and the public live board. */
 const BARE_AUCTION_RE = /^\/seasons\/[^/]+\/auction\/(overlay|board)(\/|$)/;
 
-/** /seasons/{slug}/auction/{live|cockpit|spectate|replay}[/...] */
+/** /seasons/{slug}/auction/{live|cockpit|spectate|replay|plan}[/...] */
 export function liveMatch(pathname: string): { slug: string; segment: string } | null {
   const match = /^\/seasons\/([^/]+)\/auction\/([^/]+)/.exec(pathname);
   if (match !== null && LIVE_SEGMENTS.has(match[2] as string)) {

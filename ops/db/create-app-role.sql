@@ -184,4 +184,19 @@ revoke insert, update, delete on finops_events from desiauction_app;
 revoke update, delete on auction_events, settlement_events, finops_events, audit_log
   from desiauction_app, desiauction_engine, desiauction_runner, desiauction_system;
 
+-- PRIVATE PER-TEAM PLANS (WR-1 "My plan", migration 0041).
+--
+-- The web tier is the only writer and the only intended reader of an owner's
+-- plan. The engine and runner inherit SELECT on every new table from the
+-- default privileges above and must not keep it here: nothing either service
+-- folds reads a plan, and a service credential that can read every owner's
+-- ceiling is a leak waiting for a bug. The system pool keeps its platform read
+-- like the rest of the schema; what contains it is that no admin projection
+-- imports these tables (machine-checked in the web suite).
+revoke all on auction_team_targets, auction_team_target_revisions
+  from desiauction_engine, desiauction_runner;
+-- Revisions are evidence: appended by the app, rewritten by nobody.
+revoke update, delete on auction_team_target_revisions
+  from desiauction_app, desiauction_engine, desiauction_runner, desiauction_system;
+
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'

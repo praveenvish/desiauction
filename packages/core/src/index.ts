@@ -352,3 +352,47 @@ export {
   type TeamPosterMember,
   type TeamPosterRow,
 } from "./poster";
+export {
+  TARGET_PRIORITIES,
+  TARGET_PRIORITY_LABELS,
+  isTargetPriority,
+  evaluatePlan,
+  whatIf,
+  ladderFloor,
+  validateTargetMax,
+  fallbackWouldCycle,
+} from "./team-plan";
+export type {
+  TargetPriority,
+  PlanTarget,
+  PlanLot,
+  PlanRules,
+  PlanCurrentLot,
+  PlanInput,
+  PlanState,
+  PlanBudget,
+  PlanFit,
+  PlanSuggestion,
+  TargetState,
+  TargetOutcome,
+  TargetMaxValidation,
+  LotAdvice,
+  LotVerdict,
+  Consequence,
+} from "./team-plan";
+export {
+  FEATURES,
+  FEATURE_SCOPE_TYPES,
+  FEATURE_PLATFORM_SCOPE_ID,
+  isFeature,
+  resolveFeature,
+} from "./feature-settings";
+export type {
+  Feature,
+  FeatureDefinition,
+  FeatureScopeType,
+  FeatureSettingLike,
+  FeatureDenial,
+  FeatureResolution,
+  FeatureContext,
+} from "./feature-settings";
