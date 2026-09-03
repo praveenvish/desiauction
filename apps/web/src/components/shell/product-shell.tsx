@@ -122,6 +122,14 @@ function BellLink({
       setUnread(false);
       return;
     }
+    // Standing ON the notifications page, the answer is already "you are
+    // reading them" — the page advances the watermark for the next render,
+    // but this effect ran first and kept the dot lit over the very list it
+    // was pointing at.
+    if (pathname.startsWith("/inbox")) {
+      setUnread(false);
+      return;
+    }
     const seen = window.localStorage.getItem(inboxSeenKey(personId));
     setUnread(seen === null || latestEventAt > seen);
   }, [latestEventAt, pathname, personId]);
@@ -850,7 +858,12 @@ export function ProductShell({
               <span className="shell-railuser-avatar">{initials}</span>
               <span className="shell-railuser-text">
                 <strong>{session.name ?? formatPhone(session.phone)}</strong>
-                <span>Organizer</span>
+                {/* The second line used to hardcode "Organizer" — a role claim
+                    the shell cannot know and stamped on every member, viewer
+                    and player alike. The phone is the one identity fact that is
+                    always true, and on the shared handsets this product targets
+                    it says WHICH account is signed in. */}
+                {session.name !== null ? <span>{formatPhone(session.phone)}</span> : null}
               </span>
             </Link>
           }

@@ -54,6 +54,20 @@ export interface HomeTopCompetition {
   slug: string;
   name: string;
   status: string;
+  /**
+   * The settlement case's own word, never arithmetic's: a season whose books
+   * are settled must not badge as "Reg closed" two cards under a lifecycle
+   * rail that says "Settled" — that is the asserted-not-derived defect class.
+   * `null` means no case exists (or it was voided) and the competition status
+   * is the whole truth.
+   */
+  settlement: "settling" | "settled" | null;
+  /**
+   * Whether this reader holds the books. "₹0 collected" must not be reported
+   * as a fact about books this person cannot open — the settlement rail below
+   * already obeys this; the season rows now obey the same gate.
+   */
+  canSeeMoney: boolean;
   teams: number;
   registrations: number;
   collectedPaise: number;
@@ -63,6 +77,14 @@ export interface HomeActivityRow {
   id: string;
   action: string;
   subject: string | null;
+  /**
+   * The season or club the event belongs to, by NAME. The audit row's own
+   * `subject` is a ULID — evidence, not prose — so the feed showed six
+   * anonymous "Paddle granted" lines and the reader could not tell which
+   * season any of them meant. The scope resolves to a name this person is
+   * already allowed to see (the same competitions/orgs this page lists).
+   */
+  scope: string | null;
   at: string;
   /**
    * How many raw events this row stands for. 1 for a real event; greater for
@@ -227,6 +249,7 @@ function foldActivity(
     scopeId: string;
   }[],
   canSeeMoney: (scopeId: string) => boolean,
+  scopeName: (scopeId: string) => string | null,
 ): HomeActivityRow[] {
   const iso = (at: Date | string) => (at instanceof Date ? at : new Date(at)).toISOString();
   const finance: typeof rows = [];
@@ -247,6 +270,7 @@ function foldActivity(
       id: row.id,
       action: row.action,
       subject: row.subject,
+      scope: scopeName(row.scopeId),
       at: iso(row.at),
       count: 1,
     }));
@@ -256,6 +280,7 @@ function foldActivity(
       id: `finance-${newest.id}`,
       action: "finops.summary",
       subject: null,
+      scope: null,
       at: iso(newest.at),
       count: finance.length,
     });
@@ -325,7 +350,20 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     const orgId = scopeOrg.get(scopeId);
     return orgId !== undefined && settleable.has(orgId);
   };
-  const activity = foldActivity(activityRaw, canSeeMoney);
+  // A scope's display name, resolved from what this person already sees on the
+  // page. Fails closed to null — an unresolvable scope simply gets no sub-line.
+  const scopeNames = new Map<string, string>();
+  for (const competition of view.competitions) {
+    scopeNames.set(competition.id, competition.name);
+  }
+  for (const org of view.orgs) {
+    scopeNames.set(org.id, org.name);
+  }
+  const activity = foldActivity(
+    activityRaw,
+    canSeeMoney,
+    (scopeId) => scopeNames.get(scopeId) ?? null,
+  );
   const tournamentCount = tournamentRows[0]?.count ?? 0;
 
   if (competitionIds.length === 0) {
@@ -562,11 +600,27 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     .sort((a, b) => (a.status === b.status ? 0 : a.status === "live" ? -1 : 1))
     .slice(0, 4);
 
+  // The case's answer per competition, terminal states first: settled and
+  // closed books both read "settled" to the person this page greets, a voided
+  // case never happened, anything else is money in flight.
+  const caseStatusBy = new Map<string, "settling" | "settled">();
+  for (const row of caseRows) {
+    if (row.status === "voided") {
+      continue;
+    }
+    const terminal = row.status === "settled" || row.status === "closed";
+    if (terminal || !caseStatusBy.has(row.competitionId)) {
+      caseStatusBy.set(row.competitionId, terminal ? "settled" : "settling");
+    }
+  }
+
   const top: HomeTopCompetition[] = view.competitions
     .map((competition) => ({
       slug: competition.slug,
       name: competition.name,
       status: competition.status,
+      settlement: caseStatusBy.get(competition.id) ?? null,
+      canSeeMoney: settleable.has(competition.orgId),
       teams: teamsBy.get(competition.id) ?? 0,
       registrations: registrationsBy.get(competition.id) ?? 0,
       collectedPaise: collectedBy.get(competition.id) ?? 0,
