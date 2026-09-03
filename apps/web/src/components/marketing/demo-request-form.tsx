@@ -152,8 +152,10 @@ export function DemoRequestForm({ source }: { source: string }) {
       </div>
 
       <div className={styles["noteField"]}>
+        {/* Same optional convention as the Email field above — one form, one
+            way of saying it. */}
         <label className={styles["noteLabel"]} htmlFor="demo-note">
-          Anything else? <span className={styles["optional"]}>Optional</span>
+          Anything else? <span className={styles["optional"]}>(optional)</span>
         </label>
         <textarea
           id="demo-note"
@@ -175,7 +177,7 @@ export function DemoRequestForm({ source }: { source: string }) {
 
       <div className={styles["actions"]}>
         <Button type="submit" size="lg" loading={pending}>
-          Request a demo
+          Book a demo
         </Button>
         <p className={styles["assurance"]}>
           One working day, usually less. We use your number to arrange the demo and nothing else.

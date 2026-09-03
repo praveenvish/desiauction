@@ -17,7 +17,15 @@ export default function ReleasesPage() {
     <main className="content-page content-narrow">
       <h1>Release notes</h1>
       <p className="content-lead">
-        What each update delivered. Running version <code>{env.APP_VERSION}</code>.
+        {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
+            developer string, not a version a reader should ever meet. */}
+        What each update delivered.
+        {env.APP_VERSION !== "dev" ? (
+          <>
+            {" "}
+            Running version <code>{env.APP_VERSION}</code>.
+          </>
+        ) : null}
       </p>
       {RELEASES.map((release) => {
         const releaseId = `release-${slugify(release.version)}`;

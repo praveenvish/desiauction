@@ -45,6 +45,15 @@ check(
   "the app-role connection",
   "set DATABASE_URL to the desiauction_app (NOBYPASSRLS) role",
 );
+// /support and /releases quote this to users. The zod default is "dev"; the
+// pages suppress the sentence for that value, but a launch should ship a real
+// version string rather than silently saying nothing.
+warn(
+  "APP_VERSION",
+  typeof env.APP_VERSION === "string" && env.APP_VERSION !== "" && env.APP_VERSION !== "dev",
+  `APP_VERSION=${env.APP_VERSION ?? "(unset)"}`,
+  "set APP_VERSION to the release tag so /support and /releases can quote it",
+);
 check(
   "SYSTEM_DATABASE_URL-distinct",
   isPostgres(env.SYSTEM_DATABASE_URL) && env.SYSTEM_DATABASE_URL !== env.DATABASE_URL,

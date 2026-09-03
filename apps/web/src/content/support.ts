@@ -17,9 +17,13 @@ export const SUPPORT = {
     },
     {
       title: "Auction-night help",
-      detail: "support@desiauction.in — subject line: AUCTION NIGHT",
+      // The address alone: the old detail appended "— subject line: AUCTION
+      // NIGHT", which rendered as one two-line underlined link with prose
+      // inside it. The href pre-fills the subject, and the note below already
+      // says why it matters.
+      detail: "support@desiauction.in",
       href: "mailto:support@desiauction.in?subject=AUCTION%20NIGHT",
-      note: "If something is wrong during a live auction, say so in the subject line. Those go to the front of the queue.",
+      note: "If something is wrong during a live auction, put AUCTION NIGHT in the subject line — those go to the front of the queue. The link pre-fills it.",
     },
   ],
   issueCategories: [
@@ -31,7 +35,7 @@ export const SUPPORT = {
       // silence at the phone step. Both fixed: the real limits (from
       // server/auth/otp.ts) first, and the passkey named as prevention for next
       // time rather than as a way out of this.
-      body: "A code lasts five minutes. You can ask for another after 30 seconds, up to five in an hour, and five wrong entries lock that number for a while — if the screen has gone quiet, you have probably hit one of those, and waiting an hour clears it. Check the number you typed, and that the SMS hasn't been filtered. Still stuck, email us. Once you are in, add a passkey from your account page: it is what stops this happening next time, but it cannot get you in today.",
+      body: "A code lasts five minutes; you can ask for another after 30 seconds, up to five an hour, and five wrong entries lock that number for a while. If the screen has gone quiet you have probably hit one of those limits — waiting an hour clears it. Check the number you typed and your SMS filters, and email us if you are still stuck.",
       link: { label: "Read: signing in & passkeys", href: "/help/signing-in" },
     },
     {

@@ -7,6 +7,7 @@ import { currentSession } from "../../../../server/auth/actions";
 import { playerProfileFor } from "../../../../server/player/profile";
 import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
+import { dateRange } from "../../../tournaments/season-card";
 import { RegisterFlow } from "./register-flow";
 import { WithdrawRegistration } from "./withdraw-registration";
 import "../../seasons.css";
@@ -92,11 +93,11 @@ export default async function RegisterPage({
             <h2>{preview.competitionName}</h2>
             <p className="register-hint">
               {[
-                preview.startsOn !== null
-                  ? preview.endsOn !== null && preview.endsOn !== preview.startsOn
-                    ? `${preview.startsOn} to ${preview.endsOn}`
-                    : preview.startsOn
-                  : null,
+                // Was the raw ISO pair — "2026-08-01 to 2026-10-31" — on the
+                // page where a player decides to sign up, while every other
+                // surface spells the same range "1 Aug – 31 Oct 2026". One
+                // formatter, already shared by the season card and the row.
+                dateRange(preview.startsOn, preview.endsOn),
                 preview.location,
               ]
                 .filter((part): part is string => part !== null && part !== "")

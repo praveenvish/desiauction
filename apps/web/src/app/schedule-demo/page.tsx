@@ -9,7 +9,7 @@ import "../content.css";
 import "./demo.css";
 
 export const metadata: Metadata = {
-  title: "Schedule a demo · DesiAuction",
+  title: "Book a demo · DesiAuction",
   description:
     "See a real auction run end to end — squads, bidding, the gavel and the money afterwards. Tell us about your tournament and we'll walk you through it live.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/schedule-demo` },
@@ -49,7 +49,7 @@ export default async function ScheduleDemoPage({
 
   return (
     <main className="content-page content-narrow">
-      <h1>Schedule a demo</h1>
+      <h1>Book a demo</h1>
       <p className="content-lead">
         Twenty minutes, on a call, watching a real auction run: teams and purses, players going
         under the hammer, the gavel, and the receipts that come out the other side. Not slides.
@@ -78,7 +78,7 @@ export default async function ScheduleDemoPage({
       <DemoRequestForm source={source} />
 
       <p className="prose-p demo-footnote">
-        Would rather just start? Every tournament gets the full platform, free, during beta —{" "}
+        Would you rather just start? Every tournament gets the full platform, free, during beta —{" "}
         <Link href="/login" className="prose-link">
           set yours up now
         </Link>{" "}

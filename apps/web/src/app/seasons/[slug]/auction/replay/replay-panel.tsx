@@ -112,7 +112,7 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
               tick for it costs nothing. */}
           {frame.ok && hydrated ? (
             <span className="competitions-hint" data-testid="replay-fold-time">
-              fold {frame.foldMs.toFixed(1)} ms
+              rebuilt in {frame.foldMs.toFixed(1)} ms
             </span>
           ) : null}
         </div>
@@ -125,7 +125,7 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
           <p data-testid="replay-convergence">
             <Badge tone={converged ? "success" : "danger"}>
               {converged
-                ? "identical bytes — the fold matches the live engine snapshot"
+                ? "matches the live engine snapshot, byte for byte"
                 : "DIVERGED from the live engine snapshot"}
             </Badge>
           </p>

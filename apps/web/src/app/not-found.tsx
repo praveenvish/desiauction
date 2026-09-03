@@ -20,7 +20,7 @@ export default function NotFound() {
           <ErrorState
             headingLevel={1}
             title="This page doesn't exist"
-            description="It may have moved, or the link was mistyped."
+            description="It may have moved, the link was mistyped — or your account may not have access to it."
             actions={
               <>
                 <ButtonLink href="/home">Go home</ButtonLink>

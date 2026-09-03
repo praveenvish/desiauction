@@ -406,7 +406,10 @@ export const TRUST_MARKS = [
   // above, which says every mark names something verifiable. The stage half is
   // true and carries the point on its own, so the sound half is simply gone.
   "Real-time stage",
-  "No app required for spectators",
+  // Shortened from "No app required for spectators" — the one chip in the
+  // five-mark proof strip that wrapped to two lines and broke its rhythm. The
+  // claim is unchanged: spectating needs a link, not an install.
+  "No app for spectators",
 ] as const;
 
 export interface PricingTier {

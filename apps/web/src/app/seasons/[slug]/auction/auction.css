@@ -2420,3 +2420,11 @@
     transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
   }
 }
+
+/* Replay header: the two sibling links travel as one group so the title row's
+   space-between puts THEM hard right instead of scattering one to the middle. */
+.replay-head-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}

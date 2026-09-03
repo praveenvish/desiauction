@@ -88,6 +88,11 @@ describe("competition tabs", () => {
     expect(activeCompetitionTab("/seasons/mpl/auction/ledger", "mpl")).toBe("auction");
     // Readiness lives with the auction preparation context.
     expect(activeCompetitionTab("/seasons/mpl/readiness", "mpl")).toBe("auction");
+    // Posters and the public register form are reached from elsewhere and are
+    // not tabs. They used to fall through to "overview", so the strip
+    // underlined Overview over a page that was not the overview.
+    expect(activeCompetitionTab("/seasons/mpl/posters", "mpl")).toBe("");
+    expect(activeCompetitionTab("/seasons/mpl/register", "mpl")).toBe("");
   });
 
   // PX-7: Money is absent without settlement.view — never rendered-then-disabled.
