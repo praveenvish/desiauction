@@ -2401,6 +2401,24 @@ body:has(.landing.mk) .mk-hero {
   flex-wrap: wrap;
 }
 
+/* The closing band on /features centres its eyebrow and display heading; a
+   hard-left CTA pair under them ended the page lopsided. The margin lives here
+   too — it was an inline style on the one call site that needed it. */
+.mk-cta-actions--closing {
+  justify-content: center;
+  margin-top: var(--space-10);
+}
+
+/* Phone tier: same fix .mk-hero-actions already carries (see its comment for
+   why the 1fr track is scoped) — without it the stacked pair renders at two
+   ragged unequal widths. */
+@media (max-width: 639px) {
+  .mk-cta-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  }
+}
+
 @media (max-width: 899px) {
   .mk-cta {
     flex-direction: column;
@@ -2740,6 +2758,24 @@ body:has(.landing.mk) .mk-hero {
   border-collapse: collapse;
   font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
+}
+
+/* At rest on a phone the table shows one column and a clipped sliver of the
+   next — nothing says the other tiers exist. The wrapper scrolls by design;
+   this line SAYS so, only where the scroll is real. */
+.mk-compare-hint {
+  display: none;
+  margin: var(--space-2) auto 0;
+  max-width: 900px;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (max-width: 699px) {
+  .mk-compare-hint {
+    display: block;
+  }
 }
 
 .mk-compare-caption {

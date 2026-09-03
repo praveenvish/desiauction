@@ -15,7 +15,7 @@ export const metadata: Metadata = {
  * auth. */
 export default function CaseStudiesPage() {
   return (
-    <main className="content-page mk">
+    <main className="content-page content-narrow mk">
       <h1>Case studies</h1>
       <p className="content-lead">
         We're in beta with our first tournaments now. Full write-ups — real numbers, real

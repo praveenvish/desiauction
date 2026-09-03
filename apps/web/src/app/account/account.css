@@ -40,10 +40,16 @@
   gap: var(--space-2);
 }
 
+/* Two lines, not one squeezed row: name (and badge) beside the action on the
+   first line, the dates on their own line under it. In a 520px column the old
+   single-file flex row wrapped "last active" mid-phrase and folded dates into
+   fragments beside four identical device names. */
 .security-list li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-3);
+  column-gap: var(--space-3);
+  row-gap: 2px;
   font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
   min-height: 32px;
@@ -57,13 +63,21 @@
 
 .security-meta {
   color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+/* Event rows are label + one timestamp — they stay single-line, time on the
+   right, rather than paying the sessions' two-line layout for one date. */
+.events .security-meta {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
 }
 
 .security-actions {
-  margin-left: auto;
+  grid-column: 2;
+  grid-row: 1;
   display: inline-flex;
   gap: var(--space-1);
   flex-shrink: 0;

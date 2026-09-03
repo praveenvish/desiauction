@@ -186,10 +186,47 @@
   font-size: var(--text-lg-size);
 }
 
-/* Counts go first when the row runs out of room; name and role never wrap. */
+/* The figures and the role chip travel as one unit. On desktop the container
+   is invisible — same inline row as the loose spans it replaced. */
+.org-row-meta {
+  display: contents;
+}
+
+/* The old rule deleted the counts below 720px and kept the role chip inline —
+   which squeezed "Demo Cricket Club" to one word per line while the card said
+   almost nothing. A two-line grid instead: monogram + name + arrow on the
+   first line, every count and the role chip together on the second. Nothing
+   is hidden any more. */
 @media (max-width: 720px) {
-  .org-stat {
-    display: none;
+  .org-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: var(--space-2);
+  }
+
+  .org-monogram {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .org-row-id {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .org-row-go {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .org-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    grid-row: 2;
+    grid-column: 2;
   }
 }
 
