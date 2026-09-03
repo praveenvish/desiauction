@@ -116,6 +116,20 @@ export function absoluteIst(at: Date): string {
 
 function distance(at: Date): string {
   const seconds = Math.round((Date.now() - at.getTime()) / 1000);
+  // Future instants used to fall into the `< 60` branch below and print
+  // "just now" — the Health page's "Next due 01 Apr 2027 · just now" beside a
+  // NOT RUNNING runner read as "should be firing right now". Say "in 7mo".
+  if (seconds < -30) {
+    const ahead = -seconds;
+    if (ahead < 3600) {
+      return `in ${String(Math.max(1, Math.round(ahead / 60)))}m`;
+    }
+    if (ahead < 86400) {
+      return `in ${String(Math.round(ahead / 3600))}h`;
+    }
+    const days = Math.round(ahead / 86400);
+    return days < 60 ? `in ${String(days)}d` : `in ${String(Math.round(days / 30))}mo`;
+  }
   if (seconds < 60) {
     return "just now";
   }

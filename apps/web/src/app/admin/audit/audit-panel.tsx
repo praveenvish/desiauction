@@ -1,7 +1,7 @@
 import { Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
-import { formatCount } from "../../../server/admin/format";
+import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/format";
 import type { AuditEntry, AuditFilters, AuditPage } from "../../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
 
@@ -149,7 +149,15 @@ function AuditRow({ row }: { row: AuditEntry }) {
           <span className="admin-action">{row.action}</span>
           <span className="admin-meta">
             {" by "}
-            <Link href={`/admin/users/${row.actor}`}>{row.actorName ?? row.actor.slice(-6)}</Link>
+            {/* A machine-derived row (a lot the timer closed, a sweep the
+                coordinator ran) is signed with the zero ULID. It rendered as a
+                literal "000000" linked to a /admin/users page that 404s by
+                design — a dead link to a person who does not exist. */}
+            {isSystemActor(row.actor) ? (
+              actorLabel(row.actor, row.actorName)
+            ) : (
+              <Link href={`/admin/users/${row.actor}`}>{actorLabel(row.actor, row.actorName)}</Link>
+            )}
             {row.subject !== null ? (
               <>
                 {" on "}
@@ -160,8 +168,16 @@ function AuditRow({ row }: { row: AuditEntry }) {
         </span>
         <span className="admin-attention-kind">
           {row.scopeType}
-          {row.scopeLabel !== null ? ` · ${row.scopeLabel}` : ""} ·{" "}
-          <Link href={`/admin/audit?scopeId=${row.scopeId}`}>{row.scopeId}</Link>
+          {row.scopeLabel !== null ? ` · ${row.scopeLabel}` : ""}
+          {/* The platform sentinel is a 26-zero ULID — the noisiest string on
+              the page, linking to a filter on a synthetic id. The word
+              "platform" above already says everything the zeros said. */}
+          {/^0+$/.test(row.scopeId) ? null : (
+            <>
+              {" · "}
+              <Link href={`/admin/audit?scopeId=${row.scopeId}`}>{row.scopeId}</Link>
+            </>
+          )}
         </span>
         {row.meta !== null && row.meta !== undefined ? (
           <pre className="admin-evidence">{JSON.stringify(row.meta)}</pre>

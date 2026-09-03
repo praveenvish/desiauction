@@ -3,7 +3,7 @@ import { Badge, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
 import { ADMIN_ACCESS_ACTION } from "../../server/admin/capabilities";
-import { formatCount, lifecycleLabel, waitedFor } from "../../server/admin/format";
+import { actorLabel, formatCount, lifecycleLabel, waitedFor } from "../../server/admin/format";
 import type { PlatformOverview } from "../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, statusTone } from "./admin-ui";
 
@@ -56,10 +56,12 @@ export function OverviewPanel({
         </h2>
         <div className="stat-row" data-testid="admin-outcomes">
           <Tile label="Seasons created" value={outcomes.competitionsCreated} />
-          <Tile label="Cloned (run it again)" value={outcomes.competitionsCloned} />
-          <Tile label="Clone share %" value={pct(outcomes.cloneAdoptionRate)} />
+          {/* Was "Cloned (run it again)" — the parenthetical was the internal
+              metric definition, not a label an operator should decode. */}
+          <Tile label="Seasons cloned" value={outcomes.competitionsCloned} />
+          <Tile label="Clone share" value={pct(outcomes.cloneAdoptionRate)} suffix="%" />
           <Tile label="Repeat orgs" value={outcomes.orgsRepeating} />
-          <Tile label="Repeat org rate %" value={pct(outcomes.repeatOrgRate)} />
+          <Tile label="Repeat org rate" value={pct(outcomes.repeatOrgRate)} suffix="%" />
           <Tile label="Registrations" value={outcomes.registrationsSubmitted} />
           <Tile label="Players placed" value={outcomes.playersAssigned} />
         </div>
@@ -201,7 +203,7 @@ export function OverviewPanel({
                 <li key={row.id}>
                   <span>
                     <span className="admin-action">{row.action}</span>
-                    <span className="admin-meta"> by {row.actorName ?? row.actor.slice(-6)}</span>
+                    <span className="admin-meta"> by {actorLabel(row.actor, row.actorName)}</span>
                   </span>
                   <RelativeTime at={row.at} />
                 </li>
@@ -227,11 +229,25 @@ export function OverviewPanel({
   );
 }
 
-function Tile({ label, value, href }: { label: string; value: number; href?: string }) {
+function Tile({
+  label,
+  value,
+  suffix,
+  href,
+}: {
+  label: string;
+  value: number;
+  /** Rendered with the figure — "3" under "Repeat org rate %" scans as a count. */
+  suffix?: string;
+  href?: string;
+}) {
   const tile = (
     <div className="stat-tile">
       {/* 1539 and 1558 were four unbroken digits the eye has to count. */}
-      <span className="stat-value">{formatCount(value)}</span>
+      <span className="stat-value">
+        {formatCount(value)}
+        {suffix ?? ""}
+      </span>
       <span className="stat-label">{label}</span>
     </div>
   );

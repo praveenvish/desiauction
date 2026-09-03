@@ -44,7 +44,7 @@ import {
 
 import { SMS_TEMPLATES } from "../messaging/templates";
 import { ADMIN_ACCESS_ACTION } from "./capabilities";
-import { formatCount, waitedFor } from "./format";
+import { countNoun, waitedFor } from "./format";
 
 /**
  * PX-9 read composition — the Platform Administration projections.
@@ -267,20 +267,22 @@ export async function runnerVerdictOf(
     jobs.oldestQueuedWaitMs !== null && jobs.oldestQueuedWaitMs > RUNNER_FRESHNESS_BUDGET_MS;
   const reasons: string[] = [];
   if (jobs.dead > 0) {
-    reasons.push(`${String(jobs.dead)} job(s) given up`);
+    reasons.push(`${countNoun(jobs.dead, "job")} given up`);
   }
   if (stalled && jobs.oldestQueuedWaitMs !== null) {
     reasons.push(
-      `${String(jobs.queued)} job(s) waiting, nothing picked up for ${waitedFor(jobs.oldestQueuedWaitMs)}`,
+      `${countNoun(jobs.queued, "job")} waiting, nothing picked up for ${waitedFor(jobs.oldestQueuedWaitMs)}`,
     );
   }
   if (overdueSchedules > 0) {
-    reasons.push(`${String(overdueSchedules)} schedule(s) overdue`);
+    reasons.push(`${countNoun(overdueSchedules, "schedule")} overdue`);
   }
   if (futureSchedules > 0) {
     // Not a health failure of its own, but it must be SAID: a last-fire in the
     // future means the recorded time cannot be trusted as evidence either way.
-    reasons.push(`${String(futureSchedules)} schedule(s) report a last fire in the future`);
+    reasons.push(
+      `${countNoun(futureSchedules, "schedule")} report${futureSchedules === 1 ? "s" : ""} a last fire in the future`,
+    );
   }
   return {
     healthy: jobs.dead === 0 && !stalled && overdueSchedules === 0,
@@ -355,7 +357,17 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
     auctionsByStatusOf(db),
     casesByStatusOf(db),
     runnerHealthSnapshot(deps),
-    recentActivity(db, 12, [ADMIN_ACCESS_ACTION]),
+    // Sign-in chatter excluded from the LANDING feed only: every login writes
+    // two auth rows, so the Overview's "recent platform activity" was fourteen
+    // lines of people signing in and zero lines of the platform doing
+    // anything. The audit explorer still shows every one of them — this is the
+    // same disclosure-not-concealment trade the admin.accessed exclusion makes.
+    recentActivity(db, 12, [
+      ADMIN_ACCESS_ACTION,
+      "auth.login.otp",
+      "auth.otp.requested",
+      "auth.login.passkey",
+    ]),
     liveAuctionsOf(db, deps.now()),
   ]);
   const verdict = await runnerVerdictOf(deps, db, runner);
@@ -462,7 +474,7 @@ export async function attentionQueue(
   if (runner.dead > 0) {
     rows.push({
       kind: "runner:dead-jobs",
-      subject: `${String(runner.dead)} dead job(s) across the platform`,
+      subject: `${countNoun(runner.dead, "dead job")} across the platform`,
       orgSlug: null,
       orgName: null,
       href: "/admin/health",
@@ -476,7 +488,7 @@ export async function attentionQueue(
   ) {
     rows.push({
       kind: "runner:stalled",
-      subject: `${formatCount(runner.queued)} job(s) queued — nothing picked up for ${waitedFor(runner.oldestQueuedWaitMs)}`,
+      subject: `${countNoun(runner.queued, "job")} queued — nothing picked up for ${waitedFor(runner.oldestQueuedWaitMs)}`,
       orgSlug: null,
       orgName: null,
       href: "/admin/health",
@@ -485,7 +497,7 @@ export async function attentionQueue(
   if (runner.overdueSchedules > 0) {
     rows.push({
       kind: "runner:schedule-overdue",
-      subject: `${String(runner.overdueSchedules)} schedule(s) are past due`,
+      subject: `${countNoun(runner.overdueSchedules, "schedule")} ${runner.overdueSchedules === 1 ? "is" : "are"} past due`,
       orgSlug: null,
       orgName: null,
       href: "/admin/health",
@@ -511,7 +523,7 @@ export async function attentionQueue(
     const waited = waitedFor(deps.now() - new Date(row.oldest).getTime());
     rows.push({
       kind: "auction:stuck-live",
-      subject: `${String(row.n)} auction(s) still live — the oldest for ${waited}`,
+      subject: `${countNoun(row.n, "auction")} still live — the oldest for ${waited}`,
       orgSlug: row.orgSlug,
       orgName: row.orgName,
       href: `/admin/orgs/${row.orgSlug}`,

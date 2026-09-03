@@ -116,7 +116,9 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                     <th scope="col" className="admin-num">
                       Auctions
                     </th>
-                    <th scope="col">Cases</th>
+                    <th scope="col" className="admin-num">
+                      Cases
+                    </th>
                     <th scope="col">Finance</th>
                     <th scope="col">Last activity</th>
                   </tr>
