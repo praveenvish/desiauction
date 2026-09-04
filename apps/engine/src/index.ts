@@ -64,8 +64,25 @@ const { server, hub } = buildServer({
   maxSocketsPerIp: env.WS_MAX_SOCKETS_PER_IP,
 });
 
-// The watchdog cadence: 250ms timer authority (lot expiry, closing-soon),
-// 10s WS heartbeats, 30s deep verification of every touched auction.
+// The watchdog cadence: 250ms timer authority (lot expiry, closing-soon) and
+// 10s WS heartbeats.
+//
+// THERE IS NO 30s DEEP VERIFICATION, and this comment claimed there was for
+// long enough to be believed (audit PA-1 §6). `engine.deepVerify` exists, is
+// tested, and has never had a caller.
+//
+// It must not simply be put on a timer, which is the obvious repair and a
+// dangerous one. It folds the log TWICE in parallel and compares bytes, then
+// HALTS the auction on any difference. Run from a timer it races the command
+// queue: two folds that straddle a commit legitimately differ, and the engine
+// would halt a healthy live auction — the most expensive false positive this
+// runtime can produce, in the one hour it exists for.
+//
+// Making it schedulable means running it THROUGH the per-auction FIFO queue, so
+// it cannot observe a partial commit. That is a real change to the command
+// union and belongs with the checkpointed-fold work, not here. Until then the
+// determinism it checks is a code-level property, and it is already covered on
+// every command by the rebuild-and-verify in `process`.
 const TICK_MS = 250;
 const tickTimer = setInterval(() => {
   const before = Date.now();

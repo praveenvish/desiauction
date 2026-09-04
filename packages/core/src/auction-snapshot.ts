@@ -453,6 +453,18 @@ export type CommandRejectReason =
   | "unknown_command"
   | "unknown_auction"
   | "engine_halted"
+  /**
+   * A command threw on its way through, and the engine is STILL RUNNING.
+   *
+   * Distinct from `engine_halted`, which it used to be reported as (audit
+   * PA-1 §6). That conflated the most serious state the runtime has — ledger
+   * and projection disagreed, everything refused until Recover — with an
+   * ordinary transient failure such as a lost database connection. An
+   * auctioneer was told to run engine recovery when the honest advice was to
+   * try again, and the copy for `engine_halted` says exactly that in a way
+   * that would have been actively wrong here.
+   */
+  | "command_failed"
   | "not_authorized"
   | "illegal_transition"
   | "guard_failed"
