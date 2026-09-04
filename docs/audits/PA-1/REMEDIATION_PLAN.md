@@ -203,6 +203,18 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
+#### Phase 3 — IN PROGRESS (3.1 done, 2026-09-05)
+
+| # | Outcome |
+|---|---|
+| 3.1 | **Done — migration 0043, 21 constraints, all validated.** `lots`, `bids`, `paddles`, `auctions`, `teams`, `registrations`, `competitions`, `settlement_obligations`, `payments`. ON DELETE RESTRICT everywhere: a cascade would mean deleting an org silently destroys its auctions, bids and sale record, and invariant 4 says money records survive erasure. `NOT VALID` then `VALIDATE`, which is the shape every future constraint should take. |
+| | **The constraints were the easy part.** Landing them required first closing what still produced orphans: sixteen teardowns leaving the spine behind (660/run), then two fixtures that INVENTED parents the product cannot produce — one inserting paddles for an org, competition and auction it never created; the career fixture giving two sold lots `soldToPaddleId: newId()`, a buyer referencing nothing. A third, the engine's deleted-lot drill, had to stage its corruption a step differently now that a lot with bids cannot vanish. Two of my own posture fixtures had the same flaw and were caught by the same constraints. |
+| 3.2–3.6 | Not started: status CHECKs, migration `lock_timeout` + advisory lock, allowlist burn-down (debt 9), index hygiene, `finops_jobs` retention. |
+
+**Verified:** 35 FKs / 35 validated, on the working database and on a **fresh database built from migrations alone**; engine 69, web 849, posture 13/13, grants 286; and a full suite run now leaves **zero** orphans where it used to leave hundreds.
+
+---
+
 ### Phase 4 — Observability · ~2 days · *parallel after Phase 0*
 
 | # | Item | Change |
