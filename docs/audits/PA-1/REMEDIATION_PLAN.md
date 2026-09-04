@@ -296,6 +296,18 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
+#### Phase 6 — 6.1, 6.2, 6.3 DONE · 6.4–6.8 OPEN (2026-09-05)
+
+| # | Outcome |
+|---|---|
+| 6.1 | **Done (D2).** Purses are open to the room. The seal never existed — purse is `pursePerTeam − Σ soldPrice` and all three inputs were already on the viewer's own payload. Dead branches removed rather than kept, with a comment recording where a genuine seal would live (scope the ticket AND withhold hammer prices; one without the other was the mistake). Anonymous spectator redaction stays. Pinned by `purse-visibility.test.ts`. |
+| 6.2 | **Done (D3).** The fiscal-period lifecycle is a stated boundary in `KNOWN_LIMITATIONS.md` and on the flag itself, instead of an unreachable path a future audit rediscovers. |
+| 6.3 | **Done.** `docs/40`'s enforcement map told four untruths (invariants 2, 15, 18, 35). Two are now true because the enforcement was built; two moved to where they live; 35 records that the product deliberately does not work that way. The table now states the rule it should have had: a mechanism is listed only once something in it would FAIL if the invariant broke. README's "27 migrations" corrected to 45. |
+| 6.4 | **Open — and smaller than reported.** The registrations empty state already names share, add and import in prose; PA-1's "no route to import or share" overstates it. The other stuck points (publish-before-share, close-intake-before-auction, owners claim their own paddles, Money tab discoverability, finance `profile_missing`) remain. |
+| 6.5–6.8 | **Open.** Terminology unification is a large mechanical rename with low safety value and real churn; exposing slabs/unsold policy/role quotas, the a11y gaps and the 21 `TODO(founder)` markers are product work. |
+
+---
+
 ### Phase 7 — Operations · founder-gated · runs in parallel from day 1
 
 **Start this immediately — DNS is the long pole and three things wait on it.**
