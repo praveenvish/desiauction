@@ -18,6 +18,19 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
 
 ## Platform boundaries (by design, for beta)
 
+- **Financial-operations governance is not in beta (founder decision D3,
+  2026-09-04).** Receipts and invoices work: declare a profile, open a numbering
+  series, issue documents, and the follower auto-issues receipts for captured
+  payments. What does NOT ship is the governance lifecycle above them — opening
+  a fiscal period, daily attestation, exceptions, and the year-end seal.
+  Concretely: no surface calls `openPeriod`, so `runDailyOps` returns early on
+  every runner tick and no day is attested; `viewer.canClose` is computed and
+  rendered nowhere. The code is present and tested — this is a scoping decision,
+  not a gap to be discovered. It ships once a real organizer has a real
+  financial year to close. Audit PA-1 found this as an unreachable lifecycle
+  (§24); it is now a stated boundary.
+
+
 - **Free tier caps**: 4 teams / 40 players per tournament (paid tiers publish at GA).
 - **Single region**: managed Postgres + apps in one region (Mumbai target). No multi-region failover.
 - **No self-serve platform-admin grant**: `platform.admin` is seeded by script only (`seed:admin`); there is no UI to issue it. Intentional (PX-9).

@@ -79,6 +79,16 @@ export interface FinopsViewer {
   readonly canDocument: boolean;
   readonly canDispatch: boolean;
   readonly canOperate: boolean;
+  /**
+   * Holds `finops.close` — and NOTHING CONSUMES THIS (founder decision D3).
+   *
+   * The fiscal-period lifecycle is descoped for beta: no surface calls
+   * `openPeriod`, so `runDailyOps` returns early, no day is ever attested and
+   * no period can be closed. The capability read is correct and stays, because
+   * the lifecycle exists and is tested — but a flag that is computed and never
+   * rendered reads like an oversight, so it says here that it is a boundary.
+   * See docs/operations/KNOWN_LIMITATIONS.md.
+   */
   readonly canClose: boolean;
   readonly canOverride: boolean;
 }

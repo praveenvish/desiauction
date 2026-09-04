@@ -59,13 +59,62 @@ The product's constitution, carried from the reference implementation's ratified
 
 ## Enforcement map
 
+> **Audited and corrected 2026-09-05 (PA-1R Phase 6.3).** This table was written
+> as a design intent and read as a statement of fact — including by release
+> documents and by an audit that had to check it line by line. Four of its
+> claims were false: invariants 2, 15, 18 and 35 were filed under mechanisms
+> that did not enforce them, and 18 had 26 live violations in the development
+> database at the time of the audit. Two are now true because the enforcement
+> was built; two are moved to where they actually live.
+>
+> The rule this table now follows: **a mechanism is only listed once something
+> in that mechanism would fail if the invariant broke.**
+
 | Mechanism | Invariants |
 |-----------|-----------|
-| Schema/DB constraints (52) | 1, 2, 3, 10 (no UPDATE/DELETE on ledger), 18, 20, 24 |
-| Engine machine guards (39, 41) | 9, 11, 13, 14, 15, 16, 17, 19 |
-| Read-model construction (51) | 8, 12, 29, 35 |
-| Policy module (36) | 5, 28, 34 |
+| Schema/DB constraints (52) | 1, 3, 10 (no UPDATE/DELETE on ledger), **18**, 20, 24 |
+| Engine machine guards (39, 41) | 9, 11, 13, 14, 16, 17, 19 |
+| Read-model construction (51) | 8, 12, 29 |
+| Policy module (36) | 5, **28**, 34 |
 | Product/UX law (reviewed) | 6, 7, 23, 27, 31 |
 | Platform architecture | 4, 21, 22, 25, 26, 30, 32, 33 |
+| **Application code only** (no schema or machine enforcement) | **2**, **15** |
+| **Not enforced — the product does not work this way** | **35** |
+
+### The four corrections, and what changed
+
+**18 — an Owner never owns two teams.** Was listed under schema and enforced
+nowhere: the existing partial unique is `(auction, team, person)`, which stops a
+duplicate grant for the same team and says nothing about a second one. Now true:
+migration 0043 adds a unique index on `(auction_id, person_id)` over active
+paddle grants, and `grantPaddle` refuses `owns_another_team`. Deliberately bound
+to the OWNER arm and not to `paddles` — DA-02 lets a conductor hold several
+paddles to bid for owners who are not in the room.
+
+**28 — a privileged action fails if its audit write fails.** True wherever the
+audit shares the caller's transaction, and `acceptInvite` was four separate
+writes until 2026-09-05. Now one transaction, so it holds on that path too.
+
+**2 — an Organization can never have zero owners.** Application code only. The
+guard is real (`wouldOrphanOrg`, corrected 2026-09-05 to count members rather
+than dangling grants) but it is a check in a server action, not a constraint: a
+direct DELETE still leaves an ownerless org, and eleven existed in the
+development database. Listing it under schema claimed a protection nothing
+provided.
+
+**15 — no LIVE without an active Pass, locked rules and ≥2 teams with accepted
+owners.** The engine guard requires **≥2 claimed paddles and ≥1 queued lot**,
+which is close but not this sentence: there is no Pass or entitlement check
+anywhere in the live path. Moved to application-only until the Pass exists.
+
+**35 — VIEW tokens never expose purse when the money-visibility switch redacts
+them.** There is no money-visibility switch, and after founder decision D2
+(2026-09-04) there will not be one: a rival's remaining purse is
+`pursePerTeam − Σ soldPrice`, and all three inputs are already public — the
+purse is one uniform number told to every owner, and hammer prices are the
+auction's public record. A seal would have to withhold the hammer prices, and
+those are the spectacle. **Purses are open to the room by decision**; the
+engine's ticket-scope redaction remains for ANONYMOUS spectator tickets, which
+is defence in depth rather than a seal. See `server/auction/purse-visibility.test.ts`.
 
 Each implementation phase's Definition of Done (69) includes the invariant tests for whatever it touched.

@@ -10,7 +10,7 @@ This repository is a greenfield enterprise rebuild. The previous repository serv
 
 Where things actually stand:
 
-- **Built:** identity, orgs/grants, competitions and registration, the live auction engine, settlement, financial operations, platform administration, and the public help/legal/marketing surfaces. 27 migrations.
+- **Built:** identity, orgs/grants, competitions and registration, the live auction engine, settlement, financial operations, platform administration, and the public help/legal/marketing surfaces. 45 migrations.
 - **Not deployed:** nothing is provisioned. No Fly, Vercel, managed Postgres, S3, SMS or payment accounts exist — these are founder-held ([docs/operations/PRODUCTION_CHECKLIST.md](docs/operations/PRODUCTION_CHECKLIST.md) §2–§3).
 - **Current gate:** a production-readiness audit on 2026-08-18 returned **NO-GO** with three reproduced blockers ([docs/audits/FINAL-PRR/REPORT.md](docs/audits/FINAL-PRR/REPORT.md)). Work now is closing its §9 list. Release documents written at RC-1 carry correction notices where the audit found them stale — read those notices, not just the ✔ marks.
 

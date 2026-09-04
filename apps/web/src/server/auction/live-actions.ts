@@ -215,16 +215,15 @@ export interface LiveAuctionView {
     /**
      * May this viewer read every team's remaining purse and committed spend?
      *
-     * FALSE by default for a bidder — that is the change. A sealed-purse
-     * auction is the ordinary case and rivals' money is exactly what it seals.
-     * Conductors keep the whole board: running the night requires it.
+     * TRUE for everyone in the room (founder decision D2, 2026-09-04). The
+     * previous default of "bidders see only their own" read as a seal and was
+     * not one: purse is `pursePerTeam − Σ soldPrice`, and all three inputs are
+     * already on this viewer's payload. See `canSeeAll` above for the full
+     * reasoning.
      *
-     * TODO(founder): some auctions deliberately PROJECT every purse — it is
-     * half the theatre, and /spectate already publishes purses for a public
-     * competition. If open purses become a per-auction choice, this is the flag
-     * that reads it (`auction.config`), not a new gate. Until that decision is
-     * made the default is private, because private is the answer that cannot
-     * leak. NOT decided here.
+     * If a genuinely sealed auction is ever wanted, this is still the flag that
+     * would read it from `auction.config` — but it would have to withhold
+     * hammer prices too, and those are the spectacle.
      */
     canSeeAllPurses: boolean;
     /** Whether every squad is readable, or only the viewer's own. Same rule. */
@@ -361,14 +360,51 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   // leaves the server — the payload gate that /seasons/…/money has always had
   // and this room never did. Hiding a rival's squad in the markup does not hide
   // it: it is in the RSC payload, in view-source, in the network tab.
-  const canSeeAll = gate.canConduct;
-  const mine = new Set(gate.myTeamIds);
+  /**
+   * PURSES ARE PUBLIC TO THE ROOM (founder decision D2, 2026-09-04).
+   *
+   * This was `gate.canConduct` — bidders saw only their own money — and the
+   * TODO on `canSeeAllPurses` below said the choice was "NOT decided here".
+   * It is now, and the reason is that the seal never existed.
+   *
+   * A rival's remaining purse is `pursePerTeam − Σ soldPrice`. Every one of
+   * those three is already on a payload this same viewer receives: the purse is
+   * a single uniform number told to every owner in their join preview and
+   * printed in the public rules, and the hammer prices and the paddle→team
+   * mapping are the auction's public record — /spectate publishes them lot by
+   * lot. Anyone who could read the screen could do the arithmetic (audit PA-1
+   * §10 P1-3).
+   *
+   * So the gate was not protecting the money; it was protecting the APPEARANCE
+   * of protecting it, and telling organizers their auction was sealed when it
+   * was not. Between a real seal — which would mean withholding hammer prices
+   * from the room, and that is the spectacle — and an honest open board, the
+   * open board is the product this is.
+   *
+   * What stays: the engine's ticket-scope redaction, which still refuses purses
+   * to an ANONYMOUS spectator ticket (scope `[]` in publicSpectatorView). That
+   * one is not theatre — it keeps a scraped ticket from becoming a money feed —
+   * and it is defence in depth for the room, not the room's rule.
+   */
+  const canSeeAll = true;
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionId: gate.auction.id,
-    // The seal, enforced at the source: a conductor's socket carries every
-    // purse, a bidder's carries only their own teams' (P1-6).
-    wsUrl: engineWsUrl(gate.auction.id, canSeeAll ? null : gate.myTeamIds),
+    /*
+     * The room's socket carries every purse (D2).
+     *
+     * This used to scope a bidder's ticket to their own teams and call that the
+     * seal. It was not one — see `canSeeAll` above — so the scope now matches
+     * what the room can already work out. `null` means "no redaction" to the
+     * engine; the ANONYMOUS spectator ticket still passes `[]`
+     * (publicSpectatorView), and that remains a real restriction.
+     *
+     * If a genuinely sealed auction is ever built, this is one of the two
+     * places it lives: pass `gate.myTeamIds` here and withhold hammer prices
+     * from `resolved` below. Withholding one without the other is the mistake
+     * that was here.
+     */
+    wsUrl: engineWsUrl(gate.auction.id, null),
     teams: teamRows.map(({ logoKey, ...team }) => ({
       ...team,
       logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
@@ -391,7 +427,9 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     // bidder must not receive is the pre-signed roster, which is nowhere
     // announced, and the aggregated purse figures (see the client).
     resolved,
-    preSigned: canSeeAll ? preSigned : preSigned.filter((player) => mine.has(player.teamId)),
+    // Pre-signed players are part of the same open board (D2): who is already
+    // on a roster is visible to the room, as the roster itself is.
+    preSigned,
     planAvailable: planning.available,
     ...(planning.plan === null ? {} : { plan: planning.plan }),
   };
