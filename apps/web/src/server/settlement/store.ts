@@ -86,6 +86,31 @@ function transaction(tx: Tx): SettlementTx {
      * fact of the schema, not a promise of the code.
      */
     async appendEvent(input) {
+      /**
+       * SERIALIZE THE STREAM, RATHER THAN LETTING IT COLLIDE AND SAY SO LOUDLY.
+       *
+       * The comment above is accurate: the unique index does turn a concurrent
+       * writer into a loud failure. What it does not say is who hears it. The
+       * engine can rely on that index alone because a process-level lease means
+       * one writer exists; settlement has no such lease — it runs in the web
+       * tier, where two operators on one case, or two instances behind a load
+       * balancer, are ordinary. Both would read the same `max(seq)`, both would
+       * insert `seq + 1`, and the loser got a raw Postgres 23505 in the
+       * interface while doing nothing wrong (audit PA-1 §7).
+       *
+       * A transaction-scoped advisory lock on the stream makes the second
+       * writer WAIT instead of collide: it takes the lock, reads a `max(seq)`
+       * that already includes the first write, and appends after it. Both
+       * commands succeed, in order, which is what the operator expected.
+       *
+       * Scoped to one stream, so unrelated cases never queue behind each other,
+       * and released on commit like the registration-approval lock this follows.
+       * The unique index stays as the backstop — a lock is a convention between
+       * willing participants, and the index is the thing that is simply true.
+       */
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext('settlement-stream'), hashtext(${`${input.streamType}:${input.streamId}`}))`,
+      );
       const [row] = await tx
         .select({ max: sql<number>`coalesce(max(${settlementEvents.seq}), 0)::int` })
         .from(settlementEvents)
