@@ -1,0 +1,90 @@
+# NIGHTLY PRODUCTION BACKUP (PA-1R Phase 7.3).
+#
+# `pnpm backup` has existed since the last remediation and nothing has ever run
+# it. That is the difference the audit drew and this file closes: a COMMAND that
+# produces a backup is not the same as BACKUPS EXISTING (PA-1 §19, and
+# docs/62-backup-strategy.md says so on its own page).
+#
+# Three properties this is built for, none of them accidental:
+#
+#   OFF-HOST. The dump is copied to object storage. A dump beside the database
+#   it came from does not survive the thing a backup exists for.
+#
+#   SEPARATE CREDENTIALS. `BACKUP_DATABASE_URL` should be a read-only role the
+#   running application does not hold, and the bucket credentials likewise —
+#   ransomware isolation is the reason, and it only works if the app cannot
+#   reach the backups.
+#
+#   LOUD FAILURE. A backup job that fails quietly is worse than none, because
+#   it is believed. This job has no `continue-on-error`, and the script exits
+#   non-zero on a zero-byte dump or a failed off-host copy.
+#
+# It no-ops with a summary note until the secrets exist, matching the deploy
+# workflows — the founder externals in PRODUCTION_CHECKLIST §2 gate it.
+name: backup-production
+
+on:
+  schedule:
+    - cron: "30 21 * * *" # 03:00 IST, before the nightly verify
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check backup credentials
+        id: creds
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_S3_URI: ${{ secrets.BACKUP_S3_URI }}
+        run: |
+          if [ -z "$BACKUP_DATABASE_URL" ] || [ -z "$BACKUP_S3_URI" ]; then
+            {
+              echo "### Backup skipped"
+              echo ""
+              echo "BACKUP_DATABASE_URL and BACKUP_S3_URI are not both configured, so"
+              echo "**no backup was taken**. These are founder-held (PRODUCTION_CHECKLIST §2)."
+              echo ""
+              echo "Until they exist the platform has a backup COMMAND and no backups."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The dump must be taken by a client of the SAME major version as the
+      # server, or pg_dump refuses — which is correct and is how a silently
+      # unusable dump is avoided. Pinned to 17 to match the managed instance.
+      - name: Install postgresql-client-17
+        if: steps.creds.outputs.configured == 'true'
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Take the backup
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_S3_URI: ${{ secrets.BACKUP_S3_URI }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.BACKUP_AWS_REGION }}
+          # The runner is ephemeral, so local retention is irrelevant here —
+          # the bucket's own lifecycle policy owns retention.
+          BACKUP_RETAIN: "1"
+        run: node scripts/backup-database.mjs
+
+      - name: Record it
+        if: steps.creds.outputs.configured == 'true'
+        run: |
+          {
+            echo "### Backup taken"
+            echo ""
+            echo "Copied off-host. **A backup that has never been restored is a hope,"
+            echo "not a backup** — rehearse a restore and record the RTO in"
+            echo "docs/operations/RESTORE_RUNBOOK.md."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -611,8 +611,24 @@ describe("PX-9 · The runner verdict can go red", () => {
     const snapshot = await runnerHealthSnapshot(deps);
     const verdict = await runnerVerdictOf(deps, db, snapshot);
 
-    // The snapshot's own rule, restated so the divergence is visible.
-    expect(snapshot.healthy).toBe(snapshot.jobs.dead === 0);
+    /*
+     * THE DIVERGENCE THIS LINE EXISTED TO DOCUMENT IS CLOSED (PA-1R 4.5).
+     *
+     * It asserted `snapshot.healthy === (jobs.dead === 0)` — the package's rule
+     * — precisely so the gap between it and the web tier's corrected verdict
+     * was visible in a test. That gap was the bug: `dead === 0` answers "did
+     * anything fail loudly", and a runner that has STOPPED produces no dead
+     * jobs at all, so it scored green over 1,558 jobs whose oldest had waited
+     * eleven days.
+     *
+     * `runnerHealthSnapshot` now weighs queue AGE itself, so the correction no
+     * longer lives only in the reader. Both must agree, and neither may be
+     * green while work is aging.
+     */
+    expect(snapshot.healthy).toBe(snapshot.reasons.length === 0);
+    if (snapshot.jobs.dead > 0) {
+      expect(snapshot.healthy).toBe(false);
+    }
 
     if (verdict.oldestQueuedWaitMs !== null && verdict.oldestQueuedWaitMs > 15 * 60 * 1000) {
       // THE DEFECT: `dead === 0` reported green over 1,558 jobs whose oldest

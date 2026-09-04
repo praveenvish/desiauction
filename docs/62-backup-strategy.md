@@ -21,9 +21,17 @@
 | Nightly execution | Runs in `.github/workflows/nightly-verify.yml` (which needs a git remote to run at all). |
 | Last measurement | 43/43 tables exact under concurrent write load, **2026-07-16** — before migrations 0015–0026. Stale; re-drill. |
 
-**Still operator-provisioned before this clears the P0-1 launch gate:** a
-scheduled `pnpm backup` against production writing to an off-host destination on
-a separate credential; a managed-Postgres instance with PITR (continuous WAL);
+**Update 2026-09-05 (PA-1R Phase 7.3).** Two of the three are now in the
+repository rather than owed: `.github/workflows/backup-production.yml` runs the
+dump nightly at 03:00 IST, and `scripts/backup-database.mjs` copies it off-host
+via `BACKUP_S3_URI`. Both no-op with a summary note until the secrets exist, so
+**the platform still has no backups until an operator supplies
+`BACKUP_DATABASE_URL` (a read-only role the app does not hold) and the bucket
+credentials.** What remains genuinely undone is the third: no backup has ever
+been restored.
+
+**Still operator-provisioned before this clears the P0-1 launch gate:** the
+credentials above; a managed-Postgres instance with PITR (continuous WAL);
 and at least one rehearsed restore with the RTO recorded in the runbook. The
 tooling and procedure now exist in-repo; the running backups do not until the
 operator stands them up.

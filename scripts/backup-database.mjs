@@ -89,6 +89,17 @@ try {
     });
   }
 } catch (error) {
+  /*
+   * Take the partial file with it.
+   *
+   * `pg_dump` creates its output file before it can fail — a version mismatch,
+   * a lost connection — so a failed run left a zero-byte `.dump` sitting in the
+   * backup directory. That file then looks exactly like a backup to anyone
+   * listing it, and it counts toward the retention window below, so it can push
+   * a REAL dump out of the retained set. The success path already refuses a
+   * zero-byte result; the failure path has to as well.
+   */
+  rmSync(outPath, { force: true });
   console.error(`backup FAILED: ${String(error)}`);
   process.exit(1);
 }
@@ -100,6 +111,49 @@ if (size === 0) {
   process.exit(1);
 }
 console.log(`backup complete: ${outPath} (${String(Math.round(size / 1024))} KiB)`);
+
+/*
+ * OFF-HOST, OR IT IS NOT A BACKUP.
+ *
+ * The header above already says a dump beside the database it came from is not
+ * a backup, and until now the script could not do anything about it: it wrote
+ * to a local directory and stopped (audit PA-1 §19). `BACKUP_S3_URI` is that
+ * missing half — the dump is copied to object storage, on credentials the
+ * running application never holds, which is what makes it survive both a lost
+ * host and a compromised one.
+ *
+ * `aws s3 cp` rather than a signing implementation here: it is present on CI
+ * runners and every ops box, it honours the standard credential chain, and a
+ * root script in this repository deliberately carries no dependencies. If the
+ * CLI is missing the backup FAILS — a dump that was supposed to leave the host
+ * and silently did not is the worst of both, because it reports success.
+ *
+ * The alternative, for an operator who mounts a bucket as a filesystem, is to
+ * point BACKUP_DIR at the mount and leave this unset.
+ */
+const s3Uri = process.env["BACKUP_S3_URI"] ?? "";
+if (s3Uri !== "") {
+  const destination = `${s3Uri.replace(/\/$/, "")}/${fileName}`;
+  console.log(`copying off-host → ${destination}`);
+  try {
+    execFileSync("aws", ["s3", "cp", outPath, destination], { stdio: "inherit" });
+  } catch (error) {
+    console.error(
+      `backup FAILED: could not copy the dump off-host (${String(error)}).\n` +
+        "The local dump is kept, but this run has NOT produced an off-site backup.\n" +
+        "Check that the aws CLI is installed and its credentials can write to " +
+        `${s3Uri}.`,
+    );
+    process.exit(1);
+  }
+  console.log("off-host copy complete");
+} else {
+  console.log(
+    "BACKUP_S3_URI unset — this dump exists only on this host.\n" +
+      "That is a staging copy, not a backup: set BACKUP_S3_URI, or point " +
+      "BACKUP_DIR at a mounted bucket.",
+  );
+}
 
 // Prune old local dumps (retention). Off-site/object-store retention is the
 // store's own lifecycle policy — this only bounds the local staging directory.
