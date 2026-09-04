@@ -123,10 +123,18 @@ read as "did not change state"; it is now optimistic and reconciled like the mes
   "Still to come …"). Facts only: it never says which roles a squad needs — that is the
   owner's call, or later the auction's quotas. `PlanView.preSignedRoles` feeds it.
 
+- **What if (landed 2026-09-04).** `plan-what-if.tsx`: pick any player still to come, type an
+  amount, and the page answers with the purse left, what is still planned for the other
+  targets, and whether the plan still fits — the same `whatIf` arithmetic as the live line,
+  on the client, nothing saved. A scratchpad, not a plan.
+- **Cross-tab freshness (landed 2026-09-04).** The plan page re-reads the server when its tab
+  returns to view (visibilitychange / focus) and the local rows follow the server's, so a save
+  in another tab shows up without a reload. Never fires while typing.
+
 ## Remaining Phase 1.5
 
-- Reserve + `roleQuotas` form field · what-if input · notes · org-level switch +
-  /admin write (4th platform capability set) · cross-tab refresh.
+- Reserve + `roleQuotas` form field · notes · org-level switch + /admin write (4th platform
+  capability set).
 
 ## Rules of the fold (for reviewers)
 

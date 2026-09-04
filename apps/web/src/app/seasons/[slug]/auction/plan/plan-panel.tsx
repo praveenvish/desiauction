@@ -7,6 +7,7 @@ import {
   formatPaiseINR,
   paise,
   type AuctionStatus,
+  type PlanInput,
   type PlanState,
   type TargetState,
 } from "@desiauction/core";
@@ -22,6 +23,7 @@ import {
   type BadgeTone,
 } from "@desiauction/ui";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { roleLabel } from "../../../../../lib/playing-roles";
@@ -43,6 +45,7 @@ import {
   searchPool,
 } from "./plan-model";
 import { PlanReportCard } from "./plan-report";
+import { PlanWhatIf } from "./plan-what-if";
 
 /**
  * MY PLAN — the page (WR-1).
@@ -96,6 +99,28 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
   useEffect(() => {
     setHydrated(true);
   }, []);
+  // Phase 1.5: two tabs, one plan. When this tab comes back into view the page
+  // re-reads the server, and the local rows follow the server's — a save made
+  // in the other tab shows up here without a reload. Fires only on return to
+  // the tab, never while typing.
+  const router = useRouter();
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [router]);
+  useEffect(() => {
+    setTargets(view.targets);
+    setDrafts(Object.fromEntries(view.targets.map((row) => [row.id, rupeesFromPaise(row.maxBid)])));
+  }, [view.targets]);
 
   const lotsByRegistration = useMemo(
     () => new Map(view.lots.map((lot) => [lot.registrationId, lot])),
@@ -106,19 +131,19 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     [targets],
   );
   const targeted = useMemo(() => new Set(targets.map((row) => row.registrationId)), [targets]);
-  const state: PlanState = useMemo(
-    () =>
-      evaluatePlan({
-        targets,
-        lots: view.lots,
-        myTeamId: view.team.id,
-        purseRemaining: paise(view.standing.purseRemaining),
-        squadSize: view.standing.squadSize,
-        rules: view.planRules,
-        currentLot: null,
-      }),
+  const planInput: PlanInput = useMemo(
+    () => ({
+      targets,
+      lots: view.lots,
+      myTeamId: view.team.id,
+      purseRemaining: paise(view.standing.purseRemaining),
+      squadSize: view.standing.squadSize,
+      rules: view.planRules,
+      currentLot: null,
+    }),
     [targets, view],
   );
+  const state: PlanState = useMemo(() => evaluatePlan(planInput), [planInput]);
   const groups = useMemo(() => groupByPriority(state.targets), [state.targets]);
   const results = useMemo(
     () => searchPool(view.lots, targeted, query),
@@ -389,6 +414,8 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
           ) : null}
         </Card>
       )}
+
+      {view.readOnly ? null : <PlanWhatIf input={planInput} lots={view.lots} />}
 
       {targets.length === 0 ? (
         <EmptyState
