@@ -326,6 +326,16 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
+#### Phase 7 — 7.3 and 7.9 DONE (engineering half) · 2026-09-05
+
+| # | Outcome |
+|---|---|
+| 7.9 | **Done.** `scripts/check-live-window.mjs` + a step in both deploy workflows. `paused` counts as live — a paused auction is a room waiting with a lot on the block, and restarting into it is worse than into an active lot because nobody is watching a clock that would show the problem. An unreachable database REFUSES rather than passes. Staging warns, production refuses, `DEPLOY_ANYWAY=1` is echoed into the log. Proven clear / frozen / overridden. |
+| 7.3 | **Done to the edge of the founder externals.** Nightly workflow at 03:00 IST + `BACKUP_S3_URI` off-host copy on separate credentials. No `continue-on-error`: a backup job that fails quietly is worse than none because it is believed. Both no-op with a summary note saying plainly that **no backup was taken** until the secrets exist. Found while testing: a failed `pg_dump` left a ZERO-BYTE dump that looked like a backup and counted toward retention — the failure path now cleans up as the success path already did. |
+| 7.1, 7.2, 7.4–7.8 | **Founder-held.** DNS (the long pole — three things wait on it), managed Postgres + PITR + keepalives, **one rehearsed restore** (nothing has ever been restored, and no code closes that), MSG91, S3, Sentry DSN, preflight to zero. |
+
+---
+
 ### Phase 8 — Certification · ~2 days
 
 1. `pnpm verify:local` green.
