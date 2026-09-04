@@ -7,6 +7,12 @@
 A backup you have never restored is a hope, not a backup. Rehearse this against
 a scratch instance **before** launch and record the wall-clock RTO at the bottom.
 
+`node scripts/restore-drill.mjs --rehearse` walks steps 2–6 below against a
+scratch database, times each one, and then conducts a **whole auction night** on
+the restored copy under the four production roles. Steps 1 and 7 are absent by
+design: stopping writers and cutting production over are decisions about live
+traffic, not commands.
+
 ## What a backup is here
 
 `pnpm backup` runs `pg_dump -Fc --no-owner --no-acl` and writes a compressed,
@@ -51,7 +57,12 @@ a managed-Postgres feature and remains an operator provisioning item — see
    ```
 
 5. **Re-create the four production roles + grants.** The dump carries data and
-   schema, not the role model. Re-run the role recipe and the grant manifest:
+   schema, not the role model — `pg_dump --no-owner --no-acl` drops every grant
+   deliberately, so a freshly restored database has all the data and **zero**
+   privileges. Note the asymmetry that decides how much of this you need: roles
+   are cluster-scoped, grants are database-scoped. Restoring into the same
+   cluster needs only the grants re-applied; restoring into a NEW cluster needs
+   the roles created first. The recipe is idempotent and does both.
 
    ```bash
    psql "$TARGET_ADMIN_URL" -v ON_ERROR_STOP=1 \
@@ -62,12 +73,22 @@ a managed-Postgres feature and remains an operator provisioning item — see
      pnpm --filter @desiauction/web grants:verify
    ```
 
-6. **Verify isolation is live.** Confirm the app role is NOBYPASSRLS (the web
-   tier asserts this at boot, PRR P1-1) and RLS holds:
+6. **Verify isolation is live, then verify the database can run an auction.**
+   Confirm the app role is NOBYPASSRLS (the web tier asserts this at boot, PRR
+   P1-1) and RLS holds:
 
    ```bash
    APP_DATABASE_URL=postgres://desiauction_app:...@.../desiauction_restore \
      pnpm --filter @desiauction/web rls:verify
+   ```
+
+   Then run a night on it. Row counts prove the bytes arrived; they cannot tell
+   you the restored database is *usable*, and the difference between those two
+   is precisely a missing grant:
+
+   ```bash
+   REHEARSAL_DB_NAME=desiauction_restore \
+     pnpm --filter @desiauction/web rehearsal
    ```
 
 7. **Point production at the restored database and return writers to rotation.**
@@ -81,6 +102,24 @@ target and start again from step 2.
 
 ## Rehearsal record
 
-| Date | Dump age | Target | RTO (stop → serving) | Result | By |
-|------|----------|--------|----------------------|--------|----|
-| _pending — rehearse before launch_ | | | | | |
+| Date | Source size | Target | Restore time (steps 2–6) | Result | By |
+|------|-------------|--------|--------------------------|--------|----|
+| 2026-09-05 | 25 MB / 4,968 rows / 60 tables | local scratch DB, same cluster | 1.8 s | PASS — counts identical, and a full auction night ran on the restored copy through all four roles to two issued receipts | PA-1R Phase 8.4 |
+| _pending — repeat against managed Postgres before launch_ | | | | | |
+
+**Read that 1.8 s correctly.** It is not a production RTO and must not be quoted
+as one: the database is 25 MB and the cluster is on the same machine. What the
+drill certifies is that the **procedure is complete** — that nothing has to be
+discovered during an incident. The production number will be dominated by dump
+transfer and `pg_restore`, both of which scale with data, and by steps 1 and 7,
+which are human decisions this drill deliberately excludes.
+
+The first two runs of the drill failed, and both failures were in the drill
+rather than the platform — but they are worth recording, because they are the
+exact shape of the thing a drill exists to find. `docker exec` does not attach
+stdin unless asked, and `execFileSync` discards `input` when stdin is `"ignore"`.
+Between them, the step that re-applies the role recipe reported success in 0.1 s
+having executed **nothing**, and the failure surfaced two steps later as "the app
+role cannot read `otp_codes`". A restore that silently skips step 5 leaves a
+database holding every row and no privileges — which is why step 6 now ends with
+an auction night rather than a row count.

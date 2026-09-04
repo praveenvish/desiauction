@@ -24,6 +24,7 @@
     "format:check": "prettier --check .",
     "depcruise": "depcruise apps packages",
     "check:posture": "node scripts/check-tenant-posture.mjs",
+    "restore:drill": "node --env-file-if-exists=.env.local scripts/restore-drill.mjs",
     "check:live-window": "node scripts/check-live-window.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check && pnpm depcruise && pnpm check:motion",
     "verify:local": "pnpm verify && pnpm build && pnpm test:integration && pnpm env:check && node scripts/health.mjs --no-apps",
