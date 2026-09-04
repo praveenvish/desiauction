@@ -345,6 +345,42 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 5. Re-run PA-1's §52 toolchain and diff the scorecard.
 6. Write `docs/audits/PA-1/REMEDIATION.md` recording what was fixed, what was descoped and what remains, in the style of the FINAL-PRR record.
 
+> **8.3 built and green, 2026-09-05.** `apps/web/scripts/rehearsal.ts`
+> (`pnpm --filter @desiauction/web rehearsal`). 51 steps from an empty database
+> to two numbered receipts totalling exactly the ₹2,00,000 collected, with the
+> production split honoured rather than approximated:
+>
+> | Role | What it does in the rehearsal, because it is what it does in production |
+> |---|---|
+> | `desiauction_app` | login, org, competition, teams, intake, `createAuction` (the one aggregate mutator the web calls directly), all of settlement, profile + series |
+> | `desiauction_engine` | paddles, queue, transitions, bids, the hammer — everything `conductCommand` routes |
+> | `desiauction_runner` | the FinOps follower: consumes the settlement history, auto-issues |
+> | `desiauction` (owner) | fixtures and teardown **only**, never the path under test |
+>
+> It refuses to run at all if the app role turns out to be BYPASSRLS, because a
+> rehearsal run as the owner proves nothing and would look identical.
+>
+> **The plan was wrong about where this could run.** Item 3 said "on staging",
+> which put the single most valuable gate behind founder-held infrastructure
+> that does not exist yet. The roles are what the rehearsal tests, and the roles
+> are reproducible locally from `ops/db/create-app-role.sql` — so it runs today,
+> on every developer's machine, and the staging run becomes a repeat rather than
+> a first attempt.
+>
+> **It found a defect in itself on the first run, which is the point.** Written
+> the way every integration suite is written — domain functions on the bare pool
+> — it failed at `org_members` on step 5. The product was right: `createOrgAction`
+> mints the org id first and wraps `createOrg` in `withTenantDb`, precisely so
+> the WITH CHECK'd member, grant and audit rows land under `app.org_id`. The
+> *test convention* was wrong, and under the owner it had always looked correct.
+> Every org-scoped step now enters the boundary its own action enters, one
+> transaction per step, because one transaction per action is what production
+> has.
+>
+> Still founder-gated: the same run against **staging** infrastructure, which is
+> the only thing that adds managed-Postgres behaviour (connection limits,
+> keepalives, PITR) to what is already proven about the roles.
+
 ---
 
 ## 4 · Sequencing and effort
