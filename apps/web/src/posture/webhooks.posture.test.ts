@@ -60,8 +60,19 @@ describe("POSTURE — a pool reach with no tenant boundary is blind (PA-1 P0-1)"
   const paymentId = pad("01M1POSTUREPAY");
   const orgId = pad("01M1POSTUREORG");
 
+  const caseId = pad("01M1POSTURECASE");
   beforeAll(async () => {
     await owner.sql`delete from payments where id = ${paymentId}`;
+    await owner.sql`delete from settlement_cases where id = ${caseId}`;
+    // `payments.case_id` gained a foreign key in migration 0043 — a payment
+    // whose case does not exist is a number nobody can explain, so the fixture
+    // creates the case rather than naming one that was never there.
+    await owner.sql`
+      insert into settlement_cases (id, org_id, auction_id, competition_id, basis,
+                                    source_event_count, source_digest, created_by)
+      values (${caseId}, ${orgId}, ${pad("01M1POSTUREAUC")}, ${pad("01M1POSTURECOMP")},
+              'per-team', 0, 'posture', ${pad("01M1POSTUREBY")})
+    `;
     await owner.sql`
       insert into payments (id, org_id, case_id, team_id, method, amount)
       values (${paymentId}, ${orgId}, ${pad("01M1POSTURECASE")},
@@ -70,6 +81,7 @@ describe("POSTURE — a pool reach with no tenant boundary is blind (PA-1 P0-1)"
   });
   afterAll(async () => {
     await owner.sql`delete from payments where id = ${paymentId}`;
+    await owner.sql`delete from settlement_cases where id = ${caseId}`;
   });
 
   /**

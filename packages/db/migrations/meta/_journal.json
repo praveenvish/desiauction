@@ -302,6 +302,13 @@
       "when": 1787328000000,
       "tag": "0042_owner_one_team",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1787414400000,
+      "tag": "0043_auction_spine_integrity",
+      "breakpoints": true
     }
   ]
 }

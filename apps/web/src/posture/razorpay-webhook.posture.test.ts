@@ -74,6 +74,21 @@ const withTenant = <T>(
 
 beforeAll(async () => {
   await owner.sql`delete from payments where id = ${PAYMENT}`;
+  await owner.sql`delete from settlement_cases where id = ${CASE}`;
+  /*
+   * The case the payment belongs to, which this fixture used to invent.
+   *
+   * Migration 0043 gave `payments.case_id` a foreign key, and rightly: a
+   * payment whose case does not exist is a number nobody can explain. Creating
+   * it is two lines and makes the fixture describe a state the product can
+   * actually reach.
+   */
+  await owner.sql`
+    insert into settlement_cases (id, org_id, auction_id, competition_id, basis,
+                                  source_event_count, source_digest, created_by)
+    values (${CASE}, ${ORG}, ${id("01M1POSTURERZP1AUC")}, ${id("01M1POSTURERZP1COMP")},
+            'per-team', 0, 'posture', ${id("01M1POSTURERZP1BY")})
+  `;
   await owner.sql`
     insert into payments (id, org_id, case_id, team_id, method, amount, status)
     values (${PAYMENT}, ${ORG}, ${CASE}, ${TEAM}, 'gateway:razorpay', ${AMOUNT}, 'created')
@@ -81,6 +96,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await owner.sql`delete from payments where id = ${PAYMENT}`;
+  await owner.sql`delete from settlement_cases where id = ${CASE}`;
   await owner.sql`delete from settlement_events where org_id = ${ORG}`;
   await owner.sql.end();
 });

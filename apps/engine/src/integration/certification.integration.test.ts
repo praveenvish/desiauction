@@ -433,6 +433,21 @@ describe("RECOVERY CERTIFICATION — production drills", () => {
     const [saved] = await db.select().from(lotsTable).where(eq(lotsTable.id, lot)).limit(1);
     expect(saved).toBeDefined();
 
+    /*
+     * The bids go with it, and that is a truer simulation than it looks.
+     *
+     * Migration 0043 gave `bids.lot_id` a foreign key with ON DELETE RESTRICT,
+     * so a lot with bids can no longer simply vanish — which is the whole point
+     * of the constraint, and it means this drill can no longer delete the lot
+     * alone. Deleting the bids first reproduces the same condition the drill is
+     * actually about: the PROJECTION has lost a sale the event log still
+     * records, and the watchdog must halt rather than hand a team its money
+     * back. The detection path under test is unchanged; only the way the
+     * corruption is staged had to move, because the database now refuses the
+     * lazier version of it.
+     */
+    const savedBids = await db.select().from(bidsTable).where(eq(bidsTable.lotId, lot));
+    await db.delete(bidsTable).where(eq(bidsTable.lotId, lot));
     await db.delete(lotsTable).where(eq(lotsTable.id, lot));
     engine.reset(auctionId);
     const halted = await engine.ensureAuction(auctionId);
@@ -441,6 +456,9 @@ describe("RECOVERY CERTIFICATION — production drills", () => {
     // Heal cannot re-insert a row the aggregate never wrote — fail-closed is the
     // contract. Restore the exact row so the shared auction stays verifiable.
     await db.insert(lotsTable).values(saved as typeof lotsTable.$inferInsert);
+    if (savedBids.length > 0) {
+      await db.insert(bidsTable).values(savedBids as (typeof bidsTable.$inferInsert)[]);
+    }
     engine.reset(auctionId);
     const restored = await engine.ensureAuction(auctionId);
     expect(restored?.halted).toBeNull();

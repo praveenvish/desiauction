@@ -471,7 +471,9 @@ export const competitions = pgTable(
   "competitions",
   {
     id: id(),
-    orgId: char("org_id", { length: 26 }).notNull(),
+    orgId: char("org_id", { length: 26 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
     /** The recurring tournament this is an edition of; null for a one-off. */
     tournamentId: char("tournament_id", { length: 26 }),
     name: text("name").notNull(),
@@ -541,7 +543,9 @@ export const teams = pgTable(
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
-    competitionId: char("competition_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 })
+      .notNull()
+      .references(() => competitions.id, { onDelete: "restrict" }),
     /** PI-1 P6: the durable franchise this edition-team is an appearance of;
      *  null for a one-off. Linked by the clone path, read for grouping only. */
     franchiseId: char("franchise_id", { length: 26 }),
@@ -862,7 +866,9 @@ export const auctions = pgTable(
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
-    competitionId: char("competition_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 })
+      .notNull()
+      .references(() => competitions.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     status: text("status", {
       enum: ["scheduled", "live", "paused", "completed", "reconciled", "abandoned"],
@@ -904,7 +910,9 @@ export const paddles = pgTable(
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
-    auctionId: char("auction_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 })
+      .notNull()
+      .references(() => auctions.id, { onDelete: "restrict" }),
     teamId: char("team_id", { length: 26 }).notNull(),
     personId: char("person_id", { length: 26 })
       .notNull()
@@ -930,7 +938,9 @@ export const lots = pgTable(
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
-    auctionId: char("auction_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 })
+      .notNull()
+      .references(() => auctions.id, { onDelete: "restrict" }),
     registrationId: char("registration_id", { length: 26 }).notNull(),
     lotNumber: text("lot_number").notNull(),
     seq: integer("seq").notNull(), // deterministic queue order
@@ -992,7 +1002,9 @@ export const bids = pgTable(
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     auctionId: char("auction_id", { length: 26 }).notNull(),
-    lotId: char("lot_id", { length: 26 }).notNull(),
+    lotId: char("lot_id", { length: 26 })
+      .notNull()
+      .references(() => lots.id, { onDelete: "restrict" }),
     paddleId: char("paddle_id", { length: 26 }).notNull(),
     amount: bigint("amount", { mode: "number" }).notNull(),
     status: text("status", { enum: ["accepted", "outbid", "invalidated"] })
