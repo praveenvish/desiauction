@@ -28,10 +28,22 @@ describe("clientIp (PRR P2/F32 — spoof-resistant per-IP throttle)", () => {
     expect(clientIp(h({ "x-forwarded-for": "evil" }), 3)).toBeNull();
   });
 
-  it("falls back to x-real-ip when XFF is absent or not trusted", () => {
-    expect(clientIp(h({ "x-real-ip": "5.6.7.8" }), 0)).toBe("5.6.7.8");
-    expect(clientIp(h({ "x-real-ip": "5.6.7.8", "x-forwarded-for": "1.1.1.1" }), 0)).toBe(
-      "5.6.7.8",
+  it("uses x-real-ip only when a trusted proxy is in front (audit PA-1 §25)", () => {
+    // This asserted the opposite until 2026-09-05, and the module's own comment
+    // contained the contradiction: `x-real-ip` was called safe because "a
+    // correctly-configured ingress overwrites it" — while `trustedProxies: 0`
+    // is precisely the statement that there IS no ingress. With nothing in
+    // front, the header is whatever the client typed, and an attacker rotating
+    // it defeated the 20/IP/hour OTP cap for the price of one header.
+    //
+    // Absent beats spoofable: with no trusted proxy there is no IP context, the
+    // per-phone caps carry the throttling, and preflight now refuses a
+    // production deploy that left TRUSTED_PROXY_COUNT at 0.
+    expect(clientIp(h({ "x-real-ip": "5.6.7.8" }), 0)).toBeNull();
+    expect(clientIp(h({ "x-real-ip": "5.6.7.8" }), 1)).toBe("5.6.7.8");
+    // A trusted XFF entry still wins over x-real-ip.
+    expect(clientIp(h({ "x-real-ip": "5.6.7.8", "x-forwarded-for": "1.1.1.1" }), 1)).toBe(
+      "1.1.1.1",
     );
   });
 

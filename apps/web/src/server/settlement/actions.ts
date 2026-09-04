@@ -53,6 +53,7 @@ import {
   waiveObligation,
   type Ack,
 } from "./writer";
+import { logger } from "../logger";
 
 /**
  * PX-7 Settlement Experience — the internal RPC surface (PX-1 E1/E2).
@@ -158,9 +159,24 @@ function messageFor(reason: string, detail?: string): string {
       ? `Closure verification failed (${check}). The case stays settled.`
       : `Closure verification failed — ${named}. The case stays settled and nothing moved.`;
   }
-  // An organizer reading a raw reason code can still call for help with the
-  // exact word. Silence would be worse than jargon.
-  return `${reason}${detail === undefined || detail === "" ? "" : ` — ${detail}`}`;
+  /*
+   * THE REASON, NEVER THE DETAIL (audit PA-1 §25).
+   *
+   * The instinct below is right: an organizer reading a raw reason code can at
+   * least call for help with the exact word, and silence would be worse than
+   * jargon. The `detail` beside it is a different thing. The writer supplies it
+   * as `divergences.join(" · ")` — journal digests, stream sequence numbers,
+   * the internal shape of a mismatch — and that reached anyone holding
+   * `settlement.view`, which is a finance clerk, not an engineer.
+   *
+   * So the reason still surfaces verbatim, and the detail goes to the LOG,
+   * where whoever is actually diagnosing it can find it against this request's
+   * id. Finops already made this split; settlement had not.
+   */
+  if (detail !== undefined && detail !== "") {
+    logger().warn({ reason, detail }, "settlement.rejected_with_detail");
+  }
+  return reason;
 }
 
 export type ActionResult = { ok: true; caseId?: string } | { ok: false; error: string };

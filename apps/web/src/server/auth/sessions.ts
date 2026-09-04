@@ -120,6 +120,22 @@ export async function revokeSession(db: Db, sessionId: string): Promise<void> {
   await db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, sessionId));
 }
 
+/**
+ * Revoke whatever session a raw cookie token names, if it names a live one.
+ *
+ * Used when a NEW session replaces an old one on the same device (audit
+ * PA-1 §25): the cookie was simply overwritten, leaving the previous token
+ * valid in the database for up to thirty days. Silent when the token matches
+ * nothing — an expired or already-revoked cookie is the normal case, not an
+ * error worth surfacing on a sign-in.
+ */
+export async function revokeSessionByToken(db: Db, token: string): Promise<void> {
+  await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(sessions.tokenHash, hashToken(token)), isNull(sessions.revokedAt)));
+}
+
 export interface SessionSummary {
   id: string;
   userAgent: string | null;

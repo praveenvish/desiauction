@@ -48,13 +48,14 @@ import {
   type SecurityEvent,
 } from "./security-events";
 import {
+  RETURNING_COOKIE,
+  SESSION_COOKIE,
   createSession,
   getSessionByToken,
   listSessions,
   revokeOtherSessions,
   revokeSession,
-  RETURNING_COOKIE,
-  SESSION_COOKIE,
+  revokeSessionByToken,
   type SessionSummary,
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
@@ -86,8 +87,24 @@ async function requestIp(): Promise<string | null> {
 
 async function issueSessionCookie(personId: string): Promise<void> {
   const agent = (await headers()).get("user-agent");
-  const session = await createSession(db, personId, agent);
   const store = await cookies();
+  /*
+   * THE SESSION THIS ONE REPLACES DIES WITH IT (audit PA-1 §25).
+   *
+   * Signing in again on a device minted a new session row and simply
+   * overwrote the cookie — so the previous token stayed valid in the database
+   * for up to thirty days, reachable by anyone who had captured it. Signing in
+   * again is the one thing a worried person does before asking for help, and
+   * it was doing nothing for them.
+   *
+   * Revoked BEFORE the new cookie is set, so a failure here cannot leave the
+   * browser holding a session that was meant to be replaced.
+   */
+  const replaced = store.get(SESSION_COOKIE)?.value;
+  if (replaced !== undefined && replaced !== "") {
+    await revokeSessionByToken(db, replaced);
+  }
+  const session = await createSession(db, personId, agent);
   store.set(SESSION_COOKIE, session.token, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
@@ -700,6 +717,28 @@ export async function confirmPhoneChangeAction(
   }
 
   await logSecurityEvent(session.personId, "auth.phone.changed");
+  /*
+   * A PHONE CHANGE EVICTS EVERY OTHER SESSION.
+   *
+   * The credential this account signs in with has just moved, and any session
+   * opened against the OLD one is now a key to a door that has been rekeyed.
+   * Leaving them alive meant a lurking session — the exact thing somebody
+   * changing their number in a hurry is usually worried about — simply carried
+   * on (audit PA-1 §9, §25).
+   *
+   * It also makes this flow useful as a recovery action: a person who suspects
+   * their account has been reached can move their number and, in the same
+   * step, put everyone else out.
+   *
+   * NOT the whole fix, and worth being exact about what remains. A session
+   * thief can still perform this change, because the flow deliberately does not
+   * ask for the OLD number — requiring it would leave "I lost my phone" as
+   * unrecoverable as it was before, which is a real person's real problem. The
+   * remaining mitigation is a step-up against something the thief is unlikely
+   * to hold and the owner still does — a passkey assertion where one is
+   * enrolled — and that is tracked, not done here (PA-1R 5.1).
+   */
+  await revokeOtherSessions(db, session.personId, session.sessionId);
   /*
    * Tell the OUTGOING number, and never fail the change on it.
    *

@@ -253,6 +253,19 @@ check(
   "set SENTRY_DSN so errors are captured (a missing DSN is a silent no-op in every app)",
 );
 
+// --- Per-IP throttles (audit PA-1 §25) ---------------------------------------
+// `clientIp` now refuses to read `x-real-ip` unless a trusted proxy is declared,
+// because at 0 there is nothing in front to overwrite it and the header is
+// whatever the caller typed. That is the safe answer — but it also means every
+// per-IP throttle (the 20/hour OTP cap, the demo-request limiter) silently has
+// no IP to key on until this is set. Behind Vercel or Fly the value is 1.
+check(
+  "TRUSTED_PROXY_COUNT",
+  Number(env.TRUSTED_PROXY_COUNT ?? "0") > 0,
+  "per-IP throttles need a trusted proxy hop count",
+  "set TRUSTED_PROXY_COUNT (1 behind a single Vercel/Fly ingress) or every per-IP limit keys on nothing",
+);
+
 // --- Scheduled money repair (PRR P1-3) ---------------------------------------
 // The settlement catch-up sweep endpoint is fail-closed (404 without a secret),
 // so the platform is SAFE without it — but the case↔journal seam then has no

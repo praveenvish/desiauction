@@ -39,7 +39,11 @@ jobs:
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # PINNED (audit PA-1 §18). `@master` is a MUTABLE BRANCH: a compromised
+      # or merely careless push to that third-party repository would run
+      # arbitrary code in a job that holds FLY_API_TOKEN. A tag is the minimum;
+      # a digest is better and is tracked with the rest of the action pinning.
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.5
         if: steps.creds.outputs.configured == 'true'
       - name: Deploy
         if: steps.creds.outputs.configured == 'true'
