@@ -231,6 +231,20 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
+#### Phase 4 — EXECUTED 2026-09-05
+
+| # | Outcome |
+|---|---|
+| 4.1 | **Done.** `apps/web/src/server/logger.ts` — pino with the engine's shape (same level var, base fields, redaction) plus a superset redact list for what only this tier sees: one-time codes, session/invite tokens, three webhook secrets. Request id via `AsyncLocalStorage`, preferring the edge's own; all five webhook and job routes wrapped. |
+| 4.2 | **Partially done, deliberately.** The swallows where silence cost most now log: the engine-client's three (an unreachable engine was a correct refusal and an invisible one) and the settlement/finops capability checks (which turn a DB outage into "you may not"). The repo-wide `no-empty` rule stays deferred — 84 sites, most legitimate fail-closed control flow — but its precondition now exists, so it can be done file by file with judgement instead of 80 disable comments in one pass. |
+| 4.3 | **Done in code.** `scrub` in `packages/core` (5 tests) wired as `beforeSend` in all three services. Key-path redaction does nothing for an error MESSAGE, and `duplicate key ... Key (phone)=(+91...)` would reach Sentry verbatim. The scrub deliberately keeps ids, amounts and lot numbers — a report with the money removed is not a report. **The DSN itself remains founder-held.** |
+| 4.4 | **Specified, not provisioned.** [operations/ALERTS.md](../../operations/ALERTS.md): the five alerts that close PA-1's four worst "detectability: poor" risks, each against a signal that exists in code today. Latency SLOs are explicitly excluded — nothing measures them, and an alert on an unmeasured number is a lie. |
+| 4.5 | **Done.** `runnerHealthSnapshot` scored a STOPPED runner as perfectly healthy, because `dead === 0` answers "did anything fail loudly" and a crashed runner produces no dead jobs at all. It now also fails on queue AGE, which is the only signal that separates a busy platform from a dead worker, and says in words why. |
+
+**Gate state** — `verify` ✅ · `build` ✅ · `depcruise` ✅ (2057 modules) · `test:integration` ✅ · `posture` ✅ 13/13 · core 440 tests.
+
+---
+
 ### Phase 5 — Security hardening · ~2–3 days · *parallel after Phase 0*
 
 | # | Item | Change |

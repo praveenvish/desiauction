@@ -11,14 +11,15 @@
     "env:check": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/check-env.ts"
   },
   "dependencies": {
+    "@desiauction/core": "workspace:*",
     "@desiauction/db": "workspace:*",
     "@desiauction/financial-operations": "workspace:*",
     "@sentry/node": "^10.15.0",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.0",
-    "zod": "^4.1.0",
     "pino": "^9.9.0",
-    "ulidx": "^2.4.0"
+    "postgres": "^3.4.0",
+    "ulidx": "^2.4.0",
+    "zod": "^4.1.0"
   },
   "devDependencies": {
     "@desiauction/config": "workspace:*",

@@ -101,6 +101,9 @@ importers:
 
   apps/finops-runner:
     dependencies:
+      '@desiauction/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@desiauction/db':
         specifier: workspace:*
         version: link:../../packages/db

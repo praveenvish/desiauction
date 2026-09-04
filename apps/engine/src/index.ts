@@ -1,3 +1,4 @@
+import { scrub } from "@desiauction/core";
 import * as Sentry from "@sentry/node";
 
 import { checkDb, db, sql } from "./db.js";
@@ -13,6 +14,16 @@ if (env.SENTRY_DSN !== undefined) {
     environment: env.NODE_ENV,
     release: env.APP_VERSION,
     tracesSampleRate: 0.1,
+    /**
+     * NOTHING LEAVES THIS PROCESS UNREDACTED (audit PA-1 §20).
+     *
+     * The pino loggers redact by key path, which does nothing for an error
+     * MESSAGE — and `duplicate key ... Key (phone)=(+91...)` carries a phone
+     * number in free text that Sentry would otherwise store verbatim with a
+     * third party. `scrub` is shared by all three services so they cannot
+     * disagree about what is sensitive.
+     */
+    beforeSend: (event) => scrub(event) as typeof event,
   });
 }
 
