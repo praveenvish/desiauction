@@ -135,6 +135,22 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
+#### Phase 1 — EXECUTED 2026-09-04
+
+| # | Outcome |
+|---|---|
+| 1.1 | **Done, and the plan was wrong about how.** A blanket unique index would have broken DA-02 — a deliberate shipped feature letting a conductor hold several paddles to bid for owners not in the room — and `seed:demo` with it. The DB showed the split cleanly: `paddle_grants` (the owner arm) had **0** violations, `paddles` had 4, all conductor-held. Founder decision: constrain the owner arm. Migration 0042 + an `owns_another_team` refusal. `grantPaddle`'s catch had to be hardened first — it answered `{ok:true, alreadyGranted:true}` for ANY failed insert, so with a second index a refused grant would have reported SUCCESS with a grantId never written. Removing the app check leaves the suite green: the database refuses on its own. |
+| 1.2 | **Done, and it found a second instance.** `idFor(key)` without the payload collapsed every bid into one slot. Rather than test the caller, the payload is now REQUIRED — `idFor("bid")` does not compile. That immediately surfaced the same omission on `CompleteAuction`, where an unanswered close left its slot occupied and the conductor's override retry inherited the cached `squad_below_minimum` refusal: **the night could not be closed from the panel at all.** |
+| 1.3 | **Done.** Only `open` checked auction status, so a paused auction still accepted the gavel. Now `sell`/`pass`/`hold` require `live`; `requeue`/`withdraw` stay allowed. Verified by reverting the guard and watching the new test fail. |
+| 1.4 | **Done.** `engine.rehydrate()` loads every `live`/`paused` auction before the listener binds. The test is hostile to the old behaviour: the fresh engine is never asked about the auction — only `rehydrate()`, then assert residency. |
+| 1.5 | **Done.** `command_failed` split from `engine_halted`, which had been telling auctioneers to run engine recovery for a dropped connection. The catch now also rebuilds, because a commit can succeed and a later step still throw, leaving the room rendering a snapshot the database has moved past. |
+| 1.6 | **Done — by NOT scheduling it.** `deepVerify` was documented as running every 30s and never had a caller. Putting it on a timer is the obvious repair and a dangerous one: it folds twice in parallel and halts the auction on any difference, so from a timer it races the queue and two honest folds straddling a commit would stop a healthy night. Scheduling it needs the FIFO queue; the false claim is removed and the hazard recorded. |
+| 1.7 | **Done.** The Open button is disabled with a named blocker instead of failing on click. Counted as distinct teams to match `auctionReadiness` exactly — disabling a button the engine would have accepted is a worse failure than the toast it replaces. |
+
+**Gate state after Phase 1** — `verify` ✅ · `build` ✅ · `test:integration` ✅ (engine **69**, web 843) · `check:posture` ✅ · `posture:verify` ✅ · `audit` ✅ 0 vulnerabilities · `seed:demo` ✅.
+
+---
+
 ### Phase 2 — Money path · ~2 days
 
 | # | Item | Change | Proof | Gate |
