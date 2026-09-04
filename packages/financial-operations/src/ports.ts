@@ -86,6 +86,28 @@ export interface DeliveryRequest {
   readonly body: string;
   /** The digest of `body` — carried so providers/outboxes can seal what they got. */
   readonly bodyDigest: string;
+  /**
+   * A key the PROVIDER can deduplicate on, stable across every attempt at this
+   * dispatch (audit PA-1 §16).
+   *
+   * The send is at-least-once and cannot be made otherwise here. `runDispatchSend`
+   * calls the provider and only then commits the `sent` transition, so a crash
+   * in between leaves the dispatch `requested` and the retry sends again.
+   *
+   * REVERSING THE ORDER DOES NOT FIX IT, it only chooses a different failure:
+   * commit first and a crash before the call records a document as sent that
+   * nobody received — silent non-delivery, which this platform treats as the
+   * cardinal sin (see the email adapter on the filesystem outbox that "reported
+   * Succeeded for a file on a disk nobody reads"). Adding a `sending` state to
+   * the frozen machine relocates the same dilemma rather than resolving it: the
+   * retry still cannot know whether the provider received the call.
+   *
+   * Two generals. The only party that can settle it is the provider, so we give
+   * it what it needs to: one key per dispatch, identical on every retry. A
+   * provider that honours it makes delivery effectively-once; one that ignores
+   * it behaves exactly as before, so this is never worse.
+   */
+  readonly idempotencyKey: string;
 }
 
 export type DeliverySendResult =

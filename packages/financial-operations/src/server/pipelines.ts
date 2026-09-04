@@ -192,6 +192,10 @@ export async function runDispatchSend(deps: FinopsDeps, job: JobRow): Promise<vo
     subjectRef: dispatch.subjectRef,
     body: assembled.assembled.body,
     bodyDigest: assembled.assembled.bodyDigest,
+    // One dispatch is one message, however many times we attempt it. Derived
+    // from the dispatch id alone — the body is reproduced deterministically, so
+    // the same dispatch is always the same message.
+    idempotencyKey: `dispatch:${dispatchId}`,
   };
   const result = await port.send(request);
 

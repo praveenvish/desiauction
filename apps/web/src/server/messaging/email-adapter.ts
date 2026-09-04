@@ -50,6 +50,15 @@ export interface EmailAdapterConfig {
   /** Header name the provider authenticates with. Bearer is the common case. */
   readonly authHeader?: string;
   readonly authScheme?: string;
+  /**
+   * Header the provider deduplicates retries on. `Idempotency-Key` is the
+   * common spelling (Resend, Postmark and Stripe-shaped APIs); SES uses none.
+   *
+   * Set to `null` for a provider that has no such header — the send is then
+   * at-least-once, which is what it was before this existed, rather than
+   * sending a header the provider will reject or ignore.
+   */
+  readonly idempotencyHeader?: string | null;
   readonly transport?: EmailTransport;
   readonly buildRequest?: (message: EmailMessage, from: string) => unknown;
   readonly now?: () => number;
@@ -254,6 +263,25 @@ export function createHttpEmailAdapter(
         [config.authHeader ?? "authorization"]:
           `${config.authScheme ?? "Bearer"} ${config.apiKey}`.trim(),
       };
+      /*
+       * THE ONLY PARTY THAT CAN MAKE THIS SEND EXACTLY-ONCE.
+       *
+       * `runDispatchSend` calls this and only then commits the `sent`
+       * transition, so a crash in between leaves the dispatch `requested` and
+       * the retry arrives here again. That window cannot be closed on our side
+       * — committing first would instead record documents as sent that nobody
+       * received, and this adapter already refuses to tell that particular lie.
+       *
+       * So we hand the provider a key that is identical on every attempt at
+       * this dispatch and let it collapse the duplicate. A provider that
+       * honours it makes delivery effectively-once; one that does not behaves
+       * as it did before, so this can only help (audit PA-1 §16).
+       */
+      const idempotencyHeader =
+        config.idempotencyHeader === undefined ? "idempotency-key" : config.idempotencyHeader;
+      if (idempotencyHeader !== null) {
+        headers[idempotencyHeader] = request.idempotencyKey;
+      }
       try {
         const response = await transport(config.endpoint, {
           method: "POST",

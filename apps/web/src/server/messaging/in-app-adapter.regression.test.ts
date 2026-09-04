@@ -33,8 +33,9 @@ const auctionId = newId();
 const orgId = newId();
 
 function request(recipientRef: string) {
+  const dispatchId = newId();
   return {
-    dispatchId: newId(),
+    dispatchId,
     orgId,
     channel: "in-app" as const,
     recipientRef,
@@ -43,6 +44,7 @@ function request(recipientRef: string) {
     subjectRef: `doc:${newId()}`,
     body: "Receipt RCT/2026-27/000001 for Rs 1,20,000",
     bodyDigest: "digest",
+    idempotencyKey: `dispatch:${dispatchId}`,
   };
 }
 

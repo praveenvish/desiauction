@@ -17,6 +17,7 @@ const request = {
   subjectRef: "doc:01DOC",
   body: "Receipt RCT/2026-27/000001 for Rs 1,20,000",
   bodyDigest: "digest",
+  idempotencyKey: "dispatch:01DISPATCH",
 };
 
 const ok: EmailTransport = () => Promise.resolve({ status: 202, body: "{}" });
@@ -211,5 +212,45 @@ describe("subjectFor", () => {
 
   it("falls back rather than rendering an id at a customer", () => {
     expect(subjectFor("something.new")).toBe("A document from DesiAuction");
+  });
+});
+
+describe("provider idempotency (PA-1 §16)", () => {
+  it("sends the same key on every attempt, so a retried send can be collapsed", async () => {
+    const seen: Record<string, string>[] = [];
+    const capture: EmailTransport = (_url, init) => {
+      seen.push(init.headers);
+      return Promise.resolve({ status: 202, body: "{}" });
+    };
+    const port = adapter(capture);
+    await port.send(request);
+    await port.send(request);
+
+    expect(seen).toHaveLength(2);
+    expect(seen[0]?.["idempotency-key"]).toBe("dispatch:01DISPATCH");
+    expect(
+      seen[1]?.["idempotency-key"],
+      "a retry sent a different key — the provider cannot tell it is the same message",
+    ).toBe("dispatch:01DISPATCH");
+  });
+
+  it("omits the header for a provider that has none, rather than inventing one", async () => {
+    const seen: Record<string, string>[] = [];
+    const capture: EmailTransport = (_url, init) => {
+      seen.push(init.headers);
+      return Promise.resolve({ status: 202, body: "{}" });
+    };
+    const port = createHttpEmailAdapter(
+      {
+        endpoint: "https://mail.test/send",
+        apiKey: "key",
+        from: "no-reply@desiauction.in",
+        transport: capture,
+        idempotencyHeader: null,
+      },
+      resolves,
+    );
+    await port.send(request);
+    expect(Object.keys(seen[0] ?? {})).not.toContain("idempotency-key");
   });
 });
