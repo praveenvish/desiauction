@@ -70,8 +70,6 @@ alter default privileges in schema public
   grant select, insert, update, delete on tables to desiauction_app;
 alter default privileges in schema public
   grant usage, select on sequences to desiauction_app;
-alter default privileges in schema public grant select on tables to desiauction_engine;
-alter default privileges in schema public grant select on tables to desiauction_runner;
 
 -- System role: exactly the named pre-tenant surfaces —
 --   org invites (previewInvite/acceptInvite),
@@ -132,6 +130,14 @@ where not exists (select 1 from pg_roles where rolname = 'desiauction_runner')
 \gexec
 
 grant usage on schema public to desiauction_engine, desiauction_runner;
+
+-- Their default SELECT on future tables, HERE and not above: on a fresh database
+-- the two roles do not exist until this point, and ON_ERROR_STOP aborted the
+-- whole recipe at the earlier placement — leaving no engine role, no runner
+-- role and none of the append-only revokes (the exact failure the header
+-- warns about, reached by a different door). CI's fresh-database run found it.
+alter default privileges in schema public grant select on tables to desiauction_engine;
+alter default privileges in schema public grant select on tables to desiauction_runner;
 
 -- Engine: the single writer of auction truth (+ its audit evidence); reads
 -- whatever projections it folds.

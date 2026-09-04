@@ -186,6 +186,10 @@ afterAll(async () => {
   await db.delete(paddleGrants).where(eq(paddleGrants.orgId, orgId));
   await db.delete(auctionOwnerInvites).where(eq(auctionOwnerInvites.orgId, orgId));
   await db.delete(paddlesTable).where(eq(paddlesTable.orgId, orgId));
+  // 0040 made person_id a real foreign key: a grant or an accepted invite still
+  // pointing at a bidder refuses the people delete below, so they go first.
+  await db.delete(paddleGrants).where(eq(paddleGrants.orgId, orgId));
+  await db.delete(auctionOwnerInvites).where(eq(auctionOwnerInvites.orgId, orgId));
   await db.delete(auctionsTable).where(eq(auctionsTable.orgId, orgId));
   await db.delete(registrations).where(eq(registrations.orgId, orgId));
   await db.delete(teams).where(eq(teams.orgId, orgId));
