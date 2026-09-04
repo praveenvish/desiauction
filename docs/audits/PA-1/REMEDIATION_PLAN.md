@@ -166,6 +166,30 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
+#### Phase 2 — EXECUTED 2026-09-05 (2.7 outstanding)
+
+| # | Outcome |
+|---|---|
+| 2.1 | **Done, and it uncovered a bigger defect.** `suppressions` moved to the app pool (the table is not org-scoped — a STOP tells the platform, not one club). The delivery route's finops half now runs inside `withTenantDb`, opened by ONE adapter-verified id→org lookup on the system pool. **Probing that path found the whole finance workspace could not write**: `finops_events` was `SELECT`-only for the app role, so every Issue receipt / Declare profile / Open series click failed under the documented recipe. The revoke was incoherent — the app role holds full DML on every projection rebuilt from that log — so the line moved to where it means something: INSERT yes, UPDATE/DELETE never (founder decision). |
+| 2.2 | **Done.** The tenant boundary is now a *parameter* of `handleRazorpayWebhook`, because the ordering is the security property: no tenant-scoped handle exists until the signature passes. Proven by removing it and reproducing `404:unknown_payment`. |
+| 2.3 | **Done.** A transaction-scoped advisory lock per settlement stream, so two operators on one case serialize instead of one receiving a raw `23505`. Fails on all three runs without the lock. |
+| 2.4 | **Done.** A posture test pins the gateway shut (D1), so enabling collection has to be deliberate and has to delete a test explaining why. |
+| 2.5 | **Done.** Retry now derives BOTH the command id and the dispatch stream id from one fingerprint — a stable command id alone would have deduped nothing, because `requestDispatch` mints the stream it would be deduped on. `derivedId` extracted to `server/derived-id.ts` so settlement and finops cannot solve it two ways. |
+| 2.6 | **Done.** The claimed lease is the fence token (no new column): a reclaim writes a fresh `leased_until_ms`, so a slow worker's write stops matching. Reclaims now count as attempts and exhausted ones are retired, closing the crash-loop that never dead-lettered. Both halves proven independently. |
+| 2.7 | **OUTSTANDING** — `dispatch.send` still calls the provider before committing the `sent` transition, so a crash in between re-sends. |
+| 2.8 | **Done.** One org's follower failure no longer aborts every org after it — and is reported per-org rather than swallowed, since isolation without reporting is a quieter version of the same bug. |
+
+**Gate state** — `verify` ✅ · `build` ✅ · `test:integration` ✅ (engine 69, web 847) · `check:posture` ✅ **defect 0** · `posture:verify` ✅ 13/13 · `grants:verify` ✅ 286 · `audit` ✅ 0 vulnerabilities.
+
+> **Method note, recorded because it recurred.** Three times a "prove the test
+> catches the bug" experiment reported a PASS because the string replacement had
+> silently not matched — the change never happened and the green was meaningless.
+> Every such experiment now asserts the edit applied before trusting the result.
+> A green test after a change that did not happen is exactly the false
+> confidence this milestone exists to remove.
+
+---
+
 ### Phase 3 — Data integrity · ~1–2 days · *depends on 0.2 purge*
 
 | # | Item | Change | Proof | Gate |
