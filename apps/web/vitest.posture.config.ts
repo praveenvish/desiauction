@@ -71,6 +71,27 @@ export default defineConfig({
       RAZORPAY_WEBHOOK_SECRET: "posture-razorpay-secret-0123456789",
       RAZORPAY_KEY_ID: "rzp_test_posture",
       RAZORPAY_KEY_SECRET: "posture-razorpay-key-secret",
+      // THE EMAIL DOOR HAS TO BE OPEN TOO, for exactly the reason above.
+      //
+      // `webFinopsDeps` installs the email delivery adapter ONLY when all three
+      // of these are set — deliberately, so a half-configured mailer cannot
+      // accept documents and drop them. With none of them, `delivery("email")`
+      // is undefined, the delivery-status route cannot verify the provider
+      // reference, it answers `dispatch_unknown` with a 200, and the posture
+      // test that exists to prove the app role CAN WRITE finops truth passes by
+      // never reaching the write.
+      //
+      // Which is what happened: the suite was green on every developer machine,
+      // where `.env.local` sets these, and red on CI, where nothing does. The
+      // one suite in the repository whose whole purpose is to remove
+      // environment-dependent green was itself environment-dependent
+      // (PA-1R Phase 8, found by the first CI run of this branch).
+      //
+      // The values are dummies and no network call is made: `verifyCallback` is
+      // pure parsing of the provider's body. Only the adapter's PRESENCE matters.
+      EMAIL_API_ENDPOINT: "https://posture.invalid/send",
+      EMAIL_API_KEY: "posture-email-key",
+      EMAIL_FROM: "posture@example.test",
     },
   },
 });

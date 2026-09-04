@@ -242,7 +242,32 @@ describe("POSTURE — delivery callbacks reach their tables (PA-1 P0-2)", () => 
         }),
       }),
     );
-    expect(response.status).toBeLessThan(500);
+    /*
+     * THE STATUS IS NOT THE ANSWER, AND ASSERTING ONLY ON IT LET THIS PASS
+     * WRONGLY FOR THE SECOND TIME.
+     *
+     * The route answers 200 to every refusal on purpose — providers retry
+     * anything else, and every refusal here is permanent. So `status < 500` is
+     * satisfied by `{"status":"ignored","reason":"dispatch_unknown"}`, which is
+     * precisely the shape of "the write never happened".
+     *
+     * That is not hypothetical. Without the three EMAIL_* variables the email
+     * delivery adapter is not installed, the provider reference cannot be
+     * verified, and this route returns exactly that body having touched
+     * nothing. The suite was green on developer machines, where `.env.local`
+     * supplies them, and red on CI where nothing does — so the body is read
+     * here, and a refusal is named in the failure rather than left for someone
+     * to infer from a missing row.
+     */
+    expect(response.status).toBe(200);
+    const ack = (await response.json()) as { status: string; reason?: string };
+    expect(
+      ack,
+      "the platform REFUSED the callback rather than failing to write it — a " +
+        "refusal here is a door that is not open (an unconfigured email " +
+        "adapter answers `dispatch_unknown` having touched nothing), not a " +
+        "permission problem",
+    ).toEqual({ status: "ok" });
 
     const events = (await owner.sql`
       select type from finops_events
