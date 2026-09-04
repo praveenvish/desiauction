@@ -263,6 +263,24 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
+#### Phase 5 — PARTIAL (2026-09-05)
+
+| # | Outcome |
+|---|---|
+| 5.1 | **Partial.** A phone change now evicts every other session — the credential moved, so sessions opened against the old one are keys to a rekeyed door, and this makes the flow usable as a recovery action. **The step-up remains open**: a session thief can still perform the change, and the flow deliberately does not ask for the OLD number because that would leave "I lost my phone" unrecoverable. The mitigation is a passkey assertion where one is enrolled — a feature with UI, not a hardening tweak. |
+| 5.2 | **Not done.** Signing `content-length` on the presign and verifying bytes on attach is real work, not a tweak. |
+| 5.3 | **Not done.** Postgres-backed token bucket; the OTP throttle is the proven pattern to copy. |
+| 5.4 | **Done.** `issueGrant` refuses a non-member; `holdersOf` joins membership so a dangling grant cannot stand in as an owner; `removeMember` revokes competition-scoped grants too. |
+| 5.5 | **Done.** A new session revokes the one whose cookie it replaces. |
+| 5.6 | **Done.** `acceptInvite` is one transaction — claim, membership, grant, audit. Restores invariant 28 on that path. |
+| 5.7 | **Done.** `x-real-ip` is honoured only behind a declared trusted proxy, and **preflight now refuses a production deploy that left `TRUSTED_PROXY_COUNT` at 0** — because the safe answer also silently disables every per-IP throttle, which an operator must be told rather than discover. An existing test asserted the old behaviour; it was documenting the bug. |
+| 5.8 | **Done.** Settlement stops returning journal digests and stream sequence numbers to anyone holding `settlement.view`; the reason still surfaces, the detail goes to the log. |
+| 5.9 | **Done.** `setup-flyctl@master` pinned — a mutable third-party branch was running in a job holding `FLY_API_TOKEN`. Tag-vs-SHA pinning for the rest remains open. |
+| 5.10 | **Not done, by design** — the CSP nonce stays last; it needs middleware and its own e2e pass. |
+| 5.11 | **Not done.** Moving the exported gate helpers means relocating authorization code and its helpers; a poor trade this late for a leak that is facts-about-yourself. |
+
+---
+
 ### Phase 6 — Product & UX · ~2 days · *parallel after Phase 0*
 
 | # | Item | Change |
