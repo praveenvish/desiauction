@@ -1122,3 +1122,92 @@ describe("M-IP6-3 · Rebuilds, replay & the boundary", () => {
     expect(orgSweeps).toBe(0);
   });
 });
+
+describe("JOB LEASE — the fence and the reclaim count (PA-1 §16)", () => {
+  const jobId = "01M1LEASEFENCE00000000JOB1";
+
+  async function seedJob(attempts: number, maxAttempts: number): Promise<void> {
+    await db.delete(finopsJobs).where(eq(finopsJobs.id, jobId));
+    await db.insert(finopsJobs).values({
+      id: jobId,
+      orgId: org.id,
+      kind: "dispatch.send",
+      dedupeKey: `lease-fence-${String(Date.now())}`,
+      state: "queued",
+      attempts,
+      maxAttempts,
+      notBeforeMs: 0,
+      payload: {},
+      updatedAtMs: 0,
+    });
+  }
+
+  afterAll(async () => {
+    await db.delete(finopsJobs).where(eq(finopsJobs.id, jobId));
+  });
+
+  it("a worker whose lease was reclaimed cannot write the job's outcome", async () => {
+    await seedJob(0, 5);
+    const now = Date.now();
+
+    // Worker A claims it, and remembers the lease it claimed with. The suite
+    // leaves other jobs queued for this org, so pick ours out of the batch
+    // rather than assuming it sorts first.
+    const batchA = await deps.store.claimJobs(now, 1_000, 50, org.id);
+    const claimedByA = batchA.find((job) => job.jobId === jobId);
+    if (claimedByA === undefined) {
+      throw new Error("worker A did not claim the seeded job");
+    }
+    const fenceA = claimedByA.leasedUntilMs;
+
+    // Time passes: A is still working when its lease lapses, and worker B
+    // reclaims the job. This is the case the 60s lease makes ordinary — a long
+    // export or day attestation outliving a batch claimed under one lease.
+    const batchB = await deps.store.claimJobs(now + 2_000, 60_000, 50, org.id);
+    const claimedByB = batchB.find((job) => job.jobId === jobId);
+    if (claimedByB === undefined) {
+      throw new Error("worker B could not reclaim the expired lease");
+    }
+
+    // A now finishes and tries to record `done`. It must not land: B owns this.
+    const aWon = await deps.store.transact((tx) =>
+      tx.updateJob({ ...claimedByA, state: "done", leasedUntilMs: null, lastError: null }, fenceA),
+    );
+    expect(aWon, "the reclaimed worker's write landed and overwrote the owner's").toBe(false);
+
+    // ...and B's does.
+    const bWon = await deps.store.transact((tx) =>
+      tx.updateJob(
+        { ...claimedByB, state: "done", leasedUntilMs: null, lastError: null },
+        claimedByB.leasedUntilMs,
+      ),
+    );
+    expect(bWon).toBe(true);
+  });
+
+  it("a reclaim counts as an attempt, so a job that kills its worker dies", async () => {
+    // The crash-loop: the process dies before the drain's catch can run, so
+    // `attempts` never moved and the job was re-leased for ever at 0.
+    await seedJob(2, 3);
+    const now = Date.now();
+
+    const first = (await deps.store.claimJobs(now, 1_000, 50, org.id)).find(
+      (job) => job.jobId === jobId,
+    );
+    expect(first?.attempts, "claiming a queued job must not spend an attempt").toBe(2);
+
+    // The worker vanishes; the lease lapses; the job comes back round.
+    const reclaimed = await deps.store.claimJobs(now + 2_000, 1_000, 50, org.id);
+    expect(
+      reclaimed.some((job) => job.jobId === jobId),
+      "an exhausted job was handed out again instead of being retired",
+    ).toBe(false);
+
+    const [row] = await db
+      .select({ state: finopsJobs.state, attempts: finopsJobs.attempts })
+      .from(finopsJobs)
+      .where(eq(finopsJobs.id, jobId));
+    expect(row?.attempts).toBe(3);
+    expect(row?.state, "a crash-looping job never dead-lettered").toBe("dead");
+  });
+});

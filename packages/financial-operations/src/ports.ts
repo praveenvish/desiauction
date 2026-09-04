@@ -292,7 +292,17 @@ export interface FinopsTx {
   deleteCursors(orgId: string): Promise<void>;
   /** Idempotent by (orgId, dedupeKey): returns false when the job already exists. */
   enqueueJob(row: JobRow): Promise<boolean>;
-  updateJob(row: JobRow): Promise<void>;
+  /**
+   * Write a job's new state.
+   *
+   * `fenceLeasedUntilMs` is the lease the caller CLAIMED with. Supplied, the
+   * write only lands while that lease is still the row's — so a worker whose
+   * lease expired mid-job cannot overwrite the state of the worker that
+   * reclaimed it (audit PA-1 §16). Returns whether the write matched; false
+   * means "someone else owns this job now", which is not an error, just a
+   * result this worker must not act on.
+   */
+  updateJob(row: JobRow, fenceLeasedUntilMs?: number | null): Promise<boolean>;
   putSchedule(row: ScheduleRow): Promise<void>;
 }
 

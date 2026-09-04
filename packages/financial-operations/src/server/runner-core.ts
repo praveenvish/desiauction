@@ -282,6 +282,15 @@ export interface DrainResult {
   readonly done: number;
   readonly retried: number;
   readonly dead: number;
+  /**
+   * Jobs this worker finished AFTER its lease had already been reclaimed, so
+   * its write was fenced out and another worker owns the outcome.
+   *
+   * Not an error — the job is being handled — but a number worth watching: a
+   * tick that regularly loses leases is running work longer than the lease, and
+   * the answer is a shorter batch or a longer lease, not a retry.
+   */
+  readonly lost: number;
 }
 
 /**
@@ -310,24 +319,42 @@ export async function drainJobsOnce(
   let done = 0;
   let retried = 0;
   let dead = 0;
+  /** Jobs whose lease moved on while we were still working — see below. */
+  let lost = 0;
 
   for (const job of claimed) {
+    /**
+     * The lease this worker holds for THIS job, and the fence for every write
+     * it makes about it. `claimJobs` stamped it; if another runner reclaims the
+     * job because we ran past it, that value changes and our writes stop
+     * landing — which is the difference between two workers finishing a job and
+     * two workers overwriting each other (audit PA-1 §16).
+     */
+    const fence = job.leasedUntilMs;
     const handler = handlers[job.kind];
     try {
       if (handler === undefined) {
         throw new Error(`unknown_job_kind:${job.kind}`);
       }
       await handler(deps, job);
-      await deps.store.transact(async (tx) => {
-        await tx.updateJob({ ...job, state: "done", leasedUntilMs: null, lastError: null });
-      });
-      done += 1;
+      const won = await deps.store.transact(async (tx) =>
+        tx.updateJob({ ...job, state: "done", leasedUntilMs: null, lastError: null }, fence),
+      );
+      if (won) {
+        done += 1;
+      } else {
+        // Our lease had already gone. The reclaiming worker owns the outcome;
+        // saying `done` here would overwrite whatever it recorded. Counted so a
+        // tick that is routinely losing its leases is visible rather than
+        // merely slow.
+        lost += 1;
+      }
     } catch (error) {
       const attempts = job.attempts + 1;
       const decision = retryDecision(attempts, job.maxAttempts, nowMs);
       const lastError = error instanceof Error ? error.message : String(error);
-      await deps.store.transact(async (tx) => {
-        await tx.updateJob(
+      const won = await deps.store.transact(async (tx) =>
+        tx.updateJob(
           decision.kind === "retry"
             ? {
                 ...job,
@@ -338,16 +365,19 @@ export async function drainJobsOnce(
                 lastError,
               }
             : { ...job, state: "dead", attempts, leasedUntilMs: null, lastError },
-        );
-      });
-      if (decision.kind === "retry") {
+          fence,
+        ),
+      );
+      if (!won) {
+        lost += 1;
+      } else if (decision.kind === "retry") {
         retried += 1;
       } else {
         dead += 1;
       }
     }
   }
-  return { claimed: claimed.length, done, retried, dead };
+  return { claimed: claimed.length, done, retried, dead, lost };
 }
 
 /** One full runner tick: seed slots, fire due schedules, discover pipeline

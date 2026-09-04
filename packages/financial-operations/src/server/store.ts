@@ -21,7 +21,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import type { SettlementEventEnvelope } from "@desiauction/settlement";
-import { and, asc, eq, inArray, lte, max, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, max, ne, or, sql } from "drizzle-orm";
 
 import type {
   DigestFn,
@@ -377,8 +377,21 @@ function transaction(tx: Tx): FinopsTx {
       return inserted.length > 0;
     },
 
-    async updateJob(row) {
-      await tx
+    async updateJob(row, fenceLeasedUntilMs) {
+      /**
+       * THE FENCE. This was `where id = ?`, which is correct only while a lease
+       * cannot lapse — and this one can: `drainJobsOnce` claims up to ten jobs
+       * under ONE 60s lease and runs them sequentially, so a long export or a
+       * day attestation can still be working when the lease expires and another
+       * runner reclaims the job. Both then completed it, and the slow original
+       * wrote last, stamping `done` over whatever the reclaimer had recorded
+       * (audit PA-1 §16).
+       *
+       * The lease the caller claimed with IS the fence token — no new column
+       * needed. A reclaim always writes a fresh `leased_until_ms`, so the
+       * original's predicate stops matching the moment ownership moves.
+       */
+      const updated = await tx
         .update(finopsJobs)
         .set({
           state: row.state,
@@ -386,9 +399,17 @@ function transaction(tx: Tx): FinopsTx {
           notBeforeMs: row.notBeforeMs,
           leasedUntilMs: row.leasedUntilMs,
           lastError: row.lastError,
-          updatedAtMs: row.notBeforeMs,
+          // The CLOCK, not `notBeforeMs` — this column answers "when did this
+          // row last change", and a retry's future run-at is a different fact.
+          updatedAtMs: Date.now(),
         })
-        .where(eq(finopsJobs.id, row.jobId));
+        .where(
+          fenceLeasedUntilMs === undefined || fenceLeasedUntilMs === null
+            ? eq(finopsJobs.id, row.jobId)
+            : and(eq(finopsJobs.id, row.jobId), eq(finopsJobs.leasedUntilMs, fenceLeasedUntilMs)),
+        )
+        .returning({ id: finopsJobs.id });
+      return updated.length > 0;
     },
 
     async putSchedule(row) {
@@ -678,7 +699,7 @@ export function createFinopsStore(db: Db): FinopsStore {
           and(eq(finopsJobs.state, "leased"), lte(finopsJobs.leasedUntilMs, nowMs)),
         );
         const candidates = await tx
-          .select({ id: finopsJobs.id })
+          .select({ id: finopsJobs.id, state: finopsJobs.state })
           .from(finopsJobs)
           .where(orgId === undefined ? due : and(eq(finopsJobs.orgId, orgId), due))
           .orderBy(asc(finopsJobs.notBeforeMs))
@@ -688,10 +709,48 @@ export function createFinopsStore(db: Db): FinopsStore {
           return [];
         }
         const ids = candidates.map((row) => row.id);
+
+        /**
+         * A RECLAIM IS A FAILED ATTEMPT, AND IT USED TO BE FREE.
+         *
+         * A job in `leased` state that is due again lost its lease without
+         * finishing — the worker crashed, was OOM-killed, or `die()`d. That is
+         * an attempt, and it was not counted: `attempts` only ever incremented
+         * in the drain's catch block, which never runs when the PROCESS dies.
+         * So a job that reliably kills its worker looped for ever at
+         * `attempts = 0`, never dead-lettered, and never appeared in
+         * `loadDeadJobs` for anyone to see (audit PA-1 §16).
+         *
+         * Counting it here closes that, and the sweep below then retires the
+         * ones that have used up their attempts — otherwise the count would
+         * rise for ever and change nothing.
+         */
+        const reclaimed = candidates.filter((row) => row.state === "leased").map((row) => row.id);
+        if (reclaimed.length > 0) {
+          await tx
+            .update(finopsJobs)
+            .set({
+              attempts: sql`${finopsJobs.attempts} + 1`,
+              lastError: "lease expired without completion",
+              updatedAtMs: nowMs,
+            })
+            .where(inArray(finopsJobs.id, reclaimed));
+          await tx
+            .update(finopsJobs)
+            .set({ state: "dead", leasedUntilMs: null, updatedAtMs: nowMs })
+            .where(
+              and(
+                inArray(finopsJobs.id, reclaimed),
+                gte(finopsJobs.attempts, finopsJobs.maxAttempts),
+              ),
+            );
+        }
+
         const claimed = await tx
           .update(finopsJobs)
           .set({ state: "leased", leasedUntilMs: nowMs + leaseMs, updatedAtMs: nowMs })
-          .where(inArray(finopsJobs.id, ids))
+          // A job retired just above must not then be handed out.
+          .where(and(inArray(finopsJobs.id, ids), ne(finopsJobs.state, "dead")))
           .returning();
         return claimed.map(jobRowOf);
       });
