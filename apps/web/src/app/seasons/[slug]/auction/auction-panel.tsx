@@ -108,6 +108,42 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
   });
   const liveFeasibility = view === null ? typedFeasibility : dashboard.feasibility;
 
+  /**
+   * THE GO-LIVE GUARD, SAID BEFORE THE CLICK INSTEAD OF AFTER IT (PA-1 §13).
+   *
+   * `packages/core` refuses `open` without at least two CLAIMED paddles and one
+   * queued lot, and `guardFailureDetail` explains why — in a toast, after the
+   * conductor has already pressed the button in front of a full room. It is
+   * also the single most common first-run mistake, because paddles are claimed
+   * by owners on their OWN devices: the organizer issues invitations and cannot
+   * complete the step themselves, and nothing on this screen said so.
+   *
+   * Both numbers are already on this page. The guard is restated here rather
+   * than imported because the button only needs to know whether to wait; the
+   * engine remains the authority and refuses regardless. Should these ever
+   * disagree, the engine wins and the conductor sees the toast — the old
+   * behaviour, not a worse one.
+   */
+  // DISTINCT TEAMS, matching `auctionReadiness` exactly — it counts
+  // `count(distinct paddles.team_id) where released_at is null`, not paddle
+  // rows, and the whole value of this hint is that it agrees with the guard.
+  // Counting rows instead would risk DISABLING a button the engine would have
+  // accepted, which is a worse failure than the late toast being replaced.
+  const claimedTeams = new Set((dashboard.overview?.paddles ?? []).map((paddle) => paddle.teamId))
+    .size;
+  const queuedLots = dashboard.overview?.counts.queued ?? 0;
+  const goLiveBlockers: string[] = [];
+  if (claimedTeams < 2) {
+    goLiveBlockers.push(
+      claimedTeams === 0
+        ? "no paddles claimed yet — owners claim their own from the invitation link"
+        : "only one paddle claimed — a second owner has to claim theirs before bidding can start",
+    );
+  }
+  if (queuedLots < 1) {
+    goLiveBlockers.push("no lots are queued — queue the pool first");
+  }
+
   const act = async (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
     setBusy(true);
     const result = await fn();
@@ -441,6 +477,9 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                         )
                       }
                       loading={busy}
+                      // Only `open` carries the go-live guard; pause, resume and
+                      // the rest must never be gated on paddle counts.
+                      disabled={step.command === "open" && goLiveBlockers.length > 0}
                       data-testid={`auction-${step.command}`}
                     >
                       {step.label}
@@ -465,6 +504,17 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                   />
                 ) : null}
               </div>
+            ) : null}
+            {/* A disabled control must always say why, or it is just a dead
+                button. This is the one place a first-time organizer stalls, so
+                it names the blocker AND who can clear it — several of these are
+                not things the organizer can do from this screen at all. */}
+            {viewer.canConduct &&
+            view.auction.status === "scheduled" &&
+            goLiveBlockers.length > 0 ? (
+              <p className="competitions-hint" data-testid="auction-open-blockers">
+                Not ready to open: {goLiveBlockers.join("; ")}.
+              </p>
             ) : null}
             {viewer.canConduct && view.auction.status === "scheduled" && !liveFeasibility.ok ? (
               <label className="auction-ack">
