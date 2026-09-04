@@ -62,6 +62,7 @@ import {
 } from "./fixtures";
 import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
 import { activeGroundsOf, createGround, createVenue, setGroundStatus, venuesOf } from "./venues";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -147,6 +148,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const orgIds = [org.id, orgRival.id].filter((id) => id !== "");
+  // PA-1R Phase 3: the spine these teardowns never deleted (purge-org.ts).
+  for (const purgeId of orgIds) {
+    await purgeOrg(db, purgeId);
+  }
   const personIds = [owner, outsider].filter((id) => id !== "");
   if (orgIds.length > 0) {
     await db.delete(fixturesTable).where(inArray(fixturesTable.orgId, orgIds));

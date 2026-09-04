@@ -34,6 +34,7 @@ import {
   removeMember,
   wouldOrphanOrg,
 } from "./orgs";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -72,6 +73,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // PA-1R Phase 3: the spine this teardown never deleted (see purge-org.ts).
+  await purgeOrg(db, org.id);
   const ids = [owner, second].filter((id) => id !== "");
   if (org.id !== "") {
     await db.delete(invitesTable).where(eq(invitesTable.orgId, org.id));

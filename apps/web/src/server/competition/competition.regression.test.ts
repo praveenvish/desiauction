@@ -52,6 +52,7 @@ import { registrationsOf, submitRegistration } from "./registrations";
 import { transition, transitionBatch } from "./registration-aggregate";
 import { ForbiddenError } from "../orgs/authz";
 import { outcomesProjection } from "../admin/views";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -104,6 +105,10 @@ beforeAll(async () => {
 afterAll(async () => {
   const ids = [owner, outsider, player].filter((id) => id !== "");
   const orgIds = [orgX.id, orgY.id].filter((id) => id !== "");
+  // PA-1R Phase 3: the spine these teardowns never deleted (purge-org.ts).
+  for (const purgeId of orgIds) {
+    await purgeOrg(db, purgeId);
+  }
   if (orgIds.length > 0) {
     await db
       .delete(passUpgradeRequestsTable)

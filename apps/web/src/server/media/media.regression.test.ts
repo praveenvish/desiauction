@@ -35,6 +35,7 @@ import { ForbiddenError } from "../orgs/authz";
 import { createOrg } from "../orgs/orgs";
 import { env } from "../../env";
 import { persistMediaKey, requireMediaWrite, resolveMediaSubject } from "./authz";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -97,6 +98,10 @@ beforeAll(async () => {
 afterAll(async () => {
   const ids = [owner, outsider, player].filter((id) => id !== "");
   const orgIds = [orgX.id, orgY.id].filter((id) => id !== "");
+  // PA-1R Phase 3: the spine these teardowns never deleted (purge-org.ts).
+  for (const purgeId of orgIds) {
+    await purgeOrg(db, purgeId);
+  }
   if (orgIds.length > 0) {
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));
     await db.delete(teamsTable).where(inArray(teamsTable.orgId, orgIds));
