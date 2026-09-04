@@ -1,3 +1,4 @@
+import { withTenantDb } from "@desiauction/db";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
@@ -26,6 +27,10 @@ import { handleRazorpayWebhook } from "../../../../server/settlement/webhook";
  * computed over the exact bytes Razorpay sent. Parsing the body here and
  * re-serialising it would change those bytes, and every signature would fail.
  */
+// Matches the settlement writer's SYSTEM_ACTOR: a provider callback is the
+// platform acting on verified provider truth, not a person doing something.
+const SYSTEM_ACTOR = "00000000000000000000000000";
+
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -35,11 +40,21 @@ export async function POST(request: Request): Promise<NextResponse> {
   const signature = request.headers.get("x-razorpay-signature") ?? "";
   const rawBody = await request.text();
 
-  const result = await handleRazorpayWebhook(settlementDeps(dbHandle.db), {
-    rawBody,
-    signature,
-    receivedAtMs: Date.now(),
-  });
+  /*
+   * The deps handed in FIRST are used only to reach the gateway adapter, which
+   * verifies the signature and touches no database. The org-scoped half runs
+   * inside the boundary below, on deps built from the tenant-scoped handle —
+   * so there is no way to read or write a payment before the signature has
+   * been checked, because no such handle exists until then (PA-1 §10 P0-1).
+   */
+  const result = await handleRazorpayWebhook(
+    settlementDeps(dbHandle.db),
+    { rawBody, signature, receivedAtMs: Date.now() },
+    (orgId, run) =>
+      withTenantDb(dbHandle, { personId: SYSTEM_ACTOR, orgId }, (tenantDb) =>
+        run(settlementDeps(tenantDb)),
+      ),
+  );
 
   if (!result.ok) {
     // The handler already decided what each failure is worth: 401 forged, 400

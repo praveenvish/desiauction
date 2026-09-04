@@ -27,8 +27,8 @@
       "reason": "FIXED (PA-1R 2.1). Writes `suppressions` on the app pool, which holds the DML. The table is deliberately not org-scoped \u2014 a person texting STOP tells the platform, not one club \u2014 so it carries no org_id and no RLS, and there is no tenant boundary to enter."
     },
     "apps/web/src/app/api/webhooks/razorpay/route.ts": {
-      "class": "defect",
-      "reason": "PA-1 \u00a710 P0-1 \u2014 loads the payment on the raw app pool with no app.org_id, so FORCE RLS returns zero rows and every capture 404s under the production roles. PA-1R Phase 2.2."
+      "class": "by-design",
+      "reason": "FIXED (PA-1R 2.2). The org-scoped half now runs inside withTenantDb, opened from the VERIFIED envelope's org. The remaining raw-pool reach is the deps handed in for signature verification only, which touches no database \u2014 the boundary cannot be opened before the signature is checked because no tenant-scoped handle exists until then."
     },
     "apps/web/src/app/readyz/route.ts": {
       "class": "by-design",

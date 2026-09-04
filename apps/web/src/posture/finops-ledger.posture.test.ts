@@ -27,8 +27,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const owner = createDb(process.env["OWNER_DATABASE_URL"] ?? "");
 const app = createDb(process.env["DATABASE_URL"] ?? "");
 
-const ORG = "01M1POSTUREFINOPS0000ORG1";
-const EVENT = "01M1POSTUREFINOPS000EVT1";
+// char(26): a short id is padded by Postgres and then never matches a bound
+// parameter, which looks exactly like RLS refusing. Pad, do not count.
+const id = (label: string): string => label.padEnd(26, "0");
+
+const ORG = id("01M1POSTUREFINOPSORG");
+const EVENT = id("01M1POSTUREFINOPSEVT");
 
 async function clear(): Promise<void> {
   await owner.sql`delete from finops_events where id = ${EVENT}`;
@@ -48,8 +52,8 @@ async function appendAsApp(): Promise<void> {
       insert into finops_events
         (id, org_id, stream_type, stream_id, seq, type, payload, at_ms, actor, command_id, correlation_id)
       values
-        (${EVENT}, ${ORG}, 'profile', '01M1POSTUREFINOPS000STR1', 1, 'ProfileDeclared',
-         '{}', 1, '01M1POSTUREFINOPS000ACT1', '01M1POSTUREFINOPS000CMD1', '01M1POSTUREFINOPS000COR1')
+        (${EVENT}, ${ORG}, 'profile', ${id("01M1POSTUREFINOPSSTR")}, 1, 'ProfileDeclared',
+         '{}', 1, ${id("01M1POSTUREFINOPSACT")}, ${id("01M1POSTUREFINOPSCMD")}, ${id("01M1POSTUREFINOPSCOR")})
     `;
   });
 }

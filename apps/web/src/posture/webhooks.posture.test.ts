@@ -54,15 +54,18 @@ describe("POSTURE — the role the app actually runs as", () => {
 });
 
 describe("POSTURE — a pool reach with no tenant boundary is blind (PA-1 P0-1)", () => {
-  const paymentId = "01M1POSTURE0000000000PAY01";
-  const orgId = "01M1POSTURE0000000000ORG01";
+  // char(26): Postgres pads a short id, after which a bound parameter never
+  // matches it — indistinguishable from RLS refusing. Pad rather than count.
+  const pad = (label: string): string => label.padEnd(26, "0");
+  const paymentId = pad("01M1POSTUREPAY");
+  const orgId = pad("01M1POSTUREORG");
 
   beforeAll(async () => {
     await owner.sql`delete from payments where id = ${paymentId}`;
     await owner.sql`
       insert into payments (id, org_id, case_id, team_id, method, amount)
-      values (${paymentId}, ${orgId}, ${"01M1POSTURE0000000000CAS01"},
-              ${"01M1POSTURE000000000TEAM1"}, ${"manual:cash"}, ${50000})
+      values (${paymentId}, ${orgId}, ${pad("01M1POSTURECASE")},
+              ${pad("01M1POSTURETEAM")}, ${"manual:cash"}, ${50000})
     `;
   });
   afterAll(async () => {
@@ -101,7 +104,7 @@ describe("POSTURE — a pool reach with no tenant boundary is blind (PA-1 P0-1)"
     const { createSettlementStore } = await import("../server/settlement/store");
     const found = await withTenantDb(
       dbHandle,
-      { personId: "01M1POSTURE00000000PERSON", orgId },
+      { personId: pad("01M1POSTUREPERSON"), orgId },
       async (db) => createSettlementStore(db).loadPayment(paymentId),
     );
     expect(found, "the tenant boundary could not see its own row").not.toBeNull();

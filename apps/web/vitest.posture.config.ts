@@ -65,6 +65,12 @@ export default defineConfig({
       // any database work, and the test would pass by never running the code.
       SMS_INBOUND_SECRET: "posture-inbound-secret-0123456789",
       DELIVERY_CALLBACK_SECRET: "posture-delivery-secret-0123456789",
+      // The gateway must be CONFIGURED for the callback path to exist at all
+      // (an unset secret 404s the route by design), so the posture suite can
+      // reach the handler even though beta collects manually (decision D1).
+      RAZORPAY_WEBHOOK_SECRET: "posture-razorpay-secret-0123456789",
+      RAZORPAY_KEY_ID: "rzp_test_posture",
+      RAZORPAY_KEY_SECRET: "posture-razorpay-key-secret",
     },
   },
 });

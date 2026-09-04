@@ -75,7 +75,7 @@ import { createRazorpayAdapter, type HttpTransport } from "./adapters/razorpay";
 import { issueSettlementGrant, settlementActor } from "./authz";
 import { settlementDeps, type SettlementDeps } from "./deps";
 import { recoverCase, recoverJournal, recoverPayments } from "./recovery";
-import { handleRazorpayWebhook } from "./webhook";
+import { handleRazorpayWebhook, type WithSettlementTenant } from "./webhook";
 import {
   attestManualCapture,
   caseFold,
@@ -353,6 +353,18 @@ afterAll(async () => {
 
 let lionsPaymentId = "";
 
+/**
+ * A pass-through boundary: these suites connect as the database OWNER, for whom
+ * RLS is inert, so wrapping them in a real tenant transaction would prove
+ * nothing and only add a transaction.
+ *
+ * What proves the boundary is `src/posture/webhooks.posture.test.ts`, which runs
+ * this same path as `desiauction_app` — the role that actually cannot see a
+ * payment without `app.org_id`. These tests prove the handler's LOGIC; that one
+ * proves it can reach the database it is talking to.
+ */
+const passThroughTenant: WithSettlementTenant = (_orgId, run) => run(deps);
+
 describe("M-IP5-2 · Manual collections (partial, multiple, parity)", () => {
   it("collects Tigers' dues over TWO partial manual payments", async () => {
     // Payment 1: ₹40,000 of the ₹1,00,000 owed.
@@ -545,11 +557,15 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
       order_id: "order_lions",
       amount: LIONS_DUE, // the pinned ₹25,000
     });
-    const result = await handleRazorpayWebhook(deps, {
-      rawBody: body,
-      signature: sign(body),
-      receivedAtMs: NOW,
-    });
+    const result = await handleRazorpayWebhook(
+      deps,
+      {
+        rawBody: body,
+        signature: sign(body),
+        receivedAtMs: NOW,
+      },
+      passThroughTenant,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.ack.ok).toBe(true);
 
@@ -576,7 +592,11 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
       amount: LIONS_DUE,
     });
     expect(
-      await handleRazorpayWebhook(deps, { rawBody: body, signature: "forged", receivedAtMs: NOW }),
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: "forged", receivedAtMs: NOW },
+        passThroughTenant,
+      ),
     ).toMatchObject({ ok: false, status: 401, reason: "bad_signature" });
   });
 
@@ -587,11 +607,15 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
       amount: LIONS_DUE,
     });
     const journalBefore = await deps.store.loadStream("journal", org.id);
-    const result = await handleRazorpayWebhook(deps, {
-      rawBody: body,
-      signature: sign(body),
-      receivedAtMs: NOW,
-    });
+    const result = await handleRazorpayWebhook(
+      deps,
+      {
+        rawBody: body,
+        signature: sign(body),
+        receivedAtMs: NOW,
+      },
+      passThroughTenant,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.ack).toMatchObject({ ok: true, status: "duplicate" });
     expect(await deps.store.loadStream("journal", org.id)).toHaveLength(journalBefore.length);
@@ -651,11 +675,15 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
       payment_id: "pay_lions",
       amount: 500_000,
     });
-    const result = await handleRazorpayWebhook(deps, {
-      rawBody: body,
-      signature: sign(body),
-      receivedAtMs: NOW,
-    });
+    const result = await handleRazorpayWebhook(
+      deps,
+      {
+        rawBody: body,
+        signature: sign(body),
+        receivedAtMs: NOW,
+      },
+      passThroughTenant,
+    );
     expect(result.ok).toBe(true);
 
     const refunded = await deps.store.loadPayment(lionsPaymentId);
