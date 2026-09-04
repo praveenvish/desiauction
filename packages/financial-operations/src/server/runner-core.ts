@@ -391,16 +391,49 @@ export async function runnerTick(deps: FinopsDeps, nowMs?: number): Promise<Drai
   return drainJobsOnce(deps, at);
 }
 
+/** One org the follower could not serve this tick, and why. */
+export interface FollowFailure {
+  readonly orgId: string;
+  readonly error: unknown;
+}
+
+export interface FollowAllResult {
+  /** Settlement facts consumed across every org that succeeded. */
+  readonly consumed: number;
+  /** Orgs that threw. Empty on a healthy tick; never silently discarded. */
+  readonly failures: readonly FollowFailure[];
+}
+
 /** The follower poll across every org — the loop's other half (ADR-3: polling
  * is the truth mechanism; nothing depends on a notification arriving). */
-export async function followAllOrgs(deps: FinopsDeps): Promise<number> {
+export async function followAllOrgs(deps: FinopsDeps): Promise<FollowAllResult> {
   let consumed = 0;
+  const failures: FollowFailure[] = [];
   for (const orgId of await deps.orgs.listOrgIds()) {
-    const run = await runFollower(deps, orgId);
-    consumed += run.consumed;
+    /**
+     * ONE ORG'S BAD DAY IS NOT EVERY ORG'S (audit PA-1 §16).
+     *
+     * `runFollower` throwing used to abort this loop, so every org after the
+     * failing one was skipped for the whole tick — and because the org list is
+     * stably ordered, it was the SAME orgs skipped every time. A single
+     * contended stream (a manual issuance racing the follower's auto-receipt is
+     * the ordinary way it happens) could therefore stop receipts for everyone
+     * sorted below it, indefinitely, while the runner logged a healthy tick.
+     *
+     * Isolating each org turns that into one org falling behind by one tick and
+     * catching up on the next, which is what polling is for. The failure is
+     * REPORTED rather than swallowed: the caller logs it, so a persistently
+     * failing org is visible instead of merely slow.
+     */
+    try {
+      const run = await runFollower(deps, orgId);
+      consumed += run.consumed;
+    } catch (error: unknown) {
+      failures.push({ orgId, error });
+    }
     await certifyFirstTime(deps, orgId);
   }
-  return consumed;
+  return { consumed, failures };
 }
 
 /**

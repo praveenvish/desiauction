@@ -70,10 +70,31 @@ let stopping = false;
 async function tick(): Promise<void> {
   const startedAt = Date.now();
   try {
-    const consumed = await followAllOrgs(deps);
+    const followed = await followAllOrgs(deps);
+    /**
+     * Report the orgs the follower could not serve, one line each.
+     *
+     * These used to abort the whole loop, so they were never reported at all —
+     * they simply became "every org after this one was skipped", logged as a
+     * healthy tick. Now they are isolated, which means the ONLY way anybody
+     * learns about a persistently failing org is this line and the Sentry event
+     * beside it.
+     */
+    for (const failure of followed.failures) {
+      logger.error({ err: failure.error, orgId: failure.orgId }, "runner.follower_failed");
+      Sentry.captureException(failure.error, { tags: { orgId: failure.orgId } });
+    }
     const drained = await runnerTick(deps);
-    if (drained.claimed > 0 || consumed > 0) {
-      logger.info({ consumed, ...drained, tookMs: Date.now() - startedAt }, "runner.tick");
+    if (drained.claimed > 0 || followed.consumed > 0 || followed.failures.length > 0) {
+      logger.info(
+        {
+          consumed: followed.consumed,
+          followerFailures: followed.failures.length,
+          ...drained,
+          tookMs: Date.now() - startedAt,
+        },
+        "runner.tick",
+      );
     }
   } catch (error) {
     // A failed tick is retried on the next one; jobs and cursors carry state.

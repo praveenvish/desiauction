@@ -71,6 +71,7 @@ import {
   dispatchQueueSnapshot,
   dispatchSnapshot,
   drainJobsOnce,
+  followAllOrgs,
   enqueueDispatchSends,
   enqueueExportGenerations,
   finopsDeps,
@@ -1209,5 +1210,48 @@ describe("JOB LEASE — the fence and the reclaim count (PA-1 §16)", () => {
       .where(eq(finopsJobs.id, jobId));
     expect(row?.attempts).toBe(3);
     expect(row?.state, "a crash-looping job never dead-lettered").toBe("dead");
+  });
+});
+
+describe("FOLLOWER ISOLATION — one bad org does not starve the rest (PA-1 §16)", () => {
+  it("keeps serving the orgs after the one that throws, and reports it", async () => {
+    /**
+     * `runFollower` throwing aborted the whole loop, so every org AFTER the
+     * failing one was skipped for the tick — and because the org list is stably
+     * ordered, the same orgs were skipped every time. One contended stream
+     * could stop receipts for everyone sorted below it, indefinitely, while the
+     * runner logged a healthy tick.
+     */
+    const failing = "01M1FOLLOWERISOLATION0BAD1";
+    const served: string[] = [];
+
+    const counted = {
+      ...deps,
+      orgs: { listOrgIds: () => Promise.resolve([failing, org.id]) },
+      // `runFollower` opens with `source.listOrgStreamHeads`, so that is where a
+      // contended org realistically blows up — and it is the first thing the
+      // loop does per org, which is what made the old abort so total.
+      source: {
+        ...deps.source,
+        listOrgStreamHeads: async (orgId: string) => {
+          if (orgId === failing) {
+            throw new Error("contended stream");
+          }
+          served.push(orgId);
+          return deps.source.listOrgStreamHeads(orgId);
+        },
+      },
+    } as unknown as typeof deps;
+
+    const result = await followAllOrgs(counted);
+
+    expect(
+      result.failures.map((failure) => failure.orgId),
+      "the failing org was not reported — it would be invisible",
+    ).toEqual([failing]);
+    expect(
+      served,
+      "the org after the failing one was never served — one bad org starved the tick",
+    ).toContain(org.id);
   });
 });
