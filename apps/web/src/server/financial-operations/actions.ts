@@ -31,6 +31,7 @@ import { dbHandle } from "../db";
 import { membersOf, resolveTenant, type OrgSummary } from "../orgs/orgs";
 import { can, grantsFor } from "../orgs/authz";
 import { canFinops, finopsActor, issueFinopsGrant, revokeFinopsGrant } from "./authz";
+import { derivedId } from "../derived-id";
 import { webFinopsDeps } from "./deps";
 import {
   deliveriesView,
@@ -765,8 +766,24 @@ export async function retryDeliveryAction(
   orgSlug: string,
   dispatchId: string,
 ): Promise<FinopsResult> {
+  /**
+   * DERIVED, NOT MINTED (audit PA-1 §16).
+   *
+   * This passed `newId()`, so the writer's command-id dedupe — the mechanism
+   * that exists precisely to make a repeated request one effect — could never
+   * engage. Two clicks on Retry, or one click and one impatient second, created
+   * two dispatches from the same failed one, and a dispatch is a message: the
+   * recipient got the document twice.
+   *
+   * Keying on the failed dispatch makes the intent what it actually is —
+   * "resend THIS one" — so a repeat is recognised as the same request rather
+   * than a new one. Retrying a second time after the first retry itself fails
+   * is a different intent, and gets a different key, because that failed
+   * dispatch has its own id.
+   */
+  const fingerprint = `dispatch:${dispatchId}:retry`;
   return command(orgSlug, async (deps, actor) =>
-    resultOf(await retryDispatch(deps, actor, dispatchId, newId())),
+    resultOf(await retryDispatch(deps, actor, dispatchId, fingerprint, derivedId(fingerprint))),
   );
 }
 
