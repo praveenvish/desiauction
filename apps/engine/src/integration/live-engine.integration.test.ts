@@ -68,6 +68,14 @@ const engine = new AuctionEngine({
 const orgId = newId();
 const ownerId = newId();
 const bidderIds = Array.from({ length: 10 }, () => newId());
+/**
+ * An owner who holds NO team, for the "second granted owner cannot claim a held
+ * paddle" case below. That case used to reuse `bidderIds[1]`, who already owns
+ * team 1 — a state invariant 18 now forbids (migration 0042), so the fixture
+ * would be asserting a scenario the product refuses. The behaviour under test
+ * is one ACTIVE paddle per team, which has nothing to do with owning two.
+ */
+const spareOwnerId = newId();
 const teamIds = Array.from({ length: 10 }, () => newId());
 const compId = newId();
 let auctionId = "";
@@ -100,6 +108,7 @@ beforeAll(async () => {
       phone: `+9198${RUN.slice(0, 5)}${String(i).padStart(2, "0")}`,
       name: `Bidder ${String(i + 1)}`,
     })),
+    { id: spareOwnerId, phone: `+9197${RUN}0`, name: "Spare Owner" },
   ]);
   await db
     .insert(organizations)
@@ -184,7 +193,7 @@ afterAll(async () => {
   await db.delete(orgMembers).where(eq(orgMembers.orgId, orgId));
   await db.delete(auditLog).where(eq(auditLog.scopeId, orgId));
   await db.delete(organizations).where(eq(organizations.id, orgId));
-  await db.delete(people).where(inArray(people.id, [ownerId, ...bidderIds]));
+  await db.delete(people).where(inArray(people.id, [ownerId, spareOwnerId, ...bidderIds]));
   await sql.end();
 });
 
@@ -238,9 +247,15 @@ describe("LIVE ENGINE — paddles, queue, opening", () => {
     // An ungranted person is refused BEFORE the held check (grants gate claims).
     const refused = await command("ClaimPaddle", ownerId, { teamId: teamIds[0] });
     expect(refused).toMatchObject({ accepted: false, reason: "no_grant" });
-    // MULTIPLE owners may exist: a second granted owner of team 1 still cannot
-    // claim while the paddle is held (one ACTIVE paddle per team).
-    const second = bidderIds[1] as string;
+    // MULTIPLE owners may exist for one team: a second granted owner still
+    // cannot claim while the paddle is held (one ACTIVE paddle per team).
+    //
+    // The second owner is `spareOwnerId`, who holds no other team. This used to
+    // be `bidderIds[1]`, who owns team 1 — and after migration 0042 that person
+    // can no longer be granted a second team at all, so the setup would refuse
+    // before reaching the behaviour under test. The rule being proved here is
+    // about one paddle per TEAM, not about one team per owner.
+    const second = spareOwnerId;
     const invited2 = await command(
       "InviteOwner",
       ownerId,

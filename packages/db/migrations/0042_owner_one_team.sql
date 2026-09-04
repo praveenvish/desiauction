@@ -1,0 +1,45 @@
+-- INVARIANT 18 — an Owner never owns two teams in one tournament.
+--
+-- HAND-AUTHORED, like 0019-0041.
+--
+-- `docs/40-business-rules.md` files invariant 18 under "Schema/DB constraints
+-- (52)". It was enforced NOWHERE. The existing partial unique on
+-- `paddle_grants` is (auction_id, team_id, person_id), which prevents a
+-- duplicate grant for the SAME team and says nothing whatever about a second
+-- one; no refusal existed in the aggregate either. So one person could hold the
+-- bidding authority for two teams in the same auction and bid against
+-- themselves — in a product whose entire promise is a trusted auction, and
+-- whose north-star metric is auctions completed with zero disputes.
+--
+-- Audit PA-1 (2026-09-04) found 26 (auction, person) pairs already holding
+-- paddles on two or more teams in the development database, all test fixtures.
+--
+-- WHY THIS TABLE AND NOT `paddles`.
+--
+-- The two are not the same claim. `paddle_grants` is the OWNER relationship —
+-- invite → accept → grant — and is the durable authorization invariant 18 talks
+-- about. `paddles` is the physical bidding paddle, and DA-02 deliberately lets
+-- one person hold several of them so a conductor can bid on behalf of owners
+-- who are not in the room; there is a paddle selector in the live panel built
+-- for exactly that, and a great many community auctions are run that way.
+--
+-- An organizer bidding openly for absent owners, audited, under the
+-- `auction.conduct` capability, is a different act from a rival owner quietly
+-- controlling two purses. Constraining the owner arm enforces the invariant as
+-- written and leaves the working feature alone. (Founder decision, 2026-09-04.)
+--
+-- SAFETY. Partial index, so revoked grants stay as history and a person may be
+-- granted a different team after their first grant is revoked — the ordinary
+-- correction path. Built non-concurrently because drizzle wraps the whole
+-- migration batch in one transaction; `paddle_grants` is small (hundreds of
+-- rows at beta scale) and this is a fresh-database index at deploy time.
+--
+-- It will FAIL if any violating pair exists. That is intended: an existing
+-- violation is a real auction where two teams answered to one person, and it
+-- needs a human to decide which grant stands, not a migration that guesses.
+-- `node scripts/purge-orphans.mjs` and the query in the audit report locate
+-- them.
+
+CREATE UNIQUE INDEX "paddle_grants_auction_person_active_uq"
+  ON "paddle_grants" ("auction_id", "person_id")
+  WHERE "revoked_at" IS NULL;

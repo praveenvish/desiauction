@@ -1075,6 +1075,14 @@ export const paddleGrants = pgTable(
     uniqueIndex("paddle_grants_active_uq")
       .on(table.auctionId, table.teamId, table.personId)
       .where(sql`revoked_at is null`),
+    // INVARIANT 18 — an owner never owns two teams in one tournament (0042).
+    // The index above stops a duplicate grant for the SAME team and says
+    // nothing about a second one; this is the one that carries the invariant.
+    // Deliberately NOT mirrored on `paddles`: DA-02 lets a conductor hold
+    // several paddles to bid for owners who are not in the room.
+    uniqueIndex("paddle_grants_auction_person_active_uq")
+      .on(table.auctionId, table.personId)
+      .where(sql`revoked_at is null`),
     index("paddle_grants_auction_idx").on(table.auctionId),
     index("paddle_grants_person_idx").on(table.personId),
   ],

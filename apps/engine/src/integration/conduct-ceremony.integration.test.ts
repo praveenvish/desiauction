@@ -358,6 +358,45 @@ describe("OWNER MODEL — invitation → acceptance → grant → claim", () => 
     paddleA = rows.find((row) => row.personId === ownerA)?.id ?? "";
     paddleB = rows.find((row) => row.personId === ownerB)?.id ?? "";
   });
+
+  it("INVARIANT 18: an owner cannot be granted a second team", async () => {
+    /**
+     * `docs/40` lists invariant 18 under "Schema/DB constraints" and it was
+     * enforced nowhere (audit PA-1 §5): the partial unique on `paddle_grants`
+     * is (auction, team, person), which stops a duplicate grant for the SAME
+     * team and says nothing about a second one. One person could hold the
+     * bidding authority for two teams and bid against themselves.
+     *
+     * Note the setup: ownerA ACCEPTS an owner invite for team 2 first. Without
+     * that the grant is refused `not_an_owner` and proves nothing — the
+     * invariant has to be what stops it, not the earlier gate.
+     */
+    const invited = await command(
+      "InviteOwner",
+      organizerId,
+      { teamId: teamIds[1], tokenHash: `h-${RUN}-a2`, expiresAtMs: Date.now() + 3_600_000 },
+      { conduct: true },
+    );
+    expect(invited.accepted).toBe(true);
+    const inviteId = (invited.reason ?? "").replace("invite:", "");
+    expect((await command("AcceptOwnerInvite", ownerA, { inviteId })).accepted).toBe(true);
+
+    const second = await command(
+      "GrantPaddle",
+      organizerId,
+      { teamId: teamIds[1], personId: ownerA },
+      { conduct: true },
+    );
+    expect(second.accepted, "one owner was granted paddles for two teams").toBe(false);
+    expect(second.reason).toBe("owns_another_team");
+
+    // And the first team's grant is untouched — a refusal must not disturb it.
+    const grants = await db
+      .select({ teamId: paddleGrants.teamId })
+      .from(paddleGrants)
+      .where(and(eq(paddleGrants.auctionId, auctionId), eq(paddleGrants.personId, ownerA)));
+    expect(grants.map((row) => row.teamId)).toEqual([teamIds[0]]);
+  });
 });
 
 describe("COMPENSATING UNDO — history immutable, replay identical", () => {

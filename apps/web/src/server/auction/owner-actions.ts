@@ -417,6 +417,11 @@ export async function grantPaddleAction(
   if (!ack.accepted) {
     const message: Record<string, string> = {
       not_an_owner: "That person hasn't accepted an owner invitation for this team.",
+      // Invariant 18. The organizer needs to know this is a RULE and what the
+      // way out is, not just that the click failed — otherwise the natural
+      // reading is "the app is broken" and they try again.
+      owns_another_team:
+        "That person already holds a paddle grant for another team in this auction. An owner can only hold one team — revoke the other grant first.",
       terminal_auction: "This auction has ended.",
       unknown_team: "Pick a team from this competition.",
       engine_unreachable: "The auction engine is offline.",
