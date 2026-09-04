@@ -71,7 +71,7 @@ describe("POSTURE — a pool reach with no tenant boundary is blind (PA-1 P0-1)"
       insert into settlement_cases (id, org_id, auction_id, competition_id, basis,
                                     source_event_count, source_digest, created_by)
       values (${caseId}, ${orgId}, ${pad("01M1POSTUREAUC")}, ${pad("01M1POSTURECOMP")},
-              'per-team', 0, 'posture', ${pad("01M1POSTUREBY")})
+              'committed', 0, 'posture', ${pad("01M1POSTUREBY")})
     `;
     await owner.sql`
       insert into payments (id, org_id, case_id, team_id, method, amount)

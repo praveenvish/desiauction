@@ -21,7 +21,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import type { SettlementEventEnvelope } from "@desiauction/settlement";
-import { and, asc, eq, gte, inArray, lte, max, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, lte, max, ne, or, sql } from "drizzle-orm";
 
 import type {
   DigestFn,
@@ -410,6 +410,16 @@ function transaction(tx: Tx): FinopsTx {
         )
         .returning({ id: finopsJobs.id });
       return updated.length > 0;
+    },
+
+    async purgeFinishedJobs(beforeMs) {
+      // `done` only. A `dead` job is evidence that something needs a human and
+      // is what `loadDeadJobs` and the daily checklist read.
+      const gone = await tx
+        .delete(finopsJobs)
+        .where(and(eq(finopsJobs.state, "done"), lt(finopsJobs.updatedAtMs, beforeMs)))
+        .returning({ id: finopsJobs.id });
+      return gone.length;
     },
 
     async putSchedule(row) {

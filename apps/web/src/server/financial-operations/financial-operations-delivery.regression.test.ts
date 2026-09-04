@@ -1258,3 +1258,54 @@ describe("FOLLOWER ISOLATION — one bad org does not starve the rest (PA-1 §16
     ).toContain(org.id);
   });
 });
+
+describe("JOB RETENTION — finished jobs age out, dead ones never do (PA-1 §14)", () => {
+  it("removes done jobs past the cutoff and keeps dead ones", async () => {
+    /**
+     * `finops_jobs` had no retention: a `done` row stayed for ever, so the
+     * table grew without bound and the claim query's index carried more dead
+     * weight every day. `dead` rows are deliberately kept — they are the
+     * operator's queue of things that need a human, and the daily checklist
+     * reads them, so a sweep that took them would be deleting the alert.
+     */
+    const oldDone = "01M1RETENTION000000OLDDONE";
+    const newDone = "01M1RETENTION000000NEWDONE";
+    const oldDead = "01M1RETENTION000000OLDDEAD";
+    const now = Date.now();
+    const week = 7 * 24 * 60 * 60_000;
+
+    for (const [id, state, updatedAtMs] of [
+      [oldDone, "done", now - week - 1000],
+      [newDone, "done", now - 1000],
+      [oldDead, "dead", now - week - 1000],
+    ] as const) {
+      await db.delete(finopsJobs).where(eq(finopsJobs.id, id));
+      await db.insert(finopsJobs).values({
+        id,
+        orgId: org.id,
+        kind: "dispatch.send",
+        dedupeKey: `retention-${id}`,
+        state,
+        attempts: 0,
+        maxAttempts: 5,
+        notBeforeMs: 0,
+        payload: {},
+        updatedAtMs,
+      });
+    }
+
+    const purged = await deps.store.transact((tx) => tx.purgeFinishedJobs(now - week));
+    expect(purged).toBeGreaterThanOrEqual(1);
+
+    const surviving = await db
+      .select({ id: finopsJobs.id })
+      .from(finopsJobs)
+      .where(inArray(finopsJobs.id, [oldDone, newDone, oldDead]));
+    const ids = surviving.map((row) => row.id.trim());
+    expect(ids, "an aged-out done job survived the sweep").not.toContain(oldDone);
+    expect(ids, "a recent done job was swept too early").toContain(newDone);
+    expect(ids, "a DEAD job was swept — that is the operator's alert queue").toContain(oldDead);
+
+    await db.delete(finopsJobs).where(inArray(finopsJobs.id, [newDone, oldDead]));
+  });
+});

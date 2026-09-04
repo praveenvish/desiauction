@@ -325,6 +325,16 @@ export interface FinopsTx {
    * result this worker must not act on.
    */
   updateJob(row: JobRow, fenceLeasedUntilMs?: number | null): Promise<boolean>;
+  /**
+   * Delete finished jobs older than a cutoff, and report how many went.
+   *
+   * `finops_jobs` had no retention at all: a `done` row stayed for ever, so the
+   * table grew without bound and the claim query's index carried more dead
+   * weight every day (audit PA-1 §14). `dead` rows are deliberately KEPT —
+   * they are the operator's queue of things that need a human, and the daily
+   * checklist reads them.
+   */
+  purgeFinishedJobs(beforeMs: number): Promise<number>;
   putSchedule(row: ScheduleRow): Promise<void>;
 }
 

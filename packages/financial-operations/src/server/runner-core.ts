@@ -291,6 +291,8 @@ export interface DrainResult {
    * the answer is a shorter batch or a longer lease, not a retry.
    */
   readonly lost: number;
+  /** Finished jobs the retention sweep removed on this tick, when it ran. */
+  readonly purged?: number;
 }
 
 /**
@@ -382,13 +384,54 @@ export async function drainJobsOnce(
 
 /** One full runner tick: seed slots, fire due schedules, discover pipeline
  * work (requested dispatches/exports → derived jobs), drain the queue. */
+/**
+ * How long a finished job stays before the sweep takes it.
+ *
+ * Long enough that an operator investigating this morning's run can still see
+ * what ran, short enough that the table does not become an archive. `dead` jobs
+ * are never swept — they are the queue of things needing a human.
+ */
+const FINISHED_JOB_TTL_MS = 7 * 24 * 60 * 60_000;
+
+/** How often the sweep runs, regardless of tick cadence. */
+const PURGE_INTERVAL_MS = 60 * 60_000;
+let lastPurgeMs = 0;
+
 export async function runnerTick(deps: FinopsDeps, nowMs?: number): Promise<DrainResult> {
   const at = nowMs ?? deps.now();
   await ensureSchedules(deps, at);
   await runSchedulesOnce(deps, at);
   await enqueueDispatchSends(deps, at);
   await enqueueExportGenerations(deps, at);
-  return drainJobsOnce(deps, at);
+  const drained = await drainJobsOnce(deps, at);
+
+  /*
+   * RETENTION (audit PA-1 §14). `finops_jobs` kept every completed row for
+   * ever: the ops board had already measured "1192 queued, oldest 9 days", and
+   * a claim query whose index carries years of dead rows gets slower at exactly
+   * the rate the platform gets busier.
+   *
+   * On the tick rather than on a schedule, because the schedules run inside the
+   * governance lifecycle that beta descopes (D3) — a retention sweep that only
+   * runs when somebody opens a fiscal period is a retention sweep that never
+   * runs. Hourly, and failure is swallowed on purpose: housekeeping must never
+   * be the reason a tick that did real work reports failure.
+   */
+  let purgedThisTick = 0;
+  if (at - lastPurgeMs >= PURGE_INTERVAL_MS) {
+    lastPurgeMs = at;
+    try {
+      const purged = await deps.store.transact((tx) =>
+        tx.purgeFinishedJobs(at - FINISHED_JOB_TTL_MS),
+      );
+      purgedThisTick = purged;
+    } catch {
+      // Deliberately swallowed: see above. The next hour tries again.
+    }
+  }
+  // Reported rather than logged here: `FinopsDeps` carries no logger, and the
+  // runner is the process that owns saying things out loud.
+  return purgedThisTick > 0 ? { ...drained, purged: purgedThisTick } : drained;
 }
 
 /** One org the follower could not serve this tick, and why. */

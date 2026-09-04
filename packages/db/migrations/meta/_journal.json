@@ -309,6 +309,13 @@
       "when": 1787414400000,
       "tag": "0043_auction_spine_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1787500800000,
+      "tag": "0044_closed_sets_and_indexes",
+      "breakpoints": true
     }
   ]
 }

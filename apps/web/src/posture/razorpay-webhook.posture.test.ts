@@ -87,7 +87,7 @@ beforeAll(async () => {
     insert into settlement_cases (id, org_id, auction_id, competition_id, basis,
                                   source_event_count, source_digest, created_by)
     values (${CASE}, ${ORG}, ${id("01M1POSTURERZP1AUC")}, ${id("01M1POSTURERZP1COMP")},
-            'per-team', 0, 'posture', ${id("01M1POSTURERZP1BY")})
+            'committed', 0, 'posture', ${id("01M1POSTURERZP1BY")})
   `;
   await owner.sql`
     insert into payments (id, org_id, case_id, team_id, method, amount, status)
