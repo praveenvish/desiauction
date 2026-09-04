@@ -203,13 +203,17 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 ---
 
-#### Phase 3 — IN PROGRESS (3.1 done, 2026-09-05)
+#### Phase 3 — 3.1, 3.2, 3.3, 3.5, 3.6 DONE · 3.4 PARTIAL (2026-09-05)
 
 | # | Outcome |
 |---|---|
 | 3.1 | **Done — migration 0043, 21 constraints, all validated.** `lots`, `bids`, `paddles`, `auctions`, `teams`, `registrations`, `competitions`, `settlement_obligations`, `payments`. ON DELETE RESTRICT everywhere: a cascade would mean deleting an org silently destroys its auctions, bids and sale record, and invariant 4 says money records survive erasure. `NOT VALID` then `VALIDATE`, which is the shape every future constraint should take. |
 | | **The constraints were the easy part.** Landing them required first closing what still produced orphans: sixteen teardowns leaving the spine behind (660/run), then two fixtures that INVENTED parents the product cannot produce — one inserting paddles for an org, competition and auction it never created; the career fixture giving two sold lots `soldToPaddleId: newId()`, a buyer referencing nothing. A third, the engine's deleted-lot drill, had to stage its corruption a step differently now that a lot with bids cannot vanish. Two of my own posture fixtures had the same flaw and were caught by the same constraints. |
-| 3.2–3.6 | Not started: status CHECKs, migration `lock_timeout` + advisory lock, allowlist burn-down (debt 9), index hygiene, `finops_jobs` retention. |
+| 3.2 | **Done — migration 0044, 33 CHECKs.** The audit counted ~15 enum-shaped text columns; there were 33. Generated FROM `schema.ts`'s own declarations, never from the data — a CHECK built from "what exists today" refuses a legal value the first time a state is used. Immediately caught two of my own posture fixtures using a settlement `basis` that was never a declared value. |
+| 3.3 | **Done.** `packages/db/scripts/migrate.mjs`: session advisory lock so two deploys cannot apply one batch, and a 5s `lock_timeout` so a blocked ALTER fails fast and loudly. Without it, an ALTER waiting on a long reader blocks every statement behind it — one slow query plus one deploy is a total outage of that table, and it looks like the app hanging. Verified on a fresh database and a re-run; the timeout path is code-reviewed, not simulated. |
+| 3.4 | **Started — debt 9 → 8.** `conduct-actions` burned down: `ownerAcceptancesOf` (owner names and PHONE NUMBERS) moved inside the boundary `cockpitView` already used, plus the org-name read one line outside it. What remains there is `publicSpectatorView`, which is anonymous. **`/home` deliberately not converted**: its money aggregates span every org a person belongs to via `inArray`, so a boundary means N per-org round trips — a design change on the largest money read surface, deserving its own pass. |
+| 3.5 | **Done (in 0044).** Dropped the duplicate `demo_bookings_slot_idx`; added the three unindexed FK columns on `auction_team_targets`, `audit_log(actor, at)`, and the covering index for 0041's third policy arm. |
+| 3.6 | **Done.** Hourly sweep drops `done` jobs past a week and never touches `dead` ones — those are the operator's alert queue. On the tick rather than the schedule, because the schedules live inside the governance lifecycle beta descopes (D3), and a sweep that only runs when somebody opens a fiscal period never runs. |
 
 **Verified:** 35 FKs / 35 validated, on the working database and on a **fresh database built from migrations alone**; engine 69, web 849, posture 13/13, grants 286; and a full suite run now leaves **zero** orphans where it used to leave hundreds.
 
