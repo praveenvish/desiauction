@@ -65,7 +65,11 @@ function rolePill(set: string): { key: string; label: string; technical: string 
 
 /** "Jan 2021" — the Joined column, month + year as the design shows. */
 function joinedLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /** "24 Jul 2026" — precise enough for provenance, short enough for a tooltip. */
@@ -73,6 +77,7 @@ function grantedLabel(iso: string | null): string | null {
   return iso === null
     ? null
     : new Date(iso).toLocaleDateString("en-IN", {
+        timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
         day: "numeric",
         month: "short",
         year: "numeric",

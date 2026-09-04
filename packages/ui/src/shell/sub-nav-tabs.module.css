@@ -4,6 +4,23 @@
   /* Long tab rows scroll inside the strip; the page never scrolls sideways. */
   overflow-x: auto;
   scrollbar-width: none;
+  /* SAYING SO. The strip has always scrolled and the scrollbar is hidden by
+     design, so on a phone the eight-tab admin strip simply clipped mid-word
+     ("Hea…") and four destinations were invisible to anyone who did not think
+     to swipe. These are scroll shadows: the two `local` layers are the strip's
+     own ground and travel WITH the content, the two `scroll` layers are pinned
+     to the container. At either end the ground slides over the shadow and
+     hides it — so the fade appears only where there is genuinely more to see,
+     with no scroll listener and nothing to keep in sync. */
+  background:
+    linear-gradient(to right, var(--surface-raised) 60%, transparent) left center / 20px 100%
+      no-repeat local,
+    linear-gradient(to left, var(--surface-raised) 60%, transparent) right center / 20px 100%
+      no-repeat local,
+    linear-gradient(to right, var(--border-strong), transparent) left center / 12px 100% no-repeat
+      scroll,
+    linear-gradient(to left, var(--border-strong), transparent) right center / 12px 100% no-repeat
+      scroll;
 }
 
 .tabs::-webkit-scrollbar {

@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -47,6 +48,53 @@ export const people = pgTable("people", {
 });
 
 /**
+ * THE PERSON'S DURABLE CRICKET IDENTITY (PI-1).
+ *
+ * One row per person, created lazily on first profile write. This is the
+ * SOURCE OF DEFAULTS, not the record of fact: each registration still snapshots
+ * the values chosen for that season, so editing a profile never rewrites
+ * history and the auction pool keeps reading registrations alone.
+ *
+ * Gender is deliberately NOT snapshotted anywhere — eligibility reads it here
+ * at decision time, and historical rows never embed a fact a person is
+ * entitled to correct (DPDP correction right). NULL means "never asked";
+ * `unspecified` means "asked, declined" — two different absences.
+ *
+ * No RLS and no org column, deliberately: like `people`, `sessions` and
+ * `consent_records`, this is between the platform and a person, not a club.
+ * Every read and write is scoped to the session's own person id in the app
+ * layer, and a person-isolation regression test holds that boundary.
+ */
+export const playerProfiles = pgTable(
+  "player_profiles",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    gender: text("gender", {
+      enum: ["male", "female", "non_binary", "self_described", "unspecified"],
+    }),
+    /** The person's own words; only meaningful with gender = self_described. */
+    genderSelfDescribed: text("gender_self_described"),
+    /** ISO yyyy-mm-dd; age is DERIVED at read time, never stored (D2). */
+    dateOfBirth: text("date_of_birth"),
+    /** City-level free text — no taxonomy; no feature consumes more. */
+    location: text("location"),
+    defaultRole: text("default_role", {
+      enum: ["batter", "bowler", "all_rounder", "wicket_keeper"],
+    }),
+    defaultBattingStyle: text("default_batting_style"),
+    defaultBowlingStyle: text("default_bowling_style"),
+    preferredJerseyName: text("preferred_jersey_name"),
+    preferredJerseyNumber: text("preferred_jersey_number"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("player_profiles_person_uq").on(table.personId)],
+);
+
+/**
  * Codes that prove an address belongs to the person typing it.
  *
  * Separate from `otp_codes`, whose column is named `phone` and whose indexes
@@ -57,7 +105,9 @@ export const emailVerifications = pgTable(
   "email_verifications",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     codeHash: text("code_hash").notNull(),
     expiresAt: ts("expires_at").notNull(),
@@ -83,17 +133,28 @@ export const orgMembers = pgTable(
   "org_members",
   {
     orgId: char("org_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     joinedAt: ts("joined_at").notNull().defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.orgId, table.personId] })],
+  // PRR P2/F36: the composite PK indexes (org_id, person_id) — good for "who is
+  // in this org", useless for "which orgs is this person in", which the org
+  // switcher and every person-scoped membership read do. That lookup was a full
+  // scan; this index serves it.
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.personId] }),
+    index("org_members_person_idx").on(table.personId),
+  ],
 );
 
 export const sessions = pgTable(
   "sessions",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull().unique(),
     createdAt: ts("created_at").notNull().defaultNow(),
     lastSeenAt: ts("last_seen_at").notNull().defaultNow(),
@@ -110,6 +171,16 @@ export const otpCodes = pgTable(
     id: id(),
     phone: text("phone").notNull(),
     codeHash: text("code_hash").notNull(),
+    /**
+     * What this code may prove (PI-1). Minted for one purpose, consumable for
+     * that purpose alone: before this column, the phone-change flow reused
+     * login codes by construction, so a code sent for sign-in could confirm a
+     * number change on the same phone. Purposes stay phone-shaped — email
+     * codes live in `email_verifications`, which says what it is.
+     */
+    purpose: text("purpose", { enum: ["login", "phone_change"] })
+      .notNull()
+      .default("login"),
     expiresAt: ts("expires_at").notNull(),
     attempts: integer("attempts").notNull().default(0),
     consumedAt: ts("consumed_at"),
@@ -140,13 +211,15 @@ export const consentRecords = pgTable(
   "consent_records",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     /** What they agreed to — "sms.transactional", "sms.promotional". */
     purpose: text("purpose").notNull(),
     granted: boolean("granted").notNull(),
     /** Where the agreement came from, so an audit can retrace it. */
     source: text("source", {
-      enum: ["registration", "account", "sms_stop", "sms_start", "import", "support"],
+      enum: ["registration", "account", "sms_stop", "sms_start", "import", "support", "login"],
     }).notNull(),
     /** The wording shown, the page, whatever proves what they actually saw. */
     evidence: jsonb("evidence").notNull().default({}),
@@ -179,7 +252,9 @@ export const notificationPreferences = pgTable(
   "notification_preferences",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     /** `registration`, `auction`, `money`, `marketing`. */
     topic: text("topic").notNull(),
     channel: text("channel", { enum: ["sms", "email", "in-app"] }).notNull(),
@@ -271,7 +346,9 @@ export const passkeyCredentials = pgTable(
   "passkey_credentials",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
     credentialId: text("credential_id").notNull().unique(),
     publicKey: text("public_key").notNull(),
     counter: integer("counter").notNull().default(0),
@@ -288,7 +365,9 @@ export const grants = pgTable(
   "grants",
   {
     id: id(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     // PX-9: "platform" joins the TYPE union — a type-only widening, not a schema
     // change. The column is and always was plain `text` (migration 0000; the
     // drizzle snapshot records no enum), so this emits no migration. It exists
@@ -416,6 +495,15 @@ export const competitions = pgTable(
     visibility: text("visibility", { enum: ["private", "public"] })
       .notNull()
       .default("private"),
+    /**
+     * Who this season is for (PI-1) — the competition-level half of the gender
+     * model. `open` is the honest default for every row that predates the
+     * column. Enforcement lives ONLY in core's eligibility engine; public
+     * surfaces read this for terminology ("Women's", "Open") and nothing else.
+     */
+    entryCategory: text("entry_category", { enum: ["open", "men", "women", "mixed"] })
+      .notNull()
+      .default("open"),
     // Storage KEY for the auction crest; signed at read time by the media port.
     logoUrl: text("logo_url"),
     location: text("location"),
@@ -430,12 +518,33 @@ export const competitions = pgTable(
   ],
 );
 
+/**
+ * THE TEAM THAT COMES BACK (PI-1 P6) — the 0019 tournaments pattern applied
+ * to teams: a durable org-scoped name that editions' team rows point at.
+ * Written only by the clone path; read only by career/grouping surfaces.
+ * Never an authority — the auction, rosters and money key on `teams` alone.
+ */
+export const franchises = pgTable(
+  "franchises",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    name: text("name").notNull(),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("franchises_org_idx").on(table.orgId)],
+);
+
 export const teams = pgTable(
   "teams",
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     competitionId: char("competition_id", { length: 26 }).notNull(),
+    /** PI-1 P6: the durable franchise this edition-team is an appearance of;
+     *  null for a one-off. Linked by the clone path, read for grouping only. */
+    franchiseId: char("franchise_id", { length: 26 }),
     name: text("name").notNull(),
     shortName: text("short_name"),
     primaryColor: text("primary_color"),
@@ -451,6 +560,7 @@ export const teams = pgTable(
   (table) => [
     uniqueIndex("teams_competition_name_uq").on(table.competitionId, table.name),
     index("teams_competition_idx").on(table.competitionId),
+    index("teams_franchise_idx").on(table.franchiseId),
   ],
 );
 
@@ -460,7 +570,9 @@ export const registrations = pgTable(
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     competitionId: char("competition_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     role: text("role", {
       enum: ["batter", "bowler", "all_rounder", "wicket_keeper"],
     }).notNull(),
@@ -498,6 +610,20 @@ export const registrations = pgTable(
     tshirtSize: text("tshirt_size"),
     trouserSize: text("trouser_size"),
     basePriceBand: text("base_price_band"),
+    // --- Registration desk (0034). NOT settlement money: an entry fee is desk
+    // bookkeeping and never posts to the finops ledger. See the migration.
+    feeStatus: text("fee_status", { enum: ["pending", "paid", "waived", "refunded"] })
+      .notNull()
+      .default("pending"),
+    /** Integer paise (C-7, no floats). NULL = no amount recorded, not zero. */
+    feeAmountPaise: bigint("fee_amount_paise", { mode: "number" }),
+    /** UTR / transaction reference as the player quoted it. */
+    feeReference: text("fee_reference"),
+    /**
+     * The organizer's own remark. DISTINCT from `rejectionNote`, which belongs
+     * to a triage decision; this one survives every status change.
+     */
+    note: text("note"),
     rejectionReason: text("rejection_reason"),
     rejectionNote: text("rejection_note"),
     reviewedBy: char("reviewed_by", { length: 26 }),
@@ -535,6 +661,10 @@ export const registrations = pgTable(
       .on(table.teamId)
       .where(sql`${table.isCaptain} and ${table.teamId} is not null`),
     check(
+      "registrations_fee_status_check",
+      sql`${table.feeStatus} in ('pending', 'paid', 'waived', 'refunded')`,
+    ),
+    check(
       "registrations_status_check",
       sql`${table.status} in ('draft', 'submitted', 'approved', 'rejected', 'waitlisted', 'withdrawn')`,
     ),
@@ -544,6 +674,46 @@ export const registrations = pgTable(
 // --- Fixtures & venues (M-IP3-3). Org-scoped; RLS read+write in migration 0007.
 // Venue → Ground is the physical hierarchy; fixtures reference GROUNDS only —
 // venue information is never duplicated onto a fixture row.
+
+/**
+ * HOW THIS CLUB'S REGISTRATION FORM IS READ (migration 0033).
+ *
+ * `competitionId` null = the org's default mapping; set = an override for one
+ * season. Two partial unique indexes keep each rule readable on its own rather
+ * than hiding both inside a COALESCE.
+ */
+export const orgImportMappings = pgTable(
+  "org_import_mappings",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }),
+    /** Normalized+sorted header fingerprint — a LAYOUT, never player data. */
+    signature: text("signature").notNull(),
+    label: text("label"),
+    /** core's `ColumnMapping`: field -> source column index. */
+    mapping: jsonb("mapping").notNull(),
+    /** core's `ValueMaps`: field -> { as written: as we understand it }. */
+    valueMaps: jsonb("value_maps").notNull().default({}),
+    dateOrder: text("date_order", { enum: ["dmy", "mdy"] })
+      .notNull()
+      .default("dmy"),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    updatedBy: char("updated_by", { length: 26 }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("org_import_mappings_org_default_uq")
+      .on(table.orgId, table.signature)
+      .where(sql`${table.competitionId} is null`),
+    uniqueIndex("org_import_mappings_competition_uq")
+      .on(table.orgId, table.competitionId, table.signature)
+      .where(sql`${table.competitionId} is not null`),
+    index("org_import_mappings_org_idx").on(table.orgId),
+    check("org_import_mappings_date_order_check", sql`${table.dateOrder} in ('dmy', 'mdy')`),
+  ],
+);
 
 export const venues = pgTable(
   "venues",
@@ -736,7 +906,9 @@ export const paddles = pgTable(
     orgId: char("org_id", { length: 26 }).notNull(),
     auctionId: char("auction_id", { length: 26 }).notNull(),
     teamId: char("team_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     paddleNumber: text("paddle_number").notNull(),
     issuedAt: ts("issued_at").notNull().defaultNow(),
     // M-IP4-2 claims: identity stays immutable; a release ENDS the claim. A
@@ -891,7 +1063,9 @@ export const paddleGrants = pgTable(
     orgId: char("org_id", { length: 26 }).notNull(),
     auctionId: char("auction_id", { length: 26 }).notNull(),
     teamId: char("team_id", { length: 26 }).notNull(),
-    personId: char("person_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     grantedBy: char("granted_by", { length: 26 }).notNull(),
     createdAt: ts("created_at").notNull().defaultNow(),
     revokedAt: ts("revoked_at"),
@@ -903,6 +1077,157 @@ export const paddleGrants = pgTable(
       .where(sql`revoked_at is null`),
     index("paddle_grants_auction_idx").on(table.auctionId),
     index("paddle_grants_person_idx").on(table.personId),
+  ],
+);
+
+// --- My plan (WR-1, M1). Purely additive: nothing above this line changes.
+//
+// A team owner's PRIVATE pre-auction plan: the players they mean to bid for,
+// the most they mean to pay, and who they fall back to. It is NOT auction
+// truth. The engine never reads it, the snapshot never carries it, and no rule
+// derived from it can place or refuse a bid. It is compared against engine
+// truth on the owner's own screen and nowhere else.
+//
+// WHY THE POLICY HAS A SECOND ARM. Every other auction table is org-scoped at
+// RLS and participation-gated in the read model (`liveGate`). That is enough
+// for data every participant may see. A plan is the one thing in this schema
+// that one org member must never read about another: organizer, rival owner
+// and plain member alike. So the two plan tables carry the org floor AND a
+// participant arm in the policy itself (migration 0041): the same three
+// sources `participantTeamIds` unions in the web tier, evaluated by Postgres
+// against `app.person_id`. A read model that forgets to filter by team still
+// receives nothing it should not, and `rls:verify` proves it per table.
+//
+// Keyed by REGISTRATION, not lot: a lot id dies with an abandoned auction and
+// the registration survives into the recreated one. Money is integer paise.
+// `max_bid` NULL means "no cap": the row is a target, not a price.
+
+export const auctionTeamTargets = pgTable(
+  "auction_team_targets",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 })
+      .notNull()
+      .references(() => auctions.id, { onDelete: "cascade" }),
+    teamId: char("team_id", { length: 26 })
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    registrationId: char("registration_id", { length: 26 })
+      .notNull()
+      .references(() => registrations.id, { onDelete: "cascade" }),
+    /** Integer paise. NULL = no cap set; the target is counted at base price. */
+    maxBid: bigint("max_bid", { mode: "number" }),
+    /** 1 must have · 2 high · 3 target (the default). */
+    priority: smallint("priority").notNull().default(3),
+    /** The player to turn to if this one is lost. Chains by following pointers. */
+    fallbackRegistrationId: char("fallback_registration_id", { length: 26 }),
+    createdBy: char("created_by", { length: 26 }).notNull(),
+    updatedBy: char("updated_by", { length: 26 }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("auction_team_targets_uq").on(table.auctionId, table.teamId, table.registrationId),
+    index("auction_team_targets_team_idx").on(table.orgId, table.auctionId, table.teamId),
+    // Named explicitly: drizzle's generated name for this one exceeds Postgres's
+    // 63-character identifier limit and would be silently truncated (0041).
+    foreignKey({
+      name: "auction_team_targets_fallback_registrations_id_fk",
+      columns: [table.fallbackRegistrationId],
+      foreignColumns: [registrations.id],
+    }).onDelete("set null"),
+    check(
+      "auction_team_targets_max_bid_check",
+      sql`${table.maxBid} is null or ${table.maxBid} > 0`,
+    ),
+    check("auction_team_targets_priority_check", sql`${table.priority} in (1, 2, 3)`),
+    check(
+      "auction_team_targets_fallback_check",
+      sql`${table.fallbackRegistrationId} is null or ${table.fallbackRegistrationId} <> ${table.registrationId}`,
+    ),
+  ],
+);
+
+/**
+ * WHAT THE PLAN LOOKED LIKE, EVERY TIME IT CHANGED.
+ *
+ * Append-only. One row per add / update / remove, written in the SAME
+ * transaction as the change, carrying the target's state AFTER it. This is
+ * what lets a later "plan vs actual" say what the owner's ceiling WAS when the
+ * hammer fell, rather than what it became afterwards. `at_seq` is the auction
+ * snapshot version the owner was looking at when they edited, when the client
+ * knew it: it places the edit on the auction's own timeline without touching
+ * the auction's ledger.
+ *
+ * No foreign key to the target row: removing a target deletes that row and the
+ * history must outlive it. Same participant-arm policy as the targets.
+ */
+export const auctionTeamTargetRevisions = pgTable(
+  "auction_team_target_revisions",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    auctionId: char("auction_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    targetId: char("target_id", { length: 26 }).notNull(),
+    kind: text("kind", { enum: ["added", "updated", "removed"] }).notNull(),
+    registrationId: char("registration_id", { length: 26 }).notNull(),
+    maxBid: bigint("max_bid", { mode: "number" }),
+    priority: smallint("priority").notNull(),
+    fallbackRegistrationId: char("fallback_registration_id", { length: 26 }),
+    atSeq: integer("at_seq"),
+    by: char("by", { length: 26 }).notNull(),
+    at: ts("at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("auction_team_target_revisions_team_idx").on(table.orgId, table.auctionId, table.teamId),
+    check(
+      "auction_team_target_revisions_kind_check",
+      sql`${table.kind} in ('added', 'updated', 'removed')`,
+    ),
+  ],
+);
+
+/**
+ * WHICH FEATURES ARE SWITCHED OFF, AND WHERE.
+ *
+ * The first feature-flag table in the platform (docs/63 asked for one from day
+ * one; nothing was built). Modelled on `org_messaging_settings`: a row per
+ * (scope, feature), absence means the code default, and LAYERS CAN ONLY
+ * SUBTRACT. A platform row, an org row and an auction row are ANDed together,
+ * so any layer can turn a feature off and none can force it on over a higher
+ * layer's no.
+ *
+ * `org_id` is the tenant floor for RLS, present on org and auction rows and
+ * NULL on platform rows (which only the system pool reads). `auctions.config`
+ * was deliberately NOT used: it locks at creation and a switch an organizer
+ * flips mid-season does not belong in a locked contract.
+ */
+export const featureSettings = pgTable(
+  "feature_settings",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }),
+    scopeType: text("scope_type", { enum: ["platform", "org", "auction"] }).notNull(),
+    scopeId: char("scope_id", { length: 26 }).notNull(),
+    feature: text("feature").notNull(),
+    enabled: boolean("enabled").notNull(),
+    updatedBy: char("updated_by", { length: 26 }),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("feature_settings_uq").on(table.scopeType, table.scopeId, table.feature),
+    index("feature_settings_org_idx").on(table.orgId),
+    check(
+      "feature_settings_scope_type_check",
+      sql`${table.scopeType} in ('platform', 'org', 'auction')`,
+    ),
+    // Platform rows have no tenant; every other row must name one.
+    check(
+      "feature_settings_org_check",
+      sql`(${table.scopeType} = 'platform') = (${table.orgId} is null)`,
+    ),
   ],
 );
 

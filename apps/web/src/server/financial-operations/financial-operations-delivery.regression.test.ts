@@ -45,6 +45,8 @@ import {
   otpCodes,
   otpInbox,
   payments,
+  paddleGrants as paddleGrantsTable,
+  paddles as paddlesTable,
   people,
   registrations as registrationsTable,
   sessions,
@@ -515,6 +517,14 @@ afterAll(async () => {
   await db.delete(auditLog).where(eq(auditLog.scopeId, org.id));
   await db.delete(grantsTable).where(eq(grantsTable.scopeId, org.id));
   await db.delete(orgMembers).where(eq(orgMembers.orgId, org.id));
+  // THE AUCTION SIDE, BEFORE THE PEOPLE WHO OWN IT (migration 0040).
+  // `paddles`, `paddle_grants` and `registrations` now hold a RESTRICT foreign
+  // key to `people`. Deleting the people first is therefore REFUSED, instead of
+  // silently leaving rows pointing at nobody — which is what this teardown used
+  // to do, and precisely the orphaning the constraint exists to prevent.
+  await db.delete(paddleGrantsTable).where(eq(paddleGrantsTable.orgId, org.id));
+  await db.delete(paddlesTable).where(eq(paddlesTable.orgId, org.id));
+  await db.delete(registrationsTable).where(eq(registrationsTable.orgId, org.id));
   await db.delete(organizations).where(eq(organizations.id, org.id));
   await db.delete(otpCodes).where(inArray(otpCodes.phone, TEST_PHONES));
   await db.delete(otpInbox).where(inArray(otpInbox.phone, TEST_PHONES));
@@ -1071,5 +1081,44 @@ describe("M-IP6-3 · Rebuilds, replay & the boundary", () => {
       (run) => run.params["dailyKey"] !== undefined,
     );
     expect((await verifyExport(deps, daily?.exportId ?? ""))?.verified).toBe(true);
+  });
+
+  /*
+   * The enqueue pass used to answer "what work is waiting?" by enumerating
+   * every organization and querying each one — a cost that grew with the
+   * number of TENANTS rather than the amount of WORK. A dev database that had
+   * accumulated ~1,500 orgs from past runs made a five-call helper issue
+   * thousands of sequential round-trips and time out; in production the same
+   * shape charges a query per tick for every org that has never sent anything.
+   *
+   * The discovery reads are indexed on `status` now. This pins the property
+   * that made it wrong, not the timing that revealed it: discovery must not
+   * enumerate tenants. Counting the sweep is what keeps it honest — a future
+   * `listOrgIds()` loop reintroducing the N+1 fails here immediately.
+   */
+  it("DISCOVERY IS BY WORK, NOT BY TENANT: enqueueing never enumerates orgs", async () => {
+    fakeMode = "ok";
+    const dispatchId = await newDispatch("in-app");
+
+    let orgSweeps = 0;
+    const counted: FinopsDeps = {
+      ...deps,
+      orgs: {
+        listOrgIds: async () => {
+          orgSweeps += 1;
+          return deps.orgs.listOrgIds();
+        },
+      },
+    };
+
+    const enqueued = await enqueueDispatchSends(counted, Date.now());
+    await enqueueExportGenerations(counted, Date.now());
+
+    // The work was found...
+    expect(enqueued).toBeGreaterThanOrEqual(1);
+    const queued = (await deps.store.loadJobs(org.id)).map((job) => job.dedupeKey);
+    expect(queued).toContain(`dispatch.send:${dispatchId}`);
+    // ...without asking the directory who the tenants are, even once.
+    expect(orgSweeps).toBe(0);
   });
 });

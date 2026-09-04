@@ -1079,3 +1079,29 @@
     width: 100%;
   }
 }
+
+/* PI-1: the player card's "Also played in" list — plain links, 44px targets. */
+.player-also-played {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.player-also-played a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.player-also-played a:hover {
+  border-color: var(--border-interactive);
+  color: var(--text-accent);
+}

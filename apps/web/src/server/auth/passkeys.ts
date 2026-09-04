@@ -104,6 +104,13 @@ export async function finishAuthentication(
     },
   });
   if (!verification.verified) {
+    // PI-1 audit-gap closure: the ceremony reached a KNOWN credential and
+    // failed to verify — that is an attempt against this person's account,
+    // and their ledger should show it. Unknown credentials stay silent above
+    // (no person to attribute; fail-closed before any cryptography).
+    await logSecurityEvent(credential.personId, "auth.passkey.failed", {
+      device: credential.name,
+    });
     return { ok: false };
   }
   await db

@@ -166,13 +166,18 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
                   setFilter(key);
                 }}
               >
+                {/* The status key is "retained" for history's sake, but what it
+                    holds is ICONS — `public.ts` sets it from `isIcon`, and the
+                    schema's separate `is_retained` flag means something else.
+                    Every organiser surface says Icon; so does the card below.
+                    Only this filter said Retained. */}
                 {key === "all"
                   ? "All"
                   : key === "available"
                     ? "Available"
                     : key === "sold"
                       ? "Sold"
-                      : "Retained"}
+                      : "Icons"}
                 <span className="showcase-filter-count">{counts[key]}</span>
               </button>
             ))}
@@ -282,7 +287,7 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
                   ? "Available"
                   : selected.teamName === null
                     ? "Icon player — not in the auction"
-                    : `${selected.teamName}${selected.status === "retained" ? " · retained" : ""}`}
+                    : `${selected.teamName}${selected.status === "retained" ? " · icon" : ""}`}
               </dd>
             </dl>
             <ButtonLink

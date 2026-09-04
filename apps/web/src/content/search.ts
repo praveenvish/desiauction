@@ -23,7 +23,7 @@ import { RELEASES } from "./releases";
  * equally safe, and it needs no backend.
  */
 
-export type SearchSection = "Help" | "Legal" | "Marketing" | "Support" | "Release notes";
+export type SearchSection = "Help" | "Legal" | "Product" | "Support" | "Release notes";
 
 export interface SearchDoc {
   readonly title: string;
@@ -56,21 +56,21 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
   doc(
     "DesiAuction — home",
     "/",
-    "Marketing",
-    "The product",
+    "Product",
+    "What DesiAuction is",
     "auction night tournament player auction live bidding",
   ),
   doc(
     "Features",
     "/features",
-    "Marketing",
+    "Product",
     "What the platform does",
     FEATURE_GROUPS.flatMap((g) => [g.title, ...g.features]).join(" "),
   ),
   doc(
     "Pricing",
     "/pricing",
-    "Marketing",
+    "Product",
     "Passes, not subscriptions",
     `${PRICING.sub} ${PRICING.tiers.map((t) => `${t.name} ${t.limits}`).join(" ")}`,
   ),
@@ -133,44 +133,44 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
   doc(
     "Security",
     "/security",
-    "Marketing",
+    "Product",
     "How the platform is built",
     "server verified bidding append only immutable ledger snapshot recovery grants not roles passkeys audit access control data protection",
   ),
   doc(
     "About DesiAuction",
     "/about",
-    "Marketing",
+    "Product",
     "Who we are",
     "about us company mission beta story team",
   ),
-  doc("Careers", "/careers", "Marketing", "Working here", "careers jobs hiring roles open"),
+  doc("Careers", "/careers", "Product", "Working here", "careers jobs hiring roles open"),
   doc(
     "Rules & guidelines",
     "/rules-guidelines",
-    "Marketing",
+    "Product",
     "Using the platform fairly",
     "rules guidelines fair play conduct acceptable use",
   ),
   doc(
-    "Schedule a demo",
+    "Book a demo",
     "/schedule-demo",
-    "Marketing",
+    "Product",
     "Book a live walkthrough",
     "demo walkthrough call sales talk to us book booking time slot appointment",
   ),
-  doc("Blog", "/blog", "Marketing", "Writing", "blog posts articles news updates"),
+  doc("Blog", "/blog", "Product", "Writing", "blog posts articles news updates"),
   doc(
     "Case studies",
     "/case-studies",
-    "Marketing",
+    "Product",
     "Tournaments in practice",
     "case studies customers stories examples",
   ),
   doc(
     "API docs",
     "/api-docs",
-    "Marketing",
+    "Product",
     "For developers",
     "api docs integration developer webhook endpoint",
   ),
@@ -191,14 +191,14 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
   doc(
     "Browse tournaments",
     "/c",
-    "Marketing",
+    "Product",
     "The public directory",
     "tournaments directory published competitions seasons browse watch live spectate",
   ),
   doc(
     "Your tournaments",
     "/tournaments",
-    "Marketing",
+    "Product",
     "In the app",
     "tournaments seasons your competitions workspace organizer",
   ),

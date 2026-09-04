@@ -1,11 +1,13 @@
-import { isRejectionReason } from "@desiauction/core";
+import { entryCategoryLabel, isRejectionReason } from "@desiauction/core";
 import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../../../server/auth/actions";
+import { playerProfileFor } from "../../../../server/player/profile";
 import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
+import { dateRange } from "../../../tournaments/season-card";
 import { RegisterFlow } from "./register-flow";
 import { WithdrawRegistration } from "./withdraw-registration";
 import "../../seasons.css";
@@ -91,11 +93,11 @@ export default async function RegisterPage({
             <h2>{preview.competitionName}</h2>
             <p className="register-hint">
               {[
-                preview.startsOn !== null
-                  ? preview.endsOn !== null && preview.endsOn !== preview.startsOn
-                    ? `${preview.startsOn} to ${preview.endsOn}`
-                    : preview.startsOn
-                  : null,
+                // Was the raw ISO pair — "2026-08-01 to 2026-10-31" — on the
+                // page where a player decides to sign up, while every other
+                // surface spells the same range "1 Aug – 31 Oct 2026". One
+                // formatter, already shared by the season card and the row.
+                dateRange(preview.startsOn, preview.endsOn),
                 preview.location,
               ]
                 .filter((part): part is string => part !== null && part !== "")
@@ -103,6 +105,14 @@ export default async function RegisterPage({
             </p>
             {preview.open ? (
               <>
+                {/* PI-1: the category, before anyone signs in — a mismatch
+                    should never be discovered after an OTP. */}
+                {preview.entryCategory !== "open" ? (
+                  <p className="register-hint" data-testid="register-category">
+                    This is a {entryCategoryLabel(preview.entryCategory).toLowerCase()} season —
+                    registration checks your profile against it.
+                  </p>
+                ) : null}
                 <p className="register-hint">
                   Registering puts you in this season&apos;s player pool. On auction day, team
                   owners bid to sign you.
@@ -171,6 +181,8 @@ export default async function RegisterPage({
     );
   }
   const landing = await registrationLanding(slug);
+  // PI-1: the person-level defaults that prefill step 2 of the wizard.
+  const cricketProfile = await playerProfileFor(session.personId);
   return (
     <main className="register">
       <div className="register-panel">
@@ -268,6 +280,12 @@ export default async function RegisterPage({
             phone={session.phone}
             initialName={session.name ?? ""}
             source={source}
+            profileDefaults={{
+              role: cricketProfile.defaultRole ?? "",
+              dob: cricketProfile.dateOfBirth ?? "",
+              batting: cricketProfile.defaultBattingStyle ?? "",
+              bowling: cricketProfile.defaultBowlingStyle ?? "",
+            }}
           />
         )}
       </div>

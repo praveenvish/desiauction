@@ -16,6 +16,7 @@ import "../../seasons.css";
 // tall instead of the 44px its rule specifies, and the un-wrapped board URL
 // scrolled the whole page sideways at 320px.
 import "./auction.css";
+import "./plan/plan.css";
 
 export const metadata = { title: "Auction · DesiAuction" };
 
@@ -95,6 +96,20 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     data-testid="open-cockpit"
                   >
                     Cockpit
+                  </ButtonLink>
+                ) : null}
+                {/* WR-1: the owner's private plan. Shown only to someone who holds a
+                    team in this auction, and only while planning is switched on —
+                    `planView` 404s for everyone else, so the door must not exist for
+                    them either. */}
+                {status !== null && dashboard.viewer.planAvailable ? (
+                  <ButtonLink
+                    href={`/seasons//auction/plan`}
+                    variant="secondary"
+                    size="touch"
+                    data-testid="open-plan"
+                  >
+                    My plan
                   </ButtonLink>
                 ) : null}
                 {status === "completed" || status === "reconciled" ? (

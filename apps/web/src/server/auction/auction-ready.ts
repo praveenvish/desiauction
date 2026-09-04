@@ -1,6 +1,7 @@
 import { registrations, type Db } from "@desiauction/db";
 import { eq, sql } from "drizzle-orm";
 
+import { countNoun } from "../../lib/plural";
 import type { CompetitionSummary } from "../competition/competitions";
 import { queryRegistrations } from "../competition/registrations";
 import { scheduleSnapshot } from "../competition/schedule-snapshot";
@@ -108,26 +109,43 @@ export async function auctionReady(
     sizeRows.flatMap((row) => (row.teamId === null ? [] : [[row.teamId, row.count] as const])),
   );
 
+  /**
+   * A gate row is read at a glance, and every label here used to be written
+   * as though it had already passed: "Registration is closed (the pool is
+   * locked)" sat under a BLOCKED chip WHILE REGISTRATION WAS OPEN, so a skim
+   * came away believing the opposite of the truth. A failing row now says
+   * what is true now and what to do about it; a passing one states the fact.
+   * The `id`s are untouched — specs and the readiness page key on them.
+   */
+  const intakeClosed = competition.status === "registration_closed";
+  const poolPresent = pool.length >= 1;
+  const teamsPresent = snapshot.teams.length >= 2;
   const checks: AuctionReadyCheck[] = [
     {
       id: "intake_closed",
-      label: "Registration is closed (the pool is locked)",
-      pass: competition.status === "registration_closed",
+      label: intakeClosed
+        ? "Registration is closed — the pool is locked"
+        : "Registration is still open — close it to lock the pool",
+      pass: intakeClosed,
       detail: `competition is ${competition.status.replace(/_/g, " ")}`,
     },
     {
       id: "pool_present",
       // Registrations calls this the auction pool, and it is not the same
       // number as "approved" — icons are approved and never enter it.
-      label: "The auction pool is non-empty",
-      pass: pool.length >= 1,
-      detail: `${String(pool.length)} player(s) in the auction pool`,
+      label: poolPresent
+        ? "The auction pool has players"
+        : "The auction pool is empty — approve registrations to fill it",
+      pass: poolPresent,
+      detail: `${countNoun(pool.length, "player")} in the auction pool`,
     },
     {
       id: "teams_present",
-      label: "At least two teams exist",
-      pass: snapshot.teams.length >= 2,
-      detail: `${String(snapshot.teams.length)} team(s)`,
+      label: teamsPresent
+        ? "At least two teams exist"
+        : "Fewer than two teams — add teams before the auction",
+      pass: teamsPresent,
+      detail: countNoun(snapshot.teams.length, "team"),
     },
   ];
 

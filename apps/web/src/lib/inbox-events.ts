@@ -10,6 +10,10 @@
  */
 const LABELS: Record<string, string> = {
   "auth.login.otp": "Signed in with a one-time code",
+  // Written on EVERY sign-in, so it was the single most common raw key a new
+  // account ever saw — half of a fresh inbox read `auth.otp.requested` in
+  // monospace before the person had done anything but log in twice.
+  "auth.otp.requested": "Sign-in code requested",
   // DA-19: the events a PLAYER cares about, not just the ones about their login.
   "registration.approved": "Your registration was approved — you're in the player pool",
   "registration.rejected": "Your registration wasn't approved this time",

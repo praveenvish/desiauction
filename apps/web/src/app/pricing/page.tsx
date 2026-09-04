@@ -203,6 +203,12 @@ export default function PricingPage() {
               </tbody>
             </table>
           </div>
+          {/* Phone-only (CSS-gated): at rest the wrapper shows one column and a
+              clipped sliver of the next, and nothing else said the other tiers
+              were there to swipe to. */}
+          <p className="mk-compare-hint" aria-hidden>
+            Swipe sideways to compare tiers.
+          </p>
           <p className="mk-compare-note">{PRICING.comparison.note}</p>
 
           {/* Was a 26px caption line wedged between the tier grid and the FAQ —

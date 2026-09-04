@@ -29,7 +29,7 @@ const BREAKPOINTS = [
 const PUBLIC_ROUTES = ["/", "/pricing", "/features", "/help", "/c", "/login"];
 
 /** The console pages an organizer actually works in. */
-const CONSOLE_ROUTES = ["/home", "/tournaments", "/orgs", "/account", "/inbox"];
+const CONSOLE_ROUTES = ["/home", "/tournaments", "/orgs", "/account", "/inbox", "/me/cricket"];
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   await page.goto("/login");
@@ -145,6 +145,14 @@ test("action groups are equal-width, thumb-sized rows on a phone", async ({ page
   for (const group of ACTION_GROUPS) {
     await page.goto(group.route);
     await page.waitForLoadState("domcontentloaded");
+    // Observe before measuring (the PX-6 toast rule, again): the directory
+    // streams behind a Suspense boundary, and its swap lands a beat AFTER
+    // domcontentloaded — measuring immediately reads the hidden template's
+    // zero-sized rects and asserts on nothing.
+    await page
+      .locator(`${group.selector} > a, ${group.selector} > button`)
+      .first()
+      .waitFor({ state: "visible" });
     const rows = page.locator(group.selector);
     const count = await rows.count();
     expect(count, `${group.route} has no ${group.selector} to assert on`).toBeGreaterThan(0);

@@ -33,6 +33,49 @@ export function fileStem(fileName: string): string {
   return (cut > 0 ? fileName.slice(0, cut) : fileName).trim().toLowerCase();
 }
 
+/**
+ * WHAT A DRIVE FOLDER ACTUALLY NAMES ITS FILES.
+ *
+ * A Google Form file-upload question does not store "Rohit Sharma.jpg". It
+ * stores the answer with the QUESTION appended and a copy counter when a name
+ * repeats: "Rohit Sharma - Upload your photo.jpg", "Rohit Sharma (1).jpg",
+ * "Rohit Sharma - Player Photo(2).jpg". Downloading that folder and dropping it
+ * into the importer matched almost nothing, because the stem was compared
+ * whole and every one of those stems is longer than the player's name.
+ *
+ * A copy counter is dropped, and a " - " separated name is offered from BOTH
+ * sides: "Rohit Sharma - Upload your photo" hides the player in front of the
+ * separator, while "12 - Rohit Sharma" — a numbered roster — hides them behind
+ * it. Offering both costs nothing, because a candidate only ever becomes a
+ * match by EQUALLING a player already registered here; it cannot invent one.
+ *
+ * The whole stem is always tried first, so a file named exactly after a player
+ * can never be beaten by a shortened form of somebody else. Ambiguity still
+ * refuses, and anything this cannot reduce is reported unmatched.
+ */
+export function strippedStems(stem: string): string[] {
+  const out: string[] = [stem];
+  const add = (value: string): void => {
+    const trimmed = value.trim();
+    if (trimmed !== "" && !out.includes(trimmed)) {
+      out.push(trimmed);
+    }
+  };
+  // "rohit sharma (1)" / "rohit sharma(2)" — a copy counter, not a player.
+  const noCounter = stem.replace(/\s*\(\d+\)\s*$/, "");
+  add(noCounter);
+  // Spaces around the hyphen are required, so a hyphenated name ("Jean-Paul")
+  // is never split. Both sides are offered — see the note above.
+  for (const candidate of [noCounter, stem]) {
+    const cut = candidate.lastIndexOf(" - ");
+    if (cut > 0) {
+      add(candidate.slice(0, cut));
+      add(candidate.slice(cut + 3));
+    }
+  }
+  return out;
+}
+
 /** Collapse to comparable words in any script: "rohit_sharma-2" → "rohit sharma 2". */
 function nameToken(value: string): string {
   return value
@@ -121,13 +164,41 @@ export function matchPhotoFiles(
       return { file, ok: false as const, reason: "unnamed file" };
     }
 
-    const numberHit = only(byNumber.get(stem) ?? []);
+    /*
+     * Each rule is tried against the filename as written FIRST, then against
+     * the shortened forms a Drive export produces. Order matters: the exact
+     * stem must win, so a file genuinely named after one player can never be
+     * beaten by a stripped form of another.
+     */
+    const stems = strippedStems(stem);
+    const firstHit = <T>(
+      pick: (candidate: string) => T | "ambiguous" | null,
+    ): T | "ambiguous" | null => {
+      let sawAmbiguous = false;
+      for (const candidate of stems) {
+        const hit = pick(candidate);
+        if (hit === "ambiguous") {
+          sawAmbiguous = true;
+          continue;
+        }
+        if (hit !== null) {
+          return hit;
+        }
+      }
+      return sawAmbiguous ? "ambiguous" : null;
+    };
+
+    const numberHit = firstHit((candidate) => only(byNumber.get(candidate) ?? []));
     const phoneHit =
       numberHit === null
-        ? only(distinct(phoneCandidates(stem).flatMap((candidate) => byPhone.get(candidate) ?? [])))
+        ? firstHit((candidate) =>
+            only(distinct(phoneCandidates(candidate).flatMap((c) => byPhone.get(c) ?? []))),
+          )
         : null;
     const nameHit =
-      numberHit === null && phoneHit === null ? only(byName.get(nameToken(stem)) ?? []) : null;
+      numberHit === null && phoneHit === null
+        ? firstHit((candidate) => only(byName.get(nameToken(candidate)) ?? []))
+        : null;
 
     const hit = numberHit ?? phoneHit ?? nameHit;
     const rule: PhotoMatchRule =

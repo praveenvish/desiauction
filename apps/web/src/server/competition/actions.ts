@@ -3,17 +3,33 @@
 import {
   NAME_MAX_LENGTH,
   DEFAULT_AUCTION_CONFIG,
+  applyMapping,
+  detectMapping,
+  evaluateRegistration,
+  isEntryCategory,
+  isMinor,
   isRejectionReason,
-  parseRegistrationCsv,
+  parseRegistrationRecords,
+  parseRole,
+  planImport,
+  sampleRow,
+  signatureOf,
   slugifyName,
+  tokenizeCsv,
   validateNewPlayer,
+  type ColumnMapping,
   type CsvRowError,
+  type DateOrder,
+  type DetectedMapping,
+  type ImportPolicy,
   type PhotoTarget,
   type PlayerField,
   type RegistrationEvent,
   type RegistrationStatus,
+  type ValueMaps,
 } from "@desiauction/core";
-import { withTenantDb, type Db } from "@desiauction/db";
+import { playerProfiles, registrations, withTenantDb, type Db } from "@desiauction/db";
+import { and, eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -22,6 +38,8 @@ import { auctionOf } from "@desiauction/auction";
 import { recordConsent } from "../messaging/consent";
 
 import { currentSession } from "../auth/actions";
+import { playerProfileFor, upsertPlayerProfile } from "../player/profile";
+import { personSeasonsInOrg } from "../player/career";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { canSettlement } from "../settlement/authz";
@@ -53,7 +71,14 @@ import {
   transition,
   transitionBatch,
 } from "./registration-aggregate";
-import { commitRegistrationImport } from "./registration-import";
+import { marksFreezeWithRoster } from "./roster-lock";
+import { commitRegistrationImport, existingForImport } from "./registration-import";
+import {
+  forgetImportMapping,
+  saveImportMapping,
+  savedMappingFor,
+  type SavedMapping,
+} from "./import-mappings";
 import { notifyDecision } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, type TeamsWorkspace } from "./team-workspace";
@@ -517,7 +542,14 @@ export type DetailsField = "name" | "startsOn" | "endsOn" | "location" | "form";
  */
 export async function updateCompetitionDetailsAction(
   slug: string,
-  input: { name: string; location: string; startsOn: string; endsOn: string },
+  input: {
+    name: string;
+    location: string;
+    startsOn: string;
+    endsOn: string;
+    /** PI-1: "" leaves the category as it stands (older callers omit it). */
+    entryCategory?: string;
+  },
 ): Promise<{ ok: boolean; error?: string; field?: DetailsField }> {
   const session = await requireSession();
   const competition = await resolveCompetitionScoped(session.personId, slug);
@@ -536,12 +568,17 @@ export async function updateCompetitionDetailsAction(
   } catch {
     return { ok: false, error: "You can't manage this season.", field: "form" };
   }
+  const category = input.entryCategory ?? "";
+  if (category !== "" && !isEntryCategory(category)) {
+    return { ok: false, error: "Pick one of the listed categories.", field: "form" };
+  }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
     updateCompetitionDetails(db, competition, session.personId, {
       name: input.name,
       location: input.location.trim() === "" ? null : input.location.trim(),
       startsOn: input.startsOn === "" ? null : input.startsOn,
       endsOn: input.endsOn === "" ? null : input.endsOn,
+      ...(category !== "" && isEntryCategory(category) ? { entryCategory: category } : {}),
     }),
   );
   if (!result.ok) {
@@ -808,6 +845,8 @@ export async function registrationLanding(slug: string): Promise<RegistrationLan
 export interface RegistrationPreview {
   competitionName: string;
   open: boolean;
+  /** PI-1: stated on the preview so nobody signs in to find out. */
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -827,6 +866,7 @@ export async function registrationPreview(slug: string): Promise<RegistrationPre
   return {
     competitionName: facts.name,
     open: facts.status === "registration_open",
+    entryCategory: facts.entryCategory,
     location: facts.location,
     startsOn: facts.startsOn,
     endsOn: facts.endsOn,
@@ -931,6 +971,41 @@ export async function submitRegistrationAction(
     battingStyle: formString(formData, "battingStyle"),
     bowlingStyle: formString(formData, "bowlingStyle"),
   };
+  const minor = isMinor(profile.dateOfBirth === "" ? null : profile.dateOfBirth, new Date());
+  const guardianName = formString(formData, "guardianName").trim();
+  /*
+   * ONE evaluator decides (PI-1 P3): intake, role, the PRR P0-2 minor gate
+   * (DPDP §9 — a registrant under 18 is a child and needs a named guardian's
+   * verifiable consent; the public read model additionally suppresses their
+   * age and photo everywhere public), and the entry category against the
+   * person's own profile. Enforced HERE as well as in the browser — a client
+   * gate is a courtesy. The writer below keeps its own not_open/role checks
+   * as defense-in-depth; the sentences for those two are unchanged.
+   */
+  const verdict = evaluateRegistration({
+    competitionStatus: competition.status,
+    entryCategory: competition.entryCategory,
+    role,
+    gender: (await playerProfileFor(session.personId)).gender,
+    dateOfBirth: profile.dateOfBirth === "" ? null : profile.dateOfBirth,
+    guardianConsent: formString(formData, "guardianConsent") === "true",
+    guardianName,
+    channel: "self",
+    now: new Date(),
+  });
+  if (!verdict.eligible) {
+    const reason = verdict.reasons[0];
+    return {
+      error:
+        reason === "intake_closed"
+          ? "Registration for this competition is not open."
+          : reason === "minor_missing_guardian"
+            ? "A parent or guardian must consent for a player under 18 — add their name and tick the consent box."
+            : reason === "category_mismatch"
+              ? "This season is listed as a gendered category that doesn't match your profile. If that's wrong, update your profile on the Account page — or contact the organizer, who can add you directly."
+              : "Choose a valid playing role.",
+    };
+  }
   const source = formString(formData, "source");
   const result = await withTenantDb(
     dbHandle,
@@ -975,6 +1050,28 @@ export async function submitRegistrationAction(
    * the registration has committed, and losing the evidence must not lose the
    * registration. It is logged as a gap instead.
    */
+  /*
+   * PI-1 write-back: "remember these answers" ticked means the season's
+   * choices become the person-level defaults, so the NEXT form starts filled
+   * in. A convenience after the fact — like consent evidence, it must never
+   * fail the registration that already committed.
+   */
+  if (formString(formData, "rememberProfile") === "true") {
+    try {
+      const current = await playerProfileFor(session.personId);
+      await upsertPlayerProfile(session.personId, {
+        ...current,
+        defaultRole: parseRole(role) ?? current.defaultRole,
+        dateOfBirth: profile.dateOfBirth === "" ? current.dateOfBirth : profile.dateOfBirth,
+        defaultBattingStyle:
+          profile.battingStyle === "" ? current.defaultBattingStyle : profile.battingStyle,
+        defaultBowlingStyle:
+          profile.bowlingStyle === "" ? current.defaultBowlingStyle : profile.bowlingStyle,
+      });
+    } catch {
+      // The profile is a convenience; the registration is the fact.
+    }
+  }
   try {
     const consentText = formString(formData, "publicationConsentText");
     await recordConsent(systemDb, {
@@ -997,6 +1094,22 @@ export async function submitRegistrationAction(
         basis: "gave a mobile number to be told the outcome of this registration",
       },
     });
+    // PRR P0-2: the guardian consent record for a minor — timestamped, with the
+    // guardian's name and the wording actually shown, so "who consented, to
+    // what, when" is answerable later (DPDP §9 verifiable-consent evidence).
+    if (minor) {
+      await recordConsent(systemDb, {
+        personId: session.personId,
+        purpose: "guardian.consent",
+        granted: true,
+        source: "registration",
+        evidence: {
+          competition: slug,
+          guardianName,
+          wording: formString(formData, "guardianConsentText") || null,
+        },
+      });
+    }
   } catch {
     // Evidence must never be the thing that fails a registration that has
     // already committed — the same rule the decision notices follow.
@@ -1035,6 +1148,15 @@ export interface RegistrationDashboard {
   /** Drives the closed-intake notice on the share block (DA-35). */
   registrationOpen: boolean;
   viewer: { canReview: boolean };
+  /**
+   * PI-1: rows whose person's own declared gender is directly contrary to the
+   * season's entry category — the ORGANIZER-channel advisory from the one
+   * eligibility evaluator (invariant 5: it flags, the human decides). Only
+   * declared opposites appear; an unanswered profile flags nothing, because a
+   * women's-season import of new phone numbers would otherwise flag every row.
+   * Review-gated like the rows it annotates. Keyed by registration id.
+   */
+  categoryFlags?: Record<string, "category_mismatch">;
 }
 
 const VALID_STATUS = new Set<RegistrationStatus>([
@@ -1087,6 +1209,37 @@ export async function registrationDashboard(
       teamsOf(db, competition.id),
       orphanIcons(db, competition.id),
     ]);
+    // PI-1: the organizer-channel category advisory, computed by THE evaluator
+    // (never by a second SQL copy of its rules) over just this page's people.
+    const categoryFlags: Record<string, "category_mismatch"> = {};
+    if (competition.entryCategory !== "open" && page.rows.length > 0) {
+      const genders = await db
+        .select({ personId: playerProfiles.personId, gender: playerProfiles.gender })
+        .from(playerProfiles)
+        .where(
+          inArray(
+            playerProfiles.personId,
+            page.rows.map((row) => row.personId),
+          ),
+        );
+      const genderOf = new Map(genders.map((entry) => [entry.personId, entry.gender]));
+      for (const row of page.rows) {
+        const verdict = evaluateRegistration({
+          competitionStatus: competition.status,
+          entryCategory: competition.entryCategory,
+          role: row.role,
+          gender: genderOf.get(row.personId) ?? null,
+          dateOfBirth: null,
+          guardianConsent: false,
+          guardianName: "",
+          channel: "organizer",
+          now: new Date(),
+        });
+        if (verdict.advisories.includes("category_mismatch")) {
+          categoryFlags[row.id] = "category_mismatch";
+        }
+      }
+    }
     return {
       competition,
       stats,
@@ -1095,6 +1248,7 @@ export async function registrationDashboard(
       orphanIcons: orphans,
       registrationOpen: competition.status === "registration_open",
       viewer: { canReview },
+      categoryFlags,
     };
   });
 }
@@ -1166,7 +1320,42 @@ export async function registrationTimelineAction(
   if (!gate.ok) {
     return [];
   }
-  return inCompetitionOrg(gate.personId, gate.competition, (db) => timelineOf(db, registrationId));
+  return inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    timelineOf(db, registrationId, gate.competition.id),
+  );
+}
+
+/**
+ * PI-1: "seen before in your club" — the person's other seasons IN THIS ORG,
+ * for the triage drawer (duplicate-spotting and welcome-back context). Review-
+ * gated like everything else in the drawer; scoped to the org's own records,
+ * so an organizer learns nothing about a person's life in other clubs.
+ */
+export async function personHistoryAction(
+  slug: string,
+  registrationId: string,
+): Promise<{ competitionName: string; startsOn: string | null; status: string }[]> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return [];
+  }
+  const personId = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const [row] = await db
+      .select({ personId: registrations.personId })
+      .from(registrations)
+      .where(
+        and(
+          eq(registrations.id, registrationId),
+          eq(registrations.competitionId, gate.competition.id),
+        ),
+      )
+      .limit(1);
+    return row?.personId ?? null;
+  });
+  if (personId === null) {
+    return [];
+  }
+  return personSeasonsInOrg(personId, gate.competition.orgId, gate.competition.id);
 }
 
 export async function addNoteAction(
@@ -1248,9 +1437,8 @@ export async function markRegistrationAction(
   } catch {
     return { ok: false, error: "You can't manage players here." };
   }
-  // Icon and captain marks move a player into or out of the auction pool and
-  // change squad arithmetic the engine has already priced against.
-  if (await auctionLocksRoster(competition.id)) {
+  // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
+  if (marksFreezeWithRoster(marks) && (await auctionLocksRoster(competition.id))) {
     return { ok: false, error: ROSTER_LOCKED };
   }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
@@ -1444,6 +1632,57 @@ export async function photoTargetsAction(slug: string): Promise<PhotoTarget[]> {
 export interface ImportPreview {
   validCount: number;
   errors: CsvRowError[];
+  /**
+   * What committing would actually DO, against what is already stored. Absent
+   * only when the file could not be read at all.
+   *
+   * The second upload of a roster is the normal case, and before this the
+   * preview could not tell "197 players" from "197 players you already have" —
+   * it reported the same number either way and the commit then silently did
+   * nothing with them.
+   */
+  diff?: {
+    counts: { new: number; changed: number; unchanged: number; reinstate: number };
+    /** The changed rows, so the organizer sees old → new before committing. */
+    changes: {
+      line: number;
+      name: string;
+      fields: { label: string; from: string; to: string }[];
+    }[];
+  };
+}
+
+/*
+ * A BOUND ON WHAT ARRIVES.
+ *
+ * The file rides to the server as a STRING in a server-action payload and is
+ * held in memory whole, twice — once as text, once tokenized. Nothing capped
+ * it: a pasted spreadsheet with a runaway range was a memory event on a 4 GB
+ * container rather than a message anybody could act on. The limits are far
+ * above any real season (the largest tournament this product has run is in the
+ * low hundreds) and exist only to turn an accident into a sentence.
+ */
+const MAX_IMPORT_BYTES = 2_000_000;
+const MAX_IMPORT_ROWS = 5_000;
+
+/** The refusal message, or null when the file is within bounds. */
+function oversized(csv: string): string | null {
+  const bytes = new TextEncoder().encode(csv).length;
+  if (bytes > MAX_IMPORT_BYTES) {
+    return `That file is ${String(Math.round(bytes / 1000))} KB — the limit is ${String(
+      MAX_IMPORT_BYTES / 1000,
+    )} KB. Split it and import in parts.`;
+  }
+  // Cheap upper bound: every row occupies at least one line. Counting lines is
+  // not counting records (a quoted field may contain newlines), which is fine —
+  // it can only over-estimate, and it happens before the expensive tokenize.
+  const lines = csv.split("\n").length;
+  if (lines > MAX_IMPORT_ROWS) {
+    return `That file has about ${String(lines)} rows — the limit is ${String(
+      MAX_IMPORT_ROWS,
+    )}. Split it and import in parts.`;
+  }
+  return null;
 }
 
 /**
@@ -1456,31 +1695,259 @@ async function bandsFor(competitionId: string): Promise<readonly string[]> {
   return Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands);
 }
 
-/** Validate only — no writes. The organizer previews errors before committing. */
-export async function importPreviewAction(slug: string, csv: string): Promise<ImportPreview> {
-  const gate = await reviewGate(slug);
-  if (!gate.ok) {
-    return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
-  }
-  const result = parseRegistrationCsv(csv, await bandsFor(gate.competition.id));
-  return { validCount: result.rows.length, errors: result.errors };
+/**
+ * What the mapping screen needs to draw itself: the file's own headers, a real
+ * sample value under each, and our best guess at where each column goes.
+ *
+ * Reading a file is not writing one, but it IS reading a roster of civilians'
+ * names and phone numbers — so it sits behind the same review gate as the
+ * import it precedes.
+ */
+export interface ImportInspection {
+  ok: boolean;
+  error?: string;
+  headers: string[];
+  /** First row carrying data, aligned to `headers`. */
+  sample: string[];
+  detected?: DetectedMapping;
+  /** Fingerprint of this file's layout, for recognising the form again. */
+  signature: string;
+  /** Bands this competition accepts — the value-mapping targets for a band. */
+  bands: string[];
+  /**
+   * A mapping this club already confirmed for a file of this exact layout —
+   * the season's own override if there is one, else the org default. Present
+   * means the screen opens on "using your saved mapping" instead of a guess.
+   */
+  saved?: SavedMapping;
 }
 
-/** Re-validate and commit atomically. Refuses any file with errors (no partial corruption). */
-export async function importCommitAction(
+export async function importInspectAction(slug: string, csv: string): Promise<ImportInspection> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error, headers: [], sample: [], signature: "", bands: [] };
+  }
+  const tooBig = oversized(csv);
+  if (tooBig !== null) {
+    return { ok: false, error: tooBig, headers: [], sample: [], signature: "", bands: [] };
+  }
+  const records = tokenizeCsv(csv);
+  const headers = [...(records[0] ?? [])];
+  if (headers.length === 0) {
+    return {
+      ok: false,
+      error: "That file has no header row.",
+      headers: [],
+      sample: [],
+      signature: "",
+      bands: [],
+    };
+  }
+  const signature = signatureOf(headers);
+  const saved = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    savedMappingFor(db, gate.competition.orgId, gate.competition.id, signature),
+  );
+  return {
+    ok: true,
+    headers,
+    sample: sampleRow(records),
+    detected: detectMapping(headers),
+    signature,
+    bands: [...(await bandsFor(gate.competition.id))],
+    ...(saved !== null ? { saved } : {}),
+  };
+}
+
+/**
+ * Remember a confirmed mapping for next season.
+ *
+ * `scope` is the organizer's own choice and defaults to the CLUB, because a
+ * club reuses one form across seasons — that repetition is the whole point.
+ * "season" writes an override for this competition alone.
+ */
+export async function saveImportMappingAction(
   slug: string,
-  csv: string,
-): Promise<{ ok: boolean; imported?: number; duplicates?: number; error?: string }> {
+  input: {
+    signature: string;
+    label: string | null;
+    mapping: ColumnMapping;
+    valueMaps: ValueMaps;
+    dateOrder: DateOrder;
+    scope: "org" | "season";
+  },
+): Promise<{ ok: boolean; error?: string }> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const parsed = parseRegistrationCsv(csv, await bandsFor(gate.competition.id));
-  if (parsed.errors.length > 0) {
+  if (Object.keys(input.mapping).length === 0 || input.signature === "") {
+    return { ok: false, error: "There is no mapping to remember." };
+  }
+  await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    saveImportMapping(db, gate.competition.orgId, gate.personId, {
+      competitionId: input.scope === "season" ? gate.competition.id : null,
+      signature: input.signature,
+      label: input.label,
+      mapping: input.mapping,
+      valueMaps: input.valueMaps,
+      dateOrder: input.dateOrder,
+    }),
+  );
+  return { ok: true };
+}
+
+/** Drop a saved mapping — the way out of one that turned out to be wrong. */
+export async function forgetImportMappingAction(
+  slug: string,
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    forgetImportMapping(db, gate.competition.orgId, id),
+  );
+  return { ok: true };
+}
+
+/** How the organizer decided this file should be read. */
+export interface ImportShape {
+  mapping?: ColumnMapping;
+  valueMaps?: ValueMaps;
+  /** Which number leads an ambiguous numeric date in THIS file. */
+  dateOrder?: DateOrder;
+  /** How to treat a value the file and the record disagree about. */
+  policy?: ImportPolicy;
+}
+
+/**
+ * Parse under the organizer's mapping, or straight if there is none.
+ *
+ * NO MAPPING IS NOT A BROKEN MAPPING. A file whose headers are already ours
+ * (our own export, round-tripped) needs no translation and must keep working
+ * untouched — so an absent mapping means "read it as written", not "guess".
+ */
+function parseUnderShape(
+  csv: string,
+  bands: readonly string[],
+  shape: ImportShape | undefined,
+): ReturnType<typeof parseRegistrationRecords> {
+  const records = tokenizeCsv(csv);
+  const mapping = shape?.mapping;
+  const source =
+    mapping === undefined || Object.keys(mapping).length === 0
+      ? records
+      : applyMapping(records, mapping, shape?.valueMaps);
+  return parseRegistrationRecords(source, bands, {
+    now: new Date(),
+    ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
+  });
+}
+
+/** Validate only — no writes. The organizer previews errors before committing. */
+export async function importPreviewAction(
+  slug: string,
+  csv: string,
+  shape?: ImportShape,
+): Promise<ImportPreview> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
+  }
+  const tooBig = oversized(csv);
+  if (tooBig !== null) {
+    return { validCount: 0, errors: [{ line: 1, message: tooBig }] };
+  }
+  const result = parseUnderShape(csv, await bandsFor(gate.competition.id), shape);
+  if (result.rows.length === 0) {
+    return { validCount: 0, errors: result.errors };
+  }
+  const policy = shape?.policy ?? "fill-blanks";
+  const diff = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const stored = await existingForImport(
+      db,
+      gate.competition.id,
+      result.rows.map((row) => row.phone),
+    );
+    return planImport(result.rows, stored, policy);
+  });
+  return {
+    validCount: result.rows.length,
+    errors: result.errors,
+    diff: {
+      counts: diff.counts,
+      // Capped for the screen; the counts above are the whole truth and the
+      // note under the table says how many are not listed.
+      changes: diff.rows
+        .filter((entry) => entry.plan.kind === "changed" || entry.plan.kind === "reinstate")
+        .slice(0, 25)
+        .map((entry) => ({
+          line: entry.line,
+          name: entry.name,
+          fields:
+            entry.plan.kind === "changed" || entry.plan.kind === "reinstate"
+              ? entry.plan.changes.map((c) => ({
+                  label: c.label,
+                  from: c.from ?? "(blank)",
+                  to: c.to,
+                }))
+              : [],
+        })),
+    },
+  };
+}
+
+export interface ImportCommitResult {
+  ok: boolean;
+  imported?: number;
+  /** Existing registrations the file CHANGED — the second-file case. */
+  updated?: number;
+  /** Existing registrations the file agreed with entirely. */
+  unchanged?: number;
+  reinstated?: number;
+  named?: number;
+  /** Rows left behind because they had errors (only when `skipInvalid`). */
+  skipped?: number;
+  error?: string;
+}
+
+/**
+ * Re-validate and commit atomically.
+ *
+ * ALL-OR-NOTHING WAS THE WRONG DEFAULT AT THE WRONG MOMENT. Refusing a file
+ * with any error protects against partial corruption, which is right — but it
+ * was also the only option, and combined with the strict role vocabulary it
+ * meant an ordinary 200-player sheet imported NOBODY over three misspelt cells.
+ * `skipInvalid` keeps the guarantee where it matters (every row that lands is a
+ * row that fully validated, and the commit is still one transaction) while
+ * letting the organizer take the 197 and fix the 3. The rows left behind are
+ * still listed by line number, so "skip" never means "forget".
+ */
+export async function importCommitAction(
+  slug: string,
+  csv: string,
+  options?: { skipInvalid?: boolean; shape?: ImportShape; policy?: ImportPolicy },
+): Promise<ImportCommitResult> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const tooBig = oversized(csv);
+  if (tooBig !== null) {
+    return { ok: false, error: tooBig };
+  }
+  // Re-parsed under the SAME shape the preview used — the commit never trusts a
+  // row list the browser sent, only the file plus the mapping it approved.
+  const parsed = parseUnderShape(csv, await bandsFor(gate.competition.id), options?.shape);
+  if (parsed.errors.length > 0 && options?.skipInvalid !== true) {
     return {
       ok: false,
       error: `Fix ${String(parsed.errors.length)} row error(s) before importing.`,
     };
+  }
+  if (parsed.rows.length === 0) {
+    return { ok: false, error: "No valid rows to import." };
   }
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     commitRegistrationImport(
@@ -1489,9 +1956,18 @@ export async function importCommitAction(
       gate.competition.orgId,
       gate.personId,
       parsed.rows,
+      options?.shape?.policy ?? options?.policy ?? "fill-blanks",
     ),
   );
-  return { ok: true, imported: result.imported, duplicates: result.duplicates };
+  return {
+    ok: true,
+    imported: result.imported,
+    updated: result.updated,
+    unchanged: result.unchanged,
+    reinstated: result.reinstated,
+    named: result.named,
+    skipped: parsed.errors.length,
+  };
 }
 
 /** Export authorization = registration.review; deterministic, competition-scoped CSV. */

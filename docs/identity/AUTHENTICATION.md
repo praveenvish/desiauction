@@ -2,6 +2,19 @@
 
 ## DesiAuction NEXT · v1.0 · 2026-07-14 · CTO · Permanent subsystem document (IP-2)
 
+> **Amendment · 2026-08-31 · PI-1 (player identity programme).** Four additive
+> changes, protecting suites green UNMODIFIED throughout:
+> `otp_codes.purpose` (`login | phone_change`, migration 0037) — a code is
+> minted for one purpose and consumable for that purpose alone, ending the
+> documented phone-change reuse of login codes (§3/§4 hygiene unchanged; caps
+> stay keyed per phone across purposes). Three audit-gap closures on the same
+> ledger: `auth.otp.requested` (when a person exists to own the row),
+> `auth.logout`, `auth.passkey.failed` (known credential, refused ceremony).
+> And the pre-GA DPDP signup obligation: the login form's terms/privacy notice
+> is now RECORDED — one `consent_records` row (`terms.privacy`, versioned
+> wording) per person at first verify after each notice version
+> (`auth/terms-consent.ts`). Regression home: `otp-purpose.regression.test.ts`.
+
 > Documents the **implemented** system, frozen at IP-2. Source of truth:
 > `apps/web/src/server/auth/{otp,otp-sender,actions}.ts`, `packages/core/src/phone.ts`.
 > Governed by C-24 (phone-first, India-first), IP-2_DESIGN D3/D7, ED-1 (ports), RC-1

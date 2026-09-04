@@ -1,10 +1,11 @@
 "use client";
 
-import { formatPaiseINR, paise, type AuctionSnapshot } from "@desiauction/core";
+import { formatPaiseINR, paise, type AuctionSnapshot, type PlanState } from "@desiauction/core";
 import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import { useEffect, useRef, useState } from "react";
 
 import type { AuctionRules, ResolvedLot } from "../../../../server/auction/live-summary";
+import { fitBadge } from "./plan/plan-model";
 
 // PX-6 live-experience kit: presentation over the broadcast AuctionSnapshot
 // and the resolved-lot history. NOTHING here decides — money math comes from
@@ -245,6 +246,8 @@ export function MyTeamCard({
   myPaddleNumber,
   rules,
   feed,
+  squadSize,
+  plan = null,
 }: {
   snapshot: AuctionSnapshot | null;
   myTeamId: string;
@@ -252,8 +255,23 @@ export function MyTeamCard({
   myPaddleNumber: string;
   rules: AuctionRules;
   feed: LiveFeed;
+  /**
+   * The WHOLE squad — pre-signed players plus auction buys, deduped by
+   * `squadSizesOf`. The list below this tile is the night's wins, which is a
+   * different number: a team with two icons and ten buys has won ten lots and
+   * signed twelve players. Counting the wins here printed "10/12 Squad" beside
+   * a "12/12" on the same screen, telling an owner they were two short of a
+   * squad the engine had already closed.
+   */
+  squadSize: number;
+  /**
+   * WR-1: the owner's plan folded against this frame, or null when they have
+   * none — in which case the card is exactly what it was before plans existed.
+   */
+  plan?: PlanState | null;
 }) {
   const paddle = snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null;
+  const fit = plan === null ? null : fitBadge(plan.budget.fit);
   const squad = feed.resolved.filter(
     (lot) => lot.status === "sold" && (lot.teamId === myTeamId || lot.teamName === myTeamName),
   );
@@ -289,10 +307,27 @@ export function MyTeamCard({
           </div>
           <div className="stat-tile" data-testid="my-slots">
             <span className="stat-value">
-              {squad.length}/{rules.squadMax}
+              {squadSize}/{rules.squadMax}
             </span>
             <span className="stat-label">Squad (min {rules.squadMin})</span>
           </div>
+          {plan !== null && fit !== null ? (
+            <div className="stat-tile" data-testid="my-plan-headroom" data-fit={plan.budget.fit}>
+              <span className="stat-value">
+                {plan.budget.headroom < 0
+                  ? `−${formatPaiseINR(paise(-plan.budget.headroom))}`
+                  : formatPaiseINR(paise(plan.budget.headroom))}
+              </span>
+              <span className="stat-label">Plan headroom</span>
+              <Badge tone={fit.tone} className="plan-tile-badge">
+                {plan.budget.fit === "fits"
+                  ? "Fits"
+                  : plan.budget.fit === "at_risk"
+                    ? "At risk"
+                    : "Over purse"}
+              </Badge>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {squad.length > 0 ? (

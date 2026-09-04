@@ -1,5 +1,6 @@
 import {
   DEFAULT_AUCTION_CONFIG,
+  isMinor,
   minPossiblePrice,
   type AuctionConfig,
   type IncrementSlab,
@@ -114,18 +115,26 @@ export async function lotMediaOf(
       number: registrations.registrationNumber,
       photoKey: people.photoUrl,
       photoConsentAt: people.photoConsentAt,
+      dateOfBirth: registrations.dateOfBirth,
     })
     .from(lots)
     .innerJoin(registrations, eq(registrations.id, lots.registrationId))
     .innerJoin(people, eq(people.id, registrations.personId))
     .where(eq(lots.auctionId, auctionId));
+  const now = new Date();
   const media: Record<string, LotMedia> = {};
   for (const row of rows) {
+    // PRR P0-2 (DPDP §9): a minor's face never rides the live surfaces. This
+    // media powers the public, unauthenticated broadcast pages (/board,
+    // /overlay, /spectate) exactly as `toShowcasePlayer` powers /c — so the same
+    // age suppression applies here, or the child scrubbed from /c would still
+    // appear on the auction block. The number and name still show.
     // Consent first, then signing: an unconsented photo is never signed, so a
     // URL for it cannot exist to leak.
     const consented = row.photoConsentAt !== null && row.photoKey !== null;
+    const showPhoto = consented && row.photoKey !== null && !isMinor(row.dateOfBirth, now);
     media[row.lotId] = {
-      photoUrl: consented && row.photoKey !== null ? readUrl(row.photoKey) : null,
+      photoUrl: showPhoto ? readUrl(row.photoKey as string) : null,
       number: row.number,
     };
   }

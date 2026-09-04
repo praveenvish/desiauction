@@ -31,7 +31,7 @@
 .demo-row-org {
   margin: 0 0 var(--space-1);
   color: var(--text-primary);
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: var(--text-base-size);
 }
 

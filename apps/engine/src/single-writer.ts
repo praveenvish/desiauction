@@ -17,13 +17,36 @@ import type postgres from "postgres";
  * halts mid-lot.
  *
  * A Postgres SESSION-LEVEL advisory lock turns the documented invariant into an
- * enforced one. It is the right primitive precisely because of how it ends: the
- * lock is held for as long as the owning session lives and is released
- * automatically when that session goes away, so a crashed or hard-killed engine
- * never wedges its replacement — no lease table, no expiry arithmetic, no
- * janitor. Verified against the real database before this was written: a second
- * session is refused while the first holds it, and acquires cleanly the moment
- * the first disconnects.
+ * enforced one: the lock lives as long as the owning SESSION, so there is no
+ * lease table, no expiry arithmetic and no janitor to run. A second session is
+ * refused while the first holds it, and acquires cleanly the moment the first
+ * disconnects.
+ *
+ * WHAT ENDS THE SESSION IS THE CONNECTION CLOSING — not the process dying, and
+ * those come apart in exactly one case. This comment used to claim that "a
+ * crashed or hard-killed engine never wedges its replacement", which is right
+ * for the reason it names but wrong about its reach: when a process is killed
+ * the KERNEL closes its sockets, so `kill -9` really does free the lease at
+ * once (re-verified 2026-08-31 — the replacement booted immediately).
+ *
+ * The lease wedges when the connection is severed WITHOUT a close: the database
+ * host or VM restarting, a laptop sleeping, a NAT table losing its entry, a
+ * network partition. Nothing reaches the server, so it keeps a backend open for
+ * a peer that will never speak again — and keeps honouring its lock. Observed
+ * 2026-08-31 after a Docker Desktop restart: the backend sat `idle` for four
+ * hours holding the lease and every replacement died at boot. Postgres is right
+ * to honour that session; the mistake is assuming it can always tell.
+ *
+ * Two things follow, and both are load-bearing:
+ *   1. The DATABASE must probe for peers that stopped answering
+ *      (`tcp_keepalives_idle` — set on the local container in
+ *      docker-compose.yml, and required of every deployed database; see
+ *      docs/operations/DEPLOYMENT.md). This is the ONLY thing that bounds how
+ *      long a severed connection holds the lease.
+ *   2. A refusal must say WHICH it is. "Another engine is running" and "a corpse
+ *      is holding the lock" demand opposite responses from an operator, and the
+ *      lock alone cannot tell them apart — so on refusal we look the holder up
+ *      and name it. See `describeLeaseHolder`.
  *
  * It is held on a RESERVED connection, not a pooled one, because a pooled query
  * can be handed a different socket next time and the lock would be released
@@ -50,12 +73,116 @@ export interface SingleWriterLease {
   verify: () => Promise<boolean>;
 }
 
+/**
+ * How long a holder may sit idle before it is certainly NOT a running engine.
+ *
+ * A live engine re-asserts the lease on its reserved connection every
+ * `LEASE_CHECK_MS` (10s, apps/engine/src/index.ts), so its backend can never be
+ * idle for a minute. Six missed re-assertions is not a slow engine; it is a
+ * corpse. Deliberately generous — calling a live writer orphaned would invite an
+ * operator to terminate the one process legitimately holding the gavel.
+ */
+export const LEASE_ORPHAN_AFTER_SECONDS = 60;
+
+/** Who holds the lease, as `pg_stat_activity` sees them. */
+export interface LeaseHolder {
+  readonly pid: number;
+  readonly applicationName: string;
+  readonly state: string;
+  readonly idleSeconds: number | null;
+  readonly clientAddr: string | null;
+  /** Idle far longer than any live engine could be — a session outliving its process. */
+  readonly likelyOrphaned: boolean;
+}
+
+interface HolderRow {
+  readonly pid: number;
+  readonly application_name: string;
+  readonly state: string | null;
+  readonly idle_seconds: string | number | null;
+  readonly client_addr: string | null;
+}
+
+/**
+ * Name the session holding the lease, or null if it cannot be determined.
+ *
+ * NEVER THROWS. This runs on the failure path of boot, where the only thing
+ * worse than an unhelpful error is a different, misleading one: if the
+ * diagnostic query itself fails, the caller must still report the refusal it
+ * actually observed.
+ */
+export async function describeLeaseHolder(sql: postgres.Sql): Promise<LeaseHolder | null> {
+  try {
+    const rows = await sql<HolderRow[]>`
+      select
+        a.pid,
+        coalesce(a.application_name, '') as application_name,
+        a.state,
+        extract(epoch from (now() - a.state_change)) as idle_seconds,
+        host(a.client_addr) as client_addr
+      from pg_locks l
+      join pg_stat_activity a using (pid)
+      where l.locktype = 'advisory'
+        and l.classid = ${SINGLE_WRITER_LOCK_CLASS}::oid
+        and l.objid = ${SINGLE_WRITER_LOCK_KEY}::oid
+        and l.granted
+      limit 1
+    `;
+    const row = rows[0];
+    if (row === undefined) {
+      return null;
+    }
+    // postgres.js returns `numeric` as a string; `extract(epoch ...)` is numeric.
+    const idleSeconds = row.idle_seconds === null ? null : Number(row.idle_seconds);
+    const state = row.state ?? "unknown";
+    return {
+      pid: row.pid,
+      applicationName: row.application_name,
+      state,
+      idleSeconds,
+      clientAddr: row.client_addr,
+      likelyOrphaned:
+        state === "idle" && idleSeconds !== null && idleSeconds > LEASE_ORPHAN_AFTER_SECONDS,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The refusal — and, when we can tell, WHY.
+ *
+ * The two causes need opposite responses. A live second instance means the
+ * orchestrator was asked for two writers and this exit is the system working.
+ * An orphaned backend means nothing is running and the operator must terminate
+ * a corpse to recover. Emitting one message for both is what turned a two-line
+ * fix into an investigation.
+ */
 export class SingleWriterLeaseUnavailable extends Error {
-  constructor() {
-    super(
-      "another engine instance already holds the single-writer lease — refusing to start a second writer",
-    );
+  readonly holder: LeaseHolder | null;
+
+  constructor(holder: LeaseHolder | null = null) {
+    super(SingleWriterLeaseUnavailable.describe(holder));
     this.name = "SingleWriterLeaseUnavailable";
+    this.holder = holder;
+  }
+
+  private static describe(holder: LeaseHolder | null): string {
+    if (holder === null) {
+      return "another engine instance already holds the single-writer lease — refusing to start a second writer";
+    }
+    if (holder.likelyOrphaned) {
+      const idle = Math.round(holder.idleSeconds ?? 0);
+      return (
+        `the single-writer lease is held by an ORPHANED postgres backend (pid ${String(holder.pid)}, ` +
+        `${holder.state} for ${String(idle)}s) — no live engine re-asserts for that long, so its process is gone ` +
+        `and only the session survives. Recover with: select pg_terminate_backend(${String(holder.pid)});`
+      );
+    }
+    return (
+      `another engine instance already holds the single-writer lease (pid ${String(holder.pid)}, ` +
+      `${holder.state}) — refusing to start a second writer`
+    );
   }
 }
 
@@ -75,8 +202,11 @@ export async function acquireSingleWriterLease(sql: postgres.Sql): Promise<Singl
       select pg_try_advisory_lock(${SINGLE_WRITER_LOCK_CLASS}, ${SINGLE_WRITER_LOCK_KEY}) as ok
     `;
     if (row?.ok !== true) {
+      // Look the holder up BEFORE handing the connection back, so the refusal
+      // can name a corpse as a corpse.
+      const holder = await describeLeaseHolder(sql);
       reserved.release();
-      throw new SingleWriterLeaseUnavailable();
+      throw new SingleWriterLeaseUnavailable(holder);
     }
   } catch (error) {
     if (!(error instanceof SingleWriterLeaseUnavailable)) {

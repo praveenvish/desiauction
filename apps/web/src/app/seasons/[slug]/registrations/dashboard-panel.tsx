@@ -1,6 +1,12 @@
 "use client";
 
-import { REJECTION_REASONS } from "@desiauction/core";
+import {
+  REJECTION_REASONS,
+  REQUIRED_IMPORT_FIELDS,
+  mappingOf,
+  type ColumnMapping,
+  type DateOrder,
+} from "@desiauction/core";
 import {
   Badge,
   Button,
@@ -22,16 +28,23 @@ import {
   bulkTriageAction,
   exportRegistrationsAction,
   importCommitAction,
+  importInspectAction,
   importPreviewAction,
+  saveImportMappingAction,
   markRegistrationAction,
+  personHistoryAction,
   registrationTimelineAction,
   selectAllMatchingAction,
   triageRegistrationAction,
   type ImportPreview,
+  type ImportInspection,
+  type ImportShape,
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
+import { roleLabel } from "../../../../lib/playing-roles";
 import { AddPlayerDialog } from "./add-player-dialog";
+import { ColumnMapper } from "./column-mapper";
 import { PhotoImportPanel } from "./photo-import";
 import { PlayerPhotoUploader } from "./player-photo-uploader";
 import { formatDateTime } from "../../../../lib/format-date";
@@ -129,6 +142,7 @@ export function RegistrationDashboardPanel({
   filters,
   orphanIcons,
   registrationOpen,
+  categoryFlags = {},
 }: {
   slug: string;
   stats: RegistrationStats;
@@ -137,6 +151,8 @@ export function RegistrationDashboardPanel({
   filters: { search: string; status: string; team: string; sort: string };
   orphanIcons: OrphanIcon[];
   registrationOpen: boolean;
+  /** PI-1: organizer-channel category advisories, keyed by registration id. */
+  categoryFlags?: NonNullable<RegistrationDashboard["categoryFlags"]>;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -149,8 +165,22 @@ export function RegistrationDashboardPanel({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [assignTeamId, setAssignTeamId] = useState("");
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  // PI-1: the person's other seasons in this org, shown in the details drawer.
+  const [history, setHistory] = useState<
+    { competitionName: string; startsOn: string | null; status: string }[]
+  >([]);
   const [noteText, setNoteText] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  /* The mapping step. `inspection` null = we have not read the file's headers
+     yet, which is the state the dialog opens in. */
+  const [inspection, setInspection] = useState<ImportInspection | null>(null);
+  const [mapping, setMapping] = useState<ColumnMapping>({});
+  const [dateOrder, setDateOrder] = useState<DateOrder>("dmy");
+  const [remember, setRemember] = useState(true);
+  /* Fill blanks by default — a re-import must not silently revert a correction
+     somebody made by hand in the app. `file-wins` is an explicit choice. */
+  const [fileWins, setFileWins] = useState(false);
+  const [usingSaved, setUsingSaved] = useState(false);
   const [ioOpen, setIoOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [confirmBulk, setConfirmBulk] = useState<TriageAction | null>(null);
@@ -374,7 +404,14 @@ export function RegistrationDashboardPanel({
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     setNoteText("");
-    setTimeline(await registrationTimelineAction(slug, id));
+    // PI-1: the timeline and the person's in-club history arrive together —
+    // two independent reads, one paint.
+    const [timelineRows, historyRows] = await Promise.all([
+      registrationTimelineAction(slug, id),
+      personHistoryAction(slug, id),
+    ]);
+    setTimeline(timelineRows);
+    setHistory(historyRows);
   };
 
   const submitNote = async (id: string) => {
@@ -402,41 +439,136 @@ export function RegistrationDashboardPanel({
     URL.revokeObjectURL(url);
   };
 
+  const resetImport = () => {
+    setPreview(null);
+    setInspection(null);
+    setMapping({});
+    setUsingSaved(false);
+  };
+
   const readCsvFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       if (csvRef.current) {
         csvRef.current.value = typeof reader.result === "string" ? reader.result : "";
       }
-      setPreview(null);
+      resetImport();
     };
     reader.readAsText(file);
   };
 
+  const shape = (): ImportShape => ({
+    mapping,
+    dateOrder,
+    policy: fileWins ? "file-wins" : "fill-blanks",
+  });
+
+  /**
+   * ONE BUTTON, AND THE MAPPING IS ALWAYS ON SCREEN BEFORE THE COMMIT IS.
+   *
+   * The first press reads the file's headers, settles on a mapping — one this
+   * club already confirmed for this exact layout if there is one, otherwise the
+   * detected guess — and validates under it. Later presses re-validate under
+   * whatever the organizer has since corrected.
+   *
+   * Deliberately not a separate "read the file" step. For a file whose headers
+   * are already ours (our own export, round-tripped) a mapping step would be
+   * pure friction, and for a foreign file the mapper renders right here beside
+   * the preview — so the translation is visible and correctable BEFORE anything
+   * is written, which is the property that actually matters.
+   */
   const runPreview = async () => {
     const text = csvRef.current?.value ?? "";
     if (text.trim() === "") {
       return;
     }
-    setPreview(await importPreviewAction(slug, text));
+    let active = mapping;
+    if (inspection === null) {
+      const read = await importInspectAction(slug, text);
+      setInspection(read);
+      if (!read.ok) {
+        setMapping({});
+        setPreview(null);
+        return;
+      }
+      if (read.saved !== undefined) {
+        active = read.saved.mapping;
+        setDateOrder(read.saved.dateOrder);
+        setUsingSaved(true);
+      } else {
+        active = read.detected === undefined ? {} : mappingOf(read.detected);
+        setUsingSaved(false);
+      }
+      setMapping(active);
+      // A file missing a required column cannot be previewed into anything
+      // useful; the mapper below says which, which is the actionable answer.
+      if (REQUIRED_IMPORT_FIELDS.some((field) => active[field] === undefined)) {
+        setPreview(null);
+        return;
+      }
+    }
+    setPreview(
+      await importPreviewAction(slug, text, {
+        mapping: active,
+        dateOrder,
+        policy: fileWins ? "file-wins" : "fill-blanks",
+      }),
+    );
   };
 
-  const commitImport = async () => {
+  /**
+   * `skipInvalid` is the organizer's explicit choice, taken on the button they
+   * pressed — never a default. A clean file commits whole; a file with errors
+   * commits only when they pressed the button that says how many it will leave
+   * behind, and those rows stay listed underneath by line number.
+   */
+  const commitImport = async (skipInvalid = false) => {
     const text = csvRef.current?.value ?? "";
     setBusy(true);
-    const result = await importCommitAction(slug, text);
+    const result = await importCommitAction(slug, text, { skipInvalid, shape: shape() });
+    // Remember the mapping only once the import it describes actually landed —
+    // a mapping saved beside a failed import is a mapping nobody validated.
+    if (result.ok && remember && inspection?.ok === true && Object.keys(mapping).length > 0) {
+      await saveImportMappingAction(slug, {
+        signature: inspection.signature,
+        label: null,
+        mapping,
+        valueMaps: {},
+        dateOrder,
+        scope: "org",
+      });
+    }
     setBusy(false);
     if (result.ok) {
-      toast({
-        title: `Imported ${String(result.imported ?? 0)} · ${String(result.duplicates ?? 0)} already registered`,
-        tone: "success",
-      });
-      setPreview(null);
+      // Only the outcomes that happened: a run with nothing reinstated should
+      // not report "0 rejoined" as though it were a finding.
+      const parts = [`Imported ${String(result.imported ?? 0)}`];
+      if ((result.updated ?? 0) > 0) {
+        parts.push(`${String(result.updated)} updated`);
+      }
+      if ((result.reinstated ?? 0) > 0) {
+        parts.push(`${String(result.reinstated)} rejoined`);
+      }
+      if ((result.unchanged ?? 0) > 0) {
+        parts.push(`${String(result.unchanged)} unchanged`);
+      }
+      if ((result.skipped ?? 0) > 0) {
+        parts.push(`${String(result.skipped)} skipped`);
+      }
+      toast({ title: parts.join(" · "), tone: "success" });
+      router.refresh();
+      if ((result.skipped ?? 0) > 0) {
+        // Rows were left behind on purpose. Closing the dialog and wiping the
+        // textarea would take away the only copy of WHICH rows, and the whole
+        // point of skipping is that the organizer comes back to them.
+        setPreview(await importPreviewAction(slug, text));
+        return;
+      }
+      resetImport();
       if (csvRef.current) {
         csvRef.current.value = "";
       }
       setIoOpen(false);
-      router.refresh();
     } else {
       toast({ title: result.error ?? "Import failed.", tone: "danger" });
     }
@@ -838,6 +970,7 @@ export function RegistrationDashboardPanel({
                   row={row}
                   active={index === cursor}
                   checked={selected.has(row.id)}
+                  categoryFlagged={categoryFlags[row.id] !== undefined}
                   onToggle={() => {
                     toggle(row);
                   }}
@@ -884,8 +1017,25 @@ export function RegistrationDashboardPanel({
                     {/* DA-35: one string served two different situations — an
                         empty season and a filter that matched nothing. The
                         first is the START of this screen's life, and blaming a
-                        filter that has not been applied is a dead end. */}
-                    {filtersApplied || stats.total > 0 ? (
+                        filter that has not been applied is a dead end.
+
+                        THIRD situation, found in review: no filters applied,
+                        the tiles count registrations, and the table still has
+                        zero rows. `stats.total > 0` used to shove that case
+                        into the filter branch, whose "Clear the filters"
+                        recovery is a no-op — the mismatch is a data problem
+                        (rows whose person no longer resolves), not a filter
+                        problem, and the message must not lie about it. */}
+                    {!filtersApplied && stats.total > 0 ? (
+                      <>
+                        <strong>
+                          {stats.total} registration{stats.total === 1 ? "" : "s"} exist
+                          {stats.total === 1 ? "s" : ""} but none can be displayed.
+                        </strong>{" "}
+                        This usually means the underlying player records are incomplete — contact
+                        support with this season&rsquo;s name.
+                      </>
+                    ) : filtersApplied ? (
                       <>
                         <strong>No registrations match these filters.</strong>{" "}
                         <button
@@ -972,7 +1122,7 @@ export function RegistrationDashboardPanel({
                 <dl className="details-facts" data-testid="details-facts">
                   <div>
                     <dt>Role</dt>
-                    <dd>{detail.role.replace(/_/g, " ")}</dd>
+                    <dd>{roleLabel(detail.role)}</dd>
                   </div>
                   {detail.age !== null ? (
                     <div>
@@ -1008,6 +1158,22 @@ export function RegistrationDashboardPanel({
               </>
             ) : null;
           })()}
+          {/* PI-1: welcome-back context — the club's own records only. */}
+          {history.length > 0 ? (
+            <>
+              <h3>Seen before in your club</h3>
+              <ul className="reg-person-history" data-testid="person-history">
+                {history.map((season, index) => (
+                  <li key={index}>
+                    {season.competitionName}
+                    {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""}
+                    {" · "}
+                    {season.status}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           <h3>Timeline</h3>
           <ol className="timeline">
             {timeline.map((entry, index) => (
@@ -1376,15 +1542,147 @@ export function RegistrationDashboardPanel({
                         }
                       }}
                     />
-                    <Button onClick={() => void runPreview()} data-testid="import-preview-btn">
+                    <Button
+                      onClick={() => void runPreview()}
+                      disabled={
+                        inspection !== null &&
+                        REQUIRED_IMPORT_FIELDS.some((field) => mapping[field] === undefined)
+                      }
+                      data-testid="import-preview-btn"
+                    >
                       Preview
                     </Button>
                   </div>
+
+                  {inspection !== null && !inspection.ok ? (
+                    <p role="alert" className="reg-warning">
+                      {inspection.error ?? "That file could not be read."}
+                    </p>
+                  ) : null}
+
+                  {inspection !== null && inspection.ok ? (
+                    <>
+                      {usingSaved ? (
+                        <p className="dash-hint" data-testid="mapping-saved-note">
+                          Using the mapping you saved for this form. Change anything below and the
+                          new version replaces it.
+                        </p>
+                      ) : null}
+                      <ColumnMapper
+                        inspection={inspection}
+                        mapping={mapping}
+                        onChange={(next) => {
+                          setMapping(next);
+                          // The preview describes the OLD mapping the moment
+                          // the mapping changes; showing it on would be a lie.
+                          setPreview(null);
+                        }}
+                      />
+                      <div className="io-row">
+                        <label className="io-inline" htmlFor="date-order">
+                          <span>Dates in this file read as</span>
+                          <select
+                            id="date-order"
+                            className="mapping-select"
+                            data-testid="date-order"
+                            value={dateOrder}
+                            onChange={(event) => {
+                              setDateOrder(event.target.value === "mdy" ? "mdy" : "dmy");
+                              setPreview(null);
+                            }}
+                          >
+                            <option value="dmy">day / month / year</option>
+                            <option value="mdy">month / day / year</option>
+                          </select>
+                        </label>
+                        <label className="io-inline" htmlFor="file-wins">
+                          <input
+                            id="file-wins"
+                            type="checkbox"
+                            data-testid="file-wins"
+                            checked={fileWins}
+                            onChange={(event) => {
+                              setFileWins(event.target.checked);
+                              // The preview described the other policy.
+                              setPreview(null);
+                            }}
+                          />
+                          <span>Let this file overwrite values already entered</span>
+                        </label>
+                        <label className="io-inline" htmlFor="remember-mapping">
+                          <input
+                            id="remember-mapping"
+                            type="checkbox"
+                            data-testid="remember-mapping"
+                            checked={remember}
+                            onChange={(event) => {
+                              setRemember(event.target.checked);
+                            }}
+                          />
+                          <span>Remember this mapping for next time</span>
+                        </label>
+                      </div>
+                    </>
+                  ) : null}
                   {preview !== null ? (
                     <div className="import-preview" data-testid="import-preview">
                       <p>
                         {preview.validCount} valid row(s) · {preview.errors.length} error(s)
                       </p>
+                      {/* WHAT COMMITTING WOULD ACTUALLY DO. "197 valid rows" said
+                          the same thing whether they were all new or all already
+                          here — and the commit then silently did nothing with the
+                          second case. */}
+                      {preview.diff !== undefined ? (
+                        <p data-testid="import-diff-counts">
+                          <strong>{preview.diff.counts.new} new</strong>
+                          {" · "}
+                          <strong>{preview.diff.counts.changed} changed</strong>
+                          {" · "}
+                          {preview.diff.counts.unchanged} unchanged
+                          {preview.diff.counts.reinstate > 0
+                            ? ` · ${String(preview.diff.counts.reinstate)} rejoining`
+                            : ""}
+                        </p>
+                      ) : null}
+                      {preview.diff !== undefined && preview.diff.changes.length > 0 ? (
+                        <div className="table-scroll">
+                          <table className="reg-table" data-testid="import-diff-table">
+                            <thead>
+                              <tr>
+                                <th>Player</th>
+                                <th>Field</th>
+                                <th>Now</th>
+                                <th>After import</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {preview.diff.changes.flatMap((row) =>
+                                row.fields.map((field, index) => (
+                                  <tr key={`${String(row.line)}-${field.label}`}>
+                                    <td data-label="Player">{index === 0 ? row.name : ""}</td>
+                                    <td data-label="Field">{field.label}</td>
+                                    <td data-label="Now" className="mapping-sample">
+                                      {field.from}
+                                    </td>
+                                    <td data-label="After import" className="mapping-sample">
+                                      {field.to}
+                                    </td>
+                                  </tr>
+                                )),
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null}
+                      {preview.diff !== undefined &&
+                      preview.diff.counts.changed + preview.diff.counts.reinstate >
+                        preview.diff.changes.length ? (
+                        <p className="dash-hint">
+                          Showing the first {preview.diff.changes.length}. The counts above cover
+                          every row.
+                        </p>
+                      ) : null}
                       {preview.errors.length > 0 ? (
                         <>
                           <ul className="import-errors">
@@ -1402,9 +1700,23 @@ export function RegistrationDashboardPanel({
                           ) : null}
                         </>
                       ) : null}
+                      {/* A file with errors AND valid rows now has a way forward.
+                          The button states the whole bargain — what lands and what
+                          is left — so "skip" is a choice the organizer read, not a
+                          default they were given. */}
+                      {preview.errors.length > 0 && preview.validCount > 0 ? (
+                        <Button
+                          onClick={() => void commitImport(true)}
+                          loading={busy}
+                          data-testid="import-commit-partial"
+                        >
+                          {`Import ${String(preview.validCount)} valid, skip ${String(preview.errors.length)}`}
+                        </Button>
+                      ) : null}
                       <Button
                         onClick={() => void commitImport()}
                         loading={busy}
+                        variant={preview.errors.length > 0 ? "ghost" : "primary"}
                         disabled={preview.errors.length > 0 || preview.validCount === 0}
                         data-testid="import-commit"
                       >
@@ -1412,7 +1724,7 @@ export function RegistrationDashboardPanel({
                             because four OTHER rows had errors, so it named the wrong
                             number and never said what was blocking it. */}
                         {preview.errors.length > 0
-                          ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import`
+                          ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import all`
                           : preview.validCount === 0
                             ? "Nothing to import"
                             : `Import ${String(preview.validCount)} player${preview.validCount === 1 ? "" : "s"}`}
@@ -1502,6 +1814,7 @@ function RegRow({
   row,
   active,
   checked,
+  categoryFlagged,
   onToggle,
   onDetails,
   onApprove,
@@ -1514,6 +1827,8 @@ function RegRow({
   row: Row;
   active: boolean;
   checked: boolean;
+  /** PI-1: the eligibility engine's organizer advisory — flag, never block. */
+  categoryFlagged: boolean;
   onToggle: () => void;
   onDetails: () => void;
   onApprove: () => void;
@@ -1571,11 +1886,19 @@ function RegRow({
                 possible duplicate
               </Badge>
             ) : null}
+            {categoryFlagged ? (
+              // PI-1: the season declares a gendered category and this
+              // person's own profile says otherwise. The engine flags; the
+              // organizer — who may know better — decides (invariant 5).
+              <Badge tone="warning" data-testid="category-flag">
+                check entry category
+              </Badge>
+            ) : null}
           </div>
         </div>
       </td>
       <td data-label="Role">
-        {row.role.replace(/_/g, " ")}
+        {roleLabel(row.role)}
         {row.age !== null ? <span className="reg-sub">{row.age} yrs</span> : null}
         {/* Its own class because the phone hides THIS and not the role or the
             age beside it: how somebody bats is what you read once you have

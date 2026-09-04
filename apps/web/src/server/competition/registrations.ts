@@ -33,6 +33,14 @@ import { storage } from "../media";
 // server-driven (search/filter/sort/pagination in SQL) so the client never loads
 // the whole dataset (M-IP3-2 performance target).
 
+/**
+ * A pool handle or an open transaction. Entry runs on both: the self-service
+ * and single-player paths hold a pool, the CSV import commits every row inside
+ * ONE transaction and must reinstate through the same helper rather than
+ * growing a second copy of the rule.
+ */
+type Writer = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 export type SubmitResult =
   | { ok: true; registrationId: string }
   | { ok: false; reason: "invalid_role" | "not_open" | "duplicate" };
@@ -88,8 +96,8 @@ function validProfile(profile: PlayerProfileInput | undefined): Partial<{
  * the duplicate rule doing its job, and a rejected registration is the
  * organizer's decision, which re-applying must never quietly overturn.
  */
-async function reinstateWithdrawn(
-  db: Db,
+export async function reinstateWithdrawn(
+  db: Writer,
   competitionId: string,
   personId: string,
   fresh: {
@@ -631,6 +639,7 @@ export async function publicRegistrationFacts(
 ): Promise<{
   name: string;
   status: string;
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -639,6 +648,7 @@ export async function publicRegistrationFacts(
     .select({
       name: competitions.name,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -699,8 +709,21 @@ export interface TimelineEntry {
   actorName: string | null;
 }
 
-/** A registration's audit timeline (transitions + notes), oldest→newest. */
-export async function timelineOf(db: Db, registrationId: string): Promise<TimelineEntry[]> {
+/**
+ * A registration's audit timeline (transitions + notes), oldest→newest.
+ *
+ * Object-level scoping (PRR P1-1): filtering on `auditLog.subject` alone trusts
+ * a caller-supplied id, so under an RLS-inert misconfiguration an organizer of
+ * competition A could read competition B's registration timeline by passing its
+ * id. The INNER join to `registrations` scoped by `competitionId` is the
+ * app-layer boundary that does not depend on RLS being live: a foreign id
+ * matches no row and yields an empty timeline.
+ */
+export async function timelineOf(
+  db: Db,
+  registrationId: string,
+  competitionId: string,
+): Promise<TimelineEntry[]> {
   return (
     db
       .select({
@@ -710,6 +733,12 @@ export async function timelineOf(db: Db, registrationId: string): Promise<Timeli
         actorName: people.name,
       })
       .from(auditLog)
+      // INNER join: the entry is returned only when its subject is a
+      // registration in THIS competition — the ownership check.
+      .innerJoin(
+        registrations,
+        and(eq(registrations.id, auditLog.subject), eq(registrations.competitionId, competitionId)),
+      )
       // LEFT join: a system actor (import runner, engine) has no people row, and
       // an entry with no name must still appear.
       .leftJoin(people, eq(people.id, auditLog.actor))

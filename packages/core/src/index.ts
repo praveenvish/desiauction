@@ -7,8 +7,11 @@ export {
   serializePaise,
   parsePaise,
   formatPaiseINR,
+  parseFeeStatus,
+  parseRupeesToPaise,
+  FEE_STATUSES,
 } from "./money";
-export type { Paise, DeductResult, ParsePaiseResult } from "./money";
+export type { Paise, DeductResult, ParsePaiseResult, FeeStatus } from "./money";
 export type { Clock } from "./clock";
 export { normalizePhone } from "./phone";
 export type { NormalizedPhone, PhoneResult } from "./phone";
@@ -46,10 +49,46 @@ export type {
   TransitionResult,
   NameResult,
 } from "./competition";
-export { parseRegistrationCsv, tokenizeCsv, validateNewPlayer } from "./registration-csv";
+export {
+  parseRegistrationCsv,
+  parseRegistrationRecords,
+  tokenizeCsv,
+  validateNewPlayer,
+} from "./registration-csv";
+export { isAmbiguousDate, parseCsvDate } from "./csv-date";
+export { planImport, planImportRow } from "./import-diff";
+export type {
+  ExistingRegistration,
+  FieldChange,
+  ImportDiff,
+  ImportDiffRow,
+  ImportPolicy,
+  ImportRowPlan,
+} from "./import-diff";
+export {
+  IMPORT_FIELDS,
+  IMPORT_FIELD_LABELS,
+  REQUIRED_IMPORT_FIELDS,
+  applyMapping,
+  detectMapping,
+  mappingOf,
+  normalizeHeader,
+  sampleRow,
+  signatureOf,
+} from "./import-mapping";
+export type {
+  ColumnMapping,
+  DetectedMapping,
+  ImportField,
+  MappedColumn,
+  MappingConflict,
+  ValueMaps,
+} from "./import-mapping";
+export type { DateOrder } from "./csv-date";
 export type {
   CsvRegistrationRow,
   CsvRowError,
+  CsvParseOptions,
   CsvParseResult,
   NewPlayerCheck,
   NewPlayerInput,
@@ -212,14 +251,45 @@ export {
   isBattingStyle,
   parseBattingStyle,
   parseBowlingStyle,
+  parseRole,
   isBowlingStyle,
   battingStyleLabel,
   bowlingStyleLabel,
   roleLabel,
   styleLabel,
   deriveAge,
+  isMinor,
+  MINOR_AGE_THRESHOLD,
+  GENDERS,
+  GENDER_SELF_DESCRIBED_MAX,
+  PROFILE_LOCATION_MAX,
+  JERSEY_NAME_MAX,
+  isGender,
+  genderLabel,
+  validateDateOfBirth,
+  validateProfileLocation,
+  validateJerseyNumber,
 } from "./player-profile";
-export type { BattingStyle, BowlingStyle, PlayerRole } from "./player-profile";
+export type { BattingStyle, BowlingStyle, Gender, PlayerRole } from "./player-profile";
+export {
+  ENTRY_CATEGORIES,
+  entryCategoryLabel,
+  evaluateRegistration,
+  isEntryCategory,
+} from "./eligibility";
+export type {
+  EligibilityAdvisory,
+  EligibilityReason,
+  EligibilityVerdict,
+  EntryCategory,
+  RegistrationEligibilityInput,
+} from "./eligibility";
+export { PROFILE_ITEMS, profileCompleteness } from "./profile-completeness";
+export type {
+  ProfileCompleteness,
+  ProfileCompletenessInput,
+  ProfileItem,
+} from "./profile-completeness";
 export {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -282,3 +352,47 @@ export {
   type TeamPosterMember,
   type TeamPosterRow,
 } from "./poster";
+export {
+  TARGET_PRIORITIES,
+  TARGET_PRIORITY_LABELS,
+  isTargetPriority,
+  evaluatePlan,
+  whatIf,
+  ladderFloor,
+  validateTargetMax,
+  fallbackWouldCycle,
+} from "./team-plan";
+export type {
+  TargetPriority,
+  PlanTarget,
+  PlanLot,
+  PlanRules,
+  PlanCurrentLot,
+  PlanInput,
+  PlanState,
+  PlanBudget,
+  PlanFit,
+  PlanSuggestion,
+  TargetState,
+  TargetOutcome,
+  TargetMaxValidation,
+  LotAdvice,
+  LotVerdict,
+  Consequence,
+} from "./team-plan";
+export {
+  FEATURES,
+  FEATURE_SCOPE_TYPES,
+  FEATURE_PLATFORM_SCOPE_ID,
+  isFeature,
+  resolveFeature,
+} from "./feature-settings";
+export type {
+  Feature,
+  FeatureDefinition,
+  FeatureScopeType,
+  FeatureSettingLike,
+  FeatureDenial,
+  FeatureResolution,
+  FeatureContext,
+} from "./feature-settings";

@@ -41,6 +41,14 @@ above them exist; ☑ are done and verified in-repo.
   Needs MX **plus SPF/DKIM/DMARC** — mail that arrives without them lands in
   spam, which for a grievance address is the same as not arriving.
 - ☐F Managed Postgres 17 (Mumbai, PITR + daily dumps to a separate credential/account)
+- ☐E **TCP keepalives on the production database** (`tcp_keepalives_idle=30`,
+  `tcp_keepalives_interval=10`, `tcp_keepalives_count=3`). Not tuning — the engine's
+  single-writer lease is a session lock, and a connection severed without a close (host
+  or VM restart, sleep, NAT expiry, partition) leaves a backend holding it indefinitely
+  without these. A plain `kill -9` is fine — the kernel closes the socket. Observed
+  locally 2026-08-31 after a Docker restart: four hours held, every replacement refused
+  to boot. If the managed provider does not expose them, the
+  manual recovery in [DEPLOYMENT](DEPLOYMENT.md) is the only way out of a wedged engine.
 - ☐F S3-compatible object storage + durable storage roots (freeze §8.4)
 - ☐E Run the DB bootstrap (migrations → **all four** roles → `grants:verify` → `rls:verify`) per [DEPLOYMENT](DEPLOYMENT.md). The role command needs four passwords; the two-password form printed in the runbook until 2026-08-19 aborted before creating the engine and runner roles.
 - ☑ Engine image builds (310 MB distroless) · ☑ Runner image builds + boot-smoked (244 MB)
@@ -73,7 +81,30 @@ above them exist; ☑ are done and verified in-repo.
   and the RBI payment-aggregator question, and neither waits for a turnover
   threshold.
 - ☐F SMS provider account (go-live-critical: login is OTP-first; only DevInboxSender exists) → ☐E implement the `OtpSender` port adapter + SMS-pumping circuit-breaker (RC-4 condition 2)
-- ☐F Email provider · ☐F WhatsApp BSP → ☐E finops dispatch adapters (outbox + in-app are already first-class; SDKs are drop-ins per IP-6)
+- ☑ Email provider (2026-08-30). Two systems on two domains on purpose: Zoho
+  mailboxes on the root, Resend sending on `mail.desiauction.in`, so a bounce
+  storm from registration mail cannot degrade the reputation `privacy@` and
+  `navrangi@` depend on. SPF/DKIM/DMARC pass on both; a real booking
+  confirmation was delivered with its ICS attachment intact and Reply-To
+  resolving to `support@`. Runbook: `docs/operations/EMAIL_SETUP.md`.
+  Deployment env: `EMAIL_API_ENDPOINT`, `EMAIL_API_KEY`, `EMAIL_FROM` — **all
+  three together or `transactionalMailer()` returns `UnconfiguredMailer`**,
+  which reports rather than silently drops — plus `EMAIL_REPLY_TO`, which is
+  deliberately outside that check because a missing Reply-To degrades the mail
+  without disabling the provider.
+  **Scope is transactional mail only.** This closes the founder-held account,
+  not the dispatch wiring below.
+  Still ☐F: **DMARC is at `p=none`** (report-only) on both domains. Tighten to
+  `p=quarantine` ~2026-09-13, after reading the aggregate reports and
+  confirming alignment — earlier and our own mail disappears. EDIT the existing
+  `_dmarc` record; a second one invalidates both.
+- ☐F WhatsApp BSP → ☐E finops dispatch adapters. `EmailHttpSender`
+  (`messaging/email-adapter.ts`) is the finops `DeliveryPort` and is still
+  constructed **nowhere outside its own tests** — the transactional mailer is a
+  different, smaller object and proving one says nothing about the other. The
+  credentials it needs now exist, so this is wiring it into `webFinopsDeps`
+  plus the WhatsApp equivalent (outbox + in-app are already first-class; SDKs
+  are drop-ins per IP-6)
 - ☐E Provider health monitoring (poll provider status into the finops supervisor's component list)
 
 ## 4 · Observability (PRP-1 §4)
@@ -267,6 +298,11 @@ empty database.
   Proven by booting two real engines. **Operational consequence: scaling the
   engine past one machine will crash-loop the second, by design** — scale the
   web tier for capacity (see DEPLOYMENT §"The engine is ONE process").
+  **Amended 2026-08-31:** a hard kill does release the lease (the kernel closes
+  the socket), but a connection severed WITHOUT a close does not — the session
+  outlives it until the database probes, so the lock CAN wedge a replacement; the refusal now names the holder and
+  distinguishes a live second instance from an orphaned backend. See the
+  keepalives item above — it is a prerequisite, not a nicety.
 - ☑ **A refund was booked twice.** Razorpay emits both `refund.created` and
   `refund.processed` for one refund; the idempotency key used the event type, so
   a partial refund doubled `refundedTotal` and reinstated the obligation twice.

@@ -1,4 +1,17 @@
+import path from "node:path";
+
 import { defineConfig } from "vitest/config";
+
+// The regression suites had the same split brain as the Playwright harness:
+// `.env.local` is what the app reads, and the tests never loaded it — they went
+// straight to the hardcoded fallback below. When the local database moved off
+// 5433, every suite failed with `password authentication failed` and the only
+// way to run one was to pass DATABASE_URL by hand on the command line.
+try {
+  process.loadEnvFile(path.resolve(__dirname, "../../.env.local"));
+} catch {
+  // No .env.local (CI, or a fresh clone) — the fallback below is correct there.
+}
 
 export default defineConfig({
   test: {

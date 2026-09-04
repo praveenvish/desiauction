@@ -619,6 +619,16 @@
   flex: 1;
 }
 
+/* The season/club the event belongs to — the answer to "which one?" that a
+   bare verb row withholds. One line, truncated: it is a pointer, not prose. */
+.home-feed-scope {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .home-attn-text strong,
 .home-event-text strong,
 .home-feed-text strong {

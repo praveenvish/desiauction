@@ -14,12 +14,12 @@ export const metadata = { title: "Users · Platform admin · DesiAuction" };
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; after?: string }>;
+  searchParams: Promise<{ q?: string; after?: string; filter?: string }>;
 }) {
   if ((await platformAdminPageGate("users")) === null) {
     notFound();
   }
-  const { q, after } = await searchParams;
+  const { q, after, filter } = await searchParams;
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
@@ -29,22 +29,32 @@ export default async function AdminUsersPage({
             they actually are.
           </p>
         </header>
-        <Suspense key={`${q ?? ""}-${after ?? ""}`} fallback={<LoadingState variant="page" />}>
-          <Directory query={q} after={after} />
+        <Suspense
+          key={`${q ?? ""}-${after ?? ""}-${filter ?? ""}`}
+          fallback={<LoadingState variant="page" />}
+        >
+          <Directory query={q} after={after} filter={filter} />
         </Suspense>
       </div>
     </main>
   );
 }
 
+// PI-1 P6: URL-driven facet, parsed fail-closed like every admin filter.
+function parseUserFilter(value: string | undefined): "all" | "players" | "profiled" {
+  return value === "players" || value === "profiled" ? value : "all";
+}
+
 async function Directory({
   query,
   after,
+  filter,
 }: {
   query: string | undefined;
   after: string | undefined;
+  filter: string | undefined;
 }) {
-  const directory = await adminUsers(query, after);
+  const directory = await adminUsers(query, after, parseUserFilter(filter));
   if (directory === null) {
     notFound();
   }

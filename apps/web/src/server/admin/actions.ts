@@ -28,6 +28,7 @@ import {
   type PlatformOverview,
   type UserDetail,
   type UserDirectory,
+  type UserDirectoryFilter,
 } from "./views";
 
 /**
@@ -105,11 +106,15 @@ export async function adminOrganization(slug: string): Promise<OrgDetail | null>
   return organizationDetail(systemDb, slug);
 }
 
-export async function adminUsers(query?: string, after?: string): Promise<UserDirectory | null> {
+export async function adminUsers(
+  query?: string,
+  after?: string,
+  filter?: UserDirectoryFilter,
+): Promise<UserDirectory | null> {
   if ((await platformAdminGate()) === null) {
     return null;
   }
-  return userDirectory(systemDb, query ?? "", after);
+  return userDirectory(systemDb, query ?? "", after, filter ?? "all");
 }
 
 export async function adminUser(personId: string): Promise<UserDetail | null> {

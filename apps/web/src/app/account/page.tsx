@@ -9,7 +9,9 @@ import {
   logoutAction,
 } from "../../server/auth/actions";
 import { notificationSettings } from "../../server/messaging/actions";
+import { playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
 import { NotificationSwitches } from "./notification-switches";
+import { CricketProfilePanel } from "./cricket-profile-panel";
 import { EmailVerify } from "./email-verify";
 import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
@@ -27,6 +29,11 @@ export default async function AccountPage() {
   const security = await accountSecurity();
   const settings = await notificationSettings();
   const email = await accountEmail();
+  const cricketProfile = await playerProfileFor(session.personId);
+  const completeness = await profileCompletenessFor(
+    session.personId,
+    security?.passkeys.length ?? 0,
+  );
   /*
    * The switches below announce their own state changes to a screen reader, and
    * `useAnnouncer` THROWS without this ancestor. That is a runtime error the
@@ -55,9 +62,12 @@ export default async function AccountPage() {
               personId={session.personId}
               phone={session.phone}
               name={session.name}
-              passkeyCount={security?.passkeys.length ?? 0}
+              completeness={completeness}
               signOut={<SignOutButton logout={logoutAction} />}
             />
+            {/* PI-1: the durable cricket identity, right under the account
+              identity it extends. Prefills every future registration. */}
+            <CricketProfilePanel profile={cricketProfile} />
             {/* Beside the identity it belongs to, and above Security: this is a
               contact route the product will actually use, not a credential. */}
             <Card>

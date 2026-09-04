@@ -75,14 +75,23 @@ export default function SupportPage() {
             is worse than no status page. There is no status page yet; say so.
             TODO(founder): if a real status page is commissioned, link it here. */}
         <p className="prose-p">
-          Running version <code>{env.APP_VERSION}</code>. See{" "}
+          {/* `APP_VERSION` defaults to "dev", and nothing forces a real value
+              at deploy time — so the sentence only quotes a version worth
+              quoting. "Running version dev" on a trust page is worse than no
+              version line at all. */}
+          {env.APP_VERSION !== "dev" ? (
+            <>
+              Running version <code>{env.APP_VERSION}</code>.{" "}
+            </>
+          ) : null}
+          See{" "}
           <Link href="/releases" className="prose-link">
             release notes
           </Link>{" "}
           for what each update delivered.
         </p>
         <p className="prose-p">
-          We don&rsquo;t publish a status page yet. If DesiAuction looks down to you, email{" "}
+          We don&rsquo;t publish a status page yet. If DesiAuction seems down for you, email{" "}
           <a href="mailto:support@desiauction.in" className="prose-link">
             support@desiauction.in
           </a>{" "}

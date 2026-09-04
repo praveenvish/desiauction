@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 /** Honest placeholder — no fabricated posts. Public, no auth. */
 export default function BlogPage() {
   return (
-    <main className="content-page mk">
+    <main className="content-page content-narrow mk">
       <h1>Blog</h1>
       <p className="content-lead">
         We're in beta with our first tournaments now. Notes on running auction night, building the

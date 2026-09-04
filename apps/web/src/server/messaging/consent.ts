@@ -212,7 +212,7 @@ export async function recordConsent(
     personId: string;
     purpose: string;
     granted: boolean;
-    source: "registration" | "account" | "sms_stop" | "sms_start" | "import" | "support";
+    source: "registration" | "account" | "sms_stop" | "sms_start" | "import" | "support" | "login";
     evidence?: Record<string, unknown>;
     requestIp?: string | null;
     userAgent?: string | null;

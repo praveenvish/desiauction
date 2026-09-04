@@ -93,6 +93,34 @@ describe("teamPurseRows — redacted money stays redacted", () => {
     expect(rows.find((r) => r.teamId === "team-a")?.committed).toBe(10_000_00);
   });
 
+  /**
+   * The PUBLIC board is the case where NOTHING is visible: an anonymous watcher
+   * of /board is sent no money at all, so the purse-per-team scan finds nothing
+   * to borrow from. It used to fall back to a literal 0, which the board then
+   * printed as a fact — "Demo Panthers ₹0 PURSE REMAINING" on the projector,
+   * for a franchise holding its entire purse. A team whose purse cannot be
+   * known must read "sealed", exactly like a team whose purse was withheld.
+   */
+  it("does not invent a zero purse for an unclaimed team when every purse is sealed", () => {
+    const rows = teamPurseRows(
+      snapshot([paddle({ teamId: "team-a", committed: null, purseRemaining: null })]),
+      TEAMS,
+    );
+    // team-b holds no paddle, and nothing on the wire says what a purse is.
+    expect(rows.find((r) => r.teamId === "team-b")?.purseRemaining).toBeNull();
+    expect(rows.find((r) => r.teamId === "team-b")?.total).toBeNull();
+  });
+
+  it("still lends the real purse to an unclaimed team when money IS visible", () => {
+    // The conductor's own board: team-a's money came through, so team-b's
+    // untouched purse is genuinely derivable and must still be shown.
+    const rows = teamPurseRows(
+      snapshot([paddle({ teamId: "team-a", committed: 10_000_00, purseRemaining: 90_000_00 })]),
+      TEAMS,
+    );
+    expect(rows.find((r) => r.teamId === "team-b")?.purseRemaining).toBe(100_000_00);
+  });
+
   it("does not let a sealed team poison the purse-per-team derivation", () => {
     const rows = teamPurseRows(
       snapshot([

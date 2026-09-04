@@ -21,10 +21,11 @@ export default function ApiDocsPage() {
         us what you're trying to do — it helps us prioritize.
       </p>
       <p className="mk-placeholder">
-        No public API published yet.{" "}
+        No public API published yet — write to{" "}
         <a href={`mailto:${SUPPORT.channels[0].detail}`} className="prose-link">
           {SUPPORT.channels[0].detail}
-        </a>
+        </a>{" "}
+        with what you&rsquo;d build.
       </p>
     </main>
   );

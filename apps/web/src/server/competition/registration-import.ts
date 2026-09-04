@@ -1,15 +1,24 @@
 import {
   isBattingStyle,
   isBowlingStyle,
+  planImport,
   registrationNumber,
   type CsvRegistrationRow,
+  type ExistingRegistration,
+  type FieldChange,
+  type ImportPolicy,
 } from "@desiauction/core";
 import { auditLog, newId, people, registrations, type Db } from "@desiauction/db";
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+
+import { reinstateWithdrawn } from "./registrations";
 
 // CSV import commit (M-IP3-2, doc 42 "Import Assistant stages rows"). Validation
-// happens in core (parseRegistrationCsv) BEFORE this runs — the caller only
-// commits a fully-valid file (no partial corruption). Imported players are
+// happens in core (parseRegistrationCsv) BEFORE this runs — every row that
+// reaches here fully validated, whether the organizer committed a clean file or
+// chose to skip the rows that did not (`skipInvalid`). This function's contract
+// is unchanged by that choice: it is handed VALID rows and writes all of them,
+// in one transaction, or none. Imported players are
 // unverified person STUBS (phone is the identity anchor, C-24); each still lands
 // in `submitted` and enters the pool through the same human approval gate
 // (invariant 5). The whole import is one transaction: rollback-safe.
@@ -23,7 +32,119 @@ import { inArray } from "drizzle-orm";
 
 export interface ImportResult {
   imported: number;
-  duplicates: number; // rows whose person was already registered here
+  /**
+   * Rows whose person already held a registration and whose values the file
+   * CHANGED. Formerly counted as "duplicates" and written nowhere: the second
+   * file did nothing, and every correction stayed in the spreadsheet.
+   */
+  updated: number;
+  /** Rows the file agrees with entirely — read, compared, and left alone. */
+  unchanged: number;
+  /** Rows whose person had withdrawn and is back in triage. */
+  reinstated: number;
+  /** Existing nameless person stubs the file was able to name. */
+  named: number;
+}
+
+/**
+ * What is already stored for these phones, in the shape the diff compares
+ * against. One query for the whole file, not one per row.
+ */
+export async function existingForImport(
+  db: Db,
+  competitionId: string,
+  phones: readonly string[],
+): Promise<Map<string, ExistingRegistration & { id: string }>> {
+  if (phones.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .select({
+      id: registrations.id,
+      phone: people.phone,
+      status: registrations.status,
+      role: registrations.role,
+      basePriceBand: registrations.basePriceBand,
+      dateOfBirth: registrations.dateOfBirth,
+      battingStyle: registrations.battingStyle,
+      bowlingStyle: registrations.bowlingStyle,
+      feeStatus: registrations.feeStatus,
+      feeAmountPaise: registrations.feeAmountPaise,
+      feeReference: registrations.feeReference,
+      note: registrations.note,
+      fatherName: registrations.fatherName,
+      jerseyName: registrations.jerseyName,
+      jerseyNumber: registrations.jerseyNumber,
+      tshirtSize: registrations.tshirtSize,
+      trouserSize: registrations.trouserSize,
+    })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(and(eq(registrations.competitionId, competitionId), inArray(people.phone, [...phones])));
+  return new Map(rows.map(({ phone, ...rest }) => [phone, rest]));
+}
+
+/** The column set a planned change touches, as drizzle values. */
+function changedValues(
+  changes: readonly FieldChange[],
+  row: CsvRegistrationRow,
+): Record<string, unknown> {
+  const all: Record<string, unknown> = {
+    role: row.role,
+    basePriceBand: row.basePriceBand,
+    dateOfBirth: row.dateOfBirth,
+    battingStyle: row.battingStyle,
+    bowlingStyle: row.bowlingStyle,
+    ...deskFields(row),
+  };
+  // ONLY the fields the plan named. The preview showed the organizer this exact
+  // list; writing anything else would make the preview a lie.
+  const out: Record<string, unknown> = {};
+  for (const change of changes) {
+    if (change.field in all) {
+      out[change.field] = all[change.field];
+    }
+  }
+  return out;
+}
+
+/**
+ * The desk + kit columns a file supplied, and only those.
+ *
+ * Absent stays ABSENT rather than becoming null: an organizer who typed a note
+ * on the dashboard and then imported a corrected roster should not lose it to a
+ * column their form never had.
+ */
+function deskFields(row: CsvRegistrationRow): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (row.feeStatus !== null) {
+    out["feeStatus"] = row.feeStatus;
+  }
+  if (row.feeAmountPaise !== null) {
+    out["feeAmountPaise"] = row.feeAmountPaise;
+  }
+  if (row.feeReference !== null) {
+    out["feeReference"] = row.feeReference;
+  }
+  if (row.note !== null) {
+    out["note"] = row.note;
+  }
+  if (row.fatherName !== null) {
+    out["fatherName"] = row.fatherName;
+  }
+  if (row.jerseyName !== null) {
+    out["jerseyName"] = row.jerseyName;
+  }
+  if (row.jerseyNumber !== null) {
+    out["jerseyNumber"] = row.jerseyNumber;
+  }
+  if (row.tshirtSize !== null) {
+    out["tshirtSize"] = row.tshirtSize;
+  }
+  if (row.trouserSize !== null) {
+    out["trouserSize"] = row.trouserSize;
+  }
+  return out;
 }
 
 export async function commitRegistrationImport(
@@ -32,35 +153,109 @@ export async function commitRegistrationImport(
   orgId: string,
   actorId: string,
   rows: readonly CsvRegistrationRow[],
+  /** Default is the safe one: add what is missing, never revert a hand edit. */
+  policy: ImportPolicy = "fill-blanks",
 ): Promise<ImportResult> {
   if (rows.length === 0) {
-    return { imported: 0, duplicates: 0 };
+    return { imported: 0, updated: 0, unchanged: 0, reinstated: 0, named: 0 };
   }
   return db.transaction(async (tx) => {
     // Resolve existing people by phone in one query, then create stubs for the rest.
     const phones = [...new Set(rows.map((r) => r.phone))];
     const existing = await tx
-      .select({ id: people.id, phone: people.phone })
+      .select({ id: people.id, phone: people.phone, name: people.name })
       .from(people)
       .where(inArray(people.phone, phones));
     const personByPhone = new Map(existing.map((p) => [p.phone, p.id]));
 
+    let named = 0;
     for (const phone of phones) {
+      const name = rows.find((r) => r.phone === phone)?.name ?? null;
       if (!personByPhone.has(phone)) {
         const id = newId();
-        const name = rows.find((r) => r.phone === phone)?.name ?? null;
         await tx.insert(people).values({ id, phone, name });
         personByPhone.set(phone, id);
+        continue;
+      }
+      /*
+       * NAME A STUB THE FILE CAN NAME.
+       *
+       * `addPlayerByPhone` has always done this and the comments here claim the
+       * two paths mirror each other — they did not. A person created by some
+       * earlier import or invite has a phone and no name; every screen then
+       * showed "Unnamed" for a player whose name was sitting in the column we
+       * had just read. An EXISTING name is never overwritten: it is the
+       * person's own, not ours to correct from a spreadsheet.
+       */
+      const found = existing.find((person) => person.phone === phone);
+      if (found !== undefined && found.name === null && name !== null && name !== "") {
+        const updated = await tx
+          .update(people)
+          .set({ name })
+          .where(and(eq(people.id, found.id), isNull(people.name)))
+          .returning({ id: people.id });
+        named += updated.length;
       }
     }
 
+    /*
+     * THE SECOND FILE IS THE NORMAL CASE.
+     *
+     * The plan is computed against what is already stored and decides each row
+     * exactly once — new, changed, unchanged, or reinstate. It is the SAME
+     * computation the preview showed the organizer, run again here against the
+     * file rather than against anything the browser sent back.
+     */
+    const stored = await existingForImport(tx, competitionId, phones);
+    const diff = planImport(rows, stored, policy);
+    const planByLine = new Map(diff.rows.map((entry) => [entry.line, entry.plan]));
+
     let imported = 0;
-    let duplicates = 0;
+    let updated = 0;
+    let unchanged = 0;
+    let reinstated = 0;
     for (const row of rows) {
       const personId = personByPhone.get(row.phone);
       if (personId === undefined) {
         continue;
       }
+      const plan = planByLine.get(row.line);
+      const record = stored.get(row.phone);
+
+      // Already here, and the file agrees with every column it carries.
+      if (plan?.kind === "unchanged") {
+        unchanged++;
+        continue;
+      }
+
+      // Already here, and the file changes something. Status is untouched —
+      // an approved player stays approved through a re-import (rule 3).
+      if (plan?.kind === "changed" && record !== undefined) {
+        const values = changedValues(plan.changes, row);
+        if (Object.keys(values).length > 0) {
+          await tx.update(registrations).set(values).where(eq(registrations.id, record.id));
+        }
+        updated++;
+        await tx.insert(auditLog).values({
+          id: newId(),
+          actor: actorId,
+          action: "registration.updated",
+          scopeType: "org",
+          scopeId: orgId,
+          subject: record.id,
+          // The field-level delta, so "who changed this player's phone" has an
+          // answer that does not require reading a spreadsheet's history.
+          meta: {
+            source: "csv_import",
+            changed: plan.changes.map((c) => c.field).join(","),
+            ...Object.fromEntries(
+              plan.changes.map((c) => [c.field, `${c.from ?? "(blank)"} -> ${c.to}`]),
+            ),
+          },
+        });
+        continue;
+      }
+
       const id = newId();
       const inserted = await tx
         .insert(registrations)
@@ -78,6 +273,10 @@ export async function commitRegistrationImport(
           ...(row.dateOfBirth !== null ? { dateOfBirth: row.dateOfBirth } : {}),
           ...(isBattingStyle(row.battingStyle ?? "") ? { battingStyle: row.battingStyle } : {}),
           ...(isBowlingStyle(row.bowlingStyle ?? "") ? { bowlingStyle: row.bowlingStyle } : {}),
+          // Desk + kit (0034). Spread only when the file carried them, so an
+          // import that maps none of these leaves the column defaults alone
+          // rather than writing nulls over a value entered by hand.
+          ...deskFields(row),
         })
         // Already registered here → skip, don't corrupt the batch.
         .onConflictDoNothing({
@@ -99,9 +298,43 @@ export async function commitRegistrationImport(
           subject: id,
           meta: { source: "csv_import" },
         });
-      } else {
-        duplicates++;
+        continue;
       }
+      /*
+       * A WITHDRAWAL IS NOT A LIFE SENTENCE HERE EITHER.
+       *
+       * The conflict target is TOTAL — it includes withdrawn rows — so a player
+       * who withdrew and then appeared on the organizer's final sheet was
+       * counted as an already-registered "duplicate" and left withdrawn, while
+       * the self-service and add-by-hand paths both reinstated them. Same rule,
+       * same helper, same single exit from `withdrawn` that core allows.
+       */
+      const restored = await reinstateWithdrawn(tx, competitionId, personId, {
+        role: row.role,
+        basePriceBand: row.basePriceBand,
+        profile: {
+          ...(row.dateOfBirth !== null ? { dateOfBirth: row.dateOfBirth } : {}),
+          ...(row.battingStyle !== null ? { battingStyle: row.battingStyle } : {}),
+          ...(row.bowlingStyle !== null ? { bowlingStyle: row.bowlingStyle } : {}),
+        },
+      });
+      if (restored === null) {
+        // Live registration the plan did not mark changed — nothing to do.
+        unchanged++;
+        continue;
+      }
+      reinstated++;
+      await tx.insert(auditLog).values({
+        id: newId(),
+        actor: actorId,
+        action: "registration.imported",
+        scopeType: "org",
+        scopeId: orgId,
+        subject: restored.id,
+        // The timeline must read apply → withdraw → rejoin, not a second
+        // application appearing from nowhere (the DA-27 reason, on this path).
+        meta: { source: "csv_import", reinstated: "true" },
+      });
     }
 
     await tx.insert(auditLog).values({
@@ -111,8 +344,14 @@ export async function commitRegistrationImport(
       scopeType: "org",
       scopeId: orgId,
       subject: competitionId,
-      meta: { imported: String(imported), duplicates: String(duplicates) },
+      meta: {
+        imported: String(imported),
+        updated: String(updated),
+        unchanged: String(unchanged),
+        reinstated: String(reinstated),
+        named: String(named),
+      },
     });
-    return { imported, duplicates };
+    return { imported, updated, unchanged, reinstated, named };
   });
 }

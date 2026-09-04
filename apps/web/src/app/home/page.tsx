@@ -20,6 +20,7 @@ import { competitionsView, registrationDashboard } from "../../server/competitio
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { myRegistrations } from "../../server/competition/public";
 import { homeDashboard } from "../../server/home/dashboard";
+import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
 import type { HomeDashboardData, HomeStages } from "../../server/home/dashboard";
 import { CreateOrgForm } from "../orgs/create-org-form";
 import { CreateTournamentForm } from "../tournaments/create-tournament-form";
@@ -52,13 +53,20 @@ function statusTone(status: string): Tone {
   }
 }
 
-/** Compact label so the status column never truncates in a narrow panel. */
+/**
+ * Compact label so the status column never truncates in a narrow panel.
+ *
+ * "Open"/"Closed" were shorter still, and wrong twice over: "Closed" told a
+ * reader the SEASON had ended when only registration had (auction night is
+ * next), and a settled season carried the same word as one mid-lifecycle.
+ * These abbreviate the vocabulary /tournaments uses rather than invent one.
+ */
 function statusLabel(status: string): string {
   switch (status) {
     case "registration_open":
-      return "Open";
+      return "Reg open";
     case "registration_closed":
-      return "Closed";
+      return "Reg closed";
     case "setup":
       return "Setup";
     case "draft":
@@ -66,6 +74,24 @@ function statusLabel(status: string): string {
     default:
       return status.replace(/_/g, " ");
   }
+}
+
+/**
+ * The one badge a season row shows. Whether the books are settled is the
+ * settlement CASE's answer and outranks the competition status — the same
+ * precedence the lifecycle rail below already applies.
+ */
+function seasonBadge(row: { status: string; settlement: "settling" | "settled" | null }): {
+  label: string;
+  tone: Tone;
+} {
+  if (row.settlement === "settled") {
+    return { label: "Settled", tone: "success" };
+  }
+  if (row.settlement === "settling") {
+    return { label: "Settling", tone: "info" };
+  }
+  return { label: statusLabel(row.status), tone: statusTone(row.status) };
 }
 
 interface AttentionRow {
@@ -600,12 +626,18 @@ export default async function HomePage() {
 }
 
 async function HomeBody({ personId, name }: { personId: string; name: string }) {
-  const [view, schedule, registrationsMine, dash] = await Promise.all([
+  const [view, schedule, registrationsMine, dash, hasProfile, completeness] = await Promise.all([
     competitionsView(),
     organizerScheduleView(),
     myRegistrations(personId),
     homeDashboard(),
+    hasPlayerProfile(personId),
+    profileCompletenessFor(personId),
   ]);
+  // PI-1: nudge only someone the platform can see IS a player (a registration
+  // or a profile row); a pure organizer's home never asks for a bowling style.
+  const showProfileNudge =
+    (registrationsMine.length > 0 || hasProfile) && completeness.done < completeness.total;
 
   // The night in progress leads the page. One extra read, and only when there
   // IS one: the hero needs what the list row could not say — who is on the
@@ -1093,57 +1125,63 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                           </tr>
                         </thead>
                         <tbody>
-                          {dash.top.map((row) => (
-                            <tr key={row.slug}>
-                              <td>
-                                <Link href={`/seasons/${row.slug}`} className="home-tcell">
-                                  <span className="home-crest home-crest--sm" aria-hidden>
-                                    {monogram(row.name)}
-                                  </span>
-                                  <span className="home-tcell-text">
-                                    <strong>{row.name}</strong>
-                                    <span>{rupeesShort(row.collectedPaise)} collected</span>
-                                  </span>
-                                </Link>
-                              </td>
-                              <td className="home-num home-mono">{row.teams}</td>
-                              <td className="home-num home-mono">{row.registrations}</td>
-                              <td className="home-num">
-                                <Badge tone={statusTone(row.status)}>
-                                  {statusLabel(row.status)}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
+                          {dash.top.map((row) => {
+                            const badge = seasonBadge(row);
+                            return (
+                              <tr key={row.slug}>
+                                <td>
+                                  <Link href={`/seasons/${row.slug}`} className="home-tcell">
+                                    <span className="home-crest home-crest--sm" aria-hidden>
+                                      {monogram(row.name)}
+                                    </span>
+                                    <span className="home-tcell-text">
+                                      <strong>{row.name}</strong>
+                                      {row.canSeeMoney ? (
+                                        <span>{rupeesShort(row.collectedPaise)} collected</span>
+                                      ) : null}
+                                    </span>
+                                  </Link>
+                                </td>
+                                <td className="home-num home-mono">{row.teams}</td>
+                                <td className="home-num home-mono">{row.registrations}</td>
+                                <td className="home-num">
+                                  <Badge tone={badge.tone}>{badge.label}</Badge>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                       <ul className="home-season-cards">
-                        {dash.top.map((row) => (
-                          <li key={row.slug}>
-                            <Link href={`/seasons/${row.slug}`} className="home-season-card">
-                              <span className="home-season-top">
-                                <span className="home-crest home-crest--sm" aria-hidden>
-                                  {monogram(row.name)}
+                        {dash.top.map((row) => {
+                          const badge = seasonBadge(row);
+                          return (
+                            <li key={row.slug}>
+                              <Link href={`/seasons/${row.slug}`} className="home-season-card">
+                                <span className="home-season-top">
+                                  <span className="home-crest home-crest--sm" aria-hidden>
+                                    {monogram(row.name)}
+                                  </span>
+                                  <strong className="home-season-name">{row.name}</strong>
+                                  <Badge tone={badge.tone}>{badge.label}</Badge>
                                 </span>
-                                <strong className="home-season-name">{row.name}</strong>
-                                <Badge tone={statusTone(row.status)}>
-                                  {statusLabel(row.status)}
-                                </Badge>
-                              </span>
-                              <span className="home-season-meta">
-                                <span>
-                                  <b className="home-mono">{row.teams}</b> team
-                                  {row.teams === 1 ? "" : "s"}
+                                <span className="home-season-meta">
+                                  <span>
+                                    <b className="home-mono">{row.teams}</b> team
+                                    {row.teams === 1 ? "" : "s"}
+                                  </span>
+                                  <span>
+                                    <b className="home-mono">{row.registrations}</b> player
+                                    {row.registrations === 1 ? "" : "s"}
+                                  </span>
+                                  {row.canSeeMoney ? (
+                                    <span>{rupeesShort(row.collectedPaise)} collected</span>
+                                  ) : null}
                                 </span>
-                                <span>
-                                  <b className="home-mono">{row.registrations}</b> player
-                                  {row.registrations === 1 ? "" : "s"}
-                                </span>
-                                <span>{rupeesShort(row.collectedPaise)} collected</span>
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
+                              </Link>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   </Card>
@@ -1297,6 +1335,12 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                                     ? `${String(row.count)} finance ${row.count === 1 ? "update" : "updates"}`
                                     : activityLabel(row.action)}
                                 </strong>
+                                {/* Which season the event belongs to — six
+                                    anonymous "Paddle granted" lines answer
+                                    nothing without it. */}
+                                {row.scope !== null ? (
+                                  <span className="home-feed-scope">{row.scope}</span>
+                                ) : null}
                               </span>
                               <span className="home-time">{ago(row.at)}</span>
                             </li>
@@ -1319,9 +1363,37 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
           }))}
         />
 
+        {showProfileNudge ? (
+          <Card className="home-profile-nudge" data-testid="home-profile-nudge">
+            <div className="home-attn">
+              <span className="home-attn-text">
+                <strong>
+                  Complete your player profile — {completeness.done}/{completeness.total}
+                </strong>
+                <span>
+                  {completeness.missing.length === 1
+                    ? "One thing left"
+                    : `${String(completeness.missing.length)} things left`}{" "}
+                  — the next registration form starts filled in.
+                </span>
+              </span>
+              <Link href="/account" className="home-own-poster">
+                Finish it
+              </Link>
+            </div>
+          </Card>
+        ) : null}
+
         {registrationsMine.length > 0 ? (
           <>
-            <SectionHeader title="My registrations" />
+            <SectionHeader
+              title="My registrations"
+              actions={
+                <Link href="/me/cricket" data-testid="home-career-link">
+                  My cricket →
+                </Link>
+              }
+            />
             <Card data-testid="home-registrations">
               <ul className="home-list">
                 {registrationsMine.map((registration) => (

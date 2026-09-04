@@ -894,6 +894,10 @@ function Obligations({
   const [waiving, setWaiving] = useState<ObligationView | null>(null);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  // PRR P1-2: one stable key per waive intent, re-minted each time the dialog
+  // opens, so a timeout-then-retry dedupes server-side but a genuine second
+  // waiver of the same amount is a new intent.
+  const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
 
   if (settlementCase.obligations.length === 0) {
     return (
@@ -1001,6 +1005,7 @@ function Obligations({
                           setWaiving(obligation);
                           setAmount("");
                           setReason("");
+                          setIntentKey(crypto.randomUUID());
                         }}
                         data-testid={`waive-${obligation.teamId}`}
                       >
@@ -1072,6 +1077,7 @@ function Obligations({
                       target.teamId,
                       amount,
                       reason,
+                      intentKey,
                     ),
                   "Waived. The books were updated.",
                 ).then((ok) => {
@@ -1250,6 +1256,9 @@ function Payments({
   const [refunding, setRefunding] = useState<PaymentView | null>(null);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  // PRR P1-2: one stable key per refund intent, re-minted each time the dialog
+  // opens — a lost-answer retry dedupes, a deliberate second refund does not.
+  const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
 
   if (settlementCase.payments.length === 0) {
     return (
@@ -1310,6 +1319,7 @@ function Payments({
                   setRefunding(payment);
                   setAmount("");
                   setReason("");
+                  setIntentKey(crypto.randomUUID());
                 }}
               />
             ))}
@@ -1349,7 +1359,7 @@ function Payments({
                   return;
                 }
                 void act(
-                  () => refundPaymentAction(slug, target.paymentId, amount, reason),
+                  () => refundPaymentAction(slug, target.paymentId, amount, reason, intentKey),
                   "Refunded. The money was put back on what the team owes.",
                 ).then((ok) => {
                   if (ok) {

@@ -10,6 +10,7 @@ import {
   LOT_MACHINE,
   extendOnBid,
   openLotTimer,
+  type FeatureDenial,
   type MachineEdge,
 } from "@desiauction/core";
 import { redirect } from "next/navigation";
@@ -21,6 +22,7 @@ import { canCompetition, requireCompetitionCapability } from "../competition/aut
 import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
 import { ownedTeamIdsOn } from "../competition/posters";
 import { dbHandle, systemDb } from "../db";
+import { featureEnabled, setAuctionFeature } from "../feature-settings";
 import { auctionReadiness, createAuction, type AuctionRecord } from "@desiauction/auction";
 import { auctionOf, auctionView, type AuctionView, type PaddleView } from "@desiauction/auction";
 import { auctionReady, type AuctionReadyProjection } from "./auction-ready";
@@ -178,7 +180,18 @@ export interface AuctionDashboard {
     bid: readonly MachineEdge<string, string>[];
   };
   timerDemo: { initialSeconds: number; extensionSeconds: number; steps: TimerDemoStep[] };
-  viewer: { canConduct: boolean; canPoster: boolean };
+  viewer: {
+    canConduct: boolean;
+    canPoster: boolean;
+    /** WR-1: this person holds a team here and planning is switched on for this auction. */
+    planAvailable: boolean;
+  };
+  /**
+   * WR-1: the organizer's switch for owner plans on THIS auction — its current
+   * answer and which layer decided it. Null before the auction exists, and
+   * absent from the payload for anyone who cannot conduct.
+   */
+  ownerPlans?: { enabled: boolean; deniedBy: FeatureDenial | null };
   /** PX-6 lobby: the locked rules (doc 41), display-only. Null pre-creation. */
   rules: GatedAuctionRules | null;
   /**
@@ -246,59 +259,76 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const { ready, view, canConduct, canPoster, rules, wsUrl, overview, feasibility } =
-    await inCompetitionOrg(session.personId, competition, async (db) => {
-      const [readyProjection, auction, conduct, manage, review, ownTeams] = await Promise.all([
-        auctionReady(db, competition),
-        requireAuction(db, competition.id),
-        canCompetition(db, session.personId, scope, "auction.conduct"),
-        canCompetition(db, session.personId, scope, "competition.manage"),
-        // The organizer half of the poster gate. Evaluated rather than inferred
-        // from `conduct || manage`, because the studio was shipped with no link
-        // from anywhere in the product and the first link to it must not lead
-        // some of its holders to a 403 — nor hide the door from `org:staff`,
-        // who hold `registration.review` without holding either of the other
-        // two. The owner half is below.
-        canCompetition(db, session.personId, scope, "registration.review"),
-        ownedTeamIdsOn(db, session.personId, competition.id),
-      ]);
-      // DA-30: running the night, or running the season. Nothing else sees a
-      // rival's remaining purse — least of all a team owner, whom
-      // `acceptOwnerJoin` made a member of this very org.
-      const money = conduct || manage;
-      const config = auction?.config ?? DEFAULT_AUCTION_CONFIG;
-      return {
-        ready: readyProjection,
-        view: auction === null ? null : gateAuctionView(await auctionView(db, auction), money),
-        canConduct: conduct,
-        /*
-         * A TEAM OWNER MAY MAKE THEIR OWN SQUAD SHEET, so the button has to
-         * offer it to them. `registration.review` alone was this button's whole
-         * condition, which is the same mistake the poster gate itself used to
-         * make: `viewer` is the empty capability set, so the person with the
-         * most reason to post a squad held nothing and saw nothing. One extra
-         * read, and only when the capability is absent.
-         */
-        canPoster: review || ownTeams.length > 0,
-        rules: auction === null ? null : gateRules(rulesOf(auction.config), money),
-        feasibility: feasibilityOf(readyProjection, config),
-        // DA-30: the dashboard's money surfaces are gated on `money`, and so is
-        // the socket it hands out — otherwise the ticket reopened everything
-        // the page had just withheld (P1-6).
-        wsUrl: auction === null ? null : engineWsUrl(auction.id, money ? null : []),
-        overview:
-          auction === null
-            ? null
-            : await auctionOverview(db, auction.id, auction.config, { money }),
-      };
-    });
+  const {
+    ready,
+    view,
+    canConduct,
+    canPoster,
+    planAvailable,
+    ownerPlans,
+    rules,
+    wsUrl,
+    overview,
+    feasibility,
+  } = await inCompetitionOrg(session.personId, competition, async (db) => {
+    const [readyProjection, auction, conduct, manage, review, ownTeams] = await Promise.all([
+      auctionReady(db, competition),
+      requireAuction(db, competition.id),
+      canCompetition(db, session.personId, scope, "auction.conduct"),
+      canCompetition(db, session.personId, scope, "competition.manage"),
+      // The organizer half of the poster gate. Evaluated rather than inferred
+      // from `conduct || manage`, because the studio was shipped with no link
+      // from anywhere in the product and the first link to it must not lead
+      // some of its holders to a 403 — nor hide the door from `org:staff`,
+      // who hold `registration.review` without holding either of the other
+      // two. The owner half is below.
+      canCompetition(db, session.personId, scope, "registration.review"),
+      ownedTeamIdsOn(db, session.personId, competition.id),
+    ]);
+    // DA-30: running the night, or running the season. Nothing else sees a
+    // rival's remaining purse — least of all a team owner, whom
+    // `acceptOwnerJoin` made a member of this very org.
+    const money = conduct || manage;
+    const config = auction?.config ?? DEFAULT_AUCTION_CONFIG;
+    // WR-1: one feature read serves the owner's door and the conductor's switch.
+    const myPlan =
+      auction === null
+        ? null
+        : await featureEnabled(db, "my_plan", { orgId: competition.orgId, auctionId: auction.id });
+    return {
+      ready: readyProjection,
+      view: auction === null ? null : gateAuctionView(await auctionView(db, auction), money),
+      canConduct: conduct,
+      /*
+       * A TEAM OWNER MAY MAKE THEIR OWN SQUAD SHEET, so the button has to
+       * offer it to them. `registration.review` alone was this button's whole
+       * condition, which is the same mistake the poster gate itself used to
+       * make: `viewer` is the empty capability set, so the person with the
+       * most reason to post a squad held nothing and saw nothing. One extra
+       * read, and only when the capability is absent.
+       */
+      canPoster: review || ownTeams.length > 0,
+      planAvailable: auction !== null && ownTeams.length > 0 && myPlan !== null && myPlan.enabled,
+      ownerPlans:
+        conduct && myPlan !== null ? { enabled: myPlan.enabled, deniedBy: myPlan.deniedBy } : null,
+      rules: auction === null ? null : gateRules(rulesOf(auction.config), money),
+      feasibility: feasibilityOf(readyProjection, config),
+      // DA-30: the dashboard's money surfaces are gated on `money`, and so is
+      // the socket it hands out — otherwise the ticket reopened everything
+      // the page had just withheld (P1-6).
+      wsUrl: auction === null ? null : engineWsUrl(auction.id, money ? null : []),
+      overview:
+        auction === null ? null : await auctionOverview(db, auction.id, auction.config, { money }),
+    };
+  });
   return {
     competition,
     ready,
     view,
     machines: { auction: AUCTION_MACHINE, lot: LOT_MACHINE, bid: BID_MACHINE },
     timerDemo: timerDemo(),
-    viewer: { canConduct, canPoster },
+    viewer: { canConduct, canPoster, planAvailable },
+    ...(ownerPlans === null ? {} : { ownerPlans }),
     rules,
     feasibility,
     wsUrl,
@@ -603,4 +633,38 @@ export async function verifyReplayAction(
       divergences: Number.isFinite(healed) ? healed : 0,
     },
   };
+}
+
+// --- WR-1: the organizer's switch for owner plans -----------------------------------
+
+/**
+ * Switch "My plan" on or off for THIS auction. Conduct-gated like every other
+ * control on the Auction tab; the row and its audit record land together
+ * (`setAuctionFeature`). Layers above this one — the platform, the org, the
+ * deploy-time kill switch — can only be read here, never overridden: an
+ * organizer switching ON under a higher NO changes the row and nothing else,
+ * which the panel says before they try.
+ */
+export async function setAuctionFeatureAction(
+  slug: string,
+  enabled: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await conductGate(slug);
+  if (!gate.ok) {
+    return gate;
+  }
+  return inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const auction = await requireAuction(db, gate.competition.id);
+    if (auction === null) {
+      return { ok: false, error: "Create the auction first." };
+    }
+    await setAuctionFeature(db, {
+      orgId: gate.competition.orgId,
+      auctionId: auction.id,
+      feature: "my_plan",
+      enabled,
+      actorId: gate.personId,
+    });
+    return { ok: true };
+  });
 }

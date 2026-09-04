@@ -56,7 +56,7 @@
 .demo-day-head {
   margin: 0 0 var(--space-3);
   color: var(--text-primary);
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: var(--text-base-size);
 }
 
@@ -153,7 +153,7 @@
 .demo-when {
   margin: 0 0 var(--space-2);
   color: var(--text-primary);
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: var(--text-xl-size);
 }
 

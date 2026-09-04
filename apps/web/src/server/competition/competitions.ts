@@ -7,10 +7,12 @@ import {
   slugifyName,
   validateName,
   type CompetitionStatus,
+  type EntryCategory,
 } from "@desiauction/core";
 import {
   auditLog,
   competitions,
+  franchises,
   newId,
   organizations,
   orgMembers,
@@ -76,6 +78,8 @@ export interface CompetitionSummary {
   status: CompetitionStatus;
   // PX-5: the public-page switch (existing column, now surfaced).
   visibility: "private" | "public";
+  // PI-1: the organizer-declared entry category (open | men | women | mixed).
+  entryCategory: EntryCategory;
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -135,6 +139,7 @@ export async function createCompetition(
     name: valid.value,
     slug,
     status: "draft",
+    entryCategory: "open",
     visibility: "private",
     location: input.location ?? null,
     startsOn: input.startsOn ?? null,
@@ -156,6 +161,7 @@ export async function competitionsForPerson(
       slug: competitions.slug,
       status: competitions.status,
       visibility: competitions.visibility,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -189,6 +195,7 @@ export async function competitionsOfTournament(
       slug: competitions.slug,
       status: competitions.status,
       visibility: competitions.visibility,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -258,6 +265,7 @@ export async function resolveCompetition(
       slug: competitions.slug,
       status: competitions.status,
       visibility: competitions.visibility,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -281,6 +289,9 @@ export async function competitionForRegistration(
   orgId: string;
   name: string;
   status: CompetitionStatus;
+  /** PI-1: the organizer-declared entry category, read by the eligibility
+   *  engine and by the register screens' terminology. */
+  entryCategory: "open" | "men" | "women" | "mixed";
   /** `visibility === 'public'` — whether /c/[slug] and the player pages exist
    *  for the public at all. Registration itself does NOT depend on this (a
    *  private season still takes sign-ups by direct link); the player-facing
@@ -293,6 +304,7 @@ export async function competitionForRegistration(
       orgId: competitions.orgId,
       name: competitions.name,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       visibility: competitions.visibility,
     })
     .from(competitions)
@@ -389,6 +401,8 @@ export interface CompetitionDetails {
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
+  /** PI-1: who the season is for. Absent = leave it as it stands. */
+  entryCategory?: EntryCategory;
 }
 
 export type UpdateDetailsResult =
@@ -422,6 +436,9 @@ export async function updateCompetitionDetails(
     location: input.location,
     startsOn: input.startsOn,
     endsOn: input.endsOn,
+    // PI-1: the category rides the same audited details write — declaring who
+    // a season is for is exactly as consequential as renaming it.
+    entryCategory: input.entryCategory ?? competition.entryCategory,
   };
   await db.update(competitions).set(next).where(eq(competitions.id, competition.id));
   await db.insert(auditLog).values({
@@ -437,6 +454,7 @@ export async function updateCompetitionDetails(
         location: competition.location,
         startsOn: competition.startsOn,
         endsOn: competition.endsOn,
+        entryCategory: competition.entryCategory,
       },
       to: next,
     },
@@ -602,6 +620,29 @@ export async function cloneCompetition(
     teamsCloned += 1;
     if (team.coachName !== null && team.coachName !== "") {
       await setTeamCoach(db, orgId, competition.id, created.team.id, team.coachName, personId);
+    }
+    /*
+     * PI-1 P6: the clone is the moment a team proves it is a FRANCHISE — the
+     * same name coming back for another season. The source team's franchise is
+     * reused when it has one; created and back-linked onto the source when it
+     * does not (so the first clone stitches both editions together, not just
+     * the new one). Grouping only — nothing in auction/roster/money reads it.
+     */
+    const [sourceTeam] = await db
+      .select({ id: teams.id, franchiseId: teams.franchiseId })
+      .from(teams)
+      .where(and(eq(teams.competitionId, source.id), eq(teams.name, team.name)))
+      .limit(1);
+    if (sourceTeam !== undefined) {
+      let franchiseId = sourceTeam.franchiseId;
+      if (franchiseId === null) {
+        franchiseId = newId();
+        await db
+          .insert(franchises)
+          .values({ id: franchiseId, orgId, name: team.name, createdBy: personId });
+        await db.update(teams).set({ franchiseId }).where(eq(teams.id, sourceTeam.id));
+      }
+      await db.update(teams).set({ franchiseId }).where(eq(teams.id, created.team.id));
     }
   }
   await db.insert(auditLog).values({

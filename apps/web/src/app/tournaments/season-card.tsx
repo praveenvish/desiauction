@@ -53,6 +53,25 @@ export function statusTone(status: string): (typeof STATUS_TONE)[keyof typeof ST
   return TONES[status] ?? "neutral";
 }
 
+/**
+ * The one badge a season surface shows. The settlement case's answer outranks
+ * the competition status: a season whose books are settled must never badge
+ * "Registration closed" as though the money were still an open question. Same
+ * precedence /home's lifecycle rail applies; now every row agrees with it.
+ */
+export function seasonStatusBadge(
+  status: string,
+  settlement?: "settling" | "settled" | null,
+): { label: string; tone: "neutral" | "info" | "success" | "warning" } {
+  if (settlement === "settled") {
+    return { label: "Settled", tone: "success" };
+  }
+  if (settlement === "settling") {
+    return { label: "Settling", tone: "info" };
+  }
+  return { label: statusLabel(status), tone: statusTone(status) };
+}
+
 /** "1 Aug – 15 Aug 2026", or a single dated end, or nothing. Days arrive as ISO. */
 export function dateRange(startsOn: string | null, endsOn: string | null): string | null {
   const day = (iso: string, withYear: boolean): string =>
@@ -77,10 +96,15 @@ export function dateRange(startsOn: string | null, endsOn: string | null): strin
 export function SeasonCard({
   season,
 }: {
-  season: CompetitionSummary & { orgName?: string; running?: boolean };
+  season: CompetitionSummary & {
+    orgName?: string;
+    running?: boolean;
+    settlement?: "settling" | "settled" | null;
+  };
 }) {
   const when = dateRange(season.startsOn, season.endsOn);
   const hasMeta = when !== null || season.location !== null;
+  const badge = seasonStatusBadge(season.status, season.settlement);
   return (
     <Link href={`/seasons/${season.slug}`} className="competition-link">
       <Card padding="none">
@@ -89,7 +113,7 @@ export function SeasonCard({
             {/* "Which edition am I running?" is the question this page exists to
                 answer, and the page had no visual answer at all. */}
             {season.running === true ? <Badge tone="live">Now running</Badge> : null}
-            <Badge tone={STATUS_TONE[season.status]}>{STATUS_LABEL[season.status]}</Badge>
+            <Badge tone={badge.tone}>{badge.label}</Badge>
           </div>
           <strong>{season.name}</strong>
           {season.orgName !== undefined ? (

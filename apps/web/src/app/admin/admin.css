@@ -132,6 +132,14 @@
   word-break: break-all;
 }
 
+/* Its own line in TABLE cells only: rendered inline after a name link, the
+   underline ran straight into the monospace slug ("Form Org 89435571form-
+   org-…") in every row of the org directory's primary scan column. The detail
+   pages keep the inline form — theirs sits mid-sentence between dividers. */
+td .admin-id {
+  display: block;
+}
+
 .admin-evidence {
   font-family: var(--font-mono);
   font-size: var(--text-xs-size);

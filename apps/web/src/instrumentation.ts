@@ -11,6 +11,11 @@ export async function register(): Promise<void> {
         tracesSampleRate: 0.1,
       });
     }
+    // PRR P1-1: prove RLS tenant isolation is actually load-bearing before this
+    // instance serves a single request. Refuses to boot if the app role can
+    // bypass RLS in production.
+    const { assertTenantIsolation } = await import("./server/db");
+    await assertTenantIsolation();
   }
 }
 

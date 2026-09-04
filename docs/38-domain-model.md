@@ -2,6 +2,23 @@
 
 > Canon: C-3, C-9, C-13 · v1.0 · 2026-07-11
 
+> **Amendment · 2026-08-31 · PI-1 (player identity programme).** The "person ≠
+> participation" principle gains its missing person-level half:
+> `player_profiles` (1:1 `people`, migration 0036) holds the durable cricket
+> identity — gender, DOB, location, playing defaults — as the SOURCE OF
+> DEFAULTS; each registration remains the immutable per-season snapshot, so a
+> profile edit never rewrites history. `competitions.entry_category`
+> (0038) declares who a season is for; core's `eligibility.ts` is the single
+> evaluator (self-serve blocks a declared opposite, organizer channels get
+> advisories — invariant 5 holds). `franchises` (0039) applies this file's own
+> tournaments pattern to teams: durable name, editions' team rows point at it,
+> linked by the clone path, grouping only. Career history is a PROJECTION
+> (`server/player/career.ts`, `/me/cricket`) over registrations × teams ×
+> tournaments × lots — never a table, so it cannot drift from the certified
+> writers. The H3 consent boundary stands: cross-org history renders publicly
+> only as same-org "also played in" entries, each covered by its own season's
+> publication consent.
+
 ## Principles
 
 1. **Person ≠ participation** (carried, PAS): a human identity is one record; their appearances (registration here, ownership there) are separate participation records. Identity is never duplicated per tournament (invariant 3).

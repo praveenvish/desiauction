@@ -242,6 +242,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     slug: edition.slug,
     status: edition.status as CompetitionSummary["status"],
     visibility: edition.visibility,
+    entryCategory: edition.entryCategory,
     location: edition.location,
     startsOn: edition.startsOn,
     endsOn: edition.endsOn,
@@ -252,6 +253,10 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     // The catalogue does not carry dates-vs-today, and this tab is a summary
     // rather than the place an edition is run from; /tournaments marks it.
     running: false,
+    // Nor does the catalogue read settlement cases; null renders the
+    // competition status, exactly what this tab showed before the field
+    // existed. /tournaments, which does read the case, shows "Settled".
+    settlement: null,
   });
   // `tournament.create` and `competition.create` are both owner-only in the
   // capability sets, so the flag the org view already resolved answers this
@@ -396,9 +401,25 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
           follows the user in here, with the next rung live. */}
       {laddering ? <OrgLadder rungs={rungs} current={currentRung} /> : null}
 
+      {/* Seasons lead when every season is a one-off: "0 Tournaments" as the
+          first tile above a live season read as an empty club — the same
+          confusion /tournaments defuses with its "one-off" hint. */}
       <StatRow label="Organization at a glance">
-        <Stat label={plural(stats.tournaments, "Tournament")} value={stats.tournaments} />
-        <Stat label={plural(stats.seasons, "Season")} value={stats.seasons} />
+        {stats.tournaments === 0 && stats.seasons > 0 ? (
+          <>
+            <Stat label={plural(stats.seasons, "Season")} value={stats.seasons} />
+            <Stat
+              label={plural(stats.tournaments, "Tournament")}
+              value={stats.tournaments}
+              hint="Your seasons are one-offs"
+            />
+          </>
+        ) : (
+          <>
+            <Stat label={plural(stats.tournaments, "Tournament")} value={stats.tournaments} />
+            <Stat label={plural(stats.seasons, "Season")} value={stats.seasons} />
+          </>
+        )}
         <Stat label={plural(stats.members, "Member")} value={stats.members} />
         <Stat label={`Active ${plural(stats.teams, "team")}`} value={stats.teams} />
       </StatRow>

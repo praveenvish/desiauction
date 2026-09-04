@@ -7,9 +7,11 @@ import {
   Card,
   Dialog,
   Field,
+  Select,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
+import { ENTRY_CATEGORIES, entryCategoryLabel } from "@desiauction/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +25,7 @@ import {
   type SeasonOverviewView,
 } from "../../../server/competition/actions";
 import { formatDate } from "../../../lib/format-date";
+import { roleLabel } from "../../../lib/playing-roles";
 import { track } from "../../../lib/telemetry";
 import { CompetitionLogoUploader } from "./competition-logo-uploader";
 import { ShareRegistration } from "./registrations/share-registration";
@@ -94,16 +97,8 @@ function nextDestination(
   return { href: `/seasons/${slug}/money`, label: "Review settlement" };
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  batter: "Batter",
-  bowler: "Bowler",
-  all_rounder: "All rounder",
-  wicket_keeper: "Wicket-keeper",
-};
-
-function roleLabel(role: string): string {
-  return ROLE_LABEL[role] ?? role.replace(/_/g, " ");
-}
+// Third consumer moved the map to lib/playing-roles — one prose name per role,
+// shared with the auction overview and the registration desk.
 
 /**
  * Money the way the tiles show it: crores and lakhs, because a purse reads as
@@ -858,12 +853,17 @@ function Retrospective({
         </dl>
       </div>
       <div className="season-stepper-actions">
+        {/* This card is the FINISHED season. "Review readiness" sent an
+            organizer to the auction-readiness gates, where a season whose
+            auction is long over reads as a wall of failures — the gates
+            describe a night that already happened. The record of what
+            happened is the useful destination. */}
         <Link
-          href={`/seasons/${slug}/readiness`}
+          href={`/seasons/${slug}/auction/replay`}
           className="season-inline-link"
-          data-testid="open-readiness"
+          data-testid="open-replay"
         >
-          Review readiness
+          Replay the auction
         </Link>
         {view.viewer.canSeeMoney ? (
           <ButtonLink href={`/seasons/${slug}/money`} variant="secondary">
@@ -906,6 +906,7 @@ function SeasonSettingsDialog({
   const [location, setLocation] = useState(competition.location ?? "");
   const [startsOn, setStartsOn] = useState(competition.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(competition.endsOn ?? "");
+  const [entryCategory, setEntryCategory] = useState<string>(competition.entryCategory);
   const [error, setError] = useState<{ field: DetailsField; message: string } | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -914,7 +915,13 @@ function SeasonSettingsDialog({
 
   const save = async () => {
     setPending(true);
-    const result = await updateCompetitionDetailsAction(slug, { name, location, startsOn, endsOn });
+    const result = await updateCompetitionDetailsAction(slug, {
+      name,
+      location,
+      startsOn,
+      endsOn,
+      entryCategory,
+    });
     setPending(false);
     if (result.ok) {
       setError(null);
@@ -987,6 +994,24 @@ function SeasonSettingsDialog({
             {...errorFor("endsOn")}
           />
         </div>
+        {/* PI-1: who the season is for. Read by the register gate and the
+            public terminology; enforcement lives in core's eligibility engine. */}
+        <Select
+          label="Entry category"
+          name="season-entry-category"
+          value={entryCategory}
+          onChange={(event) => {
+            setEntryCategory(event.target.value);
+          }}
+          help="Open takes everyone. A gendered category is checked at self-registration; you can still add anyone directly."
+          data-testid="season-entry-category"
+        >
+          {ENTRY_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {entryCategoryLabel(category)}
+            </option>
+          ))}
+        </Select>
       </div>
     </Dialog>
   );

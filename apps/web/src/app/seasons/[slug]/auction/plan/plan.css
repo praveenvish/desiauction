@@ -1,0 +1,242 @@
+/* MY PLAN (WR-1). Shares the season/auction vocabulary — .dash-stack,
+   .stat-row/.stat-tile, .registration-name, .live-exits — and adds only the
+   shapes this page introduces: a search result, a target row, a fit note.
+   Mobile-first at 360px; the target row recomposes to one line from 900px. */
+
+.plan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.plan-teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.plan-team-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.plan-team-link[aria-current="page"] {
+  border-color: var(--text-heading);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-medium);
+}
+
+.plan-fit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.plan-note {
+  margin: 0;
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+
+.plan-hint {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.plan-search-results {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+.plan-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.plan-result:first-child {
+  border-top: 0;
+}
+
+.plan-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.plan-identity-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  min-width: 0;
+}
+
+.plan-identity-text .registration-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.plan-sub {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-group h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.plan-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.plan-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.plan-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.plan-row-marks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Four controls: max, priority, backup, remove. Two per line on a phone,
+   one line from 900px. Aligned to the TOP so a field's help line ("Counted
+   at base") hangs below it instead of pushing its neighbours down; the remove
+   button is offset by one label height to sit level with the inputs. */
+.plan-row-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2) var(--space-3);
+  align-items: start;
+}
+
+.plan-remove {
+  justify-self: start;
+  min-height: 44px;
+  margin-top: calc(var(--text-sm-line) + var(--space-1));
+}
+
+@media (min-width: 900px) {
+  .plan-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr);
+    align-items: start;
+  }
+
+  .plan-row-controls {
+    grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(160px, 1.4fr) auto;
+  }
+}
+
+/* THE LIVE ROOM'S ONE LINE (M4): under the raise button, above the stats.
+   Muted by design — the current bid stays the loudest thing on the surface. */
+.plan-line {
+  margin: var(--space-3) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.plan-line-head {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  color: var(--text-primary);
+}
+
+.plan-line-next {
+  margin: 0;
+}
+
+.plan-line-money {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* The fourth tile on the team card: fit as a badge under the label. */
+.stat-tile .plan-tile-badge {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+/* THE ORGANIZER'S SWITCH (M5), on the Auction tab's lifecycle card. A 44px
+   row: the control, then what it does in one line. */
+.plan-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 44px;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--border-subtle);
+  cursor: pointer;
+}
+
+.plan-switch input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.plan-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+}
+
+.plan-switch-label {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.plan-switch-detail {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}

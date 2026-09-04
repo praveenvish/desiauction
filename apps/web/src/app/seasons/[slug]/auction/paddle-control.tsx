@@ -7,8 +7,9 @@ import {
   paise,
 } from "@desiauction/core";
 import { Card } from "@desiauction/ui";
-import type { AuctionSnapshot } from "@desiauction/core";
+import type { AuctionSnapshot, PlanState } from "@desiauction/core";
 
+import { PlanLine } from "./plan-line";
 import { TeamChip, type TeamIdentity } from "./purse-board";
 
 import type { AuctionRules } from "../../../../server/auction/live-summary";
@@ -34,6 +35,8 @@ export function PaddleControl({
   squadSigned,
   disabled,
   onBid,
+  plan = null,
+  planNames = () => "a player",
 }: {
   lot: NonNullable<AuctionSnapshot["currentLot"]>;
   rules: AuctionRules;
@@ -43,6 +46,9 @@ export function PaddleControl({
   squadSigned: number;
   disabled: boolean;
   onBid: (amount: number) => void;
+  /** WR-1: the owner's plan folded against this frame; null when they have none. */
+  plan?: PlanState | null;
+  planNames?: (registrationId: string) => string;
 }) {
   const paiseSlabs = rules.slabs.map((slab) => ({
     upTo: slab.upTo === null ? null : paise(slab.upTo),
@@ -137,7 +143,7 @@ export function PaddleControl({
 
       {blocked !== null ? (
         <p
-          className={paused ? "paddle-leading paddle-frozen" : "paddle-leading"}
+          className="paddle-leading"
           id="paddle-blocked"
           data-testid="paddle-leading"
           data-reason={
@@ -197,6 +203,10 @@ export function PaddleControl({
           </div>
         </div>
       </div>
+
+      {/* WR-1: the plan's one line, BELOW the raise button and above the stats —
+          never above the button, whose place at the fold is a measured budget. */}
+      {plan !== null ? <PlanLine state={plan} names={planNames} /> : null}
 
       {/* Distinct testids from MyTeamCard's: the same three figures appear in
           both (deliberately — a bidder shouldn't look away mid-lot), and a

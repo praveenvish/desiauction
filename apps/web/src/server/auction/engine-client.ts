@@ -111,6 +111,10 @@ export async function fetchEngineDiagnostics(auctionId: string): Promise<unknown
     const response = await fetch(`${env.ENGINE_URL}/diagnostics/${auctionId}`, {
       headers: { "x-engine-secret": env.ENGINE_SECRET },
       cache: "no-store",
+      // PRR P2/F46: a hung engine must not hang the server render. These are
+      // read-only dashboard fetches, so a timeout degrades to "unreachable",
+      // never a stalled page. `sendEngineCommand` already carries this budget.
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
       return null;
@@ -127,6 +131,8 @@ export async function fetchEngineSnapshot(auctionId: string): Promise<string | n
     const response = await fetch(`${env.ENGINE_URL}/snapshot/${auctionId}`, {
       headers: { "x-engine-secret": env.ENGINE_SECRET },
       cache: "no-store",
+      // PRR P2/F46: bounded so a hung engine cannot stall the replay viewer's render.
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
       return null;

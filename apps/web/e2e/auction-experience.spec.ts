@@ -229,6 +229,65 @@ test("the full night: lobby → owners → bidding with notifications → public
     await expect(entry.page.getByTestId("my-slots")).toContainText("0/");
   }
 
+  // --- WR-1: owner A makes a plan; the organizer's switch hides and restores it --
+  const planUrl = `/seasons/${slug}/auction/plan`;
+  await ownerA.page.goto(planUrl);
+  await expect(ownerA.page.getByTestId("plan-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  // Both fixtures go on the plan, so whichever the pool orders first is a target.
+  for (let added = 0; added < 2; added += 1) {
+    await ownerA.page.getByTestId("plan-search").fill("Star");
+    await ownerA.page.locator('[data-testid^="plan-add-"]').first().click();
+    await expect(ownerA.page.locator('[data-testid^="plan-target-"]')).toHaveCount(added + 1, {
+      timeout: 20_000,
+    });
+  }
+  // A max of ₹12,000 against a ₹10,000 base on a ₹5,000 ladder: the opening
+  // bid is within plan, the second rung is over it. Entered in rupees.
+  const maxes = ownerA.page.locator('[data-testid^="plan-max-"]');
+  for (let i = 0; i < 2; i += 1) {
+    await maxes.nth(i).fill("12000");
+    await maxes.nth(i).press("Enter");
+  }
+  await expect(ownerA.page.getByTestId("plan-exposure")).toContainText("₹24,000", {
+    timeout: 20_000,
+  });
+  await expect(ownerA.page.getByTestId("plan-fit")).toHaveAttribute("data-fit", "fits");
+
+  // The organizer switches owner plans OFF: the page is gone (404, not 403 —
+  // existence privacy) and the door vanishes; ON brings both back untouched.
+  await organizer.goto(`/seasons/${slug}/auction`);
+  await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  await expect(organizer.getByTestId("owner-plans-switch")).toBeChecked();
+  await organizer.getByTestId("owner-plans-switch").uncheck();
+  await expect(organizer.getByTestId("owner-plans-switch")).not.toBeChecked({ timeout: 20_000 });
+  await organizer.reload();
+  await expect(organizer.getByTestId("owner-plans-switch")).not.toBeChecked({ timeout: 30_000 });
+  await ownerA.page.goto(planUrl);
+  await expect(ownerA.page.getByRole("heading", { name: "This page doesn't exist" })).toBeVisible({
+    timeout: 30_000,
+  });
+  await ownerA.page.goto(liveUrl);
+  await expect(ownerA.page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  await expect(ownerA.page.getByTestId("open-plan")).toHaveCount(0);
+  await expect(ownerA.page.getByTestId("my-plan-headroom")).toHaveCount(0);
+  await organizer.getByTestId("owner-plans-switch").check();
+  await expect(organizer.getByTestId("owner-plans-switch")).toBeChecked({ timeout: 20_000 });
+  await ownerA.page.goto(planUrl);
+  await expect(ownerA.page.locator('[data-testid^="plan-target-"]')).toHaveCount(2, {
+    timeout: 30_000,
+  });
+  await ownerA.page.goto(liveUrl);
+  await expect(ownerA.page.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  await expect(ownerA.page.getByTestId("open-plan")).toBeVisible();
+
   // --- Go live; a PUBLIC (anonymous) spectator joins the stage ----------------
   await organizer.goto(`/seasons/${slug}/auction`);
   await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
@@ -259,6 +318,17 @@ test("the full night: lobby → owners → bidding with notifications → public
     ).toBeVisible({ timeout: 20_000 });
   }
   await expect(ownerA.page.getByTestId("bid-ladder")).toBeVisible({ timeout: 20_000 });
+  // WR-1: the lot on the block is on A's plan; the line reads the opening bid as within it.
+  await expect(ownerA.page.getByTestId("plan-line")).toHaveAttribute(
+    "data-verdict",
+    "within_plan",
+    {
+      timeout: 20_000,
+    },
+  );
+  // B has no plan: no line, no tile — the room as it was before plans existed.
+  await expect(ownerB.page.getByTestId("plan-line")).toHaveCount(0);
+  await expect(ownerB.page.getByTestId("my-plan-headroom")).toHaveCount(0);
 
   await ownerA.page.getByTestId("bid-next").click();
   await expect(ownerA.page.getByTestId("my-team-leading")).toBeVisible({ timeout: 20_000 });
@@ -269,9 +339,19 @@ test("the full night: lobby → owners → bidding with notifications → public
     expect(ownerA.page.getByText(/Outbid — Team Bravo/)).toBeVisible({ timeout: 45_000 }),
     ownerB.page.getByTestId("bid-next").click(),
   ]);
+  // WR-1: B took the lot to ₹15,000; A's next rung is ₹20,000 against a ₹12,000 max.
+  await expect(ownerA.page.getByTestId("plan-line")).toHaveAttribute("data-verdict", "over_max", {
+    timeout: 20_000,
+  });
+  await expect(ownerA.page.getByTestId("plan-line-verdict")).toContainText("₹8,000");
 
   await ownerA.page.getByTestId("bid-next").click();
   await expect(ownerA.page.getByTestId("my-team-leading")).toBeVisible({ timeout: 20_000 });
+  // WR-1: the owner stayed in control — the line records that they lead past their max.
+  await expect(ownerA.page.getByTestId("plan-line")).toHaveAttribute("data-verdict", "leading", {
+    timeout: 20_000,
+  });
+  await expect(ownerA.page.getByTestId("plan-line")).toContainText("over your max");
   // WHICHEVER PLAYER IS ACTUALLY ON THE BLOCK.
   //
   // This used to assert the winner's toast names "Star Batter", because the
@@ -307,6 +387,21 @@ test("the full night: lobby → owners → bidding with notifications → public
     timeout: 30_000,
   });
   await expect(organizer.getByTestId("timeline-sold").first()).toBeVisible();
+  // WR-1: the headroom tile moved with the purse, and the plan never left A's own
+  // payload. Asserted on the served bytes, not the DOM: a rival's Owner Room and
+  // the public stage must carry neither the plan key nor a planned amount.
+  await expect(ownerA.page.getByTestId("my-plan-headroom")).toBeVisible({ timeout: 20_000 });
+  const [mineHtml, rivalHtml, publicHtml] = await Promise.all([
+    ownerA.page.request.get(liveUrl).then((r) => r.text()),
+    ownerB.page.request.get(liveUrl).then((r) => r.text()),
+    spectator.request.get(spectateUrl).then((r) => r.text()),
+  ]);
+  expect(mineHtml).toContain("targetsByTeam");
+  expect(mineHtml).toContain("maxBid");
+  expect(rivalHtml).not.toContain("targetsByTeam");
+  expect(rivalHtml).not.toContain("maxBid");
+  expect(publicHtml).not.toContain("targetsByTeam");
+  expect(publicHtml).not.toContain("maxBid");
 
   // Big-screen mode: chrome retreats, the stage stays.
   await spectator.getByTestId("stage-toggle").click();
@@ -338,6 +433,14 @@ test("the full night: lobby → owners → bidding with notifications → public
     "Congratulations, Team Alpha",
   );
   await expect(ownerA.page.getByRole("link", { name: "Watch the replay" })).toBeVisible();
+  // WR-1: after the night the plan is read-only and shows what happened to each target.
+  await ownerA.page.goto(planUrl);
+  await expect(ownerA.page.getByTestId("plan-panel")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
+  await expect(ownerA.page.getByTestId("plan-auction-status")).toContainText("Completed");
+  await expect(ownerA.page.getByTestId("plan-add")).toHaveCount(0);
+  await expect(ownerA.page.getByText("Signed", { exact: true })).toBeVisible();
 
   await spectatorCtx.close();
   await ownerA.ctx.close();
@@ -387,5 +490,24 @@ test("accessibility and small screens on the night's surfaces", async ({ browser
     expect(offenders, offenders.join(" | ")).toEqual([]);
   } finally {
     await mobile.close();
+  }
+
+  // WR-1: the owner's plan at phone size — read-only now, still clean and unscrolled.
+  const ownerPhone = await browser.newContext({ viewport: { width: 360, height: 740 } });
+  const planView = await ownerPhone.newPage();
+  try {
+    await otpLogin(planView, OWNER_A);
+    await planView.goto(`/seasons/${slug}/auction/plan`);
+    await expect(planView.getByTestId("plan-panel")).toHaveAttribute("data-hydrated", "true", {
+      timeout: 30_000,
+    });
+    const planScan = await new AxeBuilder({ page: planView }).analyze();
+    expect(planScan.violations, JSON.stringify(planScan.violations, null, 2)).toEqual([]);
+    const wide = await planView.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    );
+    expect(wide).toBe(false);
+  } finally {
+    await ownerPhone.close();
   }
 });

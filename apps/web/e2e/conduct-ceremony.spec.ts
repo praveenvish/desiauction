@@ -363,16 +363,21 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(ledgerPage.getByTestId("replay-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
-  await expect(ledgerPage.getByTestId("replay-convergence")).toContainText("identical bytes", {
-    timeout: 20_000,
-  });
+  await expect(ledgerPage.getByTestId("replay-convergence")).toContainText(
+    "matches the live engine snapshot",
+    {
+      timeout: 20_000,
+    },
+  );
   // Scrub to the beginning and back — pure visualization, nothing mutates.
   await ledgerPage.getByTestId("replay-slider").fill("1");
   await expect(ledgerPage.getByTestId("replay-status")).toHaveText("scheduled");
   await ledgerPage
     .getByTestId("replay-slider")
     .fill((await ledgerPage.getByTestId("replay-slider").getAttribute("max")) ?? "1");
-  await expect(ledgerPage.getByTestId("replay-convergence")).toContainText("identical bytes");
+  await expect(ledgerPage.getByTestId("replay-convergence")).toContainText(
+    "matches the live engine snapshot",
+  );
   await axeClean(ledgerPage, "replay");
 
   // --- Engine restart + recovery dashboard ------------------------------------

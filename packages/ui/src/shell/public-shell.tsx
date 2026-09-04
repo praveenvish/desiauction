@@ -38,6 +38,7 @@ export function PublicShell({
   footerSocial,
   footerNewsletter,
   footerNote,
+  footerLegal,
   footerBottomLinks = [],
   footerCompact = false,
   contentFill = false,
@@ -123,6 +124,12 @@ export function PublicShell({
                 {footerTagline !== undefined ? (
                   <p className={styles["footer-tagline"]}>{footerTagline}</p>
                 ) : null}
+                {footerNewsletter !== undefined ? (
+                  <div className={styles["footer-newsletter"]}>
+                    <h2 className={styles["footer-group-label"]}>Stay updated</h2>
+                    {footerNewsletter}
+                  </div>
+                ) : null}
                 {footerSocial !== undefined ? (
                   <div className={styles["footer-social"]} aria-hidden="true">
                     {footerSocial}
@@ -144,12 +151,6 @@ export function PublicShell({
                     </ul>
                   </div>
                 ))}
-                {footerNewsletter !== undefined ? (
-                  <div className={styles["footer-group"]}>
-                    <h2 className={styles["footer-group-label"]}>Stay updated</h2>
-                    {footerNewsletter}
-                  </div>
-                ) : null}
               </nav>
             </div>
           ) : footerLinks.length > 0 ? (
@@ -177,6 +178,11 @@ export function PublicShell({
               ) : null}
             </div>
           ) : null}
+          {/* Compact keeps its promise: the bottom bar alone. The identity is
+              a tap away through the policy links that bar carries. */}
+          {footerCompact || footerLegal === undefined ? null : (
+            <div className={styles["footer-legal"]}>{footerLegal}</div>
+          )}
         </div>
       </footer>
     </div>

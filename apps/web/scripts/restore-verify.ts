@@ -43,7 +43,11 @@ const COUNT_SQL = `
   where n.nspname = 'public' and relkind = 'r' order by relname`;
 
 async function main(): Promise<void> {
-  const handle = createDb(url as string);
+  // Disable the idle-in-transaction ceiling for this connection: the drill holds
+  // a repeatable-read transaction OPEN (idle) while the external pg_dump runs on
+  // its exported snapshot, which can exceed the default 60s on a real database.
+  // The default would kill the snapshot mid-dump (PRR re-validation regression).
+  const handle = createDb(url as string, { idleTransactionTimeoutMs: 0, statementTimeoutMs: 0 });
   let sourceCounts: Record<string, string> = {};
   try {
     // Snapshot-consistent source truth: counts and pg_dump share one snapshot.

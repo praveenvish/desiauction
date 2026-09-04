@@ -174,3 +174,66 @@ meters prove it on every run. On acceptance, tag **`ip6-frozen` (v0.6.0)**.
 ---
 
 **IP-6 is CERTIFIED FOR FREEZE.** Engineering for IP-6 ends at this artifact.
+
+---
+
+## 10 · Amendments after the freeze
+
+A frozen package is not an unmaintainable one. It is one whose changes must be
+enumerated, justified against the freeze's own invariants, and re-proven by the
+regression corpus the freeze was certified with. This section is that ledger.
+
+### A-1 · Discovery by work, not by tenant (2026-08-31)
+
+**What changed.** Two enqueue scans in
+`packages/financial-operations/src/server/pipelines.ts` —
+`enqueueDispatchSends` and `enqueueExportGenerations` — enumerated every
+organization on the platform and issued one status query per org on every
+runner tick, whether or not that org had ever dispatched or exported anything.
+Cost was `O(orgs)` queries per tick for `O(work)` actual work. They now ask the
+store for the work directly, via two new read ports:
+
+```ts
+listRequestedDispatches(): Promise<readonly { dispatchId: string; orgId: string }[]>;
+listRequestedExports(): Promise<readonly { exportId: string; orgId: string }[]>;
+```
+
+Files touched: `src/ports.ts` (+2 port methods), `src/server/store.ts`
+(+2 implementations), `src/server/pipelines.ts` (both loop headers).
+
+**Why it is safe against the freeze's invariants.**
+
+- *Tenancy.* The replaced code already read across tenants: `orgs.listOrgIds()`
+  is an unfiltered cross-org select, and `store`, `source`, `orgs` and
+  `reference` all share one `db` handle (`server/deps.ts`). The new queries are
+  cross-org reads of exactly the same rows, reached in one statement instead of
+  N. Nothing newly crosses a boundary; the `orgId` still comes from the row and
+  is still what every downstream write is scoped by.
+- *Idempotence.* Job identity is unchanged — the dedupe key is still derived
+  from the aggregate id (`dispatch.send:{dispatchId}`,
+  `export.generate:{exportId}`). Discovery order changed; derived work did not.
+  A crash between discovery and effect is healed by the next scan exactly as
+  before.
+- *Scope.* Only the two *discovery* scans changed. `runSchedulesOnce`
+  (`runner-core.ts`) and `followAllOrgs` (`runner-core.ts`) still iterate
+  `listOrgIds()` **by design** — every org's schedule must fire and every org's
+  follower must be polled, so there the tenant list *is* the work list
+  (ADR-3). They were deliberately left alone.
+- *Shape.* Two ports added; no exported symbol changed shape, no migration, no
+  table, no policy, no event type, no capability set.
+
+**Proof.** A regression was added at
+`apps/web/src/server/financial-operations/financial-operations-delivery.regression.test.ts`
+— *"DISCOVERY IS BY WORK, NOT BY TENANT: enqueueing never enumerates orgs"* —
+which counts calls to `orgs.listOrgIds()` through a wrapped dep and asserts
+zero while still asserting the job is enqueued. It was verified to **fail on
+the pre-amendment code** (`expected 1 to be +0`) and pass on the amendment.
+
+Re-proven on the full corpus, 2026-08-31:
+
+| Suite | Result |
+| --- | --- |
+| `@desiauction/financial-operations` package tests | 91/91 pass |
+| IP-6 web regressions (`src/server/financial-operations`) | 137/137 pass |
+| Full web integration suite (`vitest run src`) | 806/806 pass, 59 files |
+| `pnpm verify` (lint · typecheck · all package tests · format · depcruise · motion) | exit 0 |

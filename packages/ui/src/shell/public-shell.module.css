@@ -296,8 +296,10 @@ a.wordmark:hover .wordmark-glyph {
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 40px;
-  height: 40px;
+  /* PRR P2/F73: the product's own declared minimum touch target is 44px; a
+     40px control fails it on the phones this hamburger exists for. */
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
@@ -430,22 +432,19 @@ a.wordmark:hover .wordmark-glyph {
   margin-bottom: var(--space-10);
 }
 
-/* Desktop: one flush row — brand, the four link columns, then Stay updated.
-   `display: contents` lets the group columns join the outer grid directly. */
-@media (min-width: 1000px) {
+/* Desktop: TWO blocks — the brand (wordmark, tagline, subscribe) and the link
+   columns beside it. It used to be six tracks in one row, with `display:
+   contents` flattening the groups into the outer grid and a sixth track for the
+   subscribe form. Two problems came out of that: the form sat at the far right,
+   a full page away from the sentence that motivates it, and the template
+   hard-coded `repeat(4, …)` — so the columns silently mis-sized the day a fifth
+   group was added or a fourth removed. The columns now size themselves (see
+   `.footer-columns`), which is why this is safe to change link groups under. */
+@media (min-width: 900px) {
   .footer-grid {
-    grid-template-columns:
-      minmax(0, 1.7fr)
-      repeat(4, minmax(0, 1fr))
-      minmax(0, 1.9fr);
+    grid-template-columns: minmax(280px, 1fr) minmax(0, 2.15fr);
     align-items: start;
-    gap: var(--space-6);
-  }
-
-  /* Higher specificity than the base `.footer-columns { display: grid }` below,
-     so the group columns flatten into the outer grid regardless of order. */
-  .footer-grid > .footer-columns {
-    display: contents;
+    gap: clamp(var(--space-8), 5vw, var(--space-16));
   }
 }
 
@@ -465,10 +464,24 @@ a.wordmark:hover .wordmark-glyph {
   max-width: 34ch;
 }
 
+/* auto-fit, so the row is right for however many groups the app passes: four
+   columns on a wide viewport, two on a tablet, two on a phone. 150px is wide
+   enough that "Rules & guidelines" and "Browse tournaments" set on one line at
+   the desktop size and wrap to two at most below it. */
 .footer-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: var(--space-6);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-6) var(--space-5);
+  align-items: start;
+}
+
+/* The subscribe block, now under the tagline. Its own width, not the brand
+   column's: a 44px control stretched to 400px reads as a form that wants a
+   paragraph, and this one wants an address. */
+.footer-newsletter {
+  margin-top: var(--space-2);
+  width: 100%;
+  max-width: 20rem;
 }
 
 .footer-group-label {
@@ -581,6 +594,39 @@ a.wordmark:hover .wordmark-glyph {
   font-size: var(--text-xs-size);
   /* -14px = half of (44px box − the ~16px line box these 12px links had). */
   margin-block: -14px;
+}
+
+/* The operator's fine print: who is actually offering this service, in the
+   place every serious site puts it. Quieter than the copyright line above it —
+   it is there to be FOUND, by someone checking the company is real or looking
+   for where to send a notice, not read on the way past. */
+.footer-legal {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, var(--border-subtle) 20% 80%, transparent) 1;
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: 1.7;
+}
+
+/* No measure cap: the identity is ONE sentence of fields, and a 90ch cap broke
+   it mid-address ("…Rajasthan 302019," / "India") on a desktop where the whole
+   line fits. The footer's own 1200px inner width is the only limit it needs. */
+.footer-legal p {
+  margin: 0;
+}
+
+/* The separators between identity fields. A middot with air on both sides
+   reads as punctuation; without it the CIN runs into the address. */
+.footer-legal span + span::before {
+  content: "·";
+  margin: 0 0.7ch;
+  /* Inherits the line's own colour rather than dropping to a border token —
+     a separator dimmer than the 12px text beside it disappears at exactly the
+     size where the eye needs it most, and the fields run together. */
+  color: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

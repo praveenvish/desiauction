@@ -126,6 +126,7 @@ const REASONS: Record<string, string> = {
   job_unknown: "That job no longer exists.",
   export_unknown: "That export no longer exists.",
   source_unknown: "The settlement fact this was made from could not be found.",
+  series_unknown: "That numbering series does not belong to this organization.",
   stream_missing: "That record no longer exists.",
   period_missing: "That fiscal year has not been opened.",
   profile_missing: "This organization has not declared its finance profile yet.",

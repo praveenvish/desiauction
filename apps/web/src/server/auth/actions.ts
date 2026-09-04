@@ -15,6 +15,7 @@ import { people, withTenantDb } from "@desiauction/db";
 import { eq } from "drizzle-orm";
 
 import { env } from "../../env";
+import { clientIp } from "../../lib/client-ip";
 import { db, dbHandle } from "../db";
 import { createPlayerSmsSender } from "../competition/registration-notify";
 import { maySend } from "../messaging/consent";
@@ -29,6 +30,7 @@ import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
 import { safeNext } from "./redirect";
+import { ensureTermsConsent } from "./terms-consent";
 import {
   finishAuthentication,
   finishEnrollment,
@@ -77,10 +79,9 @@ async function takeChallenge(): Promise<string | null> {
 }
 
 async function requestIp(): Promise<string | null> {
-  const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip");
-  // Loopback is the server/proxy itself, never a client — no IP context.
-  return ip === null || ip === "127.0.0.1" || ip === "::1" ? null : ip;
+  // PRR P2/F32: trust only the forwarded-for hop our own infrastructure added,
+  // never the spoofable leftmost entry a client controls.
+  return clientIp(await headers(), env.TRUSTED_PROXY_COUNT);
 }
 
 async function issueSessionCookie(personId: string): Promise<void> {
@@ -144,6 +145,11 @@ export async function requestOtpAction(
     // PX-3: provider failure (or open breaker) is an honest, retryable state —
     // never a crash screen on the front door.
     if (error instanceof OtpSendError) {
+      // PRR P1-6: an SMS/provider outage on the login front door used to be
+      // completely silent — the user saw a retry message and no one else saw
+      // anything. Capture it so a sustained outage pages someone.
+      const Sentry = await import("@sentry/nextjs");
+      Sentry.captureException(error, { tags: { area: "otp-send" } });
       return {
         step: "phone",
         phone,
@@ -239,6 +245,16 @@ export async function verifyOtpAction(
     };
   }
   await logSecurityEvent(result.personId, "auth.login.otp");
+  // PI-1 P2: the login form carries the terms/privacy notice; this records the
+  // acceptance once per person per notice version. The same try/catch
+  // discipline as registration's consent evidence — a recording hiccup must
+  // never fail a login that already happened.
+  try {
+    await ensureTermsConsent(db, result.personId);
+  } catch (error) {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.captureException(error, { tags: { area: "terms-consent" } });
+  }
   await issueSessionCookie(result.personId);
   const target = safeNext(previous.next);
   // A brand-new (nameless) account used to be verified, sent to /home, and
@@ -472,6 +488,9 @@ export async function logoutAction(): Promise<void> {
     const session = await getSessionByToken(db, token);
     if (session !== null) {
       await revokeSession(db, session.sessionId);
+      // PI-1 audit-gap closure: a sign-out is a security fact the person can
+      // check against — "I signed out at the café" belongs on their ledger.
+      await logSecurityEvent(session.personId, "auth.logout");
     }
   }
   store.delete(SESSION_COOKIE);
@@ -498,6 +517,7 @@ export async function logoutToAction(next: string): Promise<void> {
     const session = await getSessionByToken(db, token);
     if (session !== null) {
       await revokeSession(db, session.sessionId);
+      await logSecurityEvent(session.personId, "auth.logout");
     }
   }
   store.delete(SESSION_COOKIE);

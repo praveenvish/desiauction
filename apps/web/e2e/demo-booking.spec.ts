@@ -53,11 +53,11 @@ test("a stranger asks for a demo and is told what happens next", async ({ page }
   await page.goto("/schedule-demo");
 
   // The page must say what the demo IS before asking for a phone number.
-  await expect(page.getByRole("heading", { level: 1, name: "Schedule a demo" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Book a demo" })).toBeVisible();
   await axeClean(page, "/schedule-demo");
 
   await fillDemoForm(page, freshPhone());
-  await page.getByRole("button", { name: "Request a demo" }).click();
+  await page.getByRole("button", { name: "Book a demo" }).click();
 
   const done = page.getByTestId("demo-request-done");
   await expect(done).toBeVisible();
@@ -73,7 +73,7 @@ test("the form refuses what it should, in the field that is wrong", async ({ pag
   await page.getByLabel("Your name").fill("Ravi Kumar");
   await page.getByLabel("Mobile number").fill("12345");
   await page.getByLabel("Tournament or club").fill("E2E Warriors");
-  await page.getByRole("button", { name: "Request a demo" }).click();
+  await page.getByRole("button", { name: "Book a demo" }).click();
 
   // The message rides the field, is announced, and the control is marked — the
   // Field primitive's contract, asserted here because a hand-rolled error
@@ -96,7 +96,7 @@ test("the form refuses what it should, in the field that is wrong", async ({ pag
 
 test("native validation blocks an empty submit without a round trip", async ({ page }) => {
   await page.goto("/schedule-demo");
-  await page.getByRole("button", { name: "Request a demo" }).click();
+  await page.getByRole("button", { name: "Book a demo" }).click();
   // Still on the form, nothing submitted: `required` reaches the DOM.
   await expect(page.getByTestId("demo-request-done")).toHaveCount(0);
   await expect(page.getByLabel("Your name")).toHaveJSProperty("validity.valueMissing", true);
@@ -120,7 +120,7 @@ test("the honeypot is invisible to a person and fatal to a filler", async ({ pag
 
   await fillDemoForm(page, freshPhone());
   await trap.fill("https://spam.example", { force: true });
-  await page.getByRole("button", { name: "Request a demo" }).click();
+  await page.getByRole("button", { name: "Book a demo" }).click();
 
   // Indistinguishable from success: telling a bot which submissions were binned
   // is telling it how to stop being binned.
@@ -187,7 +187,7 @@ test("the demo form works at 360px", async ({ page }) => {
     const box = await page.getByLabel(name).boundingBox();
     expect(box?.height ?? 0, `${name} is too short to hit`).toBeGreaterThanOrEqual(44);
   }
-  const submit = await page.getByRole("button", { name: "Request a demo" }).boundingBox();
+  const submit = await page.getByRole("button", { name: "Book a demo" }).boundingBox();
   expect(submit?.height ?? 0).toBeGreaterThanOrEqual(44);
 
   await axeClean(page, "/schedule-demo at 360px");
@@ -223,7 +223,7 @@ test.describe("with times published", () => {
 
     await page.goto("/schedule-demo");
     await fillDemoForm(page, freshPhone());
-    await page.getByRole("button", { name: "Request a demo" }).click();
+    await page.getByRole("button", { name: "Book a demo" }).click();
 
     await page.getByRole("link", { name: "Or pick a time yourself" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Pick a time" })).toBeVisible();
@@ -290,7 +290,7 @@ test.describe("with times published", () => {
     // First person books the earliest slot.
     await page.goto("/schedule-demo");
     await fillDemoForm(page, freshPhone());
-    await page.getByRole("button", { name: "Request a demo" }).click();
+    await page.getByRole("button", { name: "Book a demo" }).click();
     await page.getByRole("link", { name: "Or pick a time yourself" }).click();
     const taken = page.locator("label.demo-slot").first();
     const takenLabel = (await taken.textContent())?.trim() ?? "";
@@ -304,7 +304,7 @@ test.describe("with times published", () => {
     const secondPage = await second.newPage();
     await secondPage.goto("/schedule-demo");
     await fillDemoForm(secondPage, freshPhone());
-    await secondPage.getByRole("button", { name: "Request a demo" }).click();
+    await secondPage.getByRole("button", { name: "Book a demo" }).click();
     await secondPage.getByRole("link", { name: "Or pick a time yourself" }).click();
 
     // The derivation subtracts it: the slot is absent, not merely disabled.
@@ -316,7 +316,7 @@ test.describe("with times published", () => {
   test("one request cannot hold two times at once", async ({ page }) => {
     await page.goto("/schedule-demo");
     await fillDemoForm(page, freshPhone());
-    await page.getByRole("button", { name: "Request a demo" }).click();
+    await page.getByRole("button", { name: "Book a demo" }).click();
 
     const pick = page.getByRole("link", { name: "Or pick a time yourself" });
     const pickUrl = (await pick.getAttribute("href")) ?? "";

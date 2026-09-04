@@ -30,6 +30,9 @@ jobs:
       - run: git diff --exit-code packages/ui/src/generated
       - run: pnpm format:check
       - run: pnpm depcruise
+      # PRR P2/F26: `check:motion` is part of the project's own `verify` gate but
+      # was missing from CI, so a motion-token regression could merge green.
+      - run: pnpm check:motion
       - run: pnpm audit --prod --audit-level high
 
   integration:
@@ -118,6 +121,12 @@ jobs:
       OTP_PROVIDER: dev
       PLAYWRIGHT_PRECOMPILED: "1"
       NEXT_DIST_DIR: .next-e2e
+      # `next start` runs with NODE_ENV=production, which trips the apps/web boot
+      # guard: OTP_PROVIDER=dev (which the suite REQUIRES, so e2e/otp.ts can read
+      # codes) is refused in a serving production process. This flag is exactly
+      # that escape — a production-shaped BUILD exercised in a non-production
+      # CONTEXT — and without it the whole e2e job fails at web-server boot.
+      ALLOW_INSECURE_LOCAL_PRODUCTION: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

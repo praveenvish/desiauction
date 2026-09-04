@@ -1,6 +1,13 @@
 "use server";
 
-import { fixtures, registrations, teams, tournaments, withTenantDb } from "@desiauction/db";
+import {
+  fixtures,
+  registrations,
+  settlementCases,
+  teams,
+  tournaments,
+  withTenantDb,
+} from "@desiauction/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -63,11 +70,48 @@ export interface SeasonCounts {
 
 const NO_COUNTS: SeasonCounts = { teams: 0, matches: 0, pending: 0 };
 
+/**
+ * One settlement-case read for the whole page, on the same system pool the
+ * season union already uses. Status metadata only — no amounts — so listing it
+ * beside a season the reader can already see leaks nothing the season page's
+ * own lifecycle rail would not say.
+ */
+async function settlementStatusFor(
+  competitionIds: string[],
+): Promise<Map<string, "settling" | "settled">> {
+  if (competitionIds.length === 0) {
+    return new Map();
+  }
+  const rows = await systemDb
+    .select({ competitionId: settlementCases.competitionId, status: settlementCases.status })
+    .from(settlementCases)
+    .where(inArray(settlementCases.competitionId, competitionIds));
+  const by = new Map<string, "settling" | "settled">();
+  for (const row of rows) {
+    if (row.status === "voided") {
+      continue;
+    }
+    const terminal = row.status === "settled" || row.status === "closed";
+    if (terminal || !by.has(row.competitionId)) {
+      by.set(row.competitionId, terminal ? "settled" : "settling");
+    }
+  }
+  return by;
+}
+
 export type SeasonRow = CompetitionSummary & {
   orgName: string;
   counts: SeasonCounts;
   /** Today falls inside this edition's dates — the edition being run now. */
   running: boolean;
+  /**
+   * The settlement case's own status, folded to the reader's vocabulary:
+   * "settled" covers settled AND closed books, a voided case never happened,
+   * anything else is "settling". Without it a season whose money was done
+   * badged "Registration closed" forever — the only settled signal on the
+   * whole page was the seed data's name.
+   */
+  settlement: "settling" | "settled" | null;
 };
 
 /**
@@ -271,11 +315,13 @@ export async function tournamentsView(): Promise<TournamentsView> {
           .where(inArray(tournaments.orgId, orgIds))
           .orderBy(tournaments.name);
   const counts = await countsFor(seasons.map((season) => season.id));
+  const settlementBy = await settlementStatusFor(seasons.map((season) => season.id));
   const today = isoToday();
   const enriched: SeasonRow[] = byEditionDate(seasons).map((season) => ({
     ...season,
     counts: counts.get(season.id) ?? NO_COUNTS,
     running: isRunningNow(season, today),
+    settlement: settlementBy.get(season.id) ?? null,
   }));
   const plainOrgs = orgs.map((org) => ({ id: org.id, name: org.name }));
   const { creatable, reviewable } = await capabilitiesOnce();
@@ -399,10 +445,18 @@ export async function tournamentSeasons(
   }));
 }
 
+/**
+ * Returns the destination rather than redirecting — the same reason
+ * `createOrgAction` does. This form is rendered by the `@action` parallel slot
+ * on BOTH `/home` and `/tournaments`, and a server-action redirect away from a
+ * route whose action slot is matched is abandoned by the router: the write
+ * lands, the navigation never does, and the submit button stays disabled on a
+ * form that already succeeded. See `createOrgAction` for the measurements.
+ */
 export async function createTournamentAction(
-  _previous: { error?: string },
+  _previous: { error?: string; created?: string },
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; created?: string }> {
   const session = await requireSession();
   const orgId = formString(formData, "orgId");
   const name = formString(formData, "name");
@@ -432,5 +486,5 @@ export async function createTournamentAction(
     }
     return { error: "Give the tournament a name of at least 3 characters." };
   }
-  redirect(`/tournaments/${slug}`);
+  return { created: slug };
 }

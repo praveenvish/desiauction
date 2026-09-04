@@ -75,8 +75,16 @@ export async function requestPhoneChange(
   }
   // The same throttles sign-in uses, on the same table, deliberately. A separate
   // code path here would be a second, unthrottled way to make this platform send
-  // SMS to an arbitrary number.
-  const sent = await requestOtp(db, sender, normalized.phone, input.requestIp ?? null);
+  // SMS to an arbitrary number. The PURPOSE differs (PI-1): this code can only
+  // confirm a phone change — a login code on the same handset cannot, and this
+  // one cannot sign anybody in.
+  const sent = await requestOtp(
+    db,
+    sender,
+    normalized.phone,
+    input.requestIp ?? null,
+    "phone_change",
+  );
   return sent.ok ? { ok: true } : { ok: false, reason: sent.reason };
 }
 
@@ -118,7 +126,7 @@ export async function confirmPhoneChange(
    * rebuilt one function later. Burning the code first means the answer costs a
    * message to a handset the asker must be holding.
    */
-  const consumed = await consumeCode(db, phone, input.code);
+  const consumed = await consumeCode(db, phone, input.code, "phone_change");
   if (!consumed.ok) {
     return consumed.reason === "invalid" && consumed.attemptsLeft !== undefined
       ? { ok: false, reason: "invalid", attemptsLeft: consumed.attemptsLeft }

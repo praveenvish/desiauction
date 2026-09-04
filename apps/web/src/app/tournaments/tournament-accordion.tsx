@@ -100,6 +100,15 @@ function HeadStat({ icon, value, label }: { icon: ReactNode; value: number; labe
 
 function SeasonRow({ season }: { season: Season }) {
   const when = dateRange(season.startsOn, season.endsOn);
+  // The settlement case's word outranks the competition status — a settled
+  // season must not read "Reg closed" forever (see seasonStatusBadge, which
+  // this mirrors in the row's short-form vocabulary).
+  const badge =
+    season.settlement === "settled"
+      ? { label: "Settled", tone: "success" as const }
+      : season.settlement === "settling"
+        ? { label: "Settling", tone: "info" as const }
+        : { label: STATUS_LABEL[season.status], tone: STATUS_TONE[season.status] };
   return (
     <Link href={`/seasons/${season.slug}`} className="tg-season" data-testid="tg-season">
       <span className="tg-season-glyph" aria-hidden>
@@ -114,14 +123,19 @@ function SeasonRow({ season }: { season: Season }) {
             phone. Shown only where the full-width column is gone. */}
         {when !== null ? <span className="tg-season-compact">{when}</span> : null}
       </span>
-      {season.running ? (
-        <Badge tone="live" className="tg-badge">
-          Now running
+      {/* One container, not two loose badges: below 620px the pair moves to its
+          own grid row under the name, and two independent flex items cannot do
+          that without overlapping the title they were crushing. */}
+      <span className="tg-season-badges">
+        {season.running ? (
+          <Badge tone="live" className="tg-badge">
+            Now running
+          </Badge>
+        ) : null}
+        <Badge tone={badge.tone} className="tg-badge">
+          {badge.label}
         </Badge>
-      ) : null}
-      <Badge tone={STATUS_TONE[season.status]} className="tg-badge">
-        {STATUS_LABEL[season.status]}
-      </Badge>
+      </span>
       {when !== null ? (
         <span className="tg-season-when">
           <IconCalendar width={15} height={15} />

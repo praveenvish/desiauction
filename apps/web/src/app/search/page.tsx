@@ -54,7 +54,7 @@ export default async function SearchPage({
           name="q"
           type="search"
           defaultValue={query}
-          placeholder="Search everything public…"
+          placeholder="Search the site…"
         />
         <button type="submit">Search</button>
       </form>

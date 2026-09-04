@@ -185,10 +185,23 @@ export function teamPurseRows(
   // committed + remaining, for any team that has a paddle. Teams with none
   // borrow it — every team in an auction starts with the same purse.
   // Derived only from teams whose money this viewer actually received.
-  let pursePerTeam = 0;
+  //
+  // NULL, NOT ZERO, WHEN NOTHING WAS RECEIVED. On /board and /spectate the
+  // engine redacts every purse (P1-6), so this scan finds nothing — and the
+  // old `0` seed was then handed to every team that had not claimed a paddle
+  // as a FACT. The projector in front of the hall read
+  //
+  //     Demo Panthers   ₹0 PURSE REMAINING
+  //
+  // for a franchise that had spent nothing and still held its whole purse.
+  // It is the same confident-zero bug as the "TOTAL SPEND ₹0" one this file
+  // already carries a comment about, one field along: zero is a claim, and
+  // this viewer has no claim to make. Unknown stays unknown, and the surfaces
+  // render it "sealed".
+  let pursePerTeam: number | null = null;
   for (const group of groups.values()) {
     if (group.purseRemaining !== null && group.committed !== null) {
-      pursePerTeam = Math.max(pursePerTeam, group.committed + group.purseRemaining);
+      pursePerTeam = Math.max(pursePerTeam ?? 0, group.committed + group.purseRemaining);
     }
   }
 

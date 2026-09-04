@@ -18,6 +18,7 @@
     "test:integration": "turbo run test:integration",
     "env:check": "turbo run env:check",
     "preflight:production": "node scripts/preflight-production.mjs",
+    "backup": "node scripts/backup-database.mjs",
     "check:motion": "node scripts/check-motion-tokens.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -45,7 +46,7 @@
       "sharp@<0.35.0": ">=0.35.0",
       "fast-uri": ">=4.1.2",
       "brace-expansion": ">=5.0.9",
-      "undici@>=7.0.0 <7.29.0": ">=7.29.0"
+      "undici@>=7.0.0 <7.29.0": ">=7.29.0 <8"
     }
   }
 }

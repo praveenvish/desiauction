@@ -17,10 +17,18 @@
   line-height: 1.5;
 }
 
+/* No wrap: wrapping put a full-width 44px gold button on its own row under
+   the input, which read as the page's primary action rather than a subscribe
+   affordance. The row is now fixed — input takes the slack, the button keeps
+   its square — and the footer block above it caps the whole at 20rem. */
 .form {
+  display: block;
+}
+
+.row {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
-  flex-wrap: wrap;
 }
 
 .input {
@@ -77,4 +85,13 @@
   margin: var(--space-2) 0 0;
   color: var(--danger-strong);
   font-size: var(--text-xs-size);
+}
+
+/* What we do with the address. Three words, but they are the difference
+   between a form a visitor fills in and one they scroll past. */
+.fine {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: 1.5;
 }

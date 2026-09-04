@@ -1,4 +1,4 @@
-import { deriveAge } from "@desiauction/core";
+import { deriveAge, isMinor } from "@desiauction/core";
 import {
   auctionEvents,
   auctions,
@@ -9,7 +9,7 @@ import {
   registrations,
   teams,
 } from "@desiauction/db";
-import { and, asc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
 import { systemDb } from "../db";
@@ -57,6 +57,8 @@ export interface PublicCompetitionView {
   name: string;
   slug: string;
   status: string;
+  /** PI-1: organizer-declared category, for terminology ("Women's") only. */
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -94,6 +96,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       visibility: competitions.visibility,
       location: competitions.location,
       startsOn: competitions.startsOn,
@@ -127,6 +130,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     name: row.name,
     slug: row.slug,
     status: row.status,
+    entryCategory: row.entryCategory,
     location: row.location,
     startsOn: row.startsOn,
     endsOn: row.endsOn,
@@ -191,14 +195,25 @@ interface ShowcaseRow {
  * team assignment only decides which name to print.
  */
 function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
+  // PRR P0-2 (DPDP Act 2023 §9): a minor's personal data may not be published on
+  // a public, unauthenticated surface. This is the one chokepoint the public
+  // player page AND the OG/Twitter share card both read, so suppressing the
+  // derived age and photo here removes a child's data from every public surface
+  // at once — regardless of any photo consent an adult would have given. The
+  // organizer still sees the full roster on the authenticated, capability-gated
+  // review screens; only public exposure is withheld.
+  const minor = isMinor(r.dateOfBirth, now);
   return {
     number: r.number,
     name: r.name ?? "Unnamed",
     role: r.role,
-    age: deriveAge(r.dateOfBirth, now),
+    age: minor ? null : deriveAge(r.dateOfBirth, now),
     battingStyle: r.battingStyle,
     bowlingStyle: r.bowlingStyle,
-    photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
+    photoUrl:
+      !minor && r.photoConsentAt !== null && r.photoKey !== null
+        ? storage.readUrl(r.photoKey)
+        : null,
     status: r.isIcon ? "retained" : r.teamId === null ? "available" : "sold",
     teamName: r.teamName,
   };
@@ -300,6 +315,13 @@ export interface PublicPlayer extends ShowcasePlayer {
    *  friend's card had no way to join the same tournament — this is what lets
    *  the page offer one, and only when the door is actually open. */
   competitionOpen: boolean;
+  /**
+   * PI-1: the same person's other appearances — SAME ORG, PUBLISHED seasons,
+   * approved registrations only. Each season's own publication consent covers
+   * its own card (the consent is per-registration), and cross-ORG history
+   * stays off public pages entirely (doc 38: that needs the person's consent).
+   */
+  alsoPlayedIn: { competitionName: string; competitionSlug: string; playerNumber: string }[];
 }
 
 /**
@@ -313,6 +335,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   const [comp] = await systemDb
     .select({
       id: competitions.id,
+      orgId: competitions.orgId,
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
@@ -329,6 +352,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   }
   const [row] = await systemDb
     .select({
+      personId: registrations.personId,
       number: registrations.registrationNumber,
       name: people.name,
       role: registrations.role,
@@ -355,11 +379,33 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   if (row === undefined) {
     return null;
   }
+  // PI-1: other published, approved appearances in the SAME org — newest
+  // seasons first, capped so a card stays a card.
+  const alsoPlayedIn = await systemDb
+    .select({
+      competitionName: competitions.name,
+      competitionSlug: competitions.slug,
+      playerNumber: registrations.registrationNumber,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .where(
+      and(
+        eq(registrations.personId, row.personId),
+        eq(competitions.orgId, comp.orgId),
+        eq(competitions.visibility, "public"),
+        eq(registrations.status, "approved"),
+        ne(registrations.competitionId, comp.id),
+      ),
+    )
+    .orderBy(desc(competitions.startsOn))
+    .limit(6);
   return {
     ...toShowcasePlayer(row, new Date()),
     competitionName: comp.name,
     competitionSlug: comp.slug,
     competitionOpen: comp.status === "registration_open",
+    alsoPlayedIn,
   };
 }
 
@@ -367,6 +413,8 @@ export interface DirectoryEntry {
   name: string;
   slug: string;
   orgName: string;
+  /** PI-1: organizer-declared category ("Women's" badge; `open` renders nothing). */
+  entryCategory: "open" | "men" | "women" | "mixed";
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -546,6 +594,7 @@ export async function publicCompetitionsDirectory(params: {
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
+      entryCategory: competitions.entryCategory,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -569,6 +618,7 @@ export async function publicCompetitionsDirectory(params: {
       name: row.name,
       slug: row.slug,
       orgName: row.orgName,
+      entryCategory: row.entryCategory,
       location: row.location,
       startsOn: row.startsOn,
       endsOn: row.endsOn,

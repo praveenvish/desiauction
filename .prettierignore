@@ -11,3 +11,12 @@ drizzle/migrations/meta/
 playwright-report/
 test-results/
 packages/ui/src/generated/
+
+# Git worktrees live under `.claude/` and carry a full copy of the tree, so the
+# ignore patterns above — which are anchored at the repo root — stopped
+# applying to them: `packages/ui/src/generated/` is ignored, but
+# `.claude/worktrees/x/packages/ui/src/generated/` was not, and a single open
+# worktree failed `format:check` (and therefore `pnpm verify`) on generated
+# files nobody had touched. It also made a root `pnpm format` reach into
+# another session's worktree and reformat them there.
+.claude/

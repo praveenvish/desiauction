@@ -10,6 +10,9 @@
   text-transform: uppercase;
   padding: var(--space-05) var(--space-2);
   border-radius: var(--radius-sm);
+  /* A pill is one word-shape: "REG OPEN" folding to two lines inside its own
+     chip reads as a layout fault. The container yields, never the badge. */
+  white-space: nowrap;
 }
 
 .neutral {

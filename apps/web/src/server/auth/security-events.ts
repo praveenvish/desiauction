@@ -13,6 +13,14 @@ export type SecurityAction =
   | "auth.login.otp"
   | "auth.login.passkey"
   | "auth.otp.lockout"
+  // PI-1 audit-gap closures. Requests, sign-outs and refused passkey
+  // ceremonies were invisible: the ledger showed only what SUCCEEDED, so the
+  // page a person checks after "did someone try to get in?" had no idea.
+  // Each is written only when a person exists to own the row — the audit
+  // substrate is person-scoped, and an unknown phone has no ledger.
+  | "auth.otp.requested"
+  | "auth.logout"
+  | "auth.passkey.failed"
   | "auth.passkey.enrolled"
   | "auth.passkey.renamed"
   | "auth.passkey.removed"
@@ -31,6 +39,10 @@ export type SecurityAction =
   // An address the platform may now send documents to. On the person's own
   // ledger, because it is a change to how the product can reach them.
   | "profile.email.verified"
+  // PI-1: the person-level cricket profile changed (gender/DOB/location/
+  // defaults). Meta names the FIELDS touched, never the values — the ledger
+  // records that an answer moved, not what a person answered.
+  | "profile.player.updated"
   // DA-19: the decisions a PLAYER cares about. 48 people were approved and one
   // rejected during certification and not one of them was told — the inbox
   // carried sign-in events only, and its own empty state admitted it. These

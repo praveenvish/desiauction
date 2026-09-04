@@ -12,7 +12,7 @@
  * detectable by digest.
  */
 
-import { canonicalJson } from "@desiauction/core";
+import { canonicalJson, csvCell } from "@desiauction/core";
 
 import type { ExportKind } from "./export-run";
 import type { Watermark } from "./watermark";
@@ -75,9 +75,11 @@ export function paiseToDecimalString(paise: number): string {
   return `${digits.slice(0, -2)}.${digits.slice(-2)}`;
 }
 
-function csvField(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
-}
+// PRR P2/F23: the finance register embeds user-controlled partyLabel/sourceRef.
+// Route through the shared escaper from @desiauction/core so it gets the same
+// spreadsheet-formula-injection neutralization as every other export, instead of
+// this package quietly keeping the pre-fix quote-only logic.
+const csvField = csvCell;
 
 function xmlEscape(value: string): string {
   return value

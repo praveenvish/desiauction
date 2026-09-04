@@ -208,7 +208,12 @@ describe("PX-10 · Content integrity", () => {
     // string is defined once, on the support channel, and the footer must use
     // the same words or the instruction is unfollowable.
     const channel = SUPPORT.channels.find((entry) => entry.title === "Auction-night help");
-    expect(channel?.detail).toContain("AUCTION NIGHT");
+    // The named string moved from `detail` to `note`: the detail is now only
+    // the address (linking prose inside one anchor wrapped it to two lines),
+    // and the note both names the string and rides beside the link everywhere
+    // the channel renders. The href still pre-fills the same subject.
+    expect(channel?.note).toContain("AUCTION NIGHT");
+    expect(channel?.href).toContain("AUCTION%20NIGHT");
     const footer = plainTextOf(HELP_ARTICLES[0]?.blocks ?? []);
     expect(footer).toContain("AUCTION NIGHT");
   });
@@ -368,7 +373,7 @@ describe("PX-10 · Search (navigation only)", () => {
 
   it("reaches every public section (the founder-demo requirement)", () => {
     const sections = new Set(SEARCH_INDEX.map((doc) => doc.section));
-    expect(sections).toEqual(new Set(["Marketing", "Help", "Legal", "Support", "Release notes"]));
+    expect(sections).toEqual(new Set(["Product", "Help", "Legal", "Support", "Release notes"]));
   });
 
   it("is AND across terms and needs at least two characters", () => {

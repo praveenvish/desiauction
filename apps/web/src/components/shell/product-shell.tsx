@@ -27,6 +27,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
+import { LEGAL_IDENTITY, legalIdentityPublished } from "../../content/company";
 import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { formatPhone } from "../../lib/format-phone";
@@ -121,6 +122,14 @@ function BellLink({
       setUnread(false);
       return;
     }
+    // Standing ON the notifications page, the answer is already "you are
+    // reading them" — the page advances the watermark for the next render,
+    // but this effect ran first and kept the dot lit over the very list it
+    // was pointing at.
+    if (pathname.startsWith("/inbox")) {
+      setUnread(false);
+      return;
+    }
     const seen = window.localStorage.getItem(inboxSeenKey(personId));
     setUnread(seen === null || latestEventAt > seen);
   }, [latestEventAt, pathname, personId]);
@@ -158,6 +167,39 @@ const RAIL_ICONS: Record<string, ReactNode> = {
  * /c/<slug> too, where the link no longer points at the page you are reading —
  * `aria-current="page"` means this page, not this neighbourhood.
  */
+/**
+ * WHO IS OFFERING THIS SERVICE — in the footer of every public page.
+ *
+ * The identity was published in one place only: the bottom of the Legal Centre,
+ * which is two navigations from anywhere a visitor actually stands. A footer
+ * that names no company is the single loudest "this might not be a real
+ * business" signal a site can send, and for an India-facing platform it is also
+ * the thing the rules ask for by name (Companies Act s.12(3)(c) for the CIN,
+ * Consumer Protection (E-Commerce) Rules 4(3) for the legal name and principal
+ * address — see `content/company.ts`).
+ *
+ * Renders NOTHING while the identity is unpublished. Not a blank, not a
+ * placeholder, and never a guess: an invented company name in a footer is the
+ * worst line this product could print.
+ */
+function OperatorIdentity(): ReactNode {
+  if (!legalIdentityPublished()) {
+    return null;
+  }
+  const id = LEGAL_IDENTITY;
+  return (
+    <p>
+      <span>{id.legalName}</span>
+      {id.registrationNumber !== null ? <span>CIN {id.registrationNumber}</span> : null}
+      {id.gstin !== null ? <span>GSTIN {id.gstin}</span> : null}
+      {id.registeredAddress !== null ? <span>{id.registeredAddress}</span> : null}
+      {id.grievanceOfficerName !== null ? (
+        <span>Grievance Officer: {id.grievanceOfficerName}</span>
+      ) : null}
+    </p>
+  );
+}
+
 function publicNav(pathname: string): PublicShellLink[] {
   const mark = (link: PublicShellLink): PublicShellLink =>
     link.href === pathname ? { ...link, active: true } : link;
@@ -169,17 +211,16 @@ function publicNav(pathname: string): PublicShellLink[] {
       label: "Resources",
       href: "/help",
       children: [
-        // Three of the four slots went to /blog, /case-studies and /api-docs —
-        // honest placeholder pages, all of them — while the route to a human
-        // and the route to the terms were reachable only from the footer. A
-        // visitor with a problem should not have to scroll to the bottom of the
-        // page to find support.
+        // Three of the six slots went to /blog, /case-studies and /api-docs —
+        // honest placeholder pages, all of them, each answering the click with
+        // "nothing published yet". Retired here for the same reason they were
+        // retired from the footer: a menu is a set of recommendations, and this
+        // one recommended three empty rooms over the route to a human. The
+        // pages remain live and findable in /search.
         { label: "Help centre", href: "/help" },
+        { label: "Rules & guidelines", href: "/rules-guidelines" },
         { label: "Support", href: "/support" },
         { label: "Legal", href: "/legal" },
-        { label: "Blog", href: "/blog" },
-        { label: "Case studies", href: "/case-studies" },
-        { label: "API docs", href: "/api-docs" },
       ].map(mark),
     },
     { label: "About", href: "/about" },
@@ -590,12 +631,21 @@ export function ProductShell({
         }
         footerCompact={atGate}
         contentFill={atLoginGate}
-        // PX-10: the complete public footer (PX-1 01 §3) — only routes that
-        // exist (the PX-2 no-dead-links ruling), all shipped in this milestone.
-        // Every footer link is a real route (the PX-2 no-dead-links ruling);
-        // 2026-07-25 founder call restored the newsletter and filled the
-        // groups out. What stays retired: superlatives the product can't
-        // evidence, and decorative social icons that link nowhere.
+        // The public footer (PX-1 01 §3). Every link is a real route (the PX-2
+        // no-dead-links ruling) — and, since 2026-08-29, a route with something
+        // on it. Four destinations left: /blog, /case-studies, /api-docs and
+        // /careers are honest placeholders that say "nothing published yet",
+        // and the footer was promoting four of them from the bottom of every
+        // public page. A no-dead-links rule is not satisfied by a link that
+        // resolves to an apology; a visitor who takes one learns the company
+        // has no writing, no customers and no API. The pages stay live, stay in
+        // the sitemap and stay findable in /search — they are simply no longer
+        // advertised. They come back the day they have content.
+        //
+        // What replaced them is what a visitor at the bottom of the page is
+        // actually looking for: the way in (start an auction, book a demo), the
+        // way to a human (help, FAQ, support, contact), and the way to check we
+        // are real (about, legal, and the operator identity below).
         footerGroups={[
           {
             label: "Product",
@@ -610,36 +660,43 @@ export function ProductShell({
           {
             label: "Tournaments",
             links: [
-              { label: "All tournaments", href: "/c" },
-              { label: "Create tournament", href: "/login" },
+              { label: "Browse tournaments", href: "/c" },
+              // Labelled for what the link DOES, not where it lands: creating a
+              // tournament begins at the phone gate, and "Create tournament"
+              // pointing at /login read as a broken link to anyone who noticed.
+              { label: "Start your auction", href: "/login" },
               { label: "Rules & guidelines", href: "/rules-guidelines" },
-              { label: "Schedule demo", href: "/schedule-demo" },
+              { label: "Book a demo", href: "/schedule-demo" },
             ],
           },
           {
-            label: "Resources",
+            label: "Support",
             links: [
               { label: "Help centre", href: "/help" },
               { label: "FAQ", href: "/help/faq" },
-              { label: "Support", href: "/support" },
-              { label: "Blog", href: "/blog" },
-              { label: "Case studies", href: "/case-studies" },
-              { label: "API docs", href: "/api-docs" },
+              { label: "Contact support", href: "/support" },
+              { label: "Search the site", href: "/search" },
             ],
           },
           {
             label: "Company",
             links: [
               { label: "About us", href: "/about" },
-              { label: "Careers", href: "/careers" },
               { label: "Contact us", href: "/contact" },
-              { label: "Legal", href: "/legal" },
+              { label: "Legal centre", href: "/legal" },
+              { label: "Grievance redressal", href: "/legal/grievances" },
             ],
           },
         ]}
         footerTagline="Live player auctions for Indian tournaments — server-verified bidding, settled to the rupee."
         footerNewsletter={<NewsletterForm />}
-        footerNote="© 2026 DesiAuction — in beta. Tournament auctions, taken seriously."
+        // The copyright belongs to the entity, not the product name: the
+        // company signing this footer is Eventztree, and it is named here for
+        // the same reason it is named in the identity block below.
+        footerNote={`© 2026 ${LEGAL_IDENTITY.tradingName ?? "DesiAuction"} — a product of ${
+          LEGAL_IDENTITY.legalName ?? "our team"
+        }. In beta.`}
+        footerLegal={<OperatorIdentity />}
         footerBottomLinks={
           atGate
             ? [
@@ -649,8 +706,11 @@ export function ProductShell({
               ]
             : [
                 { label: "Privacy Policy", href: "/legal/privacy" },
-                { label: "Terms of Use", href: "/legal/terms" },
+                // "Terms of Use" named a document titled "Terms of Service".
+                // The label now matches what the page says it is.
+                { label: "Terms of Service", href: "/legal/terms" },
                 { label: "Refund Policy", href: "/legal/refunds" },
+                { label: "Code of Conduct", href: "/legal/code-of-conduct" },
               ]
         }
         linkComponent={Link}
@@ -798,7 +858,12 @@ export function ProductShell({
               <span className="shell-railuser-avatar">{initials}</span>
               <span className="shell-railuser-text">
                 <strong>{session.name ?? formatPhone(session.phone)}</strong>
-                <span>Organizer</span>
+                {/* The second line used to hardcode "Organizer" — a role claim
+                    the shell cannot know and stamped on every member, viewer
+                    and player alike. The phone is the one identity fact that is
+                    always true, and on the shared handsets this product targets
+                    it says WHICH account is signed in. */}
+                {session.name !== null ? <span>{formatPhone(session.phone)}</span> : null}
               </span>
             </Link>
           }

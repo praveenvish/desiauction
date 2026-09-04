@@ -99,6 +99,13 @@ export function AuctionAnnouncer({
       crossedRef.current = { lotId, at: Infinity };
     }
     if (lotId === null || remainingMs === null) {
+      /*
+       * A resolved lot has no clock. Returning without clearing left the last
+       * call — "10 seconds left." — standing in the live region under a card
+       * that had already said SOLD, so the running commentary contradicted the
+       * result beside it and a screen reader kept stale urgency on the page.
+       */
+      setClock(null);
       return;
     }
     const seconds = Math.ceil(remainingMs / 1000);

@@ -27,6 +27,17 @@ export interface DbHandle {
  */
 const DEFAULT_POOL_MAX = 10;
 
+/**
+ * The database-side safety nets (PRR P2 / F49). No pool set either, so a single
+ * runaway query or a transaction left open by a crashed handler could pin a
+ * connection until `max_connections` was exhausted, undiagnosably. These are
+ * ceilings, not budgets — an order of magnitude above the slowest legitimate
+ * query (the settlement journal fold is a few seconds) — so nothing normal ever
+ * hits them, and a genuinely stuck statement or transaction is released.
+ */
+const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
+const DEFAULT_IDLE_TXN_TIMEOUT_MS = 60_000;
+
 export interface DbPoolOptions {
   /**
    * Sockets this pool may hold. Omitted means DEFAULT_POOL_MAX, so an existing
@@ -35,6 +46,10 @@ export interface DbPoolOptions {
    * touches the environment itself.
    */
   max?: number | undefined;
+  /** Per-statement ceiling in ms (0 disables). Default 30s — a safety net. */
+  statementTimeoutMs?: number | undefined;
+  /** Ceiling on an idle-in-transaction session in ms (0 disables). Default 60s. */
+  idleTransactionTimeoutMs?: number | undefined;
 }
 
 /** One factory for every consumer; apps pass their validated env URL (§11). */
@@ -49,6 +64,14 @@ export function createDb(url: string, options: DbPoolOptions = {}): DbHandle {
     idle_timeout: 60, // close idle connections after 1 minute
     max_lifetime: 60 * 30, // retire any connection after 30 minutes
     connect_timeout: 10, // fail fast instead of hanging a request
+    // Set once at connection startup and applied to every statement/transaction
+    // on it (PRR F49). Values in milliseconds; Postgres reads a bare integer as
+    // ms for these GUCs.
+    connection: {
+      statement_timeout: options.statementTimeoutMs ?? DEFAULT_STATEMENT_TIMEOUT_MS,
+      idle_in_transaction_session_timeout:
+        options.idleTransactionTimeoutMs ?? DEFAULT_IDLE_TXN_TIMEOUT_MS,
+    },
   });
   return { db: drizzle(sql, { schema }), sql };
 }

@@ -11,6 +11,7 @@ import {
   issuePaddleAction,
   queueAllLotsAction,
   releasePaddleAction,
+  setAuctionFeatureAction,
   verifyReplayAction,
   type AuctionDashboard,
   type ReplayVerifyReport,
@@ -84,6 +85,13 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
   const [fieldErrors, setFieldErrors] = useState<AuctionSetupFieldErrors>({});
   const [acceptShortSquads, setAcceptShortSquads] = useState(false);
   const [acceptShortOpen, setAcceptShortOpen] = useState(false);
+  // WR-1: optimistic, then reconciled — a fully server-controlled checkbox
+  // snaps back before the refresh lands, which reads as a switch that ignores
+  // the click (and is exactly what a browser automation sees).
+  const [ownerPlansOn, setOwnerPlansOn] = useState(dashboard.ownerPlans?.enabled ?? true);
+  useEffect(() => {
+    setOwnerPlansOn(dashboard.ownerPlans?.enabled ?? true);
+  }, [dashboard.ownerPlans?.enabled]);
   useEffect(() => {
     setHydrated(true);
   }, []);
@@ -166,7 +174,17 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             </span>
           </li>
         </ul>
-        {view === null && viewer.canConduct ? (
+        {/*
+            An abandoned auction is a season with no auction, not a season that
+            can never hold one: `createAuction` allows a replacement "unless the
+            previous one was abandoned" (packages/auction/src/aggregate.ts).
+            Gating this form on `view === null` alone contradicted that — an
+            abort left the organiser with no way back, and because intake cannot
+            be reopened either, the season was finished. The abort dialog says
+            THIS auction can never go live again; it is not a promise that the
+            season is over.
+        */}
+        {(view === null || view.auction.status === "abandoned") && viewer.canConduct ? (
           <div className="auction-setup" data-testid="auction-setup">
             {/* DA-05: these are the numbers a league negotiates, and until now
                 every auction took ₹2 Cr purses, 8–15 squads and three fixed
@@ -329,6 +347,53 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
               {view.auction.config.timer.initialSeconds}s +{" "}
               {view.auction.config.timer.extensionSeconds}s anti-snipe · config locked at creation
             </p>
+            {/* WR-1: the organizer's switch for owner plans. Outside the locked
+                config on purpose — a switch flipped mid-season is not a rule of
+                the night. Layers above (platform, club, deploy) can only be
+                read here, so the row says when one of them has decided. */}
+            {viewer.canConduct && dashboard.ownerPlans !== undefined ? (
+              <label className="plan-switch" htmlFor="owner-plans-switch">
+                <input
+                  id="owner-plans-switch"
+                  type="checkbox"
+                  checked={ownerPlansOn}
+                  disabled={
+                    busy ||
+                    (dashboard.ownerPlans.deniedBy !== null &&
+                      dashboard.ownerPlans.deniedBy !== "auction")
+                  }
+                  data-testid="owner-plans-switch"
+                  onChange={(event) => {
+                    const next = event.target.checked;
+                    setOwnerPlansOn(next);
+                    void (async () => {
+                      setBusy(true);
+                      const result = await setAuctionFeatureAction(slug, next);
+                      setBusy(false);
+                      if (result.ok) {
+                        toast({
+                          title: next ? "Owner plans on" : "Owner plans off",
+                          tone: "success",
+                        });
+                        router.refresh();
+                      } else {
+                        setOwnerPlansOn(!next);
+                        toast({ title: result.error ?? "Refused.", tone: "danger" });
+                      }
+                    })();
+                  }}
+                />
+                <span className="plan-switch-text">
+                  <span className="plan-switch-label">Owner plans</span>
+                  <span className="plan-switch-detail">
+                    {dashboard.ownerPlans.deniedBy !== null &&
+                    dashboard.ownerPlans.deniedBy !== "auction"
+                      ? "Switched off above this auction — the platform or your club decides this one."
+                      : "Team owners keep a private list of who they want and the most they'd pay, and see it against the live bidding. Off hides it for every team in this auction. It is never visible to you or to rival owners."}
+                  </span>
+                </span>
+              </label>
+            ) : null}
             {/* The shortfall follows the auction all the way to its close —
                 stated here every time the page is opened, not discovered at
                 11pm behind a refusal. */}

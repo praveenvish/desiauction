@@ -1,7 +1,13 @@
 import { resolve } from "node:path";
 
 import { createDb } from "@desiauction/db";
-import { finopsDeps, followAllOrgs, runnerTick } from "@desiauction/financial-operations/server";
+import {
+  bucketArtifactStoreFromEnv,
+  finopsDeps,
+  followAllOrgs,
+  runnerTick,
+} from "@desiauction/financial-operations/server";
+import * as Sentry from "@sentry/node";
 
 import { env } from "./env";
 import { logger } from "./logger";
@@ -24,8 +30,40 @@ import { logger } from "./logger";
  * hostile-tested at M-IP6-1 certification).
  */
 
+// PRR P1-6: error tracking + last-resort crash handlers, mirroring the engine.
+// The runner ran with neither, so an unhandled rejection or a bad config left
+// no signal anywhere; the restart policy would just loop silently.
+if (env.SENTRY_DSN !== undefined) {
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    environment: env.NODE_ENV,
+    release: env.APP_VERSION,
+    tracesSampleRate: 0.1,
+  });
+}
+
+async function die(reason: string, error: unknown): Promise<never> {
+  logger.fatal({ err: error }, reason);
+  Sentry.captureException(error);
+  await Sentry.flush(2000).catch(() => undefined);
+  process.exit(1);
+}
+
+process.on("unhandledRejection", (error) => {
+  void die("unhandled rejection", error);
+});
+process.on("uncaughtException", (error) => {
+  void die("uncaught exception", error);
+});
+
 const handle = createDb(env.DATABASE_URL);
-const deps = finopsDeps(handle.db, { storageDir: resolve(process.cwd(), env.FINOPS_STORAGE_DIR) });
+// PRR P1-4: the shared S3 store when configured, so what this process writes the
+// web tier can read. Falls back to the filesystem store (same-host / local).
+const artifactStore = bucketArtifactStoreFromEnv(env) ?? undefined;
+const deps = finopsDeps(handle.db, {
+  storageDir: resolve(process.cwd(), env.FINOPS_STORAGE_DIR),
+  ...(artifactStore === undefined ? {} : { artifacts: artifactStore }),
+});
 
 let stopping = false;
 
@@ -39,7 +77,9 @@ async function tick(): Promise<void> {
     }
   } catch (error) {
     // A failed tick is retried on the next one; jobs and cursors carry state.
+    // But a tick that keeps failing is invisible without this — surface it.
     logger.error({ err: error }, "runner.tick_failed");
+    Sentry.captureException(error);
   }
 }
 
@@ -50,6 +90,7 @@ async function main(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, env.RUNNER_TICK_MS));
   }
   await handle.sql.end({ timeout: 5 });
+  await Sentry.flush(2000).catch(() => undefined);
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

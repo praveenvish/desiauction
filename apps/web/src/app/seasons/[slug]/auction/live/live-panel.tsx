@@ -23,6 +23,7 @@ import { AuctionAnnouncer } from "../auction-announcer";
 import { GavelButton } from "../cockpit/gavel-button";
 import { LotHero } from "../lot-hero";
 import { PaddleControl } from "../paddle-control";
+import { evaluateLivePlan, planNameOf } from "../plan-live";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
@@ -338,6 +339,15 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
    * beside it, which already counted the engine's way.
    */
   const mySquadSigned = myPaddle === null ? 0 : (squadSizes[myPaddle.teamId] ?? 0);
+  // WR-1: the owner's plan, folded against THIS frame with the same squad and
+  // purse the raise button uses. Null for everyone who has none — and the
+  // payload never carried a rival's, so there is nothing here to hide.
+  const planState =
+    view.plan === undefined || myPaddle === null
+      ? null
+      : evaluateLivePlan(view.plan, myPaddle.teamId, snapshot, feed.resolved, mySquadSigned);
+  const planNames = (registrationId: string) =>
+    view.plan === undefined ? "a player" : planNameOf(view.plan, registrationId);
   /** The auction is not taking bids — paused, or over. */
   const notTakingBids = snapshot !== null && snapshot.auctionStatus !== "live";
   const finished =
@@ -407,6 +417,8 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
                   myPaddleNumber={myPaddle.paddleNumber}
                   myTeam={myTeam}
                   squadSigned={mySquadSigned}
+                  plan={planState}
+                  planNames={planNames}
                   disabled={readOnly || bidBusy}
                   onBid={(amount) => {
                     void bid(amount);
@@ -463,6 +475,8 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               myPaddleNumber={myPaddle.paddleNumber}
               rules={view.rules}
               feed={feed}
+              squadSize={squadSizes[myPaddle.teamId] ?? 0}
+              plan={planState}
             />
           ) : null}
           {/* Unconditional now: AuctionProgress renders its own connecting state,

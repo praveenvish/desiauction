@@ -37,7 +37,7 @@ function statusText(player: {
     // bid for them — and "Retained" on its own implies a retaining team there
     // is no record of. Say the thing that is actually true of them.
     return player.teamName !== null
-      ? `Retained by ${player.teamName}`
+      ? `Icon player for ${player.teamName}`
       : "Icon player — not in the auction";
   }
   return player.teamName !== null ? `Sold to ${player.teamName}` : "Sold";
@@ -165,6 +165,23 @@ export default async function PlayerProfilePage({
             player to share the thing built to be shared, and no way for the
             stranger who received it to join the tournament they were just shown.
             Both, now, and the CTA only while the door is open. */}
+        {/* PI-1: the same person's other published seasons IN THIS ORG — each
+            card covered by its own season's publication consent; cross-org
+            history never renders publicly (doc 38). */}
+        {player.alsoPlayedIn.length > 0 ? (
+          <section className="public-section" aria-labelledby="also-played-heading">
+            <h2 id="also-played-heading">Also played in</h2>
+            <ul className="player-also-played" data-testid="player-also-played">
+              {player.alsoPlayedIn.map((appearance) => (
+                <li key={appearance.competitionSlug}>
+                  <Link href={`/c/${appearance.competitionSlug}/p/${appearance.playerNumber}`}>
+                    {appearance.competitionName}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <section className="public-section" aria-labelledby="share-heading">
           <h2 id="share-heading" className="visually-hidden">
             Share and register

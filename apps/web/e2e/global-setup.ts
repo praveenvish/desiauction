@@ -42,6 +42,7 @@ const ROUTES = [
   "/seasons/warmup/standings",
   "/seasons/warmup/auction",
   "/seasons/warmup/auction/live",
+  "/seasons/warmup/auction/plan",
   "/seasons/warmup/auction/cockpit",
   "/seasons/warmup/auction/spectate",
   "/seasons/warmup/readiness",

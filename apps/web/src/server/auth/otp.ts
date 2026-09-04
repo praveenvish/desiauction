@@ -17,19 +17,30 @@ export function hashCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
 }
 
+/**
+ * What a code may prove (PI-1). Minted for one purpose, consumable for that
+ * purpose alone — before this, a code sent for sign-in could confirm a number
+ * change on the same phone, and vice versa. The default keeps every existing
+ * caller (and the protecting suites) on the login path unchanged.
+ */
+export type OtpPurpose = "login" | "phone_change";
+
 export type RequestOtpResult =
   { ok: true } | { ok: false; reason: "invalid-phone" | "cooldown" | "hourly-limit" };
 
 /**
  * Uniform behaviour for every plausible phone (no-enumeration, IP-2 §6):
  * signup is open, so a code goes to any valid Indian mobile; limits apply
- * identically whether or not the person exists.
+ * identically whether or not the person exists. The cooldown and hourly caps
+ * stay keyed by PHONE across purposes — a second purpose must never become a
+ * second, unthrottled lane to the same handset.
  */
 export async function requestOtp(
   db: Db,
   sender: OtpSender,
   rawPhone: string,
   requestIp: string | null = null,
+  purpose: OtpPurpose = "login",
 ): Promise<RequestOtpResult> {
   const normalized = normalizePhone(rawPhone);
   if (!normalized.ok) {
@@ -81,10 +92,23 @@ export async function requestOtp(
     id: newId(),
     phone,
     codeHash: hashCode(code),
+    purpose,
     expiresAt: new Date(now + CODE_TTL_MS),
     requestIp,
   });
   await sender.send(phone, code);
+  // PI-1 audit-gap closure: the request itself becomes ledger evidence — but
+  // only where a ledger exists. The lookup runs for every phone (identical
+  // path, no response difference, no oracle); only the write differs, exactly
+  // as the lockout event below already behaves.
+  const [requester] = await db
+    .select({ id: people.id })
+    .from(people)
+    .where(eq(people.phone, phone))
+    .limit(1);
+  if (requester !== undefined) {
+    await logSecurityEvent(requester.id, "auth.otp.requested", { purpose });
+  }
   return { ok: true };
 }
 
@@ -98,11 +122,18 @@ export async function requestOtp(
  * one different ending is how the cap quietly stops holding on one of the two
  * paths.
  */
-export async function consumeCode(db: Db, phone: string, code: string): Promise<ConsumeResult> {
+export async function consumeCode(
+  db: Db,
+  phone: string,
+  code: string,
+  purpose: OtpPurpose = "login",
+): Promise<ConsumeResult> {
   const [candidate] = await db
     .select()
     .from(otpCodes)
-    .where(and(eq(otpCodes.phone, phone), isNull(otpCodes.consumedAt)))
+    .where(
+      and(eq(otpCodes.phone, phone), eq(otpCodes.purpose, purpose), isNull(otpCodes.consumedAt)),
+    )
     .orderBy(desc(otpCodes.createdAt))
     .limit(1);
 

@@ -20,16 +20,22 @@ export default async function ReplayPage({ params }: { params: Promise<{ slug: s
         <header className="dash-head">
           <div className="competition-title-row">
             <h1>Replay viewer</h1>
-            <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
-              Cockpit
-            </ButtonLink>
-            <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
-              Ledger
-            </ButtonLink>
+            {/* One action group, hard right — the bare buttons sat at flex
+                extremes, scattering "Cockpit" into the middle of the page. */}
+            <div className="replay-head-actions">
+              <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
+                Cockpit
+              </ButtonLink>
+              <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
+                Ledger
+              </ButtonLink>
+            </div>
           </div>
           <p className="competitions-hint">
-            {data.auctionName} — pure visualization: fold the immutable log, observe every state,
-            compare against the live snapshot. No mutation exists on this page.
+            {/* Reader's words, not the implementation's: "fold the immutable
+                log" described the code to an organizer reviewing their night. */}
+            {data.auctionName} — step through the auction event by event, exactly as it was
+            recorded. Read-only: nothing on this page can change the record.
           </p>
         </header>
         <ReplayPanel data={data} />

@@ -26,10 +26,19 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   } catch {
     dbOk = false;
   }
+  // PRR P1-1: surface the rehearsal escape so a monitor (or a human) can see at
+  // a glance that an instance is running with development adapters. It is a
+  // POSTURE signal, not a dependency check: it does NOT flip status/HTTP (a
+  // rehearsal server must stay in rotation), but it reads as a non-ok check so
+  // an insecure instance can never masquerade as a clean production one.
+  const insecure = env.ALLOW_INSECURE_LOCAL_PRODUCTION && env.NODE_ENV === "production";
   const body: HealthResponse = {
     status: dbOk ? "ok" : "fail",
     version: env.APP_VERSION,
-    checks: { db: dbOk ? "ok" : "fail" },
+    checks: {
+      db: dbOk ? "ok" : "fail",
+      ...(insecure ? { insecure_local_production: "fail" as const } : {}),
+    },
   };
   return NextResponse.json(body, { status: dbOk ? 200 : 503 });
 }

@@ -844,6 +844,15 @@ async function executeIssue(
   options: { partyLabel?: string; corrects?: string; reason?: string } = {},
 ): Promise<FinopsAck> {
   const orgId = executorOrg(executor);
+  // Object-level scoping (PRR P1-1): the target series is a caller-supplied id.
+  // `issueCorrection` already checks `original.orgId !== actor.orgId`; the issue
+  // paths did not, so a caller could aim a document at another org's series.
+  // This is the same ownership check at the one chokepoint every issue funnels
+  // through, and it does not rely on RLS being live.
+  const series = await deps.store.loadSeries(seriesId);
+  if (series === null || series.orgId !== orgId) {
+    return { ok: false, reason: "series_unknown" };
+  }
   const assembled = await assembleIssue(deps, orgId, quote, options.partyLabel);
   if ("ok" in assembled) {
     return assembled;

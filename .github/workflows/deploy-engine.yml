@@ -10,6 +10,10 @@ on:
       - "apps/engine/**"
       - "packages/core/**"
       - "packages/contracts/**"
+      # The engine's write path and schema live here too; a change to either
+      # must redeploy the engine or it runs against a stale aggregate/schema.
+      - "packages/auction/**"
+      - "packages/db/**"
       - "pnpm-lock.yaml"
   workflow_dispatch:
     inputs:

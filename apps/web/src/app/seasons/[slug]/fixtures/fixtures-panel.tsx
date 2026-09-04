@@ -914,7 +914,17 @@ export function FixturesPanel({
               {page.rows.length === 0 ? (
                 <tr>
                   <td colSpan={canManage ? 6 : 5} className="dash-hint">
-                    No fixtures match these filters.
+                    {/* Same DA-35 rule the registration desk follows: blaming
+                        filters nobody applied is a dead end — a season with no
+                        fixtures yet gets its actual next step instead. */}
+                    {filters.status !== "" ||
+                    filters.team !== "" ||
+                    filters.ground !== "" ||
+                    filters.q !== ""
+                      ? "No fixtures match these filters."
+                      : canManage
+                        ? "No fixtures yet — generate a round robin above, or add one match at a time."
+                        : "No fixtures yet. The organizer hasn't scheduled any matches."}
                   </td>
                 </tr>
               ) : null}

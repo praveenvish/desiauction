@@ -62,6 +62,7 @@ export function grantedLine(grantedByName: string | null, grantedAt: string | nu
     grantedAt === null
       ? null
       : new Date(grantedAt).toLocaleDateString("en-IN", {
+          timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
           day: "numeric",
           month: "short",
           year: "numeric",

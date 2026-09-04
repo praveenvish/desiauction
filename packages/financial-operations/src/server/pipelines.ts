@@ -107,25 +107,26 @@ export async function assembleDispatchBody(
 /** Discover `requested` dispatches and enqueue their send jobs (derived keys). */
 export async function enqueueDispatchSends(deps: FinopsDeps, nowMs: number): Promise<number> {
   let enqueued = 0;
-  for (const orgId of await deps.orgs.listOrgIds()) {
-    for (const dispatch of await deps.store.loadDispatchesByStatus(orgId, "requested")) {
-      const inserted = await deps.store.transact(async (tx) =>
-        tx.enqueueJob({
-          jobId: deps.newId(),
-          orgId,
-          kind: "dispatch.send",
-          dedupeKey: `dispatch.send:${dispatch.dispatchId}`,
-          state: "queued",
-          attempts: 0,
-          maxAttempts: DEFAULT_MAX_ATTEMPTS,
-          notBeforeMs: nowMs,
-          leasedUntilMs: null,
-          lastError: null,
-          payload: { dispatchId: dispatch.dispatchId },
-        }),
-      );
-      enqueued += inserted ? 1 : 0;
-    }
+  // Asks for the WORK, not for the tenants. Enumerating organizations to find
+  // it cost a query per org on every tick, whether or not that org had ever
+  // sent anything — see `listRequestedDispatches` in ports.ts.
+  for (const { dispatchId, orgId } of await deps.store.listRequestedDispatches()) {
+    const inserted = await deps.store.transact(async (tx) =>
+      tx.enqueueJob({
+        jobId: deps.newId(),
+        orgId,
+        kind: "dispatch.send",
+        dedupeKey: `dispatch.send:${dispatchId}`,
+        state: "queued",
+        attempts: 0,
+        maxAttempts: DEFAULT_MAX_ATTEMPTS,
+        notBeforeMs: nowMs,
+        leasedUntilMs: null,
+        lastError: null,
+        payload: { dispatchId },
+      }),
+    );
+    enqueued += inserted ? 1 : 0;
   }
   return enqueued;
 }
@@ -327,28 +328,25 @@ export async function retryDispatch(
 /** Discover `requested` exports and enqueue their generation jobs. */
 export async function enqueueExportGenerations(deps: FinopsDeps, nowMs: number): Promise<number> {
   let enqueued = 0;
-  for (const orgId of await deps.orgs.listOrgIds()) {
-    for (const run of await deps.store.loadExportsByOrg(orgId)) {
-      if (run.status !== "requested") {
-        continue;
-      }
-      const inserted = await deps.store.transact(async (tx) =>
-        tx.enqueueJob({
-          jobId: deps.newId(),
-          orgId,
-          kind: "export.generate",
-          dedupeKey: `export.generate:${run.exportId}`,
-          state: "queued",
-          attempts: 0,
-          maxAttempts: DEFAULT_MAX_ATTEMPTS,
-          notBeforeMs: nowMs,
-          leasedUntilMs: null,
-          lastError: null,
-          payload: { exportId: run.exportId },
-        }),
-      );
-      enqueued += inserted ? 1 : 0;
-    }
+  // As above: the status filter is the query, not a per-org scan followed by a
+  // client-side `status !== "requested"` skip over every export ever run.
+  for (const { exportId, orgId } of await deps.store.listRequestedExports()) {
+    const inserted = await deps.store.transact(async (tx) =>
+      tx.enqueueJob({
+        jobId: deps.newId(),
+        orgId,
+        kind: "export.generate",
+        dedupeKey: `export.generate:${exportId}`,
+        state: "queued",
+        attempts: 0,
+        maxAttempts: DEFAULT_MAX_ATTEMPTS,
+        notBeforeMs: nowMs,
+        leasedUntilMs: null,
+        lastError: null,
+        payload: { exportId },
+      }),
+    );
+    enqueued += inserted ? 1 : 0;
   }
   return enqueued;
 }

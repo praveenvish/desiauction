@@ -132,29 +132,41 @@ export default async function TournamentsPage({
     </FormDialog>
   );
 
+  /* A person whose seasons are all one-offs was greeted by "0 Tournaments" in
+     the accent tile — over a list of things they created from a button called
+     "+ New tournament". Zero recurring brands is not the headline of a page
+     with seasons on it: Seasons leads in that case, and the tournament tile
+     explains itself instead of shouting the zero. */
+  const hasTournaments = view.totals.tournaments > 0;
+  const tournamentsTile = (
+    <Stat
+      icon={<IconTrophy />}
+      value={count(view.totals.tournaments)}
+      label="Tournaments"
+      hint={hasTournaments ? "Total" : "None yet — your seasons are one-offs"}
+      tone={hasTournaments ? "accent" : "neutral"}
+    />
+  );
+  const seasonsTile = (
+    <Stat
+      icon={<IconCalendar />}
+      value={count(view.totals.seasons)}
+      label="Seasons"
+      /* Not "Across all tournaments": some of these belong to no
+         tournament at all, and the page renders that group two
+         inches below. The hint says what the figure actually is. */
+      hint={
+        view.totals.standalone === 0
+          ? "Across all tournaments"
+          : `${count(view.totals.seasons - view.totals.standalone)} in tournaments · ${count(view.totals.standalone)} one-off`
+      }
+      tone={hasTournaments ? "info" : "accent"}
+    />
+  );
   const bandGrouped = (
     <StatRow label="Tournament summary">
-      <Stat
-        icon={<IconTrophy />}
-        value={count(view.totals.tournaments)}
-        label="Tournaments"
-        hint="Total"
-        tone="accent"
-      />
-      <Stat
-        icon={<IconCalendar />}
-        value={count(view.totals.seasons)}
-        label="Seasons"
-        /* Not "Across all tournaments": some of these belong to no
-           tournament at all, and the page renders that group two
-           inches below. The hint says what the figure actually is. */
-        hint={
-          view.totals.standalone === 0
-            ? "Across all tournaments"
-            : `${count(view.totals.seasons - view.totals.standalone)} in tournaments · ${count(view.totals.standalone)} one-off`
-        }
-        tone="info"
-      />
+      {hasTournaments ? tournamentsTile : seasonsTile}
+      {hasTournaments ? seasonsTile : tournamentsTile}
       <Stat
         icon={<IconUsers />}
         value={count(view.totals.teams)}

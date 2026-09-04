@@ -45,18 +45,17 @@ export const HELP_CATEGORIES: readonly HelpCategory[] = [
     description: "Prepare the room and conduct the live auction.",
   },
   {
-    slug: "settlement",
-    title: "Settlement guide",
-    description: "Record collections, handle waivers, and close the case.",
-  },
-  {
-    slug: "finops",
-    title: "Financial operations guide",
-    // Was "Receipts, invoices, exports, and closing the books" — three of those
-    // four cannot be done: the issuance lane refuses to issue an invoice, no
-    // screen reaches the exporter, and there is no fiscal close. The article
-    // itself has said so correctly since its rewrite; the category blurb did not.
-    description: "Declare your profile, issue receipts, and keep a sealed document register.",
+    // Was two single-article sections — "Settlement guide" and "Financial
+    // operations guide" — each a full heading plus lead for one card, which
+    // stretched an eight-section index most of a screen for two entries. One
+    // money section now holds both articles. The description keeps the finops
+    // blurb's honesty rule: it names only what a screen can actually do (the
+    // issuance lane still refuses invoices, no screen reaches the exporter,
+    // and there is no fiscal close).
+    slug: "money",
+    title: "Money & records",
+    description:
+      "Record collections, handle waivers, issue receipts, and keep a sealed document register.",
   },
 ];
 
@@ -834,7 +833,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     slug: "money-after-the-gavel",
     title: "Money after the gavel: collections, waivers, closing the case",
     summary: "The settlement desk — recording money in, adjusting, and closing.",
-    category: "settlement",
+    category: "money",
     readMinutes: 6,
     blocks: [
       { kind: "heading", level: 2, text: "The case opens itself" },
@@ -885,7 +884,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     // when a real operator can perform it from a real screen.
     title: "Receipts and your document register",
     summary: "Issue receipts, keep a sealed record, and check that it still reproduces.",
-    category: "finops",
+    category: "money",
     readMinutes: 4,
     blocks: [
       { kind: "heading", level: 2, text: "Declare your profile first" },

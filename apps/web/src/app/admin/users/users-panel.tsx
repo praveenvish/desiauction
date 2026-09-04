@@ -11,9 +11,12 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
   const nextHref =
     nextCursor === null
       ? null
-      : `/admin/users?${new URLSearchParams(
-          query === "" ? { after: nextCursor } : { q: query, after: nextCursor },
-        ).toString()}`;
+      : `/admin/users?${new URLSearchParams({
+          ...(query === "" ? {} : { q: query }),
+          // PI-1 P6: the facet must survive the page turn or "Next 50" resets it.
+          ...(directory.filter === "all" ? {} : { filter: directory.filter }),
+          after: nextCursor,
+        }).toString()}`;
   return (
     <>
       <ReadOnlyNotice />
@@ -31,6 +34,23 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
               placeholder="Name or mobile number"
               className="admin-search-input"
             />
+          </div>
+          {/* PI-1 P6: profile-aware facet. URL-driven like every admin filter. */}
+          <div>
+            <label className="stat-label" htmlFor="admin-user-filter">
+              Show
+            </label>
+            <select
+              id="admin-user-filter"
+              name="filter"
+              defaultValue={directory.filter}
+              className="admin-search-input"
+              data-testid="admin-user-filter"
+            >
+              <option value="all">Everyone</option>
+              <option value="players">Players (has a registration)</option>
+              <option value="profiled">With a cricket profile</option>
+            </select>
           </div>
           <button type="submit" className="admin-search-submit">
             Search

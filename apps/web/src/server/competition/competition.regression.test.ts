@@ -9,6 +9,7 @@ import {
   auctions as auctionsTable,
   competitions as competitionsTable,
   createDb,
+  franchises as franchisesTable,
   grants as grantsTable,
   newId,
   organizations,
@@ -35,7 +36,7 @@ import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import { resolvePassRequest } from "./pass-grant";
-import { publicCompetitionsDirectory } from "./public";
+import { publicCompetitionsDirectory, publicShowcase } from "./public";
 import {
   advanceCompetition,
   cloneCompetition,
@@ -109,6 +110,7 @@ afterAll(async () => {
       .where(inArray(passUpgradeRequestsTable.orgId, orgIds));
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));
     await db.delete(teamsTable).where(inArray(teamsTable.orgId, orgIds));
+    await db.delete(franchisesTable).where(inArray(franchisesTable.orgId, orgIds));
     await db.delete(auctionEventsTable).where(inArray(auctionEventsTable.orgId, orgIds));
     await db.delete(auctionsTable).where(inArray(auctionsTable.orgId, orgIds));
     await db.delete(competitionsTable).where(inArray(competitionsTable.orgId, orgIds));
@@ -632,6 +634,26 @@ describe("COMPETITION REGRESSION — domain contract", () => {
       .from(auditLog)
       .where(eq(auditLog.subject, cloned.competition.id));
     expect(audit.some((a) => a.action === "competition.cloned")).toBe(true);
+
+    // PI-1 P6: the clone is the moment a team becomes a FRANCHISE — source and
+    // clone rows now share one durable identity, created on first clone and
+    // back-linked onto the source (so the FIRST edition joins the family too).
+    const sourceRows = await db
+      .select({ name: teamsTable.name, franchiseId: teamsTable.franchiseId })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, source.id));
+    const cloneRows = await db
+      .select({ name: teamsTable.name, franchiseId: teamsTable.franchiseId })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, cloned.competition.id));
+    for (const sourceRow of sourceRows) {
+      expect(sourceRow.franchiseId).not.toBeNull();
+      expect(cloneRows.find((t) => t.name === sourceRow.name)?.franchiseId).toBe(
+        sourceRow.franchiseId,
+      );
+    }
+    // Distinct teams stay distinct franchises.
+    expect(new Set(sourceRows.map((t) => t.franchiseId)).size).toBe(sourceRows.length);
   });
 
   it("the outcomes projection reads live audit events back (Outcome Governance)", async () => {
@@ -822,5 +844,60 @@ describe("COMPETITION REGRESSION — domain contract", () => {
       await handle.sql.unsafe(`drop owned by ${role}`);
       await handle.sql.unsafe(`drop role if exists ${role}`);
     }
+  });
+});
+
+describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", () => {
+  it("suppresses age and photo for an under-18 player, keeps them for an adult", async () => {
+    const competition = await createCompetition(db, orgX.id, owner, { name: `Minors ${RUN}` });
+    await db
+      .update(competitionsTable)
+      .set({ visibility: "public" })
+      .where(eq(competitionsTable.id, competition.id));
+
+    // Two approved players, both with a photo AND photo consent on file, so the
+    // ONLY thing that can withhold the minor's photo is the age gate itself.
+    const minor = { id: newId(), phone: `+9193${RUN}01`, name: `Minor ${RUN}` };
+    const adult = { id: newId(), phone: `+9193${RUN}02`, name: `Adult ${RUN}` };
+    await db.insert(people).values([
+      { ...minor, photoUrl: `k/${minor.id}.jpg`, photoConsentAt: new Date() },
+      { ...adult, photoUrl: `k/${adult.id}.jpg`, photoConsentAt: new Date() },
+    ]);
+    await db.insert(registrationsTable).values([
+      {
+        id: newId(),
+        orgId: orgX.id,
+        competitionId: competition.id,
+        personId: minor.id,
+        role: "batter" as const,
+        status: "approved" as const,
+        registrationNumber: `MN${RUN.slice(-3)}001`,
+        dateOfBirth: "2015-01-01", // ~11 in 2026
+      },
+      {
+        id: newId(),
+        orgId: orgX.id,
+        competitionId: competition.id,
+        personId: adult.id,
+        role: "bowler" as const,
+        status: "approved" as const,
+        registrationNumber: `MN${RUN.slice(-3)}002`,
+        dateOfBirth: "1995-01-01", // ~31 in 2026
+      },
+    ]);
+
+    const pool = await publicShowcase(competition.slug);
+    const minorRow = pool?.players.find((p) => p.name === minor.name);
+    const adultRow = pool?.players.find((p) => p.name === adult.name);
+
+    // The minor: no age, no photo — even though consent is on file.
+    expect(minorRow?.age).toBeNull();
+    expect(minorRow?.photoUrl).toBeNull();
+    // The adult, as a control: age derived, photo published.
+    expect(adultRow?.age).toBeGreaterThanOrEqual(30);
+    expect(adultRow?.photoUrl).not.toBeNull();
+
+    await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
+    await db.delete(people).where(inArray(people.id, [minor.id, adult.id]));
   });
 });

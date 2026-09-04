@@ -27,9 +27,9 @@ const silentLogger = pino({ level: "silent" });
 const VALID_ID = "0f9a1c2e-4b6d-4f8a-9c1e-2d3b4a5c6d7e";
 
 // A stub engine: the transport tests need shape, not behavior.
-function stubEngine(): AuctionEngine {
+function stubEngine(lastTickMs = 0): AuctionEngine {
   return {
-    lastTickMs: 0,
+    lastTickMs,
     tickDriftMs: 0,
     submit: () =>
       Promise.resolve({ commandId: "c", accepted: false, reason: "unknown_auction", version: 0 }),
@@ -41,12 +41,12 @@ function stubEngine(): AuctionEngine {
   } as unknown as AuctionEngine;
 }
 
-function makeServer(dbOk: boolean) {
+function makeServer(dbOk: boolean, lastTickMs = 0) {
   return buildServer({
     logger: silentLogger,
     version: "test",
     checkDb: () => Promise.resolve(dbOk),
-    engine: stubEngine(),
+    engine: stubEngine(lastTickMs),
     engineSecret: "test-secret-123",
     nodeEnv: "test",
   });
@@ -59,21 +59,34 @@ describe("engine transport", () => {
     await built?.server.close();
   });
 
-  it("healthz returns 200 with a contract-valid body when checks pass", async () => {
+  it("healthz returns 200 with a contract-valid body when the watchdog is ticking", async () => {
     built = makeServer(true);
     const response = await built.server.inject({ method: "GET", url: "/healthz" });
     expect(response.statusCode).toBe(200);
     const body = healthResponseSchema.parse(response.json());
     expect(body.status).toBe("ok");
-    expect(body.checks["db"]).toBe("ok");
     expect(body.checks["watchdog"]).toBe("ok");
   });
 
-  it("fails closed with 503 when the db check fails", async () => {
+  it("healthz stays ALIVE (200) even when the DB is down — liveness is not readiness (PRR F45)", async () => {
+    // A DB blip must not make the orchestrator KILL a healthy engine mid-auction.
+    // Liveness reflects only the watchdog; DB reachability gates /readyz instead.
     built = makeServer(false);
     const response = await built.server.inject({ method: "GET", url: "/healthz" });
-    expect(response.statusCode).toBe(503);
-    expect(healthResponseSchema.parse(response.json()).status).toBe("fail");
+    expect(response.statusCode).toBe(200);
+    expect(healthResponseSchema.parse(response.json()).status).toBe("ok");
+  });
+
+  it("readyz is 503 when the DB is down, 200 when it is up and ticking (routing gate)", async () => {
+    const down = makeServer(false, Date.now());
+    const downRes = await down.server.inject({ method: "GET", url: "/readyz" });
+    expect(downRes.statusCode).toBe(503);
+    await down.server.close();
+
+    built = makeServer(true, Date.now());
+    const upRes = await built.server.inject({ method: "GET", url: "/readyz" });
+    expect(upRes.statusCode).toBe(200);
+    expect(healthResponseSchema.parse(upRes.json()).status).toBe("ok");
   });
 
   it("commands without the shared secret are 401; malformed commands are 400", async () => {

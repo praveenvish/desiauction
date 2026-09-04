@@ -96,7 +96,9 @@ export const RELEASES: readonly ReleaseNote[] = [
   {
     version: "Beta · Foundation",
     title: "Identity, the shell and the auction engine",
-    date: "2026",
+    // A span, not a missing month: every entry above carries "Jul 2026"-style
+    // dates and a bare "2026" scanned as a rendering bug.
+    date: "Through 2026",
     highlights: [
       "Phone-first sign-in with passkeys, and the grants-not-roles authorization model.",
       "The product shell: one navigation model across public, console and live surfaces.",

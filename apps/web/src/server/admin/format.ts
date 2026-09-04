@@ -14,6 +14,13 @@ export function formatCount(value: number): string {
 }
 
 /**
+ * Counted nouns live in `lib/plural` — the readiness gates need the same
+ * speller, and they must not import out of `server/admin`. Re-exported here so
+ * this module stays the one place admin code looks for formatting.
+ */
+export { countNoun } from "../../lib/plural";
+
+/**
  * A waiting time in words. Deliberately coarse: an operator needs "is this
  * stuck?", and "11 days" answers that where "1,558" never did.
  */
@@ -31,6 +38,33 @@ export function waitedFor(ms: number): string {
   }
   const days = Math.floor(hours / 24);
   return days === 1 ? "1 day" : `${String(days)} days`;
+}
+
+/**
+ * The zero ULID every machine-derived audit row is signed with — the same
+ * sentinel `settlement/writer.ts` writes as SYSTEM_ACTOR.
+ */
+const SYSTEM_ACTOR = "00000000000000000000000000";
+
+/**
+ * Who did it, for a screen.
+ *
+ * Both admin feeds rendered `actorName ?? actor.slice(-6)`, and a lot the timer
+ * closed or a sweep the coordinator ran has no person behind it — so the
+ * Overview read "auction.LotSold by 000000" and the audit trail linked those
+ * zeros to a /admin/users page that deliberately 404s. The platform IS the
+ * actor there, and saying so is both shorter and true.
+ */
+export function actorLabel(actor: string, actorName: string | null): string {
+  if (actorName !== null && actorName !== "") {
+    return actorName;
+  }
+  return actor === SYSTEM_ACTOR ? "the platform" : actor.slice(-6);
+}
+
+/** True when the row was written by the platform itself, not by a person. */
+export function isSystemActor(actor: string): boolean {
+  return actor === SYSTEM_ACTOR;
 }
 
 /**

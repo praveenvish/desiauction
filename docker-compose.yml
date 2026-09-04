@@ -13,8 +13,38 @@ services:
   db:
     image: postgres:17-alpine
     container_name: desiauction-postgres
+    # REAP DEAD PEERS, OR THE ENGINE CANNOT RESTART.
+    #
+    # The engine's single-writer lease is a SESSION-level advisory lock, released
+    # when the connection closes. A killed process closes it (the kernel does
+    # that), but a connection SEVERED without a close does not: a VM restart, a
+    # laptop sleeping, an expired NAT entry. Postgres hears nothing and keeps
+    # honouring a backend whose peer is gone. Observed 2026-08-31 after a Docker
+    # Desktop restart: four hours held, every replacement refused to boot
+    # (apps/engine/src/single-writer.ts).
+    #
+    # These probes are what makes the "released automatically" promise true:
+    # after 30s idle, probe every 10s, give up after 3 — so an orphan is reaped
+    # in ~60s instead of never. Every deployed database needs the same setting;
+    # see docs/operations/DEPLOYMENT.md.
+    command:
+      - postgres
+      - -c
+      - tcp_keepalives_idle=30
+      - -c
+      - tcp_keepalives_interval=10
+      - -c
+      - tcp_keepalives_count=3
+    # 5433 is this project's port and stays the default — CI service containers,
+    # the docs and every test fallback name it. But a laptop runs more than one
+    # project, and when something else takes 5433 the answer must not be "stop
+    # the other thing" or "renumber ours everywhere". Set DB_PORT in the shell
+    # (or in a root `.env`, which compose reads) and point DATABASE_URL at the
+    # same number:
+    #
+    #   DB_PORT=5436 docker compose up -d
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     environment:
       POSTGRES_USER: desiauction
       POSTGRES_PASSWORD: desiauction

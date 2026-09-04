@@ -92,3 +92,75 @@ function groupIndian(digits: string): string {
   groups.unshift(head);
   return `${groups.join(",")},${last3}`;
 }
+
+/**
+ * A FEE AS A PERSON WROTE IT, IN PAISE.
+ *
+ * `parsePaise` is deliberately fail-closed and bijective with `serializePaise`
+ * — it reads OUR canonical integer and nothing else, which is exactly right for
+ * a serialized value. It is exactly wrong for a spreadsheet cell, where an
+ * entry fee arrives as "500", "₹500", "1,500.00" or "500 /-".
+ *
+ * So this is a separate door, and it stays a separate door: nothing that reads
+ * a stored amount should become tolerant, and nothing tolerant should be used
+ * to read one back.
+ *
+ * RUPEES ARE THE UNIT ON THE PAGE. A club writes an entry fee in rupees, so a
+ * bare "500" means five hundred rupees and returns 50000 paise. At most two
+ * decimal places; a third is a typo we refuse rather than round, because
+ * silently dropping a digit off money is the one failure nobody forgives.
+ */
+export function parseRupeesToPaise(input: string): ParsePaiseResult {
+  const cleaned = input
+    .trim()
+    .replace(/^(₹|rs\.?|inr)\s*/i, "")
+    .replace(/\s*(\/-|only)$/i, "")
+    .replace(/,/g, "")
+    .trim();
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(cleaned);
+  if (match === null) {
+    return { ok: false, reason: "invalid" };
+  }
+  const rupees = Number(match[1]);
+  const fraction = (match[2] ?? "").padEnd(2, "0");
+  const total = rupees * 100 + Number(fraction);
+  if (!Number.isSafeInteger(total)) {
+    return { ok: false, reason: "invalid" };
+  }
+  return { ok: true, value: paise(total) };
+}
+
+/** Fee states a registration desk records. */
+export const FEE_STATUSES = ["pending", "paid", "waived", "refunded"] as const;
+export type FeeStatus = (typeof FEE_STATUSES)[number];
+
+const FEE_STATUS_ALIASES: Record<FeeStatus, readonly string[]> = {
+  pending: ["pending", "unpaid", "not paid", "due", "no", "n", "0", "false"],
+  paid: ["paid", "yes", "y", "done", "received", "cleared", "1", "true", "complete"],
+  waived: ["waived", "waiver", "free", "exempt", "complimentary", "comp"],
+  refunded: ["refunded", "refund", "returned"],
+};
+
+const FEE_STATUS_BY_KEY: ReadonlyMap<string, FeeStatus> = new Map(
+  FEE_STATUSES.flatMap((status) =>
+    [status, ...FEE_STATUS_ALIASES[status]].map(
+      (alias) => [alias.toLowerCase().replace(/[\s\-_]+/g, ""), status] as const,
+    ),
+  ),
+);
+
+/**
+ * Read a fee state the way a form records it — a "Paid?" column answered "Yes"
+ * is the commonest shape there is. Null for anything unplaceable, so the caller
+ * reports rather than defaulting someone to `paid`.
+ */
+export function parseFeeStatus(value: string): FeeStatus | null {
+  return (
+    FEE_STATUS_BY_KEY.get(
+      value
+        .trim()
+        .toLowerCase()
+        .replace(/[\s\-_]+/g, ""),
+    ) ?? null
+  );
+}

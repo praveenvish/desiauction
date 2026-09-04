@@ -401,6 +401,25 @@ p + .date-row {
   color: var(--text-heading);
 }
 
+/* A full purse — "₹2,00,00,000", eleven mono glyphs — overran its tile on a
+   390px screen and the border clipped the rupees mid-figure. Money is never
+   truncated: the figure steps down where tiles share a phone, twice on the
+   narrowest tier (two ~150px tiles cannot hold eleven 20px mono glyphs
+   either — measured, not guessed). */
+@media (max-width: 519px) {
+  .stat-value {
+    font-size: var(--text-xl-size);
+    line-height: var(--text-xl-line);
+  }
+}
+
+@media (max-width: 439px) {
+  .stat-value {
+    font-size: var(--text-lg-size);
+    line-height: var(--text-lg-line);
+  }
+}
+
 .stat-label {
   font-size: var(--text-sm-size);
   color: var(--text-muted);
@@ -1140,6 +1159,10 @@ p + .date-row {
   cursor: pointer;
   text-align: left;
   border-radius: var(--radius-md);
+  /* The whole tile is the target, so the UA's underline landed under the big
+     numeral and made a linked tile read as an anomaly beside its unlinked
+     neighbours. Hover and focus carry the affordance instead. */
+  text-decoration: none;
 }
 
 .stat-tile-link:focus-visible {
@@ -1405,6 +1428,16 @@ p + .date-row {
 @media (max-width: 520px) {
   .season-stepper {
     display: none;
+  }
+
+  /* With the rail hidden, `space-between` had two items and one line to put
+     them on: the summary took the left and "Review readiness" was pushed to
+     the right, where it wrapped and read as an indented orphan under a gap.
+     Two stacked left-aligned lines is what the card actually is on a phone. */
+  .season-stepper-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
   }
 }
 
@@ -3111,4 +3144,16 @@ p + .date-row {
     animation-duration: var(--duration-base);
     animation-timing-function: var(--ease-out);
   }
+}
+
+/* PI-1: the triage drawer's "seen before in your club" list. */
+.reg-person-history {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
 }

@@ -495,6 +495,16 @@
   color: var(--text-muted);
 }
 
+/* The badge pair travels as one unit so the phone tier can move it below the
+   name. On desktop it is indistinguishable from the two loose badges it
+   replaced. */
+.tg-season-badges {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .tg-season-when,
 .tg-season-where {
   flex: none;
@@ -711,6 +721,41 @@
 
   .tg-kebab {
     margin-left: auto;
+  }
+
+  /* The season row itself never got the same courtesy as the header above: two
+     unshrinkable badges left the name ~110px of a 358px row, so "Demo Premier
+     League" fell one word per line with the badge painted over it. On a phone
+     the row becomes a two-line grid — name (and org, and compact date) beside
+     the glyph and arrow, badges on their own line underneath, each line free
+     to breathe. Desktop keeps the flex row untouched. */
+  .tg-season {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: var(--space-2);
+  }
+
+  .tg-season-glyph {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .tg-season-id {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .tg-season-badges {
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+
+  .tg-season-go {
+    grid-row: 1;
+    grid-column: 3;
   }
 }
 

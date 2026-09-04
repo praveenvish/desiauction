@@ -278,15 +278,21 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
   });
   const hub = createWsHub(deps.engine, deps.logger);
 
-  server.get("/healthz", async (_request, reply) => {
-    const dbOk = await deps.checkDb();
+  server.get("/healthz", (_request, reply) => {
+    // LIVENESS, not readiness (PRR P2/F45). This gated on the DB, so a database
+    // blip returned 503 and the orchestrator would KILL a healthy engine
+    // mid-auction — dropping every live socket for a transient upstream hiccup.
+    // Liveness must answer only "is this process alive and its watchdog
+    // ticking"; DB reachability belongs to /readyz, which pulls the instance
+    // from ROUTING without killing it. A liveness probe also must not hammer the
+    // DB on every poll, so it no longer touches it at all.
     const stalled = deps.engine.lastTickMs !== 0 && Date.now() - deps.engine.lastTickMs > 5_000;
     const body: HealthResponse = {
-      status: dbOk && !stalled ? "ok" : "fail",
+      status: stalled ? "fail" : "ok",
       version: deps.version,
-      checks: { db: dbOk ? "ok" : "fail", watchdog: stalled ? "fail" : "ok" },
+      checks: { watchdog: stalled ? "fail" : "ok" },
     };
-    return reply.status(dbOk && !stalled ? 200 : 503).send(body);
+    return reply.status(stalled ? 503 : 200).send(body);
   });
 
   /**

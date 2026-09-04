@@ -988,22 +988,23 @@
   color: var(--text-secondary);
 }
 
+/* This banner carries one piece of good news — "you're leading this lot" — and
+   three refusals. It used to wear success green for all four, so "Your squad is
+   full." read as a confirmation. The refusal is the default now and only the
+   lead earns the green: a state that says no should never be dressed as a yes. */
 .paddle-leading {
   margin: var(--space-2) 0 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--success-base) 14%, transparent);
-  color: var(--success-base);
+  background: color-mix(in srgb, var(--warning-base, var(--text-secondary)) 14%, transparent);
+  color: var(--text-primary);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
 }
 
-/* The stopped clock is not good news, so it does not wear the success green
-   that "you're leading this lot" earns. */
-.paddle-leading[data-reason="paused"],
-.paddle-frozen {
-  background: color-mix(in srgb, var(--warning-base, var(--text-secondary)) 14%, transparent);
-  color: var(--text-primary);
+.paddle-leading[data-reason="leading"] {
+  background: color-mix(in srgb, var(--success-base) 14%, transparent);
+  color: var(--success-base);
 }
 
 /* The hero's countdown ring is replaced by this while the clock is stopped —
@@ -1061,8 +1062,14 @@
   outline-offset: 2px;
 }
 
+/* Fading pressed gold to 55% still leaves a gold button under a full purse and
+   a full squad — it reads as pressable and invites the click it will refuse.
+   A control that cannot act stops looking like the control that can. */
 .paddle-raise:disabled {
-  opacity: 0.55;
+  background: var(--surface-sunken, var(--surface-muted));
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -1117,7 +1124,10 @@
 }
 
 .paddle-jump-chip:disabled {
-  opacity: 0.5;
+  background: var(--surface-sunken);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+  text-decoration: line-through;
   cursor: not-allowed;
 }
 
@@ -2409,4 +2419,12 @@
   to {
     transform: perspective(600px) rotateX(0deg) translateY(0) scale(1);
   }
+}
+
+/* Replay header: the two sibling links travel as one group so the title row's
+   space-between puts THEM hard right instead of scattering one to the middle. */
+.replay-head-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }

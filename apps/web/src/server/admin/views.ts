@@ -8,6 +8,7 @@ import {
   organizations,
   orgMembers,
   people,
+  registrations,
   settlementCases,
   suppressions,
   type Db,
@@ -43,7 +44,7 @@ import {
 
 import { SMS_TEMPLATES } from "../messaging/templates";
 import { ADMIN_ACCESS_ACTION } from "./capabilities";
-import { formatCount, waitedFor } from "./format";
+import { countNoun, waitedFor } from "./format";
 
 /**
  * PX-9 read composition — the Platform Administration projections.
@@ -266,20 +267,22 @@ export async function runnerVerdictOf(
     jobs.oldestQueuedWaitMs !== null && jobs.oldestQueuedWaitMs > RUNNER_FRESHNESS_BUDGET_MS;
   const reasons: string[] = [];
   if (jobs.dead > 0) {
-    reasons.push(`${String(jobs.dead)} job(s) given up`);
+    reasons.push(`${countNoun(jobs.dead, "job")} given up`);
   }
   if (stalled && jobs.oldestQueuedWaitMs !== null) {
     reasons.push(
-      `${String(jobs.queued)} job(s) waiting, nothing picked up for ${waitedFor(jobs.oldestQueuedWaitMs)}`,
+      `${countNoun(jobs.queued, "job")} waiting, nothing picked up for ${waitedFor(jobs.oldestQueuedWaitMs)}`,
     );
   }
   if (overdueSchedules > 0) {
-    reasons.push(`${String(overdueSchedules)} schedule(s) overdue`);
+    reasons.push(`${countNoun(overdueSchedules, "schedule")} overdue`);
   }
   if (futureSchedules > 0) {
     // Not a health failure of its own, but it must be SAID: a last-fire in the
     // future means the recorded time cannot be trusted as evidence either way.
-    reasons.push(`${String(futureSchedules)} schedule(s) report a last fire in the future`);
+    reasons.push(
+      `${countNoun(futureSchedules, "schedule")} report${futureSchedules === 1 ? "s" : ""} a last fire in the future`,
+    );
   }
   return {
     healthy: jobs.dead === 0 && !stalled && overdueSchedules === 0,
@@ -354,7 +357,17 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
     auctionsByStatusOf(db),
     casesByStatusOf(db),
     runnerHealthSnapshot(deps),
-    recentActivity(db, 12, [ADMIN_ACCESS_ACTION]),
+    // Sign-in chatter excluded from the LANDING feed only: every login writes
+    // two auth rows, so the Overview's "recent platform activity" was fourteen
+    // lines of people signing in and zero lines of the platform doing
+    // anything. The audit explorer still shows every one of them — this is the
+    // same disclosure-not-concealment trade the admin.accessed exclusion makes.
+    recentActivity(db, 12, [
+      ADMIN_ACCESS_ACTION,
+      "auth.login.otp",
+      "auth.otp.requested",
+      "auth.login.passkey",
+    ]),
     liveAuctionsOf(db, deps.now()),
   ]);
   const verdict = await runnerVerdictOf(deps, db, runner);
@@ -461,7 +474,7 @@ export async function attentionQueue(
   if (runner.dead > 0) {
     rows.push({
       kind: "runner:dead-jobs",
-      subject: `${String(runner.dead)} dead job(s) across the platform`,
+      subject: `${countNoun(runner.dead, "dead job")} across the platform`,
       orgSlug: null,
       orgName: null,
       href: "/admin/health",
@@ -475,7 +488,7 @@ export async function attentionQueue(
   ) {
     rows.push({
       kind: "runner:stalled",
-      subject: `${formatCount(runner.queued)} job(s) queued — nothing picked up for ${waitedFor(runner.oldestQueuedWaitMs)}`,
+      subject: `${countNoun(runner.queued, "job")} queued — nothing picked up for ${waitedFor(runner.oldestQueuedWaitMs)}`,
       orgSlug: null,
       orgName: null,
       href: "/admin/health",
@@ -484,7 +497,7 @@ export async function attentionQueue(
   if (runner.overdueSchedules > 0) {
     rows.push({
       kind: "runner:schedule-overdue",
-      subject: `${String(runner.overdueSchedules)} schedule(s) are past due`,
+      subject: `${countNoun(runner.overdueSchedules, "schedule")} ${runner.overdueSchedules === 1 ? "is" : "are"} past due`,
       orgSlug: null,
       orgName: null,
       href: "/admin/health",
@@ -510,7 +523,7 @@ export async function attentionQueue(
     const waited = waitedFor(deps.now() - new Date(row.oldest).getTime());
     rows.push({
       kind: "auction:stuck-live",
-      subject: `${String(row.n)} auction(s) still live — the oldest for ${waited}`,
+      subject: `${countNoun(row.n, "auction")} still live — the oldest for ${waited}`,
       orgSlug: row.orgSlug,
       orgName: row.orgName,
       href: `/admin/orgs/${row.orgSlug}`,
@@ -865,6 +878,9 @@ export interface UserDirectoryRow {
   readonly lastActivityAt: Date | null;
 }
 
+/** PI-1 P6: the directory's profile-aware facets. */
+export type UserDirectoryFilter = "all" | "players" | "profiled";
+
 export interface UserDirectory {
   readonly rows: readonly UserDirectoryRow[];
   /** How many people match the current query. */
@@ -872,6 +888,7 @@ export interface UserDirectory {
   /** How many exist at all. */
   readonly platformTotal: number;
   readonly query: string;
+  readonly filter: UserDirectoryFilter;
   readonly nextCursor: string | null;
 }
 
@@ -895,10 +912,24 @@ async function userCursor(db: Db, after: string | undefined): Promise<SQL | unde
   );
 }
 
-export async function userDirectory(db: Db, query = "", after?: string): Promise<UserDirectory> {
+export async function userDirectory(
+  db: Db,
+  query = "",
+  after?: string,
+  filter: UserDirectoryFilter = "all",
+): Promise<UserDirectory> {
   const term = query.trim();
-  const where =
+  const search =
     term === "" ? undefined : or(ilike(people.name, `%${term}%`), ilike(people.phone, `%${term}%`));
+  // PI-1 P6: profile-aware facets. EXISTS subqueries, so the directory stays
+  // one indexed pass (registrations_person_idx / player_profiles_person_uq).
+  const facet =
+    filter === "players"
+      ? sql`exists (select 1 from registrations r where r.person_id = ${people.id})`
+      : filter === "profiled"
+        ? sql`exists (select 1 from player_profiles pp where pp.person_id = ${people.id})`
+        : undefined;
+  const where = search === undefined ? facet : facet === undefined ? search : and(search, facet);
   const cursor = await userCursor(db, after);
   const pageWhere =
     cursor === undefined ? where : where === undefined ? cursor : and(where, cursor);
@@ -935,6 +966,7 @@ export async function userDirectory(db: Db, query = "", after?: string): Promise
     total: matching[0]?.n ?? 0,
     platformTotal: everything[0]?.n ?? 0,
     query: term,
+    filter,
     nextCursor: more ? (page[page.length - 1]?.id ?? null) : null,
   };
 }
@@ -989,6 +1021,16 @@ export interface UserDetail {
   readonly orgs: readonly { slug: string; name: string; joinedAt: Date }[];
   readonly grants: readonly UserGrantRow[];
   readonly activity: readonly ActivityRow[];
+  /** PI-1 P6: the person's participations, read-only — the platform-admin view
+   *  of the same projection the player sees on /me/cricket (no prices here;
+   *  money surfaces stay with the money capabilities). */
+  readonly seasons: readonly {
+    competitionName: string;
+    orgName: string;
+    startsOn: string | null;
+    role: string;
+    status: string;
+  }[];
 }
 
 export async function userDetail(db: Db, personId: string): Promise<UserDetail | null> {
@@ -1000,13 +1042,27 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
   if (person === undefined) {
     return null;
   }
-  const [orgRows, grantRows, activity] = await Promise.all([
+  const [orgRows, seasonRows, grantRows, activity] = await Promise.all([
     db
       .select({ slug: organizations.slug, name: organizations.name, joinedAt: orgMembers.joinedAt })
       .from(orgMembers)
       .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
       .where(eq(orgMembers.personId, personId))
       .orderBy(asc(orgMembers.joinedAt)),
+    db
+      .select({
+        competitionName: competitions.name,
+        orgName: organizations.name,
+        startsOn: competitions.startsOn,
+        role: registrations.role,
+        status: registrations.status,
+      })
+      .from(registrations)
+      .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+      .innerJoin(organizations, eq(organizations.id, competitions.orgId))
+      .where(eq(registrations.personId, personId))
+      .orderBy(asc(competitions.startsOn))
+      .limit(50),
     db
       .select({
         id: grants.id,
@@ -1056,6 +1112,7 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
       revokedAt: row.revokedAt,
     })),
     activity,
+    seasons: seasonRows,
   };
 }
 

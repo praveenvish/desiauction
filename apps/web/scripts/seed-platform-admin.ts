@@ -55,6 +55,15 @@ const URL_ = process.env["SYSTEM_DATABASE_URL"] ?? process.env["DATABASE_URL"];
 if (URL_ === undefined) {
   throw new Error("DATABASE_URL is required (run via pnpm --filter @desiauction/web seed:admin)");
 }
+// PRR P2/F34: this grants platform:admin — the highest privilege in the system.
+// Bootstrapping the first admin IS a production act, so this is not forbidden in
+// production, only made deliberate: an accidental run against prod is refused
+// unless the operator opts in.
+if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_SEED_IN_PRODUCTION"] !== "1") {
+  throw new Error(
+    "refusing to grant platform:admin with NODE_ENV=production without ALLOW_SEED_IN_PRODUCTION=1 — set it to bootstrap the first admin deliberately.",
+  );
+}
 const handle = createDb(URL_);
 const db = handle.db;
 

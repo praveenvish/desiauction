@@ -36,6 +36,7 @@ import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { canCompetition } from "../competition/authz";
 import { announceAuctionOutcomes } from "./auction-notify";
+import { lotMediaOf } from "./live-summary";
 import {
   advanceCompetition,
   createCompetition,
@@ -943,5 +944,39 @@ describe("AUCTION FOUNDATION — isolation", () => {
         payload: {},
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("AUCTION FOUNDATION — a minor's face never rides the live surfaces (PRR P0-2)", () => {
+  it("lotMediaOf suppresses a minor's photo but keeps an adult's, both with consent on file", async () => {
+    // The live board/overlay/spectate photos come from lotMediaOf, a SEPARATE
+    // read model from the /c showcase. Both must apply the same DPDP §9 age
+    // suppression, or a child scrubbed from /c would still appear on the block.
+    const minorLot = await lotByPlayer(auction.id, "Kohli Local");
+    const adultLot = await lotByPlayer(auction.id, "Sharma Local");
+    const minorPerson = await personBehind(auction.id, "Kohli Local");
+    const adultPerson = await personBehind(auction.id, "Sharma Local");
+
+    // Both consent to a photo; only the birth dates differ.
+    await db
+      .update(people)
+      .set({ photoUrl: `k/${minorPerson}.jpg`, photoConsentAt: new Date() })
+      .where(eq(people.id, minorPerson));
+    await db
+      .update(people)
+      .set({ photoUrl: `k/${adultPerson}.jpg`, photoConsentAt: new Date() })
+      .where(eq(people.id, adultPerson));
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: "2015-01-01" }) // a minor
+      .where(eq(registrationsTable.id, minorLot.registrationId));
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: "1995-01-01" }) // an adult
+      .where(eq(registrationsTable.id, adultLot.registrationId));
+
+    const media = await lotMediaOf(db, auction.id, (key) => `/media/${key}`);
+    expect(media[minorLot.id]?.photoUrl, "minor photo must be withheld").toBeNull();
+    expect(media[adultLot.id]?.photoUrl, "adult photo publishes with consent").not.toBeNull();
   });
 });

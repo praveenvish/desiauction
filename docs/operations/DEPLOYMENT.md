@@ -73,11 +73,13 @@ with `pnpm env:check`). Web: `DATABASE_URL` (app role), `SYSTEM_DATABASE_URL`
 Engine: `DATABASE_URL` (writer credential), `ENGINE_SECRET`, `PORT`,
 `SENTRY_DSN`. Runner: `DATABASE_URL` (writer credential), `RUNNER_TICK_MS`.
 
-Added after RC-1. **None of these is in `.env.example` yet** (verified
-2026-08-19: `grep RAZORPAY .env.example` finds nothing), so this table and
-[PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md) §3/§9 are currently the only
-place they are written down — adding them to `.env.example` is an open item.
-Each app's `env.ts` remains the authority for validation.
+Added after RC-1. That open item is **closed** (re-verified 2026-08-30): every
+variable below now appears in `.env.example`, commented out and annotated with
+the reasoning that governs it, alongside this table and
+[PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md) §3/§9. The note that used to
+stand here — "none of these is in `.env.example` yet", dated 2026-08-19 — was
+true when written and is not any more. Each app's `env.ts` remains the authority
+for validation; `.env.example` documents, it does not enforce.
 
 | Variable | App | Required | Why |
 |---|---|---|---|
@@ -87,6 +89,10 @@ Each app's `env.ts` remains the authority for validation.
 | `ENGINE_ALLOWED_ORIGINS` | engine | **yes in production** | Comma-separated browser origins allowed to open the spectate WebSocket. A ticket authorises an *auction*, not a *page*, so unset means any origin can open a socket with a scraped ticket. Unset = "do not check", correct only for local dev and native clients. |
 | `WS_MAX_SOCKETS_PER_ROOM` | engine | optional (default 2000) | Per-auction socket ceiling; a DoS bound, not a product limit. |
 | `WS_MAX_SOCKETS_PER_IP` | engine | optional (default 50) | Per-client-address socket ceiling. |
+| `EMAIL_API_ENDPOINT` | web | **all three or none** | Provider send endpoint (`https://api.resend.com/emails`). |
+| `EMAIL_API_KEY` | web | **all three or none** | Provider key, sent as a bearer token. |
+| `EMAIL_FROM` | web | **all three or none** | Envelope sender, e.g. `DesiAuction <no-reply@mail.desiauction.in>`. On the **sending subdomain**, never the root — the root's reputation carries the statutory `privacy@` and `navrangi@` mailboxes. Miss any one of these three and `transactionalMailer()` returns `UnconfiguredMailer`, which reports `"unconfigured"` rather than pretending to send. |
+| `EMAIL_REPLY_TO` | web | optional | Where a human reply lands (`support@desiauction.in`). Deliberately outside the three-way check above: absent, someone replying to a receipt is talking to a wall, but the provider is still configured. See [EMAIL_SETUP](EMAIL_SETUP.md). |
 
 `ENGINE_SECRET` gained two boot-time rules (`apps/engine/src/env.ts`): it must be
 **≥ 32 characters in production**, and the repo's `dev-engine-secret` default is
@@ -130,13 +136,51 @@ Operationally this means:
   second machine crash-loops on purpose. Scale the WEB tier for capacity; the
   engine is deliberately not horizontally scalable.
 - **Rolling deploys still work.** The lock is released when the old process's
-  session ends — on graceful SIGTERM it is handed back explicitly, and on a hard
-  kill Postgres drops it with the session. A replacement claims it immediately;
-  no lease table, no expiry to wait out.
+  SESSION ends. On graceful SIGTERM it is handed back explicitly and a
+  replacement claims it immediately — no lease table, no expiry to wait out.
+- **A severed connection is different, and this page used to get it wrong.** It
+  claimed a hard kill is fine because "Postgres drops it with the session" — the
+  conclusion is right but the reason does not reach far enough. A killed process
+  has its sockets closed by the kernel, so `kill -9` genuinely does free the
+  lease at once (re-verified 2026-08-31: the replacement booted immediately).
+  What wedges the lease is a connection severed **without** a close — the
+  database host or VM restarting, a laptop sleeping, a NAT entry expiring, a
+  network partition. The server hears nothing, keeps the backend open, and keeps
+  honouring its lock. Observed 2026-08-31 after a Docker Desktop restart: the
+  backend held the lease **idle for four hours** and every replacement refused to
+  boot. Only the database can notice this, and only if told to probe:
+
+  ```
+  tcp_keepalives_idle = 30
+  tcp_keepalives_interval = 10
+  tcp_keepalives_count = 3
+  ```
+
+  Set on the local container (`docker-compose.yml`) and **required on every
+  deployed database**. With it a severed holder is reaped in ~60s; without it,
+  never. A managed Postgres that does not expose these settings needs the manual
+  recovery below kept to hand.
 - **A brief overlap window is normal** during a deploy: if the new instance
   starts before the old one has exited, it exits 1 and the platform retries.
-  Persistent crash-looping with that message means an old machine is still
-  running — stop it rather than removing the lock.
+- **Telling the two apart is the engine's job, not yours.** A refusal names the
+  holder and says which case it is. A live second instance reads
+  `another engine instance already holds the single-writer lease (pid N, active)`
+  — stop the old machine, never the lock. An orphan reads
+  `the single-writer lease is held by an ORPHANED postgres backend (pid N, idle
+  for Ns)` and prints the exact recovery. The threshold is 60s idle, six missed
+  re-assertions of a 10s cadence; a live engine can never reach it.
+- **Manual recovery from an orphaned lease.** Only after confirming no engine
+  process is running:
+
+  ```sql
+  select l.pid, a.state, a.backend_start
+    from pg_locks l join pg_stat_activity a using (pid)
+   where l.locktype = 'advisory' and l.classid = 233118225::oid and l.objid = 1::oid;
+  select pg_terminate_backend(<pid>);
+  ```
+
+  Terminating the backend of a **live** engine hands the gavel to a second
+  writer mid-auction. Confirm the process is gone first.
 - **The lease is re-checked every 10s.** If the engine loses it (its connection
   dropped and another instance took over), the process exits rather than keep
   closing lots it may no longer own — a dead engine is safer than a second one.

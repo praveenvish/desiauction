@@ -37,6 +37,8 @@ describe("shellKind", () => {
     expect(shellKind("/seasons/mpl-2026/auction/cockpit")).toBe("live");
     expect(shellKind("/seasons/mpl-2026/auction/spectate")).toBe("live");
     expect(shellKind("/seasons/mpl-2026/auction/replay")).toBe("live");
+    // WR-1: the owner's plan is an Owner Room surface.
+    expect(shellKind("/seasons/mpl-2026/auction/plan")).toBe("live");
     expect(shellKind("/gallery")).toBe("bare");
     expect(shellKind("/dev/inbox")).toBe("bare");
     // The OBS overlay and public live board are chrome-free, never Live-framed.
@@ -88,6 +90,11 @@ describe("competition tabs", () => {
     expect(activeCompetitionTab("/seasons/mpl/auction/ledger", "mpl")).toBe("auction");
     // Readiness lives with the auction preparation context.
     expect(activeCompetitionTab("/seasons/mpl/readiness", "mpl")).toBe("auction");
+    // Posters and the public register form are reached from elsewhere and are
+    // not tabs. They used to fall through to "overview", so the strip
+    // underlined Overview over a page that was not the overview.
+    expect(activeCompetitionTab("/seasons/mpl/posters", "mpl")).toBe("");
+    expect(activeCompetitionTab("/seasons/mpl/register", "mpl")).toBe("");
   });
 
   // PX-7: Money is absent without settlement.view — never rendered-then-disabled.

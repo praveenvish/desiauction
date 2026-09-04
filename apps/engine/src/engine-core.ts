@@ -223,6 +223,17 @@ export interface EngineDeps {
 
 const ACK_CACHE_LIMIT = 512;
 
+/**
+ * The web tier abandons a command at 2s (engine-client.ts AbortSignal). The
+ * post-command rebuild re-folds the whole event log to re-verify integrity —
+ * a deliberate O(events) invariant, not a bug — so per-command cost grows with
+ * the night. At beta scale (one lot on the block, a few thousand events) it
+ * stays well under budget; this warns LONG before it approaches 2s, so the
+ * degradation is caught and a checkpoint-fold fast-follow can be scheduled
+ * rather than discovered by a stalled bid (PRR P1-5, monitored risk).
+ */
+const SLOW_COMMAND_WARN_MS = 1_000;
+
 function freshStats(nowMs: number): EngineStats {
   return {
     processed: 0,
@@ -621,6 +632,20 @@ export class AuctionEngine {
       stats.accepted += 1;
     } else {
       stats.rejected += 1;
+    }
+    if (elapsed > SLOW_COMMAND_WARN_MS) {
+      // PRR P1-5: the re-fold cost is climbing toward the web tier's 2s budget.
+      // Surfaced now, while there is still headroom, so a checkpoint-fold can be
+      // scheduled before a bidder ever sees a command time out.
+      this.deps.logger.warn(
+        {
+          auctionId: envelope.auctionId,
+          processMs: Math.round(elapsed),
+          replayMs: Math.round(stats.lastReplayMs),
+          eventCount: stats.eventCount,
+        },
+        "SLOW COMMAND — engine re-fold approaching the web command budget",
+      );
     }
     const finalAck: CommandAck = { ...ack, version: state.version };
     return this.remember(state, ackKey, finalAck);

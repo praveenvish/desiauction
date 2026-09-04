@@ -7,12 +7,14 @@
 
 export type ShellKind = "public" | "console" | "live" | "bare";
 
-const LIVE_SEGMENTS = new Set(["live", "cockpit", "spectate", "replay"]);
+// "plan" is the owner's private plan (WR-1): an Owner Room surface, framed like
+// the room it belongs to, with the same one door out.
+const LIVE_SEGMENTS = new Set(["live", "cockpit", "spectate", "replay", "plan"]);
 
 /** Chrome-free auction surfaces: the OBS overlay and the public live board. */
 const BARE_AUCTION_RE = /^\/seasons\/[^/]+\/auction\/(overlay|board)(\/|$)/;
 
-/** /seasons/{slug}/auction/{live|cockpit|spectate|replay}[/...] */
+/** /seasons/{slug}/auction/{live|cockpit|spectate|replay|plan}[/...] */
 export function liveMatch(pathname: string): { slug: string; segment: string } | null {
   const match = /^\/seasons\/([^/]+)\/auction\/([^/]+)/.exec(pathname);
   if (match !== null && LIVE_SEGMENTS.has(match[2] as string)) {
@@ -357,6 +359,11 @@ export function activeCompetitionTab(pathname: string, slug: string): string {
   if (pathname.startsWith(`${base}/auction`) || pathname.startsWith(`${base}/readiness`)) {
     return "auction";
   }
+  // Posters is reached from /home and the auction page but is not a tab; the
+  // fall-through underlined "Overview" over a page that wasn't the overview.
+  if (pathname.startsWith(`${base}/posters`) || pathname.startsWith(`${base}/register`)) {
+    return "";
+  }
   return "overview";
 }
 
@@ -424,10 +431,12 @@ const RAIL_TITLES: Record<string, string> = {
   help: "Help",
 };
 
-/** The two console surfaces that sit outside the five-item rail. */
+/** The console surfaces that sit outside the five-item rail. */
 const OUTSIDE_RAIL: [string, string][] = [
   ["/inbox", "Notifications"],
   ["/account", "Account"],
+  // PI-1: the player's own career — self-scoped by identity, not by grant.
+  ["/me/cricket", "My cricket"],
 ];
 
 /**
@@ -448,9 +457,13 @@ const SURFACE_SUBTITLES: [string, string][] = [
     "Your recurring competitions, and every edition that runs under them — grouped, or all at once.",
   ],
   ["/orgs", "The clubs and academies you run tournaments under."],
-  ["/money", "Your purses, dues and receipts across every season."],
-  ["/inbox", "Account activity now; approvals, receipts and auction updates join during the beta."],
+  // What the page ships, not more: /money renders receipts (it computes no
+  // balance and no due), and /inbox already carries approvals, auction results
+  // and receipts — the old line undersold a launch product as unfinished.
+  ["/money", "Receipts issued to your teams, across every season."],
+  ["/inbox", "Approvals, auction results, receipts and account activity."],
   ["/account", "Your sign-in, profile and security."],
+  ["/me/cricket", "Every season you've played, in one place."],
 ];
 
 export interface IdentityCrumb {

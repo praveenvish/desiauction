@@ -45,6 +45,8 @@ import {
   otpCodes,
   otpInbox,
   payments,
+  paddleGrants as paddleGrantsTable,
+  paddles as paddlesTable,
   people,
   registrations as registrationsTable,
   sessions,
@@ -435,6 +437,14 @@ afterAll(async () => {
   await db.delete(auditLog).where(eq(auditLog.scopeId, org.id));
   await db.delete(grantsTable).where(eq(grantsTable.scopeId, org.id));
   await db.delete(orgMembers).where(eq(orgMembers.orgId, org.id));
+  // THE AUCTION SIDE, BEFORE THE PEOPLE WHO OWN IT (migration 0040).
+  // `paddles`, `paddle_grants` and `registrations` now hold a RESTRICT foreign
+  // key to `people`. Deleting the people first is therefore REFUSED, instead of
+  // silently leaving rows pointing at nobody — which is what this teardown used
+  // to do, and precisely the orphaning the constraint exists to prevent.
+  await db.delete(paddleGrantsTable).where(eq(paddleGrantsTable.orgId, org.id));
+  await db.delete(paddlesTable).where(eq(paddlesTable.orgId, org.id));
+  await db.delete(registrationsTable).where(eq(registrationsTable.orgId, org.id));
   await db.delete(organizations).where(eq(organizations.id, org.id));
   await db.delete(otpCodes).where(inArray(otpCodes.phone, TEST_PHONES));
   await db.delete(otpInbox).where(inArray(otpInbox.phone, TEST_PHONES));
@@ -558,6 +568,17 @@ describe("M-IP6-2 · Receipts — proof of payment, quoted off the payment fold"
         newId(),
       ),
     ).toEqual({ ok: false, reason: "fiscal_year_mismatch" });
+  });
+
+  it("OBJECT-LEVEL SCOPE (PRR P1-1): a series id that is not this org's is refused", async () => {
+    expect(
+      await issueReceipt(
+        deps,
+        { kind: "person", actor, capability: "finops.document" },
+        { seriesId: newId(), paymentId: payment1 },
+        newId(),
+      ),
+    ).toEqual({ ok: false, reason: "series_unknown" });
   });
 
   it("WATERMARK COVERAGE: unconsumed history cannot be quoted; the follower closes the gap", async () => {
