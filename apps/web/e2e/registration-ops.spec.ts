@@ -295,10 +295,18 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
 
   await expect(page.getByTestId("stat-total")).toContainText("4");
   // The roles the FORM spelled ("Batsman", "Wicket Keeper Batsman") arrived as
-  // the four the product understands. The table prints the stored token with
-  // its underscores swapped for spaces, so this asserts on what is on screen.
-  await expect(page.getByTestId("reg-table")).toContainText("all rounder");
-  await expect(page.getByTestId("reg-table")).toContainText("wicket keeper");
+  // the four the product understands, and the table prints each one's PROSE
+  // NAME through `lib/playing-roles`.
+  //
+  // This used to assert "all rounder" / "wicket keeper" — the raw stored token
+  // with its underscores swapped — which is what the registration desk showed
+  // before 4532c8f unified three copies of the same four words. That commit's
+  // whole point was that the desk lowercased the enum "in a column between
+  // Title Case badges", so this assertion was pinning the inconsistency the fix
+  // removed. It survived on main because there was no e2e job in CI and the
+  // local precompiled path did not work (PA-1R Phase 8.2) — nothing had run it.
+  await expect(page.getByTestId("reg-table")).toContainText("All rounder");
+  await expect(page.getByTestId("reg-table")).toContainText("Wicket-keeper");
 
   /*
    * PHASE 3 — the SECOND file, which is how a club actually works: the roster

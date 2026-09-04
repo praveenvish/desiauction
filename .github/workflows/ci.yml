@@ -176,6 +176,24 @@ jobs:
       - run: pnpm --filter @desiauction/web exec playwright install --with-deps chromium
       - name: End-to-end journeys
         run: pnpm --filter @desiauction/web exec playwright test
+      # THE 29 THIS JOB SILENTLY SKIPS.
+      #
+      # `/gallery` is dev-only, so on the precompiled server the four
+      # design-system specs — gallery, identity, motion, primitives — skip
+      # themselves with a reason and the job still reports success. That is 28
+      # tests, and they are not decorative: they are the ONLY measured proof of
+      # AA contrast on both themes, of self-hosted fonts, of the 44px touch
+      # rung, of focus trapping and of the polite live regions. A job that runs
+      # 101 of 129 and calls itself the journey gate is the same shape of
+      # problem this milestone exists to remove (PA-1R Phase 8.2).
+      #
+      # They need the dev compiler, so this step turns the flag off for itself.
+      - name: Design-system journeys (dev server — /gallery does not exist in a build)
+        env:
+          PLAYWRIGHT_PRECOMPILED: ""
+        run: >-
+          pnpm --filter @desiauction/web exec playwright test
+          e2e/gallery.spec.ts e2e/identity.spec.ts e2e/motion.spec.ts e2e/primitives.spec.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
