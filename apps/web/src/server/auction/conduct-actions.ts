@@ -93,8 +93,25 @@ export interface OwnerAcceptance {
 }
 
 /** Identity for every accepted owner invitation on this auction. */
-async function ownerAcceptancesOf(auctionId: string, orgId: string): Promise<OwnerAcceptance[]> {
-  const rows = await systemDb
+/**
+ * Runs on the TENANT handle now, not the bypass pool (audit PA-1 §10 P1-4).
+ *
+ * This read ships owner names and PHONE NUMBERS to the conduct screen, and it
+ * was the one part of `cockpitView` outside the boundary the rest of that view
+ * already used — `inGateOrg` is `withTenantDb`, so everything around it was
+ * scoped and this was not. Its correctness rested entirely on the `orgId`
+ * argument being right, with RLS unable to catch it if it ever wasn't.
+ *
+ * `people` carries no org and no RLS, so the join still resolves inside the
+ * boundary; what changes is that `auction_owner_invites` and `org_members` are
+ * now filtered by the policy as well as by the predicate.
+ */
+async function ownerAcceptancesOf(
+  db: Db,
+  auctionId: string,
+  orgId: string,
+): Promise<OwnerAcceptance[]> {
+  const rows = await db
     .select({
       inviteId: auctionOwnerInvites.id,
       personId: auctionOwnerInvites.acceptedBy,
@@ -162,20 +179,22 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
   if (gate === null || !gate.canConduct) {
     return null;
   }
-  const [view, owners, teamRows, preSigned, resolved] = await inGateOrg(gate, (db) =>
-    Promise.all([
-      auctionView(db, gate.auction),
-      ownerBoard(db, gate.auction),
-      db
-        .select(TEAM_IDENTITY)
-        .from(teams)
-        .where(eq(teams.competitionId, gate.competition.id))
-        .orderBy(asc(teams.name)),
-      preSignedPlayers(db, gate.competition.id),
-      resolvedLots(db, gate.auction.id),
-    ]),
+  const [view, owners, teamRows, preSigned, resolved, ownerAcceptances] = await inGateOrg(
+    gate,
+    (db) =>
+      Promise.all([
+        auctionView(db, gate.auction),
+        ownerBoard(db, gate.auction),
+        db
+          .select(TEAM_IDENTITY)
+          .from(teams)
+          .where(eq(teams.competitionId, gate.competition.id))
+          .orderBy(asc(teams.name)),
+        preSignedPlayers(db, gate.competition.id),
+        resolvedLots(db, gate.auction.id),
+        ownerAcceptancesOf(db, gate.auction.id, gate.competition.orgId),
+      ]),
   );
-  const ownerAcceptances = await ownerAcceptancesOf(gate.auction.id, gate.competition.orgId);
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionId: gate.auction.id,
@@ -266,7 +285,7 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
   if (gate === null) {
     return null;
   }
-  const [resolved, teamRows, preSigned, lotMedia] = await inGateOrg(gate, (db) =>
+  const [resolved, teamRows, preSigned, lotMedia, orgRows] = await inGateOrg(gate, (db) =>
     Promise.all([
       resolvedLots(db, gate.auction.id),
       db
@@ -276,13 +295,18 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
         .orderBy(asc(teams.name)),
       preSignedPlayers(db, gate.competition.id),
       lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
+      // Folded into the boundary the rest of this view already opened. It sat
+      // one line outside it on the bypass pool for a name (audit PA-1 §10 P1-4);
+      // `organizations` carries no RLS either way, so this is about there being
+      // one fewer raw-pool reach to reason about, not about a leak.
+      db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, gate.competition.orgId))
+        .limit(1),
     ]),
   );
-  const [org] = await systemDb
-    .select({ name: organizations.name })
-    .from(organizations)
-    .where(eq(organizations.id, gate.competition.orgId))
-    .limit(1);
+  const [org] = orgRows;
   return {
     competitionName: gate.competition.name,
     competitionSlug: gate.competition.slug,

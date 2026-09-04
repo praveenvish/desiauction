@@ -155,8 +155,8 @@
       "reason": "PA-1 \u00a710 P1-4 (priority) \u2014 money aggregates for every competition the viewer belongs to, on the bypass pool. Membership is already proven before these run, so a tenant boundary per org is available. PA-1R Phase 3.4."
     },
     "apps/web/src/server/auction/conduct-actions.ts": {
-      "class": "debt",
-      "reason": "PA-1 \u00a710 P1-4 (priority) \u2014 reads lots and owner phone numbers for the conduct screen on the bypass pool. PA-1R Phase 3.4."
+      "class": "by-design",
+      "reason": "BURNED DOWN (PA-1R 3.4). The conduct screen's reads \u2014 including owner names and phone numbers \u2014 now run inside the withTenantDb boundary the rest of cockpitView already used. The remaining system-pool reads are publicSpectatorView, which is anonymous and visibility-gated: there is no session and therefore no tenant to scope to."
     },
     "apps/web/src/server/auction/actions.ts": {
       "class": "debt",
