@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
-import { systemDb } from "../../../../server/db";
+import { db } from "../../../../server/db";
 import { applyInbound } from "../../../../server/messaging/inbound";
 
 /**
@@ -85,7 +85,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     return new NextResponse(null, { status: 400 });
   }
 
-  const result = await applyInbound(systemDb, { from, body });
+  /**
+   * THE APP POOL, NOT THE SYSTEM POOL (audit PA-1 §10 P0-2).
+   *
+   * This wrote through `systemDb`, and `desiauction_system` holds SELECT on
+   * `suppressions` and nothing more — so in production every STOP answered with
+   * a 500 and nobody was ever unsubscribed. That is a DPDP opt-out we accepted
+   * and dropped, and it was invisible locally because every local process
+   * connects as the database owner.
+   *
+   * `suppressions` is deliberately NOT org-scoped: a person texting STOP is
+   * telling the platform, not one club, and the table carries no `org_id` and no
+   * RLS. So there is no tenant boundary to enter here — the correct pool is the
+   * app pool, which holds the DML this write needs, and the absence of a
+   * `withTenantDb` wrapper is the point rather than an omission.
+   */
+  const result = await applyInbound(db, { from, body });
 
   /*
    * 200 even for a keyword we do not recognise.

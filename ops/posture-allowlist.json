@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "Files that reach a database pool WITHOUT entering withTenantDb — checked by",
+    "Files that reach a database pool WITHOUT entering withTenantDb \u2014 checked by",
     "scripts/check-tenant-posture.mjs (pnpm check:posture).",
     "",
     "This list is a RATCHET seeded from the state at audit PA-1 (2026-09-04). It",
@@ -19,16 +19,16 @@
   ],
   "allow": {
     "apps/web/src/app/api/webhooks/delivery-status/route.ts": {
-      "class": "defect",
-      "reason": "PA-1 §10 P0-2 — writes suppressions + finops rows on the system role, which holds no INSERT on either. Fails in production. PA-1R Phase 2.1."
+      "class": "by-design",
+      "reason": "FIXED (PA-1R 2.1). The finops write now runs inside withTenantDb on the app role, and the suppression on the app pool. The remaining system-pool use is ONE id\u2192org lookup that opens that boundary \u2014 the dispatch's org is the only thing that can, and reading it is itself org-scoped. Adapter-verified id, single column, no write."
     },
     "apps/web/src/app/api/webhooks/sms-inbound/route.ts": {
-      "class": "defect",
-      "reason": "PA-1 §10 P0-2 — STOP handling writes suppressions on the system role, which cannot. DPDP opt-out silently fails. PA-1R Phase 2.1."
+      "class": "by-design",
+      "reason": "FIXED (PA-1R 2.1). Writes `suppressions` on the app pool, which holds the DML. The table is deliberately not org-scoped \u2014 a person texting STOP tells the platform, not one club \u2014 so it carries no org_id and no RLS, and there is no tenant boundary to enter."
     },
     "apps/web/src/app/api/webhooks/razorpay/route.ts": {
       "class": "defect",
-      "reason": "PA-1 §10 P0-1 — loads the payment on the raw app pool with no app.org_id, so FORCE RLS returns zero rows and every capture 404s under the production roles. PA-1R Phase 2.2."
+      "reason": "PA-1 \u00a710 P0-1 \u2014 loads the payment on the raw app pool with no app.org_id, so FORCE RLS returns zero rows and every capture 404s under the production roles. PA-1R Phase 2.2."
     },
     "apps/web/src/app/readyz/route.ts": {
       "class": "by-design",
@@ -36,7 +36,7 @@
     },
     "apps/web/src/app/demo/[token]/invite.ics/route.ts": {
       "class": "by-design",
-      "reason": "Pre-tenant token path. The demo tables carry no org_id and no RLS — the person holding the link is a stranger with no tenant to be scoped to."
+      "reason": "Pre-tenant token path. The demo tables carry no org_id and no RLS \u2014 the person holding the link is a stranger with no tenant to be scoped to."
     },
     "apps/web/src/app/schedule-demo/pick/page.tsx": {
       "class": "by-design",
@@ -52,7 +52,7 @@
     },
     "apps/web/src/server/auth/actions.ts": {
       "class": "by-design",
-      "reason": "Identity: people, sessions, otp_codes, passkeys. None carries org_id, none has RLS, and at login there is no tenant yet — this is the boundary that establishes one."
+      "reason": "Identity: people, sessions, otp_codes, passkeys. None carries org_id, none has RLS, and at login there is no tenant yet \u2014 this is the boundary that establishes one."
     },
     "apps/web/src/server/player/profile.ts": {
       "class": "by-design",
@@ -64,11 +64,11 @@
     },
     "apps/web/src/server/messaging/actions.ts": {
       "class": "by-design",
-      "reason": "notification_preferences is person-scoped with no org_id — deliberately a table a club can neither read nor write."
+      "reason": "notification_preferences is person-scoped with no org_id \u2014 deliberately a table a club can neither read nor write."
     },
     "apps/web/src/server/financial-operations/my-documents.ts": {
       "class": "by-design",
-      "reason": "An owner's own receipts across every org they have ever bid in — person-scoped by paddle, cross-org by intent."
+      "reason": "An owner's own receipts across every org they have ever bid in \u2014 person-scoped by paddle, cross-org by intent."
     },
     "apps/web/src/server/competition/public.ts": {
       "class": "by-design",
@@ -92,7 +92,7 @@
     },
     "apps/web/src/server/admin/actions.ts": {
       "class": "by-design",
-      "reason": "Platform administration — cross-tenant by definition, read-only, gated by the platform:admin capability which RLS makes unforgeable."
+      "reason": "Platform administration \u2014 cross-tenant by definition, read-only, gated by the platform:admin capability which RLS makes unforgeable."
     },
     "apps/web/src/server/admin/access-log.ts": {
       "class": "by-design",
@@ -144,19 +144,19 @@
     },
     "apps/web/src/server/orgs/actions.ts": {
       "class": "by-design",
-      "reason": "Invite preview and accept are THE documented pre-tenant token paths the system pool exists for: the reader is not yet a member, so no tenant can be established. NOTE: the accept path is separately tracked for transaction atomicity (PA-1 §9, PA-1R Phase 5.6)."
+      "reason": "Invite preview and accept are THE documented pre-tenant token paths the system pool exists for: the reader is not yet a member, so no tenant can be established. NOTE: the accept path is separately tracked for transaction atomicity (PA-1 \u00a79, PA-1R Phase 5.6)."
     },
     "apps/web/src/server/auction/owner-actions.ts": {
       "class": "by-design",
-      "reason": "Owner-join landing and accept by token — pre-tenant, the same class as invites."
+      "reason": "Owner-join landing and accept by token \u2014 pre-tenant, the same class as invites."
     },
     "apps/web/src/server/home/dashboard.ts": {
       "class": "debt",
-      "reason": "PA-1 §10 P1-4 (priority) — money aggregates for every competition the viewer belongs to, on the bypass pool. Membership is already proven before these run, so a tenant boundary per org is available. PA-1R Phase 3.4."
+      "reason": "PA-1 \u00a710 P1-4 (priority) \u2014 money aggregates for every competition the viewer belongs to, on the bypass pool. Membership is already proven before these run, so a tenant boundary per org is available. PA-1R Phase 3.4."
     },
     "apps/web/src/server/auction/conduct-actions.ts": {
       "class": "debt",
-      "reason": "PA-1 §10 P1-4 (priority) — reads lots and owner phone numbers for the conduct screen on the bypass pool. PA-1R Phase 3.4."
+      "reason": "PA-1 \u00a710 P1-4 (priority) \u2014 reads lots and owner phone numbers for the conduct screen on the bypass pool. PA-1R Phase 3.4."
     },
     "apps/web/src/server/auction/actions.ts": {
       "class": "debt",

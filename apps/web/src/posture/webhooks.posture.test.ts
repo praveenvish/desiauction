@@ -111,22 +111,21 @@ describe("POSTURE — a pool reach with no tenant boundary is blind (PA-1 P0-1)"
 
 describe("POSTURE — inbound SMS: a STOP must actually suppress (PA-1 P0-2)", () => {
   /**
-   * KNOWN RED, DELIBERATELY, UNTIL PA-1R PHASE 2.1 — and it is a ratchet.
+   * FIXED IN PA-1R PHASE 2.1, and the ratchet is how we know.
    *
-   * As of 2026-09-04 this throws `permission denied for table suppressions`
-   * (SQLSTATE 42501): the route writes through `systemDb`, and
-   * `desiauction_system` holds SELECT on `suppressions` and nothing more. That
-   * is the production behaviour, reproduced — a person texting STOP is not
-   * unsubscribed, which is a DPDP opt-out we accepted and dropped.
+   * This was written as `it.fails` on 2026-09-04, recording a real defect
+   * without painting CI red: the route wrote through `systemDb`, which holds
+   * SELECT on `suppressions` and nothing more, so in production every STOP
+   * answered 500 and nobody was unsubscribed. When the route moved to the app
+   * pool the test began passing — and `it.fails` therefore FAILED, with "Expect
+   * test to fail", forcing this marker and this note to be rewritten by whoever
+   * landed the fix. A known bug could not quietly become an unknown one, and
+   * the fix could not quietly go unrecorded.
    *
-   * `it.fails` records the defect without painting CI red for a bug we have
-   * already scheduled. It works in both directions, which is the point: the
-   * moment Phase 2.1 routes this write through a role that may perform it, THIS
-   * TEST STARTS FAILING because it unexpectedly passed, and whoever fixed it
-   * must delete the `.fails` and the comment. A known bug cannot quietly become
-   * an unknown one, and a fix cannot quietly go unrecorded.
+   * It is now an ordinary assertion, and it stays: it is the only thing in the
+   * repository that proves a STOP is honoured under the production roles.
    */
-  it.fails("records the suppression instead of failing on grants", async () => {
+  it("records the suppression instead of failing on grants", async () => {
     const { POST } = await import("../app/api/webhooks/sms-inbound/route");
     const response = await POST(
       new Request("https://example.test/api/webhooks/sms-inbound", {
