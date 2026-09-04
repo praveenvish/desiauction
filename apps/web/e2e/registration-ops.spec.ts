@@ -295,10 +295,11 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
 
   await expect(page.getByTestId("stat-total")).toContainText("4");
   // The roles the FORM spelled ("Batsman", "Wicket Keeper Batsman") arrived as
-  // the four the product understands. The table prints the stored token with
-  // its underscores swapped for spaces, so this asserts on what is on screen.
-  await expect(page.getByTestId("reg-table")).toContainText("all rounder");
-  await expect(page.getByTestId("reg-table")).toContainText("wicket keeper");
+  // the four the product understands. The table prints the product's role label
+  // ("All rounder", "Wicket-keeper" — `roleLabel`), so this asserts on the words
+  // a reader sees, not on the token's spelling.
+  await expect(page.getByTestId("reg-table")).toContainText(/all rounder/i);
+  await expect(page.getByTestId("reg-table")).toContainText(/wicket.?keeper/i);
 
   /*
    * PHASE 3 — the SECOND file, which is how a club actually works: the roster
