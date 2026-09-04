@@ -1,4 +1,5 @@
 import {
+  REGISTRATION_ROLES,
   TARGET_PRIORITIES,
   TARGET_PRIORITY_LABELS,
   type PlanFit,
@@ -140,4 +141,58 @@ export function refusalMessage(
     case "not_in_room":
       return "You're not in this auction for that team.";
   }
+}
+
+export interface RoleCount {
+  role: string;
+  count: number;
+}
+
+export interface RoleFacts {
+  /** This team's squad by role: lots won plus pre-signed players. */
+  squad: RoleCount[];
+  /** Lots still to be decided, by role: neither sold nor withdrawn. */
+  remaining: RoleCount[];
+}
+
+/**
+ * ROLE FACTS (Phase 1.5): two counts an owner would otherwise tally by hand.
+ * `role` is the one player attribute that is always present and always one of
+ * four, so this is a statement of the record, not an estimate — and it stays a
+ * statement: which roles a squad NEEDS is the owner's call (or, later, the
+ * auction's quotas), never this function's. Roles appear in the product's
+ * order, zero counts included, so the line reads the same shape every time.
+ */
+export function roleFacts(
+  lots: readonly PlanLotRow[],
+  preSignedRoles: readonly string[],
+  teamId: string,
+): RoleFacts {
+  const squad = new Map<string, number>();
+  const remaining = new Map<string, number>();
+  for (const role of REGISTRATION_ROLES) {
+    squad.set(role, 0);
+    remaining.set(role, 0);
+  }
+  for (const role of preSignedRoles) {
+    squad.set(role, (squad.get(role) ?? 0) + 1);
+  }
+  for (const lot of lots) {
+    if (lot.status === "sold") {
+      if (lot.soldToTeamId === teamId) {
+        squad.set(lot.role, (squad.get(lot.role) ?? 0) + 1);
+      }
+    } else if (lot.status !== "withdrawn") {
+      remaining.set(lot.role, (remaining.get(lot.role) ?? 0) + 1);
+    }
+  }
+  const ordered = (counts: Map<string, number>): RoleCount[] =>
+    [...counts.entries()]
+      .sort(([a], [b]) => {
+        const ia = (REGISTRATION_ROLES as readonly string[]).indexOf(a);
+        const ib = (REGISTRATION_ROLES as readonly string[]).indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+      })
+      .map(([role, count]) => ({ role, count }));
+  return { squad: ordered(squad), remaining: ordered(remaining) };
 }

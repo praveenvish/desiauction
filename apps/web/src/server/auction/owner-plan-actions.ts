@@ -87,6 +87,8 @@ export interface PlanView {
   /** Consent-gated photo and registration number per lot (the live room's `lotMedia`). */
   lotMedia: Record<string, { photoUrl: string | null; number: string | null }>;
   targets: TargetRow[];
+  /** Roles of the pre-signed players already on this team (icons, retained). */
+  preSignedRoles: string[];
   standing: { purseRemaining: number; squadSize: number };
   /** The fold, from rows alone (no lot on the block — the live room adds that). */
   state: PlanState;
@@ -144,9 +146,12 @@ export async function planView(
             ]).then(([revisions, sales]) => ({ revisions, sales }))),
           })
         : null;
+      const preSignedRoles = preSigned
+        .filter((player) => player.teamId === gated.teamId)
+        .map((player) => player.role);
       const standing = teamStanding(
         lotRows,
-        preSigned.filter((player) => player.teamId === gated.teamId).length,
+        preSignedRoles.length,
         gated.teamId,
         planRules.pursePerTeam,
       );
@@ -171,6 +176,7 @@ export async function planView(
         lots: lotRows,
         lotMedia,
         targets,
+        preSignedRoles,
         standing,
         state,
         ...(report === null ? {} : { report }),

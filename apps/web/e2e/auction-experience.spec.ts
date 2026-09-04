@@ -254,6 +254,10 @@ test("the full night: lobby → owners → bidding with notifications → public
     timeout: 20_000,
   });
   await expect(ownerA.page.getByTestId("plan-fit")).toHaveAttribute("data-fit", "fits");
+  // Phase 1.5: role facts — the two fixture players are one batter and one bowler, both to come.
+  await expect(ownerA.page.getByTestId("plan-roles")).toContainText(
+    "Still to come 1 Batter · 1 Bowler",
+  );
 
   // The organizer switches owner plans OFF: the page is gone (404, not 403 —
   // existence privacy) and the door vanishes; ON brings both back untouched.

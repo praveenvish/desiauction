@@ -38,6 +38,7 @@ import {
   groupByPriority,
   outcomeBadge,
   refusalMessage,
+  roleFacts,
   rupeesFromPaise,
   searchPool,
 } from "./plan-model";
@@ -124,6 +125,14 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     [view.lots, targeted, query],
   );
   const purseLabel = money(view.planRules.pursePerTeam);
+  const roles = useMemo(
+    () => roleFacts(view.lots, view.preSignedRoles, view.team.id),
+    [view.lots, view.preSignedRoles, view.team.id],
+  );
+  const roleLine = (counts: { role: string; count: number }[]) =>
+    counts
+      .map(({ role, count }) => `${String(count)} ${roleLabel(role)}${count === 1 ? "" : "s"}`)
+      .join(" · ");
 
   const settle = (
     result: PlanMutationResult,
@@ -284,6 +293,17 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
           <span className="stat-label">Headroom</span>
         </div>
       </div>
+
+      {/* Phase 1.5: two counts, stated. Which roles a squad NEEDS stays the owner's
+          call — this line never says "you need". */}
+      <p className="plan-roles" data-testid="plan-roles">
+        <span>
+          <span className="plan-roles-label">Squad</span> {roleLine(roles.squad)}
+        </span>
+        <span>
+          <span className="plan-roles-label">Still to come</span> {roleLine(roles.remaining)}
+        </span>
+      </p>
 
       <div className="plan-fit" data-testid="plan-fit" data-fit={state.budget.fit}>
         <Badge tone={fit.tone}>{fit.label}</Badge>

@@ -3,7 +3,7 @@ import type { TargetState } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
-import { groupByPriority, rupeesFromPaise, searchPool } from "./plan-model";
+import { groupByPriority, roleFacts, rupeesFromPaise, searchPool } from "./plan-model";
 
 function lot(over: Partial<PlanLotRow> & { registrationId: string }): PlanLotRow {
   return {
@@ -97,5 +97,35 @@ describe("searchPool", () => {
   it("leaves out players already on the plan and honours the limit", () => {
     expect(searchPool(pool, new Set(["a"]), "a").map((l) => l.registrationId)).toEqual(["b", "c"]);
     expect(searchPool(pool, new Set(), "a", 1).map((l) => l.registrationId)).toEqual(["a"]);
+  });
+});
+
+describe("roleFacts", () => {
+  it("counts the squad (won + pre-signed) and what is still to come, in role order, zeros kept", () => {
+    const facts = roleFacts(
+      [
+        lot({ registrationId: "a", role: "bowler", status: "sold", soldToTeamId: "me" }),
+        lot({ registrationId: "b", role: "batter", status: "sold", soldToTeamId: "rival" }),
+        lot({ registrationId: "c", role: "batter", status: "queued" }),
+        lot({ registrationId: "d", role: "wicket_keeper", status: "on_block" }),
+        lot({ registrationId: "e", role: "all_rounder", status: "withdrawn" }),
+        lot({ registrationId: "f", role: "batter", status: "unsold" }),
+      ],
+      ["batter", "batter"],
+      "me",
+    );
+    expect(facts.squad).toEqual([
+      { role: "batter", count: 2 },
+      { role: "bowler", count: 1 },
+      { role: "all_rounder", count: 0 },
+      { role: "wicket_keeper", count: 0 },
+    ]);
+    // Unsold is still to come (it may be requeued); withdrawn is not.
+    expect(facts.remaining).toEqual([
+      { role: "batter", count: 2 },
+      { role: "bowler", count: 0 },
+      { role: "all_rounder", count: 0 },
+      { role: "wicket_keeper", count: 1 },
+    ]);
   });
 });

@@ -117,9 +117,15 @@ read as "did not change state"; it is now optimistic and reconciled like the mes
   count and total, off-plan buys, then a line per target. States, never grades. Covered by 4
   core tests and the auction-experience journey (1 of 2 signed, ₹8,000 past a max).
 
+- **Role facts (landed 2026-09-04).** `roleFacts` in `plan-model.ts`: the squad by role (won +
+  pre-signed) and what is still to come by role (neither sold nor withdrawn), in the product's
+  role order with zeros kept. Rendered as one muted line under the plan tiles ("Squad …" /
+  "Still to come …"). Facts only: it never says which roles a squad needs — that is the
+  owner's call, or later the auction's quotas. `PlanView.preSignedRoles` feeds it.
+
 ## Remaining Phase 1.5
 
-- Role facts · reserve + `roleQuotas` form field · what-if input · notes · org-level switch +
+- Reserve + `roleQuotas` form field · what-if input · notes · org-level switch +
   /admin write (4th platform capability set) · cross-tab refresh.
 
 ## Rules of the fold (for reviewers)

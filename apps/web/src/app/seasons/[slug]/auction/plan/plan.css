@@ -270,3 +270,20 @@
   align-items: flex-end;
   text-align: right;
 }
+
+/* ROLE FACTS (Phase 1.5): two counts under the tiles, one line each on a phone. */
+.plan-roles {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-roles-label {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+  margin-right: var(--space-1);
+}
