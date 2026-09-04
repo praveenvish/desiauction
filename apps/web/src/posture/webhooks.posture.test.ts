@@ -157,18 +157,61 @@ describe("POSTURE — inbound SMS: a STOP must actually suppress (PA-1 P0-2)", (
 
 describe("POSTURE — delivery callbacks reach their tables (PA-1 P0-2)", () => {
   /**
-   * Passes today, and is weaker than it looks — say so rather than bank it.
+   * THE PROOF THIS TEST DID NOT USED TO CARRY.
    *
-   * A bounce for an address matching no dispatch is refused before any write,
-   * so this currently proves only that the door opens, not that the write role
-   * can write. Reaching `ingestDeliveryCallback`'s finops insert needs a seeded
-   * dispatch, which needs an org, a series and a document.
+   * Its first version posted a bounce for an address matching no dispatch and
+   * asserted only that the response was not a 5xx. That passed for the wrong
+   * reason: `parseEmailCallback` requires the provider reference to be
+   * `email:{dispatchId}`, and the payload carried a bare id — so the callback
+   * was refused as unparseable before a single row was touched, and a route
+   * that could not write would have looked exactly as healthy.
    *
-   * Phase 2.1 must strengthen this to seed that chain, or the sibling defect
-   * ships unproven behind a green test — the exact failure mode this whole
-   * suite exists to end.
+   * Which is the failure mode this whole suite exists to end, sitting inside
+   * the suite. So the chain is seeded for real: a `DispatchRequested` event and
+   * its projection, then a genuine bounce for that dispatch. Reaching
+   * `DispatchFailed` means the app role appended to `finops_events` from inside
+   * the tenant boundary the route opens — the two things PA-1 §10 P0-2 found
+   * broken, asserted rather than assumed.
    */
-  it("accepts a bounce without a grants failure", async () => {
+  const pad = (label: string): string => label.padEnd(26, "0");
+  const dispatchOrg = pad("01M1POSTUREDLVORG");
+  const dispatchId = pad("01M1POSTUREDLVDSP");
+  const eventId = pad("01M1POSTUREDLVEVT");
+
+  beforeAll(async () => {
+    await owner.sql`delete from finops_events where org_id = ${dispatchOrg}`;
+    await owner.sql`delete from finops_dispatches where id = ${dispatchId}`;
+    // seq 1 must be DispatchRequested, and its payload dispatchId must equal
+    // the stream id — the reducer refuses `malformed_dispatch` otherwise.
+    await owner.sql`
+      insert into finops_events
+        (id, org_id, stream_type, stream_id, seq, type, payload, at_ms, actor, command_id, correlation_id)
+      values (${eventId}, ${dispatchOrg}, 'dispatch', ${dispatchId}, 1, 'DispatchRequested',
+        ${JSON.stringify({
+          dispatchId,
+          orgId: dispatchOrg,
+          channel: "email",
+          recipientRef: "owner:posture-team",
+          templateId: "document.issued",
+          templateVersion: "1",
+          subjectRef: pad("01M1POSTUREDLVDOC"),
+        })}::jsonb,
+        1, ${pad("01M1POSTUREDLVACT")}, ${pad("01M1POSTUREDLVCMD")}, ${pad("01M1POSTUREDLVCOR")})
+    `;
+    await owner.sql`
+      insert into finops_dispatches
+        (id, org_id, status, channel, recipient_ref, template_id, template_version, subject_ref, requested_by)
+      values (${dispatchId}, ${dispatchOrg}, 'requested', 'email', 'owner:posture-team',
+        'document.issued', '1', ${pad("01M1POSTUREDLVDOC")}, ${pad("01M1POSTUREDLVACT")})
+    `;
+  });
+
+  afterAll(async () => {
+    await owner.sql`delete from finops_events where org_id = ${dispatchOrg}`;
+    await owner.sql`delete from finops_dispatches where id = ${dispatchId}`;
+  });
+
+  it("writes DispatchFailed for a real bounce, under the app role", async () => {
     const { POST } = await import("../app/api/webhooks/delivery-status/route");
     const response = await POST(
       new Request("https://example.test/api/webhooks/delivery-status", {
@@ -179,17 +222,55 @@ describe("POSTURE — delivery callbacks reach their tables (PA-1 P0-2)", () => 
         },
         body: JSON.stringify({
           event: "bounce",
-          email: "posture-bounce@example.test",
-          messageId: "posture-delivery-0001",
+          // The reference the adapter actually reads — `email:` prefixed, or the
+          // callback is unparseable and nothing below is exercised.
+          messageId: `email:${dispatchId}`,
+          eventId: "posture-provider-event-1",
+          recipient: "posture-bounce@example.test",
         }),
       }),
     );
+    expect(response.status).toBeLessThan(500);
 
-    // The route's own contract is that it never answers 5xx: it either accepts
-    // the report or refuses it deliberately. A 500 here is the grants failure.
+    const events = (await owner.sql`
+      select type from finops_events
+       where stream_id = ${dispatchId} and type = 'DispatchFailed'
+    `) as unknown as { type: string }[];
     expect(
-      response.status,
-      "delivery callback returned 5xx — the write role lacks the grant",
-    ).toBeLessThan(500);
+      events.length,
+      "the bounce did not append DispatchFailed — the delivery callback cannot " +
+        "write finops truth under the production roles, so a bounced document " +
+        "stays 'requested' for ever and the sending domain keeps being used",
+    ).toBe(1);
+  });
+
+  it("is idempotent — the provider retrying does not append twice", async () => {
+    const { POST } = await import("../app/api/webhooks/delivery-status/route");
+    const body = JSON.stringify({
+      event: "bounce",
+      messageId: `email:${dispatchId}`,
+      eventId: "posture-provider-event-1",
+      recipient: "posture-bounce@example.test",
+    });
+    const send = async (): Promise<void> => {
+      await POST(
+        new Request("https://example.test/api/webhooks/delivery-status", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-callback-secret": process.env["DELIVERY_CALLBACK_SECRET"] ?? "",
+          },
+          body,
+        }),
+      );
+    };
+    await send();
+    await send();
+
+    const events = (await owner.sql`
+      select type from finops_events
+       where stream_id = ${dispatchId} and type = 'DispatchFailed'
+    `) as unknown as { type: string }[];
+    expect(events.length, "a retried provider callback appended a second event").toBe(1);
   });
 });
