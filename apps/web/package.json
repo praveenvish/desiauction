@@ -27,7 +27,8 @@
     "perf:collections": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-collections.ts",
     "perf:closure": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-closure.ts",
     "perf:finops": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-finops.ts",
-    "pass:grant": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/grant-pass.ts"
+    "pass:grant": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/grant-pass.ts",
+    "posture:verify": "vitest run --config vitest.posture.config.ts"
   },
   "dependencies": {
     "@desiauction/auction": "workspace:*",

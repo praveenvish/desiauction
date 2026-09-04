@@ -20,6 +20,7 @@ import {
 } from "@desiauction/core";
 import {
   auctionEvents as auctionEventsTable,
+  auctionOwnerInvites,
   auctions as auctionsTable,
   auditLog,
   bids as bidsTable,
@@ -28,6 +29,7 @@ import {
   newId,
   organizations,
   orgMembers,
+  paddleGrants,
   paddles as paddlesTable,
   people,
   registrations,
@@ -157,6 +159,23 @@ afterAll(async () => {
   await db.delete(auctionEventsTable).where(eq(auctionEventsTable.orgId, orgId));
   await db.delete(bidsTable).where(eq(bidsTable.orgId, orgId));
   await db.delete(lotsTable).where(eq(lotsTable.orgId, orgId));
+  // THE OWNER MODEL LEAVES TWO TABLES THIS TEARDOWN NEVER KNEW ABOUT.
+  //
+  // The suite drives the real production path — invite → accept → grant →
+  // claim — so it writes `auction_owner_invites` and `paddle_grants` as well as
+  // `paddles`. Migration 0040 then gave `paddle_grants.person_id` a foreign key
+  // with ON DELETE RESTRICT, and from that day the final `delete from people`
+  // below could not succeed: all 66 assertions passed and `afterAll` threw
+  // 23503, so the suite reported FAILED with nothing wrong with the engine.
+  //
+  // Worse than a red suite: every run leaked a person and its grants into the
+  // shared database, and that residue is what later makes an unrelated failure
+  // look like a product bug (audit PA-1 §21).
+  //
+  // Grants and invites go before paddles for readability — the delete order
+  // that matters is simply that both precede `people`.
+  await db.delete(paddleGrants).where(eq(paddleGrants.orgId, orgId));
+  await db.delete(auctionOwnerInvites).where(eq(auctionOwnerInvites.orgId, orgId));
   await db.delete(paddlesTable).where(eq(paddlesTable.orgId, orgId));
   await db.delete(auctionsTable).where(eq(auctionsTable.orgId, orgId));
   await db.delete(registrations).where(eq(registrations.orgId, orgId));
