@@ -241,7 +241,7 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 | 4.4 | **Specified, not provisioned.** [operations/ALERTS.md](../../operations/ALERTS.md): the five alerts that close PA-1's four worst "detectability: poor" risks, each against a signal that exists in code today. Latency SLOs are explicitly excluded — nothing measures them, and an alert on an unmeasured number is a lie. |
 | 4.5 | **Done.** `runnerHealthSnapshot` scored a STOPPED runner as perfectly healthy, because `dead === 0` answers "did anything fail loudly" and a crashed runner produces no dead jobs at all. It now also fails on queue AGE, which is the only signal that separates a busy platform from a dead worker, and says in words why. |
 
-**Gate state** — `verify` ✅ · `build` ✅ · `depcruise` ✅ (2057 modules) · `test:integration` ✅ · `posture` ✅ 13/13 · core 440 tests.
+**Gate state** — `verify` ✅ · `build` ✅ · `depcruise` ✅ · `test:integration` ✅ · `posture` ✅ 13/13 · core 440 tests.
 
 ---
 
@@ -380,6 +380,24 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 > Still founder-gated: the same run against **staging** infrastructure, which is
 > the only thing that adds managed-Postgres behaviour (connection limits,
 > keepalives, PITR) to what is already proven about the roles.
+
+---
+
+#### Phase 8 — EXECUTED 2026-09-05
+
+| # | Outcome |
+|---|---|
+| 8.1 | **Done.** `pnpm verify:local` green — lint, typecheck, unit, format, depcruise, motion, build, integration (engine 69 · web 852/65 files), env:check, health. |
+| 8.2 | **Done locally, and it took three fixes to get there — none of them a test.** The e2e suite had not been run: the documented precompiled command omits the env file on the build line (dies with `DATABASE_URL: Invalid input`, exits 0 through a pipe, then fails as "Could not find a production build"), and `next start` boots as production so the env guard refuses on twelve counts. Both now handled by `playwright.config.ts` itself. Then two genuine defects: an e2e fixture inventing a `soldToPaddleId` that references nothing — the same flaw fixed in the integration career fixture in Phase 3.1, missed here because no suite that could see it had been run — and an assertion demanding the raw lowercased role enum that `4532c8f` had already replaced with prose labels on `main`. **Final: 101 passed · 0 failed**, plus the 28 `/gallery`-family tests on the dev path. |
+| | **The job also skipped 29 and called itself green.** `/gallery` does not exist in a build, so the four design-system specs skip themselves with a reason — and they are the only measured proof of AA contrast on both themes, self-hosted fonts, the 44px touch rung, focus trapping and the polite live regions. CI now runs them in a second step on the dev server. |
+| 8.3 | **Done** — see above. |
+| 8.4 | **Done.** `scripts/restore-drill.mjs --rehearse`: runbook steps 2–6, each timed, ending with a whole auction night on the restored database. 25 MB / 4,968 rows / 60 tables / **1.8 s**, recorded in `RESTORE_RUNBOOK.md` with the caveat that it is not a production RTO. Its own first two runs failed inside the drill (`docker exec` does not attach stdin; `execFileSync` discards `input` when stdin is `"ignore"`) — the role-recipe step reported success in 0.1 s having executed nothing, surfacing two steps later as "the app role cannot read `otp_codes`". Which is why step 6 now ends with an auction instead of a row count. |
+| 8.5 | **Done.** PA-1 §52 re-run in full; the diff is in [REMEDIATION.md](REMEDIATION.md) §6. The one number that went UP is `preflight:production`, 16 → 17 blockers, because `TRUSTED_PROXY_COUNT` became required in 5.7. |
+| 8.6 | **Done** — [REMEDIATION.md](REMEDIATION.md). |
+
+**Final gate state** — `verify` ✅ · `verify:local` ✅ · `test:integration` ✅ engine 69 / web 852 · `check:posture` ✅ 34 by-design · 8 debt · **0 defect** · `posture:verify` ✅ 13/13 · `grants:verify` ✅ 286 across 60 tables and 4 roles · `rls:verify` ✅ under `desiauction_app` · `audit` ✅ 0 vulnerabilities · e2e ✅ 101 + 28 · rehearsal ✅ 51 steps · restore drill ✅ · `preflight:production` ❌ 17, all provisioning.
+
+**Not verified, and PA-1 could not verify it either:** the CI run itself. `gh` is not installed on this machine, so every job's *commands* were run locally and the *pipeline* was not observed.
 
 ---
 
