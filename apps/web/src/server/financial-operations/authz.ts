@@ -9,6 +9,7 @@ import { auditLog, grants, newId, type Db } from "@desiauction/db";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { ForbiddenError, grantsFor, requireCapability } from "../orgs/authz";
+import { logger } from "../logger";
 
 /**
  * Financial-operations authorization (IP-6_ARCHITECTURE §19, ADR-5). Identity
@@ -64,7 +65,12 @@ export async function issueFinopsGrant(
 ): Promise<FinopsGrantResult> {
   try {
     await requireCapability(db, actorId, { scopeType: "org", scopeId: orgId }, "grant.issue");
-  } catch {
+  } catch (error: unknown) {
+    // A refusal is the right ANSWER here — `requireCapability` throws when the
+    // grant is absent, and fail-closed is correct. But it also throws when the
+    // database is unreachable, and that used to be indistinguishable from "you
+    // may not": an operator saw "not authorized" for an outage (PA-1 §15).
+    logger().warn({ err: error }, "finops.capability_check_refused");
     return { ok: false, reason: "forbidden" };
   }
   // Nothing mints an unexpandable grant (the IP-2 invites discipline).
@@ -103,7 +109,12 @@ export async function revokeFinopsGrant(
 ): Promise<FinopsGrantResult> {
   try {
     await requireCapability(db, actorId, { scopeType: "org", scopeId: orgId }, "grant.revoke");
-  } catch {
+  } catch (error: unknown) {
+    // A refusal is the right ANSWER here — `requireCapability` throws when the
+    // grant is absent, and fail-closed is correct. But it also throws when the
+    // database is unreachable, and that used to be indistinguishable from "you
+    // may not": an operator saw "not authorized" for an outage (PA-1 §15).
+    logger().warn({ err: error }, "finops.capability_check_refused");
     return { ok: false, reason: "forbidden" };
   }
   const [row] = await db

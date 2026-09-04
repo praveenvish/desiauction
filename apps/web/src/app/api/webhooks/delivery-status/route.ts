@@ -10,6 +10,7 @@ import { db, dbHandle, systemDb } from "../../../../server/db";
 import { webFinopsDeps } from "../../../../server/financial-operations/deps";
 import { suppress } from "../../../../server/messaging/consent";
 import { SUPPRESSING_EVENTS, parseEmailCallback } from "../../../../server/messaging/email-adapter";
+import { withRequestId } from "../../../../server/logger";
 
 /**
  * PROVIDER DELIVERY REPORTS — where "accepted" becomes "arrived".
@@ -66,7 +67,7 @@ async function resolveDispatchOrg(raw: string): Promise<string | null> {
   return row?.orgId ?? null;
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+async function handle(request: Request): Promise<NextResponse> {
   const expected = env.DELIVERY_CALLBACK_SECRET;
   if (expected === undefined || expected === "") {
     // Closed until configured, and indistinguishable from absent. A callback
@@ -148,4 +149,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   return NextResponse.json(ack.ok ? { status: "ok" } : { status: "ignored", reason: ack.reason }, {
     status: 200,
   });
+}
+
+/**
+ * Every line this request logs carries one id (PA-1 §20).
+ *
+ * Provider callbacks and scheduled sweeps are exactly the requests nobody is
+ * watching when they run, so "which delivery did that error belong to" has to
+ * be answerable afterwards from the log alone.
+ */
+export function POST(request: Request): Promise<NextResponse> {
+  return withRequestId(request.headers, () => handle(request));
 }

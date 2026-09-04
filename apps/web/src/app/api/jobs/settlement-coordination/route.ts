@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
 import { sweepSettlementCoordination } from "../../../../server/settlement/coordination-sweep";
+import { withRequestId } from "../../../../server/logger";
 
 /**
  * THE SETTLEMENT CATCH-UP SWEEP — an endpoint onto the repair scan (PRR P1-3).
@@ -36,7 +37,7 @@ function secretMatches(provided: string | null, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+async function handle(request: Request): Promise<NextResponse> {
   const expected = env.SETTLEMENT_JOB_SECRET;
   if (expected === undefined || expected === "") {
     return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -62,4 +63,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   return NextResponse.json(report);
+}
+
+/**
+ * Every line this request logs carries one id (PA-1 §20).
+ *
+ * Provider callbacks and scheduled sweeps are exactly the requests nobody is
+ * watching when they run, so "which delivery did that error belong to" has to
+ * be answerable afterwards from the log alone.
+ */
+export function POST(request: Request): Promise<NextResponse> {
+  return withRequestId(request.headers, () => handle(request));
 }

@@ -397,6 +397,16 @@ export interface FinopsStore {
   loadJobs(orgId: string): Promise<readonly JobRow[]>;
   loadDeadJobs(orgId: string): Promise<readonly JobRow[]>;
   countJobs(): Promise<Readonly<Record<JobState, number>>>;
+  /**
+   * The oldest queued job's due time, or null when nothing is waiting.
+   *
+   * `runnerHealthSnapshot` reported healthy whenever `dead === 0`, so a runner
+   * that had STOPPED — the failure that matters most, because nothing else
+   * notices — read as perfectly healthy while work piled up behind it
+   * (audit PA-1 §16, §20). Queue depth alone cannot tell a busy platform from a
+   * dead worker; the AGE of the oldest due job can.
+   */
+  oldestQueuedNotBeforeMs(): Promise<number | null>;
   loadSchedules(): Promise<readonly ScheduleRow[]>;
   /** Operational audit breadcrumbs (append-only substrate, read-only) — the
    * certification register's input (M-IP6-4). */

@@ -796,6 +796,14 @@ export function createFinopsStore(db: Db): FinopsStore {
       return counts;
     },
 
+    async oldestQueuedNotBeforeMs() {
+      const [row] = await db
+        .select({ oldest: sql<number | null>`min(${finopsJobs.notBeforeMs})` })
+        .from(finopsJobs)
+        .where(eq(finopsJobs.state, "queued"));
+      return row?.oldest ?? null;
+    },
+
     async loadSchedules() {
       const rows = await db.select().from(finopsSchedules).orderBy(asc(finopsSchedules.slot));
       return rows.map((row) => ({

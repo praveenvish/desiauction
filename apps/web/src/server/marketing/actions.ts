@@ -14,6 +14,7 @@ import {
   validateDemoRequest,
   type ValidationField,
 } from "./demo-requests";
+import { logger } from "../logger";
 
 // Anonymous, unauthenticated capture — newsletter_subscribers carries no
 // tenant data and no RLS (schema.ts), so a plain pool write is correct here,
@@ -121,8 +122,7 @@ export async function requestDemoAction(
     // The lead is safe in the database and the person has been told on screen.
     // This is an operational problem, and an operational problem that is not
     // written down is one nobody fixes.
-    // eslint-disable-next-line no-console
-    console.error("demo request mail failed", { requestId, ...outcomes });
+    logger().error({ demoRequestId: requestId, ...outcomes }, "demo.request_mail_failed");
   }
 
   return { success: true, requestId };
