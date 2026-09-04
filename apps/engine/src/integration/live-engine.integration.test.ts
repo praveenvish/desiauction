@@ -485,6 +485,38 @@ describe("LIVE ENGINE — the single writer under fire", () => {
     expect((resumeEvent.payload["endsAtMs"] as number) - resumeEvent.atMs).toBe(held);
   });
 
+  it("PAUSE IS TOTAL: the gavel is refused while the auction is paused", async () => {
+    /**
+     * Audit PA-1 §6. `transitionLot` checked `auction.status === "live"` for
+     * `open` only, so a PAUSED auction still accepted CloseLot and HoldLot: the
+     * lot on the block could be sold, passed or frozen in the middle of the
+     * dispute the pause was called to settle. The timer half was already
+     * correct — pause banks the remainder and nulls `ends_at_ms` — which is why
+     * nothing caught it: the auction looked frozen while the gavel still worked.
+     *
+     * Ordering note: this runs before the closing-soon test below and returns
+     * the auction to `live`, so the shared fixture is unchanged for it.
+     */
+    expect((await command("PauseAuction", ownerId, {}, { conduct: true })).accepted).toBe(true);
+    expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("paused");
+
+    const hammered = await command("CloseLot", ownerId, { lotId: lot1 }, { conduct: true });
+    expect(hammered.accepted, "a paused auction sold the lot on the block").toBe(false);
+    expect(hammered.accepted ? "" : hammered.reason).toBe("auction_not_live");
+
+    const held = await command("HoldLot", ownerId, { lotId: lot1 }, { conduct: true });
+    expect(held.accepted, "a paused auction froze the lot on the block").toBe(false);
+
+    // The lot is untouched, and resuming leaves the night exactly where it was.
+    const [row] = await db
+      .select({ status: lotsTable.status })
+      .from(lotsTable)
+      .where(eq(lotsTable.id, lot1));
+    expect(row?.status).toBe("on_block");
+    expect((await command("ResumeAuction", ownerId, {}, { conduct: true })).accepted).toBe(true);
+    expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("live");
+  });
+
   it("CLOSING-SOON BID: the anti-snipe extend edge replays cleanly (regression: watchdog halt)", async () => {
     // Drive the lot into closing_soon via the watchdog tick, then bid. The
     // TimerExtended event must flip the projection back to on_block exactly

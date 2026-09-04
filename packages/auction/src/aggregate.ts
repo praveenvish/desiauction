@@ -614,6 +614,32 @@ export async function transitionLot(
   if (!decision.ok) {
     return decision;
   }
+  /**
+   * PAUSE IS TOTAL, AND FOR THESE FOUR COMMANDS IT WAS NOT (audit PA-1 §6).
+   *
+   * Only `open` checked the auction's status, so a paused auction still
+   * accepted the gavel: `CloseLot` sold or passed the lot on the block, and
+   * `HoldLot` froze it. A pause is called to settle a dispute, take a phone
+   * call, or stop the room — doc 39 states it stops the night, and a sale
+   * landing in the middle of one is the single most expensive thing this
+   * product can get wrong, because the hammer is not reversible without an
+   * audited override.
+   *
+   * The timer half was already right: `pause` nulls `ends_at_ms` and banks the
+   * remainder in `held_remaining_ms`, so the tick cannot fire `_TimerClose`
+   * while paused and `resume` restores the exact remaining time. This closes
+   * the manual half, and with it the narrow race where a tick already in the
+   * queue lands just after the pause commits.
+   *
+   * `requeue` and `withdraw` stay allowed: both are administrative tidying of
+   * lots that are NOT on the block, and a paused auction is exactly when an
+   * organizer does them.
+   */
+  if (command === "sell" || command === "pass" || command === "hold") {
+    if (auction.status !== "live") {
+      return { ok: false, reason: "auction_not_live" };
+    }
+  }
   if (command === "open") {
     if (auction.status !== "live") {
       return { ok: false, reason: "auction_not_live" };

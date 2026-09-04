@@ -10,6 +10,7 @@ import {
   type LiveAuctionView,
 } from "../../../../../server/auction/live-actions";
 import { CeremonyStage } from "../ceremony-stage";
+import { useIntentIds } from "../use-intent-ids";
 import {
   AuctionProgress,
   AuctionSummaryCard,
@@ -43,58 +44,6 @@ const AUCTION_TONE = {
   reconciled: "neutral",
   abandoned: "danger",
 } as const;
-
-function commandId(): string {
-  return crypto.randomUUID();
-}
-
-/**
- * THE IDEMPOTENCY KEY BELONGS TO THE INTENT, NOT TO THE ATTEMPT.
- *
- * The engine de-duplicates on (actor, commandId): the same id from the same
- * person returns the ORIGINAL ack and executes nothing twice. That guarantee
- * was unreachable from here, because every attempt minted a fresh id — so the
- * one case it exists for was exactly the case it did not cover.
- *
- * That case is the `catch` below, which says so in as many words: a rejected
- * promise means the ANSWER was lost, not that the command failed, so the bid may
- * well be recorded. A bidder who taps again after seeing that message was, with
- * a new id each time, bidding against themselves.
- *
- * So an intent keeps its id until it gets a DEFINITIVE answer — accepted or
- * refused, both of which are answers. Only then is the slot cleared and the next
- * press a genuinely new intent.
- *
- * THE INTENT IS THE CONTROL *AND* WHAT IT WAS ASKED TO DO. Keying on the control
- * alone would be wrong in the other direction: after an unanswered ₹100 bid, a
- * ₹200 bid would inherit the id, and if the first HAD landed the engine would
- * return its cached ack — the bidder would be told ₹200 succeeded while ₹100 is
- * what stands. Folding the payload into the key makes "the same intent" mean
- * what the words mean: same control, same request.
- */
-function useIntentIds(): {
-  idFor: (key: string, payload?: Record<string, unknown>) => string;
-  settle: (key: string, payload?: Record<string, unknown>) => void;
-} {
-  const ids = useRef(new Map<string, string>());
-  const slot = (key: string, payload?: Record<string, unknown>): string =>
-    payload === undefined ? key : `${key}:${JSON.stringify(payload)}`;
-  return {
-    idFor: (key, payload) => {
-      const at = slot(key, payload);
-      const existing = ids.current.get(at);
-      if (existing !== undefined) {
-        return existing;
-      }
-      const minted = commandId();
-      ids.current.set(at, minted);
-      return minted;
-    },
-    settle: (key, payload) => {
-      ids.current.delete(slot(key, payload));
-    },
-  };
-}
 
 export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView }) {
   const router = useRouter();
@@ -142,7 +91,17 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       try {
         // Reuses this intent's id if a previous attempt ended without an answer,
         // so the retry is de-duplicated by the engine instead of re-executed.
-        ack = await submitAuctionCommand(slug, intents.idFor(key), type, payload);
+        //
+        // THE PAYLOAD IS PART OF THE KEY, and leaving it out was the defect
+        // (audit PA-1 §6). `useIntentIds` has always supported payload-keyed
+        // slots and its comment explains precisely why they are needed — but
+        // both calls here passed the control name alone, so every bid shared
+        // one slot called "bid". After a lost answer that slot survives, and the
+        // next press — a different amount, or the NEXT LOT — arrived carrying
+        // the previous id. The engine, correctly, returned the cached ack for
+        // the earlier command. The bidder was told "accepted" for a bid that
+        // never landed, on a player they did not buy.
+        ack = await submitAuctionCommand(slug, intents.idFor(key, payload), type, payload);
       } catch {
         // DO NOT CLAIM THE COMMAND FAILED. A rejected promise means the ANSWER
         // did not come back; it does not mean the request never arrived. The
@@ -163,8 +122,10 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
         setPending(null);
       }
       // An ack — accepted OR refused — is a definitive answer, so this intent is
-      // over and the next press starts a new one.
-      intents.settle(key);
+      // over and the next press starts a new one. Settled by the same
+      // (control, payload) slot it was minted under, or the entry leaks and the
+      // slot is never reused for an identical retry.
+      intents.settle(key, payload);
       if (ack.accepted) {
         if (done !== undefined) {
           toast({ title: done, tone: "success" });
@@ -222,7 +183,20 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       // Same intent discipline as `send`: closing the night twice because the
       // first answer was lost is exactly the mistake the engine can prevent, but
       // only if the retry carries the id the first attempt used.
-      ack = await submitAuctionCommand(slug, intents.idFor("complete"), "CompleteAuction", payload);
+      //
+      // KEYED ON THE PAYLOAD, for the reason the comment below the call already
+      // gives and this line used to defeat. Settling on any answer handles a
+      // refusal; it cannot handle a LOST one. With the payload omitted, an
+      // unanswered plain close left its slot occupied, and the conductor's next
+      // attempt — the one carrying the override — inherited that id and was
+      // handed the cached `squad_below_minimum` refusal. The override could
+      // never take effect and the night could not be closed from this panel.
+      ack = await submitAuctionCommand(
+        slug,
+        intents.idFor("complete", payload),
+        "CompleteAuction",
+        payload,
+      );
     } catch {
       // Same rule as `send` above: an unanswered request is not a failed one,
       // and "the night is still open" would be a claim this code cannot make.
@@ -241,7 +215,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
      * could never take effect, so the slot is cleared on any answer, not just a
      * successful one.
      */
-    intents.settle("complete");
+    intents.settle("complete", payload);
     if (ack.accepted) {
       setCompleteOpen(false);
       setShortSquads(false);
