@@ -396,3 +396,12 @@ export type {
   FeatureResolution,
   FeatureContext,
 } from "./feature-settings";
+export { planVersusActual } from "./team-plan-report";
+export type {
+  PlanReport,
+  PlanReportInput,
+  PlanReportRow,
+  PlanRevisionLike,
+  PlanSaleLike,
+  ReportOutcome,
+} from "./team-plan-report";

@@ -106,9 +106,21 @@ class the memory already records, not the feature. One real defect surfaced by t
 organizer's switch was fully server-controlled, so a click snapped back before the refresh and
 read as "did not change state"; it is now optimistic and reconciled like the messaging switches.
 
-## Remaining
+## Phase 1.5 progress
 
-- Nothing in Phase 1 scope. Phase 1.5 items are listed above.
+- **Plan versus actual (landed 2026-09-04).** `packages/core/src/team-plan-report.ts`
+  (`planVersusActual`): each player ever on the plan is judged by the LAST revision at or
+  before their lot's `LotSold` (removed before the hammer = not a target; added after = the
+  same; a reopened-and-resold lot is judged by the sale that stood). `PlanView.report` is
+  built only for terminal auctions from `revisionsOf` + `lotSalesOf`; the read-only plan page
+  shows "How the night went" (`plan-report.tsx`): signed x of y, paid vs planned, past-a-max
+  count and total, off-plan buys, then a line per target. States, never grades. Covered by 4
+  core tests and the auction-experience journey (1 of 2 signed, ₹8,000 past a max).
+
+## Remaining Phase 1.5
+
+- Role facts · reserve + `roleQuotas` form field · what-if input · notes · org-level switch +
+  /admin write (4th platform capability set) · cross-tab refresh.
 
 ## Rules of the fold (for reviewers)
 

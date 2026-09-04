@@ -240,3 +240,33 @@
   color: var(--text-muted);
   font-size: var(--text-sm-size);
 }
+
+/* HOW THE NIGHT WENT (Phase 1.5): one line per target on the read-only page. */
+.plan-report-list {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+}
+
+.plan-report-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.plan-report-name,
+.plan-report-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  min-width: 0;
+}
+
+.plan-report-outcome {
+  align-items: flex-end;
+  text-align: right;
+}

@@ -440,7 +440,15 @@ test("the full night: lobby → owners → bidding with notifications → public
   });
   await expect(ownerA.page.getByTestId("plan-auction-status")).toContainText("Completed");
   await expect(ownerA.page.getByTestId("plan-add")).toHaveCount(0);
-  await expect(ownerA.page.getByText("Signed", { exact: true })).toBeVisible();
+  await expect(
+    ownerA.page.locator('[data-testid^="plan-target-"][data-outcome="won"]'),
+  ).toHaveCount(1);
+  // Phase 1.5: the night's report — one of two targets signed, once past a max, by ₹8,000.
+  await expect(ownerA.page.getByTestId("plan-report-signed")).toContainText("1 of 2");
+  await expect(ownerA.page.getByTestId("plan-report-over")).toContainText("₹8,000");
+  await expect(ownerA.page.getByTestId("plan-report-outside")).toContainText(
+    "Nothing bought off-plan",
+  );
 
   await spectatorCtx.close();
   await ownerA.ctx.close();

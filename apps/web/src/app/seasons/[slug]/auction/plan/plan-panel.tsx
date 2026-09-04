@@ -41,6 +41,7 @@ import {
   rupeesFromPaise,
   searchPool,
 } from "./plan-model";
+import { PlanReportCard } from "./plan-report";
 
 /**
  * MY PLAN — the page (WR-1).
@@ -317,6 +318,10 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
           </p>
         ))}
       </div>
+
+      {view.report !== undefined ? (
+        <PlanReportCard report={view.report} lotsByRegistration={lotsByRegistration} />
+      ) : null}
 
       {view.readOnly ? null : (
         <Card data-testid="plan-add">
