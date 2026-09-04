@@ -253,7 +253,7 @@ PA-1 named nine blockers and four conditions for reconsideration.
 | PA-1 condition | State |
 |---|---|
 | Every P0 closed and evidenced | ✅ |
-| One green pipeline including e2e, `grants:verify`, `rls:verify` | ✅ **locally**, every job's commands green: quality, integration, posture, e2e (both halves), `grants:verify` 286, `rls:verify` under `desiauction_app`. ❌ **as a CI run** — `gh` is not installed on this machine, so no run history could be inspected, exactly as PA-1 said of itself |
+| One green pipeline including e2e, `grants:verify`, `rls:verify` | ✅ **run [33920713730](https://github.com/praveenvish/desiauction/actions/runs/33920713730)** — quality, integration, e2e, secrets-scan and pr-title, all green on `b66f571`. The first green run this repository has had; §9 records what the first RED one found |
 | One complete rehearsal auction under the four-role recipe, through settlement to an issued receipt, no manual intervention | ✅ — and it is now a **command**, not an event |
 | One restore with the RTO in the runbook | ✅ locally, with the number and its caveat recorded. ❌ from stored production infrastructure |
 | A decision on purse visibility | ✅ D2 — public |
@@ -288,6 +288,47 @@ restored database.
 That is the difference between "found by an audit" and "cannot merge", and it is
 the only durable answer to a finding whose root cause was that **nothing local
 ran as a role that could notice.**
+
+---
+
+## 9 · The first CI run, and why it is in this record
+
+An earlier draft of this document said the pipeline had never been observed —
+`gh` is not installed on the machine this work was done on, so every job's
+*commands* were run locally and the *run* was not. That has since been closed
+through the API, and the sentence is worth replacing rather than deleting,
+because of how it closed.
+
+**The first CI run of this branch failed, on `posture:verify`** — the one suite
+in this repository whose entire purpose is to catch code that works on a
+developer machine and not in production. It was doing exactly that itself.
+
+`webFinopsDeps` installs the email delivery adapter only when
+`EMAIL_API_ENDPOINT`, `EMAIL_API_KEY` and `EMAIL_FROM` are all set. That
+condition is deliberate: a half-configured mailer that accepts documents and
+drops them is worse than none. Developer machines have all three in
+`.env.local`. CI has none. Without them `delivery("email")` is undefined, the
+delivery-status route cannot verify the provider reference, and it answers
+`dispatch_unknown` with a **200** having written nothing — and the test asserted
+`status < 500`, which that satisfies. Green locally, for ever, for a reason
+nothing local could see.
+
+It is the **second** time that test passed for the wrong reason; its own comment
+records the first, when it posted a bounce for a dispatch that did not exist and
+checked only that the response was not a 5xx. The pattern is identical both
+times: asserting on the answer the route *gives* rather than on the effect it is
+supposed to *have*. A route that answers 200 to every refusal — correctly, since
+providers retry anything else — cannot be verified by its status code.
+
+Fixed on both sides. The test reads the body and requires `{status:"ok"}`, and
+names the cause in its failure message. The posture config supplies the three
+variables with the same reasoning it already supplies the three webhook secrets:
+the door has to be open, or the test passes by never reaching the code. Proven
+by stripping them and watching it fail, rather than by reasoning that it would.
+
+The lesson is not about email. It is that **a gate is only as good as the
+environment it has been run in**, and this milestone's central gate had been run
+in exactly one.
 
 ---
 

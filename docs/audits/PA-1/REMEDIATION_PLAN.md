@@ -397,7 +397,14 @@ P0 Gates ──► P1 Auction ──► P2 Money ──► P3 Data
 
 **Final gate state** — `verify` ✅ · `verify:local` ✅ · `test:integration` ✅ engine 69 / web 852 · `check:posture` ✅ 34 by-design · 8 debt · **0 defect** · `posture:verify` ✅ 13/13 · `grants:verify` ✅ 286 across 60 tables and 4 roles · `rls:verify` ✅ under `desiauction_app` · `audit` ✅ 0 vulnerabilities · e2e ✅ 101 + 28 · rehearsal ✅ 51 steps · restore drill ✅ · `preflight:production` ❌ 17, all provisioning.
 
-**Not verified, and PA-1 could not verify it either:** the CI run itself. `gh` is not installed on this machine, so every job's *commands* were run locally and the *pipeline* was not observed.
+**The pipeline, now verified:** run
+[33920713730](https://github.com/praveenvish/desiauction/actions/runs/33920713730)
+— quality, integration, e2e, secrets-scan, pr-title, all green on `b66f571`.
+This line previously said the CI run could not be observed because `gh` is not
+installed here; it was closed through the API instead. The FIRST run was red, on
+`posture:verify`, for an environment-dependent reason inside the suite that
+exists to end environment-dependent green — see [REMEDIATION.md](REMEDIATION.md)
+§8.
 
 ---
 
