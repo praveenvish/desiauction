@@ -154,8 +154,46 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
-server.listen({ host: "0.0.0.0", port: env.PORT }).catch((error: unknown) => {
-  void die("engine failed to bind", error);
-});
+/**
+ * REHYDRATE THE AUCTIONS THAT ARE STILL RUNNING, BEFORE SERVING (PA-1 §6).
+ *
+ * The watchdog tick is the timer authority, and it only walks auctions RESIDENT
+ * in memory (`this.states`). A restarted engine's map is empty, and an auction
+ * only becomes resident when something touches it — a socket joining, a command
+ * arriving, a diagnostics read.
+ *
+ * So after a deploy or a crash mid-lot, the lot's clock did not resume. It
+ * waited. If every participant was watching rather than clicking — which is
+ * exactly what a room does while a lot runs down — nothing touched the auction
+ * and the countdown on every screen simply stopped. Correctness held (a bid
+ * arriving late is still refused on its stamped arrival time), but the night
+ * stalled until somebody poked it, and the `/readyz` comment described a replay
+ * phase that did not exist.
+ *
+ * Restricted to `live` and `paused`: a scheduled auction has no running clock
+ * and a terminal one has nothing to resume, so this is bounded by the number of
+ * auctions genuinely in flight — in practice a handful, and zero most of the
+ * time. Failures here are logged and not fatal; the old lazy path still works,
+ * so a rehydration problem must not stop the engine from serving.
+ */
+async function rehydrateRunningAuctions(): Promise<void> {
+  const { found, loaded } = await engine.rehydrate();
+  if (found > 0) {
+    logger.info({ found, loaded }, "rehydrated in-flight auctions — timers resumed");
+  }
+}
+
+void rehydrateRunningAuctions()
+  .catch((error: unknown) => {
+    // Never fatal: the lazy load path still works, and an engine that refuses
+    // to serve because it could not preload is strictly worse than one that
+    // resumes a clock a moment late.
+    logger.error({ err: error }, "auction rehydration failed — falling back to lazy load");
+  })
+  .finally(() => {
+    server.listen({ host: "0.0.0.0", port: env.PORT }).catch((error: unknown) => {
+      void die("engine failed to bind", error);
+    });
+  });
 
 logger.info({ port: env.PORT }, "auction engine online — single writer, server time only");

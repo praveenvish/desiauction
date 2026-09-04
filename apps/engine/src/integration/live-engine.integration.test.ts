@@ -632,6 +632,33 @@ describe("LIVE ENGINE — restart, recovery, fail-closed", () => {
     console.log(`recovery (replay + rebuild) after restart: ${recoveryMs.toFixed(1)} ms`);
   });
 
+  it("BOOT REHYDRATION: a restarted engine resumes the clock with nobody touching it", async () => {
+    /**
+     * Audit PA-1 §6. `tick()` only walks auctions resident in memory, and a
+     * fresh engine's map is empty — an auction became resident only when
+     * something touched it. So after a deploy or crash mid-lot, the countdown
+     * on every screen stopped until somebody clicked, which is precisely what a
+     * room does NOT do while it watches a lot run down.
+     *
+     * The test is deliberately hostile to the old behaviour: the fresh engine
+     * is never asked about this auction. No ensureAuction, no snapshotOf, no
+     * command. Only `rehydrate()` — then a tick.
+     */
+    const fresh = new AuctionEngine({ db, logger, onSnapshot: () => undefined });
+
+    // Nothing is resident until it is rehydrated.
+    expect(fresh.snapshotOf(auctionId)).toBeUndefined();
+
+    const { found, loaded } = await fresh.rehydrate();
+    expect(found, "the live auction was not found for rehydration").toBeGreaterThanOrEqual(1);
+    expect(loaded).toBe(found);
+    expect(
+      fresh.snapshotOf(auctionId),
+      "a live auction was not made resident by rehydration, so its timer would not run",
+    ).toBeDefined();
+    expect(fresh.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("live");
+  });
+
   it("PROJECTION HEALING: corrupted rows halt fail-closed, RecoverAuction heals, engine resumes", async () => {
     // Corrupt the sold lot's row projection out-of-band.
     await db
