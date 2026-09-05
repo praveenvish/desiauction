@@ -356,7 +356,7 @@ export interface RegistrationRow {
   personId: string;
   name: string | null;
   phone: string;
-  role: string;
+  role: string | null;
   status: RegistrationStatus;
   teamId: string | null;
   teamName: string | null;
@@ -391,7 +391,7 @@ export async function myRegistration(
 ): Promise<{
   id: string;
   status: RegistrationStatus;
-  role: string;
+  role: string | null;
   number: string;
   /**
    * DA-35: the reason was captured, shipped to the organizer's browser and
@@ -777,7 +777,7 @@ export async function exportRegistrationsCsv(
     .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
   return toCsv(
     ["registration_number", "name", "phone", "role", "status", "team"],
-    rows.map((r) => [r.number, r.name ?? "", r.phone, r.role, r.status, r.team ?? ""]),
+    rows.map((r) => [r.number, r.name ?? "", r.phone, r.role ?? "", r.status, r.team ?? ""]),
   );
 }
 

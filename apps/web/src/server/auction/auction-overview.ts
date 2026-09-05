@@ -28,7 +28,8 @@ export interface AuctionLotRow {
   lotId: string;
   lotNumber: string;
   playerName: string | null;
-  role: string;
+  /** Null in a sport whose pack declares no playing roles (Phase 2). */
+  role: string | null;
   basePrice: number;
   status: string;
   soldPrice: number | null;
@@ -50,7 +51,8 @@ export interface AuctionPaddleRow {
 export interface AuctionOnBlock {
   lotNumber: string;
   playerName: string | null;
-  role: string;
+  /** Null in a sport whose pack declares no playing roles (Phase 2). */
+  role: string | null;
   basePrice: number;
   /** Highest accepted bid, or null when nobody has bid yet. */
   currentBid: number | null;

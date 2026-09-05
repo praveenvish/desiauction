@@ -86,6 +86,7 @@ beforeAll(async () => {
   await db.insert(competitions).values({
     id: competitionId,
     orgId,
+    sport: "cricket",
     name: `In-app Season ${RUN}`,
     slug: `inapp-season-${RUN}`,
     createdBy: ownerId,

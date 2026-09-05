@@ -19,7 +19,7 @@ import type { PreSignedPlayer, ResolvedLot } from "../../../../server/auction/li
 export interface SquadMember {
   key: string;
   name: string;
-  role: string;
+  role: string | null;
   /** Null for pre-signed players — they were never bid on. */
   price: number | null;
   icon: boolean;

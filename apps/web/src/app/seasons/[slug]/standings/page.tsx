@@ -1,5 +1,4 @@
 import { Badge, Card, EmptyState, PageIntro } from "@desiauction/ui";
-import { oversOf } from "@desiauction/core";
 import { notFound } from "next/navigation";
 
 import { standingsView } from "../../../../server/competition/fixture-actions";
@@ -71,9 +70,13 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                     <th scope="col" className="admin-num">
                       Pts
                     </th>
-                    <th scope="col" className="admin-num">
-                      NRR
-                    </th>
+                    {/* The sport's own tiebreaks, in its own order: NRR for
+                        cricket, GD then GF for football. */}
+                    {standings.sport.standings.tiebreakers.map((tiebreaker) => (
+                      <th key={tiebreaker.key} scope="col" className="admin-num">
+                        {tiebreaker.label}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -88,11 +91,12 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                       </td>
                       <td data-label="Team">
                         <span className="registration-name">{row.teamName}</span>
-                        {/* The runs and overs behind the rate, so it is
-                            checkable rather than a number to be trusted. */}
+                        {/* The numbers behind the tiebreak, so it is checkable
+                            rather than trusted. The pack decides how they read —
+                            "180/20.0" in cricket, "12" in football. */}
                         <span className="competitions-hint">
-                          {row.runsFor}/{oversOf(row.ballsFaced)} for · {row.runsAgainst}/
-                          {oversOf(row.ballsBowled)} against
+                          {standings.sport.standings.summariseSide(row.scored)} for ·{" "}
+                          {standings.sport.standings.summariseSide(row.conceded)} against
                         </span>
                       </td>
                       <td data-label="Played" className="admin-num">
@@ -113,13 +117,23 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                       <td data-label="Points" className="admin-num">
                         <strong>{row.points}</strong>
                       </td>
-                      <td data-label="Net run rate" className="admin-num">
-                        {/* An em dash, not 0.00. Zero is a real net run rate —
-                            a team exactly level on rate has one — so printing
-                            it for "has not played" would put a new team level
-                            with one that genuinely broke even. */}
-                        {row.netRunRate === null ? "—" : row.netRunRate.toFixed(3)}
-                      </td>
+                      {standings.sport.standings.tiebreakers.map((tiebreaker) => {
+                        const value = row.tiebreakers[tiebreaker.key] ?? null;
+                        return (
+                          <td
+                            key={tiebreaker.key}
+                            data-label={tiebreaker.label}
+                            className="admin-num"
+                          >
+                            {/* An em dash, not 0.00. Zero is a real net run rate
+                                and a real goal difference — a team exactly level
+                                has one — so printing it for "has not played"
+                                would put a new team level with one that
+                                genuinely broke even. */}
+                            {value === null ? "—" : value.toFixed(tiebreaker.precision)}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

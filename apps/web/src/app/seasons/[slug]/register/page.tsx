@@ -1,4 +1,4 @@
-import { entryCategoryLabel, isRejectionReason } from "@desiauction/core";
+import { entryCategoryLabel, isRejectionReason, roleLabel } from "@desiauction/core";
 import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -203,7 +203,7 @@ export default async function RegisterPage({
               <h2>{STATUS_COPY[landing.mine.status]?.title ?? landing.mine.status}</h2>
             </div>
             <p className="register-hint">
-              <strong>{landing.competitionName}</strong> · {landing.mine.role.replace(/_/g, " ")} ·
+              <strong>{landing.competitionName}</strong> · {roleLabel(landing.mine.role)} ·
               registration {landing.mine.number}
             </p>
             <p className="register-hint">{STATUS_COPY[landing.mine.status]?.body}</p>

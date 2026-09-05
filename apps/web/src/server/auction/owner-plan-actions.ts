@@ -148,7 +148,9 @@ export async function planView(
         : null;
       const preSignedRoles = preSigned
         .filter((player) => player.teamId === gated.teamId)
-        .map((player) => player.role);
+        .map((player) => player.role)
+        // A sport with no roles contributes none to the plan's tally.
+        .filter((role): role is string => role !== null);
       const standing = teamStanding(
         lotRows,
         preSignedRoles.length,

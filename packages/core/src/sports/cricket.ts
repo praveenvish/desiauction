@@ -22,13 +22,14 @@
  * values still come from one place.
  */
 
-import { DEFAULT_POINTS } from "../standings";
+import { DEFAULT_POINTS, ratePer } from "../standings";
 
 import type {
   AttributeSpec,
   RoleVocabulary,
   ScoreFieldSpec,
   SportPack,
+  Terminology,
   VocabularyTerm,
 } from "./types";
 
@@ -189,12 +190,14 @@ const ATTRIBUTES: readonly AttributeSpec[] = [
     key: "batting_style",
     label: "Batting style",
     storage: { kind: "column", column: "batting_style" },
+    headerAliases: ["batting style", "batting", "bats", "batting hand"],
     options: options(CRICKET_BATTING_STYLE_KEYS, BATTING_STYLE_LABELS),
   },
   {
     key: "bowling_style",
     label: "Bowling style",
     storage: { kind: "column", column: "bowling_style" },
+    headerAliases: ["bowling style", "bowling", "bowls", "bowling arm", "bowling type"],
     options: options(CRICKET_BOWLING_STYLE_KEYS, BOWLING_STYLE_LABELS),
   },
 ];
@@ -209,8 +212,63 @@ const ATTRIBUTES: readonly AttributeSpec[] = [
 const SCORE_FIELDS: readonly ScoreFieldSpec[] = [
   { key: "runs", label: "Runs", min: 0, max: 2000 },
   { key: "wickets", label: "Wickets", min: 0, max: 10 },
-  { key: "balls", label: "Balls", min: 0, max: 3000 },
+  {
+    key: "balls",
+    label: "Balls",
+    min: 0,
+    max: 3000,
+    entry: { label: "Overs", help: "18.3 — not 18.5 for a half" },
+    parse: ballsOf,
+  },
 ];
+
+/**
+ * NET RUN RATE, now a declared tiebreak rather than a hard-wired one.
+ *
+ * OVERS ARE BALLS THROUGHOUT. `4.5` overs is four overs and five balls, and a
+ * rate computed on that decimal is wrong by roughly eight percent per
+ * fractional over — quietly, all season, in the number that decides who
+ * qualifies. This divides runs by BALLS and multiplies by six, which is the
+ * whole reason `balls` is a stored score component and `overs` is only ever a
+ * display.
+ *
+ * Null, not zero, when a side has faced nothing: zero is a real NRR that a team
+ * exactly level has earned.
+ */
+const NET_RUN_RATE = {
+  key: "net_run_rate",
+  label: "NRR",
+  precision: 3,
+  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) => {
+    const scored = ratePer(totals.scored["runs"] ?? 0, totals.scored["balls"] ?? 0, 6);
+    const conceded = ratePer(totals.conceded["runs"] ?? 0, totals.conceded["balls"] ?? 0, 6);
+    return scored === null || conceded === null ? null : scored - conceded;
+  },
+};
+
+const TERMS: Terminology = {
+  participant: ["Player", "Players"],
+  squad: "Squad",
+  fixture: "Match",
+  ground: "Ground",
+};
+
+/** Balls → the "4.5" cricket writes. Display only; never arithmetic. */
+export function oversOf(balls: number): string {
+  return `${String(Math.floor(balls / 6))}.${String(balls % 6)}`;
+}
+
+/** "4.5" → 29 balls. Returns null for anything that is not a legal over count. */
+export function ballsOf(overs: string): number | null {
+  const match = /^(\d{1,3})(?:\.([0-5]))?$/.exec(overs.trim());
+  if (match === null) {
+    return null;
+  }
+  // `.6` is rejected by the pattern above rather than folded to the next over:
+  // somebody typing 4.6 has made a mistake, and silently reading it as 5.0
+  // hides it inside a number nobody re-checks.
+  return Number(match[1]) * 6 + Number(match[2] ?? 0);
+}
 
 export const CRICKET: SportPack = {
   key: "cricket",
@@ -225,5 +283,10 @@ export const CRICKET: SportPack = {
    * it moves in here when Phase 2 generalizes the tiebreaker chain and
    * standings.ts stops being cricket's home.
    */
-  standings: { points: DEFAULT_POINTS },
+  standings: {
+    points: DEFAULT_POINTS,
+    tiebreakers: [NET_RUN_RATE],
+    summariseSide: (totals) => `${String(totals["runs"] ?? 0)}/${oversOf(totals["balls"] ?? 0)}`,
+  },
+  terms: TERMS,
 };

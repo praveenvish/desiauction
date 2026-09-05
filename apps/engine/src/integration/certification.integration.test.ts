@@ -138,6 +138,7 @@ beforeAll(async () => {
   await db.insert(competitions).values({
     id: compId,
     orgId,
+    sport: "cricket",
     name: `Cert League ${RUN}`,
     slug: `cert-league-${RUN}`,
     status: "registration_closed",
@@ -647,6 +648,7 @@ describe("WATCHDOG CERTIFICATION — a poisoned log fails closed and STAYS close
     await db.insert(competitions).values({
       id: gapCompId,
       orgId,
+      sport: "cricket",
       name: `Gap League ${RUN}`,
       slug: `gap-league-${RUN}`,
       status: "registration_closed",

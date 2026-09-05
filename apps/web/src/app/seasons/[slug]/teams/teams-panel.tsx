@@ -477,6 +477,10 @@ function RosterDetail({
   const tally = useMemo(() => {
     const counts = new Map<string, number>();
     for (const row of roster) {
+      // A sport with no playing roles has no tally to show.
+      if (row.role === null) {
+        continue;
+      }
       counts.set(row.role, (counts.get(row.role) ?? 0) + 1);
     }
     // The pack declares the order; the design's "fixed order" IS that order.

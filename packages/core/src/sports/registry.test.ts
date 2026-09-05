@@ -94,10 +94,13 @@ describe("the pack and the types cannot drift apart", () => {
  * their share card and "All rounder" in the registrations table.
  */
 describe("one role, one label", () => {
-  it("gives every role a distinct label", () => {
-    const labels = CRICKET.roles.values.map((role) => role.label);
-    expect(new Set(labels).size).toBe(labels.length);
-  });
+  it.each(SPORTS.map((pack) => [pack.key, pack] as const))(
+    "%s gives every role a distinct label",
+    (_key, pack) => {
+      const labels = pack.roles.values.map((role) => role.label);
+      expect(new Set(labels).size).toBe(labels.length);
+    },
+  );
 
   it("spells all_rounder the way the public surfaces already did", () => {
     expect(roleLabel("all_rounder")).toBe("All-rounder");
@@ -108,17 +111,47 @@ describe("one role, one label", () => {
     expect(roleLabel("left_wing")).toBe("left wing");
   });
 
-  it("never lets one alias point at two roles", () => {
-    const seen = new Map<string, string>();
-    for (const role of CRICKET.roles.values) {
-      for (const spelling of [role.key, role.label, ...role.aliases]) {
-        const normalized = normalizeVocabularyKey(spelling);
-        const owner = seen.get(normalized);
-        expect(owner === undefined || owner === role.key, `"${spelling}" is ambiguous`).toBe(true);
-        seen.set(normalized, role.key);
+  /*
+   * WITHIN a pack, never across. Cricket's "keeper" is a wicket-keeper and
+   * football's is a goalkeeper; both are correct, and a cross-pack check would
+   * call that a collision and force one of them to be wrong.
+   */
+  it.each(SPORTS.map((pack) => [pack.key, pack] as const))(
+    "%s never lets one alias point at two roles",
+    (_key, pack) => {
+      const seen = new Map<string, string>();
+      for (const role of pack.roles.values) {
+        for (const spelling of [role.key, role.label, ...role.aliases]) {
+          const normalized = normalizeVocabularyKey(spelling);
+          const owner = seen.get(normalized);
+          expect(owner === undefined || owner === role.key, `"${spelling}" is ambiguous`).toBe(
+            true,
+          );
+          seen.set(normalized, role.key);
+        }
       }
-    }
-  });
+    },
+  );
+
+  it.each(SPORTS.map((pack) => [pack.key, pack] as const))(
+    "%s never lets one alias point at two values of an attribute",
+    (_key, pack) => {
+      for (const attribute of pack.attributes) {
+        const seen = new Map<string, string>();
+        for (const option of attribute.options) {
+          for (const spelling of [option.key, option.label, ...option.aliases]) {
+            const normalized = normalizeVocabularyKey(spelling);
+            const owner = seen.get(normalized);
+            expect(
+              owner === undefined || owner === option.key,
+              `${attribute.key}: "${spelling}" is ambiguous`,
+            ).toBe(true);
+            seen.set(normalized, option.key);
+          }
+        }
+      }
+    },
+  );
 });
 
 describe("reading a value the way a person wrote it", () => {

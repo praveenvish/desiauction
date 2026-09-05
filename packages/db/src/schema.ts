@@ -452,7 +452,6 @@ export const tournaments = pgTable(
     /** The sport every edition of this tournament defaults to (0046). */
     sport: text("sport")
       .notNull()
-      .default("cricket")
       .references(() => sports.key),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
@@ -511,7 +510,6 @@ export const competitions = pgTable(
      */
     sport: text("sport")
       .notNull()
-      .default("cricket")
       .references(() => sports.key),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
@@ -614,9 +612,16 @@ export const registrations = pgTable(
     personId: char("person_id", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
-    role: text("role", {
-      enum: ["batter", "bowler", "all_rounder", "wicket_keeper"],
-    }).notNull(),
+    /**
+     * The playing role, validated against the COMPETITION'S sport pack (0047).
+     *
+     * No enum here on purpose: the legal values are football's or cricket's
+     * depending on the season, and a column-level list could only ever name
+     * one sport's. Nullable because `required` is a per-sport fact the pack
+     * declares — cricket and football both say true, pickleball has no
+     * meaningful role at all.
+     */
+    role: text("role"),
     status: text("status", {
       enum: ["draft", "submitted", "approved", "rejected", "waitlisted", "withdrawn"],
     })
@@ -651,6 +656,15 @@ export const registrations = pgTable(
     tshirtSize: text("tshirt_size"),
     trouserSize: text("trouser_size"),
     basePriceBand: text("base_price_band"),
+    /**
+     * Sport-specific player detail (0047), keyed by the pack's attribute keys.
+     *
+     * Cricket's `batting_style`/`bowling_style` keep their own columns above —
+     * they predate the registry and the pack records that in `AttributeStorage`.
+     * Every sport added from football on lands here, so a new pack never costs
+     * a migration.
+     */
+    attributes: jsonb("attributes").notNull().default({}),
     // --- Registration desk (0034). NOT settlement money: an entry fee is desk
     // bookkeeping and never posts to the finops ledger. See the migration.
     feeStatus: text("fee_status", { enum: ["pending", "paid", "waived", "refunded"] })
@@ -834,12 +848,19 @@ export const fixtureResults = pgTable(
       enum: ["home_win", "away_win", "tie", "no_result", "abandoned"],
     }).notNull(),
     winnerTeamId: char("winner_team_id", { length: 26 }),
-    homeRuns: integer("home_runs"),
-    homeWickets: integer("home_wickets"),
-    homeBalls: integer("home_balls"),
-    awayRuns: integer("away_runs"),
-    awayWickets: integer("away_wickets"),
-    awayBalls: integer("away_balls"),
+    /**
+     * The scoreline, in the shape the season's sport pack declares (0047):
+     * `{ home: { runs, wickets, balls }, away: {...} }` for cricket,
+     * `{ home: { goals }, away: { goals } }` for football.
+     *
+     * `outcome`, `winnerTeamId`, `method` and `note` stay as they were — all
+     * four were already true in every team sport, which is why replacing the
+     * cricket integers was the only change this table needed.
+     */
+    score: jsonb("score").$type<{
+      home?: Record<string, number>;
+      away?: Record<string, number>;
+    }>(),
     /** "DLS", "super over", "conceded" — how, when not simply the higher score. */
     method: text("method"),
     note: text("note"),

@@ -9,6 +9,7 @@ import {
   withTenantDb,
 } from "@desiauction/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { DEFAULT_SPORT_KEY } from "@desiauction/core";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -460,6 +461,13 @@ export async function createTournamentAction(
   const session = await requireSession();
   const orgId = formString(formData, "orgId");
   const name = formString(formData, "name");
+  /*
+   * A tournament's sport is the default every edition inherits. Empty falls
+   * back to the platform default rather than refusing: this form predates the
+   * dimension and a tournament with no seasons yet commits to nothing — the
+   * season form asks again, and that answer is the one that reaches a fixture.
+   */
+  const sport = formString(formData, "sport") || DEFAULT_SPORT_KEY;
   // Membership + capability: only an owner/staff of THIS org may create in it.
   const memberships = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
     orgsFor(db, session.personId),
@@ -476,7 +484,7 @@ export async function createTournamentAction(
         // A tournament is a competition container: it rides the same capability
         // as creating the seasons inside it rather than inventing a new one.
         await requireCompetitionCapability(db, session.personId, { orgId }, "competition.create");
-        return createTournament(db, orgId, session.personId, name);
+        return createTournament(db, orgId, session.personId, name, sport);
       },
     );
     slug = tournament.slug;

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { CRICKET } from "./cricket";
+import { SPORTS } from ".";
 
 /**
  * THE SPORT VOCABULARY BOUNDARY (Phase 0).
@@ -63,15 +63,21 @@ const SCAN_ROOTS = [
  */
 const ALLOWED = new Set([
   "packages/core/src/sports/cricket.ts",
+  "packages/core/src/sports/football.ts",
   "packages/ui/src/identity/player-card.tsx",
   "apps/web/src/app/gallery/identity-demo.tsx",
   "apps/web/src/content/marketing.ts",
 ]);
 
-const ROLE_TOKENS = CRICKET.roles.values.map((role) => role.key);
-const ROLE_LABELS = CRICKET.roles.values.map((role) => role.label);
-const STYLE_TOKENS = CRICKET.attributes.flatMap((attribute) =>
-  attribute.options.map((option) => option.key),
+/*
+ * EVERY pack's words, not just cricket's. A second pack that nobody guards is a
+ * second vocabulary free to spread exactly the way the first one did — which is
+ * the whole failure this test was written after.
+ */
+const ROLE_TOKENS = SPORTS.flatMap((pack) => pack.roles.values.map((role) => role.key));
+const ROLE_LABELS = SPORTS.flatMap((pack) => pack.roles.values.map((role) => role.label));
+const STYLE_TOKENS = SPORTS.flatMap((pack) =>
+  pack.attributes.flatMap((attribute) => attribute.options.map((option) => option.key)),
 );
 
 /** A token or label sitting in quotes, which is how a copied list is written. */
@@ -160,6 +166,11 @@ describe("a sport's words live in its pack and nowhere else", () => {
   /* A rename of the pack must not quietly turn this whole test into a no-op. */
   it("still sees the pack itself, so a rename cannot blind the scan", () => {
     const pack = readFileSync(resolve(REPO, "packages/core/src/sports/cricket.ts"), "utf8");
+    const second = readFileSync(resolve(REPO, "packages/core/src/sports/football.ts"), "utf8");
+    expect(
+      matches(second, QUOTED_ROLE).length,
+      "football's own tokens are scanned",
+    ).toBeGreaterThan(1);
     expect(matches(pack, QUOTED_ROLE).length).toBeGreaterThan(1);
     expect(matches(pack, QUOTED_LABEL).length).toBeGreaterThan(0);
     expect(matches(pack, QUOTED_STYLE).length).toBeGreaterThan(0);

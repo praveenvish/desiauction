@@ -268,6 +268,7 @@ beforeAll(async () => {
   officer = await login(PHONE_OFFICER);
   org = await createOrg(db, owner, `Coll ${RUN}`);
   comp = await createCompetition(db, org.id, owner, {
+    sport: "cricket",
     name: `Season ${RUN}`,
     location: "Malad",
     startsOn: "2026-08-01",

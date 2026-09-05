@@ -1,4 +1,4 @@
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
 import {
   Badge,
   ButtonLink,
@@ -839,7 +839,7 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                       {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
                       <span className="home-live-role">
                         {" · "}
-                        {liveBoard.onBlock.role.replace(/_/g, " ")}
+                        {roleLabel(liveBoard.onBlock.role)}
                       </span>
                     </dd>
                   </div>
@@ -1408,7 +1408,7 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                       <span className="home-attn-text">
                         <strong>{registration.competitionName}</strong>
                         <span>
-                          {registration.orgName} · {registration.role.replace(/_/g, " ")} ·{" "}
+                          {registration.orgName} · {roleLabel(registration.role)} ·{" "}
                           {registration.number}
                         </span>
                       </span>

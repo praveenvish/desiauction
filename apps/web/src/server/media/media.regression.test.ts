@@ -77,7 +77,10 @@ beforeAll(async () => {
   player = await login(PHONE_PLAYER);
   orgX = await createOrg(db, owner, `Media Org X ${RUN}`);
   orgY = await createOrg(db, outsider, `Media Org Y ${RUN}`);
-  comp = await createCompetition(db, orgX.id, owner, { name: `Media Cup ${RUN}` });
+  comp = await createCompetition(db, orgX.id, owner, {
+    sport: "cricket",
+    name: `Media Cup ${RUN}`,
+  });
   const team = await createTeam(db, orgX.id, comp.id, owner, `Alpha ${RUN}`, "ALP");
   if (!team.ok) {
     throw new Error("team setup failed");

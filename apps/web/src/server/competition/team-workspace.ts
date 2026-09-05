@@ -58,7 +58,7 @@ export interface TeamRosterRow {
   registrationId: string;
   name: string | null;
   phone: string;
-  role: string;
+  role: string | null;
   /** Paise paid at auction; null for a pre-signed/icon slot with no hammer price. ABSENT without money sight. */
   buyPrice?: number | null;
   isIcon: boolean;

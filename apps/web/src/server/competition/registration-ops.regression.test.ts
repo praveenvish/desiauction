@@ -112,7 +112,10 @@ beforeAll(async () => {
   outsider = await login(PHONE_OUTSIDER);
   org = await createOrg(db, owner, `Ops Org ${RUN}`);
   orgOutsider = await createOrg(db, outsider, `Ops Rival ${RUN}`);
-  const competition = await createCompetition(db, org.id, owner, { name: `Ops Cup ${RUN}` });
+  const competition = await createCompetition(db, org.id, owner, {
+    sport: "cricket",
+    name: `Ops Cup ${RUN}`,
+  });
   compId = competition.id;
 });
 
@@ -196,7 +199,10 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
   it("a withdrawn registration does not block a rejoin; a live one still does", async () => {
     // Its own season, opened for intake, so the rest of the suite's competition
     // keeps its state.
-    const season = await createCompetition(db, org.id, owner, { name: `Rejoin Cup ${RUN}` });
+    const season = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
+      name: `Rejoin Cup ${RUN}`,
+    });
     await db
       .update(competitionsTable)
       .set({ status: "registration_open" })
@@ -928,6 +934,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(numbers).toEqual([...numbers].sort()); // stable by registration number
     // No rival-org rows: a foreign competition's registration never appears.
     const rival = await createCompetition(db, orgOutsider.id, outsider, {
+      sport: "cricket",
       name: `Rival Cup ${RUN}`,
     });
     await seed(rival.id, orgOutsider.id, "Rival Player", "rv01", "submitted");
@@ -955,7 +962,10 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
   });
 
   it("SCALE: 300 registrations page and aggregate correctly, bounded per page", async () => {
-    const scaleComp = await createCompetition(db, org.id, owner, { name: `Scale Cup ${RUN}` });
+    const scaleComp = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
+      name: `Scale Cup ${RUN}`,
+    });
     const rows = Array.from({ length: 300 }, (_, i) => {
       const personId = newId();
       const id = newId();

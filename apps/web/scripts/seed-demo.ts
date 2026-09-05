@@ -316,6 +316,7 @@ async function main(): Promise<void> {
   await db.insert(competitions).values({
     id: leagueId,
     orgId,
+    sport: "cricket",
     name: "Demo Premier League",
     slug: "demo-premier-league",
     status: "registration_open",
@@ -352,6 +353,7 @@ async function main(): Promise<void> {
   await db.insert(competitions).values({
     id: cupId,
     orgId,
+    sport: "cricket",
     name: "Demo Cup (settled)",
     slug: "demo-cup-settled",
     status: "registration_closed",
@@ -397,6 +399,7 @@ async function main(): Promise<void> {
     tournamentId: null,
     visibility: "private" as const,
     entryCategory: "open" as const,
+    sport: "cricket",
     location: "Mumbai",
     startsOn: "2026-01-10",
     endsOn: "2026-03-15",

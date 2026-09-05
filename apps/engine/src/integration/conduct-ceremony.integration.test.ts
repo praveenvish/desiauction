@@ -127,6 +127,7 @@ beforeAll(async () => {
   await db.insert(competitions).values({
     id: compId,
     orgId,
+    sport: "cricket",
     name: `Conduct Cup ${RUN}`,
     slug: `conduct-cup-${RUN}`,
     status: "registration_closed",

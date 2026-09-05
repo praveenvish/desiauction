@@ -507,7 +507,7 @@ async function playerPosterFrom(
       return {
         playerName: row.playerName,
         number: row.number,
-        role: row.role,
+        role: row.role ?? "",
         photoKey,
         outcome,
         pricePaise: outcome === "sold" ? (lot?.soldPrice ?? null) : null,
@@ -696,7 +696,7 @@ async function teamPosterFrom(
       const members: TeamPosterMember[] = [
         ...preSigned.map((row): TeamPosterMember => ({
           name: row.name ?? UNNAMED,
-          role: row.role,
+          role: row.role ?? "",
           pricePaise: null,
           marker: row.isIcon ? "icon" : "retained",
         })),
@@ -707,7 +707,7 @@ async function teamPosterFrom(
           .filter((row) => !preSigned.some((pre) => pre.registrationId === row.registrationId))
           .map((row): TeamPosterMember => ({
             name: row.name ?? UNNAMED,
-            role: row.role,
+            role: row.role ?? "",
             pricePaise: row.price,
             marker: row.isCaptain ? "captain" : null,
           })),

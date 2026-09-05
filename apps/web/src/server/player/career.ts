@@ -39,7 +39,7 @@ export interface CareerSeason {
   orgName: string;
   /** Competition start date (ISO) — the career's ordering key. */
   startsOn: string | null;
-  role: string;
+  role: string | null;
   status: string;
   teamName: string | null;
   isCaptain: boolean;

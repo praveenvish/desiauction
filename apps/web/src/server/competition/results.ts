@@ -11,6 +11,7 @@ import {
   buildStandings,
   scoreWithinBounds,
   sportPackFor,
+  standingsRulesOf,
   type SportPack,
   type FixtureResultInput,
   type ResultOutcome,
@@ -46,12 +47,14 @@ export function isResultOutcome(value: string): value is ResultOutcome {
 
 export interface RecordResultInput {
   readonly outcome: ResultOutcome;
-  readonly homeRuns?: number | null;
-  readonly homeWickets?: number | null;
-  readonly homeBalls?: number | null;
-  readonly awayRuns?: number | null;
-  readonly awayWickets?: number | null;
-  readonly awayBalls?: number | null;
+  /**
+   * Per-side score components, keyed by the SEASON'S pack (Phase 2):
+   * `{ runs, wickets, balls }` in cricket, `{ goals }` in football. Absent
+   * keys mean "not recorded", which is different from zero and stays different
+   * all the way into the league table.
+   */
+  readonly homeScore?: Readonly<Record<string, number | null>>;
+  readonly awayScore?: Readonly<Record<string, number | null>>;
   readonly method?: string | null;
   readonly note?: string | null;
 }
@@ -70,13 +73,27 @@ export type RecordResultOutcome =
  * for `DEFAULT_SPORT` with a note that the right pack was the competition's and
  * the compiler would say so once the column existed. It does, and it did.
  */
-function plausible(
+/**
+ * The scoreline as it is stored: only the pack's own components, and only the
+ * ones actually given. `undefined` is dropped rather than written as null —
+ * "not recorded" is the absence of a key, which is what the league table reads
+ * when it decides a rate cannot be computed.
+ */
+function buildScore(
   pack: SportPack,
-  runs?: number | null,
-  wickets?: number | null,
-  balls?: number | null,
-): boolean {
-  return scoreWithinBounds(pack, { runs, wickets, balls });
+  r: RecordResultInput,
+): { home?: Record<string, number>; away?: Record<string, number> } {
+  const side = (given: Readonly<Record<string, number | null>> | undefined) => {
+    const out: Record<string, number> = {};
+    for (const field of pack.result.scoreFields) {
+      const value = given?.[field.key];
+      if (value != null) {
+        out[field.key] = value;
+      }
+    }
+    return out;
+  };
+  return { home: side(r.homeScore), away: side(r.awayScore) };
 }
 
 /**
@@ -128,10 +145,7 @@ export async function recordFixtureResult(
   }
   const r = input.result;
   const pack = sportPackFor(fixture.sport);
-  if (
-    !plausible(pack, r.homeRuns, r.homeWickets, r.homeBalls) ||
-    !plausible(pack, r.awayRuns, r.awayWickets, r.awayBalls)
-  ) {
+  if (!scoreWithinBounds(pack, r.homeScore ?? {}) || !scoreWithinBounds(pack, r.awayScore ?? {})) {
     return { ok: false, reason: "impossible_score" };
   }
   /*
@@ -141,7 +155,17 @@ export async function recordFixtureResult(
    * results that say nothing about how they played.
    */
   const decided = r.outcome === "home_win" || r.outcome === "away_win" || r.outcome === "tie";
-  if (decided && (r.homeRuns == null || r.awayRuns == null)) {
+  /*
+   * A declared winner needs a score behind it. "A score" is the pack's FIRST
+   * score field — runs in cricket, goals in football — because that is the
+   * component every result of that sport has: a cricket result without runs, or
+   * a football result without goals, says nothing about how the match was won
+   * and would still put points on the table.
+   */
+  const primary = pack.result.scoreFields[0]?.key ?? "";
+  const homePrimary = r.homeScore?.[primary];
+  const awayPrimary = r.awayScore?.[primary];
+  if (decided && (homePrimary == null || awayPrimary == null)) {
     return { ok: false, reason: "winner_without_score" };
   }
 
@@ -165,12 +189,7 @@ export async function recordFixtureResult(
     competitionId: fixture.competitionId,
     outcome: r.outcome,
     winnerTeamId,
-    homeRuns: r.homeRuns ?? null,
-    homeWickets: r.homeWickets ?? null,
-    homeBalls: r.homeBalls ?? null,
-    awayRuns: r.awayRuns ?? null,
-    awayWickets: r.awayWickets ?? null,
-    awayBalls: r.awayBalls ?? null,
+    score: buildScore(pack, r),
     method: r.method ?? null,
     note: r.note ?? null,
     recordedBy: input.actorId,
@@ -193,7 +212,13 @@ export async function recordFixtureResult(
     scopeType: "org",
     scopeId: input.orgId,
     subject: input.fixtureId,
-    meta: { outcome: r.outcome, homeRuns: r.homeRuns ?? null, awayRuns: r.awayRuns ?? null },
+    // The primary component by the pack's own name — "runs" in cricket,
+    // "goals" in football — so an audit row reads correctly for its sport.
+    meta: {
+      outcome: r.outcome,
+      [`home_${primary}`]: homePrimary ?? null,
+      [`away_${primary}`]: awayPrimary ?? null,
+    },
   });
   return { ok: true, amended };
 }
@@ -202,12 +227,8 @@ export interface ResultRow {
   readonly fixtureId: string;
   readonly outcome: ResultOutcome;
   readonly winnerTeamId: string | null;
-  readonly homeRuns: number | null;
-  readonly homeWickets: number | null;
-  readonly homeBalls: number | null;
-  readonly awayRuns: number | null;
-  readonly awayWickets: number | null;
-  readonly awayBalls: number | null;
+  /** The scoreline in the season's own shape; null when none was recorded. */
+  readonly score: { home?: Record<string, number>; away?: Record<string, number> } | null;
   readonly method: string | null;
   readonly note: string | null;
 }
@@ -236,12 +257,7 @@ function toResultRow(row: typeof fixtureResults.$inferSelect): ResultRow {
     fixtureId: row.fixtureId,
     outcome: row.outcome,
     winnerTeamId: row.winnerTeamId,
-    homeRuns: row.homeRuns,
-    homeWickets: row.homeWickets,
-    homeBalls: row.homeBalls,
-    awayRuns: row.awayRuns,
-    awayWickets: row.awayWickets,
-    awayBalls: row.awayBalls,
+    score: row.score,
     method: row.method,
     note: row.note,
   };
@@ -249,6 +265,8 @@ function toResultRow(row: typeof fixtureResults.$inferSelect): ResultRow {
 
 export interface StandingsView {
   readonly rows: readonly (StandingsRow & { readonly teamName: string })[];
+  /** The season's pack — the table's columns and their order are its rules. */
+  readonly sport: SportPack;
   /** How many fixtures have a result, of how many that were played. */
   readonly recorded: number;
   readonly playable: number;
@@ -262,6 +280,14 @@ export interface StandingsView {
  * it without saying so invites somebody to read it as the season's standing.
  */
 export async function standingsOf(db: Db, competitionId: string): Promise<StandingsView> {
+  const [seasonRow] = await db
+    .select({ sport: competitions.sport })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  // The season's pack decides which components are summed, which tiebreaks are
+  // applied and in what order — the whole table, in other words.
+  const pack = sportPackFor(seasonRow?.sport ?? null);
   const [teamRows, resultRows, playedFixtures] = await Promise.all([
     db
       .select({ id: teams.id, name: teams.name })
@@ -271,10 +297,7 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
       .select({
         fixtureId: fixtureResults.fixtureId,
         outcome: fixtureResults.outcome,
-        homeRuns: fixtureResults.homeRuns,
-        homeBalls: fixtureResults.homeBalls,
-        awayRuns: fixtureResults.awayRuns,
-        awayBalls: fixtureResults.awayBalls,
+        score: fixtureResults.score,
       })
       .from(fixtureResults)
       .where(eq(fixtureResults.competitionId, competitionId)),
@@ -307,10 +330,8 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
       homeTeamId: fixture.homeTeamId,
       awayTeamId: fixture.awayTeamId,
       outcome: result.outcome,
-      homeRuns: result.homeRuns,
-      homeBalls: result.homeBalls,
-      awayRuns: result.awayRuns,
-      awayBalls: result.awayBalls,
+      ...(result.score?.home !== undefined ? { homeScore: result.score.home } : {}),
+      ...(result.score?.away !== undefined ? { awayScore: result.score.away } : {}),
     });
   }
 
@@ -318,7 +339,8 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
   const rows = buildStandings(
     teamRows.map((row) => row.id),
     inputs,
+    standingsRulesOf(pack),
   ).map((row) => ({ ...row, teamName: names.get(row.teamId) ?? row.teamId }));
 
-  return { rows, recorded: inputs.length, playable: playedFixtures.length };
+  return { rows, sport: pack, recorded: inputs.length, playable: playedFixtures.length };
 }

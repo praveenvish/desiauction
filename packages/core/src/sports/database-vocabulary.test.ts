@@ -8,49 +8,36 @@ import { CRICKET } from "./cricket";
 import { roleKeys } from ".";
 
 /**
- * THE COPY THE PACK CANNOT DELETE.
+ * WHERE THE DATABASE STILL NAMES A SPORT, AND WHERE IT NO LONGER MAY.
  *
- * `sport-vocabulary.test.ts` hunts second copies of the role list and, when
- * this was written, found six. It could not find the two that matter most,
- * because they are not in its scan roots and could never be removed anyway:
+ * Phase 0 wrote this test to stop `registrations.role` and
+ * `player_profiles.default_role` drifting from the cricket pack — two copies a
+ * leaf package cannot delete, because `db-is-a-leaf` forbids `packages/db` from
+ * importing core and that rule is right.
  *
- *   packages/db/src/schema.ts   registrations.role         enum
- *   packages/db/src/schema.ts   player_profiles.default_role enum
+ * PHASE 2 SPLIT THOSE TWO APART, and the test says so rather than being
+ * deleted:
  *
- * `packages/db` is a LEAF — the `db-is-a-leaf` dependency rule permits it
- * drizzle, postgres and ulidx and nothing else, so the schema physically cannot
- * import the pack. That rule is right and this test does not argue with it. A
- * column's permitted values are a fact about the database, and the database is
- * the one place in this system that must be able to state its own constraints
- * without asking an application package for permission.
+ *   · `registrations.role` is now OPEN — no enum, nullable. It has to be: the
+ *     legal values are football's or cricket's depending on the season, and a
+ *     column-level list could only ever name one sport's. The pack validates it
+ *     instead, because the pack is the only thing that knows which season this
+ *     registration belongs to.
+ *   · `player_profiles.default_role` is STILL cricket's four. That is not an
+ *     oversight and not drift — it is the Phase 3 boundary. A person-level
+ *     default role assumes a person plays ONE sport, which is exactly the
+ *     assumption Phase 3 removes by splitting the person from the player
+ *     (`player_sport_profiles`). Until then the column means "this person's
+ *     default CRICKET role", and this test holds it to that.
  *
- * So the copy stays and the DRIFT goes. Reading the schema as text is the only
- * check available that does not violate the boundary it is protecting, and it
- * is the same technique the vocabulary guardrail already uses — deliberately
- * with `readFileSync`, never grep, for the reason recorded there.
- *
- * WHEN THIS FAILS, IT IS USUALLY RIGHT AND YOU HAVE WORK TO DO. Adding a role
- * to the pack is not a code change, it is a MIGRATION: the two enums above, and
- * the CHECK constraints behind them in `0036_player_profiles.sql` and
- * `0044_closed_sets_and_indexes.sql`, all describe the same closed set. Phase 2
- * opens `registrations.role` (nullable, no enum) precisely so this stops being
- * true — and when it does, this test should be rewritten to assert the new
- * arrangement, not deleted.
+ * When Phase 3 lands, the second assertion is the one that must change.
  */
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const REPO = resolve(HERE, "../../../..");
 const SCHEMA = resolve(REPO, "packages/db/src/schema.ts");
 
-/**
- * The string list from `<field>: text("<column>", { enum: [...] })`.
- *
- * Deliberately anchored on the drizzle call rather than on a bare `enum:` — the
- * schema has many enums and only the two named below describe a playing role.
- * Returns null when the column is not found in that shape at all, which is a
- * failure worth reporting distinctly: it means the schema was restructured and
- * this test has quietly stopped looking at anything.
- */
+/** The string list from `text("<column>", { enum: [...] })`, or null if none. */
 function columnEnum(source: string, column: string): string[] | null {
   const call = new RegExp(
     `text\\(\\s*["']${column}["']\\s*,\\s*\\{[^}]*?enum:\\s*\\[([^\\]]*)\\]`,
@@ -63,42 +50,39 @@ function columnEnum(source: string, column: string): string[] | null {
   return [...(found[1] ?? "").matchAll(/["']([^"']+)["']/g)].map((m) => m[1] as string);
 }
 
-describe("the database's role vocabulary matches the pack's", () => {
+describe("the database's role vocabulary", () => {
   const source = readFileSync(SCHEMA, "utf8");
-  const expected = roleKeys(CRICKET);
 
-  it("finds both role columns in the shape this test can read", () => {
-    // Guards the assertions below: a regex that silently matches nothing would
-    // make every test in this file pass by looking at an empty list.
-    expect(columnEnum(source, "role"), "registrations.role").not.toBeNull();
-    expect(columnEnum(source, "default_role"), "player_profiles.default_role").not.toBeNull();
+  it("leaves registrations.role OPEN — no column-level list can name two sports", () => {
+    expect(
+      columnEnum(source, "role"),
+      "an enum here would refuse every football role the pack allows",
+    ).toBeNull();
   });
 
-  it("registrations.role permits exactly the pack's roles, in the pack's order", () => {
-    expect(columnEnum(source, "role")).toEqual([...expected]);
-  });
-
-  it("player_profiles.default_role permits exactly the pack's roles", () => {
-    expect(columnEnum(source, "default_role")).toEqual([...expected]);
+  it("lets registrations.role be absent, because some sports have no roles", () => {
+    // `required` is a per-sport fact the pack declares. Cricket and football
+    // both say true; pickleball has no meaningful playing role at all, and a
+    // NOT NULL column would force it to invent one.
+    const declaration = /role: text\("role"\)([^,]*),/.exec(source);
+    expect(declaration, "registrations.role is no longer a plain text column").not.toBeNull();
+    expect(declaration?.[1] ?? "", "role must not be notNull").not.toContain("notNull");
   });
 
   /*
-   * The schema is only half of it. The CHECK constraints are the half Postgres
-   * actually enforces, and a schema edited without a migration is a column that
-   * accepts a value the database then refuses — at 11pm, on a registration
-   * somebody is trying to submit.
+   * The Phase 3 boundary, asserted rather than assumed. This column is the last
+   * place the schema still says "a person plays one sport".
    */
-  it("names the migrations that must change alongside the enums", () => {
-    const constraints = [
-      "packages/db/migrations/0036_player_profiles.sql",
-      "packages/db/migrations/0044_closed_sets_and_indexes.sql",
-    ];
-    for (const file of constraints) {
-      const sql = readFileSync(resolve(REPO, file), "utf8");
-      // Historical DDL is immutable, so this asserts only that these files are
-      // still where the constraints live — the pointer a future migration
-      // needs, not a claim that their text should track the pack forever.
-      expect(sql, `${file} no longer holds a role CHECK`).toMatch(/CHECK[\s\S]*?role/i);
-    }
+  it("still holds player_profiles.default_role to cricket, until Phase 3 splits it", () => {
+    expect(columnEnum(source, "default_role")).toEqual([...roleKeys(CRICKET)]);
+  });
+
+  it("names the migrations that opened the column, for whoever changes it next", () => {
+    const opened = readFileSync(
+      resolve(REPO, "packages/db/migrations/0047_second_sport.sql"),
+      "utf8",
+    );
+    expect(opened).toMatch(/registrations_role_check/);
+    expect(opened).toMatch(/DROP NOT NULL/);
   });
 });

@@ -123,6 +123,7 @@ async function seed(lotCount: number): Promise<Seeded> {
   await db.insert(competitions).values({
     id: compId,
     orgId,
+    sport: "cricket",
     name: `Scale League ${tag}`,
     slug: `scale-league-${tag}`,
     status: "registration_closed",

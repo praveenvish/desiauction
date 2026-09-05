@@ -867,19 +867,38 @@ export async function placeBid(
   if (roleRow === undefined) {
     return { ok: false, code: "not_found" };
   }
+  /*
+   * ROLE QUOTAS, WHEN THE SPORT HAS ROLES (SP-1 Phase 2).
+   *
+   * The gauntlet has always enforced "no more than N of this role per squad".
+   * That rule is sport-AGNOSTIC — it never knew what the roles were — but it did
+   * assume every registration HAS one, which stopped being true when
+   * `registrations.role` became nullable for sports that have no meaningful
+   * playing role (pickleball, table tennis).
+   *
+   * No role means no role quota: the count is zero and the ceiling is absent,
+   * so this rule stands down and every other rule in `decideBid` is unaffected.
+   * It does NOT mean "unlimited of an unknown role" — there is no role to be
+   * unlimited about.
+   */
   const role = roleRow.role;
-  const [roleCountRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(lots)
-    .innerJoin(registrations, eq(registrations.id, lots.registrationId))
-    .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
-    .where(
-      and(
-        eq(lots.auctionId, auction.id),
-        eq(paddles.teamId, paddle.teamId),
-        eq(registrations.role, role),
-      ),
-    );
+  const roleCountRow =
+    role === null
+      ? undefined
+      : (
+          await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(lots)
+            .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+            .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+            .where(
+              and(
+                eq(lots.auctionId, auction.id),
+                eq(paddles.teamId, paddle.teamId),
+                eq(registrations.role, role),
+              ),
+            )
+        )[0];
 
   const atMs = serverNowMs();
   const decision = decideBid({
@@ -899,7 +918,7 @@ export async function placeBid(
     squadMax: auction.config.squadMax,
     minPossiblePrice: minPossiblePrice(auction.config),
     roleCount: roleCountRow?.count ?? 0,
-    roleMax: auction.config.roleQuotas[role] ?? null,
+    roleMax: role === null ? null : (auction.config.roleQuotas[role] ?? null),
     // The lot's deadline is a RULE, not just a scheduler input — judged on when
     // the bid ARRIVED, so queue depth can never turn a bid that was in time
     // into one that was not.

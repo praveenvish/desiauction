@@ -38,7 +38,7 @@ export default async function OpengraphImage({
   const model = buildPlayerShareCard({
     name: player.name,
     number: player.number,
-    role: player.role,
+    role: player.role ?? "",
     age: player.age,
     battingStyle: player.battingStyle,
     bowlingStyle: player.bowlingStyle,

@@ -27,7 +27,8 @@ export interface ResolvedLot {
   lotNumber: string;
   seq: number;
   playerName: string | null;
-  role: string;
+  /** Null in a sport whose pack declares no playing roles (Phase 2). */
+  role: string | null;
   status: "sold" | "unsold" | "withdrawn";
   soldPrice: number | null;
   teamId: string | null;
@@ -154,7 +155,8 @@ export async function lotMediaOf(
 export interface PreSignedPlayer {
   registrationId: string;
   playerName: string | null;
-  role: string;
+  /** Null in a sport whose pack declares no playing roles (Phase 2). */
+  role: string | null;
   teamId: string;
   isIcon: boolean;
   isRetained: boolean;

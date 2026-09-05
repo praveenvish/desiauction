@@ -46,7 +46,7 @@ export interface SeasonTeamSpend {
 }
 
 export interface SeasonRoleCount {
-  role: string;
+  role: string | null;
   count: number;
 }
 

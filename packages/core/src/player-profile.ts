@@ -39,7 +39,7 @@ export type BowlingStyle = (typeof BOWLING_STYLES)[number];
 export type PlayerRole = (typeof PLAYER_ROLES)[number];
 
 /** Human label for a role; an unknown/legacy value comes back readable. */
-export function roleLabel(role: string): string {
+export function roleLabel(role: string | null): string {
   return roleLabelIn(CRICKET, role);
 }
 

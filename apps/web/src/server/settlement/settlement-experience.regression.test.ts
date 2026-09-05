@@ -292,6 +292,7 @@ beforeAll(async () => {
 
   org = await createOrg(db, owner, `Desk ${RUN}`);
   comp = await createCompetition(db, org.id, owner, {
+    sport: "cricket",
     name: `Cup ${RUN}`,
     location: "Pune",
     startsOn: "2026-08-01",
@@ -1030,6 +1031,7 @@ describe("PX-7 · A voided case", () => {
     // A voided case never blocks a fresh attempt — but it must be voidable only
     // while it is clean, which the earlier ATTACK proved for a paid case.
     const secondComp = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
       name: `Void ${RUN}`,
       location: "Nashik",
       startsOn: "2026-10-01",

@@ -143,7 +143,10 @@ describe("TIER LIMITS — the ceiling the pricing page has always described", ()
    * and a season on the beta grant never meets a ceiling at all.
    */
   const freeSeason = async (name: string) => {
-    const competition = await createCompetition(db, orgX.id, owner, { name: `${name} ${RUN}` });
+    const competition = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `${name} ${RUN}`,
+    });
     await db
       .update(competitionsTable)
       .set({ tier: "free" })
@@ -456,7 +459,10 @@ describe("TIER LIMITS — the ceiling the pricing page has always described", ()
 
   it("never blocks a season created during beta — that promise is on the page", async () => {
     // createCompetition stamps BETA_TIER, so this is the default path today.
-    const competition = await createCompetition(db, orgX.id, owner, { name: `Beta ${RUN}` });
+    const competition = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `Beta ${RUN}`,
+    });
     for (let n = 1; n <= 6; n += 1) {
       expect(
         (await createTeam(db, orgX.id, competition.id, owner, `Beta Team ${String(n)}`)).ok,
@@ -477,7 +483,10 @@ describe('PUBLIC DIRECTORY — "live" means something is happening', () => {
    * The event log already knew. These three cases are the whole rule.
    */
   const seed = async (name: string, status: "live" | "paused", lastEventAgeMs: number | null) => {
-    const competition = await createCompetition(db, orgX.id, owner, { name: `${name} ${RUN}` });
+    const competition = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `${name} ${RUN}`,
+    });
     await db
       .update(competitionsTable)
       .set({ visibility: "public" })
@@ -553,9 +562,10 @@ describe("COMPETITION REGRESSION — domain contract", () => {
   });
 
   it("creates a tournament and a competition; the competition starts in draft", async () => {
-    const tournament = await createTournament(db, orgX.id, owner, `Tournament ${RUN}`);
+    const tournament = await createTournament(db, orgX.id, owner, `Tournament ${RUN}`, "cricket");
     expect((await tournamentsOf(db, orgX.id)).map((t) => t.id)).toContain(tournament.id);
     const competition = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
       name: `MPL ${RUN}`,
       tournamentId: tournament.id,
       location: "Malad",
@@ -572,7 +582,10 @@ describe("COMPETITION REGRESSION — domain contract", () => {
 
   it("the lifecycle guard blocks opening registration until dates+location exist", async () => {
     // A bare competition (no dates/location) cannot open registration.
-    const bare = await createCompetition(db, orgX.id, owner, { name: `Bare ${RUN}` });
+    const bare = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `Bare ${RUN}`,
+    });
     const setup = await advanceCompetition(db, { ...bare, orgId: orgX.id }, owner, "setup");
     expect(setup.ok).toBe(true);
     const bareResolved = must(await resolveCompetition(db, owner, bare.slug), "bare competition");
@@ -591,6 +604,7 @@ describe("COMPETITION REGRESSION — domain contract", () => {
 
   it("clones a competition into a fresh draft — team shells + coach carry over, the player pool does NOT (retention)", async () => {
     const src = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
       name: `Malad League ${RUN} 2026`,
       location: "Malad",
       startsOn: "2026-08-01",
@@ -678,6 +692,7 @@ describe("COMPETITION REGRESSION — domain contract", () => {
 
   it("attributes a registration to its share source — audit meta + projection (Outcome Governance)", async () => {
     const c = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
       name: `Attrib ${RUN}`,
       location: "Malad",
       startsOn: "2026-08-01",
@@ -774,7 +789,10 @@ describe("COMPETITION REGRESSION — domain contract", () => {
 
   it("registration only opens while intake is open (not before)", async () => {
     // orgY has a fresh draft competition — registration must be refused.
-    const draft = await createCompetition(db, orgY.id, outsider, { name: `Draft ${RUN}` });
+    const draft = await createCompetition(db, orgY.id, outsider, {
+      sport: "cricket",
+      name: `Draft ${RUN}`,
+    });
     expect(await submitRegistration(db, draft.id, orgY.id, player, "bowler")).toEqual({
       ok: false,
       reason: "not_open",
@@ -854,7 +872,10 @@ describe("COMPETITION REGRESSION — domain contract", () => {
 
 describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", () => {
   it("suppresses age and photo for an under-18 player, keeps them for an adult", async () => {
-    const competition = await createCompetition(db, orgX.id, owner, { name: `Minors ${RUN}` });
+    const competition = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `Minors ${RUN}`,
+    });
     await db
       .update(competitionsTable)
       .set({ visibility: "public" })

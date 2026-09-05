@@ -1071,7 +1071,8 @@ export interface UserDetail {
     competitionName: string;
     orgName: string;
     startsOn: string | null;
-    role: string;
+    /** Null in a sport whose pack declares no playing roles (Phase 2). */
+    role: string | null;
     status: string;
   }[];
 }

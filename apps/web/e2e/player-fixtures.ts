@@ -67,6 +67,7 @@ export async function insertCareerFixture(
     await db.insert(competitions).values({
       id: competitionId,
       orgId,
+      sport: "cricket",
       name: competitionName,
       slug: `career-fixture-cup-${stamp}`,
       status: "registration_closed",
@@ -159,6 +160,7 @@ export async function insertWomensSeason(stamp: string): Promise<{ registerPath:
     await db.insert(competitions).values({
       id: competitionId,
       orgId,
+      sport: "cricket",
       name: `Womens Fixture Cup ${stamp}`,
       slug,
       status: "registration_open",

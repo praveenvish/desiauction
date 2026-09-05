@@ -120,6 +120,7 @@ beforeAll(async () => {
   org = await createOrg(db, owner, `Fix Org ${RUN}`);
   orgRival = await createOrg(db, outsider, `Fix Rival ${RUN}`);
   comp = await createCompetition(db, org.id, owner, {
+    sport: "cricket",
     name: `Malad Premier League ${RUN}`,
     location: "Malad",
     startsOn: "2026-08-01",
@@ -274,6 +275,7 @@ describe("FIXTURE OPS REGRESSION — deterministic generation", () => {
   it("generation is deterministic: an identical competition yields the identical schedule", async () => {
     const mk = async (name: string) => {
       const c = await createCompetition(db, org.id, owner, {
+        sport: "cricket",
         name,
         startsOn: "2026-10-01",
         endsOn: "2026-10-30",
@@ -666,7 +668,10 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
     const numbers = lines.slice(1).map((l) => l.split(",")[0] ?? "");
     expect(numbers).toEqual([...numbers].sort());
     // Tenant scoping: a rival competition's fixtures never leak in.
-    const rivalComp = await createCompetition(db, orgRival.id, outsider, { name: `Rival ${RUN}` });
+    const rivalComp = await createCompetition(db, orgRival.id, outsider, {
+      sport: "cricket",
+      name: `Rival ${RUN}`,
+    });
     const rt1 = await createTeam(db, orgRival.id, rivalComp.id, outsider, "Rival Reds");
     const rt2 = await createTeam(db, orgRival.id, rivalComp.id, outsider, "Rival Blues");
     if (!rt1.ok || !rt2.ok) {
@@ -800,6 +805,7 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
 
   it("SCALE: 520 fixtures page correctly, bounded per page, stats reconcile", async () => {
     const scaleComp = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
       name: `Scale Fixtures ${RUN}`,
       startsOn: "2026-08-01",
       endsOn: "2027-08-01",
@@ -878,7 +884,7 @@ describe("RESULTS — who won, and the table derived from it", () => {
         orgId: org.id,
         fixtureId: target,
         actorId: owner,
-        result: { outcome: "home_win", homeRuns: 100, awayRuns: 90 },
+        result: { outcome: "home_win", homeScore: { runs: 100 }, awayScore: { runs: 90 } },
       }),
     ).toEqual({ ok: false, reason: "not_played" });
     await db.update(fixturesTable).set({ status: "completed" }).where(eq(fixturesTable.id, target));
@@ -904,7 +910,11 @@ describe("RESULTS — who won, and the table derived from it", () => {
         orgId: org.id,
         fixtureId: played,
         actorId: owner,
-        result: { outcome: "home_win", homeRuns: 100, homeWickets: 11, awayRuns: 90 },
+        result: {
+          outcome: "home_win",
+          homeScore: { runs: 100, wickets: 11 },
+          awayScore: { runs: 90 },
+        },
       }),
     ).toEqual({ ok: false, reason: "impossible_score" });
   });
@@ -916,12 +926,8 @@ describe("RESULTS — who won, and the table derived from it", () => {
       actorId: owner,
       result: {
         outcome: "home_win",
-        homeRuns: 180,
-        homeWickets: 4,
-        homeBalls: 120,
-        awayRuns: 150,
-        awayWickets: 8,
-        awayBalls: 120,
+        homeScore: { runs: 180, wickets: 4, balls: 120 },
+        awayScore: { runs: 150, wickets: 8, balls: 120 },
       },
     });
     expect(first).toEqual({ ok: true, amended: false });
@@ -933,18 +939,14 @@ describe("RESULTS — who won, and the table derived from it", () => {
       actorId: owner,
       result: {
         outcome: "home_win",
-        homeRuns: 181,
-        homeWickets: 4,
-        homeBalls: 120,
-        awayRuns: 150,
-        awayWickets: 8,
-        awayBalls: 120,
+        homeScore: { runs: 181, wickets: 4, balls: 120 },
+        awayScore: { runs: 150, wickets: 8, balls: 120 },
       },
     });
     expect(second, "the second is an amendment, and says so").toEqual({ ok: true, amended: true });
 
     const stored = await resultOf(db, played);
-    expect(stored?.homeRuns, "one row, the current truth").toBe(181);
+    expect(stored?.score?.home?.["runs"], "one row, the current truth").toBe(181);
     // Named apart from the first recording: "who changed this afterwards" is
     // the question an aggrieved club asks, and one action cannot answer it.
     const actions = (
@@ -977,6 +979,75 @@ describe("RESULTS — who won, and the table derived from it", () => {
     expect(after.recorded, "a cancelled fixture takes its result out of the table").toBe(0);
     expect(after.rows.every((row) => row.played === 0)).toBe(true);
     await db.update(fixturesTable).set({ status: "completed" }).where(eq(fixturesTable.id, played));
+  });
+
+  /*
+   * SP-1 PHASE 2, END TO END. Everything else in this file proves cricket still
+   * works. This proves the platform actually runs a second sport: a football
+   * season, through the same writer and the same table, judged by football's
+   * rules — three points for a win, goal difference, goals in place of runs.
+   *
+   * It exercises the parts that could each silently fall back to cricket: the
+   * score is stored under football's own key, the bounds that reject it are
+   * football's, and the tiebreaks on the row are football's.
+   */
+  it("runs a FOOTBALL season through the same writer and table", async () => {
+    const football = await createCompetition(db, org.id, owner, {
+      sport: "football",
+      name: `Malad Football League ${RUN}`,
+      location: "Malad",
+      startsOn: "2026-08-01",
+      endsOn: "2026-09-15",
+    });
+    for (const name of [`FC Home ${RUN}`, `FC Away ${RUN}`]) {
+      const made = await createTeam(db, org.id, football.id, owner, name);
+      if (!made.ok) {
+        throw new Error("football team setup failed");
+      }
+    }
+    expect(
+      await generateFixtures(db, football, owner, {
+        rounds: 1 as const,
+        startDate: "2026-08-01",
+        kickoffTimes: ["18:00"],
+        durationMinutes: 90,
+        groundIds: [groundA],
+      }),
+    ).toEqual({ ok: true, created: 1 });
+    const listed = await queryFixtures(db, football.id, { sort: "number", page: 1, pageSize: 10 });
+    const fixture = listed.rows[0];
+    await db
+      .update(fixturesTable)
+      .set({ status: "completed" })
+      .where(eq(fixturesTable.id, fixture?.id ?? ""));
+
+    // Goals, not runs — and 100 goals is past football's typo net even though
+    // it is a perfectly ordinary number of runs.
+    expect(
+      await recordFixtureResult(db, {
+        orgId: org.id,
+        fixtureId: fixture?.id ?? "",
+        actorId: owner,
+        result: { outcome: "home_win", homeScore: { goals: 300 }, awayScore: { goals: 0 } },
+      }),
+    ).toEqual({ ok: false, reason: "impossible_score" });
+
+    expect(
+      await recordFixtureResult(db, {
+        orgId: org.id,
+        fixtureId: fixture?.id ?? "",
+        actorId: owner,
+        result: { outcome: "home_win", homeScore: { goals: 3 }, awayScore: { goals: 1 } },
+      }),
+    ).toEqual({ ok: true, amended: false });
+
+    const table = await standingsOf(db, football.id);
+    expect(table.sport.key, "the season resolved its own pack").toBe("football");
+    const winner = table.rows.find((row) => row.teamId === fixture?.homeTeamId);
+    expect(winner?.points, "three points for a win, not cricket's two").toBe(3);
+    expect(winner?.tiebreakers["goal_difference"]).toBe(2);
+    expect(winner?.tiebreakers["net_run_rate"], "no run rate in football").toBeUndefined();
+    expect(winner?.scored["goals"]).toBe(3);
   });
 
   it("RLS: a rival tenant, and no tenant at all, read no results", async () => {

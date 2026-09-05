@@ -110,6 +110,7 @@ beforeAll(async () => {
   stranger = await login(PHONE_STRANGER);
   org = await createOrg(db, organizer, `Poster Org ${RUN}`);
   const competition = await createCompetition(db, org.id, organizer, {
+    sport: "cricket",
     name: `Poster Cup ${RUN}`,
   });
   compId = competition.id;
@@ -429,7 +430,10 @@ describe("POSTER ACCESS — everyone else", () => {
      * season the person ever played in. So the grant is asserted directly —
      * that is the thing that must stay narrow, and the 404 is downstream of it.
      */
-    const second = await createCompetition(db, org.id, organizer, { name: `Poster Cup B ${RUN}` });
+    const second = await createCompetition(db, org.id, organizer, {
+      sport: "cricket",
+      name: `Poster Cup B ${RUN}`,
+    });
     const gate = await posterGateFor(sold.personId, second.slug);
     // No registration in THAT season, so nothing is granted and the refusal is
     // the outsider's 404 rather than a grant that happens not to resolve.

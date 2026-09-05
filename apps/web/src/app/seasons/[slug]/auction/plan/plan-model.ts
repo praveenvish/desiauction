@@ -2,6 +2,7 @@ import {
   REGISTRATION_ROLES,
   TARGET_PRIORITIES,
   TARGET_PRIORITY_LABELS,
+  roleLabel,
   type PlanFit,
   type TargetOutcome,
   type TargetPriority,
@@ -67,8 +68,7 @@ export function searchPool(
     if (targeted.has(lot.registrationId) || lot.status === "sold" || lot.status === "withdrawn") {
       continue;
     }
-    const haystack =
-      `${lot.playerName ?? ""} ${lot.number} ${lot.role.replace(/_/g, " ")}`.toLowerCase();
+    const haystack = `${lot.playerName ?? ""} ${lot.number} ${roleLabel(lot.role)}`.toLowerCase();
     if (tokens.every((token) => haystack.includes(token))) {
       out.push(lot);
       if (out.length >= limit) {
@@ -178,6 +178,11 @@ export function roleFacts(
     squad.set(role, (squad.get(role) ?? 0) + 1);
   }
   for (const lot of lots) {
+    // A sport with no playing roles has no role tally to keep — the lot still
+    // counts toward the squad and the purse, it simply has nothing to count IN.
+    if (lot.role === null) {
+      continue;
+    }
     if (lot.status === "sold") {
       if (lot.soldToTeamId === teamId) {
         squad.set(lot.role, (squad.get(lot.role) ?? 0) + 1);

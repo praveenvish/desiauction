@@ -17,7 +17,7 @@ export interface AuctionPoolEntry {
   readonly registrationId: string;
   readonly personId: string;
   readonly playerName: string | null;
-  readonly role: string;
+  readonly role: string | null;
   readonly basePriceBand: string | null;
   readonly registrationNumber: string;
   /** Already on a team sheet (retained, or sold in this auction) — not "left to place". */

@@ -224,7 +224,7 @@ export async function createCompetitionAction(
    * which the database cannot know. Empty is allowed and takes the column
    * default (cricket) while that default is still true.
    */
-  if (sport !== "" && !(await isSportEnabled(sport))) {
+  if (sport === "" || !(await isSportEnabled(sport))) {
     return { error: "Pick a sport this platform currently runs.", field: "sport" };
   }
   // The tournament arrives from a hidden field, so it is caller input like any
@@ -251,7 +251,7 @@ export async function createCompetitionAction(
           location,
           startsOn,
           endsOn,
-          ...(sport !== "" ? { sport } : {}),
+          sport,
           ...(tournamentId !== "" ? { tournamentId } : {}),
         });
       },
@@ -829,7 +829,7 @@ export interface RegistrationLanding {
   mine: {
     id: string;
     status: string;
-    role: string;
+    role: string | null;
     number: string;
     rejectionReason: string | null;
   } | null;
@@ -1240,7 +1240,7 @@ export async function registrationDashboard(
         const verdict = evaluateRegistration({
           competitionStatus: competition.status,
           entryCategory: competition.entryCategory,
-          role: row.role,
+          role: row.role ?? "",
           gender: genderOf.get(row.personId) ?? null,
           dateOfBirth: null,
           guardianConsent: false,
@@ -1559,7 +1559,7 @@ export async function setTeamCoachAction(
 export interface AddPlayerInput {
   name: string;
   phone: string;
-  role: string;
+  role: string | null;
   basePriceBand: string;
   dateOfBirth: string;
   battingStyle: string;
@@ -1586,7 +1586,12 @@ export async function addPlayerAction(
     return { ok: false, error: gate.error };
   }
   const check = validateNewPlayer(
-    { name: input.name, phone: input.phone, role: input.role, basePriceBand: input.basePriceBand },
+    {
+      name: input.name,
+      phone: input.phone,
+      role: input.role ?? "",
+      basePriceBand: input.basePriceBand,
+    },
     await bandsFor(gate.competition.id),
   );
   if (!check.ok) {

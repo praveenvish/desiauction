@@ -180,6 +180,7 @@ beforeAll(async () => {
   org = await createOrg(db, owner, `Auction Org ${RUN}`);
   orgRival = await createOrg(db, outsider, `Auction Rival ${RUN}`);
   comp = await createCompetition(db, org.id, owner, {
+    sport: "cricket",
     name: `Mumbai Premier League ${RUN}`,
     location: "Malad",
     startsOn: "2026-08-01",
@@ -767,6 +768,7 @@ describe("AUCTION FOUNDATION — events, audit, replay, recovery", () => {
 
   it("ABORT freezes everything; a new auction may then be created", async () => {
     const comp2 = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
       name: `Abort League ${RUN}`,
       location: "Malad",
       startsOn: "2026-10-01",
@@ -813,6 +815,7 @@ describe("AUCTION FOUNDATION — after the hammer, nothing moves", () => {
    */
   it("refuses every lot command once the auction is terminal", async () => {
     const comp3 = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
       name: `Terminal League ${RUN}`,
       location: "Malad",
       startsOn: "2026-11-01",

@@ -39,31 +39,71 @@ const OUTCOMES: readonly { value: string; label: string }[] = [
   { value: "abandoned", label: "Abandoned (never started)" },
 ];
 
+/**
+ * The scoreline in one line. The PRIMARY component only — runs, or goals — the
+ * way a result reads when somebody asks who won. An em dash for a component
+ * that was never recorded, because zero is a real score.
+ */
+function summarise(side: Record<string, number> | undefined): string {
+  const first = side === undefined ? undefined : Object.values(side)[0];
+  return first === undefined ? "—" : String(first);
+}
+
 export function ResultsCard({
   slug,
   fixtures,
   results,
+  scoreFields,
   canManage,
 }: {
   slug: string;
   fixtures: readonly ResultFixture[];
-  results: Record<string, { outcome: string; homeRuns: number | null; awayRuns: number | null }>;
+  results: Record<
+    string,
+    {
+      outcome: string;
+      score: { home?: Record<string, number>; away?: Record<string, number> } | null;
+    }
+  >;
+  /**
+   * The season's score components, as plain data. The pack itself cannot cross
+   * this boundary — it carries functions — so the form receives the labels and
+   * the server parses what the scorer types (SP-1 Phase 2).
+   */
+  scoreFields: readonly { key: string; label: string; help?: string }[];
   canManage: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({
-    outcome: "home_win",
-    homeRuns: "",
-    homeWickets: "",
-    homeOvers: "",
-    awayRuns: "",
-    awayWickets: "",
-    awayOvers: "",
-    method: "",
-  });
+  const [form, setForm] = useState<{
+    outcome: string;
+    home: Record<string, string>;
+    away: Record<string, string>;
+    method: string;
+  }>({ outcome: "home_win", home: {}, away: {}, method: "" });
+
+  /** One numeric input per score component, per side. */
+  const scoreInputs = (side: "home" | "away", teamName: string | null) =>
+    scoreFields.map((field) => (
+      <Field
+        key={`${side}-${field.key}`}
+        label={`${side === "home" ? (teamName ?? "Home") : (teamName ?? "Away")} ${(field.help !==
+        undefined
+          ? field.label
+          : field.label
+        ).toLowerCase()}`}
+        name={`${side}-${field.key}`}
+        inputMode="numeric"
+        {...(field.help !== undefined ? { help: field.help } : {})}
+        value={form[side][field.key] ?? ""}
+        onChange={(event) => {
+          setForm({ ...form, [side]: { ...form[side], [field.key]: event.target.value } });
+        }}
+        data-testid={`result-${side}-${field.key}`}
+      />
+    ));
 
   const played = fixtures.filter(
     (fixture) => fixture.status === "completed" || fixture.status === "in_progress",
@@ -124,7 +164,7 @@ export function ResultsCard({
               <span className="competitions-hint">
                 {recorded === undefined
                   ? "no result recorded"
-                  : `${String(recorded.homeRuns ?? "—")} – ${String(recorded.awayRuns ?? "—")} · ${recorded.outcome.replace("_", " ")}`}
+                  : `${summarise(recorded.score?.home)} – ${summarise(recorded.score?.away)} · ${recorded.outcome.replace("_", " ")}`}
               </span>
               {canManage ? (
                 <Button
@@ -154,63 +194,8 @@ export function ResultsCard({
                       </option>
                     ))}
                   </Select>
-                  <Field
-                    label={`${fixture.homeTeamName ?? "Home"} runs`}
-                    name="homeRuns"
-                    inputMode="numeric"
-                    value={form.homeRuns}
-                    onChange={(event) => {
-                      setForm({ ...form, homeRuns: event.target.value });
-                    }}
-                    data-testid="result-home-runs"
-                  />
-                  <Field
-                    label="Home wickets"
-                    name="homeWickets"
-                    inputMode="numeric"
-                    value={form.homeWickets}
-                    onChange={(event) => {
-                      setForm({ ...form, homeWickets: event.target.value });
-                    }}
-                  />
-                  <Field
-                    label="Home overs"
-                    name="homeOvers"
-                    help="18.3 — not 18.5 for a half"
-                    value={form.homeOvers}
-                    onChange={(event) => {
-                      setForm({ ...form, homeOvers: event.target.value });
-                    }}
-                    data-testid="result-home-overs"
-                  />
-                  <Field
-                    label={`${fixture.awayTeamName ?? "Away"} runs`}
-                    name="awayRuns"
-                    inputMode="numeric"
-                    value={form.awayRuns}
-                    onChange={(event) => {
-                      setForm({ ...form, awayRuns: event.target.value });
-                    }}
-                    data-testid="result-away-runs"
-                  />
-                  <Field
-                    label="Away wickets"
-                    name="awayWickets"
-                    inputMode="numeric"
-                    value={form.awayWickets}
-                    onChange={(event) => {
-                      setForm({ ...form, awayWickets: event.target.value });
-                    }}
-                  />
-                  <Field
-                    label="Away overs"
-                    name="awayOvers"
-                    value={form.awayOvers}
-                    onChange={(event) => {
-                      setForm({ ...form, awayOvers: event.target.value });
-                    }}
-                    data-testid="result-away-overs"
-                  />
+                  {scoreInputs("home", fixture.homeTeamName)}
+                  {scoreInputs("away", fixture.awayTeamName)}
                   <Field
                     label="Method"
                     name="method"

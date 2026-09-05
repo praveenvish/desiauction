@@ -6,22 +6,30 @@
  * first time somebody amends a scorecard, and then two screens disagree about
  * who is top. Deriving costs one pass over a season's fixtures.
  *
- * OVERS ARE BALLS THROUGHOUT. `4.5` overs is four overs and five balls, and net
- * run rate computed on that decimal is wrong by roughly eight percent per
- * fractional over — quietly, all season, in the number that decides who
- * qualifies. Every rate here divides runs by BALLS and multiplies by six.
+ * SPORT-AGNOSTIC SINCE SP-1 PHASE 2. This module used to speak cricket: it
+ * summed `runs` and `balls` by name and hard-wired net run rate as the only
+ * tiebreak. It now accumulates whatever score components the caller names and
+ * applies whatever tiebreakers the caller supplies, so a football table breaks
+ * ties on goal difference and a cricket table still breaks them on NRR — same
+ * function, no branch on sport anywhere in it.
+ *
+ * IT TAKES RULES, IT DOES NOT IMPORT A PACK. `sports/cricket.ts` already reads
+ * `DEFAULT_POINTS` from here; importing a pack back would close a cycle the
+ * `no-circular` gate refuses, and rightly — the league table is arithmetic, and
+ * arithmetic should not know what a sport is. The pack passes its rules in.
  */
 
 export type ResultOutcome = "home_win" | "away_win" | "tie" | "no_result" | "abandoned";
+
+/** Per-side score components, keyed by the sport's score-field keys. */
+export type ScoreRecord = Readonly<Record<string, number | null | undefined>>;
 
 export interface FixtureResultInput {
   readonly homeTeamId: string;
   readonly awayTeamId: string;
   readonly outcome: ResultOutcome;
-  readonly homeRuns?: number | null;
-  readonly homeBalls?: number | null;
-  readonly awayRuns?: number | null;
-  readonly awayBalls?: number | null;
+  readonly homeScore?: ScoreRecord;
+  readonly awayScore?: ScoreRecord;
 }
 
 /**
@@ -41,6 +49,38 @@ export interface PointsPolicy {
 
 export const DEFAULT_POINTS: PointsPolicy = { win: 2, tie: 1, loss: 0, noResult: 1 };
 
+/** What a team scored, and what was scored against it, summed over the season. */
+export interface SideTotals {
+  readonly scored: Readonly<Record<string, number>>;
+  readonly conceded: Readonly<Record<string, number>>;
+}
+
+/**
+ * One ordered tiebreak after points.
+ *
+ * `compute` returns null when the number cannot be formed at all — NOT zero.
+ * Zero is a real net run rate and a real goal difference: a team exactly level
+ * has one, and returning it for "has not played" would place a brand-new team
+ * level with a team that genuinely broke even.
+ */
+export interface TiebreakerSpec {
+  readonly key: string;
+  /** The column heading a table shows: "NRR", "GD". */
+  readonly label: string;
+  /** Higher is better. Null sorts below every real number. */
+  readonly compute: (totals: SideTotals) => number | null;
+  /** Digits when displayed — NRR wants 3, goal difference wants 0. */
+  readonly precision: number;
+}
+
+export interface StandingsRules {
+  readonly points: PointsPolicy;
+  /** The score components this sport accumulates, e.g. runs, balls | goals. */
+  readonly scoreFields: readonly string[];
+  /** Applied in order, after points. */
+  readonly tiebreakers: readonly TiebreakerSpec[];
+}
+
 export interface StandingsRow {
   readonly teamId: string;
   readonly played: number;
@@ -49,54 +89,58 @@ export interface StandingsRow {
   readonly tied: number;
   readonly noResult: number;
   readonly points: number;
-  /** Runs scored and balls faced, for the rate. Shown so the rate is checkable. */
-  readonly runsFor: number;
-  readonly ballsFaced: number;
-  readonly runsAgainst: number;
-  readonly ballsBowled: number;
-  /**
-   * Net run rate, or null when it cannot be computed rather than zero.
-   *
-   * Zero is a real NRR — a team exactly level on rate has one — so returning it
-   * for "no completed matches yet" would put a brand-new team level with a team
-   * that has genuinely broken even, and sort them together.
-   */
-  readonly netRunRate: number | null;
+  /** Summed score components, so every tiebreak below is checkable by eye. */
+  readonly scored: Readonly<Record<string, number>>;
+  readonly conceded: Readonly<Record<string, number>>;
+  /** Tiebreak values by key, in the rules' order. Null = not computable. */
+  readonly tiebreakers: Readonly<Record<string, number | null>>;
 }
 
-function rate(runs: number, balls: number): number | null {
-  return balls === 0 ? null : (runs / balls) * 6;
+interface Mutable {
+  teamId: string;
+  played: number;
+  won: number;
+  lost: number;
+  tied: number;
+  noResult: number;
+  points: number;
+  scored: Record<string, number>;
+  conceded: Record<string, number>;
+}
+
+function zeroed(fields: readonly string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const field of fields) {
+    out[field] = 0;
+  }
+  return out;
+}
+
+function addInto(
+  target: Record<string, number>,
+  source: ScoreRecord | undefined,
+  fields: readonly string[],
+): void {
+  for (const field of fields) {
+    target[field] = (target[field] ?? 0) + (source?.[field] ?? 0);
+  }
 }
 
 /**
  * Build the table.
  *
  * `abandoned` fixtures are EXCLUDED entirely — not played, no points, no effect
- * on run rate. A no-result is different: it was played, and both sides take the
+ * on any rate. A no-result is different: it was played, and both sides take the
  * no-result points. Collapsing the two is the most common way a league table
  * comes out wrong.
  */
 export function buildStandings(
   teamIds: readonly string[],
   results: readonly FixtureResultInput[],
-  policy: PointsPolicy = DEFAULT_POINTS,
+  rules: StandingsRules,
 ): StandingsRow[] {
-  const rows = new Map<
-    string,
-    {
-      teamId: string;
-      played: number;
-      won: number;
-      lost: number;
-      tied: number;
-      noResult: number;
-      points: number;
-      runsFor: number;
-      ballsFaced: number;
-      runsAgainst: number;
-      ballsBowled: number;
-    }
-  >();
+  const { points: policy, scoreFields, tiebreakers } = rules;
+  const rows = new Map<string, Mutable>();
   // Every team gets a row, including one that has not played. A league table
   // that omits the team who has yet to play its first match reads as if they
   // are not in the competition.
@@ -109,10 +153,8 @@ export function buildStandings(
       tied: 0,
       noResult: 0,
       points: 0,
-      runsFor: 0,
-      ballsFaced: 0,
-      runsAgainst: 0,
-      ballsBowled: 0,
+      scored: zeroed(scoreFields),
+      conceded: zeroed(scoreFields),
     });
   }
 
@@ -153,7 +195,7 @@ export function buildStandings(
     }
 
     /*
-     * Run rate takes the innings that were actually bowled, whatever the
+     * The innings, halves or sets that were actually played count, whatever the
      * outcome. A no-result often has one complete innings and a rained-off
      * reply; counting the first and not the second is right, and a scheme that
      * needed both would throw away real cricket.
@@ -161,58 +203,57 @@ export function buildStandings(
      * A side bowled out short of its full overs is deliberately NOT credited
      * with the full quota here. That is a genuine variation between leagues,
      * and inventing one silently would make the table subtly wrong for the
-     * clubs using the other. It belongs in the policy the day somebody asks.
+     * clubs using the other. It belongs in the rules the day somebody asks.
      */
-    const hr = result.homeRuns ?? 0;
-    const hb = result.homeBalls ?? 0;
-    const ar = result.awayRuns ?? 0;
-    const ab = result.awayBalls ?? 0;
-    home.runsFor += hr;
-    home.ballsFaced += hb;
-    home.runsAgainst += ar;
-    home.ballsBowled += ab;
-    away.runsFor += ar;
-    away.ballsFaced += ab;
-    away.runsAgainst += hr;
-    away.ballsBowled += hb;
+    addInto(home.scored, result.homeScore, scoreFields);
+    addInto(home.conceded, result.awayScore, scoreFields);
+    addInto(away.scored, result.awayScore, scoreFields);
+    addInto(away.conceded, result.homeScore, scoreFields);
   }
 
   return [...rows.values()]
     .map((row) => {
-      const scored = rate(row.runsFor, row.ballsFaced);
-      const conceded = rate(row.runsAgainst, row.ballsBowled);
-      return {
-        ...row,
-        netRunRate: scored === null || conceded === null ? null : scored - conceded,
-      };
+      const totals: SideTotals = { scored: row.scored, conceded: row.conceded };
+      const computed: Record<string, number | null> = {};
+      for (const tiebreaker of tiebreakers) {
+        computed[tiebreaker.key] = tiebreaker.compute(totals);
+      }
+      return { ...row, tiebreakers: computed };
     })
-    .sort(compareStandings);
+    .sort((a, b) => compareStandings(a, b, tiebreakers));
 }
 
 /**
- * Points, then net run rate, then wins, then team id.
+ * Points, then each tiebreak in the sport's own order, then wins, then team id.
  *
  * The last key is not decoration: without a total order the table's row order
  * depends on insertion, so two equal teams could swap places between page
  * loads. A stable, arbitrary tiebreak is honest; a flickering one is not.
  *
- * A null rate sorts BELOW any real one — a team that has not played cannot be
- * placed above one that has by virtue of having no number.
+ * A null tiebreak sorts BELOW any real one — a team that has not played cannot
+ * be placed above one that has by virtue of having no number.
  */
-export function compareStandings(a: StandingsRow, b: StandingsRow): number {
+export function compareStandings(
+  a: StandingsRow,
+  b: StandingsRow,
+  tiebreakers: readonly TiebreakerSpec[],
+): number {
   if (a.points !== b.points) {
     return b.points - a.points;
   }
-  const ar = a.netRunRate;
-  const br = b.netRunRate;
-  if (ar !== br) {
-    if (ar === null) {
+  for (const tiebreaker of tiebreakers) {
+    const av = a.tiebreakers[tiebreaker.key] ?? null;
+    const bv = b.tiebreakers[tiebreaker.key] ?? null;
+    if (av === bv) {
+      continue;
+    }
+    if (av === null) {
       return 1;
     }
-    if (br === null) {
+    if (bv === null) {
       return -1;
     }
-    return br - ar;
+    return bv - av;
   }
   if (a.won !== b.won) {
     return b.won - a.won;
@@ -220,19 +261,14 @@ export function compareStandings(a: StandingsRow, b: StandingsRow): number {
   return a.teamId.localeCompare(b.teamId);
 }
 
-/** Balls → the "4.5" cricket writes. Display only; never arithmetic. */
-export function oversOf(balls: number): string {
-  return `${String(Math.floor(balls / 6))}.${String(balls % 6)}`;
-}
-
-/** "4.5" → 29 balls. Returns null for anything that is not a legal over count. */
-export function ballsOf(overs: string): number | null {
-  const match = /^(\d{1,3})(?:\.([0-5]))?$/.exec(overs.trim());
-  if (match === null) {
-    return null;
-  }
-  // `.6` is rejected by the pattern above rather than folded to the next over:
-  // somebody typing 4.6 has made a mistake, and silently reading it as 5.0
-  // hides it inside a number nobody re-checks.
-  return Number(match[1]) * 6 + Number(match[2] ?? 0);
+/**
+ * A per-unit rate, or null when the denominator is absent.
+ *
+ * Shared by the tiebreakers a pack declares: cricket multiplies runs-per-ball
+ * by six to get an over rate, football divides nothing at all and simply takes
+ * a difference. Exported because a pack's `compute` is where that choice
+ * belongs, not here.
+ */
+export function ratePer(numerator: number, denominator: number, per = 1): number | null {
+  return denominator === 0 ? null : (numerator / denominator) * per;
 }

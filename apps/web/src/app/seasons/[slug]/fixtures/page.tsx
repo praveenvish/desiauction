@@ -62,6 +62,7 @@ export default async function FixturesPage({
             ) : null}
           </header>
           <FixturesPanel
+            scoreFields={dashboard.scoreFields}
             slug={slug}
             orgSlug={dashboard.orgSlug}
             isPublic={dashboard.competition.visibility === "public"}

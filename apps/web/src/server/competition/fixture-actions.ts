@@ -1,6 +1,12 @@
 "use server";
 
-import { ballsOf, parseFixtureCsv, type FixtureStatus } from "@desiauction/core";
+import {
+  parseFixtureCsv,
+  parseScoreField,
+  sportPackFor,
+  type FixtureStatus,
+  type ResultOutcome,
+} from "@desiauction/core";
 import { organizations, withTenantDb, type Db } from "@desiauction/db";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -300,6 +306,8 @@ export interface FixtureDashboardParams {
  * populated cannot leak through a component that forgets to check.
  */
 export interface FixtureDashboard {
+  /** The season's score components, as plain data for the client form. */
+  scoreFields: readonly { key: string; label: string; help?: string }[];
   competition: CompetitionSummary;
   /** Where to create venues and grounds — the activation path, as a link. */
   orgSlug: string;
@@ -317,7 +325,13 @@ export interface FixtureDashboard {
    * that were played and never scored — the state a season quietly accumulates
    * and nothing else surfaces.
    */
-  results: Record<string, { outcome: string; homeRuns: number | null; awayRuns: number | null }>;
+  results: Record<
+    string,
+    {
+      outcome: ResultOutcome;
+      score: { home?: Record<string, number>; away?: Record<string, number> } | null;
+    }
+  >;
   viewer: { canManage: boolean };
 }
 
@@ -375,10 +389,17 @@ export async function fixtureDashboard(
       teams: teamList,
       ...(groundList !== undefined ? { grounds: groundList } : {}),
       ...(conflicts !== undefined ? { conflicts } : {}),
+      scoreFields: sportPackFor(competition.sport).result.scoreFields.map((field) => ({
+        key: field.key,
+        label: field.entry?.label ?? field.label,
+        ...(field.entry?.help !== undefined ? { help: field.entry.help } : {}),
+      })),
       results: Object.fromEntries(
         [...resultMap.entries()].map(([fixtureId, row]) => [
           fixtureId,
-          { outcome: row.outcome, homeRuns: row.homeRuns, awayRuns: row.awayRuns },
+          // The scoreline in the season's own shape — the card renders it
+          // through the pack rather than assuming runs.
+          { outcome: row.outcome, score: row.score },
         ]),
       ),
       viewer: { canManage },
@@ -800,8 +821,12 @@ export async function standingsView(slug: string): Promise<StandingsPageView | n
 /**
  * Record or amend a result.
  *
- * Overs arrive as the "18.3" a scorer writes and are converted to BALLS here,
- * at the edge. `ballsOf` refuses `.6` rather than folding it to the next over:
+ * THE SCORE ARRIVES AS THE SCORER TYPED IT, keyed by the season's own score
+ * components — `{ home: { runs, wickets, balls }, away: … }` in cricket,
+ * `{ home: { goals } }` in football — and is parsed HERE, at the edge, by the
+ * pack. That is deliberate: cricket's `balls` is written "18.3" and stored as
+ * 111, and the function that knows so cannot cross into a client component.
+ * `ballsOf` still refuses `.6` rather than folding it to the next over —
  * somebody typing 4.6 has made a mistake, and reading it as 5.0 buries that in
  * a number nobody re-checks.
  */
@@ -810,12 +835,9 @@ export async function recordResultAction(
   fixtureId: string,
   input: {
     outcome: string;
-    homeRuns?: string;
-    homeWickets?: string;
-    homeOvers?: string;
-    awayRuns?: string;
-    awayWickets?: string;
-    awayOvers?: string;
+    /** Raw text per score component, exactly as the scorer typed it. */
+    home?: Record<string, string>;
+    away?: Record<string, string>;
     method?: string;
     note?: string;
   },
@@ -829,30 +851,32 @@ export async function recordResultAction(
   if (!isResultOutcome(outcome)) {
     return { ok: false, error: "Pick how the match ended." };
   }
-  const number = (raw?: string): number | null | undefined => {
-    if (raw === undefined || raw.trim() === "") {
-      return null;
+  const pack = sportPackFor(competition.sport);
+  /*
+   * A component the scorer left blank is null and fine; one they filled in that
+   * the pack cannot read is a mistake worth naming. The two are told apart by
+   * comparing against what was GIVEN, not by a flag set inside the loop.
+   */
+  const given = (side?: Record<string, string>, key?: string): boolean =>
+    (side?.[key ?? ""] ?? "").trim() !== "";
+  const side = (raw?: Record<string, string>): Record<string, number | null> => {
+    const out: Record<string, number | null> = {};
+    for (const field of pack.result.scoreFields) {
+      out[field.key] = given(raw, field.key)
+        ? parseScoreField(pack, field.key, raw?.[field.key] ?? "")
+        : null;
     }
-    const value = Number(raw);
-    return Number.isSafeInteger(value) ? value : undefined;
+    return out;
   };
-  const overs = (raw?: string): number | null | undefined => {
-    if (raw === undefined || raw.trim() === "") {
-      return null;
-    }
-    return ballsOf(raw) ?? undefined;
-  };
-  const fields = {
-    homeRuns: number(input.homeRuns),
-    homeWickets: number(input.homeWickets),
-    homeBalls: overs(input.homeOvers),
-    awayRuns: number(input.awayRuns),
-    awayWickets: number(input.awayWickets),
-    awayBalls: overs(input.awayOvers),
-  };
-  if (Object.values(fields).includes(undefined)) {
-    // Named specifically, because "invalid input" on a six-field form sends a
-    // scorer hunting. Overs are the field people get wrong.
+  const fields = { homeScore: side(input.home), awayScore: side(input.away) };
+  const unreadable = pack.result.scoreFields.some(
+    (field) =>
+      (given(input.home, field.key) && fields.homeScore[field.key] === null) ||
+      (given(input.away, field.key) && fields.awayScore[field.key] === null),
+  );
+  if (unreadable) {
+    // Named specifically, because "invalid input" on a multi-field form sends a
+    // scorer hunting. In cricket, overs are the field people get wrong.
     return {
       ok: false,
       error: "Check the numbers — overs are written like 18.3, and .6 is not an over.",
@@ -876,7 +900,7 @@ export async function recordResultAction(
       actorId: session.personId,
       result: {
         outcome,
-        ...(fields as Record<string, number | null>),
+        ...fields,
         method: input.method?.trim() === "" ? null : (input.method ?? null),
         note: input.note?.trim() === "" ? null : (input.note ?? null),
       },

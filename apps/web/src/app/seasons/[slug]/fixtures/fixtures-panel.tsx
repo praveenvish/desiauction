@@ -85,6 +85,7 @@ export function FixturesPanel({
   results,
   canManage,
   filters,
+  scoreFields,
 }: {
   slug: string;
   orgSlug: string;
@@ -92,6 +93,7 @@ export function FixturesPanel({
   stats: FixtureDashboard["stats"];
   page: FixtureDashboard["page"];
   teams: FixtureDashboard["teams"];
+  scoreFields: FixtureDashboard["scoreFields"];
   grounds?: FixtureDashboard["grounds"];
   conflicts?: FixtureDashboard["conflicts"];
   results: FixtureDashboard["results"];
@@ -746,7 +748,13 @@ export function FixturesPanel({
       {/* The worklist nothing else surfaces: matches that were played and never
           scored. A season quietly accumulates them, and the table's "6 of 20
           results in" is the symptom rather than the place to fix it. */}
-      <ResultsCard slug={slug} fixtures={page.rows} results={results} canManage={canManage} />
+      <ResultsCard
+        slug={slug}
+        fixtures={page.rows}
+        results={results}
+        scoreFields={scoreFields}
+        canManage={canManage}
+      />
 
       <Card>
         <form

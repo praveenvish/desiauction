@@ -86,12 +86,13 @@ async function main(): Promise<void> {
     status: "draft",
     visibility: "private" as const,
     entryCategory: "open" as const,
+    sport: "cricket",
     location: "Local",
     startsOn: "2026-01-01",
     endsOn: "2027-12-31",
   };
   ids.competitions.push(fixComp.id);
-  await db.insert(competitions).values({ ...fixComp, createdBy: personId });
+  await db.insert(competitions).values({ ...fixComp, sport: "cricket", createdBy: personId });
   const venueId = newId();
   ids.venues.push(venueId);
   await db
@@ -200,7 +201,7 @@ async function main(): Promise<void> {
   // --- 300-registration dashboard --------------------------------------------------
   const regComp: CompetitionSummary = { ...fixComp, id: newId(), slug: `perf-reg-${RUN}` };
   ids.competitions.push(regComp.id);
-  await db.insert(competitions).values({ ...regComp, createdBy: personId });
+  await db.insert(competitions).values({ ...regComp, sport: "cricket", createdBy: personId });
   const regPeople = Array.from({ length: 300 }, (_, i) => ({
     id: newId(),
     phone: `+9191${RUN.slice(-4)}${String(i).padStart(3, "0")}`,

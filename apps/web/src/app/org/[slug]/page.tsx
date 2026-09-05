@@ -241,6 +241,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   ): SeasonRow => ({
     id: edition.id,
     orgId: view.org.id,
+    sport: edition.sport,
     tournamentId,
     name: edition.name,
     slug: edition.slug,

@@ -300,6 +300,7 @@ beforeAll(async () => {
 
   org = await createOrg(db, owner, `Finance ${RUN}`);
   comp = await createCompetition(db, org.id, owner, {
+    sport: "cricket",
     name: `Ops ${RUN}`,
     location: "Vashi",
     startsOn: "2026-08-01",

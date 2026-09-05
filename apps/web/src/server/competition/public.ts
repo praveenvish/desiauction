@@ -153,7 +153,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
 export interface ShowcasePlayer {
   number: string;
   name: string;
-  role: string;
+  role: string | null;
   age: number | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
@@ -171,7 +171,7 @@ export interface ShowcasePlayer {
 interface ShowcaseRow {
   number: string;
   name: string | null;
-  role: string;
+  role: string | null;
   dateOfBirth: string | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
@@ -675,7 +675,7 @@ export interface MyRegistration {
   competitionSlug: string;
   orgName: string;
   status: string;
-  role: string;
+  role: string | null;
   number: string;
   open: boolean;
   /**

@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ballsOf,
-  buildStandings,
-  oversOf,
-  type FixtureResultInput,
-  type StandingsRow,
-} from "./standings";
+import { buildStandings, type FixtureResultInput, type StandingsRow } from "./standings";
+import { CRICKET, ballsOf, oversOf } from "./sports/cricket";
+import { FOOTBALL } from "./sports/football";
+import { standingsRulesOf } from "./sports";
+
+/*
+ * SP-1 Phase 2: the table takes RULES now. Cricket's are the pack's, so every
+ * assertion below is still about cricket's arithmetic — a change to NRR or to
+ * the points scheme fails here exactly as it did before the generalisation.
+ */
+const CRICKET_RULES = standingsRulesOf(CRICKET);
 
 /**
  * A league table is arithmetic nobody re-checks. It is read as fact, it decides
@@ -60,10 +64,13 @@ describe("the table", () => {
   it("gives a team that has not played a row, not an absence", () => {
     // A table that omits the team yet to play its first match reads as if they
     // are not in the competition at all.
-    const rows = buildStandings(TEAMS, []);
+    const rows = buildStandings(TEAMS, [], CRICKET_RULES);
     expect(rows).toHaveLength(3);
     expect(rowFor(rows, C).played).toBe(0);
-    expect(rowFor(rows, C).netRunRate, "no innings is not a rate of zero").toBeNull();
+    expect(
+      rowFor(rows, C).tiebreakers["net_run_rate"],
+      "no innings is not a rate of zero",
+    ).toBeNull();
   });
 
   it("counts a no-result as PLAYED and shares the point; abandoned counts as nothing", () => {
@@ -77,7 +84,7 @@ describe("the table", () => {
       { homeTeamId: A, awayTeamId: B, outcome: "no_result" },
       { homeTeamId: A, awayTeamId: C, outcome: "abandoned" },
     ];
-    const rows = buildStandings(TEAMS, results);
+    const rows = buildStandings(TEAMS, results, CRICKET_RULES);
     expect(rowFor(rows, A).played).toBe(1);
     expect(rowFor(rows, A).noResult).toBe(1);
     expect(rowFor(rows, A).points).toBe(1);
@@ -96,15 +103,14 @@ describe("the table", () => {
           homeTeamId: A,
           awayTeamId: B,
           outcome: "home_win",
-          homeRuns: 180,
-          homeBalls: 120,
-          awayRuns: 150,
-          awayBalls: 120,
+          homeScore: { runs: 180, balls: 120 },
+          awayScore: { runs: 150, balls: 120 },
         },
       ],
+      CRICKET_RULES,
     );
-    expect(rowFor(rows, A).netRunRate).toBeCloseTo(1.5, 10);
-    expect(rowFor(rows, B).netRunRate).toBeCloseTo(-1.5, 10);
+    expect(rowFor(rows, A).tiebreakers["net_run_rate"]).toBeCloseTo(1.5, 10);
+    expect(rowFor(rows, B).tiebreakers["net_run_rate"]).toBeCloseTo(-1.5, 10);
   });
 
   it("gets a part-over innings right, where the decimal would not", () => {
@@ -120,15 +126,17 @@ describe("the table", () => {
           homeTeamId: A,
           awayTeamId: B,
           outcome: "away_win",
-          homeRuns: 149,
-          homeBalls: 120,
-          awayRuns: 150,
-          awayBalls: ballsOf("18.3") ?? 0,
+          homeScore: { runs: 149, balls: 120 },
+          awayScore: { runs: 150, balls: ballsOf("18.3") ?? 0 },
         },
       ],
+      CRICKET_RULES,
     );
-    expect(rowFor(rows, B).ballsFaced).toBe(111);
-    expect(rowFor(rows, B).netRunRate).toBeCloseTo((150 / 111) * 6 - (149 / 120) * 6, 10);
+    expect(rowFor(rows, B).scored["balls"]).toBe(111);
+    expect(rowFor(rows, B).tiebreakers["net_run_rate"]).toBeCloseTo(
+      (150 / 111) * 6 - (149 / 120) * 6,
+      10,
+    );
   });
 
   it("orders by points, then run rate, then wins — and never flickers", () => {
@@ -143,32 +151,26 @@ describe("the table", () => {
         homeTeamId: A,
         awayTeamId: C,
         outcome: "home_win",
-        homeRuns: 200,
-        homeBalls: 120,
-        awayRuns: 100,
-        awayBalls: 120,
+        homeScore: { runs: 200, balls: 120 },
+        awayScore: { runs: 100, balls: 120 },
       },
       {
         homeTeamId: B,
         awayTeamId: C,
         outcome: "home_win",
-        homeRuns: 150,
-        homeBalls: 120,
-        awayRuns: 140,
-        awayBalls: 120,
+        homeScore: { runs: 150, balls: 120 },
+        awayScore: { runs: 140, balls: 120 },
       },
     ];
-    const rows = buildStandings(TEAMS, results);
+    const rows = buildStandings(TEAMS, results, CRICKET_RULES);
     expect(
       rows.map((row) => row.teamId),
       "equal points, A ahead on rate",
     ).toEqual([A, B, C]);
     // Deterministic across runs and across input order.
-    expect(buildStandings(TEAMS, [...results].reverse()).map((row) => row.teamId)).toEqual([
-      A,
-      B,
-      C,
-    ]);
+    expect(
+      buildStandings(TEAMS, [...results].reverse(), CRICKET_RULES).map((row) => row.teamId),
+    ).toEqual([A, B, C]);
   });
 
   it("sorts a team with no rate BELOW every team that has one", () => {
@@ -181,14 +183,13 @@ describe("the table", () => {
           homeTeamId: A,
           awayTeamId: B,
           outcome: "no_result",
-          homeRuns: 10,
-          homeBalls: 60,
-          awayRuns: 90,
-          awayBalls: 60,
+          homeScore: { runs: 10, balls: 60 },
+          awayScore: { runs: 90, balls: 60 },
         },
       ],
+      CRICKET_RULES,
     );
-    expect(rowFor(rows, A).netRunRate).toBeLessThan(0);
+    expect(rowFor(rows, A).tiebreakers["net_run_rate"]).toBeLessThan(0);
     expect(rows[0]?.teamId, "a real negative rate outranks none at all").toBe(B);
   });
 
@@ -196,8 +197,101 @@ describe("the table", () => {
     const rows = buildStandings(
       [A, B],
       [{ homeTeamId: A, awayTeamId: "ghost", outcome: "home_win" }],
+      CRICKET_RULES,
     );
     expect(rowFor(rows, A).played, "the table describes the teams it was given").toBe(0);
     expect(rows).toHaveLength(2);
+  });
+});
+
+/*
+ * THE SAME FUNCTION, A DIFFERENT SPORT.
+ *
+ * Cricket passing after the Phase 2 generalisation only proves nothing broke.
+ * These prove the table actually generalised: three points for a win, goal
+ * difference then goals scored, and not one branch on sport in `buildStandings`.
+ */
+describe("the table, in football", () => {
+  const RULES = standingsRulesOf(FOOTBALL);
+
+  it("awards THREE points for a win, where cricket awards two", () => {
+    const rows = buildStandings(
+      [A, B],
+      [
+        {
+          homeTeamId: A,
+          awayTeamId: B,
+          outcome: "home_win",
+          homeScore: { goals: 2 },
+          awayScore: { goals: 1 },
+        },
+      ],
+      RULES,
+    );
+    expect(rowFor(rows, A).points, "3-1-0 is what reshaped how football is played").toBe(3);
+    expect(rowFor(rows, B).points).toBe(0);
+  });
+
+  it("breaks a tie on goal difference, then on goals scored", () => {
+    /*
+     * A and C both win once and sit on three points. A wins 5–0 and C wins 1–0,
+     * so A is ahead on difference. B and D also tie on points but on the same
+     * difference — B scored more, so B is ahead. Both keys are exercised.
+     */
+    const rows = buildStandings(
+      [A, B, C, "team-d"],
+      [
+        {
+          homeTeamId: A,
+          awayTeamId: B,
+          outcome: "home_win",
+          homeScore: { goals: 5 },
+          awayScore: { goals: 0 },
+        },
+        {
+          homeTeamId: C,
+          awayTeamId: "team-d",
+          outcome: "home_win",
+          homeScore: { goals: 1 },
+          awayScore: { goals: 0 },
+        },
+      ],
+      RULES,
+    );
+    expect(rows.map((row) => row.teamId).slice(0, 2), "A ahead of C on difference").toEqual([A, C]);
+    expect(rowFor(rows, A).tiebreakers["goal_difference"]).toBe(5);
+    expect(rowFor(rows, C).tiebreakers["goal_difference"]).toBe(1);
+    expect(rowFor(rows, A).tiebreakers["goals_for"]).toBe(5);
+  });
+
+  it("has no net run rate to compute, and does not invent one", () => {
+    const rows = buildStandings([A, B], [], RULES);
+    expect(Object.keys(rowFor(rows, A).tiebreakers)).toEqual(["goal_difference", "goals_for"]);
+    expect(rowFor(rows, A).tiebreakers["net_run_rate"]).toBeUndefined();
+  });
+
+  it("summarises a side as a goal count, where cricket reads 180/20.0", () => {
+    expect(FOOTBALL.standings.summariseSide({ goals: 12 })).toBe("12");
+    expect(CRICKET.standings.summariseSide({ runs: 180, balls: 120 })).toBe("180/20.0");
+  });
+
+  it("counts a goalless draw as played, with a real zero difference", () => {
+    // Zero is a REAL goal difference here — the distinction the null in
+    // `compute` exists to protect.
+    const rows = buildStandings(
+      [A, B],
+      [
+        {
+          homeTeamId: A,
+          awayTeamId: B,
+          outcome: "tie",
+          homeScore: { goals: 0 },
+          awayScore: { goals: 0 },
+        },
+      ],
+      RULES,
+    );
+    expect(rowFor(rows, A).points).toBe(1);
+    expect(rowFor(rows, A).tiebreakers["goal_difference"]).toBe(0);
   });
 });

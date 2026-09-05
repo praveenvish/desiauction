@@ -12,11 +12,15 @@
  */
 
 import { CRICKET } from "./cricket";
+import { FOOTBALL } from "./football";
+
+import type { StandingsRules } from "../standings";
 
 import type { AttributeSpec, SportPack, VocabularyTerm } from "./types";
 
 export type {
   AttributeSpec,
+  Terminology,
   AttributeStorage,
   RoleVocabulary,
   ScoreFieldSpec,
@@ -25,14 +29,18 @@ export type {
 } from "./types";
 export {
   CRICKET,
+  ballsOf,
+  oversOf,
   CRICKET_ROLE_KEYS,
   CRICKET_BATTING_STYLE_KEYS,
   CRICKET_BOWLING_STYLE_KEYS,
 } from "./cricket";
 export type { CricketRole, CricketBattingStyle, CricketBowlingStyle } from "./cricket";
+export { FOOTBALL, FOOTBALL_ROLE_KEYS, FOOTBALL_FOOT_KEYS } from "./football";
+export type { FootballRole, FootballFoot } from "./football";
 
-/** Every sport the platform can run. One entry, honestly, until one is asked for. */
-export const SPORTS: readonly SportPack[] = [CRICKET];
+/** Every sport the platform can run. A pack each — see `types.ts` for the contract. */
+export const SPORTS: readonly SportPack[] = [CRICKET, FOOTBALL];
 
 /**
  * The pack every caller resolves to until competitions carry a sport (Phase 1).
@@ -139,11 +147,19 @@ export function parseRoleIn(pack: SportPack, value: string): string | null {
  * The one spelling of a role that any surface shows.
  *
  * An unknown token comes back readable ("left_wing" -> "left wing") rather than
- * raw. Cricket cannot currently store an unknown role — the column's enum
- * refuses one — but a sport whose roles are open-ended can, and a screen
- * printing a snake_case token at a spectator is a bug waiting for Phase 2.
+ * raw, because `registrations.role` has no enum since Phase 2 and the pack is
+ * the only thing that knows the legal values.
+ *
+ * NULL BECOMES THE EMPTY STRING, not a dash. A sport whose pack declares no
+ * playing roles has nothing to say here, and a surface should render nothing
+ * rather than a placeholder standing in for a fact that does not exist. Both
+ * packs shipped today declare `required: true`, so this is the forward path
+ * rather than a case anyone currently hits.
  */
-export function roleLabelIn(pack: SportPack, role: string): string {
+export function roleLabelIn(pack: SportPack, role: string | null): string {
+  if (role === null) {
+    return "";
+  }
   return termLabel(pack.roles.values, role) ?? role.replace(/_/g, " ");
 }
 
@@ -189,6 +205,45 @@ export function attributeOptionLabel(pack: SportPack, value: string | null): str
     }
   }
   return value;
+}
+
+/**
+ * Read one score component the way a scorer wrote it.
+ *
+ * Falls back to a plain non-negative integer, which is right for every
+ * component that is simply counted — goals, runs, wickets. Cricket's `balls`
+ * overrides it because overs are not a decimal.
+ */
+export function parseScoreField(pack: SportPack, key: string, raw: string): number | null {
+  const field = pack.result.scoreFields.find((entry) => entry.key === key);
+  if (field === undefined) {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  if (field.parse !== undefined) {
+    return field.parse(trimmed);
+  }
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+}
+
+// --- Standings ---------------------------------------------------------------
+
+/**
+ * A pack's rules in the shape `buildStandings` takes.
+ *
+ * The league table is arithmetic and does not import a pack — that would close
+ * a cycle, and a table has no business knowing what a sport is. This is the
+ * adapter, in the one module that legitimately knows both.
+ */
+export function standingsRulesOf(pack: SportPack): StandingsRules {
+  return {
+    points: pack.standings.points,
+    tiebreakers: pack.standings.tiebreakers,
+    scoreFields: pack.result.scoreFields.map((field) => field.key),
+  };
 }
 
 // --- Results -----------------------------------------------------------------

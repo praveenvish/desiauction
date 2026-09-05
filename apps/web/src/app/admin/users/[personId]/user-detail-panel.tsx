@@ -1,4 +1,5 @@
 import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
+import { roleLabel } from "@desiauction/core";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
@@ -127,7 +128,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                 <span className="admin-meta">
                   {season.orgName}
                   {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
-                  {season.role.replace(/_/g, " ")} · {season.status}
+                  {roleLabel(season.role)} · {season.status}
                 </span>
               </li>
             ))}

@@ -259,6 +259,7 @@ async function buildTheSeason(): Promise<{ competition: CompetitionRef; teamIds:
 
   let competition = await asOrg(organizer, (tenant) =>
     createCompetition(tenant, orgId, organizer, {
+      sport: "cricket",
       name: `Rehearsal Season ${RUN}`,
       location: "Malad",
       startsOn: "2026-10-01",

@@ -1,6 +1,6 @@
 # SP-1 — MULTI-SPORT · PROGRAMME PLAN
 
-## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phases 0–1 COMPLETE · gate instrumented (0045) · Phases 2–4 awaiting demand
+## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phases 0–2 COMPLETE · cricket + football live · Phases 3–4 open
 
 Taking the platform beyond cricket. Scope is **sports only** — auction
 categories outside sport (asset, commodity, charity) are deliberately deferred
@@ -78,7 +78,7 @@ definition — which is also the smallest possible widening of the read-only
 |---|-------|------|------------|
 | **0** | ✅ **The seam** — registry, cricket pack, guardrail. No behaviour change. | 2 wks | **0** |
 | 1 | ✅ **Sport becomes a dimension** — `competitions.sport`, `tournaments.sport`, `sports` catalogue, admin toggle. Backfill all rows to `cricket`. | 1.5 wks | 1 |
-| 2 | **Ship the second sport end to end** — relax `registrations.role` (nullable, enum dropped), add `registrations.attributes jsonb`, `fixture_results.score jsonb`, standings tiebreaker chains, pack-driven import fields, terminology across ~95 components. | 3 wks | 2 |
+| 2 | ✅ **Ship the second sport end to end** — relax `registrations.role` (nullable, enum dropped), add `registrations.attributes jsonb`, `fixture_results.score jsonb`, standings tiebreaker chains, pack-driven import fields, terminology across ~95 components. | 3 wks | 2 |
 | 3 | Split the person from the player — `player_sport_profiles`, `/me/[sport]`, per-sport career. | 2 wks | 1 |
 | 4 | The long tail — one pack file per further sport. | 2–4 days each | 0 |
 
@@ -94,7 +94,14 @@ Phase 0 report).
 > only". What the gate still decides is **which pack is written second**, which
 > is Phase 2's question and the expensive one. See `PHASE-1_REPORT.md` §6.
 
-**Phases 2–4 remain GATED on demand, not scheduled.** Seven weeks aimed at demand
+> **PHASE 2 SHIPPED FOOTBALL on a founder decision (2026-09-05), not on demand
+> data** — the gate's instrument had been live for hours, not weeks. The sport
+> was named by the founder rather than read from `demo_requests.sport`. What the
+> phase bought regardless: the pack contract is now proven against two sports
+> instead of one, so a third is a file rather than a discovery. See
+> `PHASE-2_REPORT.md` §1 for what the second implementation actually forced.
+
+**Phases 3–4 remain GATED on demand, not scheduled.** Seven weeks aimed at demand
 nobody has observed is the wrong bet on a product whose own audits say the
 remaining gaps are commercial, not engineering.
 

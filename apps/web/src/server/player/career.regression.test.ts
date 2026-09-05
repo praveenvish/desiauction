@@ -59,6 +59,7 @@ beforeAll(async () => {
   await db.insert(tournaments).values({
     id: tournamentId,
     orgId,
+    sport: "cricket",
     name: "Career Premier League",
     slug: `career-premier-league-${RUN}`,
     createdBy: personId,
@@ -67,6 +68,7 @@ beforeAll(async () => {
     {
       id: soldCompId,
       orgId,
+      sport: "cricket",
       tournamentId,
       name: "CPL 1",
       slug: `cpl-1-${RUN}`,
@@ -77,6 +79,7 @@ beforeAll(async () => {
     {
       id: withdrawnCompId,
       orgId,
+      sport: "cricket",
       name: "Career One-Off",
       slug: `career-one-off-${RUN}`,
       status: "registration_open",

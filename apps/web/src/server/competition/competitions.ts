@@ -39,6 +39,8 @@ export async function createTournament(
   orgId: string,
   personId: string,
   name: string,
+  /** The sport every edition of this tournament defaults to (Phase 1/2). */
+  sport: string,
 ): Promise<TournamentSummary> {
   const valid = validateName(name);
   if (!valid.ok) {
@@ -47,7 +49,9 @@ export async function createTournament(
   const id = newId();
   // ULID suffix keeps the slug unique without a retry loop (competitions pattern).
   const slug = `${slugifyName(valid.value)}-${id.slice(-4).toLowerCase()}`;
-  await db.insert(tournaments).values({ id, orgId, name: valid.value, slug, createdBy: personId });
+  await db
+    .insert(tournaments)
+    .values({ id, orgId, sport, name: valid.value, slug, createdBy: personId });
   await db.insert(auditLog).values({
     id: newId(),
     actor: personId,
@@ -73,6 +77,8 @@ export interface CompetitionSummary {
   orgId: string;
   /** The recurring tournament this is an edition of; null for a one-off. */
   tournamentId: string | null;
+  /** The season's sport — the key its pack is resolved from. */
+  sport: string;
   name: string;
   slug: string;
   status: CompetitionStatus;
@@ -88,11 +94,12 @@ export interface CompetitionSummary {
 export interface NewCompetition {
   name: string;
   /**
-   * Which sport this season is (SP-1 Phase 1). Omitted means the column's
-   * default, which is cricket and remains true while it is the only pack
-   * enabled — Phase 2 drops that default and makes this required.
+   * Which sport this season is. REQUIRED since Phase 2 dropped the column's
+   * `cricket` default — a season that does not state its sport is now a NOT
+   * NULL violation rather than a silently cricket one, which is what a football
+   * organizer would otherwise have got from any form that failed to post it.
    */
-  sport?: string;
+  sport: string;
   /** The recurring tournament this edition belongs to. */
   tournamentId?: string;
   location?: string;
@@ -118,7 +125,7 @@ export async function createCompetition(
     orgId,
     name: valid.value,
     slug,
-    ...(input.sport !== undefined ? { sport: input.sport } : {}),
+    sport: input.sport,
     ...(input.tournamentId !== undefined ? { tournamentId: input.tournamentId } : {}),
     ...(input.location !== undefined && input.location !== "" ? { location: input.location } : {}),
     ...(input.startsOn !== undefined && input.startsOn !== "" ? { startsOn: input.startsOn } : {}),
@@ -142,6 +149,7 @@ export async function createCompetition(
   return {
     id,
     orgId,
+    sport: input.sport,
     tournamentId: input.tournamentId ?? null,
     name: valid.value,
     slug,
@@ -164,6 +172,7 @@ export async function competitionsForPerson(
       id: competitions.id,
       orgId: competitions.orgId,
       tournamentId: competitions.tournamentId,
+      sport: competitions.sport,
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
@@ -198,6 +207,7 @@ export async function competitionsOfTournament(
       id: competitions.id,
       orgId: competitions.orgId,
       tournamentId: competitions.tournamentId,
+      sport: competitions.sport,
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
@@ -268,6 +278,7 @@ export async function resolveCompetition(
       id: competitions.id,
       orgId: competitions.orgId,
       tournamentId: competitions.tournamentId,
+      sport: competitions.sport,
       name: competitions.name,
       slug: competitions.slug,
       status: competitions.status,
@@ -608,6 +619,9 @@ export async function cloneCompetition(
 ): Promise<CloneResult> {
   const competition = await createCompetition(db, orgId, personId, {
     name: nextSeasonName(source.name),
+    // Next season of the same competition is the same sport. Anything else
+    // would be a new competition, not a clone.
+    sport: source.sport,
     ...(source.location !== null ? { location: source.location } : {}),
   });
   let teamsCloned = 0;

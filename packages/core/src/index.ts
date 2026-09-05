@@ -241,8 +241,17 @@ export type {
 } from "./auction";
 export { buildAuctionLedger } from "./auction-ledger";
 export type { AuctionLedgerRow } from "./auction-ledger";
-export { DEFAULT_POINTS, ballsOf, buildStandings, compareStandings, oversOf } from "./standings";
-export type { FixtureResultInput, PointsPolicy, ResultOutcome, StandingsRow } from "./standings";
+export { DEFAULT_POINTS, buildStandings, compareStandings, ratePer } from "./standings";
+export type {
+  FixtureResultInput,
+  PointsPolicy,
+  ResultOutcome,
+  ScoreRecord,
+  SideTotals,
+  StandingsRow,
+  StandingsRules,
+  TiebreakerSpec,
+} from "./standings";
 export { deriveCeremony } from "./auction-ceremony";
 export type { CeremonyPhase, CeremonyState } from "./auction-ceremony";
 export {
@@ -420,6 +429,8 @@ export {
   CRICKET_ROLE_KEYS,
   CRICKET_BATTING_STYLE_KEYS,
   CRICKET_BOWLING_STYLE_KEYS,
+  ballsOf,
+  oversOf,
   isSportKey,
   sportPack,
   sportPackFor,
@@ -433,7 +444,9 @@ export {
   attributeOptionLabel,
   isAttributeValueIn,
   parseAttributeIn,
+  parseScoreField,
   scoreWithinBounds,
+  standingsRulesOf,
 } from "./sports";
 export type {
   AttributeSpec,
@@ -444,5 +457,6 @@ export type {
   RoleVocabulary,
   ScoreFieldSpec,
   SportPack,
+  Terminology,
   VocabularyTerm,
 } from "./sports";

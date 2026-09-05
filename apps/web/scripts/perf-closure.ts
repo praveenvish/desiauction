@@ -106,6 +106,7 @@ async function main(): Promise<void> {
   await db.insert(competitions).values({
     id: compId,
     orgId,
+    sport: "cricket",
     tournamentId: null,
     name: `Perf Season ${RUN}`,
     slug: `perf-season-${RUN}`,
@@ -157,6 +158,7 @@ async function main(): Promise<void> {
     status: "registration_closed" as const,
     visibility: "private" as const,
     entryCategory: "open" as const,
+    sport: "cricket",
     location: "Local",
     startsOn: "2026-01-01",
     endsOn: "2026-12-31",

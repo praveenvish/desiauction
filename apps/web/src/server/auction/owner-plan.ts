@@ -51,7 +51,8 @@ export interface PlanLotRow extends PlanLot {
   lotNumber: string;
   seq: number;
   playerName: string | null;
-  role: string;
+  /** Null in a sport whose pack declares no playing roles (Phase 2). */
+  role: string | null;
   /** The registration number: the identity the player already sees on their public page. */
   number: string;
 }

@@ -83,6 +83,7 @@ async function main(): Promise<void> {
   await db.insert(competitions).values({
     id: compId,
     orgId,
+    sport: "cricket",
     name: `Perf Live League ${RUN}`,
     slug: `perf-live-league-${RUN}`,
     status: "registration_closed",

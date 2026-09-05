@@ -36,7 +36,7 @@ export type ImportPolicy = "fill-blanks" | "file-wins";
 /** The stored values a re-import compares itself against. */
 export interface ExistingRegistration {
   status: string;
-  role: string;
+  role: string | null;
   basePriceBand: string | null;
   dateOfBirth: string | null;
   battingStyle: string | null;

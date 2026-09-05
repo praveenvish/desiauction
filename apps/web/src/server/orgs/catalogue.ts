@@ -34,6 +34,8 @@ export interface EditionRow {
   slug: string;
   name: string;
   status: string;
+  /** The season's sport (SP-1 Phase 1) — the key its pack resolves from. */
+  sport: string;
   visibility: "private" | "public";
   /** PI-1: the organizer-declared entry category. */
   entryCategory: "open" | "men" | "women" | "mixed";
@@ -73,6 +75,7 @@ async function editionsFor(
       id: competitions.id,
       slug: competitions.slug,
       name: competitions.name,
+      sport: competitions.sport,
       status: competitions.status,
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
@@ -136,6 +139,7 @@ async function editionsFor(
       id: row.id,
       slug: row.slug,
       name: row.name,
+      sport: row.sport,
       status: row.status,
       visibility: row.visibility,
       entryCategory: row.entryCategory,
