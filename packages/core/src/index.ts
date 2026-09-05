@@ -422,6 +422,7 @@ export {
   CRICKET_BOWLING_STYLE_KEYS,
   isSportKey,
   sportPack,
+  sportPackFor,
   normalizeVocabularyKey,
   roleKeys,
   isRoleIn,

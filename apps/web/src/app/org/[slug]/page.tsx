@@ -9,6 +9,7 @@ import {
   VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
+import { enabledSports } from "../../../server/competition/sports";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -200,6 +201,9 @@ function OrgLadder({ rungs, current }: { rungs: OrgRung[]; current: number }) {
 }
 
 export default async function OrgHomePage({ params }: { params: Promise<{ slug: string }> }) {
+  // The sports currently switched on — the picker renders only when there is
+  // more than one (SP-1 Phase 1).
+  const sportOptions = await enabledSports();
   const { slug } = await params;
   const view = await orgView(slug);
   if (view === null) {
@@ -277,6 +281,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       canCreateSeason: canCreateSeasonHere,
       seasonForm: (
         <CreateCompetitionForm
+          sports={sportOptions}
           orgs={[{ id: view.org.id, name: view.org.name }]}
           tournamentId={tournament.id}
         />
@@ -292,7 +297,12 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
             kind: "standalone" as const,
             seasonDialogTitle: "New one-off season",
             canCreateSeason: canCreateSeasonHere,
-            seasonForm: <CreateCompetitionForm orgs={[{ id: view.org.id, name: view.org.name }]} />,
+            seasonForm: (
+              <CreateCompetitionForm
+                sports={sportOptions}
+                orgs={[{ id: view.org.id, name: view.org.name }]}
+              />
+            ),
           },
         ]
       : []),

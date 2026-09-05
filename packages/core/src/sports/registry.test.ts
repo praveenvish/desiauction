@@ -25,6 +25,7 @@ import {
   roleLabelIn,
   scoreWithinBounds,
   sportPack,
+  sportPackFor,
 } from ".";
 
 describe("the registry", () => {
@@ -33,6 +34,23 @@ describe("the registry", () => {
     expect(sportPack("kabaddi")).toBeNull();
     expect(isSportKey("cricket")).toBe(true);
     expect(isSportKey("kabaddi")).toBe(false);
+  });
+
+  it("resolves a stored key to its pack, and never to an outage", () => {
+    // The read path's resolver: a page renders, so it cannot refuse.
+    expect(sportPackFor("cricket")).toBe(CRICKET);
+    expect(sportPackFor(null)).toBe(DEFAULT_SPORT);
+    expect(sportPackFor(undefined)).toBe(DEFAULT_SPORT);
+    // Unreachable while the FK on competitions.sport holds — kept because the
+    // one case it cannot cover is a pack file deleted with its catalogue row
+    // still enabled, which should look like stale labels, not a 500.
+    expect(sportPackFor("kabaddi")).toBe(DEFAULT_SPORT);
+  });
+
+  it("still refuses an unknown key where a CALLER is validating input", () => {
+    // The contrast with sportPackFor is the point: a write path must be able to
+    // say no, a read path must be able to render.
+    expect(sportPack("kabaddi")).toBeNull();
   });
 
   it("names the default rather than assuming it", () => {

@@ -54,6 +54,23 @@ export function sportPack(key: string): SportPack | null {
 }
 
 /**
+ * THE PACK BEHIND A STORED SPORT KEY (Phase 1).
+ *
+ * `sportPack` returns null so a CALLER validating input can refuse. This one
+ * never refuses, because its callers are read paths rendering a page: a season
+ * whose sport has no pack should degrade to the default's labels, not to a 500.
+ *
+ * In practice the fallback is unreachable — `competitions.sport` carries a
+ * foreign key to the `sports` catalogue, and a catalogue row only exists for a
+ * pack that shipped. It is here for the one case the FK cannot cover: a pack
+ * file deleted while its catalogue row is still enabled, which is a deploy
+ * mistake and should look like stale labels rather than an outage.
+ */
+export function sportPackFor(key: string | null | undefined): SportPack {
+  return (key === null || key === undefined ? null : sportPack(key)) ?? DEFAULT_SPORT;
+}
+
+/**
  * Comparable form of a vocabulary value.
  *
  * Case, spaces, hyphens and underscores are noise: a form builder writes "All

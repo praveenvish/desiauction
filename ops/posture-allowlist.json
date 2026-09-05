@@ -185,6 +185,10 @@
     "apps/web/src/server/media/actions.ts": {
       "class": "debt",
       "reason": "Media subject resolution partly on the system pool; the writes are inside a tenant boundary. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/competition/sports.ts": {
+      "class": "by-design",
+      "reason": "SP-1 Phase 1. The `sports` catalogue is global reference data \u2014 the same rows for every organization, no org_id column, no RLS policy \u2014 so there is no tenant to scope to and withTenantDb would set a GUC nothing reads. Reads only; the table is written by migrations."
     }
   }
 }

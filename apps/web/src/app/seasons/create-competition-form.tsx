@@ -10,9 +10,23 @@ import {
 
 export function CreateCompetitionForm({
   orgs,
+  sports,
   tournamentId,
 }: {
   orgs: { id: string; name: string }[];
+  /**
+   * The sports currently switched on (SP-1 Phase 1, migration 0046).
+   *
+   * A picker over ONE option is friction carrying no information, so the field
+   * only appears once there is a genuine choice; with a single enabled sport
+   * the form posts it as a hidden input instead. That is deliberately not the
+   * same as posting nothing — the column's default would also produce
+   * "cricket", but a row that says cricket because somebody's form said so and
+   * a row that says cricket because nobody asked are different facts, and
+   * Phase 2 drops that default. The day a second pack is enabled, the picker
+   * appears on all eight call sites at once with no edit here.
+   */
+  sports: { key: string; label: string }[];
   /**
    * Set when the form is rendered inside a tournament: the new season becomes
    * an edition of it. Left undefined on /seasons, where a season is a one-off —
@@ -66,6 +80,18 @@ export function CreateCompetitionForm({
         required
         {...errorFor("name")}
       />
+      {sports.length > 1 ? (
+        <Select label="Sport" name="sport" required defaultValue={sports[0]?.key ?? ""}>
+          {sports.map((sport) => (
+            <option key={sport.key} value={sport.key}>
+              {sport.label}
+            </option>
+          ))}
+        </Select>
+      ) : sports.length === 1 ? (
+        <input type="hidden" name="sport" value={sports[0]?.key ?? ""} />
+      ) : null}
+
       <Field label="Location" name="location" placeholder="Malad, Mumbai" />
       <div className="date-row">
         <Field label="Starts on" name="startsOn" type="date" />

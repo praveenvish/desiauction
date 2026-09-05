@@ -1,6 +1,6 @@
 # SP-1 — MULTI-SPORT · PROGRAMME PLAN
 
-## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phase 0 COMPLETE · gate instrumented (0045) · Phases 1–4 awaiting demand
+## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phases 0–1 COMPLETE · gate instrumented (0045) · Phases 2–4 awaiting demand
 
 Taking the platform beyond cricket. Scope is **sports only** — auction
 categories outside sport (asset, commodity, charity) are deliberately deferred
@@ -76,8 +76,8 @@ definition — which is also the smallest possible widening of the read-only
 
 | # | Phase | Cost | Migrations |
 |---|-------|------|------------|
-| **0** | **The seam** — registry, cricket pack, guardrail. No behaviour change. | 2 wks | **0** |
-| 1 | Sport becomes a dimension — `competitions.sport`, `tournaments.sport`, `sports` catalogue, admin toggle. Backfill all rows to `cricket`. | 1.5 wks | 1 |
+| **0** | ✅ **The seam** — registry, cricket pack, guardrail. No behaviour change. | 2 wks | **0** |
+| 1 | ✅ **Sport becomes a dimension** — `competitions.sport`, `tournaments.sport`, `sports` catalogue, admin toggle. Backfill all rows to `cricket`. | 1.5 wks | 1 |
 | 2 | **Ship the second sport end to end** — relax `registrations.role` (nullable, enum dropped), add `registrations.attributes jsonb`, `fixture_results.score jsonb`, standings tiebreaker chains, pack-driven import fields, terminology across ~95 components. | 3 wks | 2 |
 | 3 | Split the person from the player — `player_sport_profiles`, `/me/[sport]`, per-sport career. | 2 wks | 1 |
 | 4 | The long tail — one pack file per further sport. | 2–4 days each | 0 |
@@ -86,7 +86,15 @@ definition — which is also the smallest possible widening of the read-only
 pays for itself by deleting a duplication defect that already shipped (§ the
 Phase 0 report).
 
-**Phases 1–4 are GATED on demand, not scheduled.** Seven weeks aimed at demand
+> **PHASE 1 WAS BUILT AHEAD OF THE GATE, on an explicit instruction (2026-09-05),
+> after the gate rationale below was put twice and overruled. Recording it so
+> nobody later reads the code as evidence the gate was met: it was not. No demand
+> data existed when `competitions.sport` shipped, and none informs it — Phase 1
+> is sport-agnostic scaffolding that costs nothing if the answer is "cricket
+> only". What the gate still decides is **which pack is written second**, which
+> is Phase 2's question and the expensive one. See `PHASE-1_REPORT.md` §6.
+
+**Phases 2–4 remain GATED on demand, not scheduled.** Seven weeks aimed at demand
 nobody has observed is the wrong bet on a product whose own audits say the
 remaining gaps are commercial, not engineering.
 

@@ -11,6 +11,7 @@ import {
   StatRow,
 } from "@desiauction/ui";
 import Link from "next/link";
+import { enabledSports } from "../../server/competition/sports";
 import { redirect } from "next/navigation";
 
 import { FormDialog } from "../../components/form-dialog";
@@ -47,6 +48,9 @@ export default async function TournamentsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // The sports currently switched on — the picker renders only when there is
+  // more than one (SP-1 Phase 1).
+  const sportOptions = await enabledSports();
   const session = await currentSession();
   if (session === null) {
     redirect("/login?next=/tournaments");
@@ -81,6 +85,7 @@ export default async function TournamentsPage({
       // A season under this tournament: org fixed, tournament pre-set.
       seasonForm: (
         <CreateCompetitionForm
+          sports={sportOptions}
           orgs={[{ id: tournament.orgId, name: tournament.orgName }]}
           tournamentId={tournament.id}
         />
@@ -99,7 +104,7 @@ export default async function TournamentsPage({
             seasonDialogTitle: "New one-off season",
             canCreateSeason: canCreate,
             // No tournament: a standalone season across any of the person's orgs.
-            seasonForm: <CreateCompetitionForm orgs={createIn} />,
+            seasonForm: <CreateCompetitionForm sports={sportOptions} orgs={createIn} />,
           },
         ]
       : []),
@@ -128,7 +133,7 @@ export default async function TournamentsPage({
       size="touch"
       triggerTestId="new-season"
     >
-      <CreateCompetitionForm orgs={createIn} />
+      <CreateCompetitionForm sports={sportOptions} orgs={createIn} />
     </FormDialog>
   );
 
@@ -283,7 +288,7 @@ export default async function TournamentsPage({
                        caller arriving from /seasons must find it either way. */
                     triggerTestId="new-season"
                   >
-                    <CreateCompetitionForm orgs={createIn} />
+                    <CreateCompetitionForm sports={sportOptions} orgs={createIn} />
                   </FormDialog>
                 </>
               ) : view.orgs.length > 0 ? (

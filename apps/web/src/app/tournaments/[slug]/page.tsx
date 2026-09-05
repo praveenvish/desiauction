@@ -1,4 +1,5 @@
 import { Card, EmptyState, IconArrowLeft, PageIntro, SectionHeader } from "@desiauction/ui";
+import { enabledSports } from "../../../server/competition/sports";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
@@ -49,6 +50,9 @@ const WHAT_A_TOURNAMENT_IS =
  * season list, which is unbounded and the slow half of the page, streams.
  */
 export default async function TournamentPage({ params }: { params: Promise<{ slug: string }> }) {
+  // The sports currently switched on — the picker renders only when there is
+  // more than one (SP-1 Phase 1).
+  const sportOptions = await enabledSports();
   const { slug } = await params;
   const header = await tournamentHeader(slug);
   if (header === null) {
@@ -58,6 +62,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
 
   const addSeasonForm = (
     <CreateCompetitionForm
+      sports={sportOptions}
       orgs={[{ id: tournament.orgId, name: tournament.orgName }]}
       tournamentId={tournament.id}
     />

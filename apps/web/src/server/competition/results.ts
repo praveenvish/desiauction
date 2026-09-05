@@ -1,8 +1,17 @@
-import { auditLog, fixtureResults, fixtures, newId, teams, type Db } from "@desiauction/db";
 import {
-  DEFAULT_SPORT,
+  auditLog,
+  competitions,
+  fixtureResults,
+  fixtures,
+  newId,
+  teams,
+  type Db,
+} from "@desiauction/db";
+import {
   buildStandings,
   scoreWithinBounds,
+  sportPackFor,
+  type SportPack,
   type FixtureResultInput,
   type ResultOutcome,
   type StandingsRow,
@@ -57,13 +66,17 @@ export type RecordResultOutcome =
 /**
  * Ten wickets, and a score cannot be negative. Cheap, and it catches a typo.
  *
- * The bounds are the sport pack's now, not three literals sitting in a server
- * module (Phase 0). Until a competition carries its own sport, the pack is the
- * default one — and when it does, this is one of the callers the compiler will
- * point at, because the right pack here is the competition's, not the house's.
+ * The bounds are the SEASON'S pack (SP-1 Phase 1). Phase 0 left this reaching
+ * for `DEFAULT_SPORT` with a note that the right pack was the competition's and
+ * the compiler would say so once the column existed. It does, and it did.
  */
-function plausible(runs?: number | null, wickets?: number | null, balls?: number | null): boolean {
-  return scoreWithinBounds(DEFAULT_SPORT, { runs, wickets, balls });
+function plausible(
+  pack: SportPack,
+  runs?: number | null,
+  wickets?: number | null,
+  balls?: number | null,
+): boolean {
+  return scoreWithinBounds(pack, { runs, wickets, balls });
 }
 
 /**
@@ -91,8 +104,11 @@ export async function recordFixtureResult(
       status: fixtures.status,
       homeTeamId: fixtures.homeTeamId,
       awayTeamId: fixtures.awayTeamId,
+      /* SP-1 Phase 1: the season's sport decides which pack judges the score. */
+      sport: competitions.sport,
     })
     .from(fixtures)
+    .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
     .where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.orgId, input.orgId)))
     .limit(1);
   if (fixture === undefined) {
@@ -111,9 +127,10 @@ export async function recordFixtureResult(
     return { ok: false, reason: "not_played" };
   }
   const r = input.result;
+  const pack = sportPackFor(fixture.sport);
   if (
-    !plausible(r.homeRuns, r.homeWickets, r.homeBalls) ||
-    !plausible(r.awayRuns, r.awayWickets, r.awayBalls)
+    !plausible(pack, r.homeRuns, r.homeWickets, r.homeBalls) ||
+    !plausible(pack, r.awayRuns, r.awayWickets, r.awayBalls)
   ) {
     return { ok: false, reason: "impossible_score" };
   }

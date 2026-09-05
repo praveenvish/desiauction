@@ -64,6 +64,7 @@ import {
   type PublishBlocker,
   type TeamSummary,
 } from "./competitions";
+import { isSportEnabled } from "./sports";
 import {
   addNote,
   assignTeam,
@@ -183,7 +184,7 @@ export async function competitionsView(): Promise<CompetitionsView> {
  * authorisation refusal, which belongs to no field at all, landed there too.
  * Naming the field is the server's job: only the server knows which rule fired.
  */
-export type CompetitionFormField = "name" | "orgId" | "endsOn" | "form";
+export type CompetitionFormField = "name" | "orgId" | "endsOn" | "sport" | "form";
 
 export interface CreateCompetitionState {
   error?: string;
@@ -202,6 +203,7 @@ export async function createCompetitionAction(
   const startsOn = formString(formData, "startsOn");
   const endsOn = formString(formData, "endsOn");
   const tournamentId = formString(formData, "tournamentId");
+  const sport = formString(formData, "sport");
   // Membership + capability: only an owner/staff of THIS org may create in it.
   const memberships = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
     orgsFor(db, session.personId),
@@ -214,6 +216,16 @@ export async function createCompetitionAction(
   // and the season overview never showed the dates, so nobody could see it.
   if (startsOn !== "" && endsOn !== "" && endsOn < startsOn) {
     return { error: "The end date falls before the start date.", field: "endsOn" };
+  }
+  /*
+   * The sport arrives from a select, which is a SUGGESTION — a form post is
+   * whatever the poster sent. The foreign key already refuses a sport with no
+   * pack behind it; this refuses one whose pack shipped but is switched off,
+   * which the database cannot know. Empty is allowed and takes the column
+   * default (cricket) while that default is still true.
+   */
+  if (sport !== "" && !(await isSportEnabled(sport))) {
+    return { error: "Pick a sport this platform currently runs.", field: "sport" };
   }
   // The tournament arrives from a hidden field, so it is caller input like any
   // other: prove it belongs to the SAME org before letting a season claim it,
@@ -239,6 +251,7 @@ export async function createCompetitionAction(
           location,
           startsOn,
           endsOn,
+          ...(sport !== "" ? { sport } : {}),
           ...(tournamentId !== "" ? { tournamentId } : {}),
         });
       },

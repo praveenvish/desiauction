@@ -413,3 +413,28 @@ td .admin-id {
     min-height: 44px;
   }
 }
+
+/* SP-1 Phase 1 — the sport catalogue, read-only. One row per shipped pack. */
+.admin-sport-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-sport-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.admin-sport-name {
+  font-weight: 600;
+}
+
+.admin-sport-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

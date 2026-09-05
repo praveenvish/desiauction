@@ -87,6 +87,12 @@ export interface CompetitionSummary {
 
 export interface NewCompetition {
   name: string;
+  /**
+   * Which sport this season is (SP-1 Phase 1). Omitted means the column's
+   * default, which is cricket and remains true while it is the only pack
+   * enabled — Phase 2 drops that default and makes this required.
+   */
+  sport?: string;
   /** The recurring tournament this edition belongs to. */
   tournamentId?: string;
   location?: string;
@@ -112,6 +118,7 @@ export async function createCompetition(
     orgId,
     name: valid.value,
     slug,
+    ...(input.sport !== undefined ? { sport: input.sport } : {}),
     ...(input.tournamentId !== undefined ? { tournamentId: input.tournamentId } : {}),
     ...(input.location !== undefined && input.location !== "" ? { location: input.location } : {}),
     ...(input.startsOn !== undefined && input.startsOn !== "" ? { startsOn: input.startsOn } : {}),

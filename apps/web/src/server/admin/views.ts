@@ -10,6 +10,7 @@ import {
   people,
   registrations,
   settlementCases,
+  sports,
   suppressions,
   type Db,
 } from "@desiauction/db";
@@ -221,6 +222,48 @@ export interface PlatformOverview {
   readonly followers: FollowerRollup;
   readonly recent: readonly ActivityRow[];
   readonly attention: readonly AttentionRow[];
+}
+
+/** One shipped sport pack and whether it is switched on (SP-1 Phase 1). */
+export interface SportCatalogueRow {
+  readonly key: string;
+  readonly label: string;
+  readonly enabled: boolean;
+  readonly competitions: number;
+}
+
+/**
+ * WHICH SPORTS THIS PLATFORM RUNS, AND HOW MUCH EACH IS USED.
+ *
+ * Administration OBSERVES the catalogue; it does not administer it. Enabling a
+ * sport needs its pack to exist in code, which is a deploy, so the flag can
+ * never usefully move ahead of one — and a toggle here would cost the provable
+ * "administration cannot act" property for a two-row list (see the header of
+ * `access-log.ts` for the argument that property is holding). Migration 0046
+ * seeds it; this reads it.
+ *
+ * Takes `db` like every projection here, so the runtime read-only proof drives
+ * it through a handle that throws on mutation.
+ */
+export async function sportCatalogueProjection(db: Db): Promise<SportCatalogueRow[]> {
+  const rows = await db
+    .select({
+      key: sports.key,
+      label: sports.label,
+      enabled: sports.enabled,
+      sortOrder: sports.sortOrder,
+      competitions: sql<number>`count(${competitions.id})::int`,
+    })
+    .from(sports)
+    .leftJoin(competitions, eq(competitions.sport, sports.key))
+    .groupBy(sports.key, sports.label, sports.enabled, sports.sortOrder)
+    .orderBy(asc(sports.sortOrder), asc(sports.key));
+  return rows.map((row) => ({
+    key: row.key,
+    label: row.label,
+    enabled: row.enabled,
+    competitions: row.competitions,
+  }));
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   organizationDirectory,
   organizationExists,
   outcomesProjection,
+  sportCatalogueProjection,
   personExists,
   platformHealth,
   platformOverview,
@@ -26,6 +27,7 @@ import {
   type OrgFilter,
   type PlatformHealth,
   type PlatformOverview,
+  type SportCatalogueRow,
   type UserDetail,
   type UserDirectory,
   type UserDirectoryFilter,
@@ -56,6 +58,17 @@ export async function adminOverview(): Promise<PlatformOverview | null> {
     return null;
   }
   return platformOverview(deps(), systemDb);
+}
+
+/**
+ * The sport catalogue, read (SP-1 Phase 1). Gated like every other admin read;
+ * there is no matching writer, deliberately — see `sportCatalogueProjection`.
+ */
+export async function adminSportCatalogue(): Promise<SportCatalogueRow[] | null> {
+  if ((await platformAdminGate()) === null) {
+    return null;
+  }
+  return sportCatalogueProjection(systemDb);
 }
 
 // Outcome Governance: the audit-log-backed North-Star metrics (last N days).

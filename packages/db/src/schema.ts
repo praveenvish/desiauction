@@ -423,11 +423,37 @@ export const auditLog = pgTable(
  * pointing at it is one edition: BPL 1, BPL 2, BPL 3. The tournament carries
  * no status of its own; the edition is the thing that runs.
  */
+/**
+ * WHICH SHIPPED SPORT PACKS ARE LIVE (migration 0046).
+ *
+ * A flag, never a definition. `key` names a pack in
+ * `packages/core/src/sports/`; the foreign keys on `competitions.sport` and
+ * `tournaments.sport` then make it impossible for a season to name a sport
+ * nothing on this platform can actually run.
+ *
+ * Seeded by migration, not administered: enabling a sport requires its pack to
+ * exist in code, which is a deploy, so the flag cannot usefully move ahead of
+ * one. No RLS — global reference data, identical for every tenant.
+ */
+export const sports = pgTable("sports", {
+  key: text("key").primaryKey(),
+  label: text("label").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  /** Picker order. Not alphabetical — the likeliest answer belongs on top. */
+  sortOrder: integer("sort_order").notNull().default(0),
+  addedAt: ts("added_at").notNull().defaultNow(),
+});
+
 export const tournaments = pgTable(
   "tournaments",
   {
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
+    /** The sport every edition of this tournament defaults to (0046). */
+    sport: text("sport")
+      .notNull()
+      .default("cricket")
+      .references(() => sports.key),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     createdBy: char("created_by", { length: 26 }).notNull(),
@@ -476,6 +502,17 @@ export const competitions = pgTable(
       .references(() => organizations.id, { onDelete: "restrict" }),
     /** The recurring tournament this is an edition of; null for a one-off. */
     tournamentId: char("tournament_id", { length: 26 }),
+    /**
+     * WHICH SPORT THIS SEASON IS (0046) — the dimension Phase 0's registry was
+     * built to be read by. Defaults to cricket, which is a fact and not a
+     * guess: every row that existed when the column landed was cricket, because
+     * there had never been a way to create anything else. The default is
+     * dropped in Phase 2, when a second pack makes it a lie.
+     */
+    sport: text("sport")
+      .notNull()
+      .default("cricket")
+      .references(() => sports.key),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     status: text("status", {
