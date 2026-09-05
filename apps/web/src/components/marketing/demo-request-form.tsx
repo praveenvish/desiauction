@@ -117,6 +117,30 @@ export function DemoRequestForm({ source }: { source: string }) {
         error={errorFor("orgName")}
       />
 
+      {/*
+        No `defaultValue`. Every other select here opens on a sensible answer,
+        because a form that arrives half-filled gets finished. This one must
+        not: it is the only question on the page whose answers get COUNTED, and
+        a preselected "Cricket" would be indistinguishable from thousands of
+        people choosing it. The empty option makes the browser ask.
+      */}
+      <Select label="Which sport?" name="sport" required defaultValue="">
+        <option value="" disabled>
+          Choose a sport
+        </option>
+        <option value="cricket">Cricket</option>
+        <option value="football">Football</option>
+        <option value="kabaddi">Kabaddi</option>
+        <option value="volleyball">Volleyball</option>
+        <option value="badminton">Badminton</option>
+        <option value="basketball">Basketball</option>
+        <option value="hockey">Hockey</option>
+        <option value="table-tennis">Table tennis</option>
+        <option value="pickleball">Pickleball</option>
+        <option value="esports">Esports</option>
+        <option value="other">Another sport</option>
+      </Select>
+
       <div className={styles["row"]}>
         <Select label="How many teams?" name="tournamentSize" required defaultValue="8-16">
           <option value="under-8">Under 8</option>
@@ -163,7 +187,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           rows={3}
           maxLength={2000}
           className={styles["note"]}
-          placeholder="What you're worried about, what you tried last year, who else needs to see it."
+          placeholder="What you're worried about, what you tried last year, who else needs to see it. If you picked another sport, tell us which."
         />
       </div>
 

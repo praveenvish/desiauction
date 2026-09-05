@@ -44,6 +44,10 @@ async function fillDemoForm(page: Page, phone: string): Promise<void> {
   // per-IP throttle started silently swallowing submissions from localhost —
   // which looks exactly like a broken form and is in fact the throttle working.
   await page.getByLabel("Tournament or club").fill(`${E2E_MARK} Sunday Warriors`);
+  // Deliberately NOT cricket. The sport picker is the SP-1 gate's instrument,
+  // and a fixture that always answers cricket would pass just as happily if the
+  // field were ignored and the column defaulted.
+  await page.getByLabel("Which sport?").selectOption("kabaddi");
   await page.getByLabel("How many teams?").selectOption("8-16");
   await page.getByLabel("Best time to talk").selectOption("weekend-evening");
   await page.getByLabel("Anything else?").fill("We run 12 teams every March.");
@@ -73,6 +77,11 @@ test("the form refuses what it should, in the field that is wrong", async ({ pag
   await page.getByLabel("Your name").fill("Ravi Kumar");
   await page.getByLabel("Mobile number").fill("12345");
   await page.getByLabel("Tournament or club").fill("E2E Warriors");
+  // Every REQUIRED field must be answered for the submit to reach the server at
+  // all — this test is about the SERVER's field-level routing, and native
+  // validation would otherwise stop the form at the sport picker (which, unlike
+  // the other two selects, deliberately opens with no answer chosen).
+  await page.getByLabel("Which sport?").selectOption("football");
   await page.getByRole("button", { name: "Book a demo" }).click();
 
   // The message rides the field, is announced, and the control is marked — the

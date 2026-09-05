@@ -1737,6 +1737,32 @@ export const demoRequests = pgTable(
     tournamentSize: text("tournament_size", {
       enum: ["under-8", "8-16", "16-32", "over-32", "unsure"],
     }).notNull(),
+    /**
+     * Which sport they asked for (0045) — the SP-1 gate's only instrument.
+     *
+     * NULLABLE on purpose: a row written before the question existed has no
+     * answer, and defaulting it would manufacture demand data in the one column
+     * that exists to be counted. The app requires it going forward.
+     *
+     * This list is NOT the sport registry and must never be wired to it: the
+     * registry names sports we can RUN, this records what somebody ASKED for,
+     * so it has to offer sports we cannot run yet.
+     */
+    sport: text("sport", {
+      enum: [
+        "cricket",
+        "football",
+        "kabaddi",
+        "volleyball",
+        "badminton",
+        "basketball",
+        "hockey",
+        "table-tennis",
+        "pickleball",
+        "esports",
+        "other",
+      ],
+    }),
     auctionOn: date("auction_on"),
     preferredWindow: text("preferred_window", {
       enum: ["weekday-evening", "weekend-morning", "weekend-evening", "any"],
@@ -1760,6 +1786,7 @@ export const demoRequests = pgTable(
     index("demo_requests_created_idx").on(table.createdAt),
     index("demo_requests_phone_idx").on(table.phone, table.createdAt),
     index("demo_requests_ip_idx").on(table.requestIp, table.createdAt),
+    index("demo_requests_sport_idx").on(table.sport, table.createdAt),
   ],
 );
 

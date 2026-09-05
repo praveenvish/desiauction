@@ -96,6 +96,7 @@ export async function requestDemoAction(
     phone: field(formData, "phone"),
     email: field(formData, "email"),
     orgName: field(formData, "orgName"),
+    sport: field(formData, "sport"),
     tournamentSize: field(formData, "tournamentSize"),
     auctionOn: field(formData, "auctionOn"),
     preferredWindow: field(formData, "preferredWindow"),

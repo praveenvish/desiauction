@@ -45,6 +45,7 @@ function request(overrides: Partial<ValidDemoRequest> = {}): ValidDemoRequest {
     phone: `+9199${String(Math.floor(Math.random() * 90_000_000) + 10_000_000)}`,
     email: null,
     orgName: `${MARK} Warriors`,
+    sport: "cricket",
     tournamentSize: "8-16",
     auctionOn: null,
     preferredWindow: "any",

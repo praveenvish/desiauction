@@ -1,6 +1,7 @@
+import { SPORTS } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
-import { validateDemoRequest, type DemoRequestInput } from "./demo-requests";
+import { DEMO_SPORTS, validateDemoRequest, type DemoRequestInput } from "./demo-requests";
 
 /**
  * What the public form will and will not accept. Every case here is one a real
@@ -15,6 +16,7 @@ const base: DemoRequestInput = {
   phone: "98765 43210",
   email: null,
   orgName: "Sunday Warriors PL",
+  sport: "cricket",
   tournamentSize: "8-16",
   auctionOn: null,
   preferredWindow: "any",
@@ -74,6 +76,41 @@ describe("validateDemoRequest", () => {
   it("refuses a size or window outside the closed list", () => {
     expect(validateDemoRequest({ ...base, tournamentSize: "loads" }, NOW).ok).toBe(false);
     expect(validateDemoRequest({ ...base, preferredWindow: "3am" }, NOW).ok).toBe(false);
+  });
+
+  /*
+   * THE SP-1 GATE'S ONLY INSTRUMENT (migration 0045). These tests exist to keep
+   * one number honest: how many people asked for each sport. Everything below
+   * is a way that number could quietly stop meaning anything.
+   */
+  it("accepts every sport the form offers", () => {
+    for (const sport of DEMO_SPORTS) {
+      expect(valid({ sport }).sport).toBe(sport);
+    }
+  });
+
+  it("requires an answer — an unanswered select is not a silent 'cricket'", () => {
+    const result = validateDemoRequest({ ...base, sport: "" }, NOW);
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.field).toBe("form");
+  });
+
+  it("refuses a tampered sport instead of folding it to 'other'", () => {
+    // The contrast with `source` on the next test is deliberate and is the
+    // whole design: a bad attribution is noise we can live with, a bad sport is
+    // noise in the number the Phase 1 decision reads.
+    expect(validateDemoRequest({ ...base, sport: "quidditch" }, NOW).ok).toBe(false);
+    expect(validateDemoRequest({ ...base, sport: "<script>" }, NOW).ok).toBe(false);
+    expect(validateDemoRequest({ ...base, sport: "Cricket" }, NOW).ok).toBe(false);
+  });
+
+  it("keeps the sport list independent of the sports the platform can run", () => {
+    // core's registry knows cricket and nothing else. If this list is ever
+    // wired to it, the form offers one option and measures nothing.
+    expect(DEMO_SPORTS.length).toBeGreaterThan(SPORTS.length);
+    for (const pack of SPORTS) {
+      expect(DEMO_SPORTS).toContain(pack.key);
+    }
   });
 
   it("records an unrecognised source as 'other' rather than losing the lead", () => {

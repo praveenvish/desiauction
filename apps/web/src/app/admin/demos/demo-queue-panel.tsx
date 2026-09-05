@@ -73,6 +73,26 @@ const SIZE_WORDS: Record<string, string> = {
   unsure: "size unknown",
 };
 
+/**
+ * The words for the SP-1 gate's answer. `cricket` is NOT dropped as the
+ * unremarkable case: an operator reading this queue is counting, and a badge
+ * that appears only for the interesting answers makes "cricket" and "asked
+ * before we asked the question" look identical.
+ */
+const SPORT_WORDS: Record<string, string> = {
+  cricket: "cricket",
+  football: "football",
+  kabaddi: "kabaddi",
+  volleyball: "volleyball",
+  badminton: "badminton",
+  basketball: "basketball",
+  hockey: "hockey",
+  "table-tennis": "table tennis",
+  pickleball: "pickleball",
+  esports: "esports",
+  other: "another sport — see the note",
+};
+
 const WINDOW_WORDS: Record<string, string> = {
   "weekday-evening": "weekday evenings",
   "weekend-morning": "weekend mornings",
@@ -131,6 +151,12 @@ function DemoRow({ row, showCancel = false }: { row: DemoQueueRow; showCancel?: 
           </p>
         </div>
         <div className="demo-row-tags">
+          {/* First, because which sport they run changes how the rest reads. A
+              request taken before migration 0045 has no answer, and says so
+              rather than being quietly counted as cricket. */}
+          <Badge tone={row.sport === null ? "neutral" : "info"}>
+            {row.sport === null ? "sport not asked" : (SPORT_WORDS[row.sport] ?? row.sport)}
+          </Badge>
           <Badge tone="neutral">{SIZE_WORDS[row.tournamentSize] ?? row.tournamentSize}</Badge>
           {urgency !== null ? (
             <Badge tone={urgency <= 14 ? "danger" : urgency <= 30 ? "warning" : "neutral"}>

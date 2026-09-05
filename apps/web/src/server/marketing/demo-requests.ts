@@ -24,9 +24,40 @@ export const PREFERRED_WINDOWS = [
 ] as const;
 export const DEMO_SOURCES = ["schedule-demo", "pricing", "landing", "help", "other"] as const;
 
+/**
+ * WHAT THEY ASKED FOR — the SP-1 gate's only instrument (migration 0045).
+ *
+ * NOT the sport registry, and it must never be wired to one. `core`'s registry
+ * names the sports the platform can RUN, which is cricket and nothing else;
+ * this list is what somebody came here WANTING, so it has to offer sports we
+ * cannot run yet. Pointing it at the registry would show a single option and
+ * measure nothing — and the measurement is the entire reason the column exists.
+ *
+ * Ordered by expected volume, not alphabetically, because the top of a select
+ * is where an honest answer is cheapest to give.
+ *
+ * `other` is deliberately last and deliberately vague. It is a tail-catcher:
+ * the form's note field is where an unlisted sport gets named, and its help
+ * text says so.
+ */
+export const DEMO_SPORTS = [
+  "cricket",
+  "football",
+  "kabaddi",
+  "volleyball",
+  "badminton",
+  "basketball",
+  "hockey",
+  "table-tennis",
+  "pickleball",
+  "esports",
+  "other",
+] as const;
+
 export type TournamentSize = (typeof TOURNAMENT_SIZES)[number];
 export type PreferredWindow = (typeof PREFERRED_WINDOWS)[number];
 export type DemoSource = (typeof DEMO_SOURCES)[number];
+export type DemoSport = (typeof DEMO_SPORTS)[number];
 
 /**
  * Limits, in the shape `server/auth/otp.ts` set. Per-phone is the tight one
@@ -47,6 +78,7 @@ export interface DemoRequestInput {
   readonly phone: string;
   readonly email: string | null;
   readonly orgName: string;
+  readonly sport: string;
   readonly tournamentSize: string;
   readonly auctionOn: string | null;
   readonly preferredWindow: string;
@@ -60,6 +92,7 @@ export interface ValidDemoRequest {
   readonly phone: string;
   readonly email: string | null;
   readonly orgName: string;
+  readonly sport: DemoSport;
   readonly tournamentSize: TournamentSize;
   readonly auctionOn: string | null;
   readonly preferredWindow: PreferredWindow;
@@ -142,6 +175,16 @@ export function validateDemoRequest(
     return { ok: false, field: "orgName", message: "What's the tournament or club called?" };
   }
 
+  /*
+   * Refused rather than folded to `other`, which is how `source` is treated
+   * three checks below — and the difference is the point. A bad `source` is an
+   * attribution we can live without; a bad `sport` is the answer this column
+   * exists to hold, and quietly recording "other" for a tampered value would
+   * put noise into the one number the Phase 1 decision reads.
+   */
+  if (!isMember(DEMO_SPORTS, input.sport)) {
+    return { ok: false, field: "form", message: "Pick the sport you run." };
+  }
   if (!isMember(TOURNAMENT_SIZES, input.tournamentSize)) {
     return { ok: false, field: "form", message: "Pick a tournament size." };
   }
@@ -175,6 +218,7 @@ export function validateDemoRequest(
       phone: normalized.phone,
       email: email === "" ? null : email,
       orgName,
+      sport: input.sport,
       tournamentSize: input.tournamentSize,
       auctionOn,
       preferredWindow: input.preferredWindow,
@@ -237,6 +281,7 @@ export async function recordDemoRequest(db: Db, request: ValidDemoRequest): Prom
     phone: request.phone,
     email: request.email,
     orgName: request.orgName,
+    sport: request.sport,
     tournamentSize: request.tournamentSize,
     auctionOn: request.auctionOn,
     preferredWindow: request.preferredWindow,

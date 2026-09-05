@@ -27,6 +27,8 @@ export interface DemoQueueRow {
   readonly phone: string;
   readonly email: string | null;
   readonly orgName: string;
+  /** Null for a request taken before the question was asked (migration 0045). */
+  readonly sport: string | null;
   readonly tournamentSize: string;
   readonly auctionOn: string | null;
   readonly preferredWindow: string;
@@ -53,6 +55,7 @@ const columns = {
   phone: demoRequests.phone,
   email: demoRequests.email,
   orgName: demoRequests.orgName,
+  sport: demoRequests.sport,
   tournamentSize: demoRequests.tournamentSize,
   auctionOn: demoRequests.auctionOn,
   preferredWindow: demoRequests.preferredWindow,

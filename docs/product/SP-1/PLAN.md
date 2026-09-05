@@ -1,6 +1,6 @@
 # SP-1 — MULTI-SPORT · PROGRAMME PLAN
 
-## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phase 0 COMPLETE · Phases 1–4 GATED
+## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phase 0 COMPLETE · gate instrumented (0045) · Phases 1–4 awaiting demand
 
 Taking the platform beyond cricket. Scope is **sports only** — auction
 categories outside sport (asset, commodity, charity) are deliberately deferred
@@ -90,12 +90,46 @@ Phase 0 report).
 nobody has observed is the wrong bet on a product whose own audits say the
 remaining gaps are commercial, not engineering.
 
-**The gate costs one day:** put a sport picker on `/schedule-demo` (the
-`demo_requests` table already exists) and on the pricing and landing pages, then
-read it at four weeks. Do not write a second pack before a named organizer has
-asked for one — *a pack written without a user is a guess with a type
-signature*, and the second implementation is the only thing that proves whether
-the abstraction is right.
+**The gate is BUILT** (migration 0045, 2026-09-05). `/schedule-demo` now asks
+which sport, as a required question with **no preselected answer** — every other
+select on that form opens on a sensible default because a half-filled form gets
+finished, and this one must not, because a preselected "Cricket" would be
+indistinguishable from thousands of people choosing it.
+
+Do not write a second pack before a named organizer has asked for one — *a pack
+written without a user is a guess with a type signature*, and the second
+implementation is the only thing that proves whether the abstraction is right.
+
+### 5.1 · Reading the instrument
+
+`demo_requests.sport` is nullable and rows predating 0045 are NULL — they were
+never asked, and counting them as cricket would answer on their behalf in the
+one column that exists to be counted. The operator queue at `/admin/demos`
+badges every request with its sport, and says "sport not asked" rather than
+guessing.
+
+```sql
+-- What has been asked for, most-wanted first.
+SELECT sport, count(*) AS asks, max(created_at) AS latest
+FROM demo_requests
+WHERE sport IS NOT NULL
+GROUP BY sport
+ORDER BY asks DESC;
+
+-- The tail: 'other' is a count with the answer in the note beside it.
+SELECT created_at::date, org_name, note
+FROM demo_requests
+WHERE sport = 'other'
+ORDER BY created_at DESC;
+```
+
+**Read it at four weeks.** A sport clearly leading is the trigger for Phases 1
+and 2, run against that named organizer. Nothing leading is also an answer, and
+Phase 0 will have cost nothing either way.
+
+**The list is not the registry.** `DEMO_SPORTS` offers eleven sports; the
+registry can run one. Wiring the form to `SPORTS` would show a single option and
+measure nothing, so a unit test holds the two apart deliberately.
 
 ## 6 · Why sport, and not other auction categories
 
