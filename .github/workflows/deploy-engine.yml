@@ -72,7 +72,18 @@ jobs:
           else
             node scripts/check-live-window.mjs --warn
           fi
-      - uses: superfly/flyctl-actions/setup-flyctl@v1.5
+      # SHA-pinned, not tag-pinned (PA-1R 5.9): this job holds FLY_API_TOKEN,
+      # and it previously ran `@master` — a mutable third-party branch with a
+      # deploy credential in scope.
+      #
+      # The first pin was `@v1.5` and it did not exist. superfly/flyctl-actions
+      # tags releases WITHOUT the `v` (1.4, 1.5, 1.6); only `v1` and `v1.4`
+      # carry one. Every deploy workflow failed at "Set up job" with `unable to
+      # resolve action`, which is fail-closed and therefore harmless — but it
+      # was invisible until a push to main ran them, because deploys do not run
+      # on pull requests. A SHA cannot be mistyped into something that silently
+      # resolves elsewhere, which is the other half of why it is pinned this way.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
         if: steps.creds.outputs.configured == 'true'
       - name: Deploy
         if: steps.creds.outputs.configured == 'true'
