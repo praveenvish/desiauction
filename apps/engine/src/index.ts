@@ -1,3 +1,4 @@
+import { scrub } from "@desiauction/core";
 import * as Sentry from "@sentry/node";
 
 import { checkDb, db, sql } from "./db.js";
@@ -13,6 +14,16 @@ if (env.SENTRY_DSN !== undefined) {
     environment: env.NODE_ENV,
     release: env.APP_VERSION,
     tracesSampleRate: 0.1,
+    /**
+     * NOTHING LEAVES THIS PROCESS UNREDACTED (audit PA-1 §20).
+     *
+     * The pino loggers redact by key path, which does nothing for an error
+     * MESSAGE — and `duplicate key ... Key (phone)=(+91...)` carries a phone
+     * number in free text that Sentry would otherwise store verbatim with a
+     * third party. `scrub` is shared by all three services so they cannot
+     * disagree about what is sensitive.
+     */
+    beforeSend: (event) => scrub(event) as typeof event,
   });
 }
 
@@ -64,8 +75,25 @@ const { server, hub } = buildServer({
   maxSocketsPerIp: env.WS_MAX_SOCKETS_PER_IP,
 });
 
-// The watchdog cadence: 250ms timer authority (lot expiry, closing-soon),
-// 10s WS heartbeats, 30s deep verification of every touched auction.
+// The watchdog cadence: 250ms timer authority (lot expiry, closing-soon) and
+// 10s WS heartbeats.
+//
+// THERE IS NO 30s DEEP VERIFICATION, and this comment claimed there was for
+// long enough to be believed (audit PA-1 §6). `engine.deepVerify` exists, is
+// tested, and has never had a caller.
+//
+// It must not simply be put on a timer, which is the obvious repair and a
+// dangerous one. It folds the log TWICE in parallel and compares bytes, then
+// HALTS the auction on any difference. Run from a timer it races the command
+// queue: two folds that straddle a commit legitimately differ, and the engine
+// would halt a healthy live auction — the most expensive false positive this
+// runtime can produce, in the one hour it exists for.
+//
+// Making it schedulable means running it THROUGH the per-auction FIFO queue, so
+// it cannot observe a partial commit. That is a real change to the command
+// union and belongs with the checkpointed-fold work, not here. Until then the
+// determinism it checks is a code-level property, and it is already covered on
+// every command by the rebuild-and-verify in `process`.
 const TICK_MS = 250;
 const tickTimer = setInterval(() => {
   const before = Date.now();
@@ -137,8 +165,46 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
-server.listen({ host: "0.0.0.0", port: env.PORT }).catch((error: unknown) => {
-  void die("engine failed to bind", error);
-});
+/**
+ * REHYDRATE THE AUCTIONS THAT ARE STILL RUNNING, BEFORE SERVING (PA-1 §6).
+ *
+ * The watchdog tick is the timer authority, and it only walks auctions RESIDENT
+ * in memory (`this.states`). A restarted engine's map is empty, and an auction
+ * only becomes resident when something touches it — a socket joining, a command
+ * arriving, a diagnostics read.
+ *
+ * So after a deploy or a crash mid-lot, the lot's clock did not resume. It
+ * waited. If every participant was watching rather than clicking — which is
+ * exactly what a room does while a lot runs down — nothing touched the auction
+ * and the countdown on every screen simply stopped. Correctness held (a bid
+ * arriving late is still refused on its stamped arrival time), but the night
+ * stalled until somebody poked it, and the `/readyz` comment described a replay
+ * phase that did not exist.
+ *
+ * Restricted to `live` and `paused`: a scheduled auction has no running clock
+ * and a terminal one has nothing to resume, so this is bounded by the number of
+ * auctions genuinely in flight — in practice a handful, and zero most of the
+ * time. Failures here are logged and not fatal; the old lazy path still works,
+ * so a rehydration problem must not stop the engine from serving.
+ */
+async function rehydrateRunningAuctions(): Promise<void> {
+  const { found, loaded } = await engine.rehydrate();
+  if (found > 0) {
+    logger.info({ found, loaded }, "rehydrated in-flight auctions — timers resumed");
+  }
+}
+
+void rehydrateRunningAuctions()
+  .catch((error: unknown) => {
+    // Never fatal: the lazy load path still works, and an engine that refuses
+    // to serve because it could not preload is strictly worse than one that
+    // resumes a clock a moment late.
+    logger.error({ err: error }, "auction rehydration failed — falling back to lazy load");
+  })
+  .finally(() => {
+    server.listen({ host: "0.0.0.0", port: env.PORT }).catch((error: unknown) => {
+      void die("engine failed to bind", error);
+    });
+  });
 
 logger.info({ port: env.PORT }, "auction engine online — single writer, server time only");

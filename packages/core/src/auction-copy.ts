@@ -65,6 +65,11 @@ const COMMAND_REFUSAL_COPY: Record<string, string> = {
   // Recover, and an auctioneer told "try again" will keep clicking instead.
   engine_halted:
     "The auction service has stopped itself because its record and its live state disagreed. Nothing more will be accepted until an organizer runs Recover engine from the cockpit.",
+  // A command threw and the engine kept running — transient, and a retry is
+  // the correct advice, which is exactly what `engine_halted` above must never
+  // say. Splitting the two reasons is what makes both sentences honest.
+  command_failed:
+    "That didn't go through — the auction service hit an error handling it. Check the bid feed, then try again.",
   // Gateway
   not_authorized: "You don't have permission to do that.",
   unknown_command: "That action isn't available here.",

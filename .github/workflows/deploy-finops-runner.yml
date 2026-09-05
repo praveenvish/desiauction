@@ -39,7 +39,38 @@ jobs:
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # PINNED (audit PA-1 §18). `@master` is a MUTABLE BRANCH: a compromised
+      # or merely careless push to that third-party repository would run
+      # arbitrary code in a job that holds FLY_API_TOKEN. A tag is the minimum;
+      # a digest is better and is tracked with the rest of the action pinning.
+      # THE LIVE-WINDOW FREEZE (Canon C-22, audit PA-1 §19).
+      #
+      # "No production deploy while any auction is LIVE; the platform knows its
+      # own live windows and enforces the freeze." It knew them and enforced
+      # nothing — this job went straight to `flyctl deploy`, and a deploy
+      # restarts the engine. The engine is the single writer and holds every lot
+      # timer, so a restart mid-auction stops the countdown in the room.
+      #
+      # Staging warns; production refuses. An operator with a genuine reason —
+      # the engine is already broken and the deploy IS the repair — sets
+      # DEPLOY_ANYWAY, which is echoed in the log so the choice is on the record.
+      - name: Live-window freeze
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DEPLOY_ANYWAY: ${{ vars.DEPLOY_ANYWAY }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "No PRODUCTION_DATABASE_URL secret — cannot check for a live auction." >> "$GITHUB_STEP_SUMMARY"
+            echo "The freeze is UNENFORCED for this deploy (founder externals pending)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "${{ inputs.environment || 'staging' }}" = "production" ]; then
+            node scripts/check-live-window.mjs
+          else
+            node scripts/check-live-window.mjs --warn
+          fi
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.5
         if: steps.creds.outputs.configured == 'true'
       - name: Deploy
         if: steps.creds.outputs.configured == 'true'

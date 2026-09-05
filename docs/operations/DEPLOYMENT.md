@@ -109,7 +109,18 @@ Run in order; any failure stops the deploy.
 2. **Does this release ship a migration?** `git diff --name-only <deployed-sha>..HEAD -- packages/db/migrations apps/engine/drizzle`. The answer decides the whole rollback plan below, so establish it *before* deploying, not during the incident.
 3. **Record the restore point.** Write down the PITR timestamp (or take the labelled dump) taken immediately before the migration step, and put it in the deploy note alongside the currently-deployed image id. Migrations are forward-only; this timestamp is the only thing that can undo one. A deploy with a migration and no recorded restore point has no rollback path at all.
 4. `pnpm --filter @desiauction/web grants:verify` against the target database if the release adds a table or a write path.
-5. Confirm no auction is LIVE (C-22).
+5. Confirm no auction is LIVE (C-22) — `DATABASE_URL=<target> node scripts/check-live-window.mjs`.
+   Both deploy workflows run this and refuse on a live or paused auction; running
+   it by hand first means finding out before the pipeline does. An unreachable
+   database is also a refusal: it is not evidence the room is empty.
+6. **When the roles or grants changed in this release** — a new table, a new
+   write path, a `create-app-role.sql` edit — run the rehearsal against a
+   database with the target's roles:
+   `pnpm --filter @desiauction/web rehearsal`. It drives a whole night through
+   `desiauction_app`, `desiauction_engine` and `desiauction_runner` at once,
+   which is the only check that exercises the recipe as a *system* rather than
+   table by table. The recipe has silently rotted twelve migrations behind the
+   code once already (FINAL-PRR P0-1).
 
 ## Release order
 

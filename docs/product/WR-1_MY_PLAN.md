@@ -106,9 +106,35 @@ class the memory already records, not the feature. One real defect surfaced by t
 organizer's switch was fully server-controlled, so a click snapped back before the refresh and
 read as "did not change state"; it is now optimistic and reconciled like the messaging switches.
 
-## Remaining
+## Phase 1.5 progress
 
-- Nothing in Phase 1 scope. Phase 1.5 items are listed above.
+- **Plan versus actual (landed 2026-09-04).** `packages/core/src/team-plan-report.ts`
+  (`planVersusActual`): each player ever on the plan is judged by the LAST revision at or
+  before their lot's `LotSold` (removed before the hammer = not a target; added after = the
+  same; a reopened-and-resold lot is judged by the sale that stood). `PlanView.report` is
+  built only for terminal auctions from `revisionsOf` + `lotSalesOf`; the read-only plan page
+  shows "How the night went" (`plan-report.tsx`): signed x of y, paid vs planned, past-a-max
+  count and total, off-plan buys, then a line per target. States, never grades. Covered by 4
+  core tests and the auction-experience journey (1 of 2 signed, ₹8,000 past a max).
+
+- **Role facts (landed 2026-09-04).** `roleFacts` in `plan-model.ts`: the squad by role (won +
+  pre-signed) and what is still to come by role (neither sold nor withdrawn), in the product's
+  role order with zeros kept. Rendered as one muted line under the plan tiles ("Squad …" /
+  "Still to come …"). Facts only: it never says which roles a squad needs — that is the
+  owner's call, or later the auction's quotas. `PlanView.preSignedRoles` feeds it.
+
+- **What if (landed 2026-09-04).** `plan-what-if.tsx`: pick any player still to come, type an
+  amount, and the page answers with the purse left, what is still planned for the other
+  targets, and whether the plan still fits — the same `whatIf` arithmetic as the live line,
+  on the client, nothing saved. A scratchpad, not a plan.
+- **Cross-tab freshness (landed 2026-09-04).** The plan page re-reads the server when its tab
+  returns to view (visibilitychange / focus) and the local rows follow the server's, so a save
+  in another tab shows up without a reload. Never fires while typing.
+
+## Remaining Phase 1.5
+
+- Reserve + `roleQuotas` form field · notes · org-level switch + /admin write (4th platform
+  capability set).
 
 ## Rules of the fold (for reviewers)
 

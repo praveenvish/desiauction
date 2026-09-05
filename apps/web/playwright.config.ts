@@ -41,8 +41,26 @@ try {
 // server. That claim is retracted; this flag is what makes it possible to.
 //
 // Run it with:
-//   NEXT_DIST_DIR=.next-e2e pnpm --filter @desiauction/web exec next build
-//   PLAYWRIGHT_PRECOMPILED=1 pnpm --filter @desiauction/web exec playwright test
+//   cd apps/web
+//   NEXT_DIST_DIR=.next-e2e node --env-file-if-exists=../../.env.local \
+//     node_modules/next/dist/bin/next build
+//   PLAYWRIGHT_PRECOMPILED=1 pnpm exec playwright test
+//
+// The server half needs `ALLOW_INSECURE_LOCAL_PRODUCTION=1`, which the
+// webServer env below now sets for you — see the comment there.
+//
+// The env file on the BUILD line is load-bearing and was missing from this
+// comment (PA-1R Phase 8.2). `pnpm exec next build` skips the package script,
+// so nothing loads `.env.local`, and the build dies collecting page data for
+// the OG-image and robots routes with "DATABASE_URL: Invalid input" — the env
+// guard doing exactly its job. Piped into `tail`, that failure exits 0, and the
+// suite then fails at startup with "Could not find a production build", which
+// reads like a Playwright problem two steps from its cause.
+//
+// CI has never had either problem: its e2e job supplies DATABASE_URL,
+// NEXT_DIST_DIR and ALLOW_INSECURE_LOCAL_PRODUCTION as JOB-level env, so every
+// step inherits them. This is the LOCAL path catching up with the one that
+// already worked.
 //
 // Requires OTP_PROVIDER=dev in the environment (or .env.local) so sign-in
 // still writes codes to otp_inbox for `e2e/otp.ts` to read — nothing here
@@ -118,6 +136,22 @@ export default defineConfig({
         // Its OWN build directory: sharing .next with a developer's server on
         // :3000 corrupts the webpack pack cache for both.
         NEXT_DIST_DIR: ".next-e2e",
+        // `next start` boots with NODE_ENV=production, so apps/web's env guard
+        // applies its PRODUCTION refinements and refuses to start on twelve of
+        // them at once — a localhost PUBLIC_BASE_URL, OTP_PROVIDER=dev, no
+        // SENTRY_DSN, and so on. All twelve are correct refusals for a real
+        // deploy and none of them is true of a local suite. This is the one
+        // named escape hatch for exactly that case (PRODUCTION_CHECKLIST §8):
+        // it prints a three-line warning to stderr, is reported by /readyz, and
+        // `preflight:production` refuses a deploy that has it set, so it cannot
+        // leak into production from here.
+        //
+        // It lives in the config rather than the doc comment because forgetting
+        // it fails 60 seconds later as "Timed out waiting for config.webServer"
+        // with the twelve real reasons scrolled off the top (PA-1R Phase 8.2).
+        // CI already sets it as job env; spreading process.env first means CI's
+        // value wins and this only fills the gap for a local run.
+        ...(PRECOMPILED ? { ALLOW_INSECURE_LOCAL_PRODUCTION: "1" } : {}),
       },
     },
     {

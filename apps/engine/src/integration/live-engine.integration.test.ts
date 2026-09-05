@@ -20,6 +20,7 @@ import {
 } from "@desiauction/core";
 import {
   auctionEvents as auctionEventsTable,
+  auctionOwnerInvites,
   auctions as auctionsTable,
   auditLog,
   bids as bidsTable,
@@ -28,6 +29,7 @@ import {
   newId,
   organizations,
   orgMembers,
+  paddleGrants,
   paddles as paddlesTable,
   people,
   registrations,
@@ -66,6 +68,14 @@ const engine = new AuctionEngine({
 const orgId = newId();
 const ownerId = newId();
 const bidderIds = Array.from({ length: 10 }, () => newId());
+/**
+ * An owner who holds NO team, for the "second granted owner cannot claim a held
+ * paddle" case below. That case used to reuse `bidderIds[1]`, who already owns
+ * team 1 — a state invariant 18 now forbids (migration 0042), so the fixture
+ * would be asserting a scenario the product refuses. The behaviour under test
+ * is one ACTIVE paddle per team, which has nothing to do with owning two.
+ */
+const spareOwnerId = newId();
 const teamIds = Array.from({ length: 10 }, () => newId());
 const compId = newId();
 let auctionId = "";
@@ -98,6 +108,7 @@ beforeAll(async () => {
       phone: `+9198${RUN.slice(0, 5)}${String(i).padStart(2, "0")}`,
       name: `Bidder ${String(i + 1)}`,
     })),
+    { id: spareOwnerId, phone: `+9197${RUN}0`, name: "Spare Owner" },
   ]);
   await db
     .insert(organizations)
@@ -157,7 +168,28 @@ afterAll(async () => {
   await db.delete(auctionEventsTable).where(eq(auctionEventsTable.orgId, orgId));
   await db.delete(bidsTable).where(eq(bidsTable.orgId, orgId));
   await db.delete(lotsTable).where(eq(lotsTable.orgId, orgId));
+  // THE OWNER MODEL LEAVES TWO TABLES THIS TEARDOWN NEVER KNEW ABOUT.
+  //
+  // The suite drives the real production path — invite → accept → grant →
+  // claim — so it writes `auction_owner_invites` and `paddle_grants` as well as
+  // `paddles`. Migration 0040 then gave `paddle_grants.person_id` a foreign key
+  // with ON DELETE RESTRICT, and from that day the final `delete from people`
+  // below could not succeed: all 66 assertions passed and `afterAll` threw
+  // 23503, so the suite reported FAILED with nothing wrong with the engine.
+  //
+  // Worse than a red suite: every run leaked a person and its grants into the
+  // shared database, and that residue is what later makes an unrelated failure
+  // look like a product bug (audit PA-1 §21).
+  //
+  // Grants and invites go before paddles for readability — the delete order
+  // that matters is simply that both precede `people`.
+  await db.delete(paddleGrants).where(eq(paddleGrants.orgId, orgId));
+  await db.delete(auctionOwnerInvites).where(eq(auctionOwnerInvites.orgId, orgId));
   await db.delete(paddlesTable).where(eq(paddlesTable.orgId, orgId));
+  // 0040 made person_id a real foreign key: a grant or an accepted invite still
+  // pointing at a bidder refuses the people delete below, so they go first.
+  await db.delete(paddleGrants).where(eq(paddleGrants.orgId, orgId));
+  await db.delete(auctionOwnerInvites).where(eq(auctionOwnerInvites.orgId, orgId));
   await db.delete(auctionsTable).where(eq(auctionsTable.orgId, orgId));
   await db.delete(registrations).where(eq(registrations.orgId, orgId));
   await db.delete(teams).where(eq(teams.orgId, orgId));
@@ -165,7 +197,7 @@ afterAll(async () => {
   await db.delete(orgMembers).where(eq(orgMembers.orgId, orgId));
   await db.delete(auditLog).where(eq(auditLog.scopeId, orgId));
   await db.delete(organizations).where(eq(organizations.id, orgId));
-  await db.delete(people).where(inArray(people.id, [ownerId, ...bidderIds]));
+  await db.delete(people).where(inArray(people.id, [ownerId, spareOwnerId, ...bidderIds]));
   await sql.end();
 });
 
@@ -219,9 +251,15 @@ describe("LIVE ENGINE — paddles, queue, opening", () => {
     // An ungranted person is refused BEFORE the held check (grants gate claims).
     const refused = await command("ClaimPaddle", ownerId, { teamId: teamIds[0] });
     expect(refused).toMatchObject({ accepted: false, reason: "no_grant" });
-    // MULTIPLE owners may exist: a second granted owner of team 1 still cannot
-    // claim while the paddle is held (one ACTIVE paddle per team).
-    const second = bidderIds[1] as string;
+    // MULTIPLE owners may exist for one team: a second granted owner still
+    // cannot claim while the paddle is held (one ACTIVE paddle per team).
+    //
+    // The second owner is `spareOwnerId`, who holds no other team. This used to
+    // be `bidderIds[1]`, who owns team 1 — and after migration 0042 that person
+    // can no longer be granted a second team at all, so the setup would refuse
+    // before reaching the behaviour under test. The rule being proved here is
+    // about one paddle per TEAM, not about one team per owner.
+    const second = spareOwnerId;
     const invited2 = await command(
       "InviteOwner",
       ownerId,
@@ -466,6 +504,38 @@ describe("LIVE ENGINE — the single writer under fire", () => {
     expect((resumeEvent.payload["endsAtMs"] as number) - resumeEvent.atMs).toBe(held);
   });
 
+  it("PAUSE IS TOTAL: the gavel is refused while the auction is paused", async () => {
+    /**
+     * Audit PA-1 §6. `transitionLot` checked `auction.status === "live"` for
+     * `open` only, so a PAUSED auction still accepted CloseLot and HoldLot: the
+     * lot on the block could be sold, passed or frozen in the middle of the
+     * dispute the pause was called to settle. The timer half was already
+     * correct — pause banks the remainder and nulls `ends_at_ms` — which is why
+     * nothing caught it: the auction looked frozen while the gavel still worked.
+     *
+     * Ordering note: this runs before the closing-soon test below and returns
+     * the auction to `live`, so the shared fixture is unchanged for it.
+     */
+    expect((await command("PauseAuction", ownerId, {}, { conduct: true })).accepted).toBe(true);
+    expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("paused");
+
+    const hammered = await command("CloseLot", ownerId, { lotId: lot1 }, { conduct: true });
+    expect(hammered.accepted, "a paused auction sold the lot on the block").toBe(false);
+    expect(hammered.accepted ? "" : hammered.reason).toBe("auction_not_live");
+
+    const held = await command("HoldLot", ownerId, { lotId: lot1 }, { conduct: true });
+    expect(held.accepted, "a paused auction froze the lot on the block").toBe(false);
+
+    // The lot is untouched, and resuming leaves the night exactly where it was.
+    const [row] = await db
+      .select({ status: lotsTable.status })
+      .from(lotsTable)
+      .where(eq(lotsTable.id, lot1));
+    expect(row?.status).toBe("on_block");
+    expect((await command("ResumeAuction", ownerId, {}, { conduct: true })).accepted).toBe(true);
+    expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("live");
+  });
+
   it("CLOSING-SOON BID: the anti-snipe extend edge replays cleanly (regression: watchdog halt)", async () => {
     // Drive the lot into closing_soon via the watchdog tick, then bid. The
     // TimerExtended event must flip the projection back to on_block exactly
@@ -564,6 +634,33 @@ describe("LIVE ENGINE — restart, recovery, fail-closed", () => {
     expect(recoveryMs).toBeLessThan(2_000);
     // eslint-disable-next-line no-console
     console.log(`recovery (replay + rebuild) after restart: ${recoveryMs.toFixed(1)} ms`);
+  });
+
+  it("BOOT REHYDRATION: a restarted engine resumes the clock with nobody touching it", async () => {
+    /**
+     * Audit PA-1 §6. `tick()` only walks auctions resident in memory, and a
+     * fresh engine's map is empty — an auction became resident only when
+     * something touched it. So after a deploy or crash mid-lot, the countdown
+     * on every screen stopped until somebody clicked, which is precisely what a
+     * room does NOT do while it watches a lot run down.
+     *
+     * The test is deliberately hostile to the old behaviour: the fresh engine
+     * is never asked about this auction. No ensureAuction, no snapshotOf, no
+     * command. Only `rehydrate()` — then a tick.
+     */
+    const fresh = new AuctionEngine({ db, logger, onSnapshot: () => undefined });
+
+    // Nothing is resident until it is rehydrated.
+    expect(fresh.snapshotOf(auctionId)).toBeUndefined();
+
+    const { found, loaded } = await fresh.rehydrate();
+    expect(found, "the live auction was not found for rehydration").toBeGreaterThanOrEqual(1);
+    expect(loaded).toBe(found);
+    expect(
+      fresh.snapshotOf(auctionId),
+      "a live auction was not made resident by rehydration, so its timer would not run",
+    ).toBeDefined();
+    expect(fresh.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("live");
   });
 
   it("PROJECTION HEALING: corrupted rows halt fail-closed, RecoverAuction heals, engine resumes", async () => {

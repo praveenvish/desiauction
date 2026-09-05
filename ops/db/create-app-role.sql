@@ -70,8 +70,6 @@ alter default privileges in schema public
   grant select, insert, update, delete on tables to desiauction_app;
 alter default privileges in schema public
   grant usage, select on sequences to desiauction_app;
-alter default privileges in schema public grant select on tables to desiauction_engine;
-alter default privileges in schema public grant select on tables to desiauction_runner;
 
 -- System role: exactly the named pre-tenant surfaces —
 --   org invites (previewInvite/acceptInvite),
@@ -133,6 +131,14 @@ where not exists (select 1 from pg_roles where rolname = 'desiauction_runner')
 
 grant usage on schema public to desiauction_engine, desiauction_runner;
 
+-- Their default SELECT on future tables, HERE and not above: on a fresh database
+-- the two roles do not exist until this point, and ON_ERROR_STOP aborted the
+-- whole recipe at the earlier placement — leaving no engine role, no runner
+-- role and none of the append-only revokes (the exact failure the header
+-- warns about, reached by a different door). CI's fresh-database run found it.
+alter default privileges in schema public grant select on tables to desiauction_engine;
+alter default privileges in schema public grant select on tables to desiauction_runner;
+
 -- Engine: the single writer of auction truth (+ its audit evidence); reads
 -- whatever projections it folds.
 grant select on all tables in schema public to desiauction_engine;
@@ -164,9 +170,34 @@ grant insert, update, delete on finops_documents,
 -- evidence the projections are rebuilt FROM.
 grant insert on finops_events, audit_log to desiauction_runner;
 
--- Freeze §8.2 lands: the web tier cannot write finops truth. Web finops
--- surfaces are read-only projections; the runner is the writer.
-revoke insert, update, delete on finops_events from desiauction_app;
+-- THE WEB TIER MAY APPEND FINOPS TRUTH. IT MAY NEVER REWRITE IT.
+--
+-- This used to be `revoke insert, update, delete on finops_events from
+-- desiauction_app`, carrying freeze §8.2: "the web tier cannot write finops
+-- truth; the runner is the writer". That was a real position, and the code
+-- stopped agreeing with it when PX-8 shipped the finance workspace — Issue
+-- receipt, Issue invoice, Declare profile, Open series all append finops events
+-- through the app pool. Nothing local ever noticed, because every local process
+-- connects as the OWNER and RLS and grants are both inert for it. Under the
+-- documented production recipe, issuing a receipt failed with `permission
+-- denied for table finops_events` (audit PA-1R Phase 2, proven by probe).
+--
+-- The revoke was also incoherent on its own terms. The app role holds full DML
+-- on `finops_documents`, `finops_dispatches`, `finops_series`, `finops_periods`
+-- and the rest — every projection REBUILT FROM this log. A tier that can
+-- rewrite the projections but not append the truth is not contained; it is
+-- merely inconsistent, and the containment the revoke looked like it provided
+-- did not exist.
+--
+-- So the line is drawn where it actually means something, and it is the same
+-- line the runner sits behind: INSERT yes, UPDATE and DELETE never. History is
+-- immutable for every runtime role (the revoke below), and the capability
+-- checks inside the finops writer remain the authorization boundary.
+--
+-- Founder decision, 2026-09-04. Revisit if finops writes ever move to the
+-- runner wholesale, at which point this grant comes back out and issuance
+-- becomes asynchronous.
+grant insert on finops_events to desiauction_app;
 
 -- APPEND-ONLY LEDGERS, ENFORCED BY THE DATABASE.
 --

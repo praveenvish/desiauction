@@ -26,6 +26,7 @@ import { DevInboxSender } from "../auth/otp-sender";
 import { ForbiddenError, can, requireCapability } from "./authz";
 import { acceptInvite, createInvite, previewInvite, revokeInvite } from "./invites";
 import { createOrg, issueGrant, membersOf, resolveTenant, revokeGrants } from "./orgs";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -69,6 +70,10 @@ beforeAll(async () => {
 afterAll(async () => {
   const ids = [owner, staff, outsider].filter((id) => id !== "");
   const orgIds = [orgX.id, orgY.id].filter((id) => id !== "");
+  // PA-1R Phase 3: the spine these teardowns never deleted (purge-org.ts).
+  for (const purgeId of orgIds) {
+    await purgeOrg(db, purgeId);
+  }
   if (orgIds.length > 0) {
     await db.delete(invitesTable).where(inArray(invitesTable.orgId, orgIds));
     await db.delete(orgMembers).where(inArray(orgMembers.orgId, orgIds));

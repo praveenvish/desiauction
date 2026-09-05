@@ -282,6 +282,17 @@ export interface DrainResult {
   readonly done: number;
   readonly retried: number;
   readonly dead: number;
+  /**
+   * Jobs this worker finished AFTER its lease had already been reclaimed, so
+   * its write was fenced out and another worker owns the outcome.
+   *
+   * Not an error — the job is being handled — but a number worth watching: a
+   * tick that regularly loses leases is running work longer than the lease, and
+   * the answer is a shorter batch or a longer lease, not a retry.
+   */
+  readonly lost: number;
+  /** Finished jobs the retention sweep removed on this tick, when it ran. */
+  readonly purged?: number;
 }
 
 /**
@@ -310,24 +321,42 @@ export async function drainJobsOnce(
   let done = 0;
   let retried = 0;
   let dead = 0;
+  /** Jobs whose lease moved on while we were still working — see below. */
+  let lost = 0;
 
   for (const job of claimed) {
+    /**
+     * The lease this worker holds for THIS job, and the fence for every write
+     * it makes about it. `claimJobs` stamped it; if another runner reclaims the
+     * job because we ran past it, that value changes and our writes stop
+     * landing — which is the difference between two workers finishing a job and
+     * two workers overwriting each other (audit PA-1 §16).
+     */
+    const fence = job.leasedUntilMs;
     const handler = handlers[job.kind];
     try {
       if (handler === undefined) {
         throw new Error(`unknown_job_kind:${job.kind}`);
       }
       await handler(deps, job);
-      await deps.store.transact(async (tx) => {
-        await tx.updateJob({ ...job, state: "done", leasedUntilMs: null, lastError: null });
-      });
-      done += 1;
+      const won = await deps.store.transact(async (tx) =>
+        tx.updateJob({ ...job, state: "done", leasedUntilMs: null, lastError: null }, fence),
+      );
+      if (won) {
+        done += 1;
+      } else {
+        // Our lease had already gone. The reclaiming worker owns the outcome;
+        // saying `done` here would overwrite whatever it recorded. Counted so a
+        // tick that is routinely losing its leases is visible rather than
+        // merely slow.
+        lost += 1;
+      }
     } catch (error) {
       const attempts = job.attempts + 1;
       const decision = retryDecision(attempts, job.maxAttempts, nowMs);
       const lastError = error instanceof Error ? error.message : String(error);
-      await deps.store.transact(async (tx) => {
-        await tx.updateJob(
+      const won = await deps.store.transact(async (tx) =>
+        tx.updateJob(
           decision.kind === "retry"
             ? {
                 ...job,
@@ -338,39 +367,116 @@ export async function drainJobsOnce(
                 lastError,
               }
             : { ...job, state: "dead", attempts, leasedUntilMs: null, lastError },
-        );
-      });
-      if (decision.kind === "retry") {
+          fence,
+        ),
+      );
+      if (!won) {
+        lost += 1;
+      } else if (decision.kind === "retry") {
         retried += 1;
       } else {
         dead += 1;
       }
     }
   }
-  return { claimed: claimed.length, done, retried, dead };
+  return { claimed: claimed.length, done, retried, dead, lost };
 }
 
 /** One full runner tick: seed slots, fire due schedules, discover pipeline
  * work (requested dispatches/exports → derived jobs), drain the queue. */
+/**
+ * How long a finished job stays before the sweep takes it.
+ *
+ * Long enough that an operator investigating this morning's run can still see
+ * what ran, short enough that the table does not become an archive. `dead` jobs
+ * are never swept — they are the queue of things needing a human.
+ */
+const FINISHED_JOB_TTL_MS = 7 * 24 * 60 * 60_000;
+
+/** How often the sweep runs, regardless of tick cadence. */
+const PURGE_INTERVAL_MS = 60 * 60_000;
+let lastPurgeMs = 0;
+
 export async function runnerTick(deps: FinopsDeps, nowMs?: number): Promise<DrainResult> {
   const at = nowMs ?? deps.now();
   await ensureSchedules(deps, at);
   await runSchedulesOnce(deps, at);
   await enqueueDispatchSends(deps, at);
   await enqueueExportGenerations(deps, at);
-  return drainJobsOnce(deps, at);
+  const drained = await drainJobsOnce(deps, at);
+
+  /*
+   * RETENTION (audit PA-1 §14). `finops_jobs` kept every completed row for
+   * ever: the ops board had already measured "1192 queued, oldest 9 days", and
+   * a claim query whose index carries years of dead rows gets slower at exactly
+   * the rate the platform gets busier.
+   *
+   * On the tick rather than on a schedule, because the schedules run inside the
+   * governance lifecycle that beta descopes (D3) — a retention sweep that only
+   * runs when somebody opens a fiscal period is a retention sweep that never
+   * runs. Hourly, and failure is swallowed on purpose: housekeeping must never
+   * be the reason a tick that did real work reports failure.
+   */
+  let purgedThisTick = 0;
+  if (at - lastPurgeMs >= PURGE_INTERVAL_MS) {
+    lastPurgeMs = at;
+    try {
+      const purged = await deps.store.transact((tx) =>
+        tx.purgeFinishedJobs(at - FINISHED_JOB_TTL_MS),
+      );
+      purgedThisTick = purged;
+    } catch {
+      // Deliberately swallowed: see above. The next hour tries again.
+    }
+  }
+  // Reported rather than logged here: `FinopsDeps` carries no logger, and the
+  // runner is the process that owns saying things out loud.
+  return purgedThisTick > 0 ? { ...drained, purged: purgedThisTick } : drained;
+}
+
+/** One org the follower could not serve this tick, and why. */
+export interface FollowFailure {
+  readonly orgId: string;
+  readonly error: unknown;
+}
+
+export interface FollowAllResult {
+  /** Settlement facts consumed across every org that succeeded. */
+  readonly consumed: number;
+  /** Orgs that threw. Empty on a healthy tick; never silently discarded. */
+  readonly failures: readonly FollowFailure[];
 }
 
 /** The follower poll across every org — the loop's other half (ADR-3: polling
  * is the truth mechanism; nothing depends on a notification arriving). */
-export async function followAllOrgs(deps: FinopsDeps): Promise<number> {
+export async function followAllOrgs(deps: FinopsDeps): Promise<FollowAllResult> {
   let consumed = 0;
+  const failures: FollowFailure[] = [];
   for (const orgId of await deps.orgs.listOrgIds()) {
-    const run = await runFollower(deps, orgId);
-    consumed += run.consumed;
+    /**
+     * ONE ORG'S BAD DAY IS NOT EVERY ORG'S (audit PA-1 §16).
+     *
+     * `runFollower` throwing used to abort this loop, so every org after the
+     * failing one was skipped for the whole tick — and because the org list is
+     * stably ordered, it was the SAME orgs skipped every time. A single
+     * contended stream (a manual issuance racing the follower's auto-receipt is
+     * the ordinary way it happens) could therefore stop receipts for everyone
+     * sorted below it, indefinitely, while the runner logged a healthy tick.
+     *
+     * Isolating each org turns that into one org falling behind by one tick and
+     * catching up on the next, which is what polling is for. The failure is
+     * REPORTED rather than swallowed: the caller logs it, so a persistently
+     * failing org is visible instead of merely slow.
+     */
+    try {
+      const run = await runFollower(deps, orgId);
+      consumed += run.consumed;
+    } catch (error: unknown) {
+      failures.push({ orgId, error });
+    }
     await certifyFirstTime(deps, orgId);
   }
-  return consumed;
+  return { consumed, failures };
 }
 
 /**

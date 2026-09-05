@@ -1,5 +1,6 @@
 import {
   auditLog,
+  competitions,
   grants,
   newId,
   organizations,
@@ -7,7 +8,7 @@ import {
   people,
   type Db,
 } from "@desiauction/db";
-import { aliasedTable, and, asc, eq, isNull, sql } from "drizzle-orm";
+import { aliasedTable, and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 // Organizations + membership (IP-2_DESIGN §4). Membership records belonging;
 // grants carry permission — the two are deliberately separate (C-8).
@@ -185,10 +186,28 @@ export async function memberCountOf(db: Db, orgId: string): Promise<number> {
 }
 
 /** People holding an ACTIVE grant of this exact set on this org. */
+/**
+ * Who actually holds a capability set here — grant AND membership.
+ *
+ * The membership join is the correction (audit PA-1 §9). `wouldOrphanOrg` is
+ * computed from this list, and counting grants alone let a grant issued to
+ * somebody who is not a member stand in as an owner: the real owner could then
+ * revoke themselves, the guard would see "two owners" and allow it, and the
+ * organization would be left with nobody who could mint an invite — an
+ * unrecoverable state reached through the surface designed to prevent it.
+ *
+ * A grant to a non-member is inert everywhere else too, since every org surface
+ * resolves membership first. Counting it as authority was the one place it
+ * meant anything.
+ */
 export async function holdersOf(db: Db, orgId: string, capabilitySet: string): Promise<string[]> {
   const rows = await db
     .select({ personId: grants.personId })
     .from(grants)
+    .innerJoin(
+      orgMembers,
+      and(eq(orgMembers.orgId, orgId), eq(orgMembers.personId, grants.personId)),
+    )
     .where(
       and(
         eq(grants.scopeType, "org"),
@@ -227,14 +246,31 @@ export async function removeMember(
   targetPersonId: string,
   removedBy: string,
 ): Promise<void> {
+  /*
+   * EVERY SCOPE, not just the org one (audit PA-1 §9).
+   *
+   * This revoked `scopeType: "org"` grants and left competition-scoped ones —
+   * the `"tournament"` scope whose id is a competition — exactly where they
+   * were. So offboarding a person removed them from the member list and from
+   * the org's grants while leaving them holding, say, `auction.conduct` on a
+   * specific season: invisible on every screen that lists org authority, and
+   * live again the moment anybody re-invited them.
+   *
+   * Leaving means leaving. The competitions belong to this org, so their grants
+   * are revoked alongside it.
+   */
+  const orgCompetitionIds = await db
+    .select({ id: competitions.id })
+    .from(competitions)
+    .where(eq(competitions.orgId, orgId));
+  const scopeIds = [orgId, ...orgCompetitionIds.map((row) => row.id)];
   await db
     .update(grants)
     .set({ revokedAt: new Date() })
     .where(
       and(
         eq(grants.personId, targetPersonId),
-        eq(grants.scopeType, "org"),
-        eq(grants.scopeId, orgId),
+        inArray(grants.scopeId, scopeIds),
         isNull(grants.revokedAt),
       ),
     );
@@ -258,6 +294,28 @@ export async function issueGrant(
   capabilitySet: string,
   grantedBy: string,
 ): Promise<void> {
+  /*
+   * A GRANT GOES TO A MEMBER, OR NOWHERE (audit PA-1 §9).
+   *
+   * This accepted any person id at all. Two things followed. A grant issued to
+   * somebody who had never joined counted toward `holdersOf`, so an owner could
+   * manufacture a second "owner" and then revoke themselves, leaving the org
+   * with nobody able to mint an invite. And a capability set could be parked on
+   * a person in advance — dormant, invisible on a member list that has no row
+   * for them, and live the moment somebody later invites them as a viewer.
+   *
+   * Membership is cheap to require and is what every other org surface already
+   * assumes. Refusing loudly beats writing a row that means nothing until it
+   * suddenly means everything.
+   */
+  const [member] = await db
+    .select({ personId: orgMembers.personId })
+    .from(orgMembers)
+    .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.personId, targetPersonId)))
+    .limit(1);
+  if (member === undefined) {
+    throw new Error("grant_target_not_a_member");
+  }
   await db.insert(grants).values({
     id: newId(),
     personId: targetPersonId,

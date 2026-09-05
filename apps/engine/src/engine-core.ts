@@ -28,7 +28,7 @@ import {
   type CommandAck,
 } from "@desiauction/core";
 import { auctions, paddles, type Db } from "@desiauction/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 
 // THE AUCTION ENGINE CORE (M-IP4-2). The single mutation authority for live
@@ -429,11 +429,39 @@ export class AuctionEngine {
     this.pending.set(envelope.auctionId, (this.pending.get(envelope.auctionId) ?? 0) + 1);
     const next = tail
       .then(() => this.process(envelope))
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         this.deps.logger.error({ err: error, commandId: envelope.commandId }, "command failed");
+        /**
+         * A THROW IS NOT A HALT, AND SAYING SO WAS WRONG TWICE (audit PA-1 §6).
+         *
+         * This answered `engine_halted` — the one state that means the ledger
+         * and the projections disagreed and NOTHING will be accepted until an
+         * organizer runs Recover. Its copy says precisely that. But the engine
+         * reaching here has not halted: `state.halted` is untouched and the
+         * very next command will be served. A dropped database connection told
+         * an auctioneer to run engine recovery mid-auction.
+         *
+         * Second, the write may well have COMMITTED before the throw — the
+         * transaction commits, then something after it fails — so the
+         * in-memory snapshot can now be behind the database, and every client
+         * in the room is looking at it. Nothing rebuilt it, because `process`
+         * never reached its rebuild. So rebuild here, before answering: the
+         * room must not keep rendering a state the database has moved past.
+         */
+        try {
+          const state = this.states.get(envelope.auctionId);
+          if (state !== undefined) {
+            await this.rebuild(state, envelope.auctionId);
+          }
+        } catch (rebuildError: unknown) {
+          // If the rebuild ALSO fails the engine cannot prove its own state,
+          // which is the genuine article — leave it to the halt machinery
+          // rather than papering over it here.
+          this.deps.logger.error({ err: rebuildError }, "rebuild after command failure failed");
+        }
         return this.reject(
           envelope,
-          "engine_halted",
+          "command_failed",
           this.states.get(envelope.auctionId)?.version ?? 0,
         );
       })
@@ -451,6 +479,44 @@ export class AuctionEngine {
 
   private reject(envelope: QueuedCommand, reason: string, version: number): CommandAck {
     return { commandId: envelope.commandId, accepted: false, reason, version };
+  }
+
+  /**
+   * REHYDRATE THE AUCTIONS THAT ARE STILL RUNNING (audit PA-1 §6).
+   *
+   * `tick()` is the timer authority and it only walks auctions RESIDENT in
+   * `this.states`. A restarted engine's map is empty, and an auction becomes
+   * resident only when something touches it — a socket joining, a command, a
+   * diagnostics read. So after a deploy or a crash mid-lot the lot's clock did
+   * not resume: it waited. If everyone in the room was watching rather than
+   * clicking — which is what a room does while a lot runs down — nothing
+   * touched the auction and every countdown simply stopped.
+   *
+   * Correctness held throughout (a late bid is still refused on its stamped
+   * arrival time), but the night stalled until somebody poked it.
+   *
+   * `live` and `paused` only: a scheduled auction has no running clock and a
+   * terminal one has nothing to resume, so this is bounded by what is genuinely
+   * in flight — a handful at most, and zero most of the time. One auction
+   * failing to load must not stop the others, or a single bad row would keep
+   * the whole platform's timers down.
+   */
+  async rehydrate(): Promise<{ found: number; loaded: number }> {
+    const rows = await this.deps.db
+      .select({ id: auctions.id })
+      .from(auctions)
+      .where(inArray(auctions.status, ["live", "paused"]));
+    let loaded = 0;
+    for (const row of rows) {
+      try {
+        if ((await this.ensureAuction(row.id)) !== null) {
+          loaded += 1;
+        }
+      } catch (error: unknown) {
+        this.deps.logger.error({ err: error, auctionId: row.id }, "rehydrate failed for auction");
+      }
+    }
+    return { found: rows.length, loaded };
   }
 
   /** Load (or reload) an auction: replay-on-load IS the recovery path. */
@@ -991,9 +1057,21 @@ export class AuctionEngine {
   }
 
   /**
-   * Deep verification (periodic watchdog): rebuild the snapshot twice from the
-   * log and compare BYTES — indeterminism is an integrity failure, halted like
-   * any other. Cheap enough to run on a slow cadence.
+   * Deep verification: rebuild the snapshot twice from the log and compare
+   * BYTES — indeterminism is an integrity failure, halted like any other.
+   *
+   * NOT ON A TIMER, AND NOT SAFE ON ONE (audit PA-1 §6). It was documented as
+   * running every 30 seconds and has never had a caller. The two folds below
+   * run in parallel and read the database directly, so from a timer they race
+   * the command queue: a commit landing between them makes two HONEST folds
+   * differ, and this method's response to a difference is to halt the auction.
+   * A healthy live night stopped by its own watchdog is a worse outcome than
+   * the indeterminism it looks for.
+   *
+   * To schedule it, route it through the per-auction FIFO queue so it cannot
+   * straddle a commit — the same serialization every mutation already gets.
+   * Until then this is an on-demand tool, and the per-command
+   * rebuild-and-verify in `process` is what guards the live path.
    */
   async deepVerify(auctionId: string): Promise<boolean> {
     const state = this.states.get(auctionId);

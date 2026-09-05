@@ -23,7 +23,7 @@
     "@desiauction/db": "workspace:*",
     "@sentry/node": "^10.15.0",
     "drizzle-orm": "^0.45.2",
-    "fastify": "^5.6.0",
+    "fastify": "^5.12.1",
     "pino": "^9.9.0",
     "postgres": "^3.4.0",
     "ws": "^8.18.0",

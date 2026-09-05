@@ -22,6 +22,15 @@ above them exist; ☑ are done and verified in-repo.
   green with the engine writing as `desiauction_engine`; runner boot-smoked
   under `desiauction_runner`. finops_events DML revoked from the app role —
   freeze §8.2 landed.
+- ☑ **The rehearsal** `pnpm --filter @desiauction/web rehearsal` (PA-1R 8.3) — one
+  whole auction night under all four roles at once: the app tier signs four
+  people in, builds the season and creates the auction; the *engine* role issues
+  paddles, queues, opens, bids and hammers; the app tier settles and declares;
+  the *runner* role's follower auto-issues the receipts. The owner touches only
+  fixtures and teardown. It refuses to run if the app role turns out to be
+  BYPASSRLS — a rehearsal run as the owner passes and proves nothing. This is
+  the gate the other three probes leave open: `rls:verify`, `grants:verify` and
+  `posture:verify` each check a property, and none of them runs a night.
 - ☐E Flip production `DATABASE_URL`s to the four-role recipe at first deploy
   (app/system/engine/runner) — the posture is now fully certified locally.
 - ☐E (CTO approval required — needs a migration, currently frozen) the

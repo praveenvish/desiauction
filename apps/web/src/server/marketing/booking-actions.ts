@@ -9,6 +9,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { bookSlot, bookingByToken, cancelBooking, rescheduleBooking } from "./demo-booking";
 import { sendBookingCancellation, sendBookingConfirmation } from "./demo-booking-mail";
+import { logger } from "../logger";
 
 /**
  * THE PUBLIC BOOKING ACTIONS.
@@ -97,8 +98,7 @@ export async function bookSlotAction(
         sequence: await sequenceFor(requestId),
       });
       if (outcome === "failed") {
-        // eslint-disable-next-line no-console
-        console.error("demo booking confirmation failed", { requestId });
+        logger().error({ demoRequestId: requestId }, "demo.booking_confirmation_failed");
       }
     }
   }

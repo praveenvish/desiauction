@@ -1,9 +1,9 @@
 "use server";
 
-import { createHash } from "node:crypto";
-
 import { auctionOf, type AuctionRecord } from "@desiauction/auction";
 import { newId, withTenantDb, type Db } from "@desiauction/db";
+
+import { derivedId } from "../derived-id";
 import {
   isPaymentMethod,
   settlementCapabilitiesOf,
@@ -53,6 +53,7 @@ import {
   waiveObligation,
   type Ack,
 } from "./writer";
+import { logger } from "../logger";
 
 /**
  * PX-7 Settlement Experience — the internal RPC surface (PX-1 E1/E2).
@@ -158,9 +159,24 @@ function messageFor(reason: string, detail?: string): string {
       ? `Closure verification failed (${check}). The case stays settled.`
       : `Closure verification failed — ${named}. The case stays settled and nothing moved.`;
   }
-  // An organizer reading a raw reason code can still call for help with the
-  // exact word. Silence would be worse than jargon.
-  return `${reason}${detail === undefined || detail === "" ? "" : ` — ${detail}`}`;
+  /*
+   * THE REASON, NEVER THE DETAIL (audit PA-1 §25).
+   *
+   * The instinct below is right: an organizer reading a raw reason code can at
+   * least call for help with the exact word, and silence would be worse than
+   * jargon. The `detail` beside it is a different thing. The writer supplies it
+   * as `divergences.join(" · ")` — journal digests, stream sequence numbers,
+   * the internal shape of a mismatch — and that reached anyone holding
+   * `settlement.view`, which is a finance clerk, not an engineer.
+   *
+   * So the reason still surfaces verbatim, and the detail goes to the LOG,
+   * where whoever is actually diagnosing it can find it against this request's
+   * id. Finops already made this split; settlement had not.
+   */
+  if (detail !== undefined && detail !== "") {
+    logger().warn({ reason, detail }, "settlement.rejected_with_detail");
+  }
+  return reason;
 }
 
 export type ActionResult = { ok: true; caseId?: string } | { ok: false; error: string };
@@ -661,27 +677,6 @@ export async function computeObligationsAction(
   caseId: string,
 ): Promise<ActionResult> {
   return command(slug, (deps, actor) => computeCaseObligations(deps, actor, caseId, newId()));
-}
-
-/** Crockford base32 — the alphabet every `newId()` ULID in this product is written in. */
-const CROCKFORD32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-
-/**
- * A 26-character id derived from a string instead of from the clock.
- *
- * `payments.id` and `settlement_events.stream_id` are `char(26)` — the ULID
- * shape — so an id that is not exactly that wide is rejected by the insert. The
- * first 34 hex digits of the digest are 136 bits, comfortably more than the 130
- * bits twenty-six base32 characters carry, so no character is short of entropy.
- */
-function derivedId(fingerprint: string): string {
-  let value = BigInt(`0x${createHash("sha256").update(fingerprint).digest("hex").slice(0, 34)}`);
-  let out = "";
-  for (let i = 0; i < 26; i += 1) {
-    out = `${CROCKFORD32[Number(value % 32n)] ?? "0"}${out}`;
-    value /= 32n;
-  }
-  return out;
 }
 
 /**

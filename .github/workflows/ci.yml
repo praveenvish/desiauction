@@ -14,6 +14,26 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # `pnpm build` needs a database: `apps/web/src/env.ts` refuses to load
+    # without DATABASE_URL, and the sitemap queries at build time. This job
+    # never had one, so its build step has failed for as long as it has
+    # existed — behind the unit tests, so it was rarely reached.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: desiauction
+          POSTGRES_PASSWORD: desiauction
+          POSTGRES_DB: desiauction
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U desiauction"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://desiauction:desiauction@localhost:5433/desiauction
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,6 +45,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @desiauction/db db:migrate
       - run: pnpm build
       # Generated tokens are committed; a rebuild must be a no-op (IP-1_DESIGN §6).
       - run: git diff --exit-code packages/ui/src/generated
@@ -33,6 +54,16 @@ jobs:
       # PRR P2/F26: `check:motion` is part of the project's own `verify` gate but
       # was missing from CI, so a motion-token regression could merge green.
       - run: pnpm check:motion
+      # PA-1R Phase 0.4 — THE TENANT-POSTURE RATCHET.
+      #
+      # Static, needs no database, runs in a second. Every file that reaches a
+      # database pool without entering `withTenantDb` must be named in
+      # ops/posture-allowlist.json with a reason. A NEW bypass fails here; so
+      # does an allowlist entry whose file no longer bypasses, so the list can
+      # never rot into a rubber stamp. Audit PA-1 found two production defects
+      # of exactly this shape (§10 P0-1, P0-2), both invisible to every other
+      # gate because they only misbehave under the production roles.
+      - run: pnpm check:posture
       - run: pnpm audit --prod --audit-level high
 
   integration:
@@ -94,6 +125,29 @@ jobs:
         env:
           APP_DATABASE_URL: postgres://desiauction_app:ci-app@localhost:5433/desiauction
 
+      # PA-1R Phase 0.5 — THE RUNTIME POSTURE SUITE.
+      #
+      # `grants:verify` proves the roles hold the grants the manifest declares,
+      # and `rls:verify` proves the policies are load-bearing. Neither runs the
+      # APPLICATION. This does: real route handlers, real read paths, connected
+      # as `desiauction_app` and `desiauction_system` exactly as production is.
+      #
+      # It is the only suite in the repository that does. Every other one —
+      # unit, integration, e2e — connects as the database owner, which Postgres
+      # exempts from RLS, so a path that skips the tenant boundary passes all of
+      # them and fails on the first real event. That blind spot is where both of
+      # PA-1's P0s lived.
+      #
+      # Fixtures still need owner rights (creating a tenant is not a thing a
+      # tenant-scoped role can do), so seeding uses OWNER_DATABASE_URL on a
+      # separate connection and only the code under test runs as the app.
+      - name: Application posture under the production roles
+        run: pnpm --filter @desiauction/web posture:verify
+        env:
+          APP_DATABASE_URL: postgres://desiauction_app:ci-app@localhost:5433/desiauction
+          SYSTEM_DATABASE_URL_POSTURE: postgres://desiauction_system:ci-system@localhost:5433/desiauction
+          OWNER_DATABASE_URL: postgres://desiauction:desiauction@localhost:5433/desiauction
+
   # THE JOURNEY GATE. There was no e2e step in CI at all: the two proofs the
   # release documents lean on (end-to-end journeys and tenant isolation) were
   # both absent from the only gate that runs. It uses the PRECOMPILED server —
@@ -143,6 +197,24 @@ jobs:
       - run: pnpm --filter @desiauction/web exec playwright install --with-deps chromium
       - name: End-to-end journeys
         run: pnpm --filter @desiauction/web exec playwright test
+      # THE 29 THIS JOB SILENTLY SKIPS.
+      #
+      # `/gallery` is dev-only, so on the precompiled server the four
+      # design-system specs — gallery, identity, motion, primitives — skip
+      # themselves with a reason and the job still reports success. That is 28
+      # tests, and they are not decorative: they are the ONLY measured proof of
+      # AA contrast on both themes, of self-hosted fonts, of the 44px touch
+      # rung, of focus trapping and of the polite live regions. A job that runs
+      # 101 of 129 and calls itself the journey gate is the same shape of
+      # problem this milestone exists to remove (PA-1R Phase 8.2).
+      #
+      # They need the dev compiler, so this step turns the flag off for itself.
+      - name: Design-system journeys (dev server — /gallery does not exist in a build)
+        env:
+          PLAYWRIGHT_PRECOMPILED: ""
+        run: >-
+          pnpm --filter @desiauction/web exec playwright test
+          e2e/gallery.spec.ts e2e/identity.spec.ts e2e/motion.spec.ts e2e/primitives.spec.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

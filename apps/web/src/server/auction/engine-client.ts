@@ -4,6 +4,7 @@ import type { AuctionCommandEnvelope, CommandAck } from "@desiauction/core";
 import { newId } from "@desiauction/db";
 
 import { env } from "../../env";
+import { logger } from "../logger";
 
 // The web tier's engine client (M-IP4-2). Web routes SUBMIT COMMANDS ONLY —
 // identity and capability are resolved here (session → tenant → capability),
@@ -42,8 +43,11 @@ export async function sendEngineCommand(input: EngineCommandInput): Promise<Comm
       };
     }
     return (await response.json()) as CommandAck;
-  } catch {
-    // The engine is down: a deterministic rejection, never a silent failure.
+  } catch (error: unknown) {
+    // The engine is down: a deterministic rejection, never a silent failure —
+    // and now not a silent one in the LOG either. The refusal reaching the
+    // conductor says "engine unreachable"; this says which command, and why.
+    logger().error({ err: error, type: envelope.type }, "engine.command_unreachable");
     return {
       commandId: envelope.commandId,
       accepted: false,
@@ -120,7 +124,8 @@ export async function fetchEngineDiagnostics(auctionId: string): Promise<unknown
       return null;
     }
     return (await response.json()) as unknown;
-  } catch {
+  } catch (error: unknown) {
+    logger().warn({ err: error, auctionId }, "engine.diagnostics_unreachable");
     return null; // engine unreachable — the dashboard says so, loudly
   }
 }
@@ -138,7 +143,8 @@ export async function fetchEngineSnapshot(auctionId: string): Promise<string | n
       return null;
     }
     return await response.text();
-  } catch {
+  } catch (error: unknown) {
+    logger().warn({ err: error, auctionId }, "engine.snapshot_unreachable");
     return null;
   }
 }

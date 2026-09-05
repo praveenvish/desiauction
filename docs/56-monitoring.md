@@ -16,6 +16,9 @@
 - **Logs:** structured pino JSON in all three services, PII-redacted (secrets, OTP codes, the engine-secret header). Fly/Vercel aggregate by default.
 - **Errors:** Sentry is wired in web and engine; production DSNs are founder-held and unset, so nothing is currently reported. Note also that 74 bare `catch {}` sites discard the error object, so a share of failures would not reach Sentry even with a DSN (audit P3-7).
 - **Health:** web `/healthz` (liveness) and `/readyz` (DB `select 1`); engine `/healthz` (DB + watchdog). These are the whole of the current observability surface.
+- **Logs (corrected 2026-09-05):** the claim above that all three services emit structured pino JSON was **false for the web tier**, which had no logger at all — five `console.*` calls in 109,000 lines (audit PA-1 §20). It now has one, with the same level variable, base fields and redaction as the engine's, plus an `AsyncLocalStorage` request id that prefers the edge's own (`x-vercel-id`/`x-request-id`). All five webhook and job routes carry it.
+- **Error tracking scrubbing (new):** all three services now pass Sentry events through `scrub` from `packages/core`. Key-path redaction in the loggers does nothing for an error MESSAGE, and `duplicate key ... Key (phone)=(+91...)` would otherwise reach a third party verbatim.
+- **Alerts:** the five that must exist before beta are specified in [operations/ALERTS.md](operations/ALERTS.md), each against a signal that exists in the code today.
 
 ## Stack — target (not yet provisioned)
 

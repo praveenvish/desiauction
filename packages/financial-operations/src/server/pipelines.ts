@@ -192,6 +192,10 @@ export async function runDispatchSend(deps: FinopsDeps, job: JobRow): Promise<vo
     subjectRef: dispatch.subjectRef,
     body: assembled.assembled.body,
     bodyDigest: assembled.assembled.bodyDigest,
+    // One dispatch is one message, however many times we attempt it. Derived
+    // from the dispatch id alone — the body is reproduced deterministically, so
+    // the same dispatch is always the same message.
+    idempotencyKey: `dispatch:${dispatchId}`,
   };
   const result = await port.send(request);
 
@@ -301,6 +305,17 @@ export async function retryDispatch(
   actor: FinopsActor,
   failedDispatchId: string,
   commandId: string,
+  /**
+   * The id the retry's own dispatch stream takes.
+   *
+   * Optional only so existing callers keep working; supply it whenever the
+   * retry must be idempotent. `requestDispatch` otherwise mints a fresh
+   * dispatch id, and since the writer dedupes on (streamType, streamId,
+   * commandId), a NEW stream means a stable command id has nothing to match —
+   * the second click searches an empty stream, finds no duplicate, and sends
+   * the document again (audit PA-1 §16).
+   */
+  retryDispatchId?: string,
 ): Promise<FinopsAck> {
   const failed = await deps.store.loadDispatch(failedDispatchId);
   if (failed === null || failed.orgId !== actor.orgId) {
@@ -318,6 +333,7 @@ export async function retryDispatch(
       templateId: failed.templateId,
       templateVersion: failed.templateVersion,
       subjectRef: failed.subjectRef,
+      ...(retryDispatchId === undefined ? {} : { dispatchId: retryDispatchId }),
     },
     commandId,
   );

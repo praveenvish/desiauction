@@ -47,6 +47,7 @@ import {
   submitRegistration,
   timelineOf,
 } from "./registrations";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -117,6 +118,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const orgIds = [org.id, orgOutsider.id].filter((id) => id !== "");
+  // PA-1R Phase 3: the spine these teardowns never deleted (purge-org.ts).
+  for (const purgeId of orgIds) {
+    await purgeOrg(db, purgeId);
+  }
   const personIds = [owner, outsider, ...seededPersonIds].filter((id) => id !== "");
   if (orgIds.length > 0) {
     await db.delete(registrationsTable).where(inArray(registrationsTable.orgId, orgIds));

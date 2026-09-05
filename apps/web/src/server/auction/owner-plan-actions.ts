@@ -3,7 +3,9 @@
 import {
   evaluatePlan,
   parseRupeesToPaise,
+  planVersusActual,
   type AuctionStatus,
+  type PlanReport,
   type PlanRules,
   type PlanState,
 } from "@desiauction/core";
@@ -17,10 +19,12 @@ import { liveGate } from "./live-actions";
 import { lotMediaOf, preSignedPlayers, rulesOf, type AuctionRules } from "./live-summary";
 import {
   addTarget,
+  lotSalesOf,
   pickPlanTeam,
   planLots,
   planRulesOf,
   removeTarget,
+  revisionsOf,
   targetsOf,
   teamStanding,
   updateTarget,
@@ -83,9 +87,16 @@ export interface PlanView {
   /** Consent-gated photo and registration number per lot (the live room's `lotMedia`). */
   lotMedia: Record<string, { photoUrl: string | null; number: string | null }>;
   targets: TargetRow[];
+  /** Roles of the pre-signed players already on this team (icons, retained). */
+  preSignedRoles: string[];
   standing: { purseRemaining: number; squadSize: number };
   /** The fold, from rows alone (no lot on the block — the live room adds that). */
   state: PlanState;
+  /**
+   * Phase 1.5: how the night went, once it is over — the plan as it stood at
+   * each hammer against the record. Absent while the auction is still running.
+   */
+  report?: PlanReport;
 }
 
 export async function planView(
@@ -124,9 +135,23 @@ export async function planView(
       }
       const rules = rulesOf(gate.auction.config);
       const planRules = planRulesOf(rules);
+      const readOnly = TERMINAL.has(gate.auction.status);
+      const report = readOnly
+        ? planVersusActual({
+            lots: lotRows,
+            myTeamId: gated.teamId,
+            ...(await Promise.all([
+              revisionsOf(db, gate.auction.id, gated.teamId),
+              lotSalesOf(db, gate.auction.id),
+            ]).then(([revisions, sales]) => ({ revisions, sales }))),
+          })
+        : null;
+      const preSignedRoles = preSigned
+        .filter((player) => player.teamId === gated.teamId)
+        .map((player) => player.role);
       const standing = teamStanding(
         lotRows,
-        preSigned.filter((player) => player.teamId === gated.teamId).length,
+        preSignedRoles.length,
         gated.teamId,
         planRules.pursePerTeam,
       );
@@ -143,7 +168,7 @@ export async function planView(
         competition: { name: gate.competition.name, slug: gate.competition.slug },
         auctionId: gate.auction.id,
         auctionStatus: gate.auction.status,
-        readOnly: TERMINAL.has(gate.auction.status),
+        readOnly,
         team,
         teams: teamRows,
         rules,
@@ -151,8 +176,10 @@ export async function planView(
         lots: lotRows,
         lotMedia,
         targets,
+        preSignedRoles,
         standing,
         state,
+        ...(report === null ? {} : { report }),
       };
     },
   );

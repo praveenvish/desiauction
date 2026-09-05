@@ -157,36 +157,55 @@ export async function acceptInvite(db: Db, personId: string, token: string): Pro
   ) {
     return { ok: false };
   }
-  // Claim atomically: only one accept can flip acceptedAt from NULL.
-  const claimed = await db
-    .update(invites)
-    .set({ acceptedBy: personId, acceptedAt: new Date() })
-    .where(and(eq(invites.id, row.id), isNull(invites.acceptedAt), isNull(invites.revokedAt)))
-    .returning({ id: invites.id });
-  if (claimed.length === 0) {
+  /*
+   * ONE TRANSACTION, BECAUSE JOINING IS ONE ACT (audit PA-1 §9).
+   *
+   * The claim, the membership, the grant and the audit row were four separate
+   * statements. The claim is atomic on its own — only one accept can flip
+   * `accepted_at` from NULL — but a failure after it left an invite marked
+   * USED by a person who was never made a member: single-use, so it could not
+   * be retried, and the only repair was an operator issuing a fresh link.
+   *
+   * It also breaks invariant 28, which says a privileged action fails if its
+   * audit write fails. Outside a transaction the audit could be the statement
+   * that failed and the grant would stand anyway.
+   */
+  const accepted = await db.transaction(async (tx) => {
+    // Claim atomically: only one accept can flip acceptedAt from NULL.
+    const claimed = await tx
+      .update(invites)
+      .set({ acceptedBy: personId, acceptedAt: new Date() })
+      .where(and(eq(invites.id, row.id), isNull(invites.acceptedAt), isNull(invites.revokedAt)))
+      .returning({ id: invites.id });
+    if (claimed.length === 0) {
+      return false;
+    }
+    await tx.insert(orgMembers).values({ orgId: row.orgId, personId }).onConflictDoNothing();
+    await tx.insert(grants).values({
+      id: newId(),
+      personId,
+      scopeType: "org",
+      scopeId: row.orgId,
+      capabilitySet: row.capabilitySet,
+      grantedBy: row.createdBy,
+    });
+    await tx.insert(auditLog).values({
+      id: newId(),
+      actor: personId,
+      action: "invite.accepted",
+      scopeType: "org",
+      scopeId: row.orgId,
+      // WHICH link did this person use? The row carried no subject at all, so the
+      // trail could say somebody joined but never which of twelve outstanding
+      // links they came through — the one question an audit of an invite exists
+      // to answer. `acceptOwnerJoin` has always done this; this copies it.
+      subject: row.id,
+    });
+    return true;
+  });
+  if (!accepted) {
     return { ok: false };
   }
-  await db.insert(orgMembers).values({ orgId: row.orgId, personId }).onConflictDoNothing();
-  await db.insert(grants).values({
-    id: newId(),
-    personId,
-    scopeType: "org",
-    scopeId: row.orgId,
-    capabilitySet: row.capabilitySet,
-    grantedBy: row.createdBy,
-  });
-  await db.insert(auditLog).values({
-    id: newId(),
-    actor: personId,
-    action: "invite.accepted",
-    scopeType: "org",
-    scopeId: row.orgId,
-    // WHICH link did this person use? The row carried no subject at all, so the
-    // trail could say somebody joined but never which of twelve outstanding
-    // links they came through — the one question an audit of an invite exists
-    // to answer. `acceptOwnerJoin` has always done this; this copies it.
-    subject: row.id,
-  });
   const [org] = await db
     .select({ slug: organizations.slug, name: organizations.name })
     .from(organizations)

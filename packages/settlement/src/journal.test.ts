@@ -418,7 +418,10 @@ describe("OrgJournal — replay determinism", () => {
     expect(refundPosting?.sourceStream).toBe("payment:01PAYB");
   });
 
-  it("folds a large journal within the certified envelope", () => {
+  // Self-calibrating (see below), so the only thing vitest's default 5 s could
+  // measure is the CI runner's contention: the fold took 5.2 s under a busy
+  // runner and was cut off before its own linear-shape assertion ever ran.
+  it("folds a large journal within the certified envelope", { timeout: 60_000 }, () => {
     seq = 0;
     const events: SettlementEventEnvelope[] = [];
     const cases = 500;

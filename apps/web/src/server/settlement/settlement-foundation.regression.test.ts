@@ -108,6 +108,7 @@ import {
   waiveObligation,
   type SettlementActor,
 } from "./writer";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -338,6 +339,8 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  // PA-1R Phase 3: the spine this teardown never deleted (see purge-org.ts).
+  await purgeOrg(db, org.id);
   const caseRows = await db
     .select({ id: settlementCases.id })
     .from(settlementCases)

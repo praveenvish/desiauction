@@ -109,12 +109,49 @@ export interface RunnerHealthSnapshot {
   readonly jobs: Readonly<Record<JobState, number>>;
   readonly schedules: readonly ScheduleRow[];
   readonly healthy: boolean;
+  /** How long the oldest queued job has been due, or null if none is waiting. */
+  readonly oldestQueuedAgeMs: number | null;
+  /** Why `healthy` is false, in an operator's words. Empty when it is true. */
+  readonly reasons: readonly string[];
 }
+
+/**
+ * How long a job may sit due before the runner is presumed to have stopped.
+ *
+ * The tick is 15s by default, so a job still waiting ten minutes after it was
+ * due is not a busy platform — it is nobody working. Generous enough that a
+ * long tick or a brief restart cannot trip it.
+ */
+const STALLED_QUEUE_MS = 10 * 60_000;
 
 export async function runnerHealthSnapshot(deps: FinopsDeps): Promise<RunnerHealthSnapshot> {
   const jobs = await deps.store.countJobs();
   const schedules = await deps.store.loadSchedules();
-  return { jobs, schedules, healthy: jobs.dead === 0 };
+  const oldest = await deps.store.oldestQueuedNotBeforeMs();
+  const oldestQueuedAgeMs = oldest === null ? null : Math.max(0, deps.now() - oldest);
+
+  /*
+   * A STOPPED RUNNER USED TO READ AS HEALTHY.
+   *
+   * `healthy: jobs.dead === 0` answers "has anything failed loudly", which is
+   * the easy half. The half that matters is silence: a runner that has crashed,
+   * lost its host or never been deployed produces no dead jobs at all, so it
+   * scored perfectly while queued work aged behind it — and nothing else in the
+   * platform watches the runner (PA-1 §16, §20).
+   *
+   * Queue DEPTH cannot distinguish a busy platform from a dead one. Queue AGE
+   * can: a job still waiting long after it was due means nobody is working.
+   */
+  const reasons: string[] = [];
+  if (jobs.dead > 0) {
+    reasons.push(`${String(jobs.dead)} job(s) dead-lettered and awaiting an operator`);
+  }
+  if (oldestQueuedAgeMs !== null && oldestQueuedAgeMs > STALLED_QUEUE_MS) {
+    reasons.push(
+      `oldest queued job has been due for ${String(Math.round(oldestQueuedAgeMs / 60_000))} minutes — the runner may not be running`,
+    );
+  }
+  return { jobs, schedules, oldestQueuedAgeMs, reasons, healthy: reasons.length === 0 };
 }
 
 // --- OperationalSnapshot ----------------------------------------------------------------

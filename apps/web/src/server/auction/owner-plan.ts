@@ -7,10 +7,13 @@ import {
   type Paise,
   type PlanLot,
   type PlanRules,
+  type PlanRevisionLike,
+  type PlanSaleLike,
   type PlanTarget,
   type TargetPriority,
 } from "@desiauction/core";
 import {
+  auctionEvents,
   auctionTeamTargetRevisions,
   auctionTeamTargets,
   lots,
@@ -162,6 +165,59 @@ export function teamStanding(
     purseRemaining: paise(Math.max(0, pursePerTeam - committed)),
     squadSize: won + preSignedCount,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The record, for the night's report (Phase 1.5).
+
+/** This team's plan history, oldest first — private, same policy as the targets. */
+export async function revisionsOf(
+  db: Db,
+  auctionId: string,
+  teamId: string,
+): Promise<PlanRevisionLike[]> {
+  const rows = await db
+    .select({
+      targetId: auctionTeamTargetRevisions.targetId,
+      kind: auctionTeamTargetRevisions.kind,
+      registrationId: auctionTeamTargetRevisions.registrationId,
+      maxBid: auctionTeamTargetRevisions.maxBid,
+      priority: auctionTeamTargetRevisions.priority,
+      at: auctionTeamTargetRevisions.at,
+    })
+    .from(auctionTeamTargetRevisions)
+    .where(
+      and(
+        eq(auctionTeamTargetRevisions.auctionId, auctionId),
+        eq(auctionTeamTargetRevisions.teamId, teamId),
+      ),
+    )
+    .orderBy(asc(auctionTeamTargetRevisions.at));
+  return rows.map((row) => ({
+    targetId: row.targetId,
+    kind: row.kind,
+    registrationId: row.registrationId,
+    maxBid: row.maxBid === null ? null : paise(row.maxBid),
+    priority: row.priority as TargetPriority,
+    atMs: row.at.getTime(),
+  }));
+}
+
+/**
+ * Every `LotSold` in the ledger, with when it fell. Public facts (the hall
+ * heard them called); a lot reopened by undo and resold appears twice, and the
+ * report keeps the sale that stood.
+ */
+export async function lotSalesOf(db: Db, auctionId: string): Promise<PlanSaleLike[]> {
+  const rows = await db
+    .select({ seq: auctionEvents.seq, atMs: auctionEvents.atMs, payload: auctionEvents.payload })
+    .from(auctionEvents)
+    .where(and(eq(auctionEvents.auctionId, auctionId), eq(auctionEvents.type, "LotSold")))
+    .orderBy(asc(auctionEvents.seq));
+  return rows.flatMap((row) => {
+    const lotId = (row.payload as { lotId?: unknown }).lotId;
+    return typeof lotId === "string" ? [{ lotId, atMs: row.atMs, seq: row.seq }] : [];
+  });
 }
 
 // ---------------------------------------------------------------------------

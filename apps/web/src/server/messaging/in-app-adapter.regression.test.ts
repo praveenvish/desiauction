@@ -1,4 +1,16 @@
-import { auditLog, createDb, newId, paddles, people, type DbHandle } from "@desiauction/db";
+import {
+  auctions,
+  auditLog,
+  competitions,
+  createDb,
+  newId,
+  organizations,
+  paddles,
+  people,
+  teams,
+  type DbHandle,
+} from "@desiauction/db";
+import { DEFAULT_AUCTION_CONFIG } from "@desiauction/core";
 import { eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -31,10 +43,12 @@ const secondTeamId = newId();
 const orphanTeamId = newId();
 const auctionId = newId();
 const orgId = newId();
+const competitionId = newId();
 
 function request(recipientRef: string) {
+  const dispatchId = newId();
   return {
-    dispatchId: newId(),
+    dispatchId,
     orgId,
     channel: "in-app" as const,
     recipientRef,
@@ -43,6 +57,7 @@ function request(recipientRef: string) {
     subjectRef: `doc:${newId()}`,
     body: "Receipt RCT/2026-27/000001 for Rs 1,20,000",
     bodyDigest: "digest",
+    idempotencyKey: `dispatch:${dispatchId}`,
   };
 }
 
@@ -52,6 +67,43 @@ beforeAll(async () => {
     { id: ownerId, phone: PHONE_OWNER, name: "Inapp Synthetic" },
     { id: secondId, phone: PHONE_SECOND, name: "Second Synthetic" },
   ]);
+  /*
+   * THE PARENTS THIS FIXTURE USED TO INVENT.
+   *
+   * It minted an `orgId`, a `competitionId` and an `auctionId` and inserted
+   * paddles against them without ever creating the rows — a state the product
+   * cannot produce, and one migration 0043's foreign keys now refuse outright.
+   * Building the real chain is a handful of inserts and makes the fixture
+   * describe something that could actually exist, which is what a regression
+   * test is for.
+   */
+  await db.insert(organizations).values({
+    id: orgId,
+    name: `In-app Org ${RUN}`,
+    slug: `inapp-org-${RUN}`,
+    createdBy: ownerId,
+  });
+  await db.insert(competitions).values({
+    id: competitionId,
+    orgId,
+    name: `In-app Season ${RUN}`,
+    slug: `inapp-season-${RUN}`,
+    createdBy: ownerId,
+  });
+  await db.insert(teams).values([
+    { id: teamId, orgId, competitionId, name: `In-app Team A ${RUN}`, createdBy: ownerId },
+    { id: secondTeamId, orgId, competitionId, name: `In-app Team B ${RUN}`, createdBy: ownerId },
+    { id: orphanTeamId, orgId, competitionId, name: `In-app Team C ${RUN}`, createdBy: ownerId },
+  ]);
+  await db.insert(auctions).values({
+    id: auctionId,
+    orgId,
+    competitionId,
+    name: `In-app Auction ${RUN}`,
+    config: DEFAULT_AUCTION_CONFIG,
+    createdBy: ownerId,
+  });
+
   // Ownership is a PADDLE, not a column on the team — the chain the adapter has
   // to walk, and the one an earlier fix got wrong by looking in `people`.
   // One paddle per team: `paddles_auction_team_active_uq` is UNIQUE on
@@ -70,6 +122,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(auditLog).where(inArray(auditLog.scopeId, [ownerId, secondId]));
   await db.delete(paddles).where(eq(paddles.auctionId, auctionId));
+  await db.delete(auctions).where(eq(auctions.id, auctionId));
+  await db.delete(teams).where(eq(teams.competitionId, competitionId));
+  await db.delete(competitions).where(eq(competitions.id, competitionId));
+  await db.delete(organizations).where(eq(organizations.id, orgId));
   await db.delete(people).where(inArray(people.phone, [PHONE_OWNER, PHONE_SECOND]));
   await db.delete(auditLog).where(like(auditLog.subject, `%${RUN}%`));
   await handle.sql.end({ timeout: 5 });

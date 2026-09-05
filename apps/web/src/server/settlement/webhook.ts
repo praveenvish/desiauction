@@ -30,9 +30,24 @@ export interface WebhookRequest {
   readonly receivedAtMs: number;
 }
 
+/**
+ * Opens the tenant boundary the org-scoped half of this handler runs inside.
+ *
+ * A parameter rather than something the handler reaches for, because the ORDER
+ * is the security property: the org may only come from a VERIFIED envelope, so
+ * the boundary cannot be opened until step 3 has passed. Passing it in makes
+ * that sequence structural — there is no tenant-scoped handle in scope before
+ * the signature is checked — and lets tests supply a pass-through.
+ */
+export type WithSettlementTenant = <T>(
+  orgId: string,
+  run: (deps: SettlementDeps) => Promise<T>,
+) => Promise<T>;
+
 export async function handleRazorpayWebhook(
   deps: SettlementDeps,
   request: WebhookRequest,
+  withTenant: WithSettlementTenant,
 ): Promise<WebhookResult> {
   const gateway: PaymentGatewayPort | null = deps.gateway("gateway:razorpay");
   if (gateway === null) {
@@ -54,39 +69,56 @@ export async function handleRazorpayWebhook(
   }
   const envelope = verification.envelope;
 
-  // 4 · tenant context is the envelope's org. 5 · the FIRST org-scoped read runs
-  // under it: the payment row is org-scoped by app-layer + RLS, and this is the
-  // point at which a withTenant boundary would wrap the work (§21).
-  const payment = await deps.store.loadPayment(envelope.paymentId);
-  if (payment === null) {
-    return { ok: false, status: 404, reason: "unknown_payment" };
-  }
+  /*
+   * 4 · TENANT CONTEXT, AND IT USED TO BE A COMMENT INSTEAD OF A BOUNDARY.
+   *
+   * This block said "the point at which a withTenant boundary WOULD wrap the
+   * work (§21)" and then did the org-scoped read on the raw pool. Under the
+   * production recipe — `desiauction_app` is NOBYPASSRLS and `payments` carries
+   * FORCE ROW LEVEL SECURITY on `app.org_id` — no GUC meant no rows, so
+   * `loadPayment` returned null and every genuine capture answered 404. Razorpay
+   * would retry a 404 until it gave up, while the organizer's account had been
+   * credited and the platform still showed the obligation outstanding.
+   *
+   * Nothing local could see it: every local process connects as the OWNER, for
+   * which RLS is inert (audit PA-1 §10 P0-1).
+   *
+   * The org comes from the VERIFIED envelope, which is the whole reason the
+   * signature check is step 3 and this is step 4. Everything org-scoped now runs
+   * inside the boundary — the read, the pin check, and the command.
+   */
+  return withTenant(envelope.orgId, async (tenantDeps) => {
+    const payment = await tenantDeps.store.loadPayment(envelope.paymentId);
+    if (payment === null) {
+      return { ok: false, status: 404, reason: "unknown_payment" };
+    }
 
-  // 6 · pin verification — the envelope must agree with the pinned initiation.
-  // The org is the load-bearing one (it selected the tenant); the rest are
-  // defence in depth. Any disagreement is attempted forgery.
-  if (
-    payment.orgId !== envelope.orgId ||
-    envelope.currency !== "INR" ||
-    (envelope.kind === "captured" && envelope.amount !== payment.amount)
-  ) {
-    return { ok: false, status: 409, reason: "envelope_mismatch" };
-  }
+    // 6 · pin verification — the envelope must agree with the pinned initiation.
+    // The org is the load-bearing one (it selected the tenant); the rest are
+    // defence in depth. Any disagreement is attempted forgery.
+    if (
+      payment.orgId !== envelope.orgId ||
+      envelope.currency !== "INR" ||
+      (envelope.kind === "captured" && envelope.amount !== payment.amount)
+    ) {
+      return { ok: false, status: 409, reason: "envelope_mismatch" };
+    }
 
-  // 7 · process — provider truth mapped onto the machine, idempotent by
-  // providerEventId (a replayed webhook returns the original ack, appends nothing).
-  const facts: WebhookFacts = {
-    providerEventId: envelope.providerEventId,
-    kind: envelope.kind,
-    amount: envelope.amount,
-    providerRef: envelope.providerRef,
-    reason: `razorpay ${envelope.kind}`,
-  };
-  const ack = await ingestWebhookEvent(deps, envelope.orgId, envelope.paymentId, facts);
-  // A rejected command (e.g. an illegal transition for this payment's state) is
-  // still a 200 to the provider — we received and understood it; retrying will
-  // not change the verdict. Only infrastructure faults surface as 5xx.
-  return { ok: true, ack };
+    // 7 · process — provider truth mapped onto the machine, idempotent by
+    // providerEventId (a replayed webhook returns the original ack, appends nothing).
+    const facts: WebhookFacts = {
+      providerEventId: envelope.providerEventId,
+      kind: envelope.kind,
+      amount: envelope.amount,
+      providerRef: envelope.providerRef,
+      reason: `razorpay ${envelope.kind}`,
+    };
+    const ack = await ingestWebhookEvent(tenantDeps, envelope.orgId, envelope.paymentId, facts);
+    // A rejected command (e.g. an illegal transition for this payment's state) is
+    // still a 200 to the provider — we received and understood it; retrying will
+    // not change the verdict. Only infrastructure faults surface as 5xx.
+    return { ok: true, ack };
+  });
 }
 
 /** The payment projection carries orgId only via the row; expose it for the pin

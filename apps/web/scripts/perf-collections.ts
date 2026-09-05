@@ -47,7 +47,10 @@ import {
 } from "../src/server/settlement/adapters/razorpay.js";
 import { settlementDeps } from "../src/server/settlement/deps.js";
 import { recoverCase, recoverJournal, recoverPayments } from "../src/server/settlement/recovery.js";
-import { handleRazorpayWebhook } from "../src/server/settlement/webhook.js";
+import {
+  handleRazorpayWebhook,
+  type WithSettlementTenant,
+} from "../src/server/settlement/webhook.js";
 import {
   attestManualCapture,
   computeCaseObligations,
@@ -275,6 +278,9 @@ async function main(): Promise<void> {
   }
   report("journal posting (manual capture+discharge)", posting);
 
+  // Owner connection: RLS is inert, so the boundary is a pass-through here.
+  const passThroughTenant: WithSettlementTenant = (_orgId, run) => run(deps);
+
   // 3 · Webhook processing (gateway create + signed capture).
   const gatewayIds: string[] = [];
   for (let i = 0; i < N; i++) {
@@ -307,7 +313,11 @@ async function main(): Promise<void> {
       },
     });
     const t = performance.now();
-    await handleRazorpayWebhook(deps, { rawBody: body, signature: sign(body), receivedAtMs: NOW });
+    await handleRazorpayWebhook(
+      deps,
+      { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+      passThroughTenant,
+    );
     webhook.push(performance.now() - t);
   }
   report("webhook processing (capture ingress)", webhook);

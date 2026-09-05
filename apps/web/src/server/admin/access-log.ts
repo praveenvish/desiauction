@@ -2,6 +2,7 @@ import { auditLog, newId } from "@desiauction/db";
 
 import { systemDb } from "../db";
 import { ADMIN_ACCESS_ACTION, PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "./capabilities";
+import { logger } from "../logger";
 
 /**
  * THE ONE WRITE IN PLATFORM ADMINISTRATION.
@@ -104,7 +105,6 @@ export async function recordAdminAccess(
   } catch (error) {
     // The failure of the audit trail is exactly the thing that must not be
     // silent, even though it must not break the page either.
-    // eslint-disable-next-line no-console
-    console.error("admin access log failed", { surface, subject, error });
+    logger().error({ err: error, surface, subject }, "admin.access_log_failed");
   }
 }

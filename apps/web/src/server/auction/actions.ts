@@ -586,6 +586,7 @@ export async function auctionLifecycleAction(
       squad_below_minimum: `Some teams are still below the minimum squad size. ${SHORT_SQUAD_OVERRIDE_HINT}`,
       engine_unreachable: "The auction engine is offline.",
       engine_halted: "The engine halted fail-closed — run recovery from the cockpit.",
+      command_failed: "The engine hit an error running that — check the feed, then try again.",
     };
     return { ok: false, error: message[result.reason ?? ""] ?? "Refused." };
   }

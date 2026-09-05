@@ -3,8 +3,9 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
-import { systemDb } from "../../../../server/db";
+import { db } from "../../../../server/db";
 import { applyInbound } from "../../../../server/messaging/inbound";
+import { withRequestId } from "../../../../server/logger";
 
 /**
  * INBOUND SMS WEBHOOK — where a STOP actually lands.
@@ -56,7 +57,7 @@ function readField(source: Record<string, unknown>, names: readonly string[]): s
   return "";
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+async function handle(request: Request): Promise<NextResponse> {
   const expected = env.SMS_INBOUND_SECRET;
   if (expected === undefined || expected === "") {
     // Closed until configured. 404 rather than 503: an unconfigured endpoint
@@ -85,7 +86,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     return new NextResponse(null, { status: 400 });
   }
 
-  const result = await applyInbound(systemDb, { from, body });
+  /**
+   * THE APP POOL, NOT THE SYSTEM POOL (audit PA-1 §10 P0-2).
+   *
+   * This wrote through `systemDb`, and `desiauction_system` holds SELECT on
+   * `suppressions` and nothing more — so in production every STOP answered with
+   * a 500 and nobody was ever unsubscribed. That is a DPDP opt-out we accepted
+   * and dropped, and it was invisible locally because every local process
+   * connects as the database owner.
+   *
+   * `suppressions` is deliberately NOT org-scoped: a person texting STOP is
+   * telling the platform, not one club, and the table carries no `org_id` and no
+   * RLS. So there is no tenant boundary to enter here — the correct pool is the
+   * app pool, which holds the DML this write needs, and the absence of a
+   * `withTenantDb` wrapper is the point rather than an omission.
+   */
+  const result = await applyInbound(db, { from, body });
 
   /*
    * 200 even for a keyword we do not recognise.
@@ -102,4 +118,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     result.handled ? { status: "ok", action: result.intent } : { status: "ok", action: "ignored" },
     { status: 200 },
   );
+}
+
+/**
+ * Every line this request logs carries one id (PA-1 §20).
+ *
+ * Provider callbacks and scheduled sweeps are exactly the requests nobody is
+ * watching when they run, so "which delivery did that error belong to" has to
+ * be answerable afterwards from the log alone.
+ */
+export function POST(request: Request): Promise<NextResponse> {
+  return withRequestId(request.headers, () => handle(request));
 }

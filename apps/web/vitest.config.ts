@@ -22,6 +22,18 @@ export default defineConfig({
         process.env["DATABASE_URL"] ??
         "postgres://desiauction:desiauction@localhost:5433/desiauction",
     },
+    // POSTURE SUITES ARE NOT PART OF THIS RUN (PA-1R Phase 0.5).
+    //
+    // They live under `src/` so they can import real handlers by relative path,
+    // which puts them in this config's way. They must not run here: this suite
+    // connects as the database OWNER, and the whole point of a posture suite is
+    // to connect as `desiauction_app`. Run under the owner, an assertion that a
+    // tenant row is INVISIBLE trivially fails, and an `it.fails` marking a known
+    // grants defect "passes" and so reports as a failure.
+    //
+    // They have their own config, their own roles and their own CI step:
+    //   pnpm --filter @desiauction/web posture:verify
+    exclude: ["**/node_modules/**", "**/*.posture.test.ts"],
     // The settlement/finops regression suites drive the SHARED job queue and
     // event streams in the one dev database; parallel test FILES drain each
     // other's jobs and skew injected-clock assertions (PX-4 finding: the

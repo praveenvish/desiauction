@@ -5,6 +5,7 @@ import {
   lots,
   newId,
   organizations,
+  paddles,
   people,
   registrations,
   teams,
@@ -135,6 +136,37 @@ beforeAll(async () => {
       createdBy: personId,
     },
   ]);
+  /*
+   * REAL PADDLES, because a sold lot has a real buyer.
+   *
+   * Both lots used to carry `soldToPaddleId: newId()` — a buyer invented on the
+   * spot, referencing nothing. Migration 0043's `lots_sold_to_paddle_id_fk`
+   * refuses that outright, and rightly: a sale whose paddle does not exist is
+   * precisely the corruption the audit found 214 of, and a fixture that asserts
+   * career facts about it was asserting them about a state the product cannot
+   * reach. The phantom this test is actually about is the ABANDONED auction,
+   * not a dangling pointer, and that phantom is unaffected.
+   */
+  const realPaddleId = newId();
+  const phantomPaddleId = newId();
+  await db.insert(paddles).values([
+    {
+      id: realPaddleId,
+      orgId,
+      auctionId: realAuctionId,
+      teamId,
+      personId,
+      paddleNumber: "P01",
+    },
+    {
+      id: phantomPaddleId,
+      orgId,
+      auctionId: abandonedAuctionId,
+      teamId,
+      personId,
+      paddleNumber: "P01",
+    },
+  ]);
   await db.insert(lots).values([
     {
       id: newId(),
@@ -145,7 +177,7 @@ beforeAll(async () => {
       seq: 1,
       basePrice: 10_000_00,
       status: "sold",
-      soldToPaddleId: newId(),
+      soldToPaddleId: realPaddleId,
       soldPrice: SOLD_PRICE,
     },
     {
@@ -157,7 +189,7 @@ beforeAll(async () => {
       seq: 1,
       basePrice: 10_000_00,
       status: "sold",
-      soldToPaddleId: newId(),
+      soldToPaddleId: phantomPaddleId,
       soldPrice: 99_99_999_00, // the phantom price that must never surface
     },
   ]);
@@ -165,6 +197,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(lots).where(inArray(lots.auctionId, [realAuctionId, abandonedAuctionId]));
+  await db.delete(paddles).where(inArray(paddles.auctionId, [realAuctionId, abandonedAuctionId]));
   await db.delete(auctions).where(inArray(auctions.id, [realAuctionId, abandonedAuctionId]));
   await db.delete(registrations).where(inArray(registrations.id, [regSold, regWithdrawn]));
   await db.delete(teams).where(eq(teams.id, teamId));

@@ -151,7 +151,6 @@ function expectations(allTables: string[]): Expectation[] {
   // scopes it. Anything the app role cannot even SELECT is a 500 in production
   // and a green test locally.
   for (const table of allTables) {
-    if (table === "finops_events") continue; // freeze §8.2: runner is the writer
     out.push({
       role: "desiauction_app",
       table,
@@ -279,8 +278,12 @@ function expectations(allTables: string[]): Expectation[] {
     role: "desiauction_app",
     table: "finops_events",
     verb: "INSERT",
-    allowed: false,
-    why: "freeze §8.2: the web tier cannot write finops truth",
+    allowed: true,
+    why:
+      "the shipped finance workspace appends finops events from the web tier; " +
+      "containment is the UPDATE/DELETE revoke below, not a missing INSERT " +
+      "(the app role already holds full DML on every projection rebuilt from " +
+      "this log, so blocking only the append contained nothing)",
   });
 
   for (const table of PRIVATE_PLAN_TABLES) {

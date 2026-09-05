@@ -5,6 +5,7 @@ import {
   lots,
   newId,
   organizations,
+  paddles,
   people,
   registrations,
   teams,
@@ -55,6 +56,7 @@ export async function insertCareerFixture(
     const teamId = newId();
     const registrationId = newId();
     const auctionId = newId();
+    const paddleId = newId();
     const competitionName = `Career Fixture Cup ${stamp}`;
     await db.insert(organizations).values({
       id: orgId,
@@ -97,6 +99,29 @@ export async function insertCareerFixture(
       config: {},
       createdBy: personId,
     });
+    /*
+     * THE BUYER HAS TO EXIST.
+     *
+     * `soldToPaddleId` used to be `newId()` — a buyer invented on the spot,
+     * referencing nothing. Every read this fixture feeds joined through it and
+     * found no row, so the career page rendered a sale with no purchaser and
+     * the test still passed. Migration 0043's `lots_sold_to_paddle_id_fk` now
+     * refuses the insert outright, which is the constraint doing its job: a
+     * fixture that describes a state the product cannot produce is not a
+     * fixture, it is a fiction the assertions are written against.
+     *
+     * The same flaw lived in `career.regression.test.ts` and was fixed there
+     * during PA-1R Phase 3.1; this copy was missed because no suite that could
+     * see it had been run. That is the whole argument for running e2e.
+     */
+    await db.insert(paddles).values({
+      id: paddleId,
+      orgId,
+      auctionId,
+      teamId,
+      personId,
+      paddleNumber: "P1",
+    });
     await db.insert(lots).values({
       id: newId(),
       orgId,
@@ -106,7 +131,7 @@ export async function insertCareerFixture(
       seq: 1,
       basePrice: 10_000_00,
       status: "sold",
-      soldToPaddleId: newId(),
+      soldToPaddleId: paddleId,
       soldPrice: 3_50_000_00, // ₹3,50,000
     });
     return { competitionName, soldPriceLabel: "₹3,50,000" };

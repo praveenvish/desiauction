@@ -130,6 +130,7 @@ import {
 import { issueSettlementGrant, settlementActor } from "../settlement/authz";
 import { settlementDeps } from "../settlement/deps";
 import { canFinops, finopsActor, issueFinopsGrant, revokeFinopsGrant } from "./authz";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -409,6 +410,8 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
+  // PA-1R Phase 3: the spine this teardown never deleted (see purge-org.ts).
+  await purgeOrg(db, org.id);
   await db.delete(finopsCursors).where(eq(finopsCursors.orgId, org.id));
   await db.delete(finopsJobs).where(eq(finopsJobs.orgId, org.id));
   await db.delete(finopsPeriodDays).where(eq(finopsPeriodDays.orgId, org.id));

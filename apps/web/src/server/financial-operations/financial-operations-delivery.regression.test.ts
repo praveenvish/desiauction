@@ -71,6 +71,7 @@ import {
   dispatchQueueSnapshot,
   dispatchSnapshot,
   drainJobsOnce,
+  followAllOrgs,
   enqueueDispatchSends,
   enqueueExportGenerations,
   finopsDeps,
@@ -128,6 +129,7 @@ import {
 import { issueSettlementGrant, settlementActor } from "../settlement/authz";
 import { settlementDeps } from "../settlement/deps";
 import { finopsActor, issueFinopsGrant } from "./authz";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -488,6 +490,8 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
+  // PA-1R Phase 3: the spine this teardown never deleted (see purge-org.ts).
+  await purgeOrg(db, org.id);
   rmSync(STORAGE_DIR, { recursive: true, force: true });
   await db.delete(finopsCursors).where(eq(finopsCursors.orgId, org.id));
   await db.delete(finopsJobs).where(eq(finopsJobs.orgId, org.id));
@@ -1120,5 +1124,188 @@ describe("M-IP6-3 · Rebuilds, replay & the boundary", () => {
     expect(queued).toContain(`dispatch.send:${dispatchId}`);
     // ...without asking the directory who the tenants are, even once.
     expect(orgSweeps).toBe(0);
+  });
+});
+
+describe("JOB LEASE — the fence and the reclaim count (PA-1 §16)", () => {
+  const jobId = "01M1LEASEFENCE00000000JOB1";
+
+  async function seedJob(attempts: number, maxAttempts: number): Promise<void> {
+    await db.delete(finopsJobs).where(eq(finopsJobs.id, jobId));
+    await db.insert(finopsJobs).values({
+      id: jobId,
+      orgId: org.id,
+      kind: "dispatch.send",
+      dedupeKey: `lease-fence-${String(Date.now())}`,
+      state: "queued",
+      attempts,
+      maxAttempts,
+      notBeforeMs: 0,
+      payload: {},
+      updatedAtMs: 0,
+    });
+  }
+
+  afterAll(async () => {
+    await db.delete(finopsJobs).where(eq(finopsJobs.id, jobId));
+  });
+
+  it("a worker whose lease was reclaimed cannot write the job's outcome", async () => {
+    await seedJob(0, 5);
+    const now = Date.now();
+
+    // Worker A claims it, and remembers the lease it claimed with. The suite
+    // leaves other jobs queued for this org, so pick ours out of the batch
+    // rather than assuming it sorts first.
+    const batchA = await deps.store.claimJobs(now, 1_000, 50, org.id);
+    const claimedByA = batchA.find((job) => job.jobId === jobId);
+    if (claimedByA === undefined) {
+      throw new Error("worker A did not claim the seeded job");
+    }
+    const fenceA = claimedByA.leasedUntilMs;
+
+    // Time passes: A is still working when its lease lapses, and worker B
+    // reclaims the job. This is the case the 60s lease makes ordinary — a long
+    // export or day attestation outliving a batch claimed under one lease.
+    const batchB = await deps.store.claimJobs(now + 2_000, 60_000, 50, org.id);
+    const claimedByB = batchB.find((job) => job.jobId === jobId);
+    if (claimedByB === undefined) {
+      throw new Error("worker B could not reclaim the expired lease");
+    }
+
+    // A now finishes and tries to record `done`. It must not land: B owns this.
+    const aWon = await deps.store.transact((tx) =>
+      tx.updateJob({ ...claimedByA, state: "done", leasedUntilMs: null, lastError: null }, fenceA),
+    );
+    expect(aWon, "the reclaimed worker's write landed and overwrote the owner's").toBe(false);
+
+    // ...and B's does.
+    const bWon = await deps.store.transact((tx) =>
+      tx.updateJob(
+        { ...claimedByB, state: "done", leasedUntilMs: null, lastError: null },
+        claimedByB.leasedUntilMs,
+      ),
+    );
+    expect(bWon).toBe(true);
+  });
+
+  it("a reclaim counts as an attempt, so a job that kills its worker dies", async () => {
+    // The crash-loop: the process dies before the drain's catch can run, so
+    // `attempts` never moved and the job was re-leased for ever at 0.
+    await seedJob(2, 3);
+    const now = Date.now();
+
+    const first = (await deps.store.claimJobs(now, 1_000, 50, org.id)).find(
+      (job) => job.jobId === jobId,
+    );
+    expect(first?.attempts, "claiming a queued job must not spend an attempt").toBe(2);
+
+    // The worker vanishes; the lease lapses; the job comes back round.
+    const reclaimed = await deps.store.claimJobs(now + 2_000, 1_000, 50, org.id);
+    expect(
+      reclaimed.some((job) => job.jobId === jobId),
+      "an exhausted job was handed out again instead of being retired",
+    ).toBe(false);
+
+    const [row] = await db
+      .select({ state: finopsJobs.state, attempts: finopsJobs.attempts })
+      .from(finopsJobs)
+      .where(eq(finopsJobs.id, jobId));
+    expect(row?.attempts).toBe(3);
+    expect(row?.state, "a crash-looping job never dead-lettered").toBe("dead");
+  });
+});
+
+describe("FOLLOWER ISOLATION — one bad org does not starve the rest (PA-1 §16)", () => {
+  it("keeps serving the orgs after the one that throws, and reports it", async () => {
+    /**
+     * `runFollower` throwing aborted the whole loop, so every org AFTER the
+     * failing one was skipped for the tick — and because the org list is stably
+     * ordered, the same orgs were skipped every time. One contended stream
+     * could stop receipts for everyone sorted below it, indefinitely, while the
+     * runner logged a healthy tick.
+     */
+    const failing = "01M1FOLLOWERISOLATION0BAD1";
+    const served: string[] = [];
+
+    const counted = {
+      ...deps,
+      orgs: { listOrgIds: () => Promise.resolve([failing, org.id]) },
+      // `runFollower` opens with `source.listOrgStreamHeads`, so that is where a
+      // contended org realistically blows up — and it is the first thing the
+      // loop does per org, which is what made the old abort so total.
+      source: {
+        ...deps.source,
+        listOrgStreamHeads: async (orgId: string) => {
+          if (orgId === failing) {
+            throw new Error("contended stream");
+          }
+          served.push(orgId);
+          return deps.source.listOrgStreamHeads(orgId);
+        },
+      },
+    } as unknown as typeof deps;
+
+    const result = await followAllOrgs(counted);
+
+    expect(
+      result.failures.map((failure) => failure.orgId),
+      "the failing org was not reported — it would be invisible",
+    ).toEqual([failing]);
+    expect(
+      served,
+      "the org after the failing one was never served — one bad org starved the tick",
+    ).toContain(org.id);
+  });
+});
+
+describe("JOB RETENTION — finished jobs age out, dead ones never do (PA-1 §14)", () => {
+  it("removes done jobs past the cutoff and keeps dead ones", async () => {
+    /**
+     * `finops_jobs` had no retention: a `done` row stayed for ever, so the
+     * table grew without bound and the claim query's index carried more dead
+     * weight every day. `dead` rows are deliberately kept — they are the
+     * operator's queue of things that need a human, and the daily checklist
+     * reads them, so a sweep that took them would be deleting the alert.
+     */
+    const oldDone = "01M1RETENTION000000OLDDONE";
+    const newDone = "01M1RETENTION000000NEWDONE";
+    const oldDead = "01M1RETENTION000000OLDDEAD";
+    const now = Date.now();
+    const week = 7 * 24 * 60 * 60_000;
+
+    for (const [id, state, updatedAtMs] of [
+      [oldDone, "done", now - week - 1000],
+      [newDone, "done", now - 1000],
+      [oldDead, "dead", now - week - 1000],
+    ] as const) {
+      await db.delete(finopsJobs).where(eq(finopsJobs.id, id));
+      await db.insert(finopsJobs).values({
+        id,
+        orgId: org.id,
+        kind: "dispatch.send",
+        dedupeKey: `retention-${id}`,
+        state,
+        attempts: 0,
+        maxAttempts: 5,
+        notBeforeMs: 0,
+        payload: {},
+        updatedAtMs,
+      });
+    }
+
+    const purged = await deps.store.transact((tx) => tx.purgeFinishedJobs(now - week));
+    expect(purged).toBeGreaterThanOrEqual(1);
+
+    const surviving = await db
+      .select({ id: finopsJobs.id })
+      .from(finopsJobs)
+      .where(inArray(finopsJobs.id, [oldDone, newDone, oldDead]));
+    const ids = surviving.map((row) => row.id.trim());
+    expect(ids, "an aged-out done job survived the sweep").not.toContain(oldDone);
+    expect(ids, "a recent done job was swept too early").toContain(newDone);
+    expect(ids, "a DEAD job was swept — that is the operator's alert queue").toContain(oldDead);
+
+    await db.delete(finopsJobs).where(inArray(finopsJobs.id, [newDone, oldDead]));
   });
 });

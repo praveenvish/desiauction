@@ -1,0 +1,190 @@
+{
+  "$comment": [
+    "Files that reach a database pool WITHOUT entering withTenantDb \u2014 checked by",
+    "scripts/check-tenant-posture.mjs (pnpm check:posture).",
+    "",
+    "This list is a RATCHET seeded from the state at audit PA-1 (2026-09-04). It",
+    "may only shrink. A new bypass that is not listed fails the build; a listed",
+    "file that no longer bypasses ALSO fails the build, so fixing a file forces",
+    "the entry to be deleted and the list can never rot.",
+    "",
+    "class = by-design: there is genuinely no tenant to scope to (pre-tenant token",
+    "  paths, identity, public/unauthenticated reads, person-scoped data, tables",
+    "  with no org_id, cross-tenant platform administration). These stay.",
+    "class = debt: this SHOULD run inside withTenantDb. Tracked by PA-1R Phase 3.4.",
+    "  Every one of these is a place where a single missing WHERE clause is a",
+    "  cross-tenant leak with no second line of defence.",
+    "class = defect: a known bug being fixed in PA-1R Phase 2. Should reach zero",
+    "  before launch."
+  ],
+  "allow": {
+    "apps/web/src/app/api/webhooks/delivery-status/route.ts": {
+      "class": "by-design",
+      "reason": "FIXED (PA-1R 2.1). The finops write now runs inside withTenantDb on the app role, and the suppression on the app pool. The remaining system-pool use is ONE id\u2192org lookup that opens that boundary \u2014 the dispatch's org is the only thing that can, and reading it is itself org-scoped. Adapter-verified id, single column, no write."
+    },
+    "apps/web/src/app/api/webhooks/sms-inbound/route.ts": {
+      "class": "by-design",
+      "reason": "FIXED (PA-1R 2.1). Writes `suppressions` on the app pool, which holds the DML. The table is deliberately not org-scoped \u2014 a person texting STOP tells the platform, not one club \u2014 so it carries no org_id and no RLS, and there is no tenant boundary to enter."
+    },
+    "apps/web/src/app/api/webhooks/razorpay/route.ts": {
+      "class": "by-design",
+      "reason": "FIXED (PA-1R 2.2). The org-scoped half now runs inside withTenantDb, opened from the VERIFIED envelope's org. The remaining raw-pool reach is the deps handed in for signature verification only, which touches no database \u2014 the boundary cannot be opened before the signature is checked because no tenant-scoped handle exists until then."
+    },
+    "apps/web/src/app/readyz/route.ts": {
+      "class": "by-design",
+      "reason": "Readiness probe: `select 1` only. Touches no tenant data, and must answer even when no session or org exists."
+    },
+    "apps/web/src/app/demo/[token]/invite.ics/route.ts": {
+      "class": "by-design",
+      "reason": "Pre-tenant token path. The demo tables carry no org_id and no RLS \u2014 the person holding the link is a stranger with no tenant to be scoped to."
+    },
+    "apps/web/src/app/schedule-demo/pick/page.tsx": {
+      "class": "by-design",
+      "reason": "Public booking form, no session. Demo scheduling tables have no org_id."
+    },
+    "apps/web/src/app/dev/inbox/page.tsx": {
+      "class": "by-design",
+      "reason": "Dev-only surface (notFound() outside development). Reads the OTP inbox, which is identity data with no tenant."
+    },
+    "apps/web/src/app/inbox/page.tsx": {
+      "class": "by-design",
+      "reason": "Person-scoped inbox spanning every org the viewer belongs to. The tenant here is the person, not one organization."
+    },
+    "apps/web/src/server/auth/actions.ts": {
+      "class": "by-design",
+      "reason": "Identity: people, sessions, otp_codes, passkeys. None carries org_id, none has RLS, and at login there is no tenant yet \u2014 this is the boundary that establishes one."
+    },
+    "apps/web/src/server/player/profile.ts": {
+      "class": "by-design",
+      "reason": "player_profiles is person-scoped with no org_id; the module self-scopes by personId."
+    },
+    "apps/web/src/server/player/career.ts": {
+      "class": "by-design",
+      "reason": "A player's career spans organizations by definition; scoping it to one would be wrong."
+    },
+    "apps/web/src/server/messaging/actions.ts": {
+      "class": "by-design",
+      "reason": "notification_preferences is person-scoped with no org_id \u2014 deliberately a table a club can neither read nor write."
+    },
+    "apps/web/src/server/financial-operations/my-documents.ts": {
+      "class": "by-design",
+      "reason": "An owner's own receipts across every org they have ever bid in \u2014 person-scoped by paddle, cross-org by intent."
+    },
+    "apps/web/src/server/competition/public.ts": {
+      "class": "by-design",
+      "reason": "Public directory and season pages for unauthenticated visitors. Gated on visibility, not on tenancy."
+    },
+    "apps/web/src/server/competition/posters.ts": {
+      "class": "by-design",
+      "reason": "Public share-card rendering for visibility-gated competitions; no session exists."
+    },
+    "apps/web/src/server/competition/pass.ts": {
+      "class": "by-design",
+      "reason": "Entitlement/tier lookup is a platform-billing fact that crosses orgs."
+    },
+    "apps/web/src/server/feature-settings.ts": {
+      "class": "by-design",
+      "reason": "Platform-scope feature rows have no org_id; the org and auction layers below them do run inside a tenant boundary."
+    },
+    "apps/web/src/server/settlement/coordination-sweep.ts": {
+      "class": "by-design",
+      "reason": "System sweep: enumerates orgs on the system pool, then enters withTenantDb per org to do the actual work."
+    },
+    "apps/web/src/server/admin/actions.ts": {
+      "class": "by-design",
+      "reason": "Platform administration \u2014 cross-tenant by definition, read-only, gated by the platform:admin capability which RLS makes unforgeable."
+    },
+    "apps/web/src/server/admin/access-log.ts": {
+      "class": "by-design",
+      "reason": "Writes the audited breadcrumb for a platform-admin read. Cross-tenant by definition."
+    },
+    "apps/web/src/server/admin/demo-views.ts": {
+      "class": "by-design",
+      "reason": "Platform demo desk. Demo tables have no org_id."
+    },
+    "apps/web/src/server/admin/pass-views.ts": {
+      "class": "by-design",
+      "reason": "Platform billing projections, cross-tenant by definition."
+    },
+    "apps/web/src/server/admin/pass-actions.ts": {
+      "class": "by-design",
+      "reason": "Platform billing: resolves a tier change for any org, gated by platform:billing."
+    },
+    "apps/web/src/server/marketing/actions.ts": {
+      "class": "by-design",
+      "reason": "Public newsletter + demo request from strangers. No tenant exists."
+    },
+    "apps/web/src/server/marketing/booking-actions.ts": {
+      "class": "by-design",
+      "reason": "Demo booking by HMAC-derived token, pre-tenant."
+    },
+    "apps/web/src/server/marketing/demo-availability.ts": {
+      "class": "by-design",
+      "reason": "Public demo availability; tables carry no org_id."
+    },
+    "apps/web/src/server/marketing/demo-booking.ts": {
+      "class": "by-design",
+      "reason": "Public demo booking; tables carry no org_id."
+    },
+    "apps/web/src/server/marketing/demo-desk.ts": {
+      "class": "by-design",
+      "reason": "Demo desk reads; tables carry no org_id."
+    },
+    "apps/web/src/server/marketing/demo-reminders.ts": {
+      "class": "by-design",
+      "reason": "Scheduled reminder sweep over pre-tenant demo bookings."
+    },
+    "apps/web/src/server/marketing/demo-retention.ts": {
+      "class": "by-design",
+      "reason": "Retention purge over pre-tenant demo data."
+    },
+    "apps/web/src/server/marketing/demo-slots.ts": {
+      "class": "by-design",
+      "reason": "Slot computation over pre-tenant demo data."
+    },
+    "apps/web/src/server/orgs/actions.ts": {
+      "class": "by-design",
+      "reason": "Invite preview and accept are THE documented pre-tenant token paths the system pool exists for: the reader is not yet a member, so no tenant can be established. NOTE: the accept path is separately tracked for transaction atomicity (PA-1 \u00a79, PA-1R Phase 5.6)."
+    },
+    "apps/web/src/server/auction/owner-actions.ts": {
+      "class": "by-design",
+      "reason": "Owner-join landing and accept by token \u2014 pre-tenant, the same class as invites."
+    },
+    "apps/web/src/server/home/dashboard.ts": {
+      "class": "debt",
+      "reason": "PA-1 \u00a710 P1-4 (priority) \u2014 money aggregates for every competition the viewer belongs to, on the bypass pool. Membership is already proven before these run, so a tenant boundary per org is available. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/auction/conduct-actions.ts": {
+      "class": "by-design",
+      "reason": "BURNED DOWN (PA-1R 3.4). The conduct screen's reads \u2014 including owner names and phone numbers \u2014 now run inside the withTenantDb boundary the rest of cockpitView already used. The remaining system-pool reads are publicSpectatorView, which is anonymous and visibility-gated: there is no session and therefore no tenant to scope to."
+    },
+    "apps/web/src/server/auction/actions.ts": {
+      "class": "debt",
+      "reason": "auctionReadiness is read on the system pool after the capability gate has already resolved the org. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/auction/live-actions.ts": {
+      "class": "debt",
+      "reason": "One system-pool read inside an otherwise tenant-scoped module. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/competition/actions.ts": {
+      "class": "debt",
+      "reason": "resolveCompetition and several season reads run on the system pool after membership is proven. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/competition/fixture-actions.ts": {
+      "class": "debt",
+      "reason": "Organizer schedule reads on the system pool after membership is proven. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/competition/tournament-actions.ts": {
+      "class": "debt",
+      "reason": "Tournament listings on the system pool after membership is re-proven in application code. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/settlement/actions.ts": {
+      "class": "debt",
+      "reason": "resolveCompetition runs on the system pool before the tenant transaction opens; the money commands themselves are correctly inside withTenantDb. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/media/actions.ts": {
+      "class": "debt",
+      "reason": "Media subject resolution partly on the system pool; the writes are inside a tenant boundary. PA-1R Phase 3.4."
+    }
+  }
+}

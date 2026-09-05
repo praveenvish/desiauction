@@ -40,7 +40,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 // Input shapes (structural — web's CompetitionSummary and AuctionReadyProjection
 // satisfy them; the engine supplies them from its own reads). The package never
@@ -613,6 +613,32 @@ export async function transitionLot(
   const decision = lotTransition(lot.status, command, guards);
   if (!decision.ok) {
     return decision;
+  }
+  /**
+   * PAUSE IS TOTAL, AND FOR THESE FOUR COMMANDS IT WAS NOT (audit PA-1 §6).
+   *
+   * Only `open` checked the auction's status, so a paused auction still
+   * accepted the gavel: `CloseLot` sold or passed the lot on the block, and
+   * `HoldLot` froze it. A pause is called to settle a dispute, take a phone
+   * call, or stop the room — doc 39 states it stops the night, and a sale
+   * landing in the middle of one is the single most expensive thing this
+   * product can get wrong, because the hammer is not reversible without an
+   * audited override.
+   *
+   * The timer half was already right: `pause` nulls `ends_at_ms` and banks the
+   * remainder in `held_remaining_ms`, so the tick cannot fire `_TimerClose`
+   * while paused and `resume` restores the exact remaining time. This closes
+   * the manual half, and with it the narrow race where a tick already in the
+   * queue lands just after the pause commits.
+   *
+   * `requeue` and `withdraw` stay allowed: both are administrative tidying of
+   * lots that are NOT on the block, and a paused auction is exactly when an
+   * organizer does them.
+   */
+  if (command === "sell" || command === "pass" || command === "hold") {
+    if (auction.status !== "live") {
+      return { ok: false, reason: "auction_not_live" };
+    }
   }
   if (command === "open") {
     if (auction.status !== "live") {
@@ -1760,7 +1786,10 @@ export async function acceptOwnerInvite(
 
 export type GrantPaddleResult =
   | { ok: true; grantId: string; alreadyGranted: boolean }
-  | { ok: false; reason: "terminal_auction" | "unknown_team" | "not_an_owner" };
+  | {
+      ok: false;
+      reason: "terminal_auction" | "unknown_team" | "not_an_owner" | "owns_another_team";
+    };
 
 /**
  * The explicit grant (directive: "no active paddle without explicit grant").
@@ -1804,6 +1833,41 @@ export async function grantPaddle(
   if (accepted === undefined) {
     return { ok: false, reason: "not_an_owner" };
   }
+  /**
+   * INVARIANT 18 — an owner never owns two teams in one tournament.
+   *
+   * `docs/40` files this under "Schema/DB constraints", and it was enforced
+   * nowhere: the existing partial unique is (auction, team, person), which stops
+   * a duplicate grant for the SAME team and says nothing about a second one
+   * (audit PA-1 §5). One person could hold the bidding authority for two teams
+   * and bid against themselves — in a product whose entire promise is a trusted
+   * auction.
+   *
+   * The rule binds the OWNER arm, which is this table. It deliberately does not
+   * bind `paddles`: DA-02 lets a conductor hold several paddles and bid on
+   * behalf of owners who are not in the room, which is how a great many
+   * community auctions are actually run. An organizer operating in the open and
+   * audited is a different act from a rival owner holding two purses.
+   *
+   * Checked here AND by a unique index (migration 0042). This check exists for
+   * the message; the index is what makes it true, including against a second
+   * writer that never comes through this function.
+   */
+  const [otherTeam] = await db
+    .select({ teamId: paddleGrants.teamId })
+    .from(paddleGrants)
+    .where(
+      and(
+        eq(paddleGrants.auctionId, auction.id),
+        eq(paddleGrants.personId, personId),
+        ne(paddleGrants.teamId, teamId),
+        isNull(paddleGrants.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (otherTeam !== undefined) {
+    return { ok: false, reason: "owns_another_team" };
+  }
   const grantId = newId();
   const correlationId = newId();
   const atMs = serverNowMs();
@@ -1831,6 +1895,15 @@ export async function grantPaddle(
   } catch {
     // The partial unique (auction, team, person) WHERE revoked_at IS NULL:
     // granting twice is idempotent — the original grant stands.
+    //
+    // THIS CATCH MUST NOT SPEAK FOR EVERY CONSTRAINT. It used to return
+    // `{ ok: true, alreadyGranted: true }` for ANY failure, which was safe only
+    // while one unique index existed on this table. Migration 0042 adds a
+    // second (invariant 18), and under the old code a refused second-team grant
+    // would have been reported as SUCCESS, carrying a grantId for a row that
+    // was never inserted — a silent authorization lie, and a worse bug than the
+    // one being fixed. So the idempotent answer is now given only when the
+    // matching grant is actually found.
     const [existing] = await db
       .select({ id: paddleGrants.id })
       .from(paddleGrants)
@@ -1843,7 +1916,13 @@ export async function grantPaddle(
         ),
       )
       .limit(1);
-    return { ok: true, grantId: existing?.id ?? grantId, alreadyGranted: true };
+    if (existing !== undefined) {
+      return { ok: true, grantId: existing.id, alreadyGranted: true };
+    }
+    // No same-team grant exists, so something else refused the insert. The one
+    // other thing that can is invariant 18, raced between the check above and
+    // this write; report it as the refusal it is rather than inventing success.
+    return { ok: false, reason: "owns_another_team" };
   }
   return { ok: true, grantId, alreadyGranted: false };
 }

@@ -92,6 +92,7 @@ import {
   waiveObligation,
   type SettlementActor,
 } from "./writer";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -279,6 +280,8 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  // PA-1R Phase 3: the spine this teardown never deleted (see purge-org.ts).
+  await purgeOrg(db, org.id);
   await db.delete(paymentsTable).where(eq(paymentsTable.orgId, org.id));
   await db.delete(journalLegs).where(eq(journalLegs.orgId, org.id));
   await db.delete(journalPostings).where(eq(journalPostings.orgId, org.id));
@@ -305,6 +308,54 @@ afterAll(async () => {
   await db.delete(people).where(like(people.phone, `${SEED}%`));
   await handle.sql.end({ timeout: 5 });
 }, 60_000);
+
+describe("CERT · Concurrent appends to one stream serialize (PA-1 §7)", () => {
+  it("two simultaneous appends both commit, in order, instead of one colliding", async () => {
+    /**
+     * `appendEvent` reads `max(seq)` and inserts `seq + 1`. The engine can rely
+     * on the unique index alone for that because a process-level lease means one
+     * writer exists. Settlement has no lease: it runs in the web tier, where two
+     * operators on one case — or two instances behind a load balancer — are
+     * ordinary. Both read the same max, both insert the same seq, and the loser
+     * got a raw Postgres 23505 in the interface while doing nothing wrong.
+     *
+     * A transaction-scoped advisory lock on the stream makes the second writer
+     * WAIT: it reads a max that already includes the first append and lands
+     * after it. This drives the store directly — two real transactions racing —
+     * because that is the only way to observe the interleave the lock prevents.
+     */
+    const streamId = `concurrency-${SEED}`;
+    const append = (type: string): Promise<number> =>
+      deps.store.transact((tx) =>
+        tx.appendEvent({
+          orgId: org.id,
+          streamType: "case",
+          streamId,
+          type,
+          atMs: Date.now(),
+          actor: owner,
+          correlationId: newId(),
+          commandId: newId(),
+          payload: {},
+        }),
+      );
+
+    const seqs = await Promise.all([append("ProbeA"), append("ProbeB")]);
+
+    // Both succeeded, and they took different consecutive places in the order.
+    expect([...seqs].sort((a, b) => a - b)).toEqual([1, 2]);
+
+    const rows = await db
+      .select({ seq: settlementEvents.seq })
+      .from(settlementEvents)
+      .where(and(eq(settlementEvents.streamType, "case"), eq(settlementEvents.streamId, streamId)));
+    expect(rows.length).toBe(2);
+
+    await db
+      .delete(settlementEvents)
+      .where(and(eq(settlementEvents.streamType, "case"), eq(settlementEvents.streamId, streamId)));
+  });
+});
 
 describe("CERT · Event sourcing — reordering, gaps, duplicates all fail closed", () => {
   it("REJECTS a reordered stream (out-of-seq folds are refused)", async () => {

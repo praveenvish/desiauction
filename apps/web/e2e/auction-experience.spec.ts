@@ -254,6 +254,10 @@ test("the full night: lobby → owners → bidding with notifications → public
     timeout: 20_000,
   });
   await expect(ownerA.page.getByTestId("plan-fit")).toHaveAttribute("data-fit", "fits");
+  // Phase 1.5: role facts — the two fixture players are one batter and one bowler, both to come.
+  await expect(ownerA.page.getByTestId("plan-roles")).toContainText(
+    "Still to come 1 Batter · 1 Bowler",
+  );
 
   // The organizer switches owner plans OFF: the page is gone (404, not 403 —
   // existence privacy) and the door vanishes; ON brings both back untouched.
@@ -440,7 +444,15 @@ test("the full night: lobby → owners → bidding with notifications → public
   });
   await expect(ownerA.page.getByTestId("plan-auction-status")).toContainText("Completed");
   await expect(ownerA.page.getByTestId("plan-add")).toHaveCount(0);
-  await expect(ownerA.page.getByText("Signed", { exact: true })).toBeVisible();
+  await expect(
+    ownerA.page.locator('[data-testid^="plan-target-"][data-outcome="won"]'),
+  ).toHaveCount(1);
+  // Phase 1.5: the night's report — one of two targets signed, once past a max, by ₹8,000.
+  await expect(ownerA.page.getByTestId("plan-report-signed")).toContainText("1 of 2");
+  await expect(ownerA.page.getByTestId("plan-report-over")).toContainText("₹8,000");
+  await expect(ownerA.page.getByTestId("plan-report-outside")).toContainText(
+    "Nothing bought off-plan",
+  );
 
   await spectatorCtx.close();
   await ownerA.ctx.close();
