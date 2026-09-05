@@ -40,11 +40,12 @@ import {
   registrations,
   teams,
 } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { pino } from "pino";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, sql } from "../db.js";
+import { deletePeopleCascading } from "./people-teardown.js";
 import { AuctionEngine } from "../engine-core.js";
 
 const logger = pino({ level: "silent" });
@@ -184,7 +185,7 @@ afterAll(async () => {
   await db.delete(orgMembers).where(eq(orgMembers.orgId, orgId));
   await db.delete(auditLog).where(eq(auditLog.scopeId, orgId));
   await db.delete(organizations).where(eq(organizations.id, orgId));
-  await db.delete(people).where(inArray(people.id, [organizerId, ownerA, ownerB, outsiderId]));
+  await deletePeopleCascading([organizerId, ownerA, ownerB, outsiderId]);
   await sql.end();
 });
 
