@@ -4,6 +4,7 @@ import {
   REJECTION_REASONS,
   REQUIRED_IMPORT_FIELDS,
   mappingOf,
+  roleLabel,
   type ColumnMapping,
   type DateOrder,
 } from "@desiauction/core";
@@ -42,7 +43,6 @@ import {
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
-import { roleLabel } from "../../../../lib/playing-roles";
 import { AddPlayerDialog } from "./add-player-dialog";
 import { ColumnMapper } from "./column-mapper";
 import { PhotoImportPanel } from "./photo-import";

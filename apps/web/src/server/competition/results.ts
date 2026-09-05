@@ -1,6 +1,8 @@
 import { auditLog, fixtureResults, fixtures, newId, teams, type Db } from "@desiauction/db";
 import {
+  DEFAULT_SPORT,
   buildStandings,
+  scoreWithinBounds,
   type FixtureResultInput,
   type ResultOutcome,
   type StandingsRow,
@@ -52,15 +54,16 @@ export type RecordResultOutcome =
       reason: "unknown_fixture" | "not_played" | "impossible_score" | "winner_without_score";
     };
 
-/** Ten wickets, and a score cannot be negative. Cheap, and it catches a typo. */
+/**
+ * Ten wickets, and a score cannot be negative. Cheap, and it catches a typo.
+ *
+ * The bounds are the sport pack's now, not three literals sitting in a server
+ * module (Phase 0). Until a competition carries its own sport, the pack is the
+ * default one — and when it does, this is one of the callers the compiler will
+ * point at, because the right pack here is the competition's, not the house's.
+ */
 function plausible(runs?: number | null, wickets?: number | null, balls?: number | null): boolean {
-  if (runs != null && (runs < 0 || runs > 2000)) {
-    return false;
-  }
-  if (wickets != null && (wickets < 0 || wickets > 10)) {
-    return false;
-  }
-  return !(balls != null && (balls < 0 || balls > 3000));
+  return scoreWithinBounds(DEFAULT_SPORT, { runs, wickets, balls });
 }
 
 /**

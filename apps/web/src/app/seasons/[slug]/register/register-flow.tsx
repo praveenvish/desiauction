@@ -9,6 +9,7 @@ import {
   REGISTRATION_ROLES,
   battingStyleLabel,
   bowlingStyleLabel,
+  roleLabel,
 } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select } from "@desiauction/ui";
 import { useEffect, useState, useTransition } from "react";
@@ -18,13 +19,6 @@ import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
 import { SelfPhotoUploader } from "./self-photo-uploader";
-
-const ROLE_LABEL: Record<string, string> = {
-  batter: "Batter",
-  bowler: "Bowler",
-  all_rounder: "All-rounder",
-  wicket_keeper: "Wicket-keeper",
-};
 
 type Step = "profile" | "role" | "review";
 
@@ -343,7 +337,7 @@ export function RegisterFlow({
             <option value="">Choose your role…</option>
             {REGISTRATION_ROLES.map((entry) => (
               <option key={entry} value={entry}>
-                {ROLE_LABEL[entry] ?? entry}
+                {roleLabel(entry)}
               </option>
             ))}
           </Select>
@@ -486,7 +480,7 @@ export function RegisterFlow({
             <dt>Mobile</dt>
             <dd>{formatPhone(phone)}</dd>
             <dt>Playing role</dt>
-            <dd>{ROLE_LABEL[role] ?? role}</dd>
+            <dd>{roleLabel(role)}</dd>
             {/* DA-21: step 2 collects date of birth and both styles, and the
                 review showed none of them — you could not check what you were
                 about to submit. Omitted rows stay omitted rather than printing

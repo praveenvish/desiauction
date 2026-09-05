@@ -6,6 +6,7 @@ import {
   evaluatePlan,
   formatPaiseINR,
   paise,
+  roleLabel,
   type AuctionStatus,
   type PlanInput,
   type PlanState,
@@ -26,7 +27,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
-import { roleLabel } from "../../../../../lib/playing-roles";
 import type { PlanLotRow, TargetRow } from "../../../../../server/auction/owner-plan";
 import {
   addTargetAction,

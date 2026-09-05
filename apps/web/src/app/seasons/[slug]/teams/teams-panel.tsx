@@ -1,5 +1,6 @@
 "use client";
 
+import { REGISTRATION_ROLES, roleLabel } from "@desiauction/core";
 import {
   Badge,
   Button,
@@ -26,17 +27,6 @@ import {
 import type { TeamCard, TeamsWorkspaceView } from "../../../../server/competition/actions";
 import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
 import { TeamLogoUploader } from "./team-logo-uploader";
-
-const ROLE_LABEL: Record<string, string> = {
-  batter: "Batter",
-  bowler: "Bowler",
-  all_rounder: "All rounder",
-  wicket_keeper: "Wicket-keeper",
-};
-
-function roleLabel(role: string): string {
-  return ROLE_LABEL[role] ?? role.replace(/_/g, " ");
-}
 
 /** "₹74,31,250" — exact rupees, Indian grouping. */
 function exactINR(paise: number): string {
@@ -489,7 +479,10 @@ function RosterDetail({
     for (const row of roster) {
       counts.set(row.role, (counts.get(row.role) ?? 0) + 1);
     }
-    const order = ["batter", "bowler", "all_rounder", "wicket_keeper"];
+    // The pack declares the order; the design's "fixed order" IS that order.
+    // Widened to string because a roster row's role is whatever the row holds —
+    // an unknown one still sorts first, exactly as it did before.
+    const order: readonly string[] = REGISTRATION_ROLES;
     return [...counts.entries()].sort(
       (a, b) => order.indexOf(a[0]) + 100 - (order.indexOf(b[0]) + 100),
     );

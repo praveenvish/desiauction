@@ -11,7 +11,7 @@ import {
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
-import { ENTRY_CATEGORIES, entryCategoryLabel } from "@desiauction/core";
+import { ENTRY_CATEGORIES, entryCategoryLabel, roleLabel } from "@desiauction/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -25,7 +25,6 @@ import {
   type SeasonOverviewView,
 } from "../../../server/competition/actions";
 import { formatDate } from "../../../lib/format-date";
-import { roleLabel } from "../../../lib/playing-roles";
 import { track } from "../../../lib/telemetry";
 import { CompetitionLogoUploader } from "./competition-logo-uploader";
 import { ShareRegistration } from "./registrations/share-registration";
@@ -97,8 +96,8 @@ function nextDestination(
   return { href: `/seasons/${slug}/money`, label: "Review settlement" };
 }
 
-// Third consumer moved the map to lib/playing-roles — one prose name per role,
-// shared with the auction overview and the registration desk.
+// Role names come from core's sport pack — one prose name per role, shared by
+// every surface that shows one (Phase 0; the map used to live in four places).
 
 /**
  * Money the way the tiles show it: crores and lakhs, because a purse reads as

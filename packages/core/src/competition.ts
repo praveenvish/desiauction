@@ -6,6 +6,10 @@
  * Pure — no storage, no ambient time (a Clock is injected where time is needed).
  */
 
+import { CRICKET, CRICKET_ROLE_KEYS, isRoleIn } from "./sports";
+
+import type { CricketRole } from "./sports";
+
 // --- Competition lifecycle (pre-auction slice; doc 39 Tournament machine) -----
 // Draft → Setup → RegistrationOpen ⇄ RegistrationClosed → [AuctionReady …IP-4].
 // AuctionReady and beyond are IP-4 guards (invariant 15/16) — declared, not stubbed.
@@ -104,17 +108,22 @@ export function isRejectionReason(value: string): value is RejectionReason {
   return (REJECTION_REASONS as readonly string[]).includes(value);
 }
 
-export type RegistrationRole = "batter" | "bowler" | "all_rounder" | "wicket_keeper";
+/**
+ * THE PLAYING ROLES, DECLARED ONCE (Phase 0).
+ *
+ * This list used to be spelled out here as well as in `player-profile.ts`, and
+ * two more times in the web app. Four copies of four strings is survivable; two
+ * different LABELS for the same role was not, and that is what four copies
+ * produced. The sport pack owns the vocabulary now and this is a re-export, so
+ * the type every registration writer is checked against still resolves to the
+ * same literal union it always did.
+ */
+export type RegistrationRole = CricketRole;
 
-export const REGISTRATION_ROLES: readonly RegistrationRole[] = [
-  "batter",
-  "bowler",
-  "all_rounder",
-  "wicket_keeper",
-];
+export const REGISTRATION_ROLES: readonly RegistrationRole[] = CRICKET_ROLE_KEYS;
 
 export function isRegistrationRole(value: string): value is RegistrationRole {
-  return (REGISTRATION_ROLES as readonly string[]).includes(value);
+  return isRoleIn(CRICKET, value);
 }
 
 const REGISTRATION_EDGES: Record<RegistrationStatus, ReadonlySet<RegistrationEvent["type"]>> = {

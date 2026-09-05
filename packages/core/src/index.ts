@@ -406,3 +406,42 @@ export type {
   PlanSaleLike,
   ReportOutcome,
 } from "./team-plan-report";
+
+/**
+ * THE SPORT REGISTRY (Phase 0). Vocabulary only — no columns, no migrations.
+ * `DEFAULT_SPORT` is the pack every caller resolves to until `competitions.sport`
+ * arrives in Phase 1.
+ */
+export {
+  SPORTS,
+  DEFAULT_SPORT,
+  DEFAULT_SPORT_KEY,
+  CRICKET,
+  CRICKET_ROLE_KEYS,
+  CRICKET_BATTING_STYLE_KEYS,
+  CRICKET_BOWLING_STYLE_KEYS,
+  isSportKey,
+  sportPack,
+  normalizeVocabularyKey,
+  roleKeys,
+  isRoleIn,
+  parseRoleIn,
+  roleLabelIn,
+  attributeSpec,
+  attributeOptionKeys,
+  attributeOptionLabel,
+  isAttributeValueIn,
+  parseAttributeIn,
+  scoreWithinBounds,
+} from "./sports";
+export type {
+  AttributeSpec,
+  AttributeStorage,
+  CricketRole,
+  CricketBattingStyle,
+  CricketBowlingStyle,
+  RoleVocabulary,
+  ScoreFieldSpec,
+  SportPack,
+  VocabularyTerm,
+} from "./sports";

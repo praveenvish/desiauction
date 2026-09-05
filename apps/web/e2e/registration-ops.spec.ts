@@ -311,7 +311,10 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
   // /wicket.?keeper/i matches the raw token "wicket keeper" too — it would pass
   // on a regression to precisely the state 4532c8f removed, which is the one
   // thing this assertion exists to catch.
-  await expect(page.getByTestId("reg-table")).toContainText("All rounder");
+  // Phase 0 converged the two spellings this table and the share card used to
+  // disagree about; "All-rounder" is the one that won, and it is now the only
+  // one the sport pack knows.
+  await expect(page.getByTestId("reg-table")).toContainText("All-rounder");
   await expect(page.getByTestId("reg-table")).toContainText("Wicket-keeper");
 
   /*

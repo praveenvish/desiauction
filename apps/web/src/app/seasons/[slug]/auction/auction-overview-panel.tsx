@@ -1,6 +1,6 @@
 import { Card } from "@desiauction/ui";
 
-import { roleLabel } from "../../../../lib/playing-roles";
+import { roleLabel } from "@desiauction/core";
 import type { AuctionOverview } from "../../../../server/auction/auction-overview";
 
 /**
