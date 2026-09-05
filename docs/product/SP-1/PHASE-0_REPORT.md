@@ -17,6 +17,7 @@ place, and adds a test that keeps it there. Net **−95 lines**.
 | `packages/core/src/sports/index.ts` | The registry and pack-generic readers (`parseRoleIn`, `roleLabelIn`, `attributeOptionLabel`, `scoreWithinBounds`, …). |
 | `packages/core/src/sports/registry.test.ts` | 18 tests, including the drift guard (§4) and an alias-ambiguity check. |
 | `packages/core/src/sports/sport-vocabulary.test.ts` | The boundary guardrail (§3). |
+| `packages/core/src/sports/database-vocabulary.test.ts` | The drift guard for the two copies in `packages/db`, which a leaf package cannot delete (§3). |
 
 Every helper takes the pack as its **first argument** rather than reaching for a
 default. That is the shape Phase 1 needs; until `competitions.sport` exists,
@@ -85,6 +86,28 @@ identical, and proven so by the existing control-character test in
 `player-profile.test.ts`. `gender-boundary.test.ts` was already doing this
 correctly.
 
+### The two copies the pack cannot delete
+
+`packages/db` is a leaf: the `db-is-a-leaf` rule permits it drizzle, postgres
+and ulidx and nothing else, so `schema.ts` physically cannot import the pack.
+Its two role enums — `registrations.role` and `player_profiles.default_role` —
+are therefore a seventh and eighth copy that will exist for as long as the rule
+does, and the rule is right: a column's permitted values are a fact about the
+database, and the database must be able to state its own constraints without
+asking an application package for permission.
+
+So the copy stays and the drift goes. `database-vocabulary.test.ts` reads
+`schema.ts` as text and asserts both enums equal the pack's roles exactly, in
+order. Mutation-checked, not merely written: adding `goalkeeper` to
+`registrations.role` alone fails the run and names the value.
+
+It also pins the two migrations holding the matching CHECK constraints
+(`0036_player_profiles.sql`, `0044_closed_sets_and_indexes.sql`), because a
+schema edited without a migration is a column that accepts a value Postgres
+then refuses — at 11pm, on a registration somebody is trying to submit. Phase 2
+opens `registrations.role` deliberately; when it does, that test gets rewritten
+to assert the new arrangement, not deleted.
+
 ## 4 · How the types survived
 
 `PlayerRole`, `RegistrationRole`, `BattingStyle` and `BowlingStyle` are
@@ -114,7 +137,7 @@ Google Form mapping journey).
 | Gate | Result |
 |------|--------|
 | `pnpm verify` (lint · typecheck ×11 · unit · format · depcruise · motion) | **green** |
-| `packages/core` unit | **463 passed**, including 23 new |
+| `packages/core` unit | **467 passed**, including 27 new |
 | depcruise (incl. the no-circular gate) | **no violations** — 2065 modules, 11622 dependencies |
 | Full e2e, precompiled server | **101 passed, 29 skipped, 0 failed** (4.0m) |
 
