@@ -42,7 +42,7 @@ const ALLOWED = new Set([
   "packages/core/src/eligibility.ts",
   "packages/core/src/player-profile.ts",
   "apps/web/src/server/player/actions.ts",
-  "apps/web/src/app/account/cricket-profile-panel.tsx",
+  "apps/web/src/app/account/person-profile-panel.tsx",
 ]);
 
 // Comparisons against the gender VALUE literals, either side. Null checks and

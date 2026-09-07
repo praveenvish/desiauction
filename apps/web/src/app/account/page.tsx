@@ -1,4 +1,5 @@
 import { AnnouncerProvider, Card, PageIntro, ToastProvider } from "@desiauction/ui";
+import { SPORTS } from "@desiauction/core";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -9,9 +10,14 @@ import {
   logoutAction,
 } from "../../server/auth/actions";
 import { notificationSettings } from "../../server/messaging/actions";
-import { playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
+import {
+  playerProfileFor,
+  sportProfilesFor,
+  profileCompletenessFor,
+} from "../../server/player/profile";
 import { NotificationSwitches } from "./notification-switches";
-import { CricketProfilePanel } from "./cricket-profile-panel";
+import { PersonProfilePanel } from "./person-profile-panel";
+import { SportProfilePanel } from "./sport-profile-panel";
 import { EmailVerify } from "./email-verify";
 import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
@@ -30,6 +36,30 @@ export default async function AccountPage() {
   const settings = await notificationSettings();
   const email = await accountEmail();
   const cricketProfile = await playerProfileFor(session.personId);
+  /*
+   * One form per enabled sport, built from its pack. The specs are flattened to
+   * plain `{ key, label }` here because the packs carry functions and a
+   * function cannot cross into a client component.
+   */
+  const sportProfiles = await sportProfilesFor(session.personId);
+  const sportForms = SPORTS.map((pack) => {
+    const held = sportProfiles.find((profile) => profile.sport === pack.key);
+    return {
+      spec: {
+        key: pack.key,
+        label: pack.label,
+        roleRequired: pack.roles.required,
+        roles: pack.roles.values.map((role) => ({ key: role.key, label: role.label })),
+        attributes: pack.attributes.map((attribute) => ({
+          key: attribute.key,
+          label: attribute.label,
+          options: attribute.options.map((option) => ({ key: option.key, label: option.label })),
+        })),
+      },
+      defaultRole: held?.defaultRole ?? null,
+      attributes: held?.attributes ?? {},
+    };
+  });
   const completeness = await profileCompletenessFor(
     session.personId,
     security?.passkeys.length ?? 0,
@@ -65,9 +95,19 @@ export default async function AccountPage() {
               completeness={completeness}
               signOut={<SignOutButton logout={logoutAction} />}
             />
-            {/* PI-1: the durable cricket identity, right under the account
-              identity it extends. Prefills every future registration. */}
-            <CricketProfilePanel profile={cricketProfile} />
+            {/* PI-1: the durable identity, right under the account identity it
+              extends. Prefills every future registration. */}
+            <PersonProfilePanel profile={cricketProfile} />
+            {/* SP-1 Phase 3: one panel per sport the platform runs, because
+              "how you play" has a different answer in each. */}
+            {sportForms.map((form) => (
+              <SportProfilePanel
+                key={form.spec.key}
+                spec={form.spec}
+                defaultRole={form.defaultRole}
+                attributes={form.attributes}
+              />
+            ))}
             {/* Beside the identity it belongs to, and above Security: this is a
               contact route the product will actually use, not a credential. */}
             <Card>

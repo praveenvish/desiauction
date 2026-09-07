@@ -307,6 +307,8 @@ export async function competitionForRegistration(
   orgId: string;
   name: string;
   status: CompetitionStatus;
+  /** The season's sport, so the register form prefills from that profile. */
+  sport: string;
   /** PI-1: the organizer-declared entry category, read by the eligibility
    *  engine and by the register screens' terminology. */
   entryCategory: "open" | "men" | "women" | "mixed";
@@ -322,6 +324,7 @@ export async function competitionForRegistration(
       orgId: competitions.orgId,
       name: competitions.name,
       status: competitions.status,
+      sport: competitions.sport,
       entryCategory: competitions.entryCategory,
       visibility: competitions.visibility,
     })

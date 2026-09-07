@@ -81,17 +81,43 @@ export const playerProfiles = pgTable(
     dateOfBirth: text("date_of_birth"),
     /** City-level free text — no taxonomy; no feature consumes more. */
     location: text("location"),
-    defaultRole: text("default_role", {
-      enum: ["batter", "bowler", "all_rounder", "wicket_keeper"],
-    }),
-    defaultBattingStyle: text("default_batting_style"),
-    defaultBowlingStyle: text("default_bowling_style"),
     preferredJerseyName: text("preferred_jersey_name"),
     preferredJerseyNumber: text("preferred_jersey_number"),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (table) => [uniqueIndex("player_profiles_person_uq").on(table.personId)],
+);
+
+/**
+ * HOW A PERSON PLAYS ONE SPORT (migration 0048).
+ *
+ * `player_profiles` above is about a PERSON — gender, date of birth, location,
+ * jersey — all true of them whatever they play. This is about a PLAYER, which
+ * is a person IN A SPORT: somebody can be an all-rounder at cricket and a
+ * goalkeeper at football, and one row per person could only ever hold one of
+ * those answers.
+ *
+ * Keyed by (person_id, sport) with no surrogate id: the row IS that pair, and a
+ * generated id would be a second way to name the same thing.
+ */
+export const playerSportProfiles = pgTable(
+  "player_sport_profiles",
+  {
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    sport: text("sport")
+      .notNull()
+      .references(() => sports.key),
+    /** Validated against the SPORT'S pack — never a column-level list. */
+    defaultRole: text("default_role"),
+    /** The pack's attribute keys: batting_style, bowling_style, preferred_foot. */
+    attributes: jsonb("attributes").notNull().default({}),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.personId, table.sport] })],
 );
 
 /**

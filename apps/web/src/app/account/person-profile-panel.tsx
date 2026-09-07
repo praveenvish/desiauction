@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  BATTING_STYLES,
-  BOWLING_STYLES,
-  GENDERS,
-  PLAYER_ROLES,
-  battingStyleLabel,
-  bowlingStyleLabel,
-  genderLabel,
-  roleLabel,
-} from "@desiauction/core";
+import { GENDERS, genderLabel } from "@desiauction/core";
 import { Button, Card, Field, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
@@ -27,7 +18,7 @@ import type { PlayerProfile } from "../../server/player/profile";
  * beside each says exactly who sees it, which is the DPDP notice done as UI
  * rather than as a policy link.
  */
-export function CricketProfilePanel({ profile }: { profile: PlayerProfile }) {
+export function PersonProfilePanel({ profile }: { profile: PlayerProfile }) {
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(updatePlayerProfileAction, {});
@@ -38,7 +29,7 @@ export function CricketProfilePanel({ profile }: { profile: PlayerProfile }) {
     if (state.saved === true && !announced.current) {
       announced.current = true;
       track("profile.updated");
-      toast({ tone: "success", title: "Cricket profile saved" });
+      toast({ tone: "success", title: "Profile saved" });
       router.refresh();
     }
     if (state.saved !== true) {
@@ -51,26 +42,13 @@ export function CricketProfilePanel({ profile }: { profile: PlayerProfile }) {
 
   return (
     <Card className="account-card" data-testid="cricket-profile-panel">
-      <h2>Cricket profile</h2>
+      <h2>Player profile</h2>
       <p className="account-prose">
-        How you play, remembered once — the next registration form starts filled in. Every field is
-        optional.
+        About you, remembered once — the next registration form starts filled in. How you PLAY is
+        below, per sport, because that answer is different in each. Every field is optional.
       </p>
       <form action={formAction} className="cricket-profile-form">
         <div className="cricket-profile-grid">
-          <Select
-            label="Playing role"
-            name="default_role"
-            defaultValue={profile.defaultRole ?? ""}
-            {...errorFor("default_role")}
-          >
-            <option value="">Choose…</option>
-            {PLAYER_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {roleLabel(role)}
-              </option>
-            ))}
-          </Select>
           <Field
             label="Date of birth"
             name="date_of_birth"
@@ -79,32 +57,6 @@ export function CricketProfilePanel({ profile }: { profile: PlayerProfile }) {
             help="Only organizers of seasons you join see your age."
             {...errorFor("date_of_birth")}
           />
-          <Select
-            label="Batting style"
-            name="default_batting_style"
-            defaultValue={profile.defaultBattingStyle ?? ""}
-            {...errorFor("default_batting_style")}
-          >
-            <option value="">Choose…</option>
-            {BATTING_STYLES.map((style) => (
-              <option key={style} value={style}>
-                {battingStyleLabel(style)}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Bowling style"
-            name="default_bowling_style"
-            defaultValue={profile.defaultBowlingStyle ?? ""}
-            {...errorFor("default_bowling_style")}
-          >
-            <option value="">Choose…</option>
-            {BOWLING_STYLES.map((style) => (
-              <option key={style} value={style}>
-                {bowlingStyleLabel(style)}
-              </option>
-            ))}
-          </Select>
           <Field
             label="City"
             name="location"
@@ -158,7 +110,7 @@ export function CricketProfilePanel({ profile }: { profile: PlayerProfile }) {
         </div>
         <div className="profile-save">
           <Button type="submit" loading={pending} variant="secondary">
-            Save cricket profile
+            Save profile
           </Button>
         </div>
       </form>

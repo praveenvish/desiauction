@@ -1,15 +1,30 @@
-import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabelIn, sportPack } from "@desiauction/core";
 import { Badge, Card, EmptyState, PageIntro, PlayerImage, Stat, StatRow } from "@desiauction/ui";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { currentSession } from "../../../server/auth/actions";
 import { playerCareer, type CareerSeason } from "../../../server/player/career";
-import { playerProfileFor, profileCompletenessFor } from "../../../server/player/profile";
+import {
+  playerProfileFor,
+  profileCompletenessFor,
+  sportProfileFor,
+} from "../../../server/player/profile";
 import { formatDate } from "../../../lib/format-date";
 import "./me-cricket.css";
 
-export const metadata = { title: "My cricket · DesiAuction" };
+/**
+ * ONE SPORT'S CAREER (SP-1 Phase 3).
+ *
+ * `/me/cricket` still resolves — it is this route with `sport = "cricket"` — so
+ * every link and bookmark that existed before Phase 3 keeps working, and
+ * `/me/football` now exists beside it. A person's cricket seasons and their
+ * football seasons are two stories, and this page tells one of them.
+ */
+export async function generateMetadata({ params }: { params: Promise<{ sport: string }> }) {
+  const pack = sportPack((await params).sport);
+  return { title: pack === null ? "Not found" : `My ${pack.label.toLowerCase()} · DesiAuction` };
+}
 
 /**
  * THE PLAYER'S OWN CAREER (PI-1 P5) — /me/cricket.
@@ -47,13 +62,19 @@ function auctionBadge(
   return { tone: "neutral", text: "Unsold" };
 }
 
-export default async function MyCricketPage() {
+export default async function MySportPage({ params }: { params: Promise<{ sport: string }> }) {
+  const pack = sportPack((await params).sport);
+  if (pack === null) {
+    // A sport this platform has no pack for is ABSENT, not empty.
+    notFound();
+  }
   const session = await currentSession();
   if (session === null) {
-    redirect("/login?next=/me/cricket");
+    redirect(`/login?next=/me/${pack.key}`);
   }
-  const [career, profile, completeness] = await Promise.all([
-    playerCareer(session.personId),
+  const [career, sportProfile, profile, completeness] = await Promise.all([
+    playerCareer(session.personId, pack.key),
+    sportProfileFor(session.personId, pack.key),
     playerProfileFor(session.personId),
     profileCompletenessFor(session.personId),
   ]);
@@ -73,7 +94,9 @@ export default async function MyCricketPage() {
             <h2>{session.name ?? "—"}</h2>
             <p className="me-cricket-sub">
               {[
-                profile.defaultRole !== null ? roleLabel(profile.defaultRole) : null,
+                sportProfile.defaultRole !== null
+                  ? roleLabelIn(pack, sportProfile.defaultRole)
+                  : null,
                 profile.location,
               ]
                 .filter((part): part is string => part !== null)
@@ -130,7 +153,7 @@ export default async function MyCricketPage() {
                             {[
                               season.orgName,
                               season.startsOn !== null ? formatDate(season.startsOn) : null,
-                              roleLabel(season.role),
+                              roleLabelIn(pack, season.role),
                               season.teamName,
                               season.isCaptain
                                 ? "Captain"

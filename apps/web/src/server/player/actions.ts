@@ -2,10 +2,10 @@
 
 import {
   JERSEY_NAME_MAX,
-  isBattingStyle,
-  isBowlingStyle,
+  isAttributeValueIn,
   isGender,
-  parseRole,
+  parseRoleIn,
+  sportPack,
   validateDateOfBirth,
   validateJerseyNumber,
   validateProfileLocation,
@@ -13,7 +13,12 @@ import {
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
-import { playerProfileFor, upsertPlayerProfile, type PlayerProfile } from "./profile";
+import {
+  playerProfileFor,
+  upsertPlayerProfile,
+  upsertSportProfile,
+  type PlayerProfile,
+} from "./profile";
 
 // The cricket-profile form (PI-1): /account's "How you play" panel and,
 // later, the register wizard's write-back. One action, one validator per
@@ -88,21 +93,6 @@ export async function updatePlayerProfileAction(
     location = verdict.location;
   }
 
-  const roleRaw = orNull(formString(formData, "default_role"));
-  const defaultRole = roleRaw === null ? null : parseRole(roleRaw);
-  if (roleRaw !== null && defaultRole === null) {
-    return { error: "Pick one of the four roles.", field: "default_role" };
-  }
-
-  const battingRaw = orNull(formString(formData, "default_batting_style"));
-  if (battingRaw !== null && !isBattingStyle(battingRaw)) {
-    return { error: "Pick a listed batting style.", field: "default_batting_style" };
-  }
-  const bowlingRaw = orNull(formString(formData, "default_bowling_style"));
-  if (bowlingRaw !== null && !isBowlingStyle(bowlingRaw)) {
-    return { error: "Pick a listed bowling style.", field: "default_bowling_style" };
-  }
-
   const jerseyName = orNull(formString(formData, "preferred_jersey_name"));
   if (jerseyName !== null && jerseyName.length > JERSEY_NAME_MAX) {
     return {
@@ -126,13 +116,58 @@ export async function updatePlayerProfileAction(
     genderSelfDescribed,
     dateOfBirth,
     location,
-    defaultRole,
-    defaultBattingStyle: battingRaw,
-    defaultBowlingStyle: bowlingRaw,
     preferredJerseyName: jerseyName,
     preferredJerseyNumber,
   };
   await upsertPlayerProfile(session.personId, next);
+  return { saved: true };
+}
+
+/**
+ * HOW THIS PERSON PLAYS ONE SPORT (SP-1 Phase 3).
+ *
+ * Separate from the person-level action above, because the two answer different
+ * questions and a single form could only ever hold one sport's. Everything here
+ * is validated against THAT SPORT'S pack — the only thing that knows whether
+ * "goalkeeper" is a legal role or "off_break" a legal style.
+ */
+export async function updateSportProfileAction(
+  _previous: PlayerProfileFormState,
+  formData: FormData,
+): Promise<PlayerProfileFormState> {
+  const session = await currentSession();
+  if (session === null) {
+    redirect("/login?next=/account");
+  }
+  const sportKey = formString(formData, "sport");
+  const pack = sportPack(sportKey);
+  if (pack === null) {
+    return { error: "That sport is not one this platform runs.", field: "sport" };
+  }
+
+  const roleRaw = orNull(formString(formData, "default_role"));
+  const defaultRole = roleRaw === null ? null : parseRoleIn(pack, roleRaw);
+  if (roleRaw !== null && defaultRole === null) {
+    return { error: `Pick one of ${pack.label}'s roles.`, field: "default_role" };
+  }
+
+  const attributes: Record<string, string> = {};
+  for (const attribute of pack.attributes) {
+    const raw = orNull(formString(formData, attribute.key));
+    if (raw === null) {
+      continue;
+    }
+    if (!isAttributeValueIn(pack, attribute.key, raw)) {
+      return { error: `Pick a listed ${attribute.label.toLowerCase()}.`, field: attribute.key };
+    }
+    attributes[attribute.key] = raw;
+  }
+
+  await upsertSportProfile(session.personId, {
+    sport: pack.key,
+    defaultRole,
+    attributes,
+  });
   return { saved: true };
 }
 

@@ -50,14 +50,23 @@ test("the cricket profile saves, counts, and frames the career page", async ({ p
   await page.goto("/account");
   await expect(page.getByTestId("profile-completion")).toContainText("Profile 1/8 complete");
 
-  await page.getByLabel("Playing role").selectOption("all_rounder");
+  /*
+   * TWO SAVES, because Phase 3 split one form into two facts. Date of birth and
+   * city are true of the PERSON whatever they play; the playing role is true of
+   * them in a SPORT. The old single panel could only hold one sport's answer.
+   */
   await page.getByLabel("Date of birth").fill("1995-05-10");
   await page.getByLabel("City").fill("Kolkata");
   await page.getByLabel("Gender").selectOption("unspecified");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(page.getByText("Profile saved")).toBeVisible();
+
+  await page.getByLabel("Cricket playing role").selectOption("all_rounder");
   await page.getByRole("button", { name: "Save cricket profile" }).click();
   await expect(page.getByText("Cricket profile saved")).toBeVisible();
 
-  // name + role + dob + city = 4 of 8; gender deliberately never counts.
+  // name + role + dob + city = 4 of 8; gender deliberately never counts. The
+  // role now reaches the checklist from the cricket panel, which is the point.
   await expect(page.getByTestId("profile-completion")).toContainText("Profile 4/8 complete");
 
   await page.goto("/me/cricket");
@@ -97,13 +106,15 @@ test("a gendered category refuses a declared mismatch, and the profile fix opens
   await otpLogin(page, PLAYER);
   await page.goto("/account");
   await page.getByLabel("Gender").selectOption("male");
-  await page.getByRole("button", { name: "Save cricket profile" }).click();
-  await expect(page.getByText("Cricket profile saved")).toBeVisible();
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(page.getByText("Profile saved")).toBeVisible();
 
   // The register page opens on step 2 (name is set), PREFILLED from the
   // profile — the PI-1 write-back and prefill meeting in one control.
   await page.goto(season.registerPath);
   await expect(page.getByTestId("register-card")).toBeVisible();
+  // The register form's own control — still "Playing role". Only /account
+  // names the sport, because only /account shows one panel per sport.
   await expect(page.getByLabel("Playing role")).toHaveValue("all_rounder");
   await page.getByTestId("register-continue").click();
   await page.getByTestId("register-consent").check();
@@ -114,8 +125,8 @@ test("a gendered category refuses a declared mismatch, and the profile fix opens
   // Correct the profile; the same door opens.
   await page.goto("/account");
   await page.getByLabel("Gender").selectOption("female");
-  await page.getByRole("button", { name: "Save cricket profile" }).click();
-  await expect(page.getByText("Cricket profile saved")).toBeVisible();
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(page.getByText("Profile saved")).toBeVisible();
 
   await page.goto(season.registerPath);
   await page.getByTestId("register-continue").click();

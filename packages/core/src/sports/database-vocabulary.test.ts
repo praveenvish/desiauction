@@ -4,9 +4,6 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { CRICKET } from "./cricket";
-import { roleKeys } from ".";
-
 /**
  * WHERE THE DATABASE STILL NAMES A SPORT, AND WHERE IT NO LONGER MAY.
  *
@@ -70,11 +67,17 @@ describe("the database's role vocabulary", () => {
   });
 
   /*
-   * The Phase 3 boundary, asserted rather than assumed. This column is the last
-   * place the schema still says "a person plays one sport".
+   * Phase 3 moved this column out of `player_profiles` entirely. What replaced
+   * it must not re-introduce the problem: a per-sport role is validated by that
+   * sport's pack, and a column-level list could only ever name one sport's.
    */
-  it("still holds player_profiles.default_role to cricket, until Phase 3 splits it", () => {
-    expect(columnEnum(source, "default_role")).toEqual([...roleKeys(CRICKET)]);
+  it("leaves the per-sport default_role open too, and off the person", () => {
+    expect(columnEnum(source, "default_role"), "no enum on the per-sport role").toBeNull();
+    const personTable = source.slice(
+      source.indexOf('pgTable("player_profiles"'),
+      source.indexOf('pgTable("player_sport_profiles"'),
+    );
+    expect(personTable, "a person's row holds no sport vocabulary").not.toMatch(/default_role/);
   });
 
   it("names the migrations that opened the column, for whoever changes it next", () => {

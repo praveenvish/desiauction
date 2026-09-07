@@ -3,7 +3,14 @@ import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
-import { EMPTY_PLAYER_PROFILE, playerProfileFor, upsertPlayerProfile } from "./profile";
+import {
+  EMPTY_PLAYER_PROFILE,
+  playerProfileFor,
+  upsertPlayerProfile,
+  sportProfileFor,
+  sportProfilesFor,
+  upsertSportProfile,
+} from "./profile";
 
 /**
  * The person-level profile, against a real database (PI-1).
@@ -53,14 +60,54 @@ describe("player profile document (PI-1)", () => {
       gender: "female",
       dateOfBirth: "1998-03-11",
       location: "Kolkata",
-      defaultRole: "all_rounder",
     });
     const read = await playerProfileFor(personA);
     expect(read.gender).toBe("female");
     expect(read.dateOfBirth).toBe("1998-03-11");
     expect(read.location).toBe("Kolkata");
-    expect(read.defaultRole).toBe("all_rounder");
     expect(read.preferredJerseyNumber).toBeNull();
+  });
+
+  /*
+   * SP-1 PHASE 3 — the fact the old single row could not hold.
+   *
+   * One person, two sports, two different answers, neither overwriting the
+   * other. Before the split, saving a football role would have silently
+   * replaced their cricket one.
+   */
+  it("keeps a person's cricket and football answers apart", async () => {
+    await upsertSportProfile(personA, {
+      sport: "cricket",
+      defaultRole: "all_rounder",
+      attributes: { batting_style: "right_hand" },
+    });
+    await upsertSportProfile(personA, {
+      sport: "football",
+      defaultRole: "goalkeeper",
+      attributes: { preferred_foot: "left" },
+    });
+
+    const cricket = await sportProfileFor(personA, "cricket");
+    const football = await sportProfileFor(personA, "football");
+    expect(cricket.defaultRole).toBe("all_rounder");
+    expect(cricket.attributes["batting_style"]).toBe("right_hand");
+    expect(football.defaultRole, "the football answer did not overwrite cricket's").toBe(
+      "goalkeeper",
+    );
+    expect(football.attributes["preferred_foot"]).toBe("left");
+    expect(
+      football.attributes["batting_style"],
+      "and cricket's did not leak into football",
+    ).toBeUndefined();
+
+    const all = await sportProfilesFor(personA);
+    expect(all.map((profile) => profile.sport)).toEqual(["cricket", "football"]);
+  });
+
+  it("reads an untouched sport as empty rather than absent", async () => {
+    const empty = await sportProfileFor(personB, "football");
+    expect(empty.defaultRole).toBeNull();
+    expect(empty.attributes).toEqual({});
   });
 
   it("updates in place — one row per person, held by the unique index", async () => {

@@ -10,7 +10,6 @@ import {
   isMinor,
   isRejectionReason,
   parseRegistrationRecords,
-  parseRole,
   planImport,
   sampleRow,
   signatureOf,
@@ -26,6 +25,8 @@ import {
   type PlayerField,
   type RegistrationEvent,
   type RegistrationStatus,
+  parseRoleIn,
+  sportPackFor,
   type ValueMaps,
 } from "@desiauction/core";
 import { playerProfiles, registrations, withTenantDb, type Db } from "@desiauction/db";
@@ -38,7 +39,12 @@ import { auctionOf } from "@desiauction/auction";
 import { recordConsent } from "../messaging/consent";
 
 import { currentSession } from "../auth/actions";
-import { playerProfileFor, upsertPlayerProfile } from "../player/profile";
+import {
+  playerProfileFor,
+  sportProfileFor,
+  upsertPlayerProfile,
+  upsertSportProfile,
+} from "../player/profile";
 import { personSeasonsInOrg } from "../player/career";
 import { dbHandle, systemDb } from "../db";
 import { ForbiddenError } from "../orgs/authz";
@@ -818,6 +824,8 @@ export async function bulkTriageAction(
 
 export interface RegistrationLanding {
   competitionName: string;
+  /** The season's sport, so the form prefills from the right profile (Phase 3). */
+  sport: string;
   open: boolean;
   /** The season is published, so `/c/[slug]` and the player pages exist. The
    *  status card links a player to their OWN public page, and must not offer a
@@ -848,6 +856,7 @@ export async function registrationLanding(slug: string): Promise<RegistrationLan
   );
   return {
     competitionName: competition.name,
+    sport: competition.sport,
     open: competition.status === "registration_open",
     listed: competition.listed,
     slug,
@@ -1071,15 +1080,30 @@ export async function submitRegistrationAction(
    */
   if (formString(formData, "rememberProfile") === "true") {
     try {
+      /*
+       * Two writes, because the answer splits in two (Phase 3): the date of
+       * birth is true of the PERSON whatever they play, while the role and the
+       * styles are true of them in THIS SEASON'S SPORT. Remembering a football
+       * role onto their cricket profile is exactly the bug this phase removes.
+       */
       const current = await playerProfileFor(session.personId);
       await upsertPlayerProfile(session.personId, {
         ...current,
-        defaultRole: parseRole(role) ?? current.defaultRole,
         dateOfBirth: profile.dateOfBirth === "" ? current.dateOfBirth : profile.dateOfBirth,
-        defaultBattingStyle:
-          profile.battingStyle === "" ? current.defaultBattingStyle : profile.battingStyle,
-        defaultBowlingStyle:
-          profile.bowlingStyle === "" ? current.defaultBowlingStyle : profile.bowlingStyle,
+      });
+      const pack = sportPackFor(competition.sport);
+      const held = await sportProfileFor(session.personId, pack.key);
+      const attributes = { ...held.attributes };
+      if (profile.battingStyle !== "") {
+        attributes["batting_style"] = profile.battingStyle;
+      }
+      if (profile.bowlingStyle !== "") {
+        attributes["bowling_style"] = profile.bowlingStyle;
+      }
+      await upsertSportProfile(session.personId, {
+        sport: pack.key,
+        defaultRole: parseRoleIn(pack, role) ?? held.defaultRole,
+        attributes,
       });
     } catch {
       // The profile is a convenience; the registration is the fact.

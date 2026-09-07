@@ -63,7 +63,7 @@ export interface PlayerCareer {
 /** Seasons per page on /me/cricket — plenty for a local career, honest beyond it. */
 export const CAREER_PAGE_SIZE = 50;
 
-export async function playerCareer(personId: string): Promise<PlayerCareer> {
+export async function playerCareer(personId: string, sport?: string): Promise<PlayerCareer> {
   const rows = await systemDb
     .select({
       registrationId: registrations.id,
@@ -100,7 +100,14 @@ export async function playerCareer(personId: string): Promise<PlayerCareer> {
       ),
     )
     .leftJoin(lots, and(eq(lots.registrationId, registrations.id), eq(lots.auctionId, auctions.id)))
-    .where(eq(registrations.personId, personId))
+    .where(
+      and(
+        eq(registrations.personId, personId),
+        // One sport's career, when the page is about one sport (Phase 3). A
+        // person's cricket seasons and their football seasons are two stories.
+        ...(sport === undefined ? [] : [eq(competitions.sport, sport)]),
+      ),
+    )
     .orderBy(asc(competitions.startsOn), asc(registrations.id))
     .limit(CAREER_PAGE_SIZE);
 

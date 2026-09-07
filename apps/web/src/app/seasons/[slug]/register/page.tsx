@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../../../server/auth/actions";
-import { playerProfileFor } from "../../../../server/player/profile";
+import { playerProfileFor, sportProfileFor } from "../../../../server/player/profile";
 import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
 import { dateRange } from "../../../tournaments/season-card";
@@ -182,7 +182,14 @@ export default async function RegisterPage({
   }
   const landing = await registrationLanding(slug);
   // PI-1: the person-level defaults that prefill step 2 of the wizard.
-  const cricketProfile = await playerProfileFor(session.personId);
+  const personProfile = await playerProfileFor(session.personId);
+  /*
+   * Prefilled from how this person plays THIS season's sport (Phase 3).
+   * Registering for a football season offers their football answers; the
+   * cricket ones stay where they belong and neither overwrites the other.
+   */
+  const sportProfile =
+    landing === null ? null : await sportProfileFor(session.personId, landing.sport);
   return (
     <main className="register">
       <div className="register-panel">
@@ -281,10 +288,10 @@ export default async function RegisterPage({
             initialName={session.name ?? ""}
             source={source}
             profileDefaults={{
-              role: cricketProfile.defaultRole ?? "",
-              dob: cricketProfile.dateOfBirth ?? "",
-              batting: cricketProfile.defaultBattingStyle ?? "",
-              bowling: cricketProfile.defaultBowlingStyle ?? "",
+              role: sportProfile?.defaultRole ?? "",
+              dob: personProfile.dateOfBirth ?? "",
+              batting: sportProfile?.attributes["batting_style"] ?? "",
+              bowling: sportProfile?.attributes["bowling_style"] ?? "",
             }}
           />
         )}

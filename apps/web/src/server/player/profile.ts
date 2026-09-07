@@ -1,11 +1,13 @@
-import { newId, passkeyCredentials, people, playerProfiles, withTenantDb } from "@desiauction/db";
 import {
-  profileCompleteness,
-  type Gender,
-  type PlayerRole,
-  type ProfileCompleteness,
-} from "@desiauction/core";
-import { eq } from "drizzle-orm";
+  newId,
+  passkeyCredentials,
+  people,
+  playerProfiles,
+  playerSportProfiles,
+  withTenantDb,
+} from "@desiauction/db";
+import { profileCompleteness, type Gender, type ProfileCompleteness } from "@desiauction/core";
+import { and, asc, eq } from "drizzle-orm";
 
 import { dbHandle } from "../db";
 import { logSecurityEvent } from "../auth/security-events";
@@ -23,14 +25,19 @@ import { logSecurityEvent } from "../auth/security-events";
  * the register wizard prefills from here and writes its own snapshot onto the
  * registration, so a later profile edit never rewrites history.
  */
+/**
+ * THE PERSON (SP-1 Phase 3).
+ *
+ * Everything here is true of somebody whatever they play. How they PLAY —
+ * their role, their batting style, their preferred foot — moved to
+ * `SportProfile` below, because a person can be an all-rounder at cricket and
+ * a goalkeeper at football and one row could only ever hold one answer.
+ */
 export interface PlayerProfile {
   gender: Gender | null;
   genderSelfDescribed: string | null;
   dateOfBirth: string | null;
   location: string | null;
-  defaultRole: PlayerRole | null;
-  defaultBattingStyle: string | null;
-  defaultBowlingStyle: string | null;
   preferredJerseyName: string | null;
   preferredJerseyNumber: string | null;
 }
@@ -40,12 +47,28 @@ export const EMPTY_PLAYER_PROFILE: PlayerProfile = {
   genderSelfDescribed: null,
   dateOfBirth: null,
   location: null,
-  defaultRole: null,
-  defaultBattingStyle: null,
-  defaultBowlingStyle: null,
   preferredJerseyName: null,
   preferredJerseyNumber: null,
 };
+
+/**
+ * THE PLAYER, IN ONE SPORT.
+ *
+ * `attributes` is keyed by the pack's own attribute keys — `batting_style` and
+ * `bowling_style` for cricket, `preferred_foot` for football — so a new sport
+ * adds a pack file and nothing else.
+ */
+export interface SportProfile {
+  sport: string;
+  defaultRole: string | null;
+  attributes: Record<string, string>;
+}
+
+export const emptySportProfile = (sport: string): SportProfile => ({
+  sport,
+  defaultRole: null,
+  attributes: {},
+});
 
 /** The profile, or the empty shape — absence of a row IS the empty state. */
 export async function playerProfileFor(personId: string): Promise<PlayerProfile> {
@@ -62,12 +85,82 @@ export async function playerProfileFor(personId: string): Promise<PlayerProfile>
     genderSelfDescribed: row.genderSelfDescribed,
     dateOfBirth: row.dateOfBirth,
     location: row.location,
-    defaultRole: row.defaultRole,
-    defaultBattingStyle: row.defaultBattingStyle,
-    defaultBowlingStyle: row.defaultBowlingStyle,
     preferredJerseyName: row.preferredJerseyName,
     preferredJerseyNumber: row.preferredJerseyNumber,
   };
+}
+
+/** How this person plays one sport, or the empty shape. */
+export async function sportProfileFor(personId: string, sport: string): Promise<SportProfile> {
+  const [row] = await dbHandle.db
+    .select()
+    .from(playerSportProfiles)
+    .where(and(eq(playerSportProfiles.personId, personId), eq(playerSportProfiles.sport, sport)))
+    .limit(1);
+  if (row === undefined) {
+    return emptySportProfile(sport);
+  }
+  return {
+    sport: row.sport,
+    defaultRole: row.defaultRole,
+    attributes: (row.attributes ?? {}) as Record<string, string>,
+  };
+}
+
+/** Every sport this person has said anything about. */
+export async function sportProfilesFor(personId: string): Promise<SportProfile[]> {
+  const rows = await dbHandle.db
+    .select()
+    .from(playerSportProfiles)
+    .where(eq(playerSportProfiles.personId, personId))
+    .orderBy(asc(playerSportProfiles.sport));
+  return rows.map((row) => ({
+    sport: row.sport,
+    defaultRole: row.defaultRole,
+    attributes: (row.attributes ?? {}) as Record<string, string>,
+  }));
+}
+
+/**
+ * Write how a person plays ONE sport. Same contract as the person-level write:
+ * the caller has validated against that sport's pack, this persists what it is
+ * handed, and the audit row names the fields that CHANGED, never their values.
+ */
+export async function upsertSportProfile(personId: string, next: SportProfile): Promise<void> {
+  const previous = await sportProfileFor(personId, next.sport);
+  const changed: string[] = [];
+  if (previous.defaultRole !== next.defaultRole) {
+    changed.push("default_role");
+  }
+  for (const key of new Set([
+    ...Object.keys(previous.attributes),
+    ...Object.keys(next.attributes),
+  ])) {
+    if (previous.attributes[key] !== next.attributes[key]) {
+      changed.push(key);
+    }
+  }
+  if (changed.length === 0) {
+    return;
+  }
+  await withTenantDb(dbHandle, { personId }, (db) =>
+    db
+      .insert(playerSportProfiles)
+      .values({
+        personId,
+        sport: next.sport,
+        defaultRole: next.defaultRole,
+        attributes: next.attributes,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [playerSportProfiles.personId, playerSportProfiles.sport],
+        set: { defaultRole: next.defaultRole, attributes: next.attributes, updatedAt: new Date() },
+      }),
+  );
+  await logSecurityEvent(personId, "profile.player.updated", {
+    fields: `${next.sport}:${changed.join(",")}`,
+  });
 }
 
 /**
@@ -127,15 +220,25 @@ export async function profileCompletenessFor(
     .where(eq(people.id, personId))
     .limit(1);
   const profile = await playerProfileFor(personId);
+  /*
+   * "Have you said how you play?" is now a question about ANY sport (Phase 3).
+   * A person who has filled in their football profile and nothing else has
+   * answered it — asking them for a cricket role to complete their account
+   * would be asking about a sport they do not play.
+   */
+  const sports = await sportProfilesFor(personId);
+  const anyRole = sports.find((entry) => entry.defaultRole !== null)?.defaultRole ?? null;
+  const anyAttribute = (key: string): string | null =>
+    sports.map((entry) => entry.attributes[key]).find((value) => value !== undefined) ?? null;
   return profileCompleteness({
     name: person?.name ?? null,
     photoUrl: person?.photoUrl ?? null,
     emailVerified: person?.emailVerifiedAt != null,
     dateOfBirth: profile.dateOfBirth,
     location: profile.location,
-    defaultRole: profile.defaultRole,
-    defaultBattingStyle: profile.defaultBattingStyle,
-    defaultBowlingStyle: profile.defaultBowlingStyle,
+    defaultRole: anyRole,
+    defaultBattingStyle: anyAttribute("batting_style"),
+    defaultBowlingStyle: anyAttribute("bowling_style"),
     passkeyCount: knownPasskeys,
   });
 }
