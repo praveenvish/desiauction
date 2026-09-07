@@ -111,7 +111,31 @@ load**. On a Playwright retry the module is re-imported, so the retry invents a
 *brand-new, nameless* player and lands on the onboarding gate — a failure that
 looks nothing like the real one and hides it. Debug that spec with `--retries=0`.
 
-## 6 · Still open, deliberately
+## 6 · The nightly, and what it finally proved
+
+`nightly-verify` had failed four consecutive nights at `pnpm test:integration`.
+After the teardown fix it **passes that step** and four more — RLS probe,
+restore-verify, seed, browser install — reaching `End-to-end journeys` for the
+first time, where it failed 27 of 96.
+
+Those 27 are not product defects. They are `ERR_CONNECTION_RESET` and
+`page.goto` timeouts scattered across unrelated specs: the signature of a
+`next dev` server crossing its memory threshold and restarting mid-request. The
+same suite is **101 passed / 0 failed** against a compiled server.
+
+The nightly's e2e step ran bare `npx playwright test` with none of the four
+things `ci`'s own e2e job sets. It now matches that proven job:
+`PLAYWRIGHT_PRECOMPILED=1`, `NEXT_DIST_DIR=.next-e2e`, `OTP_PROVIDER=dev`,
+`ALLOW_INSECURE_LOCAL_PRODUCTION=1`, plus the build step a compiled server needs
+(the flag serves `.next-e2e`; it never builds it).
+
+Not yet proven by a real nightly run — the dispatch needs repo-admin rights this
+session does not have. What was verified: the workflow parses, the step order is
+right, and the exact CI build command (`pnpm --filter @desiauction/web exec next
+build`, which skips the package script and so depends purely on job env) exits 0
+against nothing but `DATABASE_URL`.
+
+## 7 · Still open, deliberately
 
 - **The nav still says "My cricket"** and points at `/me/cricket`. It resolves,
   but a person who plays football is offered the wrong career. Making it

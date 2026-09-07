@@ -29,6 +29,24 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://desiauction:desiauction@localhost:5433/desiauction
+      # THE E2E STEP RUNS AGAINST A COMPILED SERVER, like ci's e2e job does.
+      #
+      # Without this the suite runs against `next dev`, and an on-demand
+      # compiler is what grows the heap: the server crosses its memory
+      # threshold, restarts, and drops the requests in flight. Those arrive as
+      # `ERR_CONNECTION_RESET` and `page.goto` timeouts spread across unrelated
+      # specs — 27 of 96 on 2026-09-06, none of them a product defect, and the
+      # same suite is 101/0 against a compiled server. A nightly that fails for
+      # its own harness teaches everyone to ignore it.
+      #
+      # OTP_PROVIDER=dev is required by the suite (e2e/otp.ts reads codes from
+      # otp_inbox); `next start` forces NODE_ENV=production, whose boot guard
+      # refuses that provider — ALLOW_INSECURE_LOCAL_PRODUCTION is exactly the
+      # escape for a production-shaped BUILD in a non-production CONTEXT.
+      OTP_PROVIDER: dev
+      PLAYWRIGHT_PRECOMPILED: "1"
+      NEXT_DIST_DIR: .next-e2e
+      ALLOW_INSECURE_LOCAL_PRODUCTION: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -78,8 +96,18 @@ jobs:
         run: pnpm seed:demo
 
       # The full journey suite (real web + real engine + real WebSockets).
+      #
+      # Built before it is served: `PLAYWRIGHT_PRECOMPILED=1` swaps `next dev`
+      # for `next start`, which serves whatever `.next-e2e` already holds and
+      # builds nothing itself. Missing this step fails the suite at startup with
+      # "Could not find a production build", two steps from its cause.
+      - name: Build the server the suite will run against
+        run: pnpm --filter @desiauction/web exec next build
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
+      # ~29 specs SKIP here by design: `next start` forces NODE_ENV=production
+      # and the /gallery family is dev-only, so those pages correctly 404. They
+      # report as skipped, not failed.
       - name: End-to-end journeys
         run: npx playwright test
         working-directory: apps/web
