@@ -13,9 +13,24 @@
 -- writers, BYPASSRLS-equivalent posture) — they derive tenancy from the
 -- aggregate they own, never from a request.
 --
--- Run as the database owner, once per environment. RE-RUN after any future
--- migration: grants are static by design (no ALTER DEFAULT PRIVILEGES —
--- migrations run as the owner and the schema is frozen).
+-- Run as the database owner, once per environment.
+--
+-- WHEN A MIGRATION ADDS A TABLE, the answer depends on WHICH ROLE needs it:
+--
+--   · desiauction_app  — nothing to do. ALTER DEFAULT PRIVILEGES below (see the
+--     block above the `alter default privileges` lines for why) makes a new
+--     table reachable the moment it exists, so the app role does not depend on
+--     anyone remembering.
+--   · desiauction_system / _engine / _runner — RE-RUN, and edit first if the
+--     new table belongs in their surface. Their grants are deliberately
+--     ENUMERATED per table, because least privilege is the point: a role that
+--     silently acquires every future table is not least-privileged.
+--
+-- This header used to say flatly "grants are static by design (no ALTER DEFAULT
+-- PRIVILEGES)", which the six `alter default privileges` statements below have
+-- contradicted since the day they landed. It sent a reader to re-run the recipe
+-- for migrations 0046-0048 that needed nothing (2026-09-07); `pnpm --filter
+-- @desiauction/web grants:verify` is the check that settles it either way.
 --
 -- ALL FOUR PASSWORDS, ALWAYS. The script sets ON_ERROR_STOP, so a two-variable
 -- invocation ABORTS at the engine role and silently leaves the deployment with

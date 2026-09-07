@@ -28,11 +28,15 @@
 -- readable by all four roles, written by migrations only. A tenancy policy here
 -- would be a policy with nothing to say.
 --
--- RE-RUN THE ROLE RECIPE AFTER THIS MIGRATION. `ops/db/create-app-role.sql`
--- grants `on all tables in schema public`, which binds the tables that exist
--- when it runs — a new table is invisible to desiauction_app until it is
--- re-run. Locally you connect as the owner and will never notice; in
--- production every page that reads a competition would fail.
+-- NO ROLE RECIPE RE-RUN IS NEEDED FOR THIS TABLE (corrected 2026-09-07).
+-- `ops/db/create-app-role.sql` does grant `on all tables in schema public`,
+-- which binds only what exists when it runs — but it ALSO sets ALTER DEFAULT
+-- PRIVILEGES for desiauction_app, so a table created later is reachable the
+-- moment it exists. Confirmed: `sports` carries the app role's four privileges
+-- with no recipe run, and grants:verify passes over it.
+--
+-- A re-run IS required when a new table must be reached by desiauction_system,
+-- _engine or _runner, whose grants are enumerated per table on purpose.
 
 CREATE TABLE "sports" (
   "key" text PRIMARY KEY,

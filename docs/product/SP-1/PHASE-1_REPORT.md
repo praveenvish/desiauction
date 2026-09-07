@@ -92,18 +92,26 @@ decides. `demo_requests.sport` keeps collecting.
 
 ## 7 · Operational note — READ THIS BEFORE DEPLOYING
 
-**Re-run the role recipe.** `ops/db/create-app-role.sql` grants `on all tables in
-schema public`, which binds the tables existing when it runs. `sports` is
-invisible to `desiauction_app` until it is re-run, and locally you connect as the
-owner and will never notice — in production every page reading a competition
-would fail. This is the same class as the drift audited in 2026-08-18.
+**CORRECTED 2026-09-07 — no recipe re-run was needed.** This section originally
+said `sports` would be invisible to `desiauction_app` until
+`ops/db/create-app-role.sql` was re-run. That was wrong, and it was wrong
+because it trusted that file's header comment ("grants are static by design, no
+ALTER DEFAULT PRIVILEGES") over the six `alter default privileges` statements 47
+lines below it, which have covered the app role since they landed.
 
-```
-docker compose exec -T db psql -U desiauction -d desiauction -v ON_ERROR_STOP=1 \
-  -v app_password=... -v system_password=... -v engine_password=... -v runner_password=... \
-  < ops/db/create-app-role.sql
-pnpm --filter @desiauction/web grants:verify
-```
+Verified rather than argued: `sports` and `player_sport_profiles` both carry
+`SELECT, INSERT, UPDATE, DELETE` for `desiauction_app` with no recipe run, and
+`pnpm --filter @desiauction/web grants:verify` reports **292 expectations across
+62 tables and 4 roles** — a real pass, because the verifier enumerates tables
+from `pg_tables` at runtime rather than from a list, so both new tables were
+genuinely checked.
+
+What DOES still need a re-run is a new table that `desiauction_system`,
+`_engine` or `_runner` must reach: their grants are enumerated per table on
+purpose, because a least-privilege role that silently acquires every future
+table is not least-privileged. Neither of these two tables is in that position.
+The recipe's header has been corrected so the next reader is not sent the same
+way.
 
 ## 8 · Verification
 
