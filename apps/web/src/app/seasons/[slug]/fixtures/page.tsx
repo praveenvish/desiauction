@@ -1,4 +1,5 @@
 import { ButtonLink, ToastProvider } from "@desiauction/ui";
+import { SportTermsProvider } from "../../../../components/sport-terms";
 import { notFound } from "next/navigation";
 
 import { fixtureDashboard } from "../../../../server/competition/fixture-actions";
@@ -61,26 +62,28 @@ export default async function FixturesPage({
               </p>
             ) : null}
           </header>
-          <FixturesPanel
-            scoreFields={dashboard.scoreFields}
-            slug={slug}
-            orgSlug={dashboard.orgSlug}
-            isPublic={dashboard.competition.visibility === "public"}
-            stats={dashboard.stats}
-            page={dashboard.page}
-            teams={dashboard.teams}
-            grounds={dashboard.grounds}
-            conflicts={dashboard.conflicts}
-            results={dashboard.results}
-            canManage={dashboard.viewer.canManage}
-            filters={{
-              status: sp["status"] ?? "",
-              team: sp["team"] ?? "",
-              ground: sp["ground"] ?? "",
-              q: sp["q"] ?? "",
-              sort: sp["sort"] ?? "kickoff",
-            }}
-          />
+          <SportTermsProvider terms={dashboard.terms}>
+            <FixturesPanel
+              scoreFields={dashboard.scoreFields}
+              slug={slug}
+              orgSlug={dashboard.orgSlug}
+              isPublic={dashboard.competition.visibility === "public"}
+              stats={dashboard.stats}
+              page={dashboard.page}
+              teams={dashboard.teams}
+              grounds={dashboard.grounds}
+              conflicts={dashboard.conflicts}
+              results={dashboard.results}
+              canManage={dashboard.viewer.canManage}
+              filters={{
+                status: sp["status"] ?? "",
+                team: sp["team"] ?? "",
+                ground: sp["ground"] ?? "",
+                q: sp["q"] ?? "",
+                sort: sp["sort"] ?? "kickoff",
+              }}
+            />
+          </SportTermsProvider>
         </div>
       </main>
     </ToastProvider>

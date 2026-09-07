@@ -308,6 +308,13 @@ export interface FixtureDashboardParams {
 export interface FixtureDashboard {
   /** The season's score components, as plain data for the client form. */
   scoreFields: readonly { key: string; label: string; help?: string }[];
+  /** What this season's sport calls things — plain data, so it may cross. */
+  terms: {
+    participant: readonly [string, string];
+    squad: string;
+    fixture: string;
+    ground: string;
+  };
   competition: CompetitionSummary;
   /** Where to create venues and grounds — the activation path, as a link. */
   orgSlug: string;
@@ -389,6 +396,7 @@ export async function fixtureDashboard(
       teams: teamList,
       ...(groundList !== undefined ? { grounds: groundList } : {}),
       ...(conflicts !== undefined ? { conflicts } : {}),
+      terms: sportPackFor(competition.sport).terms,
       scoreFields: sportPackFor(competition.sport).result.scoreFields.map((field) => ({
         key: field.key,
         label: field.entry?.label ?? field.label,

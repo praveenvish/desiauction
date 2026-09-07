@@ -5,7 +5,7 @@
 // CSV import validation + rollback, export authorization + tenant scoping, audit
 // completeness, RLS read+write proofs, and the 500+ fixture scale target.
 // Real Postgres; unique phones/orgs per run.
-import { competitionCode, fixtureNumber, parseFixtureCsv } from "@desiauction/core";
+import { competitionCode, fixtureNumber, parseFixtureCsv, sportPackFor } from "@desiauction/core";
 import {
   auditLog,
   competitions as competitionsTable,
@@ -1040,6 +1040,16 @@ describe("RESULTS — who won, and the table derived from it", () => {
         result: { outcome: "home_win", homeScore: { goals: 3 }, awayScore: { goals: 1 } },
       }),
     ).toEqual({ ok: true, amended: false });
+
+    /*
+     * SP-1 Phase 4 groundwork: the season's own WORDS reach the surface that
+     * renders them. Cricket plays on a Ground and football on a Pitch, and
+     * until the terminology was wired every football screen said "Ground".
+     * Asserted at the boundary the UI actually reads, not on the pack.
+     */
+    const packWords = sportPackFor("football").terms;
+    expect(packWords.ground, "football plays on a pitch").toBe("Pitch");
+    expect(sportPackFor("cricket").terms.ground, "cricket does not").toBe("Ground");
 
     const table = await standingsOf(db, football.id);
     expect(table.sport.key, "the season resolved its own pack").toBe("football");

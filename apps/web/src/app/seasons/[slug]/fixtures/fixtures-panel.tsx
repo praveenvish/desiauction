@@ -1,6 +1,7 @@
 "use client";
 
 import { FIXTURE_CSV_HEADER } from "@desiauction/core";
+import { useSportTerms } from "../../../../components/sport-terms";
 import {
   Badge,
   Button,
@@ -100,6 +101,7 @@ export function FixturesPanel({
   canManage: boolean;
   filters: { status: string; team: string; ground: string; q: string; sort: string };
 }) {
+  const terms = useSportTerms();
   // Both arrive undefined without fixture.manage — the server omits the keys
   // rather than trusting this component to hide them.
   const grounds = groundsProp ?? [];
@@ -482,7 +484,7 @@ export function FixturesPanel({
             />
           </div>
           <fieldset className="ground-picker">
-            <legend>Grounds</legend>
+            <legend>{terms.ground}s</legend>
             {grounds.length === 0 ? (
               <p className="competitions-hint">
                 No active grounds yet — <Link href={`/org/${orgSlug}/venues`}>add a venue</Link> and
@@ -710,7 +712,7 @@ export function FixturesPanel({
               ))}
             </Select>
             <Select
-              label="Ground"
+              label={terms.ground}
               name="manualGround"
               value={manGround}
               onChange={(event) => {
@@ -803,7 +805,7 @@ export function FixturesPanel({
             ))}
           </Select>
           <Select
-            label="Ground"
+            label={terms.ground}
             name="ground"
             value={filters.ground}
             onChange={(event) => {
@@ -875,7 +877,7 @@ export function FixturesPanel({
                 <th scope="col">#</th>
                 <th scope="col">Fixture</th>
                 <th scope="col">Kickoff</th>
-                <th scope="col">Ground</th>
+                <th scope="col">{terms.ground}</th>
                 <th scope="col">Status</th>
                 {canManage ? (
                   <th scope="col">
@@ -1109,6 +1111,7 @@ function FixtureRow({
   onConfirmMove: () => void;
   onDetails: () => void;
 }) {
+  const terms = useSportTerms();
   const next = NEXT_ACTION[fixture.status];
   const movable = fixture.status === "scheduled" || fixture.status === "published";
   const cancellable = fixture.status !== "completed" && fixture.status !== "cancelled";
@@ -1147,7 +1150,7 @@ function FixtureRow({
         <td data-label="Kickoff">
           {fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "—"}
         </td>
-        <td data-label="Ground">
+        <td data-label={terms.ground}>
           {fixture.groundName ?? "—"}
           {fixture.venueName !== null ? (
             <span className="registration-phone">{fixture.venueName}</span>

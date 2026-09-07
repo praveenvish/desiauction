@@ -80,7 +80,23 @@ definition — which is also the smallest possible widening of the read-only
 | 1 | ✅ **Sport becomes a dimension** — `competitions.sport`, `tournaments.sport`, `sports` catalogue, admin toggle. Backfill all rows to `cricket`. | 1.5 wks | 1 |
 | 2 | ✅ **Ship the second sport end to end** — relax `registrations.role` (nullable, enum dropped), add `registrations.attributes jsonb`, `fixture_results.score jsonb`, standings tiebreaker chains, pack-driven import fields, terminology across ~95 components. | 3 wks | 2 |
 | 3 | ✅ **Split the person from the player** — `player_sport_profiles`, `/me/[sport]`, per-sport career. | 2 wks | 1 |
-| 4 | The long tail — one pack file per further sport. | 2–4 days each | 0 |
+| 4 | The long tail — one pack file per further sport. | 2–4 days each | 1 line |
+
+**Phase 4, measured rather than estimated (2026-09-07).** Adding a sport now
+costs: one pack file (~230 lines, `football.ts` is the template), two lines in
+`sports/index.ts`, and a one-line `INSERT INTO sports` migration — the plan's
+"0 migrations" was wrong by that one line. Nothing else changes: no schema
+(attributes are jsonb), no UI (pickers, forms, standings columns and the results
+form are pack-driven), no engine. The generic guardrails pick a new pack up
+automatically.
+
+Two things still block specific sports:
+
+- **Terminology** is now wired (`components/sport-terms.tsx`), but only `ground`
+  actually varies between the packs that exist — see `PHASE-4_NOTES.md`.
+- **Racquet sports** (badminton, table tennis, tennis, pickleball) run a team tie
+  as several RUBBERS, not one scoreline. That needs `fixtureShape` and a score
+  shape to match — a Phase-2-sized change, not a pack file.
 
 **Phase 0 is unconditional.** It has no migrations, no behaviour change, and it
 pays for itself by deleting a duplication defect that already shipped (§ the
