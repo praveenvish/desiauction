@@ -43,7 +43,13 @@ export default async function DevInboxPage({
             <tr key={row.id}>
               <td>{row.phone}</td>
               <td data-testid={`code-${row.phone}`}>{row.code}</td>
-              <td>{row.createdAt.toLocaleTimeString()}</td>
+              <td>
+                {/* Pinned like every other time in the product: a bare call
+                    reads the HOST zone, so this page showed UTC on a server and
+                    IST on a laptop for the same row. Dev-only, but the one
+                    unpinned formatter left in the tree. */}
+                {row.createdAt.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })}
+              </td>
             </tr>
           ))}
         </tbody>
