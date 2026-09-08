@@ -1,4 +1,4 @@
-import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabel, sportPackFor } from "@desiauction/core";
 import {
   Badge,
   ButtonLink,
@@ -638,6 +638,18 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
   // or a profile row); a pure organizer's home never asks for a bowling style.
   const showProfileNudge =
     (registrationsMine.length > 0 || hasProfile) && completeness.done < completeness.total;
+  /*
+   * The sport this person most recently registered in — the career link should
+   * take them to a page with their record on it, not to cricket's on the
+   * assumption that cricket is what everybody plays.
+   *
+   * The LAST row, not the first: `myRegistrations` is ordered by start date
+   * ASCENDING because that is the order the list reads in, so the most recent
+   * season is at the end.
+   */
+  const careerPack = sportPackFor(registrationsMine[registrationsMine.length - 1]?.sport ?? null);
+  const careerSport = careerPack.key;
+  const careerSportLabel = careerPack.label.toLowerCase();
 
   // The night in progress leads the page. One extra read, and only when there
   // IS one: the hero needs what the list row could not say — who is on the
@@ -1389,8 +1401,14 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
             <SectionHeader
               title="My registrations"
               actions={
-                <Link href="/me/cricket" data-testid="home-career-link">
-                  My cricket →
+                /*
+                 * The career page of a sport this person ACTUALLY plays, taken
+                 * from their most recent registration. It said "My cricket" and
+                 * pointed there regardless — which sent a football player to an
+                 * empty cricket career and told them that was their record.
+                 */
+                <Link href={`/me/${careerSport}`} data-testid="home-career-link">
+                  My {careerSportLabel} →
                 </Link>
               }
             />

@@ -673,6 +673,8 @@ export interface MyRegistration {
   registrationId: string;
   competitionName: string;
   competitionSlug: string;
+  /** The season's sport — so /home can link to the right career page. */
+  sport: string;
   orgName: string;
   status: string;
   role: string | null;
@@ -698,6 +700,7 @@ export async function myRegistrations(personId: string): Promise<MyRegistration[
       registrationId: registrations.id,
       competitionName: competitions.name,
       competitionSlug: competitions.slug,
+      sport: competitions.sport,
       orgName: organizations.name,
       status: registrations.status,
       role: registrations.role,
@@ -734,6 +737,7 @@ export async function myRegistrations(personId: string): Promise<MyRegistration[
     registrationId: row.registrationId,
     competitionName: row.competitionName,
     competitionSlug: row.competitionSlug,
+    sport: row.sport,
     orgName: row.orgName,
     status: row.status,
     role: row.role,

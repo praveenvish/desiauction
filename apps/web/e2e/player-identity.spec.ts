@@ -91,9 +91,14 @@ test("a settled season renders on /me/cricket with its verdict and price", async
   );
   // Totals fold from the same rows the list renders.
   await expect(page.getByText("Times sold")).toBeVisible();
-  // /home now offers the career door beside the registrations rail.
+  // /home now offers the career door beside the registrations rail, and it
+  // names the sport this person actually plays — the fixture season is cricket,
+  // so it must say cricket because of the registration, not by default.
   await page.goto("/home");
-  await expect(page.getByTestId("home-career-link")).toBeVisible();
+  const career = page.getByTestId("home-career-link");
+  await expect(career).toBeVisible();
+  await expect(career).toHaveText("My cricket →");
+  await expect(career).toHaveAttribute("href", "/me/cricket");
 });
 
 test("a gendered category refuses a declared mismatch, and the profile fix opens it", async ({

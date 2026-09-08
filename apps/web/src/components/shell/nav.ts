@@ -1,3 +1,5 @@
+import { sportPack } from "@desiauction/core";
+
 /**
  * The one navigation model (PX-1 01; PX-2 scope §2). Pure data + pure
  * functions — the single source for shell selection, rail items, competition
@@ -436,7 +438,7 @@ const OUTSIDE_RAIL: [string, string][] = [
   ["/inbox", "Notifications"],
   ["/account", "Account"],
   // PI-1: the player's own career — self-scoped by identity, not by grant.
-  ["/me/cricket", "My cricket"],
+  // Its sport comes from the PATH, not from this list — see `careerTitle`.
 ];
 
 /**
@@ -579,7 +581,35 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
   if (outside !== undefined) {
     return withLede(outside[1]);
   }
+  const career = careerTitle(pathname);
+  if (career !== null) {
+    return withLede(career);
+  }
   return { crumbs: [], title: section };
+}
+
+/**
+ * "My cricket", "My football" — the career page names its own sport.
+ *
+ * This used to be one static entry, `/me/cricket`, which was correct while the
+ * platform ran one sport. SP-1 Phase 3 made the route `/me/[sport]`, and every
+ * other sport then fell through this lookup to the generic fallback and lost
+ * its title in the identity bar — a football player's career page was headed by
+ * whatever the section happened to be called.
+ *
+ * Derived from the PATH rather than the session, which is the whole reason it
+ * can live in a pure module: the sport is already in the URL, so the shell
+ * needs no query to know which one it is showing. An unknown segment returns
+ * null and falls through, because a URL naming a sport this platform has no
+ * pack for should not be given a confident title.
+ */
+export function careerTitle(pathname: string): string | null {
+  const match = /^\/me\/([^/?#]+)/.exec(pathname);
+  if (match === null) {
+    return null;
+  }
+  const pack = sportPack(decodeURIComponent(match[1] ?? ""));
+  return pack === null ? null : `My ${pack.label.toLowerCase()}`;
 }
 
 /** The one labeled door out of a live surface (canon docs/16). */

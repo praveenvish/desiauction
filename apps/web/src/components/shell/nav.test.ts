@@ -15,6 +15,7 @@ import {
   pageIdentity,
   sectionLabel,
   shellKind,
+  careerTitle,
 } from "./nav";
 
 describe("shellKind", () => {
@@ -324,5 +325,38 @@ describe("liveExit", () => {
     // A guest reached the stage from /c/<slug>; the door back is the same one.
     expect(liveExit("/seasons/mpl/auction/spectate", false).href).toBe("/c/mpl");
     expect(liveExit("/seasons/mpl/auction/spectate", true).href).toBe("/seasons/mpl/auction");
+  });
+});
+
+/*
+ * SP-1: the career page names its own sport.
+ *
+ * `/me/cricket` was a static entry in OUTSIDE_RAIL, correct while the platform
+ * ran one sport. Phase 3 made the route `/me/[sport]`, and every other sport
+ * fell through to the generic fallback — a football player's career page went
+ * out under whatever the section happened to be called.
+ */
+describe("careerTitle", () => {
+  it("names the sport in the path", () => {
+    expect(careerTitle("/me/cricket")).toBe("My cricket");
+    expect(careerTitle("/me/football")).toBe("My football");
+    expect(careerTitle("/me/kabaddi")).toBe("My kabaddi");
+    expect(careerTitle("/me/volleyball")).toBe("My volleyball");
+  });
+
+  it("refuses a sport this platform has no pack for", () => {
+    // Rather than confidently titling a page for a sport that cannot exist.
+    expect(careerTitle("/me/quidditch")).toBeNull();
+    expect(careerTitle("/me")).toBeNull();
+  });
+
+  it("ignores paths that are not a career page", () => {
+    expect(careerTitle("/home")).toBeNull();
+    expect(careerTitle("/account")).toBeNull();
+  });
+
+  it("reads the segment, not the rest of the URL", () => {
+    expect(careerTitle("/me/football/")).toBe("My football");
+    expect(careerTitle("/me/football?from=home")).toBe("My football");
   });
 });
