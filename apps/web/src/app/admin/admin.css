@@ -224,6 +224,28 @@ td .admin-id {
   flex-wrap: wrap;
 }
 
+/*
+ * A CHIP IN THIS ROW MAY BE A SENTENCE, NOT A STATUS WORD.
+ *
+ * `Badge` is `white-space: nowrap`, which is right for the short states it was
+ * designed for — "queued 4", "Healthy". Administration also puts a whole
+ * clause in one: "oldest queued job has waited three days". At 360px that chip
+ * measured 355px wide and could not break, so it pushed the BODY to 416px and
+ * scrolled the whole page sideways — 56px of it.
+ *
+ * Measured, not guessed: the element ending at exactly the document's
+ * scrollWidth was that badge.
+ *
+ * It only appears once the job queue is non-empty, which is why a fresh
+ * database never showed it and the responsive test looked intermittent for
+ * weeks. Scoped here rather than changed on the primitive: every other surface
+ * uses badges as the short labels they are, and PX-1 04 §9 says wide content
+ * wraps or scrolls in its OWN container — never the body.
+ */
+.admin-chips > * {
+  white-space: normal;
+}
+
 .admin-count {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
