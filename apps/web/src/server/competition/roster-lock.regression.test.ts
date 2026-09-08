@@ -25,6 +25,23 @@ describe("ROSTER LOCK — what the auction freezes, and what it must not", () =>
     expect(marksFreezeWithRoster({ teamId: null })).toBe(true);
   });
 
+  it("freezes retention, which moves the pool exactly as an icon mark does", () => {
+    /*
+     * Retention was absent from this predicate until it had a writer, and the
+     * omission was free while the only way to set `is_retained` was hand-written
+     * SQL. It is not free now. `auctionReady` filters the pool on
+     * `isIcon OR isRetained` and `placeBid` counts both into the squadMax cap,
+     * so retaining somebody mid-auction would delete a lot the queue is already
+     * built from and shrink a squad's remaining slots after bids were priced
+     * against the old count.
+     *
+     * UN-retaining is the same event in reverse — it ADDS a player to a pool
+     * the queue was already built from — which is why `false` freezes too.
+     */
+    expect(marksFreezeWithRoster({ isRetained: true })).toBe(true);
+    expect(marksFreezeWithRoster({ isRetained: false })).toBe(true);
+  });
+
   it("does NOT freeze the captain badge — the one mark only auction night can settle", () => {
     expect(marksFreezeWithRoster({ isCaptain: true })).toBe(false);
     expect(marksFreezeWithRoster({ isCaptain: false })).toBe(false);
@@ -35,6 +52,9 @@ describe("ROSTER LOCK — what the auction freezes, and what it must not", () =>
     // both is still a roster move.
     expect(marksFreezeWithRoster({ isCaptain: true, teamId: "01ABC" })).toBe(true);
     expect(marksFreezeWithRoster({ isCaptain: true, isIcon: true })).toBe(true);
+    // Retaining last season's captain is one request that does both, and the
+    // half that moves the pool decides.
+    expect(marksFreezeWithRoster({ isCaptain: true, isRetained: true })).toBe(true);
   });
 
   it("has nothing to freeze when nothing was asked for", () => {

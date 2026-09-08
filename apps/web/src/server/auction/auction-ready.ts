@@ -76,10 +76,22 @@ export async function auctionReady(
       pageSize: 100,
     });
     pool.push(
-      // Icon (marquee) players are pre-signed to their team and never enter the
-      // block — they are retained squad, not auction lots.
+      // Pre-signed players never enter the block — they are squad already, not
+      // auction lots. TWO MARKS MEAN THAT, and this filter read only one.
+      //
+      // `is_retained` has been documented as excluded since migration 0018 and
+      // was excluded by the poster, the showcase, the career page and the live
+      // summary — but not here, so a retained player reached the block and was
+      // bid for. `squad-board.tsx` carries the scar: it de-duplicates a player
+      // who is "BOTH pre-signed and auctioned", a combination its own comment
+      // calls impossible, because this line made it possible. That defence
+      // stays; the cause is fixed here.
+      //
+      // It was unreachable in practice only because nothing could SET the flag.
+      // Now that an organizer can, it would be a live defect rather than a
+      // latent one.
       ...result.rows
-        .filter((row) => !row.isIcon)
+        .filter((row) => !row.isIcon && !row.isRetained)
         .map((row) => ({
           registrationId: row.id,
           personId: row.personId,

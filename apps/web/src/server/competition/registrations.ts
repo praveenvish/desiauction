@@ -362,6 +362,10 @@ export interface RegistrationRow {
   teamName: string | null;
   // Icon (marquee) player: pre-assigned to their team, excluded from the auction.
   isIcon: boolean;
+  // Retained from a prior season: pre-assigned and excluded the same way. The
+  // row carried every other mark and not this one, so the dashboard could not
+  // show the flag it now lets an organizer set.
+  isRetained: boolean;
   // Team captain marker (display + team-sheet ordering).
   isCaptain: boolean;
   // Surfaced for the IP-4 AuctionReady pool (additive projection field, M-IP4-1).
@@ -429,13 +433,19 @@ export interface RegistrationStats {
    * DA-35: what auction night will actually contain. Two tabs of one console
    * disagreed — Registrations said "Approved 2" while the Auction tab's
    * readiness gate said "1 approved player(s)" — because an Icon is approved
-   * AND excluded from the block (auction-ready.ts filters `!row.isIcon`). This
-   * figure is computed from the same two facts the auction filters on, so the
-   * two screens can no longer drift apart.
+   * AND excluded from the block. This figure is computed from the same facts
+   * the auction filters on, so the two screens can no longer drift apart.
+   *
+   * THE SAME DRIFT CAME BACK THROUGH THE SECOND PRE-SIGNED MARK. This counted
+   * `isIcon` only, exactly as `auction-ready.ts` did, so both were wrong in the
+   * same direction and agreed with each other while disagreeing with the
+   * poster, the showcase and the career page. Both now read both marks.
    */
   auctionPool: number;
   /** Approved icons — pre-signed, never on the block. */
   icons: number;
+  /** Approved retained players — pre-signed from a prior season, never on the block. */
+  retained: number;
   /**
    * Approved icons with no team. An icon is only counted into a squad when
    * `registrations.team_id = paddle.team_id`, so a teamless icon is in NO
@@ -443,6 +453,8 @@ export interface RegistrationStats {
    * screen warns; the aggregate constraint itself is not ours to change.
    */
   iconsWithoutTeam: number;
+  /** The same disappearance, reached by the other mark. */
+  retainedWithoutTeam: number;
 }
 
 export async function registrationStats(db: Db, competitionId: string): Promise<RegistrationStats> {
@@ -450,12 +462,18 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     .select({
       status: registrations.status,
       isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
       hasTeam: sql<boolean>`${registrations.teamId} is not null`,
       count: sql<number>`count(*)::int`,
     })
     .from(registrations)
     .where(eq(registrations.competitionId, competitionId))
-    .groupBy(registrations.status, registrations.isIcon, sql`${registrations.teamId} is not null`);
+    .groupBy(
+      registrations.status,
+      registrations.isIcon,
+      registrations.isRetained,
+      sql`${registrations.teamId} is not null`,
+    );
   const stats: RegistrationStats = {
     total: 0,
     submitted: 0,
@@ -465,7 +483,9 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     withdrawn: 0,
     auctionPool: 0,
     icons: 0,
+    retained: 0,
     iconsWithoutTeam: 0,
+    retainedWithoutTeam: 0,
   };
   for (const row of rows) {
     // Registrations are created in "submitted"; "draft" is a machine-only state
@@ -475,10 +495,18 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     }
     stats.total += row.count;
     if (row.status === "approved") {
+      // Icon first where a player is both, the precedence `outcomeOf` and the
+      // orphan warning already use — one row must not be counted twice, and
+      // `auctionPool` is the figure that has to match the auction exactly.
       if (row.isIcon) {
         stats.icons += row.count;
         if (!row.hasTeam) {
           stats.iconsWithoutTeam += row.count;
+        }
+      } else if (row.isRetained) {
+        stats.retained += row.count;
+        if (!row.hasTeam) {
+          stats.retainedWithoutTeam += row.count;
         }
       } else {
         stats.auctionPool += row.count;
@@ -570,6 +598,7 @@ export async function queryRegistrations(
       teamId: registrations.teamId,
       teamName: teams.name,
       isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
       isCaptain: registrations.isCaptain,
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
@@ -659,30 +688,52 @@ export async function publicRegistrationFacts(
   return row ?? null;
 }
 
-export interface OrphanIcon {
+export interface OrphanPreSigned {
   id: string;
   number: string;
   name: string | null;
+  /** Which mark took them out of the pool — the warning has to say which. */
+  kind: "icon" | "retained";
 }
 
 /**
- * Approved icons with no team — named, so the warning can be acted on rather
- * than merely counted. Review-gated by the caller (these are applicant names).
+ * Approved players who are pre-signed to nobody — named, so the warning can be
+ * acted on rather than merely counted. Review-gated by the caller (these are
+ * applicant names).
+ *
+ * COVERS RETENTION TOO, and used to cover only icons. A pre-signed player with
+ * no team disappears twice over: `auctionReady` drops them from the pool and
+ * `preSignedPlayers` discards null-team rows, so they are in no auction and in
+ * no squad — an approved player the season has silently lost. That is true of a
+ * teamless retained player in precisely the way it is true of a teamless icon,
+ * and while `is_retained` had no writer it could only be reached by hand-written
+ * SQL. It has a writer now, so one click can create the state, and one click
+ * creating a state the product does not mention is the shape of the original
+ * defect this warning was added for.
  */
-export async function orphanIcons(db: Db, competitionId: string): Promise<OrphanIcon[]> {
-  return db
-    .select({ id: registrations.id, number: registrations.registrationNumber, name: people.name })
+export async function orphanPreSigned(db: Db, competitionId: string): Promise<OrphanPreSigned[]> {
+  const rows = await db
+    .select({
+      id: registrations.id,
+      number: registrations.registrationNumber,
+      name: people.name,
+      isIcon: registrations.isIcon,
+    })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
     .where(
       and(
         eq(registrations.competitionId, competitionId),
         eq(registrations.status, "approved"),
-        eq(registrations.isIcon, true),
+        or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
         sql`${registrations.teamId} is null`,
       ),
     )
     .orderBy(asc(registrations.registrationNumber));
+  // Icon wins where a player is both, the same precedence `outcomeOf` uses on
+  // the poster — one player must not be described two different ways by two
+  // surfaces reading one row.
+  return rows.map(({ isIcon, ...rest }) => ({ ...rest, kind: isIcon ? "icon" : "retained" }));
 }
 
 /** Name keys that appear on >1 registration in this competition (dup/conflict flag). */

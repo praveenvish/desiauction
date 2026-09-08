@@ -94,7 +94,7 @@ import {
   addPlayerByPhone,
   exportRegistrationsCsv,
   myRegistration,
-  orphanIcons,
+  orphanPreSigned,
   photoTargetsOf,
   publicRegistrationFacts,
   queryRegistrations,
@@ -103,7 +103,7 @@ import {
   registrationsOf,
   submitRegistration,
   timelineOf,
-  type OrphanIcon,
+  type OrphanPreSigned,
   type RegistrationPage,
   type RegistrationRow,
   type RegistrationSort,
@@ -1180,7 +1180,7 @@ export interface RegistrationDashboard {
    */
   page?: RegistrationPage;
   /** Approved icons with no team, named. Review-gated: these are applicants. */
-  orphanIcons?: OrphanIcon[];
+  orphanPreSigned?: OrphanPreSigned[];
   teams?: TeamSummary[];
   /** Drives the closed-intake notice on the share block (DA-35). */
   registrationOpen: boolean;
@@ -1244,7 +1244,7 @@ export async function registrationDashboard(
       registrationStats(db, competition.id),
       queryRegistrations(db, competition.id, query),
       teamsOf(db, competition.id),
-      orphanIcons(db, competition.id),
+      orphanPreSigned(db, competition.id),
     ]);
     // PI-1: the organizer-channel category advisory, computed by THE evaluator
     // (never by a second SQL copy of its rules) over just this page's people.
@@ -1282,7 +1282,7 @@ export async function registrationDashboard(
       stats,
       page,
       teams,
-      orphanIcons: orphans,
+      orphanPreSigned: orphans,
       registrationOpen: competition.status === "registration_open",
       viewer: { canReview },
       categoryFlags,
@@ -1449,13 +1449,15 @@ export async function assignTeamAction(
 }
 
 /**
- * Set icon / captain / team marks on a registration (organizer, `team.manage`).
- * Icon players are retained to their team and excluded from the auction pool.
+ * Set icon / retained / captain / team marks on a registration (organizer,
+ * `team.manage`). Icon and retained players are both pre-signed to their team
+ * and excluded from the auction pool — an Icon because the organizer named them
+ * marquee, a retained player because they were kept from a prior season.
  */
 export async function markRegistrationAction(
   slug: string,
   registrationId: string,
-  marks: { isIcon?: boolean; isCaptain?: boolean; teamId?: string | null },
+  marks: { isIcon?: boolean; isRetained?: boolean; isCaptain?: boolean; teamId?: string | null },
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSession();
   const competition = await resolveCompetitionScoped(session.personId, slug);

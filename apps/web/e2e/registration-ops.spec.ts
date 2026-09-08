@@ -120,6 +120,39 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await page.getByTestId("bulk-approve").click();
   await expect(page.getByTestId("stat-approved")).toContainText("8");
 
+  /*
+   * RETENTION, which had no writer at all until it had this button.
+   *
+   * `is_retained` was read by the poster, the showcase, the career page and the
+   * live summary, and could only be SET by hand-written SQL — so the marks UI
+   * had no browser coverage and the flag had no path through it. What this
+   * asserts is the consequence rather than the click: retaining a player takes
+   * them off the block, and the pool figure is the number the auction will use.
+   */
+  // The VALUE, not the tile: the tile also carries a hint that spells the
+  // arithmetic out, so `toContainText("8")` on the whole thing would pass on
+  // the explanation of a figure it was not reading.
+  const poolValue = page.getByTestId("stat-auction-pool").locator(".stat-value");
+  const poolHint = page.getByTestId("stat-auction-pool").locator(".stat-hint");
+  await expect(poolValue).toHaveText("8");
+  const retain = page.getByTestId(/^retain-toggle-/).first();
+  await retain.click();
+  await page.getByTestId("confirm-retain").click();
+  await expect(page.getByTestId("retained-flag").first()).toBeVisible();
+  await expect(poolValue).toHaveText("7");
+  // The hint has to name BOTH pre-signed marks or the subtraction printed
+  // beside the figure does not come out.
+  await expect(poolHint).toHaveText("8 approved − 1 retained");
+  // None of these imported players has a team, so retaining one strands them in
+  // no auction and no squad — the warning that used to name icons only.
+  await expect(page.getByTestId("orphan-pre-signed-warning")).toContainText("Retained");
+  // Clearing it puts them back on the block, and needs no confirmation.
+  await page
+    .getByTestId(/^retain-toggle-/)
+    .first()
+    .click();
+  await expect(poolValue).toHaveText("8");
+
   // Filter to approved and confirm the table only shows approved rows.
   await page.getByLabel("Status").selectOption("approved");
   await expect(page.getByTestId("page-indicator")).toContainText("8 total");

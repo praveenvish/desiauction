@@ -346,8 +346,27 @@ export type MarksResult = { ok: true } | { ok: false; reason: "not_found" | "ico
 
 /**
  * Set organizer marks on a registration: icon (pre-signed marquee, excluded from
- * the auction), captain, and/or the pre-auction team. Any omitted field is left
- * unchanged. Append-only audit, same pattern as assignTeam.
+ * the auction), retained (kept from a prior season, excluded the same way),
+ * captain, and/or the pre-auction team. Any omitted field is left unchanged.
+ * Append-only audit, same pattern as assignTeam.
+ *
+ * RETENTION HAD NO WRITER UNTIL NOW, which is the odd part. `is_retained` has
+ * been read in eight places since migration 0018 — the auction pool excludes
+ * it, `placeBid` counts it into the squad cap, the poster prints "RETAINED",
+ * the career page and the public showcase both render it — and nothing could
+ * set it. Every consequence of retaining a player was built; retaining one
+ * required hand-written SQL.
+ *
+ * RETENTION IS NOT EXCLUSIVE WITH ANYTHING, and that is deliberate rather than
+ * an omission of the icon/captain rule below. Those two are competing answers
+ * to the same question — what this player IS to the team — so one has to win.
+ * Retention answers a different question: where the player CAME FROM. You
+ * retain last season's captain, which is the commonest retention there is, and
+ * a marquee player kept from last year is honestly both an Icon and retained.
+ * Refusing either combination would block ordinary tournaments to enforce a
+ * tidiness nothing needs: the pool filter and the squad cap both read
+ * `isIcon OR isRetained`, so no arithmetic double-counts, and where a surface
+ * must print ONE word `outcomeOf` already gives Icon precedence.
  *
  * INVARIANT: a registration is never both Icon and Captain. An Icon is
  * pre-signed and never goes under the hammer; a Captain leads a squad that
@@ -366,12 +385,20 @@ export async function setRegistrationMarks(
   orgId: string,
   competitionId: string,
   registrationId: string,
-  marks: { isIcon?: boolean; isCaptain?: boolean; teamId?: string | null },
+  marks: { isIcon?: boolean; isRetained?: boolean; isCaptain?: boolean; teamId?: string | null },
   actorId: string,
 ): Promise<MarksResult> {
-  const set: Partial<{ isIcon: boolean; isCaptain: boolean; teamId: string | null }> = {};
+  const set: Partial<{
+    isIcon: boolean;
+    isRetained: boolean;
+    isCaptain: boolean;
+    teamId: string | null;
+  }> = {};
   if (marks.isIcon !== undefined) {
     set.isIcon = marks.isIcon;
+  }
+  if (marks.isRetained !== undefined) {
+    set.isRetained = marks.isRetained;
   }
   if (marks.isCaptain !== undefined) {
     set.isCaptain = marks.isCaptain;

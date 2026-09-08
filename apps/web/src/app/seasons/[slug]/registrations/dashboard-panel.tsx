@@ -50,7 +50,7 @@ import { PlayerPhotoUploader } from "./player-photo-uploader";
 import { formatDateTime } from "../../../../lib/format-date";
 import { formatPhone } from "../../../../lib/format-phone";
 import type {
-  OrphanIcon,
+  OrphanPreSigned,
   RegistrationPage,
   RegistrationStats,
   TimelineEntry,
@@ -134,13 +134,32 @@ interface Picked {
   name: string | null;
 }
 
+/**
+ * How the auction pool is arrived at, so the tile can be checked by eye.
+ *
+ * Both pre-signed marks subtract, and naming only the one that happens to be
+ * set leaves a reader doing arithmetic that does not come out.
+ */
+function poolHint(stats: RegistrationStats): string {
+  const terms: string[] = [];
+  if (stats.icons > 0) {
+    terms.push(`${String(stats.icons)} icon${stats.icons === 1 ? "" : "s"}`);
+  }
+  if (stats.retained > 0) {
+    terms.push(`${String(stats.retained)} retained`);
+  }
+  return terms.length === 0
+    ? "Approved players who go to the block"
+    : `${String(stats.approved)} approved − ${terms.join(" − ")}`;
+}
+
 export function RegistrationDashboardPanel({
   slug,
   stats,
   page,
   teams,
   filters,
-  orphanIcons,
+  orphanPreSigned,
   registrationOpen,
   categoryFlags = {},
 }: {
@@ -149,7 +168,7 @@ export function RegistrationDashboardPanel({
   page: RegistrationPage;
   teams: NonNullable<RegistrationDashboard["teams"]>;
   filters: { search: string; status: string; team: string; sort: string };
-  orphanIcons: OrphanIcon[];
+  orphanPreSigned: OrphanPreSigned[];
   registrationOpen: boolean;
   /** PI-1: organizer-channel category advisories, keyed by registration id. */
   categoryFlags?: NonNullable<RegistrationDashboard["categoryFlags"]>;
@@ -186,6 +205,7 @@ export function RegistrationDashboardPanel({
   const [confirmBulk, setConfirmBulk] = useState<TriageAction | null>(null);
   const [rowDecline, setRowDecline] = useState<Row | null>(null);
   const [iconConfirm, setIconConfirm] = useState<Row | null>(null);
+  const [retainConfirm, setRetainConfirm] = useState<Row | null>(null);
   const csvRef = useRef<HTMLTextAreaElement>(null);
   const [search, setSearch] = useState(filters.search);
   // Interactivity marker: this effect runs only after client hydration, so the
@@ -691,9 +711,10 @@ export function RegistrationDashboardPanel({
           value={stats.auctionPool}
           testId="stat-auction-pool"
           hint={
-            stats.icons > 0
-              ? `${String(stats.approved)} approved − ${String(stats.icons)} icon${stats.icons === 1 ? "" : "s"}`
-              : "Approved players who go to the block"
+            // The subtraction has TWO terms now, and naming only the icons made
+            // the arithmetic look wrong the moment anybody was retained:
+            // "12 approved − 1 icon" printed beside a pool of 10.
+            poolHint(stats)
           }
         />
         <StatTile
@@ -734,21 +755,26 @@ export function RegistrationDashboardPanel({
           registration carries the same team as the paddle, so an Icon with no
           team is in NO auction and NO squad. One click created that state and
           the product said nothing. */}
-      {orphanIcons.length > 0 ? (
-        <Card data-testid="orphan-icon-warning">
+      {orphanPreSigned.length > 0 ? (
+        <Card data-testid="orphan-pre-signed-warning">
           <p role="alert" className="reg-warning">
             <strong>
-              {orphanIcons.length} Icon{orphanIcons.length === 1 ? " is" : "s are"} in no auction
-              and no squad.
+              {orphanPreSigned.length} pre-signed player
+              {orphanPreSigned.length === 1 ? " is" : "s are"} in no auction and no squad.
             </strong>{" "}
-            An Icon is pre-signed to a team instead of being bid for, so an Icon with no team is not
-            in the auction pool and will not appear in any squad. Assign a team, or clear the Icon
+            An Icon or a retained player joins a team instead of being bid for, so one with no team
+            is not in the auction pool and will not appear in any squad. Assign a team, or clear the
             mark to put them back in the pool.
           </p>
           <ul className="reg-warning-list">
-            {orphanIcons.map((icon) => (
-              <li key={icon.id}>
-                {icon.name ?? "Unnamed"} <span className="reg-number">{icon.number}</span>
+            {orphanPreSigned.map((player) => (
+              <li key={player.id}>
+                {player.name ?? "Unnamed"} <span className="reg-number">{player.number}</span>{" "}
+                {/* Which mark stranded them, because the two are cleared by
+                    different buttons and "pre-signed" names neither. */}
+                <Badge tone={player.kind === "icon" ? "success" : "info"}>
+                  {player.kind === "icon" ? "Icon" : "Retained"}
+                </Badge>
               </li>
             ))}
           </ul>
@@ -993,6 +1019,18 @@ export function RegistrationDashboardPanel({
                       );
                     } else {
                       setIconConfirm(row);
+                    }
+                  }}
+                  onRetain={() => {
+                    if (row.isRetained) {
+                      restoreFocusRef.current = `retain-${row.id}`;
+                      void markRegistrationAction(slug, row.id, { isRetained: false }).then(
+                        (result) => {
+                          applyMark(result, `${row.name ?? row.number} is no longer retained`);
+                        },
+                      );
+                    } else {
+                      setRetainConfirm(row);
                     }
                   }}
                   onCaptain={() => {
@@ -1418,6 +1456,69 @@ export function RegistrationDashboardPanel({
         </Select>
       </Dialog>
 
+      {/* --- Retention removes a player from the night exactly as an Icon
+          mark does, so it asks exactly as loudly. --- */}
+      <Dialog
+        open={retainConfirm !== null}
+        onClose={() => {
+          setRetainConfirm(null);
+        }}
+        title={`Retain ${retainConfirm?.name ?? "this player"} from a prior season?`}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setRetainConfirm(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              data-testid="confirm-retain"
+              onClick={() => {
+                const target = retainConfirm;
+                setRetainConfirm(null);
+                if (target !== null) {
+                  restoreFocusRef.current = `retain-${target.id}`;
+                  void markRegistrationAction(slug, target.id, { isRetained: true }).then(
+                    (result) => {
+                      if (!result.ok) {
+                        toast({
+                          title: result.error ?? "That mark could not be set.",
+                          tone: "danger",
+                        });
+                        return;
+                      }
+                      // A retained player with no team is in no auction and no
+                      // squad, so the toast that follows the click is where the
+                      // organizer finds that out — not the warning card they
+                      // may scroll past.
+                      toast({
+                        title:
+                          target.teamId === null
+                            ? `${target.name ?? target.number} is retained — assign them a team`
+                            : `${target.name ?? target.number} is retained`,
+                        tone: target.teamId === null ? "danger" : "success",
+                      });
+                      router.refresh();
+                    },
+                  );
+                }
+              }}
+            >
+              Retain
+            </Button>
+          </>
+        }
+      >
+        <p>
+          A retained player is kept from a prior season and joins their team directly instead of
+          being bid for. They leave the auction pool — the auction will have one fewer player on the
+          block — and they take up one of their team&apos;s squad slots.
+        </p>
+      </Dialog>
+
       {/* --- Marking an Icon changes what auction night contains. It says so
           before it happens, once, at the point of use. --- */}
       <Dialog
@@ -1821,6 +1922,7 @@ function RegRow({
   onWaitlist,
   onDecline,
   onIcon,
+  onRetain,
   onCaptain,
   busy,
 }: {
@@ -1835,6 +1937,7 @@ function RegRow({
   onWaitlist: () => void;
   onDecline: () => void;
   onIcon: () => void;
+  onRetain: () => void;
   onCaptain: () => void;
   busy: boolean;
 }) {
@@ -1876,6 +1979,11 @@ function RegRow({
               {row.isIcon ? (
                 <Badge tone="success" data-testid="icon-flag">
                   Icon · not in the pool
+                </Badge>
+              ) : null}
+              {row.isRetained ? (
+                <Badge tone="info" data-testid="retained-flag">
+                  Retained · not in the pool
                 </Badge>
               ) : null}
             </span>
@@ -1927,8 +2035,10 @@ function RegRow({
       </td>
       <td data-label="Team">
         {row.teamName ?? "—"}
-        {row.isIcon && row.teamId === null ? (
-          <span className="reg-sub reg-sub-warning">Icon with no team</span>
+        {(row.isIcon || row.isRetained) && row.teamId === null ? (
+          <span className="reg-sub reg-sub-warning">
+            {row.isIcon ? "Icon" : "Retained"} with no team
+          </span>
         ) : null}
       </td>
       <td className="reg-actions" data-label="Actions">
@@ -1986,6 +2096,25 @@ function RegRow({
           data-testid={`icon-toggle-${row.personId}`}
         >
           {row.isIcon ? "Icon ✓" : "Icon"}
+        </Button>
+        {/* Retention is NOT exclusive with either of its neighbours, and the
+            button says so by never being disabled. You retain last season's
+            captain — the commonest retention there is — and a marquee player
+            kept from last year is honestly both. See `setRegistrationMarks`. */}
+        <Button
+          size="sm"
+          variant={row.isRetained ? "secondary" : "ghost"}
+          onClick={onRetain}
+          aria-pressed={row.isRetained}
+          title={
+            row.isRetained
+              ? "Retained from a prior season: joins their team directly, not in the auction pool. Click to put them back in the pool."
+              : "Retain: kept from a prior season, joins their team instead of going to the auction."
+          }
+          data-focus-key={`retain-${row.id}`}
+          data-testid={`retain-toggle-${row.personId}`}
+        >
+          {row.isRetained ? "Retained ✓" : "Retain"}
         </Button>
         <Button
           size="sm"

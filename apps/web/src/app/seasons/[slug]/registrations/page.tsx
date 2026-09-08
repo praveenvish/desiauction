@@ -58,7 +58,7 @@ export default async function RegistrationsPage({
             stats={dashboard.stats}
             page={dashboard.page}
             teams={dashboard.teams}
-            orphanIcons={dashboard.orphanIcons ?? []}
+            orphanPreSigned={dashboard.orphanPreSigned ?? []}
             registrationOpen={dashboard.registrationOpen}
             categoryFlags={dashboard.categoryFlags ?? {}}
             filters={{
