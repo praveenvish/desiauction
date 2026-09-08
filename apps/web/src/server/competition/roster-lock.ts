@@ -1,3 +1,5 @@
+import type { CsvRegistrationRow } from "@desiauction/core";
+
 /**
  * Which registration marks the auction freezes.
  *
@@ -32,4 +34,37 @@ export function marksFreezeWithRoster(marks: {
   teamId?: string | null;
 }): boolean {
   return marks.isIcon !== undefined || marks.isRetained !== undefined || marks.teamId !== undefined;
+}
+
+/**
+ * The squad columns a FILE carries, in the shape the lock understands.
+ *
+ * An import and a dashboard toggle must not disagree about whether a mark can
+ * still move on auction night, so the import does not get a second opinion — it
+ * reduces the file to this and asks the same predicate. A column absent from
+ * every row is an absent mark, not a false one, which is why the answer is
+ * built by presence rather than by value.
+ *
+ * `teamId` is set to null purely to SAY THE COLUMN IS THERE: the lock asks
+ * whether a team was supplied, never which one, and the file's names are not
+ * resolved to ids until the commit.
+ */
+export function squadMarksIn(rows: readonly CsvRegistrationRow[]): {
+  isIcon?: boolean;
+  isRetained?: boolean;
+  teamId?: string | null;
+} {
+  const carried: { isIcon?: boolean; isRetained?: boolean; teamId?: string | null } = {};
+  for (const row of rows) {
+    if (row.isIcon !== null) {
+      carried.isIcon = row.isIcon;
+    }
+    if (row.isRetained !== null) {
+      carried.isRetained = row.isRetained;
+    }
+    if (row.teamName !== null) {
+      carried.teamId = null;
+    }
+  }
+  return carried;
 }

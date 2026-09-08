@@ -48,6 +48,13 @@ export const IMPORT_FIELDS = [
   "jersey_number",
   "tshirt_size",
   "trouser_size",
+  // --- The squad a file already knows. A club's roster sheet says which team
+  // each player belongs to and which of them were kept from last season; until
+  // these existed, every one of those facts was re-entered by hand.
+  "team",
+  "is_icon",
+  "is_captain",
+  "is_retained",
 ] as const;
 
 export type ImportField = (typeof IMPORT_FIELDS)[number];
@@ -73,6 +80,10 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   jersey_number: "Jersey number",
   tshirt_size: "T-shirt size",
   trouser_size: "Trouser size",
+  team: "Team",
+  is_icon: "Icon?",
+  is_captain: "Captain?",
+  is_retained: "Retained?",
 };
 
 /**
@@ -205,6 +216,39 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   jersey_number: ["jersey number", "jersey no", "shirt number", "shirt no", "preferred number"],
   tshirt_size: ["tshirt size", "t shirt size", "shirt size", "jersey size", "size"],
   trouser_size: ["trouser size", "trousers size", "pant size", "pants size", "lower size"],
+  team: ["team", "team name", "squad", "franchise", "club", "team allotted", "allotted team"],
+  /*
+   * "marquee" is an alias for icon because that is the word the tournament
+   * itself uses on the poster; "pre signed" and "direct entry" are what a
+   * roster sheet calls the same thing.
+   */
+  is_icon: [
+    "is icon",
+    "icon",
+    "icon player",
+    "marquee",
+    "marquee player",
+    "pre signed",
+    "presigned",
+    "direct entry",
+  ],
+  // No single-letter alias. A column headed "C" could be anything, and a wrong
+  // guess here hands one team's armband to another team's player.
+  is_captain: ["is captain", "captain", "skipper", "team captain"],
+  /*
+   * A retention sheet's column is usually just "retained" or "kept" — the
+   * question it answers is whether this player stays from last season.
+   */
+  is_retained: [
+    "is retained",
+    "retained",
+    "retention",
+    "retained player",
+    "kept",
+    "keep",
+    "carry forward",
+    "last season",
+  ],
 };
 
 /**
@@ -227,6 +271,21 @@ const KNOWN_NOISE: readonly string[] = [
   "serial no",
   "row",
 ];
+
+/**
+ * Every alias, and which field claims it — exported so a test can prove that
+ * no two fields claim the same one.
+ *
+ * The map below is built with `flatMap`, so a duplicate alias is not an error:
+ * the LAST field to list it silently wins, and a header the organizer never
+ * looked at lands in the wrong column. With 140-odd aliases across 22 fields
+ * that is not something anyone can check by reading.
+ */
+export const IMPORT_ALIAS_CLAIMS: readonly (readonly [string, ImportField])[] =
+  IMPORT_FIELDS.flatMap((field) => [
+    [normalizeHeader(field), field] as const,
+    ...HEADER_ALIASES[field].map((alias) => [normalizeHeader(alias), field] as const),
+  ]);
 
 const FIELD_BY_ALIAS: ReadonlyMap<string, ImportField> = new Map(
   IMPORT_FIELDS.flatMap((field) => [

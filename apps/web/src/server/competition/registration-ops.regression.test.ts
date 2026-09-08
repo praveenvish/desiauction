@@ -810,6 +810,148 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(notices).toHaveLength(1);
   });
 
+  /*
+   * THE SQUAD A FILE ALREADY KNEW.
+   *
+   * `IMPORT_FIELDS` had eighteen columns and not one of them was team, icon,
+   * captain or retained — so an organizer imported forty players and then
+   * re-entered every affiliation by hand, one toggle at a time, restating what
+   * the file in front of them contained. These columns move auction pool
+   * membership, which is why they waited for the roster lock to exist.
+   */
+  describe("importing the squad", () => {
+    it("lands the team and the marks off the file, resolving the team by NAME", async () => {
+      const team = await createTeam(db, org.id, compId, owner, `Import XI ${RUN}`);
+      expect(team.ok).toBe(true);
+      if (!team.ok) return;
+      const phone = `97${RUN}1`;
+      const csv =
+        "name,phone,role,team,is_icon,is_retained\n" +
+        // Spelled in lower case with loose spacing, as a spreadsheet does.
+        `Squad One,${phone},batter,  ${team.team.name.toLowerCase()} ,no,yes`;
+      const parsed = parseRegistrationCsv(csv, undefined, { knownTeams: [team.team.name] });
+      expect(parsed.errors).toEqual([]);
+      expect(await commitRegistrationImport(db, compId, org.id, owner, parsed.rows)).toMatchObject({
+        imported: 1,
+      });
+      const [person] = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(eq(people.phone, `+91${phone}`));
+      seededPersonIds.push(person?.id ?? "");
+      const [row] = await db
+        .select({
+          teamId: registrationsTable.teamId,
+          isIcon: registrationsTable.isIcon,
+          isRetained: registrationsTable.isRetained,
+        })
+        .from(registrationsTable)
+        .where(
+          and(
+            eq(registrationsTable.competitionId, compId),
+            eq(registrationsTable.personId, person?.id ?? ""),
+          ),
+        );
+      expect(row).toEqual({ teamId: team.team.id, isIcon: false, isRetained: true });
+    });
+
+    it("a column the file does not have clears nothing", async () => {
+      /*
+       * The failure this guards against is the expensive one: a club whose
+       * sheet has no icon column re-imports a corrected roster, and every Icon
+       * and Captain the organizer set by hand is silently cleared. Absent must
+       * stay ABSENT, not become false.
+       */
+      const team = await createTeam(db, org.id, compId, owner, `Keep XI ${RUN}`);
+      expect(team.ok).toBe(true);
+      if (!team.ok) return;
+      // Arrives by import, so the phone is one a CSV can carry back.
+      const phone = `97${RUN}3`;
+      const first = parseRegistrationCsv(`name,phone,role\nMarked By Hand,${phone},batter`);
+      expect(first.errors).toEqual([]);
+      await commitRegistrationImport(db, compId, org.id, owner, first.rows);
+      const [person] = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(eq(people.phone, `+91${phone}`));
+      seededPersonIds.push(person?.id ?? "");
+      const [seeded] = await db
+        .select({ id: registrationsTable.id })
+        .from(registrationsTable)
+        .where(
+          and(
+            eq(registrationsTable.competitionId, compId),
+            eq(registrationsTable.personId, person?.id ?? ""),
+          ),
+        );
+      const id = seeded?.id ?? "";
+      // Then marked by hand on the dashboard, as an organizer would.
+      await setRegistrationMarks(
+        db,
+        org.id,
+        compId,
+        id,
+        { isIcon: true, teamId: team.team.id },
+        owner,
+      );
+      // A second file, carrying only the columns a plain roster has.
+      const csv = `name,phone,role\nMarked By Hand,${phone},bowler`;
+      const parsed = parseRegistrationCsv(csv);
+      expect(parsed.errors).toEqual([]);
+      // FILE-WINS, deliberately: the weaker policy would leave the marks alone
+      // for the uninteresting reason that it leaves everything alone. This
+      // asserts that even when the file is allowed to overwrite, a column it
+      // does not have is still not an instruction to clear anything.
+      await commitRegistrationImport(db, compId, org.id, owner, parsed.rows, "file-wins");
+      const [after] = await db
+        .select({
+          isIcon: registrationsTable.isIcon,
+          teamId: registrationsTable.teamId,
+          role: registrationsTable.role,
+        })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, id));
+      expect(after?.isIcon, "the icon mark survived a file that never mentioned it").toBe(true);
+      expect(after?.teamId).toBe(team.team.id);
+      // And the column the file DID carry still updated.
+      expect(after?.role).toBe("bowler");
+    });
+
+    it("moves the armband when a file names a captain the team already has", async () => {
+      // DA-04's rule, reached through an import: "this player instead". Two
+      // captains within ONE file are refused by the parser, where there is no
+      // "instead" to honour.
+      const team = await createTeam(db, org.id, compId, owner, `Armband XI ${RUN}`);
+      expect(team.ok).toBe(true);
+      if (!team.ok) return;
+      const incumbent = await seed(compId, org.id, "Old Captain", "arm1");
+      await setRegistrationMarks(
+        db,
+        org.id,
+        compId,
+        incumbent,
+        { isCaptain: true, teamId: team.team.id },
+        owner,
+      );
+      const phone = `97${RUN}2`;
+      const csv =
+        "name,phone,role,team,is_captain\n" + `New Captain,${phone},batter,${team.team.name},yes`;
+      const parsed = parseRegistrationCsv(csv, undefined, { knownTeams: [team.team.name] });
+      expect(parsed.errors).toEqual([]);
+      await commitRegistrationImport(db, compId, org.id, owner, parsed.rows);
+      const [person] = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(eq(people.phone, `+91${phone}`));
+      seededPersonIds.push(person?.id ?? "");
+      const [old] = await db
+        .select({ isCaptain: registrationsTable.isCaptain })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, incumbent));
+      expect(old?.isCaptain, "the incumbent was demoted rather than colliding").toBe(false);
+    });
+  });
+
   it("DA-04: a team has exactly one captain — naming a new one moves the armband", async () => {
     const team = await createTeam(db, org.id, compId, owner, `Captaincy XI ${RUN}`);
     expect(team.ok).toBe(true);
@@ -929,7 +1071,13 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
   it("export is deterministic, stable-ordered, and competition-scoped (no leakage)", async () => {
     const csv = await exportRegistrationsCsv(db, compId);
     const lines = csv.split("\n");
-    expect(lines[0]).toBe("registration_number,name,phone,role,status,team");
+    // The header is the IMPORT's canonical vocabulary, so a file this product
+    // exported re-imports with no mapping step — which it could not before, and
+    // an organizer who exported a roster to fix one phone number in Excel lost
+    // every squad affiliation on the way back in.
+    expect(lines[0]).toBe(
+      "registration_number,name,phone,role,status,team,is_icon,is_captain,is_retained",
+    );
     const numbers = lines.slice(1).map((l) => l.split(",")[0] ?? "");
     expect(numbers).toEqual([...numbers].sort()); // stable by registration number
     // No rival-org rows: a foreign competition's registration never appears.

@@ -51,6 +51,8 @@ export type {
   NameResult,
 } from "./competition";
 export {
+  normalizeTeamName,
+  parseCsvFlag,
   parseRegistrationCsv,
   parseRegistrationRecords,
   tokenizeCsv,

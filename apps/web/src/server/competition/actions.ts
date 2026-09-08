@@ -29,7 +29,13 @@ import {
   sportPackFor,
   type ValueMaps,
 } from "@desiauction/core";
-import { playerProfiles, registrations, withTenantDb, type Db } from "@desiauction/db";
+import {
+  playerProfiles,
+  registrations,
+  teams as teamsTable,
+  withTenantDb,
+  type Db,
+} from "@desiauction/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -78,7 +84,7 @@ import {
   transition,
   transitionBatch,
 } from "./registration-aggregate";
-import { marksFreezeWithRoster } from "./roster-lock";
+import { marksFreezeWithRoster, squadMarksIn } from "./roster-lock";
 import { commitRegistrationImport, existingForImport } from "./registration-import";
 import {
   forgetImportMapping,
@@ -1740,6 +1746,22 @@ async function bandsFor(competitionId: string): Promise<readonly string[]> {
 }
 
 /**
+ * The season's team names, so the parser can refuse a typo by line.
+ *
+ * Same shape as `bandsFor` and for the same reason: a column whose legal values
+ * are a fact about THIS season cannot be validated by a pure parser that has
+ * never seen the season. Without this a misspelt "Andheri Arrow" would import
+ * as no team at all — the player silently teamless, the file reported clean.
+ */
+async function teamNamesFor(competitionId: string): Promise<readonly string[]> {
+  const rows = await systemDb
+    .select({ name: teamsTable.name })
+    .from(teamsTable)
+    .where(eq(teamsTable.competitionId, competitionId));
+  return rows.map((row) => row.name);
+}
+
+/**
  * What the mapping screen needs to draw itself: the file's own headers, a real
  * sample value under each, and our best guess at where each column goes.
  *
@@ -1875,6 +1897,7 @@ export interface ImportShape {
 function parseUnderShape(
   csv: string,
   bands: readonly string[],
+  teamNames: readonly string[],
   shape: ImportShape | undefined,
 ): ReturnType<typeof parseRegistrationRecords> {
   const records = tokenizeCsv(csv);
@@ -1885,6 +1908,7 @@ function parseUnderShape(
       : applyMapping(records, mapping, shape?.valueMaps);
   return parseRegistrationRecords(source, bands, {
     now: new Date(),
+    knownTeams: teamNames,
     ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
   });
 }
@@ -1903,7 +1927,12 @@ export async function importPreviewAction(
   if (tooBig !== null) {
     return { validCount: 0, errors: [{ line: 1, message: tooBig }] };
   }
-  const result = parseUnderShape(csv, await bandsFor(gate.competition.id), shape);
+  const result = parseUnderShape(
+    csv,
+    await bandsFor(gate.competition.id),
+    await teamNamesFor(gate.competition.id),
+    shape,
+  );
   if (result.rows.length === 0) {
     return { validCount: 0, errors: result.errors };
   }
@@ -1983,7 +2012,12 @@ export async function importCommitAction(
   }
   // Re-parsed under the SAME shape the preview used — the commit never trusts a
   // row list the browser sent, only the file plus the mapping it approved.
-  const parsed = parseUnderShape(csv, await bandsFor(gate.competition.id), options?.shape);
+  const parsed = parseUnderShape(
+    csv,
+    await bandsFor(gate.competition.id),
+    await teamNamesFor(gate.competition.id),
+    options?.shape,
+  );
   if (parsed.errors.length > 0 && options?.skipInvalid !== true) {
     return {
       ok: false,
@@ -1992,6 +2026,30 @@ export async function importCommitAction(
   }
   if (parsed.rows.length === 0) {
     return { ok: false, error: "No valid rows to import." };
+  }
+  /*
+   * THE ROSTER LOCK, APPLIED TO A FILE.
+   *
+   * A team, an Icon mark and a retention all decide who is in the pool and
+   * whose squad is how full — arithmetic the engine has already priced bids
+   * against. The dashboard's toggles have been refused after the auction opens
+   * since DA-04; an import carrying the same columns has to be refused for the
+   * same reason, or the lock is a property of the button rather than of the
+   * auction.
+   *
+   * ONLY THOSE COLUMNS. A file with no squad columns still imports mid-auction
+   * — new registrations land in `submitted` and reach the pool through the same
+   * approval gate — and the captain badge is deliberately not frozen, because
+   * a drafted player's team is decided ON auction night.
+   */
+  if (marksFreezeWithRoster(squadMarksIn(parsed.rows))) {
+    if (await auctionLocksRoster(gate.competition.id)) {
+      return {
+        ok: false,
+        error:
+          "The auction has started, so team, Icon and Retained columns can no longer be imported. Remove them from the file to import the rest.",
+      };
+    }
   }
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     commitRegistrationImport(

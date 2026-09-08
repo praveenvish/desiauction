@@ -40,6 +40,27 @@ export interface CsvRegistrationRow {
   jerseyNumber: string | null;
   tshirtSize: string | null;
   trouserSize: string | null;
+  /**
+   * THE SQUAD A FILE ALREADY KNOWS.
+   *
+   * A club's roster spreadsheet says which team a player belongs to and which
+   * of them were kept from last season — and none of it could be imported, so
+   * an organizer re-entered every affiliation by hand on the dashboard, one
+   * player at a time, restating facts the file in front of them contained.
+   *
+   * The NAME, not an id: a spreadsheet has never heard of a ULID. The commit
+   * resolves it against the season's teams, and the parser refuses a name that
+   * matches none of them when it is told what they are.
+   */
+  teamName: string | null;
+  /**
+   * The pre-signed and armband marks. NULL MEANS THE FILE DID NOT SAY, which is
+   * different from false: a club whose sheet has no icon column must not have
+   * every player's existing Icon mark cleared by importing a corrected roster.
+   */
+  isIcon: boolean | null;
+  isCaptain: boolean | null;
+  isRetained: boolean | null;
 }
 
 export interface CsvRowError {
@@ -189,11 +210,52 @@ export function tokenizeCsv(text: string): string[][] {
  * a birthday. Callers on the web path pass `new Date()`; the tests pass a fixed
  * instant so the suite does not change its mind next year.
  */
+const TRUE_WORDS = new Set(["yes", "y", "true", "t", "1", "\u2713", "\u2714", "x"]);
+const FALSE_WORDS = new Set(["no", "n", "false", "f", "0", "-", "\u2014"]);
+
+/**
+ * How a spreadsheet writes a yes.
+ *
+ * "Yes", "Y", "TRUE", "1", and a tick — a club marking a column of retentions
+ * ticks the cells, and a tick is what survives the export. `x` is a yes here
+ * for the same reason: a sheet where the icons are the marked rows marks them
+ * with an x, and nobody who typed it meant "no".
+ *
+ * Null for a value that is neither, so the row can be REFUSED by name rather
+ * than quietly treated as false — the same contract the batting style and the
+ * fee amount were given. A misread "maybe" in this column silently drops a
+ * player out of the auction, which is the most expensive kind of quiet.
+ */
+export function parseCsvFlag(value: string): boolean | null {
+  const key = value.trim().toLowerCase();
+  if (TRUE_WORDS.has(key)) {
+    return true;
+  }
+  return FALSE_WORDS.has(key) ? false : null;
+}
+
+/** Comparable form of a team name: case, spacing and punctuation are noise. */
+export function normalizeTeamName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
 export interface CsvParseOptions {
   /** Which number leads an ambiguous numeric date. Default day-first (India). */
   dateOrder?: DateOrder;
   /** Reference instant for the future-date check. Omit to skip that check. */
   now?: Date;
+  /**
+   * The season's team names. Omit to skip the check — the same shape
+   * `knownBands` has, and for the same reason: a caller that does not know the
+   * teams (a preview of a file before a season exists) must still be able to
+   * parse. A caller that DOES know them gets a typo refused by line instead of
+   * a player silently landing on no team.
+   */
+  knownTeams?: readonly string[];
 }
 
 /**
@@ -248,6 +310,12 @@ export function parseRegistrationRecords(
   const rows: CsvRegistrationRow[] = [];
   const errors: CsvRowError[] = [];
   const seenPhones = new Map<string, number>();
+  /** Which line already claimed the armband for a team, by normalized name. */
+  const captainByTeam = new Map<string, number>();
+  const knownTeams =
+    options?.knownTeams === undefined
+      ? undefined
+      : new Set(options.knownTeams.map(normalizeTeamName));
 
   for (let r = 1; r < records.length; r++) {
     const line = r + 1; // 1-based, header is line 1
@@ -300,6 +368,21 @@ export function parseRegistrationRecords(
     const parsedFeeStatus = feeStatusRaw === "" ? null : parseFeeStatus(feeStatusRaw);
     const feeAmountRaw = optional("fee_amount");
     const parsedFee = feeAmountRaw === "" ? null : parseRupeesToPaise(feeAmountRaw);
+
+    /*
+     * The squad columns. Each is read only when the file HAS the column, and a
+     * blank cell in a column that exists still means "did not say" — a sheet
+     * that lists four retentions leaves the other fifty-six cells empty, and
+     * reading those as `false` would clear marks the organizer set by hand.
+     */
+    const teamRaw = optional("team");
+    const flag = (column: string): { raw: string; value: boolean | null } => {
+      const raw = optional(column);
+      return { raw, value: raw === "" ? null : parseCsvFlag(raw) };
+    };
+    const iconFlag = flag("is_icon");
+    const captainFlag = flag("is_captain");
+    const retainedFlag = flag("is_retained");
     const capped = (column: string, limit: number): string | null => {
       const value = optional(column).slice(0, limit);
       return value === "" ? null : value;
@@ -327,6 +410,46 @@ export function parseRegistrationRecords(
     }
     if (parsedFee !== null && !parsedFee.ok) {
       rowErrors.push(`unreadable fee amount "${feeAmountRaw}"`);
+    }
+    for (const [column, read] of [
+      ["is_icon", iconFlag],
+      ["is_captain", captainFlag],
+      ["is_retained", retainedFlag],
+    ] as const) {
+      if (read.raw !== "" && read.value === null) {
+        rowErrors.push(`unreadable ${column} "${read.raw}" (yes or no)`);
+      }
+    }
+    /*
+     * The invariant the dashboard refuses one row at a time, refused here in
+     * bulk. An Icon is pre-signed and never goes under the hammer; a Captain
+     * leads a squad that plays. A file asserting both about one person has not
+     * expressed a preference the import could honour — it has a mistake in it.
+     */
+    if (iconFlag.value === true && captainFlag.value === true) {
+      rowErrors.push("a player cannot be both an Icon and a Captain");
+    }
+    if (teamRaw !== "" && knownTeams !== undefined && !knownTeams.has(normalizeTeamName(teamRaw))) {
+      rowErrors.push(`unknown team "${teamRaw}"`);
+    }
+    /*
+     * TWO CAPTAINS, ONE TEAM — caught in the file rather than by the database.
+     *
+     * `registrations_team_captain_uq` makes two unrepresentable, and the
+     * single-row writer resolves a collision by DEMOTING the incumbent, because
+     * an organizer naming a new captain means "this player instead". A file
+     * naming two captains for one team means no such thing: there is no "instead"
+     * when both arrive at once, and letting row order decide would hand the
+     * armband to whoever the spreadsheet happened to sort first.
+     */
+    if (captainFlag.value === true && teamRaw !== "") {
+      const key = normalizeTeamName(teamRaw);
+      const prior = captainByTeam.get(key);
+      if (prior !== undefined) {
+        rowErrors.push(`a second captain for "${teamRaw}" (also line ${String(prior)})`);
+      } else {
+        captainByTeam.set(key, line);
+      }
     }
     // The in-file duplicate check is the parser's alone (a form has no "file"),
     // and it needs the normalized phone even when another field failed — so a
@@ -366,6 +489,10 @@ export function parseRegistrationRecords(
       jerseyNumber: capped("jersey_number", 10),
       tshirtSize: capped("tshirt_size", 20),
       trouserSize: capped("trouser_size", 20),
+      teamName: teamRaw === "" ? null : teamRaw,
+      isIcon: iconFlag.value,
+      isCaptain: captainFlag.value,
+      isRetained: retainedFlag.value,
     });
   }
 

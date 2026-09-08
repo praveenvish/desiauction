@@ -50,6 +50,36 @@ export interface ExistingRegistration {
   jerseyNumber: string | null;
   tshirtSize: string | null;
   trouserSize: string | null;
+  /**
+   * The squad side, compared as NAMES on both sides.
+   *
+   * The file says "Andheri Arrows" and the record holds a ULID, so the caller
+   * joins the team in and hands its name over. That keeps this module pure —
+   * it needs no view of the season's teams to say what the file would change —
+   * and it keeps the preview readable, because "Team: — → Andheri Arrows" is
+   * the sentence an organizer can check.
+   */
+  teamName: string | null;
+  isIcon: boolean;
+  isCaptain: boolean;
+  isRetained: boolean;
+}
+
+/** A stored flag, in the words the preview prints. */
+function markOf(value: boolean): string {
+  return value ? "Yes" : "No";
+}
+
+/**
+ * A flag the FILE carried, or null where it said nothing.
+ *
+ * Null and false are different answers here and the distinction is the whole
+ * point: a sheet listing four retentions leaves fifty-six cells empty, and
+ * reading those as "No" would clear marks the organizer set by hand and call it
+ * an update.
+ */
+function fileMark(value: boolean | null): string | null {
+  return value === null ? null : markOf(value);
 }
 
 export interface FieldChange {
@@ -79,6 +109,20 @@ interface Comparable {
   label: string;
   fromFile: (row: CsvRegistrationRow) => string | null;
   fromRecord: (existing: ExistingRegistration) => string | null;
+  /**
+   * A field whose "No" is an ABSENCE rather than an answer — the squad marks.
+   *
+   * Without this, `fill-blanks` could never set a mark on a player who is
+   * already registered: a stored `false` renders "No", "No" is a supplied
+   * value, and rule 2 skips every supplied value. So an organizer importing
+   * last season's retentions onto an existing roster — the whole point of the
+   * column — would be told nothing changed.
+   *
+   * It stays one-directional, which is the part worth keeping. A file may ADD
+   * a mark under the default policy, because adding reverts nothing; only
+   * `file-wins` may CLEAR one the organizer set by hand.
+   */
+  blankIsFalse?: boolean;
 }
 
 const COMPARABLE: readonly Comparable[] = [
@@ -156,6 +200,28 @@ const COMPARABLE: readonly Comparable[] = [
     fromFile: (r) => r.trouserSize,
     fromRecord: (e) => e.trouserSize,
   },
+  { field: "teamName", label: "Team", fromFile: (r) => r.teamName, fromRecord: (e) => e.teamName },
+  {
+    field: "isIcon",
+    label: "Icon",
+    fromFile: (r) => fileMark(r.isIcon),
+    fromRecord: (e) => markOf(e.isIcon),
+    blankIsFalse: true,
+  },
+  {
+    field: "isCaptain",
+    label: "Captain",
+    fromFile: (r) => fileMark(r.isCaptain),
+    fromRecord: (e) => markOf(e.isCaptain),
+    blankIsFalse: true,
+  },
+  {
+    field: "isRetained",
+    label: "Retained",
+    fromFile: (r) => fileMark(r.isRetained),
+    fromRecord: (e) => markOf(e.isRetained),
+    blankIsFalse: true,
+  },
 ];
 
 /**
@@ -193,8 +259,11 @@ export function planImportRow(
     if (current === incoming) {
       continue;
     }
-    // Rule 2: fill blanks unless the organizer asked for the file to win.
-    if (policy === "fill-blanks" && supplied(current)) {
+    // Rule 2: fill blanks unless the organizer asked for the file to win. A
+    // mark's "No" is not a value a file would be reverting, so it is a blank
+    // here — see `blankIsFalse`.
+    const currentIsBlank = current === null || (entry.blankIsFalse === true && current === "No");
+    if (policy === "fill-blanks" && supplied(current) && !currentIsBlank) {
       continue;
     }
     changes.push({ field: entry.field, label: entry.label, from: current, to: incoming });

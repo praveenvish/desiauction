@@ -124,6 +124,12 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         trouserSize: null,
         battingStyle: null,
         bowlingStyle: null,
+        // The squad columns, absent from this file — and NULL, not false, which
+        // is the distinction that stops a re-import clearing marks by omission.
+        teamName: null,
+        isIcon: null,
+        isCaptain: null,
+        isRetained: null,
       },
       {
         line: 3,
@@ -143,6 +149,12 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         trouserSize: null,
         battingStyle: null,
         bowlingStyle: null,
+        // The squad columns, absent from this file — and NULL, not false, which
+        // is the distinction that stops a re-import clearing marks by omission.
+        teamName: null,
+        isIcon: null,
+        isCaptain: null,
+        isRetained: null,
       },
     ]);
   });

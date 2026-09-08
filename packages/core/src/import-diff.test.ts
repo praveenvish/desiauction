@@ -33,6 +33,10 @@ function stored(overrides: Partial<ExistingRegistration> = {}): ExistingRegistra
     jerseyNumber: null,
     tshirtSize: null,
     trouserSize: null,
+    teamName: null,
+    isIcon: false,
+    isCaptain: false,
+    isRetained: false,
     ...overrides,
   };
 }
@@ -164,5 +168,71 @@ describe("planImport — the whole file, counted", () => {
     expect(diff.rows.map((r) => r.plan.kind)).toEqual(["new", "unchanged", "changed", "reinstate"]);
     // Every planned row still names its source line, so a preview can point at it.
     expect(diff.rows.map((r) => r.line)).toEqual([2, 3, 4, 5]);
+  });
+});
+
+/**
+ * A MARK'S "NO" IS AN ABSENCE, NOT AN ANSWER.
+ *
+ * Every other column holds something a person typed, so `fill-blanks` reading a
+ * stored value as "the organizer's, leave it" is right. A boolean mark is not
+ * like that: `is_icon` is `false` on every registration ever created, so a
+ * stored `false` is the absence of a decision rather than one. Read as an
+ * answer, it made the whole squad import useless on a second file — an
+ * organizer importing last season's retentions onto a roster already in the
+ * product would be told, truthfully and uselessly, that nothing changed.
+ */
+describe("the squad marks under each policy", () => {
+  const HEAD = "name,phone,role,is_icon";
+  const marked = (value: string) => fileRow(`Rohit Sharma,9876543210,batter,${value}`, HEAD);
+
+  it("lets a file ADD a mark under fill-blanks, because adding reverts nothing", () => {
+    const plan = planImportRow(marked("yes"), stored({ isIcon: false }), "fill-blanks");
+    expect(plan).toEqual({
+      kind: "changed",
+      changes: [{ field: "isIcon", label: "Icon", from: "No", to: "Yes" }],
+    });
+  });
+
+  it("does NOT let a file clear a hand-set mark under fill-blanks", () => {
+    // The direction that matters. An organizer marked this player an Icon on
+    // the dashboard; a re-imported roster whose sheet never had the column
+    // filled in must not quietly put them back on the block.
+    expect(planImportRow(marked("no"), stored({ isIcon: true }), "fill-blanks")).toEqual({
+      kind: "unchanged",
+    });
+  });
+
+  it("lets file-wins clear one, because that is what file-wins means", () => {
+    expect(planImportRow(marked("no"), stored({ isIcon: true }), "file-wins")).toEqual({
+      kind: "changed",
+      changes: [{ field: "isIcon", label: "Icon", from: "Yes", to: "No" }],
+    });
+  });
+
+  it("reports no change when the file agrees with the record", () => {
+    // Both directions, so a no-op file does not fill the preview with rows that
+    // would write the value they already hold.
+    expect(planImportRow(marked("no"), stored({ isIcon: false }), "fill-blanks")).toEqual({
+      kind: "unchanged",
+    });
+    expect(planImportRow(marked("yes"), stored({ isIcon: true }), "file-wins")).toEqual({
+      kind: "unchanged",
+    });
+  });
+
+  it("has no opinion at all when the file lacks the column", () => {
+    const plain = fileRow("Rohit Sharma,9876543210,batter");
+    expect(planImportRow(plain, stored({ isIcon: true }), "file-wins")).toEqual({
+      kind: "unchanged",
+    });
+  });
+
+  it("names the team as a NAME, so the preview is a sentence a person can check", () => {
+    const row = fileRow("Rohit Sharma,9876543210,batter,Andheri Arrows", "name,phone,role,team");
+    expect(planImportRow(row, stored({ teamName: null }), "fill-blanks")).toEqual({
+      kind: "changed",
+      changes: [{ field: "teamName", label: "Team", from: null, to: "Andheri Arrows" }],
+    });
   });
 });

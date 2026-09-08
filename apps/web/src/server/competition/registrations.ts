@@ -816,6 +816,9 @@ export async function exportRegistrationsCsv(
       role: registrations.role,
       status: registrations.status,
       team: teams.name,
+      isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      isRetained: registrations.isRetained,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -826,9 +829,42 @@ export async function exportRegistrationsCsv(
         : and(eq(registrations.competitionId, competitionId), eq(registrations.teamId, teamId)),
     )
     .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
+  /*
+   * THE EXPORT ROUND-TRIPS THROUGH THE IMPORT, which it did not.
+   *
+   * `team` was already here and the import could not read it, so an organizer
+   * who exported a roster, corrected a phone number in Excel and imported it
+   * back lost every squad affiliation in the file they had just been given. The
+   * import understands all four of these columns now, and the header names it
+   * writes are the canonical ones, so a re-import needs no mapping step at all.
+   *
+   * Yes/no rather than true/false because a person reads this in Excel, and
+   * `parseCsvFlag` takes either.
+   */
+  const yesNo = (value: boolean): string => (value ? "yes" : "no");
   return toCsv(
-    ["registration_number", "name", "phone", "role", "status", "team"],
-    rows.map((r) => [r.number, r.name ?? "", r.phone, r.role ?? "", r.status, r.team ?? ""]),
+    [
+      "registration_number",
+      "name",
+      "phone",
+      "role",
+      "status",
+      "team",
+      "is_icon",
+      "is_captain",
+      "is_retained",
+    ],
+    rows.map((r) => [
+      r.number,
+      r.name ?? "",
+      r.phone,
+      r.role ?? "",
+      r.status,
+      r.team ?? "",
+      yesNo(r.isIcon),
+      yesNo(r.isCaptain),
+      yesNo(r.isRetained),
+    ]),
   );
 }
 

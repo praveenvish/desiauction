@@ -51,10 +51,13 @@ function playersCsv(): string {
  * dd/mm/yyyy. Before column mapping existed this file was refused at line 1
  * with "Missing required column(s): name, phone, role" and imported nobody.
  */
-function googleFormCsv(options: { withSizes?: boolean } = {}): string {
+function googleFormCsv(options: { withSizes?: boolean; withRetained?: boolean } = {}): string {
   const header =
     "Timestamp,Email Address,Player Name,Mobile Number,Which role do you play?,Date of Birth" +
-    (options.withSizes === true ? ",T-shirt size" : "");
+    (options.withSizes === true ? ",T-shirt size" : "") +
+    // A retention column, headed the way a club's own sheet heads it. Appended
+    // last so the existing mapping-select indices keep meaning what they did.
+    (options.withRetained === true ? ",Retained?" : "");
   const spellings = ["Batsman", "Fast Bowler", "All Rounder", "Wicket Keeper Batsman"];
   const rows = Array.from({ length: 4 }, (_, i) => {
     const phone = `7${STAMP}${i}`.slice(0, 10);
@@ -66,6 +69,8 @@ function googleFormCsv(options: { withSizes?: boolean } = {}): string {
       spellings[i % 4],
       "15/03/1998",
       ...(options.withSizes === true ? ["L"] : []),
+      // The first player is kept from last season; the rest go to the auction.
+      ...(options.withRetained === true ? [i === 0 ? "yes" : "no"] : []),
     ].join(",");
   });
   return [header, ...rows].join("\n");
@@ -302,9 +307,12 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
 
   await page.getByTestId("open-import").click();
-  await page.getByTestId("import-textarea").evaluate((el, csv) => {
-    (el as HTMLTextAreaElement).value = csv;
-  }, googleFormCsv());
+  await page.getByTestId("import-textarea").evaluate(
+    (el, csv) => {
+      (el as HTMLTextAreaElement).value = csv;
+    },
+    googleFormCsv({ withRetained: true }),
+  );
 
   // One press reads the headers, maps them and validates. The mapper renders
   // beside the preview, so the translation is on screen before any commit.
@@ -320,6 +328,10 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
   // Timestamp and Email Address are the form's bookkeeping — imported nowhere.
   await expect(page.getByTestId("mapping-select-0")).toHaveValue("");
   await expect(page.getByTestId("mapping-select-1")).toHaveValue("");
+  // The squad columns are mapped by the same table, from the word a club's own
+  // sheet uses. Until these existed, a roster's retentions were re-entered by
+  // hand on the dashboard, one toggle at a time.
+  await expect(page.getByTestId("mapping-select-6")).toHaveValue("is_retained");
   // Nothing is outstanding, so the required-field warning is absent.
   await expect(page.getByTestId("mapping-missing")).toHaveCount(0);
 
@@ -327,6 +339,9 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
   await page.getByTestId("import-commit").click();
 
   await expect(page.getByTestId("stat-total")).toContainText("4");
+  // And the retention landed off the file: one player marked, three not — the
+  // "no" cells are an answer, and must not mark anybody.
+  await expect(page.getByTestId("retained-flag")).toHaveCount(1);
   // The roles the FORM spelled ("Batsman", "Wicket Keeper Batsman") arrived as
   // the four the product understands, and the table prints each one's PROSE
   // NAME through `lib/playing-roles`.

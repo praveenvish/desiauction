@@ -1,6 +1,7 @@
 import {
   isBattingStyle,
   isBowlingStyle,
+  normalizeTeamName,
   planImport,
   registrationNumber,
   type CsvRegistrationRow,
@@ -8,8 +9,8 @@ import {
   type FieldChange,
   type ImportPolicy,
 } from "@desiauction/core";
-import { auditLog, newId, people, registrations, type Db } from "@desiauction/db";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { auditLog, newId, people, registrations, teams, type Db } from "@desiauction/db";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 
 import { reinstateWithdrawn } from "./registrations";
 
@@ -77,9 +78,18 @@ export async function existingForImport(
       jerseyNumber: registrations.jerseyNumber,
       tshirtSize: registrations.tshirtSize,
       trouserSize: registrations.trouserSize,
+      // The diff compares NAMES on both sides, so the stored side joins the
+      // team in rather than making a pure module resolve a ULID.
+      teamName: teams.name,
+      isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      isRetained: registrations.isRetained,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
+    // LEFT: most registrations have no team, and an inner join here would have
+    // hidden every one of them from the re-import plan.
+    .leftJoin(teams, eq(teams.id, registrations.teamId))
     .where(and(eq(registrations.competitionId, competitionId), inArray(people.phone, [...phones])));
   return new Map(rows.map(({ phone, ...rest }) => [phone, rest]));
 }
@@ -88,6 +98,8 @@ export async function existingForImport(
 function changedValues(
   changes: readonly FieldChange[],
   row: CsvRegistrationRow,
+  /** The file's team name resolved to an id — the diff speaks names, the table ids. */
+  teamId: string | null,
 ): Record<string, unknown> {
   const all: Record<string, unknown> = {
     role: row.role,
@@ -96,14 +108,43 @@ function changedValues(
     battingStyle: row.battingStyle,
     bowlingStyle: row.bowlingStyle,
     ...deskFields(row),
+    // `teamName` is what the plan named; `teamId` is what the column holds.
+    teamName: teamId,
+    isIcon: row.isIcon,
+    isCaptain: row.isCaptain,
+    isRetained: row.isRetained,
   };
   // ONLY the fields the plan named. The preview showed the organizer this exact
   // list; writing anything else would make the preview a lie.
   const out: Record<string, unknown> = {};
   for (const change of changes) {
     if (change.field in all) {
-      out[change.field] = all[change.field];
+      // The plan's field name is the diff's; the column is the table's, and
+      // only the team differs between them.
+      out[change.field === "teamName" ? "teamId" : change.field] = all[change.field];
     }
+  }
+  return out;
+}
+
+/**
+ * The marks a file supplied, and only those.
+ *
+ * Same rule as `deskFields`, and it matters more here: absent must stay ABSENT.
+ * A club whose sheet lists four retentions leaves fifty-six cells empty, and
+ * writing `false` into those would clear every Icon and Captain an organizer
+ * had set by hand — a re-import that silently emptied the season's squads.
+ */
+function squadMarks(row: CsvRegistrationRow): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (row.isIcon !== null) {
+    out["isIcon"] = row.isIcon;
+  }
+  if (row.isCaptain !== null) {
+    out["isCaptain"] = row.isCaptain;
+  }
+  if (row.isRetained !== null) {
+    out["isRetained"] = row.isRetained;
   }
   return out;
 }
@@ -160,6 +201,46 @@ export async function commitRegistrationImport(
     return { imported: 0, updated: 0, unchanged: 0, reinstated: 0, named: 0 };
   }
   return db.transaction(async (tx) => {
+    /*
+     * The season's teams, by the name a spreadsheet would write.
+     *
+     * Loaded once rather than per row, and matched on the normalized name so
+     * "andheri arrows", "Andheri  Arrows" and "Andheri-Arrows" are one team.
+     * The PARSER already refused a name that matches none of these, so anything
+     * unresolved here is a team deleted between preview and commit — which
+     * leaves the player teamless rather than failing the batch, exactly as an
+     * organizer importing before creating teams would.
+     */
+    const teamRows = await tx
+      .select({ id: teams.id, name: teams.name })
+      .from(teams)
+      .where(eq(teams.competitionId, competitionId));
+    const teamByName = new Map(teamRows.map((team) => [normalizeTeamName(team.name), team.id]));
+    const teamIdFor = (row: CsvRegistrationRow): string | null =>
+      row.teamName === null ? null : (teamByName.get(normalizeTeamName(row.teamName)) ?? null);
+
+    /*
+     * DA-04, at import scale: a team has exactly one captain, and
+     * `registrations_team_captain_uq` makes two unrepresentable. The single-row
+     * writer resolves that by DEMOTING the incumbent, because an organizer
+     * naming a new captain means "this player instead" — the same reading
+     * applies to a file. Two captains for one team WITHIN the file were already
+     * refused by the parser, where there is no "instead" to honour.
+     */
+    const demoteOthers = async (teamId: string, keep: string): Promise<void> => {
+      await tx
+        .update(registrations)
+        .set({ isCaptain: false })
+        .where(
+          and(
+            eq(registrations.competitionId, competitionId),
+            eq(registrations.teamId, teamId),
+            eq(registrations.isCaptain, true),
+            ne(registrations.id, keep),
+          ),
+        );
+    };
+
     // Resolve existing people by phone in one query, then create stubs for the rest.
     const phones = [...new Set(rows.map((r) => r.phone))];
     const existing = await tx
@@ -231,8 +312,12 @@ export async function commitRegistrationImport(
       // Already here, and the file changes something. Status is untouched —
       // an approved player stays approved through a re-import (rule 3).
       if (plan?.kind === "changed" && record !== undefined) {
-        const values = changedValues(plan.changes, row);
+        const changedTeam = teamIdFor(row);
+        const values = changedValues(plan.changes, row, changedTeam);
         if (Object.keys(values).length > 0) {
+          if (values["isCaptain"] === true && changedTeam !== null) {
+            await demoteOthers(changedTeam, record.id);
+          }
           await tx.update(registrations).set(values).where(eq(registrations.id, record.id));
         }
         updated++;
@@ -257,6 +342,21 @@ export async function commitRegistrationImport(
       }
 
       const id = newId();
+      /*
+       * BEFORE the insert, not after.
+       *
+       * `registrations_team_captain_uq` is a real index, so a row arriving as
+       * this team's captain COLLIDES with the incumbent at insert time — the
+       * whole batch aborts, and an organizer importing a corrected roster is
+       * told nothing more useful than "duplicate key". Demoting first is what
+       * makes the armband change hands instead, which is what a file naming a
+       * new captain means. The id is minted above precisely so it can be
+       * excluded here, before the row it names exists.
+       */
+      const landingTeam = teamIdFor(row);
+      if (row.isCaptain === true && landingTeam !== null) {
+        await demoteOthers(landingTeam, id);
+      }
       const inserted = await tx
         .insert(registrations)
         .values({
@@ -277,6 +377,10 @@ export async function commitRegistrationImport(
           // import that maps none of these leaves the column defaults alone
           // rather than writing nulls over a value entered by hand.
           ...deskFields(row),
+          // The squad the file already knew. Spread only when it said so, so a
+          // sheet with no icon column changes no marks.
+          ...(row.teamName !== null ? { teamId: teamIdFor(row) } : {}),
+          ...squadMarks(row),
         })
         // Already registered here → skip, don't corrupt the batch.
         .onConflictDoNothing({
