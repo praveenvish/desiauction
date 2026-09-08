@@ -94,7 +94,54 @@ rather than a fork of the pack.
 Neither would have surfaced without a third pack, which is the argument for
 adding one before the estimate is quoted to anybody.
 
-## 4 · What still blocks specific sports
+## 4 · Volleyball shipped — the first pack with a different SHAPE
+
+Fourth pack, 2026-09-08. Cricket, football and kabaddi all reduce a match to one
+running total per side. Volleyball does not: a match is a best-of-five of SETS,
+and the table ranks on set RATIO before it looks at points. So this pack carries
+**two** score components and its tiebreaks are ratios rather than differences.
+
+**The contract took it unchanged** — `scoreFields` was already a list and
+`tiebreakers` already accepted any function of the totals. Cost was the same as
+kabaddi's: a pack file, two registry lines, one `INSERT` (0050).
+
+### The bug this pack could easily have shipped
+
+Volleyball ranks on sets won ÷ sets lost, so **a team that has not lost a set
+divides by zero** — and every obvious handling is wrong in a way nobody notices
+until the table is:
+
+- returning `null` sorts them **below everyone**, because a null tiebreak sorts
+  last by design — the only unbeaten team in the league finishes bottom;
+- returning `0` does the same thing more quietly;
+- a large sentinel works until two teams are unbeaten and it makes them look
+  exactly equal, which they may not be.
+
+`Infinity` is the honest answer and it sorts correctly through the existing
+`compareStandings` with no special case: `Infinity - 5` is positive, and two
+unbeaten teams are caught by that function's `av === bv` check
+(`Infinity === Infinity`) and fall through to point ratio. The one arrangement
+that would break it — `Infinity - Infinity`, which is `NaN` and makes a sort
+incoherent — is exactly the one that equality check prevents.
+
+Four tests assert this rather than trusting the reasoning: the unbeaten team
+sorts top, two unbeaten teams separate on point ratio deterministically, a team
+yet to play gets `null` and sorts last, and sets rank before points.
+
+### The first place the contract does NOT stretch
+
+Competitive volleyball awards **3 points for a 3-0 or 3-1 win, 2 for a 3-2 win,
+and 1 for LOSING 2-3**. Those depend on the SET SCORE, and `PointsPolicy` is
+four flat numbers keyed on the outcome — it cannot express "a win, but only
+just". The pack ships the ordinary club scheme (3 / 0, with `tie` unreachable
+because volleyball plays until somebody wins) and the limitation is named in
+the file.
+
+Making the real scheme expressible means letting a policy read the score as well
+as the outcome. That is a contract change, and it waits until a league asks —
+the same rule every other deferral here followed.
+
+## 5 · What still blocks specific sports
 
 **Racquet sports** — badminton, table tennis, tennis, pickleball. A team tie is
 several **rubbers** (singles, doubles), not one scoreline, and
@@ -102,11 +149,11 @@ several **rubbers** (singles, doubles), not one scoreline, and
 "rubbers"` plus a score shape to match: a Phase-2-sized change, not a pack file.
 Everything else about them fits — they run as auction team leagues here.
 
-**Shipped:** cricket, football, kabaddi.
+**Shipped:** cricket, football, kabaddi, volleyball.
 
-**Ready with no blockers:** volleyball, hockey, basketball, box cricket, esports.
+**Ready with no blockers:** hockey, basketball, box cricket, esports.
 
-## 5 · Verification of the terminology work
+## 6 · Verification of the terminology work
 
 | Gate | Result |
 |---|---|

@@ -1,6 +1,6 @@
 # SP-1 — MULTI-SPORT · PROGRAMME PLAN
 
-## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phases 0–4 underway · cricket + football + kabaddi live · Phase 4 open for more packs
+## DesiAuction NEXT · 2026-09-05 · Architecture · **Status:** Phases 0–4 underway · cricket + football + kabaddi + volleyball live
 
 Taking the platform beyond cricket. Scope is **sports only** — auction
 categories outside sport (asset, commodity, charity) are deliberately deferred

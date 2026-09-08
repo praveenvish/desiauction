@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { buildStandings, type FixtureResultInput, type StandingsRow } from "./standings";
+import {
+  buildStandings,
+  type FixtureResultInput,
+  type ResultOutcome,
+  type StandingsRow,
+} from "./standings";
 import { CRICKET, ballsOf, oversOf } from "./sports/cricket";
 import { FOOTBALL } from "./sports/football";
 import { KABADDI } from "./sports/kabaddi";
+import { VOLLEYBALL } from "./sports/volleyball";
 import { standingsRulesOf } from "./sports";
 
 /*
@@ -368,5 +374,91 @@ describe("the table, in kabaddi", () => {
     // form nobody can fill. This is the contract's empty case, exercised.
     expect(KABADDI.attributes).toEqual([]);
     expect(standingsRulesOf(KABADDI).scoreFields).toEqual(["points"]);
+  });
+});
+
+/*
+ * VOLLEYBALL — the first pack whose tiebreaks are RATIOS, and the first that
+ * can divide by zero. A team that has not lost a set has an infinite set ratio,
+ * and every obvious handling of that is wrong in a way nobody notices until the
+ * table is. These tests exist because the reasoning alone is not evidence.
+ */
+describe("the table, in volleyball", () => {
+  const RULES = standingsRulesOf(VOLLEYBALL);
+  const D = "team-d";
+
+  const match = (home: string, away: string, hs: number, as_: number, hp: number, ap: number) => ({
+    homeTeamId: home,
+    awayTeamId: away,
+    outcome: (hs > as_ ? "home_win" : "away_win") as ResultOutcome,
+    homeScore: { sets: hs, points: hp },
+    awayScore: { sets: as_, points: ap },
+  });
+
+  it("puts an UNDEFEATED team above a beaten one, not below it", () => {
+    /*
+     * The bug this is written against. A has lost no sets, so its ratio divides
+     * by zero. Returning null or 0 for that would sort the only unbeaten team
+     * in the league to the BOTTOM of the table — quietly, all season.
+     */
+    const rows = buildStandings(
+      [A, B, C, D],
+      [match(A, B, 3, 0, 75, 50), match(C, D, 3, 1, 98, 87)],
+      RULES,
+    );
+    expect(rowFor(rows, A).tiebreakers["set_ratio"]).toBe(Number.POSITIVE_INFINITY);
+    expect(rowFor(rows, C).tiebreakers["set_ratio"]).toBe(3);
+    expect(rows.map((row) => row.teamId).slice(0, 2), "unbeaten A above C").toEqual([A, C]);
+  });
+
+  it("does not go incoherent when TWO teams are unbeaten", () => {
+    /*
+     * Infinity - Infinity is NaN, and a comparator returning NaN sorts
+     * arbitrarily. `compareStandings` catches it with `av === bv` and falls
+     * through to the next key — here, point ratio, where A is genuinely ahead.
+     */
+    const rows = buildStandings(
+      [A, C, B, D],
+      [match(A, B, 3, 0, 75, 30), match(C, D, 3, 0, 75, 70)],
+      RULES,
+    );
+    expect(rowFor(rows, A).tiebreakers["set_ratio"]).toBe(Number.POSITIVE_INFINITY);
+    expect(rowFor(rows, C).tiebreakers["set_ratio"]).toBe(Number.POSITIVE_INFINITY);
+    const order = rows.map((row) => row.teamId);
+    expect(order.slice(0, 2), "separated on point ratio, not left to chance").toEqual([A, C]);
+    // Deterministic: the same input in another order gives the same table.
+    expect(
+      buildStandings(
+        [D, B, C, A],
+        [match(C, D, 3, 0, 75, 70), match(A, B, 3, 0, 75, 30)],
+        RULES,
+      ).map((row) => row.teamId),
+    ).toEqual(order);
+  });
+
+  it("gives a team that has played nothing NO ratio, and sorts it last", () => {
+    // Distinct from an infinite one: no sets either way is genuinely "no
+    // ratio", and a team yet to play cannot outrank one that has won.
+    const rows = buildStandings([A, B, C], [match(A, B, 3, 1, 98, 87)], RULES);
+    expect(rowFor(rows, C).tiebreakers["set_ratio"]).toBeNull();
+    expect(rows[rows.length - 1]?.teamId, "the team with no ratio is last").toBe(C);
+  });
+
+  it("ranks on SETS before points, which is the whole reason it carries both", () => {
+    // B wins more points across the season but fewer sets. Volleyball ranks on
+    // sets: a team that steals long sets it loses does not climb on that.
+    const rows = buildStandings([A, B], [match(A, B, 3, 2, 100, 110)], RULES);
+    expect(rowFor(rows, A).scored["sets"]).toBe(3);
+    expect(rowFor(rows, B).scored["points"]).toBeGreaterThan(rowFor(rows, A).scored["points"] ?? 0);
+    expect(rows[0]?.teamId, "sets decide it, not points").toBe(A);
+  });
+
+  it("is played on a Court — the fourth distinct answer to one word", () => {
+    expect(VOLLEYBALL.terms.ground).toBe("Court");
+    expect([CRICKET, FOOTBALL, KABADDI].map((p) => p.terms.ground)).toEqual([
+      "Ground",
+      "Pitch",
+      "Mat",
+    ]);
   });
 });
