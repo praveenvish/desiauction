@@ -179,10 +179,19 @@ be larger than the entry above it**, or drizzle silently skips the file.
 pnpm verify
 ```
 
-Nothing else is needed. The guardrails pick a new pack up automatically:
-`registry.test.ts` iterates every registered sport and will fail if two roles
-share a label or one alias points at two roles; `sport-vocabulary.test.ts` fails
-if the new sport's words appear anywhere outside `sports/`.
+Nothing else is needed, and the guardrails pick a new pack up automatically —
+you do not add yourself to a list anywhere:
+
+- `registry.test.ts` iterates every registered sport and fails if two roles
+  share a label or one alias points at two roles;
+- `sport-vocabulary.test.ts` fails if the new sport's words appear anywhere
+  outside `sports/`;
+- `pack-contract.test.ts` fails if your pack declares a function instead of
+  using a helper, **or if you did Step 1 and 2 and forgot Step 3** — which is
+  the mistake worth protecting against, because without the migration your
+  sport simply does not appear in the picker and nothing else complains. It
+  also catches a migration label that disagrees with the pack's, and two sports
+  given the same `sort_order`.
 
 ---
 
