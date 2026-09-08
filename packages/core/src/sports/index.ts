@@ -13,6 +13,7 @@
 
 import { CRICKET } from "./cricket";
 import { FOOTBALL } from "./football";
+import { KABADDI } from "./kabaddi";
 
 import type { StandingsRules } from "../standings";
 
@@ -38,9 +39,11 @@ export {
 export type { CricketRole, CricketBattingStyle, CricketBowlingStyle } from "./cricket";
 export { FOOTBALL, FOOTBALL_ROLE_KEYS, FOOTBALL_FOOT_KEYS } from "./football";
 export type { FootballRole, FootballFoot } from "./football";
+export { KABADDI, KABADDI_ROLE_KEYS } from "./kabaddi";
+export type { KabaddiRole } from "./kabaddi";
 
 /** Every sport the platform can run. A pack each — see `types.ts` for the contract. */
-export const SPORTS: readonly SportPack[] = [CRICKET, FOOTBALL];
+export const SPORTS: readonly SportPack[] = [CRICKET, FOOTBALL, KABADDI];
 
 /**
  * The pack every caller resolves to until competitions carry a sport (Phase 1).

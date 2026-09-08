@@ -61,9 +61,16 @@ const SCAN_ROOTS = [
  *   gallery/identity-demo    — sample data for the component gallery, which
  *                              exists to render components without a database.
  */
+/*
+ * Every pack, by DIRECTORY rather than by name. Naming them one at a time was
+ * an artifact of there being one: the third pack failed this test purely for
+ * existing, which is friction a phase whose whole claim is "adding a sport is a
+ * pack file" should not have. `sports/` IS the sanctioned home for a sport's
+ * words — that is the rule, so that is what the allowlist says.
+ */
+const PACK_DIR = "packages/core/src/sports/";
+
 const ALLOWED = new Set([
-  "packages/core/src/sports/cricket.ts",
-  "packages/core/src/sports/football.ts",
   "packages/ui/src/identity/player-card.tsx",
   "apps/web/src/app/gallery/identity-demo.tsx",
   "apps/web/src/content/marketing.ts",
@@ -112,7 +119,7 @@ function sourceFiles(): string[] {
   }
   return files.filter((file) => {
     const repoPath = relative(REPO, file);
-    return !ALLOWED.has(repoPath) && !/\.test\.tsx?$/.test(file);
+    return !ALLOWED.has(repoPath) && !repoPath.startsWith(PACK_DIR) && !/\.test\.tsx?$/.test(file);
   });
 }
 

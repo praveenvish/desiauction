@@ -48,7 +48,53 @@ list seasons of every sport at once. They have no one sport to speak for, so
 they keep the neutral words by design — `useSportTerms()` returns those outside
 a provider rather than throwing, because "no single sport here" is a real state.
 
-## 3 · What still blocks specific sports
+## 3 · Kabaddi shipped — the estimate, tested
+
+Third pack, 2026-09-08. What it actually cost, against the §1 estimate:
+
+| Predicted | Actual |
+|---|---|
+| One pack file, ~230 lines | `kabaddi.ts`, **164 lines** |
+| Two lines in `sports/index.ts` | two lines |
+| One-line `INSERT` migration | `0049_kabaddi.sql`, one statement |
+| No schema / UI / engine change | **none** |
+
+**It added nothing to the contract.** Cricket built it; football forced three
+additions (terminology, tiebreaker chain, per-field entry/parse); kabaddi needed
+no new field at all. That is the claim SP-1 was making, and this is where it
+either held or did not.
+
+Three roles — raider, defender, all-rounder — with the defensive positions
+(corner, cover, left in, right in) folded in as ALIASES, the same way football
+folds CB/LB/RWB into defender. An auction is short of a raider or a defender;
+which corner they stand in is the coach's problem on the night.
+
+**No attributes, and that is a finding.** Club kabaddi records no per-player
+fact comparable to a batting style or a preferred foot, so inventing one would
+put a field on the registration form nobody can fill. It also exercises the
+contract's empty case, which neither previous pack did.
+
+**Points are 2/1/0, deliberately not the Pro Kabaddi League's 5/3/1-with-bonus.**
+PKL's scheme is real, but it is a professional competition's rule and making it
+the default would impose it on every club league that is not PKL. `PointsPolicy`
+is an injected value, so a PKL-shaped league is a value on the competition
+rather than a fork of the pack.
+
+### Two frictions the third pack exposed, both now fixed
+
+- **The vocabulary guardrail's allowlist named packs one at a time**, so
+  `kabaddi.ts` failed the build purely for existing. Naming them individually
+  was an artifact of there being one; the allowlist now covers the `sports/`
+  DIRECTORY, because that is the actual rule.
+- **Three registry tests used `"kabaddi"` as their example of an UNKNOWN sport.**
+  They failed for being right. The fixture now uses a placeholder that will
+  never be a pack — a test that assumes the roster never grows is a test with a
+  shelf life.
+
+Neither would have surfaced without a third pack, which is the argument for
+adding one before the estimate is quoted to anybody.
+
+## 4 · What still blocks specific sports
 
 **Racquet sports** — badminton, table tennis, tennis, pickleball. A team tie is
 several **rubbers** (singles, doubles), not one scoreline, and
@@ -56,10 +102,11 @@ several **rubbers** (singles, doubles), not one scoreline, and
 "rubbers"` plus a score shape to match: a Phase-2-sized change, not a pack file.
 Everything else about them fits — they run as auction team leagues here.
 
-**Ready with no blockers:** kabaddi, volleyball, hockey, basketball, box
-cricket, esports.
+**Shipped:** cricket, football, kabaddi.
 
-## 4 · Verification of the terminology work
+**Ready with no blockers:** volleyball, hockey, basketball, box cricket, esports.
+
+## 5 · Verification of the terminology work
 
 | Gate | Result |
 |---|---|

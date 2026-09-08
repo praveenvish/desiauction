@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildStandings, type FixtureResultInput, type StandingsRow } from "./standings";
 import { CRICKET, ballsOf, oversOf } from "./sports/cricket";
 import { FOOTBALL } from "./sports/football";
+import { KABADDI } from "./sports/kabaddi";
 import { standingsRulesOf } from "./sports";
 
 /*
@@ -293,5 +294,79 @@ describe("the table, in football", () => {
     );
     expect(rowFor(rows, A).points).toBe(1);
     expect(rowFor(rows, A).tiebreakers["goal_difference"]).toBe(0);
+  });
+});
+
+/*
+ * THE THIRD PACK, which is the one that tests the claim.
+ *
+ * Cricket built the contract and football forced three additions to it.
+ * Kabaddi added nothing — so what these assert is that a pack written entirely
+ * against the existing contract simply works: its own points scheme, its own
+ * tiebreaks, its own word for the place it is played, and no attributes at all.
+ */
+describe("the table, in kabaddi", () => {
+  const RULES = standingsRulesOf(KABADDI);
+
+  it("breaks a tie on score difference, then on points scored", () => {
+    const rows = buildStandings(
+      [A, B, C],
+      [
+        {
+          homeTeamId: A,
+          awayTeamId: B,
+          outcome: "home_win",
+          homeScore: { points: 44 },
+          awayScore: { points: 30 },
+        },
+        {
+          homeTeamId: C,
+          awayTeamId: B,
+          outcome: "home_win",
+          homeScore: { points: 35 },
+          awayScore: { points: 33 },
+        },
+      ],
+      RULES,
+    );
+    expect(rows.map((row) => row.teamId).slice(0, 2), "A ahead of C on difference").toEqual([A, C]);
+    expect(rowFor(rows, A).tiebreakers["score_difference"]).toBe(14);
+    expect(rowFor(rows, C).tiebreakers["score_difference"]).toBe(2);
+    expect(rowFor(rows, A).tiebreakers["points_for"]).toBe(44);
+  });
+
+  it("awards the ordinary club 2/1/0, not the Pro Kabaddi League's scheme", () => {
+    const rows = buildStandings(
+      [A, B],
+      [
+        {
+          homeTeamId: A,
+          awayTeamId: B,
+          outcome: "home_win",
+          homeScore: { points: 40 },
+          awayScore: { points: 20 },
+        },
+      ],
+      RULES,
+    );
+    // PKL awards 5 for a win with a bonus point for losing within seven. That
+    // is a professional competition's rule; encoding it as the default would
+    // impose it on every club league that is not PKL. PointsPolicy is a value.
+    expect(rowFor(rows, A).points).toBe(2);
+    expect(rowFor(rows, B).points).toBe(0);
+  });
+
+  it("is played on a Mat — the third distinct answer to one word", () => {
+    expect(KABADDI.terms.ground).toBe("Mat");
+    expect(FOOTBALL.terms.ground).toBe("Pitch");
+    expect(CRICKET.terms.ground).toBe("Ground");
+  });
+
+  it("declares no attributes, and the contract takes that", () => {
+    // Club kabaddi records no per-player fact comparable to a batting style or
+    // a preferred foot. Inventing one would put a field on the registration
+    // form nobody can fill. This is the contract's empty case, exercised.
+    expect(KABADDI.attributes).toEqual([]);
+    expect(standingsRulesOf(KABADDI).scoreFields).toEqual(["points"]);
   });
 });

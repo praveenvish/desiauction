@@ -29,11 +29,16 @@ import {
 } from ".";
 
 describe("the registry", () => {
+  /*
+   * The placeholder is deliberately NOT a real sport. These tests used
+   * "kabaddi" until kabaddi shipped, at which point three of them failed for
+   * being right — the fixture had quietly assumed the roster would never grow.
+   */
   it("resolves a pack by key and refuses one it does not have", () => {
     expect(sportPack("cricket")).toBe(CRICKET);
-    expect(sportPack("kabaddi")).toBeNull();
+    expect(sportPack("quidditch")).toBeNull();
     expect(isSportKey("cricket")).toBe(true);
-    expect(isSportKey("kabaddi")).toBe(false);
+    expect(isSportKey("quidditch")).toBe(false);
   });
 
   it("resolves a stored key to its pack, and never to an outage", () => {
@@ -44,13 +49,13 @@ describe("the registry", () => {
     // Unreachable while the FK on competitions.sport holds — kept because the
     // one case it cannot cover is a pack file deleted with its catalogue row
     // still enabled, which should look like stale labels, not a 500.
-    expect(sportPackFor("kabaddi")).toBe(DEFAULT_SPORT);
+    expect(sportPackFor("quidditch")).toBe(DEFAULT_SPORT);
   });
 
   it("still refuses an unknown key where a CALLER is validating input", () => {
     // The contrast with sportPackFor is the point: a write path must be able to
     // say no, a read path must be able to render.
-    expect(sportPack("kabaddi")).toBeNull();
+    expect(sportPack("quidditch")).toBeNull();
   });
 
   it("names the default rather than assuming it", () => {
