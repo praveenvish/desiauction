@@ -141,7 +141,35 @@ Making the real scheme expressible means letting a policy read the score as well
 as the outcome. That is a contract change, and it waits until a league asks —
 the same rule every other deferral here followed.
 
-## 5 · What still blocks specific sports
+## 5 · Packs are now DATA (2026-09-08)
+
+Four packs in, every `compute` any of them needed turned out to be one of four
+shapes — a difference, a ratio, a rate per N, or a plain total — and all four
+packs had independently written the same `termsOf` helper. Both are now shared
+(`tiebreakers.ts`, `vocabulary.ts`), and the result is that **every pack
+contains zero functions**:
+
+| Pack | code lines | functions |
+|---|---|---|
+| cricket | 187 → **157** | 8 → **0** |
+| football | 143 → **119** | 6 → **0** |
+| kabaddi | 85 → **66** | 5 → **0** |
+| volleyball | 107 → **80** | 7 → **0** |
+
+That is what makes `ADDING_A_SPORT.md` honest: a fifth sport is a file of
+values somebody can copy and edit without being a TypeScript programmer, and
+`pnpm verify` will tell them if they got it wrong.
+
+**The point is not the line count.** It is that the divide-by-zero volleyball
+exposed — the one that sorts an unbeaten team to the bottom of the table — now
+lives in `ratio()` and is inherited. No fifth pack can re-derive it wrongly,
+because no fifth pack derives it at all.
+
+The escape hatch stays: `TiebreakerSpec` is still an interface, so a sport whose
+ranking is genuinely none of the four writes its own. Needing one is a fact
+about that sport rather than a failure of the library.
+
+## 6 · What still blocks specific sports
 
 **Racquet sports** — badminton, table tennis, tennis, pickleball. A team tie is
 several **rubbers** (singles, doubles), not one scoreline, and
@@ -153,7 +181,7 @@ Everything else about them fits — they run as auction team leagues here.
 
 **Ready with no blockers:** hockey, basketball, box cricket, esports.
 
-## 6 · Verification of the terminology work
+## 7 · Verification of the terminology work
 
 | Gate | Result |
 |---|---|

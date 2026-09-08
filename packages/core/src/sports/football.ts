@@ -1,10 +1,12 @@
+import { termsOf, type TermDetail } from "./vocabulary";
+import { difference, summariseFields, total } from "./tiebreakers";
+
 import type {
   AttributeSpec,
   RoleVocabulary,
   ScoreFieldSpec,
   SportPack,
   Terminology,
-  VocabularyTerm,
 } from "./types";
 
 /**
@@ -38,15 +40,6 @@ export type FootballRole = (typeof FOOTBALL_ROLE_KEYS)[number];
 
 export const FOOTBALL_FOOT_KEYS = ["right", "left", "both"] as const;
 export type FootballFoot = (typeof FOOTBALL_FOOT_KEYS)[number];
-
-type TermDetail = { readonly label: string; readonly aliases: readonly string[] };
-
-function termsOf<K extends string>(
-  keys: readonly K[],
-  details: Record<K, TermDetail>,
-): readonly VocabularyTerm[] {
-  return keys.map((key) => ({ key, label: details[key].label, aliases: details[key].aliases }));
-}
 
 /**
  * FOUR POSITIONS, NOT ELEVEN.
@@ -142,12 +135,6 @@ const ROLES: RoleVocabulary = {
   values: termsOf(FOOTBALL_ROLE_KEYS, ROLE_TERMS),
 };
 
-const FOOT_LABELS: Record<FootballFoot, string> = {
-  right: "Right footed",
-  left: "Left footed",
-  both: "Both feet",
-};
-
 /**
  * Preferred foot — football's equivalent of a batting style, and the first
  * attribute on this platform stored as JSON rather than in a column of its own.
@@ -162,11 +149,11 @@ const ATTRIBUTES: readonly AttributeSpec[] = [
     label: "Preferred foot",
     storage: { kind: "json" },
     headerAliases: ["preferred foot", "strong foot", "foot", "footedness", "dominant foot"],
-    options: FOOTBALL_FOOT_KEYS.map((key) => ({
-      key,
-      label: FOOT_LABELS[key],
-      aliases: key === "both" ? ["either", "two footed", "both feet"] : [`${key} foot`, `${key}ie`],
-    })),
+    options: termsOf(FOOTBALL_FOOT_KEYS, {
+      right: { label: "Right footed", aliases: ["right foot", "righty"] },
+      left: { label: "Left footed", aliases: ["left foot", "lefty"] },
+      both: { label: "Both feet", aliases: ["either", "two footed", "both feet"] },
+    }),
   },
 ];
 
@@ -183,23 +170,6 @@ const ATTRIBUTES: readonly AttributeSpec[] = [
  * certainly a slipped finger, which is all cricket's 2000 runs ever claimed.
  */
 const SCORE_FIELDS: readonly ScoreFieldSpec[] = [{ key: "goals", label: "Goals", min: 0, max: 99 }];
-
-/** Goal difference, then goals scored — the order every league table uses. */
-const GOAL_DIFFERENCE = {
-  key: "goal_difference",
-  label: "GD",
-  precision: 0,
-  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) =>
-    (totals.scored["goals"] ?? 0) - (totals.conceded["goals"] ?? 0),
-};
-
-const GOALS_FOR = {
-  key: "goals_for",
-  label: "GF",
-  precision: 0,
-  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) =>
-    totals.scored["goals"] ?? 0,
-};
 
 const TERMS: Terminology = {
   participant: ["Player", "Players"],
@@ -225,8 +195,9 @@ export const FOOTBALL: SportPack = {
      * match instead, and when one asks for that it is a value here, not a fork.
      */
     points: { win: 3, tie: 1, loss: 0, noResult: 1 },
-    tiebreakers: [GOAL_DIFFERENCE, GOALS_FOR],
-    summariseSide: (totals) => String(totals["goals"] ?? 0),
+    /* Goal difference, then goals scored — the order every league uses. */
+    tiebreakers: [difference("goals", "GD", { key: "goal_difference" }), total("goals", "GF")],
+    summariseSide: summariseFields("{goals}"),
   },
   terms: TERMS,
 };

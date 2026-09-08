@@ -6,7 +6,8 @@ import {
   type ResultOutcome,
   type StandingsRow,
 } from "./standings";
-import { CRICKET, ballsOf, oversOf } from "./sports/cricket";
+import { CRICKET } from "./sports/cricket";
+import { ballsOf, oversOf } from "./sports/overs";
 import { FOOTBALL } from "./sports/football";
 import { KABADDI } from "./sports/kabaddi";
 import { VOLLEYBALL } from "./sports/volleyball";

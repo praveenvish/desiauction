@@ -1,10 +1,7 @@
-import type {
-  RoleVocabulary,
-  ScoreFieldSpec,
-  SportPack,
-  Terminology,
-  VocabularyTerm,
-} from "./types";
+import { termsOf, type TermDetail } from "./vocabulary";
+import { difference, summariseFields, total } from "./tiebreakers";
+
+import type { RoleVocabulary, ScoreFieldSpec, SportPack, Terminology } from "./types";
 
 /**
  * KABADDI — the third pack, and the first one that cost only a pack.
@@ -21,15 +18,6 @@ import type {
 
 export const KABADDI_ROLE_KEYS = ["raider", "defender", "all_rounder"] as const;
 export type KabaddiRole = (typeof KABADDI_ROLE_KEYS)[number];
-
-type TermDetail = { readonly label: string; readonly aliases: readonly string[] };
-
-function termsOf<K extends string>(
-  keys: readonly K[],
-  details: Record<K, TermDetail>,
-): readonly VocabularyTerm[] {
-  return keys.map((key) => ({ key, label: details[key].label, aliases: details[key].aliases }));
-}
 
 /**
  * THREE ROLES, and the defensive positions fold into one of them.
@@ -97,23 +85,6 @@ const SCORE_FIELDS: readonly ScoreFieldSpec[] = [
   { key: "points", label: "Points", min: 0, max: 200 },
 ];
 
-/** Score difference, then points scored — the order kabaddi tables use. */
-const SCORE_DIFFERENCE = {
-  key: "score_difference",
-  label: "SD",
-  precision: 0,
-  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) =>
-    (totals.scored["points"] ?? 0) - (totals.conceded["points"] ?? 0),
-};
-
-const POINTS_FOR = {
-  key: "points_for",
-  label: "PF",
-  precision: 0,
-  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) =>
-    totals.scored["points"] ?? 0,
-};
-
 const TERMS: Terminology = {
   participant: ["Player", "Players"],
   squad: "Squad",
@@ -157,8 +128,9 @@ export const KABADDI: SportPack = {
      * that is a value on the competition rather than a fork of this pack.
      */
     points: { win: 2, tie: 1, loss: 0, noResult: 1 },
-    tiebreakers: [SCORE_DIFFERENCE, POINTS_FOR],
-    summariseSide: (totals) => String(totals["points"] ?? 0),
+    /* Score difference, then points scored — the order kabaddi tables use. */
+    tiebreakers: [difference("points", "SD", { key: "score_difference" }), total("points", "PF")],
+    summariseSide: summariseFields("{points}"),
   },
   terms: TERMS,
 };

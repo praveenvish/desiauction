@@ -22,7 +22,10 @@
  * values still come from one place.
  */
 
-import { DEFAULT_POINTS, ratePer } from "../standings";
+import { optionsOf, termsOf, type TermDetail } from "./vocabulary";
+import { DEFAULT_POINTS } from "../standings";
+import { ballsOf } from "./overs";
+import { netRate, summariseFields } from "./tiebreakers";
 
 import type {
   AttributeSpec,
@@ -30,7 +33,6 @@ import type {
   ScoreFieldSpec,
   SportPack,
   Terminology,
-  VocabularyTerm,
 } from "./types";
 
 export const CRICKET_ROLE_KEYS = ["batter", "bowler", "all_rounder", "wicket_keeper"] as const;
@@ -57,24 +59,6 @@ export const CRICKET_BOWLING_STYLE_KEYS = [
   "left_arm_chinaman",
 ] as const;
 export type CricketBowlingStyle = (typeof CRICKET_BOWLING_STYLE_KEYS)[number];
-
-type TermDetail = { readonly label: string; readonly aliases: readonly string[] };
-
-function termsOf<K extends string>(
-  keys: readonly K[],
-  details: Record<K, TermDetail>,
-): readonly VocabularyTerm[] {
-  return keys.map((key) => ({ key, label: details[key].label, aliases: details[key].aliases }));
-}
-
-/** A curated option carries no aliases of its own — its token and its label are
- *  both matched, which is exactly what `parseBattingStyle` did before. */
-function options<K extends string>(
-  keys: readonly K[],
-  labels: Record<K, string>,
-): readonly VocabularyTerm[] {
-  return keys.map((key) => ({ key, label: labels[key], aliases: [] }));
-}
 
 /**
  * THE FOUR ROLES.
@@ -191,14 +175,14 @@ const ATTRIBUTES: readonly AttributeSpec[] = [
     label: "Batting style",
     storage: { kind: "column", column: "batting_style" },
     headerAliases: ["batting style", "batting", "bats", "batting hand"],
-    options: options(CRICKET_BATTING_STYLE_KEYS, BATTING_STYLE_LABELS),
+    options: optionsOf(CRICKET_BATTING_STYLE_KEYS, BATTING_STYLE_LABELS),
   },
   {
     key: "bowling_style",
     label: "Bowling style",
     storage: { kind: "column", column: "bowling_style" },
     headerAliases: ["bowling style", "bowling", "bowls", "bowling arm", "bowling type"],
-    options: options(CRICKET_BOWLING_STYLE_KEYS, BOWLING_STYLE_LABELS),
+    options: optionsOf(CRICKET_BOWLING_STYLE_KEYS, BOWLING_STYLE_LABELS),
   },
 ];
 
@@ -222,53 +206,12 @@ const SCORE_FIELDS: readonly ScoreFieldSpec[] = [
   },
 ];
 
-/**
- * NET RUN RATE, now a declared tiebreak rather than a hard-wired one.
- *
- * OVERS ARE BALLS THROUGHOUT. `4.5` overs is four overs and five balls, and a
- * rate computed on that decimal is wrong by roughly eight percent per
- * fractional over — quietly, all season, in the number that decides who
- * qualifies. This divides runs by BALLS and multiplies by six, which is the
- * whole reason `balls` is a stored score component and `overs` is only ever a
- * display.
- *
- * Null, not zero, when a side has faced nothing: zero is a real NRR that a team
- * exactly level has earned.
- */
-const NET_RUN_RATE = {
-  key: "net_run_rate",
-  label: "NRR",
-  precision: 3,
-  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) => {
-    const scored = ratePer(totals.scored["runs"] ?? 0, totals.scored["balls"] ?? 0, 6);
-    const conceded = ratePer(totals.conceded["runs"] ?? 0, totals.conceded["balls"] ?? 0, 6);
-    return scored === null || conceded === null ? null : scored - conceded;
-  },
-};
-
 const TERMS: Terminology = {
   participant: ["Player", "Players"],
   squad: "Squad",
   fixture: "Match",
   ground: "Ground",
 };
-
-/** Balls → the "4.5" cricket writes. Display only; never arithmetic. */
-export function oversOf(balls: number): string {
-  return `${String(Math.floor(balls / 6))}.${String(balls % 6)}`;
-}
-
-/** "4.5" → 29 balls. Returns null for anything that is not a legal over count. */
-export function ballsOf(overs: string): number | null {
-  const match = /^(\d{1,3})(?:\.([0-5]))?$/.exec(overs.trim());
-  if (match === null) {
-    return null;
-  }
-  // `.6` is rejected by the pattern above rather than folded to the next over:
-  // somebody typing 4.6 has made a mistake, and silently reading it as 5.0
-  // hides it inside a number nobody re-checks.
-  return Number(match[1]) * 6 + Number(match[2] ?? 0);
-}
 
 export const CRICKET: SportPack = {
   key: "cricket",
@@ -285,8 +228,9 @@ export const CRICKET: SportPack = {
    */
   standings: {
     points: DEFAULT_POINTS,
-    tiebreakers: [NET_RUN_RATE],
-    summariseSide: (totals) => `${String(totals["runs"] ?? 0)}/${oversOf(totals["balls"] ?? 0)}`,
+    /* Runs per BALL times six — never runs per decimal over. See `netRate`. */
+    tiebreakers: [netRate("runs", "balls", 6, "NRR", { key: "net_run_rate" })],
+    summariseSide: summariseFields("{runs}/{balls:overs}"),
   },
   terms: TERMS,
 };

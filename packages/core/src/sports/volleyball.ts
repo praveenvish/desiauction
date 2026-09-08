@@ -1,10 +1,12 @@
+import { termsOf, type TermDetail } from "./vocabulary";
+import { ratio, summariseFields } from "./tiebreakers";
+
 import type {
   AttributeSpec,
   RoleVocabulary,
   ScoreFieldSpec,
   SportPack,
   Terminology,
-  VocabularyTerm,
 } from "./types";
 
 /**
@@ -17,10 +19,12 @@ import type {
  * kabaddi carried one, and its tiebreaks are RATIOS rather than differences.
  *
  * The contract took it unchanged — `scoreFields` is already a list, and
- * `tiebreakers` already takes any function of the totals. But two things here
- * are worth reading before copying this file for a fifth sport: the infinite
- * ratio in SET_RATIO below, and the note on points at the bottom, which is the
- * first place the contract genuinely does NOT stretch.
+ * `tiebreakers` already takes any function of the totals. The divide-by-zero
+ * this sport creates (a team that has not lost a set) was worked out here and
+ * then MOVED into `tiebreakers.ts`, so every later pack inherits the right
+ * answer instead of re-deriving it. What is still worth reading here is the
+ * note on points at the bottom: the first place the contract genuinely does
+ * not stretch.
  */
 
 export const VOLLEYBALL_ROLE_KEYS = ["setter", "attacker", "blocker", "libero"] as const;
@@ -28,15 +32,6 @@ export type VolleyballRole = (typeof VOLLEYBALL_ROLE_KEYS)[number];
 
 export const VOLLEYBALL_HAND_KEYS = ["right", "left"] as const;
 export type VolleyballHand = (typeof VOLLEYBALL_HAND_KEYS)[number];
-
-type TermDetail = { readonly label: string; readonly aliases: readonly string[] };
-
-function termsOf<K extends string>(
-  keys: readonly K[],
-  details: Record<K, TermDetail>,
-): readonly VocabularyTerm[] {
-  return keys.map((key) => ({ key, label: details[key].label, aliases: details[key].aliases }));
-}
 
 /**
  * FOUR ROLES, from six positions.
@@ -82,11 +77,6 @@ const ROLES: RoleVocabulary = {
   values: termsOf(VOLLEYBALL_ROLE_KEYS, ROLE_TERMS),
 };
 
-const HAND_LABELS: Record<VolleyballHand, string> = {
-  right: "Right handed",
-  left: "Left handed",
-};
-
 /**
  * Spiking hand — recorded because in volleyball it genuinely changes where a
  * player is used: a left-hander hitting from the right is attacking across
@@ -102,11 +92,10 @@ const ATTRIBUTES: readonly AttributeSpec[] = [
     label: "Spiking hand",
     storage: { kind: "json" },
     headerAliases: ["spiking hand", "hitting hand", "hand", "handedness", "dominant hand"],
-    options: VOLLEYBALL_HAND_KEYS.map((key) => ({
-      key,
-      label: HAND_LABELS[key],
-      aliases: [`${key} hand`, `${key} handed`, `${key}y`],
-    })),
+    options: termsOf(VOLLEYBALL_HAND_KEYS, {
+      right: { label: "Right handed", aliases: ["right hand", "righty"] },
+      left: { label: "Left handed", aliases: ["left hand", "lefty"] },
+    }),
   },
 ];
 
@@ -126,53 +115,6 @@ const SCORE_FIELDS: readonly ScoreFieldSpec[] = [
   { key: "sets", label: "Sets", min: 0, max: 5 },
   { key: "points", label: "Points", min: 0, max: 500 },
 ];
-
-/**
- * SET RATIO, AND THE UNDEFEATED TEAM.
- *
- * Volleyball ranks on sets won ÷ sets lost. A team that has not lost a set has
- * divided by zero, and every obvious way to handle that is wrong in a way
- * nobody notices until the table is:
- *
- *   · returning NULL puts them BELOW everyone, because a null tiebreak sorts
- *     last by design — the undefeated side finishes bottom;
- *   · returning 0 does the same thing more quietly;
- *   · substituting a large sentinel works until two teams are undefeated and
- *     the sentinel makes them look exactly equal, which they may not be.
- *
- * `Infinity` is the honest answer and it sorts correctly through
- * `compareStandings` without a special case: `Infinity - 5` is positive, so an
- * undefeated team is placed above a beaten one, and two undefeated teams are
- * caught by that function's `av === bv` check (Infinity === Infinity) and fall
- * through to the NEXT tiebreak, which is point ratio. The one arrangement that
- * would break — `Infinity - Infinity`, which is NaN and would make the sort
- * incoherent — is exactly the one that equality check prevents.
- *
- * Null is kept for the team that has played nothing at all: no sets either way
- * is genuinely "no ratio", not an infinite one.
- */
-function ratioOf(won: number, lost: number): number | null {
-  if (won === 0 && lost === 0) {
-    return null;
-  }
-  return lost === 0 ? Number.POSITIVE_INFINITY : won / lost;
-}
-
-const SET_RATIO = {
-  key: "set_ratio",
-  label: "Sets",
-  precision: 3,
-  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) =>
-    ratioOf(totals.scored["sets"] ?? 0, totals.conceded["sets"] ?? 0),
-};
-
-const POINT_RATIO = {
-  key: "point_ratio",
-  label: "Pts",
-  precision: 3,
-  compute: (totals: { scored: Record<string, number>; conceded: Record<string, number> }) =>
-    ratioOf(totals.scored["points"] ?? 0, totals.conceded["points"] ?? 0),
-};
 
 const TERMS: Terminology = {
   participant: ["Player", "Players"],
@@ -210,8 +152,17 @@ export const VOLLEYBALL: SportPack = {
      * programme followed.
      */
     points: { win: 3, tie: 1, loss: 0, noResult: 1 },
-    tiebreakers: [SET_RATIO, POINT_RATIO],
-    summariseSide: (totals) => `${String(totals["sets"] ?? 0)} (${String(totals["points"] ?? 0)})`,
+    /*
+     * Set ratio, then point ratio. The divide-by-zero an unbeaten team creates
+     * — and why it has to be Infinity rather than null or zero — now lives in
+     * `ratio()`, where every sport inherits the right answer instead of each
+     * one re-deriving it.
+     */
+    tiebreakers: [
+      ratio("sets", "Sets", { key: "set_ratio" }),
+      ratio("points", "Pts", { key: "point_ratio" }),
+    ],
+    summariseSide: summariseFields("{sets} ({points})"),
   },
   terms: TERMS,
 };

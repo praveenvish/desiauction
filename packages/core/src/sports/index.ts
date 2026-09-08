@@ -1,3 +1,4 @@
+export { ballsOf, oversOf } from "./overs";
 /**
  * THE SPORT REGISTRY.
  *
@@ -31,8 +32,6 @@ export type {
 } from "./types";
 export {
   CRICKET,
-  ballsOf,
-  oversOf,
   CRICKET_ROLE_KEYS,
   CRICKET_BATTING_STYLE_KEYS,
   CRICKET_BOWLING_STYLE_KEYS,
