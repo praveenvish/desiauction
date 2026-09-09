@@ -56,6 +56,8 @@ export interface PublicFixture {
 export interface PublicCompetitionView {
   name: string;
   slug: string;
+  /** The season's sport, so the showcase can name roles the way it does. */
+  sport: string;
   status: string;
   /** PI-1: organizer-declared category, for terminology ("Women's") only. */
   entryCategory: "open" | "men" | "women" | "mixed";
@@ -103,6 +105,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       endsOn: competitions.endsOn,
       orgName: organizations.name,
       logoKey: competitions.logoUrl,
+      sport: competitions.sport,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -129,6 +132,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
   return {
     name: row.name,
     slug: row.slug,
+    sport: row.sport,
     status: row.status,
     entryCategory: row.entryCategory,
     location: row.location,
@@ -311,6 +315,13 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
 export interface PublicPlayer extends ShowcasePlayer {
   competitionName: string;
   competitionSlug: string;
+  /**
+   * The season's sport, so the page can name this player's role the way the
+   * sport does. It called `roleLabel`, which asks cricket and falls back to the
+   * key with its underscores swapped — so a footballer's public card, the one
+   * a club actually shares, read "midfielder" in a line of Title Case.
+   */
+  sport: string;
   /** Registration is open on this competition. A stranger who lands on a
    *  friend's card had no way to join the same tournament — this is what lets
    *  the page offer one, and only when the door is actually open. */
@@ -338,6 +349,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
       orgId: competitions.orgId,
       name: competitions.name,
       slug: competitions.slug,
+      sport: competitions.sport,
       status: competitions.status,
       visibility: competitions.visibility,
     })
@@ -404,6 +416,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
     ...toShowcasePlayer(row, new Date()),
     competitionName: comp.name,
     competitionSlug: comp.slug,
+    sport: comp.sport,
     competitionOpen: comp.status === "registration_open",
     alsoPlayedIn,
   };

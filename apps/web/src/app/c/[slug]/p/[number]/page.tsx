@@ -1,4 +1,4 @@
-import { roleLabel, styleLabel } from "@desiauction/core";
+import { roleLabelIn, sportPackFor, styleLabel } from "@desiauction/core";
 import { Badge, ButtonLink, PlayerImage } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -54,14 +54,14 @@ export async function generateMetadata({
     return { title: "Player · DesiAuction" };
   }
   const age = player.age !== null ? ` · ${String(player.age)} yrs` : "";
-  const description = `${roleLabel(player.role)}${age} · ${statusText(player)} · ${player.competitionName}`;
+  const description = `${roleLabelIn(sportPackFor(player.sport), player.role)}${age} · ${statusText(player)} · ${player.competitionName}`;
   const url = `${env.PUBLIC_BASE_URL}/c/${slug}/p/${number}`;
   // The image route's own `alt` export must be a static string, so every player
   // card in the product described itself as "Player card · DesiAuction" — a
   // blind recipient in a chat thread was handed a product name where the sighted
   // people in the group could see a person. `og:image:alt` is derived per
   // player, and it is what clients actually announce.
-  const imageAlt = `${player.name} — ${roleLabel(player.role)}, ${statusText(player)}, ${player.competitionName}`;
+  const imageAlt = `${player.name} — ${roleLabelIn(sportPackFor(player.sport), player.role)}, ${statusText(player)}, ${player.competitionName}`;
   const images = [{ url: `${url}/opengraph-image`, width: 1200, height: 630, alt: imageAlt }];
   return {
     title: `${player.name} · ${player.competitionName}`,
@@ -99,8 +99,8 @@ export default async function PlayerProfilePage({
   const bowling = styleLabel(player.bowlingStyle);
   const roleAge =
     player.age !== null
-      ? `${roleLabel(player.role)} · ${String(player.age)} yrs`
-      : roleLabel(player.role);
+      ? `${roleLabelIn(sportPackFor(player.sport), player.role)} · ${String(player.age)} yrs`
+      : roleLabelIn(sportPackFor(player.sport), player.role);
   return (
     <main className="public-page mk">
       <header className="public-hero" data-theme="floodlight">
@@ -135,7 +135,7 @@ export default async function PlayerProfilePage({
               <dt>Number</dt>
               <dd>{player.number}</dd>
               <dt>Role</dt>
-              <dd>{roleLabel(player.role)}</dd>
+              <dd>{roleLabelIn(sportPackFor(player.sport), player.role)}</dd>
               {player.age !== null ? (
                 <>
                   <dt>Age</dt>

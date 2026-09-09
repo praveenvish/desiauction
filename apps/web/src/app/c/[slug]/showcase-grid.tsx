@@ -1,6 +1,5 @@
 "use client";
 
-import { roleLabel } from "@desiauction/core";
 import { ButtonLink, Dialog, PlayerImage } from "@desiauction/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -24,7 +23,8 @@ import { SquadsView } from "./squads-view";
  * filter / sort via the pure `filterSortPlayers` core (unit-tested). SEO-safe
  * and it degrades to the full list without JS. Photos fall back to the branded
  * mark (PlayerImage / C-25); no phones are ever in the data. Role labels come
- * from the shared core `roleLabel` (one formatter across the product).
+ * from the SEASON's pack, passed in as plain {key,label} pairs (`roleLabel`
+ * is cricket's, and this page is public).
  *
  * Takes the POOL rather than an array of players. Everything this component
  * computes — the four filter counts, the "N players" line, the squad rollup and
@@ -34,8 +34,21 @@ import { SquadsView } from "./squads-view";
  * tournament, and when the two disagree the component has to say so before it
  * shows a single count.
  */
-export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string }) {
+export function ShowcaseGrid({
+  pool,
+  slug,
+  roles,
+}: {
+  pool: ShowcasePool;
+  slug: string;
+  /** The SEASON's roles — `roleLabel` asks cricket, and this page is public. */
+  roles: readonly { key: string; label: string }[];
+}) {
   const { players, total, truncated } = pool;
+  const labelOf = (role: string | null): string =>
+    role === null
+      ? ""
+      : (roles.find((entry) => entry.key === role)?.label ?? role.replace(/_/g, " "));
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -215,7 +228,7 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
                     <span className="showcase-card-body">
                       <span className="showcase-card-name">{p.name}</span>
                       <span className="showcase-card-meta">
-                        {roleLabel(p.role)}
+                        {labelOf(p.role)}
                         {p.age !== null ? ` · ${String(p.age)} yrs` : ""}
                       </span>
                       {p.battingStyle !== null || p.bowlingStyle !== null ? (
@@ -262,7 +275,7 @@ export function ShowcaseGrid({ pool, slug }: { pool: ShowcasePool; slug: string 
               <dt>Number</dt>
               <dd>{selected.number}</dd>
               <dt>Role</dt>
-              <dd>{roleLabel(selected.role)}</dd>
+              <dd>{labelOf(selected.role)}</dd>
               {selected.age !== null ? (
                 <>
                   <dt>Age</dt>

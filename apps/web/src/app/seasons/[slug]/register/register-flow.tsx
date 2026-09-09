@@ -8,7 +8,6 @@ import {
   BOWLING_STYLES,
   battingStyleLabel,
   bowlingStyleLabel,
-  roleLabel,
 } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select } from "@desiauction/ui";
 import { useEffect, useState, useTransition } from "react";
@@ -492,7 +491,7 @@ export function RegisterFlow({
             <dt>Mobile</dt>
             <dd>{formatPhone(phone)}</dd>
             <dt>Playing role</dt>
-            <dd>{roleLabel(role)}</dd>
+            <dd>{roles.find((entry) => entry.key === role)?.label ?? role}</dd>
             {/* DA-21: step 2 collects date of birth and both styles, and the
                 review showed none of them — you could not check what you were
                 about to submit. Omitted rows stay omitted rather than printing

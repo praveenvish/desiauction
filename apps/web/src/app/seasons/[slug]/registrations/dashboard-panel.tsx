@@ -4,7 +4,6 @@ import {
   REJECTION_REASONS,
   REQUIRED_IMPORT_FIELDS,
   mappingOf,
-  roleLabel,
   type ColumnMapping,
   type DateOrder,
 } from "@desiauction/core";
@@ -207,6 +206,16 @@ export function RegistrationDashboardPanel({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [confirmBulk, setConfirmBulk] = useState<TriageAction | null>(null);
   const [rowDecline, setRowDecline] = useState<Row | null>(null);
+  /**
+   * The SEASON's role labels. `roleLabel` asks cricket and falls back to the
+   * key with its underscores swapped, so a football roster read "midfielder"
+   * lower-cased in a column of Title Case.
+   */
+  const labelOf = useMemo(() => {
+    const byKey = new Map(roles.map((role) => [role.key, role.label]));
+    return (role: string | null): string =>
+      role === null ? "" : (byKey.get(role) ?? role.replace(/_/g, " "));
+  }, [roles]);
   const [iconConfirm, setIconConfirm] = useState<Row | null>(null);
   const [retainConfirm, setRetainConfirm] = useState<Row | null>(null);
   const csvRef = useRef<HTMLTextAreaElement>(null);
@@ -1050,6 +1059,7 @@ export function RegistrationDashboardPanel({
                     );
                   }}
                   busy={busy}
+                  labelOf={labelOf}
                 />
               ))}
               {rows.length === 0 ? (
@@ -1163,7 +1173,7 @@ export function RegistrationDashboardPanel({
                 <dl className="details-facts" data-testid="details-facts">
                   <div>
                     <dt>Role</dt>
-                    <dd>{roleLabel(detail.role)}</dd>
+                    <dd>{labelOf(detail.role)}</dd>
                   </div>
                   {detail.age !== null ? (
                     <div>
@@ -1927,6 +1937,7 @@ function RegRow({
   onIcon,
   onRetain,
   onCaptain,
+  labelOf,
   busy,
 }: {
   row: Row;
@@ -1942,6 +1953,7 @@ function RegRow({
   onIcon: () => void;
   onRetain: () => void;
   onCaptain: () => void;
+  labelOf: (role: string | null) => string;
   busy: boolean;
 }) {
   const canTriage = row.status === "submitted" || row.status === "waitlisted";
@@ -2009,7 +2021,7 @@ function RegRow({
         </div>
       </td>
       <td data-label="Role">
-        {roleLabel(row.role)}
+        {labelOf(row.role)}
         {row.age !== null ? <span className="reg-sub">{row.age} yrs</span> : null}
         {/* Its own class because the phone hides THIS and not the role or the
             age beside it: how somebody bats is what you read once you have

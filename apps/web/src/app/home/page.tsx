@@ -1,4 +1,4 @@
-import { formatPaiseINR, paise, roleLabel, sportPackFor } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabel, roleLabelIn, sportPackFor } from "@desiauction/core";
 import {
   Badge,
   ButtonLink,
@@ -1426,7 +1426,8 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                       <span className="home-attn-text">
                         <strong>{registration.competitionName}</strong>
                         <span>
-                          {registration.orgName} · {roleLabel(registration.role)} ·{" "}
+                          {registration.orgName} ·{" "}
+                          {roleLabelIn(sportPackFor(registration.sport), registration.role)} ·{" "}
                           {registration.number}
                         </span>
                       </span>

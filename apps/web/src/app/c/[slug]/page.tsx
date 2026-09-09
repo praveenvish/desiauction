@@ -1,5 +1,5 @@
 import { Badge, ButtonLink, EmptyState } from "@desiauction/ui";
-import { entryCategoryLabel } from "@desiauction/core";
+import { entryCategoryLabel, sportPackFor } from "@desiauction/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -218,7 +218,14 @@ export default async function PublicCompetitionPage({
               // filters and CSV are all computed over what was LOADED, and
               // `total`/`truncated` are what stop those numbers being read as
               // claims about the tournament.
-              <ShowcaseGrid pool={pool} slug={view.slug} />
+              <ShowcaseGrid
+                pool={pool}
+                slug={view.slug}
+                roles={sportPackFor(view.sport).roles.values.map((value) => ({
+                  key: value.key,
+                  label: value.label,
+                }))}
+              />
             )}
           </section>
         )}
