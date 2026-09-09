@@ -54,6 +54,8 @@ import { formatDateTime } from "../../../../lib/format-date";
 import { formatPhone } from "../../../../lib/format-phone";
 import type {
   OrphanPreSigned,
+  KitSizeCount,
+  KitSummary,
   RegistrationPage,
   RegistrationStats,
   TimelineEntry,
@@ -208,6 +210,7 @@ export function RegistrationDashboardPanel({
   teams,
   filters,
   orphanPreSigned,
+  kit,
   roles,
   rolesRequired,
   registrationOpen,
@@ -219,6 +222,8 @@ export function RegistrationDashboardPanel({
   teams: NonNullable<RegistrationDashboard["teams"]>;
   filters: { search: string; status: string; fee: string; team: string; sort: string };
   orphanPreSigned: OrphanPreSigned[];
+  /** What to order, once sizes exist — see `kitSummary`. */
+  kit?: KitSummary;
   /** The season's own roles — the add dialog offered cricket's to every sport. */
   roles: readonly { key: string; label: string }[];
   /** Whether this sport insists on one — esports does not. */
@@ -870,6 +875,34 @@ export function RegistrationDashboardPanel({
           registration carries the same team as the paddle, so an Icon with no
           team is in NO auction and NO squad. One click created that state and
           the product said nothing. */}
+      {/* WHAT TO ORDER. The rows have held every size since 0034 and nothing
+          added them up, so an organizer exported to Excel and wrote a pivot
+          table for a sum the product could have done. Rendered only once
+          somebody has recorded a size — a club that does not order kit never
+          sees this at all. */}
+      {kit !== undefined && (kit.tshirt.length > 0 || kit.trouser.length > 0) ? (
+        <Card data-testid="kit-summary">
+          <h2>Kit to order</h2>
+          <p className="dash-hint">
+            Approved players only — the ones who are actually coming.
+            {kit.missing > 0 ? ` ${String(kit.missing)} of them have no size recorded yet.` : ""}
+          </p>
+          {[
+            ["T-shirts", kit.tshirt],
+            ["Trousers", kit.trouser],
+          ].map(([label, sizes]) =>
+            (sizes as KitSizeCount[]).length === 0 ? null : (
+              <p key={label as string} className="reg-sub">
+                <strong>{label as string}</strong>{" "}
+                {(sizes as KitSizeCount[])
+                  .map((entry) => `${entry.size} × ${String(entry.count)}`)
+                  .join(" · ")}
+              </p>
+            ),
+          )}
+        </Card>
+      ) : null}
+
       {orphanPreSigned.length > 0 ? (
         <Card data-testid="orphan-pre-signed-warning">
           <p role="alert" className="reg-warning">
@@ -1339,6 +1372,49 @@ export function RegistrationDashboardPanel({
                     </div>
                   ) : null}
                 </dl>
+                {/* THE KIT, which had nowhere to be read at all. Each field
+                    renders only when the desk recorded it: a row of blanks
+                    would suggest the product had lost something it was never
+                    given. */}
+                {detail.jerseyName !== null ||
+                detail.jerseyNumber !== null ||
+                detail.tshirtSize !== null ||
+                detail.trouserSize !== null ||
+                detail.fatherName !== null ? (
+                  <dl className="details-facts" data-testid="details-kit">
+                    {detail.fatherName !== null && detail.fatherName !== "" ? (
+                      <div>
+                        {/* Not kit. Indian entry forms ask for it as an identity
+                            check, so it belongs beside the player's own name. */}
+                        <dt>Father&apos;s name</dt>
+                        <dd>{detail.fatherName}</dd>
+                      </div>
+                    ) : null}
+                    {detail.jerseyName !== null && detail.jerseyName !== "" ? (
+                      <div>
+                        <dt>On the jersey</dt>
+                        <dd>
+                          {detail.jerseyName}
+                          {detail.jerseyNumber !== null && detail.jerseyNumber !== ""
+                            ? ` · ${detail.jerseyNumber}`
+                            : ""}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {detail.tshirtSize !== null && detail.tshirtSize !== "" ? (
+                      <div>
+                        <dt>T-shirt</dt>
+                        <dd>{detail.tshirtSize}</dd>
+                      </div>
+                    ) : null}
+                    {detail.trouserSize !== null && detail.trouserSize !== "" ? (
+                      <div>
+                        <dt>Trousers</dt>
+                        <dd>{detail.trouserSize}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : null}
                 {detail.note !== null && detail.note !== "" ? (
                   /* The organizer's own remark, imported or typed. It survives
                      every status change, which is what makes it worth showing

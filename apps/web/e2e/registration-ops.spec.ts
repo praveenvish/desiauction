@@ -41,14 +41,20 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
  * imported it, and still opened their spreadsheet to answer "who has paid?".
  */
 function playersCsv(): string {
-  const header = "name,phone,role,base_price_band,fee_status,fee_amount,fee_reference";
+  const header =
+    "name,phone,role,base_price_band,fee_status,fee_amount,fee_reference," +
+    "jersey_name,jersey_number,tshirt_size";
   const rows = Array.from({ length: 8 }, (_, i) => {
     const phone = `9${STAMP}${i}`.slice(0, 10);
     const roles = ["batter", "bowler", "all_rounder", "wicket_keeper"];
     const paid = i < 5;
+    // The kit a club records to place a jersey order: five larges, three
+    // extra-larges — which is the sum the product could not do.
+    const size = i < 5 ? "L" : "XL";
     return (
       `Player ${i},${phone},${roles[i % 4]},A,` +
-      `${paid ? "paid" : "pending"},${paid ? "500" : ""},${paid ? `UTR${String(i)}` : ""}`
+      `${paid ? "paid" : "pending"},${paid ? "500" : ""},${paid ? `UTR${String(i)}` : ""},` +
+      `PLAYER${String(i)},${String(i + 1)},${size}`
     );
   });
   return [header, ...rows].join("\n");
@@ -149,6 +155,11 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await page.getByLabel("Fee", { exact: true }).selectOption("pending");
   await expect(page.getByTestId("page-indicator")).toContainText("3 total");
   await page.getByLabel("Fee", { exact: true }).selectOption("");
+  // WAIT FOR THE ROWS TO COME BACK. Clearing the filter pushes a new query and
+  // re-renders; without this the select-all below runs against whatever is
+  // still on screen and checks three rows instead of eight. It passed when this
+  // step was written and is a race either way.
+  await expect(page.getByTestId("page-indicator")).toContainText("8 total");
 
   // Select all on the page and bulk-approve.
   await page.getByLabel("Select all on page").check();
@@ -200,6 +211,17 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await page.getByRole("textbox", { name: "Search" }).fill("Player 3");
   await page.getByTestId("search-submit").click();
   await expect(page.getByTestId("page-indicator")).toContainText("1 total");
+
+  /*
+   * WHAT TO ORDER. Every size has been in the database since the desk columns
+   * landed and nothing added them up, so an organizer exported to Excel and
+   * wrote a pivot table for a sum this could have done.
+   *
+   * Approved only, which is why this reads after the bulk approve above.
+   */
+  const kit = page.getByTestId("kit-summary");
+  await expect(kit).toContainText("L × 5");
+  await expect(kit).toContainText("XL × 3");
 
   // Export produces a CSV download.
   const downloadPromise = page.waitForEvent("download");

@@ -61,6 +61,7 @@ export default async function RegistrationsPage({
             page={dashboard.page}
             teams={dashboard.teams}
             orphanPreSigned={dashboard.orphanPreSigned ?? []}
+            {...(dashboard.kit !== undefined ? { kit: dashboard.kit } : {})}
             // Plain {key,label} pairs: a pack carries functions and cannot
             // cross into a client component.
             roles={sportPackFor(dashboard.competition.sport).roles.values.map((value) => ({

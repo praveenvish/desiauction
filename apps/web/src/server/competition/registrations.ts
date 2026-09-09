@@ -397,6 +397,23 @@ export interface RegistrationRow {
   feeReference: string | null;
   /** The organizer's own remark — distinct from a rejection's note. */
   note: string | null;
+  /**
+   * THE KIT BLOCK (0034), and it was write-only for exactly as long as the fee
+   * was. The schema comment says what it is for — "only organizers who order
+   * jerseys populate it" — so a club imports two hundred names, numbers and
+   * sizes precisely to place an order, and the product could not give the list
+   * back. They reopened the spreadsheet, which is the thing the import exists
+   * to replace.
+   *
+   * `fatherName` rides here rather than in a "kit" object because it is not
+   * kit: Indian registration forms ask for it as an identity check, and it
+   * belongs beside the player's own name on the record.
+   */
+  jerseyName: string | null;
+  jerseyNumber: string | null;
+  tshirtSize: string | null;
+  trouserSize: string | null;
+  fatherName: string | null;
   // Surfaced for the IP-4 AuctionReady pool (additive projection field, M-IP4-1).
   basePriceBand: string | null;
   rejectionReason: string | null;
@@ -680,6 +697,11 @@ export async function queryRegistrations(
       feeAmountPaise: registrations.feeAmountPaise,
       feeReference: registrations.feeReference,
       note: registrations.note,
+      jerseyName: registrations.jerseyName,
+      jerseyNumber: registrations.jerseyNumber,
+      tshirtSize: registrations.tshirtSize,
+      trouserSize: registrations.trouserSize,
+      fatherName: registrations.fatherName,
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
       photoKey: people.photoUrl,
@@ -766,6 +788,81 @@ export async function publicRegistrationFacts(
     .where(and(eq(competitions.slug, slug), eq(competitions.visibility, "public")))
     .limit(1);
   return row ?? null;
+}
+
+export interface KitSizeCount {
+  /** The size as the club wrote it, trimmed and upper-cased for grouping. */
+  size: string;
+  count: number;
+}
+
+export interface KitSummary {
+  tshirt: KitSizeCount[];
+  trouser: KitSizeCount[];
+  /** Approved players with no size recorded — the ones still to chase. */
+  missing: number;
+}
+
+/**
+ * WHAT TO ORDER, which is the only question this block was collected to answer.
+ *
+ * A club imports two hundred sizes to place a kit order, and an order is
+ * counts: forty large, twelve extra-large. The rows held it and nothing added
+ * them up, so the organizer exported to Excel and wrote a pivot table — for a
+ * sum the product could have done.
+ *
+ * GROUPED ON A NORMALIZED KEY, and honestly. Sizes are free text, so a file
+ * can hold "L", "l" and " L " for one size; those are folded together because
+ * they are plainly one answer. "Large" is NOT folded into "L" — it might be,
+ * but guessing which spellings mean the same size is how an order comes back
+ * wrong, and a club that sees both listed knows to tidy their sheet before
+ * they ring the supplier. The value mapper on the import is the place to fix
+ * that properly.
+ *
+ * APPROVED ONLY. A kit order is placed for the players who are in, and counting
+ * declined applicants would buy shirts for people who are not coming.
+ */
+export async function kitSummary(db: Db, competitionId: string): Promise<KitSummary> {
+  const rows = await db
+    .select({
+      tshirt: registrations.tshirtSize,
+      trouser: registrations.trouserSize,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(registrations)
+    .where(
+      and(eq(registrations.competitionId, competitionId), eq(registrations.status, "approved")),
+    )
+    .groupBy(registrations.tshirtSize, registrations.trouserSize);
+
+  const tally = new Map<string, Map<string, number>>([
+    ["tshirt", new Map()],
+    ["trouser", new Map()],
+  ]);
+  let missing = 0;
+  for (const row of rows) {
+    const shirt = (row.tshirt ?? "").trim().toUpperCase();
+    const trouser = (row.trouser ?? "").trim().toUpperCase();
+    if (shirt === "" && trouser === "") {
+      missing += row.count;
+    }
+    for (const [key, value] of [
+      ["tshirt", shirt],
+      ["trouser", trouser],
+    ] as const) {
+      if (value !== "") {
+        const bucket = tally.get(key) as Map<string, number>;
+        bucket.set(value, (bucket.get(value) ?? 0) + row.count);
+      }
+    }
+  }
+  // Biggest order first, then alphabetically so two equal sizes do not swap
+  // places between two reads of the same season.
+  const ordered = (key: string): KitSizeCount[] =>
+    [...(tally.get(key) as Map<string, number>).entries()]
+      .map(([size, count]) => ({ size, count }))
+      .sort((a, b) => b.count - a.count || a.size.localeCompare(b.size));
+  return { tshirt: ordered("tshirt"), trouser: ordered("trouser"), missing };
 }
 
 export interface OrphanPreSigned {
@@ -902,6 +999,10 @@ export async function exportRegistrationsCsv(
       feeStatus: registrations.feeStatus,
       feeAmountPaise: registrations.feeAmountPaise,
       feeReference: registrations.feeReference,
+      jerseyName: registrations.jerseyName,
+      jerseyNumber: registrations.jerseyNumber,
+      tshirtSize: registrations.tshirtSize,
+      trouserSize: registrations.trouserSize,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -941,6 +1042,20 @@ export async function exportRegistrationsCsv(
       "fee_status",
       "fee_amount",
       "fee_reference",
+      /*
+       * THE KIT, which is the whole reason this block is collected. A jersey
+       * order IS a spreadsheet a club sends a vendor, so the export matters
+       * more here than any screen does — and it wrote none of it.
+       *
+       * `father_name` is deliberately NOT here. It is an identity check on an
+       * entry form, not kit, and this file is handed to a supplier; a list of
+       * players' fathers has no business on it. It renders on the record
+       * instead, where the organizer already sees the phone number.
+       */
+      "jersey_name",
+      "jersey_number",
+      "tshirt_size",
+      "trouser_size",
     ],
     rows.map((r) => [
       r.number,
@@ -958,6 +1073,10 @@ export async function exportRegistrationsCsv(
       // and writing zero would tell the next reader the fee was free.
       r.feeAmountPaise === null ? "" : String(r.feeAmountPaise / 100),
       r.feeReference ?? "",
+      r.jerseyName ?? "",
+      r.jerseyNumber ?? "",
+      r.tshirtSize ?? "",
+      r.trouserSize ?? "",
     ]),
   );
 }

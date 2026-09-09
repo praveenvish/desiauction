@@ -105,6 +105,7 @@ import {
   addPlayerByPhone,
   exportRegistrationsCsv,
   myRegistration,
+  kitSummary,
   orphanPreSigned,
   photoTargetsOf,
   publicRegistrationFacts,
@@ -114,6 +115,7 @@ import {
   registrationsOf,
   submitRegistration,
   timelineOf,
+  type KitSummary,
   type OrphanPreSigned,
   type RegistrationPage,
   type RegistrationRow,
@@ -1197,6 +1199,8 @@ export interface RegistrationDashboard {
   page?: RegistrationPage;
   /** Approved icons with no team, named. Review-gated: these are applicants. */
   orphanPreSigned?: OrphanPreSigned[];
+  /** What to order, once somebody has recorded sizes. Review-gated. */
+  kit?: KitSummary;
   teams?: TeamSummary[];
   /** Drives the closed-intake notice on the share block (DA-35). */
   registrationOpen: boolean;
@@ -1260,11 +1264,12 @@ export async function registrationDashboard(
         viewer: { canReview },
       };
     }
-    const [stats, page, teams, orphans] = await Promise.all([
+    const [stats, page, teams, orphans, kit] = await Promise.all([
       registrationStats(db, competition.id),
       queryRegistrations(db, competition.id, query),
       teamsOf(db, competition.id),
       orphanPreSigned(db, competition.id),
+      kitSummary(db, competition.id),
     ]);
     // PI-1: the organizer-channel category advisory, computed by THE evaluator
     // (never by a second SQL copy of its rules) over just this page's people.
@@ -1304,6 +1309,7 @@ export async function registrationDashboard(
       page,
       teams,
       orphanPreSigned: orphans,
+      kit,
       registrationOpen: competition.status === "registration_open",
       viewer: { canReview },
       categoryFlags,

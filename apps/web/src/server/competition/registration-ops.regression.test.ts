@@ -41,6 +41,7 @@ import {
   addPlayerByPhone,
   duplicateNameKeys,
   exportRegistrationsCsv,
+  kitSummary,
   photoTargetsOf,
   queryRegistrations,
   registrationStats,
@@ -878,6 +879,80 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
   });
 
   /*
+   * THE KIT BLOCK, write-only for as long as the fee was.
+   *
+   * The schema comment says what it is for — "only organizers who order jerseys
+   * populate it" — so a club imports two hundred names, numbers and sizes to
+   * place an order, and the product could not give the list back or add it up.
+   */
+  describe("what to order", () => {
+    it("counts sizes, folding spelling but not meaning", async () => {
+      const season = await createCompetition(db, org.id, owner, {
+        sport: "cricket",
+        name: `Kit Cup ${RUN}`,
+      });
+      const ids = [];
+      for (const [i, size] of ["L", "l", " L ", "Large", "XL"].entries()) {
+        const id = await seed(season.id, org.id, `Kit ${String(i)}`, `kt${String(i)}`, "approved");
+        await db
+          .update(registrationsTable)
+          .set({ tshirtSize: size, trouserSize: "32" })
+          .where(eq(registrationsTable.id, id));
+        ids.push(id);
+      }
+      // Approved but sizeless — the ones still to chase.
+      await seed(season.id, org.id, "Kit None", "kt5", "approved");
+      // Declined, and must not be counted: ordering for them buys shirts for
+      // people who are not coming.
+      const out = await seed(season.id, org.id, "Kit Out", "kt6", "rejected");
+      await db
+        .update(registrationsTable)
+        .set({ tshirtSize: "XXL" })
+        .where(eq(registrationsTable.id, out));
+
+      const kit = await kitSummary(db, season.id);
+      /*
+       * "L", "l" and " L " are plainly one answer and fold together. "Large" is
+       * NOT folded into "L" — it might mean the same thing, and guessing which
+       * spellings match is how an order comes back wrong. A club that sees both
+       * listed knows to tidy the sheet before ringing the supplier.
+       */
+      expect(kit.tshirt).toEqual([
+        { size: "L", count: 3 },
+        { size: "LARGE", count: 1 },
+        { size: "XL", count: 1 },
+      ]);
+      expect(kit.trouser).toEqual([{ size: "32", count: 5 }]);
+      expect(kit.missing, "approved, no size recorded").toBe(1);
+      expect(
+        kit.tshirt.some((entry) => entry.size === "XXL"),
+        "a declined applicant is not on the order",
+      ).toBe(false);
+    });
+
+    it("carries the kit on the row, so a screen can show it", async () => {
+      const season = await createCompetition(db, org.id, owner, {
+        sport: "cricket",
+        name: `Kit Row Cup ${RUN}`,
+      });
+      const id = await seed(season.id, org.id, "Kit Row", "kt7", "approved");
+      await db
+        .update(registrationsTable)
+        .set({ jerseyName: "RAHUL", jerseyNumber: "7", tshirtSize: "M", fatherName: "Suresh" })
+        .where(eq(registrationsTable.id, id));
+      const page = await queryRegistrations(db, season.id, { page: 1, pageSize: 20 });
+      // Absent here is absent everywhere: the table and the drawer both read
+      // this payload, so a field missing from it can never reach a screen.
+      expect(page.rows[0]).toMatchObject({
+        jerseyName: "RAHUL",
+        jerseyNumber: "7",
+        tshirtSize: "M",
+        fatherName: "Suresh",
+      });
+    });
+  });
+
+  /*
    * THE SQUAD A FILE ALREADY KNEW.
    *
    * `IMPORT_FIELDS` had eighteen columns and not one of them was team, icon,
@@ -1144,8 +1219,11 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     // every squad affiliation on the way back in.
     expect(lines[0]).toBe(
       "registration_number,name,phone,role,status,team,is_icon,is_captain,is_retained," +
-        "fee_status,fee_amount,fee_reference",
+        "fee_status,fee_amount,fee_reference,jersey_name,jersey_number,tshirt_size,trouser_size",
     );
+    // `father_name` is deliberately absent: it is an identity check on an entry
+    // form, not kit, and this file is handed to a jersey supplier.
+    expect(lines[0]).not.toContain("father_name");
     const numbers = lines.slice(1).map((l) => l.split(",")[0] ?? "");
     expect(numbers).toEqual([...numbers].sort()); // stable by registration number
     // No rival-org rows: a foreign competition's registration never appears.
