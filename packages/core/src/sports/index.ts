@@ -161,6 +161,26 @@ export function parseRoleIn(pack: SportPack, value: string): string | null {
  * packs shipped today declare `required: true`, so this is the forward path
  * rather than a case anyone currently hits.
  */
+/**
+ * A season's roles as plain {key,label} pairs, ready to cross into a client
+ * component.
+ *
+ * A pack carries FUNCTIONS — a tiebreaker's `compute`, a score field's `parse`
+ * — so it can never be handed to a client component; only plain data may
+ * cross. Every surface that needs to name a role was therefore writing the
+ * same `.roles.values.map(…)` by hand, and the ones that had not yet been
+ * converted were still asking `roleLabel`, which asks CRICKET.
+ *
+ * One helper so the shape is identical everywhere and the next surface has an
+ * obvious thing to reach for that is not the cricket-shaped one.
+ */
+export function roleOptions(sport: string): { key: string; label: string }[] {
+  return sportPackFor(sport).roles.values.map((value) => ({
+    key: value.key,
+    label: value.label,
+  }));
+}
+
 export function roleLabelIn(pack: SportPack, role: string | null): string {
   if (role === null) {
     return "";

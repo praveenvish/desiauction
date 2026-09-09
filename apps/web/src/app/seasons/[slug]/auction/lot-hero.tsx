@@ -1,8 +1,9 @@
 "use client";
 
-import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
+import { roleLabeller } from "../../../../lib/role-label";
+import { formatPaiseINR, paise } from "@desiauction/core";
 import { PlayerImage } from "@desiauction/ui";
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 import type { AuctionClock } from "./use-auction-socket";
 import type { LotMedia } from "../../../../server/auction/live-summary";
@@ -78,6 +79,7 @@ export function CountdownRing({
 }
 
 export function LotHero({
+  roles,
   lot,
   remainingMs,
   lotDurationMs,
@@ -87,6 +89,8 @@ export function LotHero({
   media,
   testId = "current-lot",
 }: {
+  /** The season's roles, so a football night is not named in cricket. */
+  roles: readonly { key: string; label: string }[];
   lot: NonNullable<AuctionSnapshot["currentLot"]>;
   remainingMs: number | null;
   lotDurationMs: number;
@@ -123,6 +127,7 @@ export function LotHero({
    */
   testId?: string;
 }) {
+  const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   const bid = lot.currentBid;
   const name = lot.playerName ?? "Unnamed";
   const photo = media?.photoUrl ?? null;
@@ -163,7 +168,7 @@ export function LotHero({
             </p>
             <h2 className="lot-hero-name">{name}</h2>
             <p className="lot-hero-meta">
-              <span className="lot-hero-role">{roleLabel(lot.role)}</span>
+              <span className="lot-hero-role">{labelOf(lot.role)}</span>
               <span>Base {formatPaiseINR(paise(lot.basePrice))}</span>
             </p>
           </div>

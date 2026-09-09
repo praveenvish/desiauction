@@ -1,6 +1,9 @@
 "use client";
 
-import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
+import { useMemo } from "react";
+
+import { roleLabeller } from "../../../../../lib/role-label";
+import { formatPaiseINR, paise } from "@desiauction/core";
 import { PlayerImage } from "@desiauction/ui";
 import type { CSSProperties } from "react";
 
@@ -25,6 +28,7 @@ function money(amount: number): string {
 }
 
 export function OverlayPanel({
+  roles,
   wsUrl,
   resolved,
   auctionName,
@@ -32,6 +36,8 @@ export function OverlayPanel({
   watchUrl,
   lotMedia,
 }: {
+  /** The season's roles, so a football night is not named in cricket. */
+  roles: readonly { key: string; label: string }[];
   wsUrl: string;
   resolved: ResolvedLot[];
   auctionName: string;
@@ -46,6 +52,7 @@ export function OverlayPanel({
    */
   lotMedia: Record<string, LotMedia>;
 }) {
+  const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // DA-20: this read `connection !== "open"` and ignored `stale`/`offline`
   // outright, so a device that went offline mid-auction kept broadcasting a
   // pulsing "Live" strip and a running price to air with no warning at all.
@@ -186,7 +193,7 @@ export function OverlayPanel({
                       keeper" on air. The shared formatter is the one place
                       those labels are decided. */}
                   <span className="obs-lt-meta">
-                    {roleLabel(lot.role)} · base {money(lot.basePrice)}
+                    {labelOf(lot.role)} · base {money(lot.basePrice)}
                   </span>
                 </>
               ) : outcome !== null ? (

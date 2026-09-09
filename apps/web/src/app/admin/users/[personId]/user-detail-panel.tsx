@@ -1,5 +1,5 @@
 import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
-import { roleLabel } from "@desiauction/core";
+import { roleLabelIn, sportPackFor } from "@desiauction/core";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
@@ -128,7 +128,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                 <span className="admin-meta">
                   {season.orgName}
                   {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
-                  {roleLabel(season.role)} · {season.status}
+                  {roleLabelIn(sportPackFor(season.sport), season.role)} · {season.status}
                 </span>
               </li>
             ))}

@@ -1,3 +1,4 @@
+import { roleOptions } from "@desiauction/core";
 import {
   auctionEvents,
   bids,
@@ -68,6 +69,15 @@ export interface AuctionEventRow {
 
 export interface AuctionOverview {
   /**
+   * The season's roles as plain {key,label} pairs.
+   *
+   * Both surfaces that render this — the auction progress card and /home's
+   * live tile — named the player on the block through `roleLabel`, which asks
+   * CRICKET, so a football night read "midfielder" in lower case.
+   */
+  roles: { key: string; label: string }[];
+
+  /**
    * `queued` means what the engine's open guard means by it: lots in status
    * `queued`. It used to include `prepared`, so the progress card read "14
    * queued" while `OpenAuction` refused with "No lots are queued yet" — the
@@ -97,6 +107,8 @@ export async function auctionOverview(
    * means every rival team owner — was served each team's spend and remaining
    * purse. The per-team money is now decided before the read is shaped.
    */
+  /** The season's sport — it decides what a role is called. */
+  sport: string,
   options: { money: boolean } = { money: true },
 ): Promise<AuctionOverview> {
   const rules = rulesOf(config);
@@ -189,6 +201,7 @@ export async function auctionOverview(
   }
 
   return {
+    roles: roleOptions(sport),
     counts,
     totalLots: lotRows.length,
     moneyMoved,

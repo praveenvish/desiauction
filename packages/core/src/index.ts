@@ -438,6 +438,7 @@ export {
   roleKeys,
   isRoleIn,
   parseRoleIn,
+  roleOptions,
   roleLabelIn,
   attributeSpec,
   attributeOptionKeys,

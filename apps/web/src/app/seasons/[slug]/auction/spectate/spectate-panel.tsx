@@ -121,6 +121,7 @@ function ResolvedBidHeader({ outcome }: { outcome: NonNullable<AuctionSnapshot["
 export function SpectatePanel({
   wsUrl,
   slug,
+  roles,
   resolved,
   teams,
   rules,
@@ -133,6 +134,8 @@ export function SpectatePanel({
 }: {
   wsUrl: string;
   slug: string;
+  /** The season's roles — the stage named a footballer's in cricket. */
+  roles: readonly { key: string; label: string }[];
   resolved: ResolvedLot[];
   teams: TeamIdentity[];
   rules: AuctionRules;
@@ -302,6 +305,7 @@ export function SpectatePanel({
           completed wrap and the between-lot SOLD/UNSOLD splash. */}
       {showCeremony ? (
         <CeremonyStage
+          roles={roles}
           snapshot={snapshot}
           ceremony={ceremony}
           remainingMs={remainingMs}
@@ -310,6 +314,7 @@ export function SpectatePanel({
       ) : (
         <div className="stage-hide">
           <LotHero
+            roles={roles}
             lot={lot}
             remainingMs={remainingMs}
             lotDurationMs={lotDurationMs}
@@ -425,6 +430,7 @@ export function SpectatePanel({
 
       <div className="stage-hide">
         <SquadBoard
+          roles={roles}
           teams={teams}
           preSigned={preSigned}
           resolved={feed.resolved}

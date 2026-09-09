@@ -36,6 +36,7 @@ export default async function BoardPage({ params }: { params: Promise<{ slug: st
           those bytes. It is keyed by lot id and joined on the client against
           the live `currentLot`. */}
       <BoardPanel
+        roles={view.roles}
         wsUrl={view.wsUrl}
         resolved={view.resolved}
         auctionName={view.auctionName}

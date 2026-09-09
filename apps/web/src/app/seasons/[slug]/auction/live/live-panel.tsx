@@ -375,6 +375,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           {lot !== null ? (
             <>
               <LotHero
+                roles={view.roles}
                 lot={lot}
                 remainingMs={remainingMs}
                 lotDurationMs={lotDurationMs}
@@ -403,6 +404,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           ) : (
             /* Between lots the owner sees exactly what the room sees. */
             <CeremonyStage
+              roles={view.roles}
               snapshot={snapshot}
               ceremony={ceremony}
               remainingMs={remainingMs}
@@ -481,6 +483,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       </div>
 
       <SquadBoard
+        roles={view.roles}
         teams={boardTeams}
         preSigned={view.preSigned}
         resolved={feed.resolved}

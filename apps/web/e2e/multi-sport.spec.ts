@@ -93,16 +93,16 @@ test("a football season admits players: the import reads the pack, not cricket",
    * And the aliases resolved to the PACK's own roles rather than the spelling
    * the file used: "CB" became defender, "Striker" became forward.
    *
-   * Case-insensitively on purpose. These render lower-cased today, because the
-   * dashboard calls `roleLabel`, which is `roleLabelIn(CRICKET, …)` and falls
-   * back to `role.replace(/_/g, " ")` for a role cricket has never heard of.
-   * That is a real defect and it is not this one — it is 48 call sites across
-   * 19 files, all of which want the season's pack instead. Asserting the
-   * casing here would pin the bug and make fixing it a test failure; asserting
-   * the word proves what this test is for, which is that the ROLE arrived.
+   * CASE-SENSITIVE, which it could not be when this test was written. Every
+   * surface then named a role through `roleLabel` — `roleLabelIn(CRICKET, …)`
+   * — whose fallback for a role cricket has never heard of is the key with its
+   * underscores swapped, lower-cased. So these read "midfielder" in a column
+   * of Title Case, and asserting the casing would have pinned that bug. The
+   * label now comes from the season's own pack, so the exact word is the
+   * assertion.
    */
   const table = page.getByTestId("reg-table");
-  for (const role of [/goalkeeper/i, /defender/i, /midfielder/i, /forward/i]) {
+  for (const role of ["Goalkeeper", "Defender", "Midfielder", "Forward"]) {
     await expect(table).toContainText(role);
   }
 });

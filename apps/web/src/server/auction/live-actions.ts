@@ -1,7 +1,12 @@
 "use server";
 
 import { auctionOf, type AuctionRecord } from "@desiauction/auction";
-import { isAuctionCommandType, isTransportCommandId, type CommandAck } from "@desiauction/core";
+import {
+  isAuctionCommandType,
+  isTransportCommandId,
+  roleOptions,
+  type CommandAck,
+} from "@desiauction/core";
 import {
   auctionOwnerInvites,
   paddleGrants,
@@ -174,6 +179,8 @@ export async function auctionMemberGate(slug: string): Promise<LiveGate | null> 
 
 export interface LiveAuctionView {
   competition: { name: string; slug: string };
+  /** The season's roles as plain {key,label} pairs — see SpectatorView.roles. */
+  roles: { key: string; label: string }[];
   auctionId: string;
   wsUrl: string;
   teams: {
@@ -389,6 +396,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
   const canSeeAll = true;
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
+    roles: roleOptions(gate.competition.sport),
     auctionId: gate.auction.id,
     /*
      * The room's socket carries every purse (D2).

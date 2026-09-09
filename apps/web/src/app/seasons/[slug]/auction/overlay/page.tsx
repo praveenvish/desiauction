@@ -46,6 +46,7 @@ export default async function OverlayPage({
     <main>
       <h1 className="auction-sr-only">{view.auctionName} — broadcast overlay</h1>
       <OverlayPanel
+        roles={view.roles}
         wsUrl={view.wsUrl}
         resolved={view.resolved}
         auctionName={view.auctionName}

@@ -1,4 +1,6 @@
-import { paise, sportPackFor } from "@desiauction/core";
+import { paise, roleOptions, sportPackFor } from "@desiauction/core";
+
+import { roleLabeller } from "../../../../../lib/role-label";
 import type { TargetState } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +9,9 @@ import { groupByPriority, roleFacts, rupeesFromPaise, searchPool } from "./plan-
 
 /** This suite's fixtures are cricket, so the season's roles are cricket's. */
 const CRICKET_ROLES = sportPackFor("cricket").roles.values.map((value) => value.key);
+
+/** This suite's fixtures are cricket, so its labels are cricket's. */
+const LABEL = roleLabeller(roleOptions("cricket"));
 
 function lot(over: Partial<PlanLotRow> & { registrationId: string }): PlanLotRow {
   return {
@@ -77,12 +82,18 @@ describe("searchPool", () => {
   ];
 
   it("shows nothing for an empty query and matches every token across name, number and role", () => {
-    expect(searchPool(pool, new Set(), "")).toEqual([]);
-    expect(searchPool(pool, new Set(), "  ")).toEqual([]);
-    expect(searchPool(pool, new Set(), "sharma").map((l) => l.registrationId)).toEqual(["a"]);
-    expect(searchPool(pool, new Set(), "021").map((l) => l.registrationId)).toEqual(["b"]);
-    expect(searchPool(pool, new Set(), "all rounder").map((l) => l.registrationId)).toEqual(["c"]);
-    expect(searchPool(pool, new Set(), "har pan").map((l) => l.registrationId)).toEqual(["c"]);
+    expect(searchPool(pool, new Set(), "", LABEL)).toEqual([]);
+    expect(searchPool(pool, new Set(), "  ", LABEL)).toEqual([]);
+    expect(searchPool(pool, new Set(), "sharma", LABEL).map((l) => l.registrationId)).toEqual([
+      "a",
+    ]);
+    expect(searchPool(pool, new Set(), "021", LABEL).map((l) => l.registrationId)).toEqual(["b"]);
+    expect(searchPool(pool, new Set(), "all rounder", LABEL).map((l) => l.registrationId)).toEqual([
+      "c",
+    ]);
+    expect(searchPool(pool, new Set(), "har pan", LABEL).map((l) => l.registrationId)).toEqual([
+      "c",
+    ]);
   });
 
   it("leaves out lots already decided: sold to anyone, or withdrawn", () => {
@@ -93,13 +104,18 @@ describe("searchPool", () => {
       lot({ registrationId: "f", playerName: "Pulled Out", status: "withdrawn" }),
       lot({ registrationId: "g", playerName: "Unsold Yet", status: "unsold" }),
     ];
-    expect(searchPool(decided, new Set(), "sold").map((l) => l.registrationId)).toEqual(["g"]);
-    expect(searchPool(decided, new Set(), "pulled")).toEqual([]);
+    expect(searchPool(decided, new Set(), "sold", LABEL).map((l) => l.registrationId)).toEqual([
+      "g",
+    ]);
+    expect(searchPool(decided, new Set(), "pulled", LABEL)).toEqual([]);
   });
 
   it("leaves out players already on the plan and honours the limit", () => {
-    expect(searchPool(pool, new Set(["a"]), "a").map((l) => l.registrationId)).toEqual(["b", "c"]);
-    expect(searchPool(pool, new Set(), "a", 1).map((l) => l.registrationId)).toEqual(["a"]);
+    expect(searchPool(pool, new Set(["a"]), "a", LABEL).map((l) => l.registrationId)).toEqual([
+      "b",
+      "c",
+    ]);
+    expect(searchPool(pool, new Set(), "a", LABEL, 1).map((l) => l.registrationId)).toEqual(["a"]);
   });
 });
 

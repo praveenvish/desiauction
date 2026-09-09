@@ -1,4 +1,6 @@
-import { formatPaiseINR, paise, roleLabel, roleLabelIn, sportPackFor } from "@desiauction/core";
+import { formatPaiseINR, paise, roleLabelIn, sportPackFor } from "@desiauction/core";
+
+import { roleLabeller } from "../../lib/role-label";
 import {
   Badge,
   ButtonLink,
@@ -851,7 +853,7 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                       {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
                       <span className="home-live-role">
                         {" · "}
-                        {roleLabel(liveBoard.onBlock.role)}
+                        {roleLabeller(liveBoard.roles)(liveBoard.onBlock.role)}
                       </span>
                     </dd>
                   </div>

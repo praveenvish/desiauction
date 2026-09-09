@@ -1,6 +1,6 @@
 import { Card } from "@desiauction/ui";
 
-import { roleLabel } from "@desiauction/core";
+import { roleLabeller } from "../../../../lib/role-label";
 import type { AuctionOverview } from "../../../../server/auction/auction-overview";
 
 /**
@@ -35,6 +35,7 @@ function initials(name: string | null): string {
 
 export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }) {
   const { counts, totalLots, moneyMoved, paddles, onBlock } = overview;
+  const labelOf = roleLabeller(overview.roles);
   const pct = (n: number) => (totalLots > 0 ? (n / totalLots) * 100 : 0);
 
   return (
@@ -106,7 +107,7 @@ export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }
                 <span className="roster-person">
                   <span className="roster-name">{onBlock.playerName ?? "Unnamed"}</span>
                   <span className="competitions-hint">
-                    {roleLabel(onBlock.role)} · base {exactINR(onBlock.basePrice)}
+                    {labelOf(onBlock.role)} · base {exactINR(onBlock.basePrice)}
                   </span>
                 </span>
               </div>

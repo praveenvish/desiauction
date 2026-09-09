@@ -1,6 +1,9 @@
 "use client";
 
-import { formatPaiseINR, paise, roleLabel } from "@desiauction/core";
+import { useMemo } from "react";
+
+import { roleLabeller } from "../../../../lib/role-label";
+import { formatPaiseINR, paise } from "@desiauction/core";
 import { Card } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
@@ -151,6 +154,7 @@ function MemberBadges({ member }: { member: SquadMember }) {
 }
 
 export function SquadBoard({
+  roles,
   teams,
   preSigned,
   resolved,
@@ -166,6 +170,8 @@ export function SquadBoard({
   showPurse = true,
   note = null,
 }: {
+  /** The season's roles, so a football night is not named in cricket. */
+  roles: readonly { key: string; label: string }[];
   teams: TeamIdentity[];
   preSigned: PreSignedPlayer[];
   resolved: ResolvedLot[];
@@ -174,6 +180,7 @@ export function SquadBoard({
   showPurse?: boolean;
   note?: string | null;
 }) {
+  const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   const squads = squadsOf(teams, preSigned, resolved);
   const purseByTeam = new Map(
     (snapshot?.paddles ?? []).map((paddle) => [paddle.teamId, paddle.purseRemaining]),
@@ -226,7 +233,7 @@ export function SquadBoard({
                     <li key={member.key} className="squad-row">
                       <span className="squad-name">{member.name}</span>
                       <MemberBadges member={member} />
-                      <span className="squad-role">{roleLabel(member.role)}</span>
+                      <span className="squad-role">{labelOf(member.role)}</span>
                       <span className="squad-price">
                         {member.price === null ? (
                           <span className="squad-presigned">pre-signed</span>

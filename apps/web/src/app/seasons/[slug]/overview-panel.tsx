@@ -11,10 +11,12 @@ import {
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
-import { ENTRY_CATEGORIES, entryCategoryLabel, roleLabel } from "@desiauction/core";
+import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { roleLabeller } from "../../../lib/role-label";
 
 import {
   advanceCompetitionAction,
@@ -215,6 +217,12 @@ function missingForRegistration(competition: SeasonOverviewView["competition"]):
 export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: string }) {
   const router = useRouter();
   const toast = useToast();
+  // The season's own roles: the pool breakdown named them through `roleLabel`,
+  // which asks cricket, so a football season's pool read in lower case.
+  const labelOf = useMemo(
+    () => roleLabeller(roleOptions(view.competition.sport)),
+    [view.competition.sport],
+  );
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
@@ -577,7 +585,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
               {view.poolByRole.map((entry) => (
                 <li key={entry.role} className="season-pool-row">
                   <span className="season-pool-top">
-                    <span className="season-pool-name">{roleLabel(entry.role)}</span>
+                    <span className="season-pool-name">{labelOf(entry.role)}</span>
                     <span className="season-pool-count">{entry.count}</span>
                   </span>
                   <span className="season-bar" aria-hidden>

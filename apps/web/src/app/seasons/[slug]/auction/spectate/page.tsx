@@ -102,6 +102,7 @@ export default async function SpectatePage({ params }: { params: Promise<{ slug:
           <SpectatePanel
             wsUrl={view.wsUrl}
             slug={slug}
+            roles={view.roles}
             resolved={view.resolved}
             teams={view.teams}
             rules={view.rules}

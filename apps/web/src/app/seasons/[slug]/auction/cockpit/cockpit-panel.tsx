@@ -400,7 +400,12 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               gavel at the same time. The lot and the controls that act on it now
               travel together down the page. */}
           <div className="cockpit-dock">
-            <CeremonyStage snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
+            <CeremonyStage
+              roles={view.roles}
+              snapshot={snapshot}
+              ceremony={ceremony}
+              remainingMs={remainingMs}
+            />
 
             {/* THE CONDUCT CARD, in three tiers.
               It used to be one flat row at equal weight — Pause · Queue lots ·
@@ -953,6 +958,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       </div>
 
       <SquadBoard
+        roles={view.roles}
         teams={view.teams}
         preSigned={view.preSigned}
         resolved={view.resolved}

@@ -1,8 +1,9 @@
 "use client";
 
-import { formatPaiseINR, paise, roleLabel, type AuctionStatus } from "@desiauction/core";
+import { roleLabeller } from "../../../../../lib/role-label";
+import { formatPaiseINR, paise, type AuctionStatus } from "@desiauction/core";
 import { PlayerImage, paintOnFill } from "@desiauction/ui";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
@@ -102,6 +103,7 @@ function BoardCrest({ team, fallback }: { team: TeamIdentity | undefined; fallba
 }
 
 export function BoardPanel({
+  roles,
   wsUrl,
   resolved,
   auctionName,
@@ -112,6 +114,8 @@ export function BoardPanel({
   teamIdentities,
   lotMedia,
 }: {
+  /** The season's roles, so a football night is not named in cricket. */
+  roles: readonly { key: string; label: string }[];
   wsUrl: string;
   resolved: ResolvedLot[];
   auctionName: string;
@@ -136,6 +140,7 @@ export function BoardPanel({
    */
   lotMedia: Record<string, LotMedia>;
 }) {
+  const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // DA-20: the board read `connection !== "open"` and ignored `stale`/`offline`
   // entirely, so six seconds offline left the projector byte-identical to the
   // online frame — pulsing green dot, "LIVE AUCTION", live money, no warning.
@@ -391,7 +396,7 @@ export function BoardPanel({
                 keeper" to a room of two hundred people. The shared formatter
                 is the one place those labels are decided. */}
             <p className="board-block-meta">
-              {roleLabel(lot.role)} · base {money(lot.basePrice)}
+              {labelOf(lot.role)} · base {money(lot.basePrice)}
             </p>
           </div>
           <div className="board-block-money">

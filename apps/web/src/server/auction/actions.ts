@@ -318,7 +318,9 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
       // the page had just withheld (P1-6).
       wsUrl: auction === null ? null : engineWsUrl(auction.id, money ? null : []),
       overview:
-        auction === null ? null : await auctionOverview(db, auction.id, auction.config, { money }),
+        auction === null
+          ? null
+          : await auctionOverview(db, auction.id, auction.config, competition.sport, { money }),
     };
   });
   return {

@@ -1073,6 +1073,15 @@ export interface UserDetail {
     startsOn: string | null;
     /** Null in a sport whose pack declares no playing roles (Phase 2). */
     role: string | null;
+    /**
+     * The season's sport, because THIS row's role belongs to THIS season.
+     *
+     * /admin lists a person's seasons across every sport at once, so there is
+     * no one pack for the screen — the label has to be resolved per row. It was
+     * resolved by `roleLabel`, which asks cricket, so a footballer's admin page
+     * named their role in lower case whatever they actually played.
+     */
+    sport: string;
     status: string;
   }[];
 }
@@ -1099,6 +1108,7 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
         orgName: organizations.name,
         startsOn: competitions.startsOn,
         role: registrations.role,
+        sport: competitions.sport,
         status: registrations.status,
       })
       .from(registrations)

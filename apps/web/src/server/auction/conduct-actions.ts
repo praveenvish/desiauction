@@ -9,6 +9,7 @@ import type {
   AuctionStatus,
   SnapshotRefs,
 } from "@desiauction/core";
+import { roleOptions } from "@desiauction/core";
 import { auctionOf } from "@desiauction/auction";
 import {
   auctionOwnerInvites,
@@ -145,6 +146,8 @@ async function ownerAcceptancesOf(
 
 export interface CockpitView {
   competition: { name: string; slug: string };
+  /** The season's roles as plain {key,label} pairs — see SpectatorView.roles. */
+  roles: { key: string; label: string }[];
   auctionId: string;
   auctionName: string;
   wsUrl: string;
@@ -197,6 +200,7 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
   );
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
+    roles: roleOptions(gate.competition.sport),
     auctionId: gate.auction.id,
     auctionName: gate.auction.name,
     // The conductor's board is the one audience that sees every purse.
@@ -219,6 +223,17 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
 export interface SpectatorView {
   competitionName: string;
   competitionSlug: string;
+  /**
+   * The season's roles, in the pack's order, as plain {key,label} pairs.
+   *
+   * The surfaces this view feeds — the projector board, the OBS overlay, the
+   * spectator stage — all named a player's role through `roleLabel`, which is
+   * `roleLabelIn(CRICKET, …)`. For any sport but cricket that fell back to the
+   * key with its underscores swapped, so a football night read "midfielder" in
+   * lower case on a wall.
+   */
+  roles: { key: string; label: string }[];
+
   auctionName: string;
   /**
    * DA-20: the auction's OWN state, so the surfaces above the socket stop
@@ -310,6 +325,7 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
   return {
     competitionName: gate.competition.name,
     competitionSlug: gate.competition.slug,
+    roles: roleOptions(gate.competition.sport),
     auctionName: gate.auction.name,
     auctionStatus: gate.auction.status,
     orgName: org?.name ?? null,
@@ -341,6 +357,7 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
       slug: competitions.slug,
       visibility: competitions.visibility,
       location: competitions.location,
+      sport: competitions.sport,
       orgName: organizations.name,
     })
     .from(competitions)
@@ -366,6 +383,7 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
   ]);
   return {
     competitionName: competition.name,
+    roles: roleOptions(competition.sport),
     competitionSlug: competition.slug,
     auctionName: auction.name,
     auctionStatus: auction.status,

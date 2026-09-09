@@ -26,6 +26,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { roleLabeller } from "../../../../../lib/role-label";
 import type { PlanLotRow, TargetRow } from "../../../../../server/auction/owner-plan";
 import {
   addTargetAction,
@@ -144,9 +145,14 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
   );
   const state: PlanState = useMemo(() => evaluatePlan(planInput), [planInput]);
   const groups = useMemo(() => groupByPriority(state.targets), [state.targets]);
+  // The SEASON's labels, declared before anything that reads them. `roleLabel`
+  // asks cricket, so a football squad read "3 defenders" only by accident of
+  // the fallback lower-casing the key, and a pack whose label is not merely its
+  // key prettified would have read wrong.
+  const labelOf = useMemo(() => roleLabeller(view.roles), [view.roles]);
   const results = useMemo(
-    () => searchPool(view.lots, targeted, query),
-    [view.lots, targeted, query],
+    () => searchPool(view.lots, targeted, query, labelOf),
+    [view.lots, targeted, query, labelOf],
   );
   const purseLabel = money(view.planRules.pursePerTeam);
   const roleKeys = useMemo(() => view.roles.map((role) => role.key), [view.roles]);
@@ -154,13 +160,6 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     () => roleFacts(view.lots, view.preSignedRoles, view.team.id, roleKeys),
     [view.lots, view.preSignedRoles, view.team.id, roleKeys],
   );
-  // The SEASON's labels. `roleLabel` asks cricket, so a football squad read
-  // "3 defenders" only by accident of the fallback lower-casing the key, and a
-  // pack whose label is not just its key prettified would have read wrong.
-  const labelOf = useMemo(() => {
-    const byKey = new Map(view.roles.map((role) => [role.key, role.label]));
-    return (role: string): string => byKey.get(role) ?? role.replace(/_/g, " ");
-  }, [view.roles]);
   const roleLine = (counts: { role: string; count: number }[]) =>
     counts
       .map(({ role, count }) => `${String(count)} ${labelOf(role)}${count === 1 ? "" : "s"}`)

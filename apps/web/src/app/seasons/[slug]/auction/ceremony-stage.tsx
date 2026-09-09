@@ -1,14 +1,14 @@
 "use client";
 
+import { roleLabeller } from "../../../../lib/role-label";
 import {
   formatPaiseINR,
   paise,
-  roleLabel,
   type AuctionSnapshot,
   type CeremonyState,
   type LotOutcomeKind,
 } from "@desiauction/core";
-import { useEffect, useState, type CSSProperties } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 
 import type { LotMedia } from "../../../../server/auction/live-summary";
 
@@ -84,6 +84,7 @@ const CONFETTI = Array.from({ length: 30 }, (_, i) => i);
 const PATIENCE_MS = 8_000;
 
 export function CeremonyStage({
+  roles,
   snapshot,
   ceremony,
   remainingMs,
@@ -98,11 +99,14 @@ export function CeremonyStage({
    */
   lotMedia = {},
 }: {
+  /** The season's roles, so a football night is not named in cricket. */
+  roles: readonly { key: string; label: string }[];
   snapshot: AuctionSnapshot | null;
   ceremony: CeremonyState;
   remainingMs: number | null;
   lotMedia?: Readonly<Record<string, LotMedia>>;
 }) {
+  const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // "Waiting for the first snapshot…" told a guest, in the product's own
   // internals, that something they have no name for has not happened. Eight
   // seconds in it stops being a wait and becomes information: the room may not
@@ -218,7 +222,7 @@ export function CeremonyStage({
                 </span>{" "}
               </>
             )}
-            {lot.lotNumber} · {roleLabel(lot.role)} · base {formatPaiseINR(paise(lot.basePrice))}
+            {lot.lotNumber} · {labelOf(lot.role)} · base {formatPaiseINR(paise(lot.basePrice))}
           </p>
           {lot.currentBid !== null ? (
             <p className="ceremony-bid" data-testid="ceremony-bid">

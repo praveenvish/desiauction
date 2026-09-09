@@ -1,7 +1,6 @@
 import {
   TARGET_PRIORITIES,
   TARGET_PRIORITY_LABELS,
-  roleLabel,
   type PlanFit,
   type TargetOutcome,
   type TargetPriority,
@@ -53,6 +52,15 @@ export function searchPool(
   lots: readonly PlanLotRow[],
   targeted: ReadonlySet<string>,
   query: string,
+  /**
+   * How this season names a role, so an owner can search by one.
+   *
+   * The haystack was built with `roleLabel` — cricket's — so in a football
+   * auction, typing "midfielder" matched only through the fallback that
+   * lower-cases the key, and any pack whose label differs from its key (a
+   * hyphen, a space) could not be searched by the word on screen at all.
+   */
+  labelOf: (role: string | null) => string,
   limit = 8,
 ): PlanLotRow[] {
   const tokens = query
@@ -67,7 +75,7 @@ export function searchPool(
     if (targeted.has(lot.registrationId) || lot.status === "sold" || lot.status === "withdrawn") {
       continue;
     }
-    const haystack = `${lot.playerName ?? ""} ${lot.number} ${roleLabel(lot.role)}`.toLowerCase();
+    const haystack = `${lot.playerName ?? ""} ${lot.number} ${labelOf(lot.role)}`.toLowerCase();
     if (tokens.every((token) => haystack.includes(token))) {
       out.push(lot);
       if (out.length >= limit) {
