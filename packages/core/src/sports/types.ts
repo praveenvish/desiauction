@@ -25,7 +25,7 @@
  *     vocabulary and ships with zero migrations.
  */
 
-import type { PointsPolicy, TiebreakerSpec } from "../standings";
+import type { LobbyPoints, PointsPolicy, TiebreakerSpec } from "../standings";
 
 /**
  * How a value is written by a person, versus how we store it.
@@ -161,6 +161,24 @@ export interface SportPack {
   /** Stored token; becomes `competitions.sport` in Phase 1. */
   readonly key: string;
   readonly label: string;
+  /**
+   * HOW MANY SIDES A FIXTURE HAS.
+   *
+   * `duel` — two, which every sport here assumed until now: `fixtures` carries
+   * a home and an away team and `fixture_results` a scoreline for each.
+   *
+   * `lobby` — many. A battle royale match is one lobby of up to twenty-five
+   * squads with no home, no away and no head-to-head; the result is a placement
+   * and a score per squad. This is the one thing no arrangement of score fields
+   * could express, which is why it needed the contract to grow rather than a
+   * pack file. (Racquet sports were once recorded as needing this too. They did
+   * not — a tie's result is one scoreline per side, and they ship as ordinary
+   * packs.)
+   *
+   * Optional, defaulting to `duel`, so the eleven packs that predate it say
+   * nothing and mean what they always did.
+   */
+  readonly fixtureShape?: "duel" | "lobby";
   readonly roles: RoleVocabulary;
   readonly attributes: readonly AttributeSpec[];
   readonly result: {
@@ -186,6 +204,12 @@ export interface SportPack {
      * league table stops being checked.
      */
     readonly summariseSide: (totals: Readonly<Record<string, number>>) => string;
+    /**
+     * How a lobby's finishing order becomes points. REQUIRED when
+     * `fixtureShape` is `lobby` and meaningless otherwise — `points` above
+     * describes a result that has a winner and a loser, which a lobby does not.
+     */
+    readonly lobby?: LobbyPoints;
   };
   readonly terms: Terminology;
 }

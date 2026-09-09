@@ -24,6 +24,51 @@ export type ResultOutcome = "home_win" | "away_win" | "tie" | "no_result" | "aba
 /** Per-side score components, keyed by the sport's score-field keys. */
 export type ScoreRecord = Readonly<Record<string, number | null | undefined>>;
 
+/** One squad's finish in a lobby. */
+export interface LobbyPlacement {
+  readonly teamId: string;
+  /** 1 is the win. Ties in placement are legal; two squads can share 3rd. */
+  readonly placement: number;
+  /** What they did there — `{ kills: 7 }`. */
+  readonly score?: ScoreRecord;
+}
+
+/**
+ * A LOBBY: many squads, one match, no opponent.
+ *
+ * Distinguished from a duel STRUCTURALLY rather than by a discriminant field,
+ * so the eleven duel sports that predate it need no change and cannot forget
+ * to declare one. `"placements" in result` is the whole test.
+ */
+export interface LobbyResultInput {
+  readonly placements: readonly LobbyPlacement[];
+  /** `abandoned` excludes the lobby entirely, exactly as it does a duel. */
+  readonly outcome?: "played" | "abandoned";
+}
+
+export type AnyResultInput = FixtureResultInput | LobbyResultInput;
+
+/**
+ * Points for finishing Nth in a lobby, plus what each score unit is worth.
+ *
+ * A battle royale has no opponent: sixteen to twenty-five squads drop into one
+ * lobby and are ranked on where they finished and what they did there. So the
+ * points cannot come from a win/loss policy — they come from a PLACEMENT table
+ * and a rate per kill, which is how every BGMI and Free Fire league scores.
+ */
+export interface LobbyPoints {
+  /**
+   * Points for 1st, 2nd, 3rd… in order. A placement past the end of this list
+   * scores nothing, which is what a league that pays the top ten intends.
+   */
+  readonly placement: readonly number[];
+  /**
+   * Points per unit of a score field — `{ kills: 1 }` is the near-universal
+   * rule. Omitted means placement alone decides.
+   */
+  readonly perScore?: Readonly<Record<string, number>>;
+}
+
 export interface FixtureResultInput {
   readonly homeTeamId: string;
   readonly awayTeamId: string;
@@ -75,6 +120,12 @@ export interface TiebreakerSpec {
 
 export interface StandingsRules {
   readonly points: PointsPolicy;
+  /**
+   * Placement points, for a sport whose fixtures are lobbies. Absent for every
+   * duel sport, and a lobby result folded without it scores nothing — which is
+   * loud rather than silent, because a table of zeroes is noticed.
+   */
+  readonly lobby?: LobbyPoints;
   /** The score components this sport accumulates, e.g. runs, balls | goals. */
   readonly scoreFields: readonly string[];
   /** Applied in order, after points. */
@@ -127,6 +178,60 @@ function addInto(
 }
 
 /**
+ * Fold ONE LOBBY into the table.
+ *
+ * A squad's points are what its finishing position is worth plus what it did
+ * getting there — `placement[n]` for finishing (n+1)th, and `perScore` applied
+ * to its own totals. That is every BGMI and Free Fire league's scoring, and it
+ * is why `PointsPolicy` could not express it: there is no opponent to win
+ * against.
+ *
+ * WHAT IS DELIBERATELY NOT SET, because a lobby has no such fact:
+ *
+ *   · `lost` and `tied` stay at zero. Finishing fifth of twenty-five is not a
+ *     loss, and calling it one would make a squad's record read 1-24 after a
+ *     good day. `won` counts first places only, which is the "WWCD" column
+ *     every battle royale table already prints.
+ *   · `conceded` stays at zero. Nobody conceded anything to anybody — there
+ *     were twenty-four other squads. A pack whose fixtures are lobbies must
+ *     therefore not declare a tiebreaker that reads `conceded`, because it
+ *     would compare every squad's zero against every other squad's zero.
+ *
+ * A placement naming a team outside the competition is skipped, exactly as a
+ * duel result naming one is: the table describes the teams it was given.
+ */
+function foldLobby(
+  rows: Map<string, Mutable>,
+  result: LobbyResultInput,
+  rules: StandingsRules,
+  scoreFields: readonly string[],
+): void {
+  for (const entry of result.placements) {
+    const row = rows.get(entry.teamId);
+    if (row === undefined) {
+      continue;
+    }
+    row.played += 1;
+    if (entry.placement === 1) {
+      row.won += 1;
+    }
+    addInto(row.scored, entry.score, scoreFields);
+    const lobby = rules.lobby;
+    if (lobby === undefined) {
+      continue;
+    }
+    // `placement` is 1-based and the table is 0-based; a finish past the end of
+    // the table is worth nothing, which is what a league paying its top ten
+    // means by listing ten numbers.
+    row.points += lobby.placement[entry.placement - 1] ?? 0;
+    const perScore: Readonly<Record<string, number>> = lobby.perScore ?? {};
+    for (const [field, per] of Object.entries(perScore)) {
+      row.points += (entry.score?.[field] ?? 0) * per;
+    }
+  }
+}
+
+/**
  * Build the table.
  *
  * `abandoned` fixtures are EXCLUDED entirely — not played, no points, no effect
@@ -136,7 +241,7 @@ function addInto(
  */
 export function buildStandings(
   teamIds: readonly string[],
-  results: readonly FixtureResultInput[],
+  results: readonly AnyResultInput[],
   rules: StandingsRules,
 ): StandingsRow[] {
   const { points: policy, scoreFields, tiebreakers } = rules;
@@ -160,6 +265,10 @@ export function buildStandings(
 
   for (const result of results) {
     if (result.outcome === "abandoned") {
+      continue;
+    }
+    if ("placements" in result) {
+      foldLobby(rows, result, rules, scoreFields);
       continue;
     }
     const home = rows.get(result.homeTeamId);

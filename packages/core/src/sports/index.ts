@@ -287,6 +287,10 @@ export function standingsRulesOf(pack: SportPack): StandingsRules {
     points: pack.standings.points,
     tiebreakers: pack.standings.tiebreakers,
     scoreFields: pack.result.scoreFields.map((field) => field.key),
+    // Carried through only when the pack has it. A duel sport that omitted
+    // this and still folded a lobby would score every squad zero, which is at
+    // least loud — a table of nothing gets noticed.
+    ...(pack.standings.lobby !== undefined ? { lobby: pack.standings.lobby } : {}),
   };
 }
 

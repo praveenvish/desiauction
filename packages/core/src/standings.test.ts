@@ -15,6 +15,7 @@ import { HOCKEY } from "./sports/hockey";
 import { BASKETBALL } from "./sports/basketball";
 import { BADMINTON } from "./sports/badminton";
 import { standingsRulesOf } from "./sports";
+import { total } from "./sports/tiebreakers";
 
 /*
  * SP-1 Phase 2: the table takes RULES now. Cricket's are the pack's, so every
@@ -610,5 +611,105 @@ describe("the table, in badminton", () => {
     // only what the table's arithmetic needs.
     const rows = buildStandings(TEAMS, [tie(A, B, 3, 1, 7, 3)], RULES);
     expect(BADMINTON.standings.summariseSide(rowFor(rows, A).scored)).toBe("3 (7)");
+  });
+});
+
+/**
+ * BATTLE ROYALE — the one sport that genuinely needed the contract to grow.
+ *
+ * A BGMI match is ONE LOBBY of up to twenty-five squads: no home, no away, no
+ * head-to-head. `PointsPolicy` describes a result with an opponent, and there
+ * are twenty-four of them. So points come from a placement table and a rate per
+ * kill, which is what every league of this format runs.
+ */
+describe("the table, in a lobby", () => {
+  /*
+   * BGMI's scheme, which every league of this format runs: ten for the win down
+   * to one for tenth, and a point a kill. Written here rather than in a pack
+   * because a `battle_royale` pack cannot ship until `fixtures` can hold a
+   * lobby — `home_team_id` and `away_team_id` are NOT NULL, and
+   * `pack-contract.test.ts` rightly refuses a pack file that no migration has
+   * switched on. The fold is what lands now; the pack lands with the fixtures.
+   */
+  const RULES = {
+    points: { win: 0, tie: 0, loss: 0, noResult: 0 },
+    scoreFields: ["kills"],
+    lobby: { placement: [10, 6, 5, 4, 3, 2, 1, 1, 1, 1], perScore: { kills: 1 } },
+    tiebreakers: [total("kills", "Kills")],
+  };
+  const D = "team-d";
+  const lobby = (...finishes: [string, number, number][]) => ({
+    placements: finishes.map(([teamId, placement, kills]) => ({
+      teamId,
+      placement,
+      score: { kills },
+    })),
+  });
+
+  it("pays the finish AND the frags, which is the whole scheme", () => {
+    // A won it (10) with 8 kills; B was second (6) with 2; C tenth (1) with 0.
+    const rows = buildStandings([A, B, C], [lobby([A, 1, 8], [B, 2, 2], [C, 10, 0])], RULES);
+    expect(rowFor(rows, A).points).toBe(18);
+    expect(rowFor(rows, B).points).toBe(8);
+    expect(rowFor(rows, C).points).toBe(1);
+  });
+
+  it("pays nothing for a placement past the end of the table", () => {
+    /*
+     * Ten numbers means a league that pays its top ten. Eleventh scores its
+     * frags and nothing else, which is what listing ten was saying.
+     */
+    const rows = buildStandings([A, B], [lobby([A, 11, 4], [B, 25, 0])], RULES);
+    expect(rowFor(rows, A).points, "kills only").toBe(4);
+    expect(rowFor(rows, B).points).toBe(0);
+  });
+
+  it("counts a win as a WIN and a fifth place as nothing worse", () => {
+    /*
+     * The record a battle royale table actually prints is played, wins and
+     * points. Finishing fifth of twenty-five is not a loss, and calling it one
+     * would read 1-24 after a good day — so `lost` stays at zero on purpose.
+     */
+    const rows = buildStandings([A, B], [lobby([A, 1, 5], [B, 5, 3])], RULES);
+    expect(rowFor(rows, A)).toMatchObject({ played: 1, won: 1, lost: 0, tied: 0 });
+    expect(rowFor(rows, B)).toMatchObject({ played: 1, won: 0, lost: 0, tied: 0 });
+  });
+
+  it("accumulates across matches and ranks on points, then kills", () => {
+    const rows = buildStandings(
+      [A, B, C, D],
+      [lobby([A, 2, 1], [B, 1, 1], [C, 3, 9]), lobby([A, 1, 1], [B, 3, 1], [C, 2, 0])],
+      RULES,
+    );
+    // A: 6+1 then 10+1 = 18. B: 10+1 then 5+1 = 17. C: 5+9 then 6+0 = 20.
+    expect(rowFor(rows, C).points).toBe(20);
+    expect(rowFor(rows, A).points).toBe(18);
+    expect(rowFor(rows, B).points).toBe(17);
+    expect(rows.map((row) => row.teamId)).toEqual([C, A, B, D]);
+    // A squad in the competition that has entered no lobby still has a row.
+    expect(rowFor(rows, D)).toMatchObject({ played: 0, points: 0 });
+  });
+
+  it("leaves CONCEDED empty, because nobody conceded to anybody", () => {
+    // Named so no later pack declares a tiebreaker that reads it: in a lobby of
+    // twenty-five it would compare every squad's zero with every other's.
+    const rows = buildStandings([A, B], [lobby([A, 1, 6], [B, 4, 2])], RULES);
+    expect(rowFor(rows, A).scored).toEqual({ kills: 6 });
+    expect(rowFor(rows, A).conceded).toEqual({ kills: 0 });
+  });
+
+  it("skips a squad that is not in this competition", () => {
+    const rows = buildStandings([A], [lobby([A, 1, 3], ["ghost-squad", 2, 9])], RULES);
+    expect(rowFor(rows, A).points).toBe(13);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("excludes an abandoned lobby entirely", () => {
+    const rows = buildStandings(
+      [A, B],
+      [{ ...lobby([A, 1, 9], [B, 2, 4]), outcome: "abandoned" as const }],
+      RULES,
+    );
+    expect(rowFor(rows, A)).toMatchObject({ played: 0, points: 0 });
   });
 });
