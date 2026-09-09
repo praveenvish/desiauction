@@ -61,10 +61,24 @@ test("the cricket profile saves, counts, and frames the career page", async ({ p
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
 
-  // `exact`: /account renders a panel per registered sport, and box cricket's
-  // "Box cricket playing role" CONTAINS this label — `getByLabel` matches on a
-  // case-insensitive substring, so a loose match resolves to both selects. The
-  // labels are distinct to a reader; only the locator conflates them.
+  /*
+   * THIS PLAYER HAS NEVER ENTERED A SEASON, so /account shows no sport panel at
+   * all — it lists the sports somebody plays, not the eight the platform runs.
+   * A wall of forms asking a cricketer how they bowl in hockey is what changed.
+   *
+   * Adding one is how a player records a sport BEFORE their first
+   * registration, which is a case this page exists for: these answers prefill
+   * every season they later enter. Deliberately NOT defaulted to cricket for a
+   * new account — that assumption is what the multi-sport work spent two days
+   * removing.
+   */
+  await expect(page.getByTestId("add-sport")).toBeVisible();
+  await page.getByLabel("Add a sport").selectOption("cricket");
+
+  // `exact`: "Box cricket playing role" CONTAINS this label and `getByLabel`
+  // matches a case-insensitive substring, so with both panels on screen a loose
+  // match resolves to two selects. Distinct to a reader; only the locator
+  // conflates them.
   await page.getByLabel("Cricket playing role", { exact: true }).selectOption("all_rounder");
   await page.getByRole("button", { name: "Save cricket profile" }).click();
   await expect(page.getByText("Cricket profile saved")).toBeVisible();

@@ -1,9 +1,11 @@
 import {
+  competitions,
   newId,
   passkeyCredentials,
   people,
   playerProfiles,
   playerSportProfiles,
+  registrations,
   withTenantDb,
 } from "@desiauction/db";
 import { profileCompleteness, type Gender, type ProfileCompleteness } from "@desiauction/core";
@@ -119,6 +121,39 @@ export async function sportProfilesFor(personId: string): Promise<SportProfile[]
     defaultRole: row.defaultRole,
     attributes: (row.attributes ?? {}) as Record<string, string>,
   }));
+}
+
+/**
+ * THE SPORTS THIS PERSON ACTUALLY PLAYS.
+ *
+ * /account used to render a profile form for every sport the PLATFORM runs.
+ * That was four panels and defensible; at eight it is a wall of forms for a
+ * cricketer, seven of which ask how they bowl in a game they have never
+ * entered. It gets worse with every pack, which is the wrong direction for a
+ * screen to move as the product succeeds.
+ *
+ * Two sources, because both are real answers to "do you play this?":
+ *   · a profile they have already filled in for that sport, and
+ *   · a season they have registered in — the stronger signal of the two, and
+ *     the one that arrives without them visiting this page at all.
+ *
+ * Withdrawn registrations count. Somebody who entered a hockey season and
+ * pulled out still plays hockey, and hiding the panel would delete the answers
+ * they gave.
+ */
+export async function sportsPlayedBy(personId: string): Promise<Set<string>> {
+  const [profiles, entered] = await Promise.all([
+    dbHandle.db
+      .select({ sport: playerSportProfiles.sport })
+      .from(playerSportProfiles)
+      .where(eq(playerSportProfiles.personId, personId)),
+    dbHandle.db
+      .selectDistinct({ sport: competitions.sport })
+      .from(registrations)
+      .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+      .where(eq(registrations.personId, personId)),
+  ]);
+  return new Set([...profiles, ...entered].map((row) => row.sport));
 }
 
 /**

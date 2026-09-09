@@ -13,11 +13,12 @@ import { notificationSettings } from "../../server/messaging/actions";
 import {
   playerProfileFor,
   sportProfilesFor,
+  sportsPlayedBy,
   profileCompletenessFor,
 } from "../../server/player/profile";
 import { NotificationSwitches } from "./notification-switches";
 import { PersonProfilePanel } from "./person-profile-panel";
-import { SportProfilePanel } from "./sport-profile-panel";
+import { SportProfiles } from "./sport-profiles";
 import { EmailVerify } from "./email-verify";
 import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
@@ -42,9 +43,14 @@ export default async function AccountPage() {
    * function cannot cross into a client component.
    */
   const sportProfiles = await sportProfilesFor(session.personId);
+  // Which of them this person actually plays — a profile they filled in, or a
+  // season they entered. Every pack is still built; `SportProfiles` decides
+  // which to show and offers the rest one at a time.
+  const played = await sportsPlayedBy(session.personId);
   const sportForms = SPORTS.map((pack) => {
     const held = sportProfiles.find((profile) => profile.sport === pack.key);
     return {
+      played: played.has(pack.key),
       spec: {
         key: pack.key,
         label: pack.label,
@@ -98,16 +104,11 @@ export default async function AccountPage() {
             {/* PI-1: the durable identity, right under the account identity it
               extends. Prefills every future registration. */}
             <PersonProfilePanel profile={cricketProfile} />
-            {/* SP-1 Phase 3: one panel per sport the platform runs, because
-              "how you play" has a different answer in each. */}
-            {sportForms.map((form) => (
-              <SportProfilePanel
-                key={form.spec.key}
-                spec={form.spec}
-                defaultRole={form.defaultRole}
-                attributes={form.attributes}
-              />
-            ))}
+            {/* SP-1 Phase 3: "how you play" has a different answer in each
+              sport. This used to render one panel per sport the PLATFORM runs,
+              which was four and became eight; it now renders the ones this
+              person plays, and offers the rest one at a time. */}
+            <SportProfiles forms={sportForms} />
             {/* Beside the identity it belongs to, and above Security: this is a
               contact route the product will actually use, not a credential. */}
             <Card>
