@@ -7,6 +7,7 @@ export {
   serializePaise,
   parsePaise,
   formatPaiseINR,
+  isFeeStatus,
   parseFeeStatus,
   parseRupeesToPaise,
   FEE_STATUSES,

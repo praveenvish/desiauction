@@ -8,6 +8,7 @@ import {
   registrationNumber,
   registrationTransition,
   toCsv,
+  type FeeStatus,
   type PhotoTarget,
   sportPackFor,
   type RegistrationStatus,
@@ -381,6 +382,21 @@ export interface RegistrationRow {
   isRetained: boolean;
   // Team captain marker (display + team-sheet ordering).
   isCaptain: boolean;
+  /**
+   * THE REGISTRATION DESK (0034), which was write-only until now.
+   *
+   * All four have been importable, validated and stored since the desk columns
+   * landed — and rendered on no screen and in no export. A club takes cash at
+   * the ground, records it in their sheet, imports it, and then could not
+   * answer "who has paid?" from this product at all. They went back to the
+   * spreadsheet, which is the thing the import exists to replace.
+   */
+  feeStatus: FeeStatus;
+  /** Integer paise. Null = no amount recorded, which is not zero. */
+  feeAmountPaise: number | null;
+  feeReference: string | null;
+  /** The organizer's own remark — distinct from a rejection's note. */
+  note: string | null;
   // Surfaced for the IP-4 AuctionReady pool (additive projection field, M-IP4-1).
   basePriceBand: string | null;
   rejectionReason: string | null;
@@ -468,6 +484,25 @@ export interface RegistrationStats {
   iconsWithoutTeam: number;
   /** The same disappearance, reached by the other mark. */
   retainedWithoutTeam: number;
+  /**
+   * THE DESK'S OWN ARITHMETIC, over every registration that is not withdrawn.
+   *
+   * Counted across all live statuses rather than approved only: a club takes
+   * the entry fee when somebody signs up, long before triage decides anything,
+   * so "who has paid?" and "who is approved?" are different questions and
+   * answering the first with the second's rows would under-report the money.
+   *
+   * A withdrawn registration is excluded — they left, and a fee they paid is a
+   * refund question, not an outstanding one.
+   */
+  fees: { pending: number; paid: number; waived: number; refunded: number };
+  /**
+   * Paise actually collected — the sum of `fee_amount_paise` over rows marked
+   * paid. Null amounts contribute nothing, because "no amount recorded" is not
+   * zero and a desk that logged a payment without its size should not have that
+   * read back as free.
+   */
+  feeCollectedPaise: number;
 }
 
 export async function registrationStats(db: Db, competitionId: string): Promise<RegistrationStats> {
@@ -477,6 +512,18 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
       isIcon: registrations.isIcon,
       isRetained: registrations.isRetained,
       hasTeam: sql<boolean>`${registrations.teamId} is not null`,
+      feeStatus: registrations.feeStatus,
+      /*
+       * Summed inside the group so a null amount contributes nothing rather
+       * than turning the whole total null, which `sum()` would do.
+       *
+       * `::double precision` is the idiom every other money sum here uses, and
+       * it is exact for this: paise are integers, and a double holds those
+       * without loss to 2^53 — about ninety trillion rupees. C-7's ban on
+       * floats is about ARITHMETIC on money, which this is not; it is a
+       * read-only total for a tile.
+       */
+      feePaise: sql<number>`coalesce(sum(${registrations.feeAmountPaise}), 0)::double precision`,
       count: sql<number>`count(*)::int`,
     })
     .from(registrations)
@@ -485,6 +532,7 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
       registrations.status,
       registrations.isIcon,
       registrations.isRetained,
+      registrations.feeStatus,
       sql`${registrations.teamId} is not null`,
     );
   const stats: RegistrationStats = {
@@ -499,6 +547,8 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     retained: 0,
     iconsWithoutTeam: 0,
     retainedWithoutTeam: 0,
+    fees: { pending: 0, paid: 0, waived: 0, refunded: 0 },
+    feeCollectedPaise: 0,
   };
   for (const row of rows) {
     // Registrations are created in "submitted"; "draft" is a machine-only state
@@ -507,6 +557,14 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
       stats[row.status] += row.count;
     }
     stats.total += row.count;
+    // The desk counts everyone still in the season, whatever triage has decided
+    // about them — see `fees`.
+    if (row.status !== "withdrawn" && row.status !== "draft") {
+      stats.fees[row.feeStatus] += row.count;
+      if (row.feeStatus === "paid") {
+        stats.feeCollectedPaise += row.feePaise;
+      }
+    }
     if (row.status === "approved") {
       // Icon first where a player is both, the precedence `outcomeOf` and the
       // orphan warning already use — one row must not be counted twice, and
@@ -534,6 +592,8 @@ export type RegistrationSort = "recent" | "oldest" | "name" | "number" | "status
 export interface RegistrationQuery {
   search?: string;
   status?: RegistrationStatus;
+  /** Narrow to one fee state — the desk's own question, "who has not paid?". */
+  fee?: FeeStatus;
   teamId?: string;
   sort?: RegistrationSort;
   page: number;
@@ -568,6 +628,9 @@ export async function queryRegistrations(
   const filters: SQL[] = [eq(registrations.competitionId, competitionId)];
   if (query.status !== undefined) {
     filters.push(eq(registrations.status, query.status));
+  }
+  if (query.fee !== undefined) {
+    filters.push(eq(registrations.feeStatus, query.fee));
   }
   if (query.teamId !== undefined && query.teamId !== "") {
     filters.push(eq(registrations.teamId, query.teamId));
@@ -613,6 +676,10 @@ export async function queryRegistrations(
       isIcon: registrations.isIcon,
       isRetained: registrations.isRetained,
       isCaptain: registrations.isCaptain,
+      feeStatus: registrations.feeStatus,
+      feeAmountPaise: registrations.feeAmountPaise,
+      feeReference: registrations.feeReference,
+      note: registrations.note,
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
       photoKey: people.photoUrl,
@@ -832,6 +899,9 @@ export async function exportRegistrationsCsv(
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
+      feeStatus: registrations.feeStatus,
+      feeAmountPaise: registrations.feeAmountPaise,
+      feeReference: registrations.feeReference,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -866,6 +936,11 @@ export async function exportRegistrationsCsv(
       "is_icon",
       "is_captain",
       "is_retained",
+      // The desk, which this export could not answer for either. Canonical
+      // header names, so a club can fix a payment in Excel and import it back.
+      "fee_status",
+      "fee_amount",
+      "fee_reference",
     ],
     rows.map((r) => [
       r.number,
@@ -877,6 +952,12 @@ export async function exportRegistrationsCsv(
       yesNo(r.isIcon),
       yesNo(r.isCaptain),
       yesNo(r.isRetained),
+      r.feeStatus,
+      // RUPEES, because the import reads rupees and a round-trip has to close.
+      // Blank rather than 0 for an unrecorded amount: they are different facts
+      // and writing zero would tell the next reader the fee was free.
+      r.feeAmountPaise === null ? "" : String(r.feeAmountPaise / 100),
+      r.feeReference ?? "",
     ]),
   );
 }

@@ -21,6 +21,7 @@ export default async function RegistrationsPage({
   const dashboard = await registrationDashboard(slug, {
     ...(sp["q"] !== undefined ? { search: sp["q"] } : {}),
     ...(sp["status"] !== undefined ? { status: sp["status"] } : {}),
+    ...(sp["fee"] !== undefined ? { fee: sp["fee"] } : {}),
     ...(sp["team"] !== undefined ? { teamId: sp["team"] } : {}),
     ...(sp["sort"] !== undefined ? { sort: sp["sort"] } : {}),
     ...(sp["page"] !== undefined ? { page: sp["page"] } : {}),
@@ -71,6 +72,7 @@ export default async function RegistrationsPage({
             filters={{
               search: sp["q"] ?? "",
               status: sp["status"] ?? "",
+              fee: sp["fee"] ?? "",
               team: sp["team"] ?? "",
               sort: sp["sort"] ?? "recent",
             }}

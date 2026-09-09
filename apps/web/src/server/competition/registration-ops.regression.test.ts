@@ -811,6 +811,73 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
   });
 
   /*
+   * THE REGISTRATION DESK, which was write-only.
+   *
+   * `fee_status`, `fee_amount`, `fee_reference` and `note` have been
+   * importable, validated and stored since the desk columns landed — and
+   * rendered on no screen and in no export. A club took cash at the ground,
+   * imported it, and still had to open their spreadsheet to answer "who has
+   * paid?", which is the thing the import exists to replace.
+   */
+  describe("the desk's arithmetic", () => {
+    it("counts every live registration's fee state and sums what came in", async () => {
+      const season = await createCompetition(db, org.id, owner, {
+        sport: "cricket",
+        name: `Desk Cup ${RUN}`,
+      });
+      const paidA = await seed(season.id, org.id, "Paid A", "f01", "approved");
+      const paidB = await seed(season.id, org.id, "Paid B", "f02", "submitted");
+      const waived = await seed(season.id, org.id, "Waived", "f03", "approved");
+      const gone = await seed(season.id, org.id, "Withdrawn", "f04", "approved");
+      await seed(season.id, org.id, "Owes", "f05", "waitlisted");
+      await db
+        .update(registrationsTable)
+        .set({ feeStatus: "paid", feeAmountPaise: 50_000 })
+        .where(inArray(registrationsTable.id, [paidA, paidB]));
+      await db
+        .update(registrationsTable)
+        .set({ feeStatus: "waived" })
+        .where(eq(registrationsTable.id, waived));
+      // Paid, then left. Their money is a refund question, not an outstanding
+      // one, so they must not appear in either count.
+      await db
+        .update(registrationsTable)
+        .set({ feeStatus: "paid", feeAmountPaise: 99_999, status: "withdrawn" })
+        .where(eq(registrationsTable.id, gone));
+
+      const stats = await registrationStats(db, season.id);
+      // Counted across ALL live statuses, not approved only: a club takes the
+      // fee when somebody signs up, long before triage decides anything.
+      expect(stats.fees).toEqual({ pending: 1, paid: 2, waived: 1, refunded: 0 });
+      expect(stats.feeCollectedPaise).toBe(100_000);
+    });
+
+    it("narrows to one fee state, which is the desk's own question", async () => {
+      const season = await createCompetition(db, org.id, owner, {
+        sport: "cricket",
+        name: `Desk Filter Cup ${RUN}`,
+      });
+      const paid = await seed(season.id, org.id, "Filter Paid", "f06", "approved");
+      await seed(season.id, org.id, "Filter Owes", "f07", "approved");
+      await db
+        .update(registrationsTable)
+        .set({ feeStatus: "paid" })
+        .where(eq(registrationsTable.id, paid));
+
+      const owing = await queryRegistrations(db, season.id, {
+        fee: "pending",
+        page: 1,
+        pageSize: 20,
+      });
+      expect(owing.rows.map((row) => row.name)).toEqual(["Filter Owes"]);
+      // And the row carries the desk, which it did not: the drawer and the
+      // table both read this payload, so a field absent here is a field no
+      // screen can ever show.
+      expect(owing.rows[0]?.feeStatus).toBe("pending");
+    });
+  });
+
+  /*
    * THE SQUAD A FILE ALREADY KNEW.
    *
    * `IMPORT_FIELDS` had eighteen columns and not one of them was team, icon,
@@ -1076,7 +1143,8 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     // an organizer who exported a roster to fix one phone number in Excel lost
     // every squad affiliation on the way back in.
     expect(lines[0]).toBe(
-      "registration_number,name,phone,role,status,team,is_icon,is_captain,is_retained",
+      "registration_number,name,phone,role,status,team,is_icon,is_captain,is_retained," +
+        "fee_status,fee_amount,fee_reference",
     );
     const numbers = lines.slice(1).map((l) => l.split(",")[0] ?? "");
     expect(numbers).toEqual([...numbers].sort()); // stable by registration number

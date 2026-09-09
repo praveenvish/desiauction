@@ -154,6 +154,18 @@ const FEE_STATUS_BY_KEY: ReadonlyMap<string, FeeStatus> = new Map(
  * is the commonest shape there is. Null for anything unplaceable, so the caller
  * reports rather than defaulting someone to `paid`.
  */
+/**
+ * Is this exactly one of the four fee states?
+ *
+ * Distinct from `parseFeeStatus`, which reads what a PERSON wrote ("done",
+ * "Paid ✓"). This asks whether a value is already canonical, which is the
+ * question a URL parameter poses: it reaches a `where` clause, so an unknown
+ * one must narrow to nothing rather than quietly widen to everything.
+ */
+export function isFeeStatus(value: string): value is FeeStatus {
+  return (FEE_STATUSES as readonly string[]).includes(value);
+}
+
 export function parseFeeStatus(value: string): FeeStatus | null {
   return (
     FEE_STATUS_BY_KEY.get(

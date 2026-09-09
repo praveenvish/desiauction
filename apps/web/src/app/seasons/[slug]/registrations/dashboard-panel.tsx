@@ -43,6 +43,7 @@ import {
   type TriageAction,
 } from "../../../../server/competition/actions";
 import { AddPlayerDialog } from "./add-player-dialog";
+import { FEE_STATUSES, formatPaiseINR, paise, type FeeStatus } from "@desiauction/core";
 import type { UnplacedValue, ValueMaps } from "@desiauction/core";
 
 import { ColumnMapper } from "./column-mapper";
@@ -79,6 +80,27 @@ const STATUS_LABEL: Record<string, string> = {
   withdrawn: "Withdrawn",
 };
 const SORTS = ["recent", "oldest", "name", "number", "status"];
+
+/**
+ * The desk's four states, in the words a person uses.
+ *
+ * "Refunded" is a real state and not a synonym for pending: the money came and
+ * went, which a club chasing payments needs to see as settled rather than as
+ * outstanding.
+ */
+const FEE_LABEL: Record<FeeStatus, string> = {
+  pending: "Not paid",
+  paid: "Paid",
+  waived: "Waived",
+  refunded: "Refunded",
+};
+
+const FEE_TONE: Record<FeeStatus, "warning" | "success" | "info" | "neutral"> = {
+  pending: "warning",
+  paid: "success",
+  waived: "info",
+  refunded: "neutral",
+};
 const SORT_LABEL: Record<string, string> = {
   recent: "Newest first",
   oldest: "Oldest first",
@@ -142,6 +164,30 @@ interface Picked {
  * Both pre-signed marks subtract, and naming only the one that happens to be
  * set leaves a reader doing arithmetic that does not come out.
  */
+/**
+ * What the desk still has to chase, and what it has taken.
+ *
+ * The outstanding COUNT leads, because that is the number an organizer acts on;
+ * the money is the number they report. Waived and refunded are named only when
+ * they exist, so an ordinary season's tile stays two facts long.
+ */
+function feeHint(stats: RegistrationStats): string {
+  const parts: string[] = [];
+  if (stats.fees.pending > 0) {
+    parts.push(`${String(stats.fees.pending)} not paid`);
+  }
+  if (stats.fees.waived > 0) {
+    parts.push(`${String(stats.fees.waived)} waived`);
+  }
+  if (stats.fees.refunded > 0) {
+    parts.push(`${String(stats.fees.refunded)} refunded`);
+  }
+  if (stats.feeCollectedPaise > 0) {
+    parts.push(`${formatPaiseINR(paise(stats.feeCollectedPaise))} in`);
+  }
+  return parts.length === 0 ? "Entry fees recorded at the desk" : parts.join(" · ");
+}
+
 function poolHint(stats: RegistrationStats): string {
   const terms: string[] = [];
   if (stats.icons > 0) {
@@ -170,7 +216,7 @@ export function RegistrationDashboardPanel({
   stats: RegistrationStats;
   page: RegistrationPage;
   teams: NonNullable<RegistrationDashboard["teams"]>;
-  filters: { search: string; status: string; team: string; sort: string };
+  filters: { search: string; status: string; fee: string; team: string; sort: string };
   orphanPreSigned: OrphanPreSigned[];
   /** The season's own roles — the add dialog offered cricket's to every sport. */
   roles: readonly { key: string; label: string }[];
@@ -769,6 +815,20 @@ export function RegistrationDashboardPanel({
             poolHint(stats)
           }
         />
+        {/* THE DESK. Every one of these numbers has been in the database since
+            the desk columns landed and on no screen at all — a club took cash
+            at the ground, imported it, and still had to open their spreadsheet
+            to answer "who has paid?". */}
+        <StatTile
+          label="Fees paid"
+          value={stats.fees.paid}
+          testId="stat-fees-paid"
+          active={filters.fee === "paid"}
+          onSelect={() => {
+            changeFilter({ fee: filters.fee === "paid" ? "" : "paid" });
+          }}
+          hint={feeHint(stats)}
+        />
         <StatTile
           label="Waitlisted"
           value={stats.waitlisted}
@@ -861,6 +921,25 @@ export function RegistrationDashboardPanel({
             {STATUS_FILTERS.map((status) => (
               <option key={status} value={status}>
                 {STATUS_LABEL[status] ?? status}
+              </option>
+            ))}
+          </Select>
+          {/* THE DESK'S OWN QUESTION. Status is about triage — approved,
+              waitlisted, declined. Whether the entry fee arrived is a different
+              axis entirely, and until now the only place it existed was a
+              column nobody could see. */}
+          <Select
+            label="Fee"
+            name="fee"
+            value={filters.fee}
+            onChange={(event) => {
+              changeFilter({ fee: event.target.value });
+            }}
+          >
+            <option value="">Any fee state</option>
+            {FEE_STATUSES.map((state) => (
+              <option key={state} value={state}>
+                {FEE_LABEL[state]}
               </option>
             ))}
           </Select>
@@ -1237,7 +1316,34 @@ export function RegistrationDashboardPanel({
                     <dt>Team</dt>
                     <dd>{detail.teamName ?? "—"}</dd>
                   </div>
+                  {/* THE DESK, which had nowhere to be read until now. The
+                      amount and the reference render only when the desk
+                      actually recorded them: a blank row would suggest the
+                      product had lost something it was never given. */}
+                  <div>
+                    <dt>Fee</dt>
+                    <dd data-testid="details-fee">
+                      {FEE_LABEL[detail.feeStatus]}
+                      {detail.feeAmountPaise !== null
+                        ? ` · ${formatPaiseINR(paise(detail.feeAmountPaise))}`
+                        : ""}
+                    </dd>
+                  </div>
+                  {detail.feeReference !== null && detail.feeReference !== "" ? (
+                    <div>
+                      <dt>Reference</dt>
+                      <dd data-testid="details-fee-reference">{detail.feeReference}</dd>
+                    </div>
+                  ) : null}
                 </dl>
+                {detail.note !== null && detail.note !== "" ? (
+                  /* The organizer's own remark, imported or typed. It survives
+                     every status change, which is what makes it worth showing
+                     beside the record rather than in the timeline. */
+                  <p className="reg-sub" data-testid="details-note">
+                    {detail.note}
+                  </p>
+                ) : null}
                 <div className="reg-photo-manage">
                   <PlayerPhotoUploader
                     slug={slug}
@@ -2101,6 +2207,15 @@ function RegRow({
           <span className="reg-sub" data-testid={`reason-${row.personId}`}>
             {REASON_LABEL[row.rejectionReason] ?? row.rejectionReason}
           </span>
+        ) : null}
+        {/* ONLY WHEN IT IS NOT PAID. Every registration has a fee state and
+            almost all of them are "pending" early on, so badging all four would
+            put a second status on every row and make the column unreadable.
+            The one an organizer acts on is the one that shows. */}
+        {row.feeStatus !== "paid" ? (
+          <Badge tone={FEE_TONE[row.feeStatus]} data-testid={`fee-${row.personId}`}>
+            {FEE_LABEL[row.feeStatus]}
+          </Badge>
         ) : null}
       </td>
       <td data-label="Team">

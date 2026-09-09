@@ -32,13 +32,24 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   }
 }
 
-// A valid-CSV of 8 players (distinct 10-digit mobiles).
+/**
+ * A valid CSV of 8 players (distinct 10-digit mobiles), with the DESK columns a
+ * club actually fills in: five have paid ₹500 at the ground, three have not.
+ *
+ * Those four fields have been importable and stored since the desk columns
+ * landed, and rendered on no screen and in no export — so a club took cash,
+ * imported it, and still opened their spreadsheet to answer "who has paid?".
+ */
 function playersCsv(): string {
-  const header = "name,phone,role,base_price_band";
+  const header = "name,phone,role,base_price_band,fee_status,fee_amount,fee_reference";
   const rows = Array.from({ length: 8 }, (_, i) => {
     const phone = `9${STAMP}${i}`.slice(0, 10);
     const roles = ["batter", "bowler", "all_rounder", "wicket_keeper"];
-    return `Player ${i},${phone},${roles[i % 4]},A`;
+    const paid = i < 5;
+    return (
+      `Player ${i},${phone},${roles[i % 4]},A,` +
+      `${paid ? "paid" : "pending"},${paid ? "500" : ""},${paid ? `UTR${String(i)}` : ""}`
+    );
   });
   return [header, ...rows].join("\n");
 }
@@ -118,6 +129,26 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await page.getByTestId("import-commit").click();
   await expect(page.getByTestId("stat-total")).toContainText("8");
   await expect(page.getByTestId("stat-submitted")).toContainText("8");
+
+  /*
+   * THE DESK, which the product could not answer for at all.
+   *
+   * Five of the eight paid ₹500 at the ground and the file said so. Until now
+   * that landed in the database and appeared nowhere: no column, no filter, no
+   * export, no tile.
+   */
+  const feesTile = page.getByTestId("stat-fees-paid");
+  await expect(feesTile.locator(".stat-value")).toHaveText("5");
+  await expect(feesTile.locator(".stat-hint")).toHaveText("3 not paid · ₹2,500 in");
+  // And the ones still owing are one click away — the desk's own question,
+  // which is a different axis from triage status.
+  await feesTile.click();
+  await expect(page.getByTestId("page-indicator")).toContainText("5 total");
+  // `exact`: the tile's own aria-label is "Filter: Fees paid", so a loose
+  // match resolves to the tile AND the select.
+  await page.getByLabel("Fee", { exact: true }).selectOption("pending");
+  await expect(page.getByTestId("page-indicator")).toContainText("3 total");
+  await page.getByLabel("Fee", { exact: true }).selectOption("");
 
   // Select all on the page and bulk-approve.
   await page.getByLabel("Select all on page").check();

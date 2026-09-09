@@ -17,6 +17,8 @@ import {
   tokenizeCsv,
   validateNewPlayer,
   IMPORT_FIELDS,
+  isFeeStatus,
+  type FeeStatus,
   type ColumnMapping,
   type CsvRowError,
   type DateOrder,
@@ -1171,6 +1173,8 @@ export async function submitRegistrationAction(
 export interface DashboardParams {
   search?: string;
   status?: string;
+  /** A fee state — the desk's own filter. */
+  fee?: string;
   teamId?: string;
   sort?: string;
   page?: string;
@@ -1234,6 +1238,10 @@ export async function registrationDashboard(
     ...(params.status !== undefined && VALID_STATUS.has(params.status as RegistrationStatus)
       ? { status: params.status as RegistrationStatus }
       : {}),
+    // Validated against the enum rather than passed through: the value reaches
+    // a `where` clause, and an unknown one should narrow to nothing rather than
+    // quietly widening to everything.
+    ...(isFeeStatus(params.fee ?? "") ? { fee: params.fee as FeeStatus } : {}),
     ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
     sort: (VALID_SORT.has(params.sort as RegistrationSort)
       ? params.sort
