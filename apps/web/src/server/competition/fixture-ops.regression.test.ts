@@ -10,6 +10,7 @@ import {
   auditLog,
   competitions as competitionsTable,
   createDb,
+  fixtureParticipants,
   fixtures as fixturesTable,
   grants as grantsTable,
   grounds as groundsTable,
@@ -96,6 +97,30 @@ async function login(phone: string): Promise<string> {
     throw new Error("login failed");
   }
   return verified.personId;
+}
+
+/**
+ * What the DATABASE said when it refused a write.
+ *
+ * Drizzle wraps a PostgresError in "Failed query: …", so the constraint name
+ * that proves WHICH rule fired is on the cause, not the message — asserting on
+ * the message alone passes for any failure at all, including a typo in the SQL.
+ * This walks the chain so a test can name the constraint it means.
+ */
+async function refusal(run: () => Promise<unknown>): Promise<string> {
+  try {
+    await run();
+  } catch (error) {
+    // `constraint_name` is postgres.js's own field on the cause, and the only
+    // place the rule that actually fired is named.
+    const cause: unknown = (error as { cause?: unknown }).cause;
+    const named =
+      typeof cause === "object" && cause !== null && "constraint_name" in cause
+        ? String((cause as { constraint_name?: unknown }).constraint_name)
+        : "";
+    return `${(error as Error).message} ${named}`;
+  }
+  throw new Error("expected the database to refuse this write, and it did not");
 }
 
 function must<T>(value: T | undefined | null, label: string): T {
@@ -258,8 +283,12 @@ describe("FIXTURE OPS REGRESSION — deterministic generation", () => {
     const home = new Map<string, number>();
     const away = new Map<string, number>();
     for (const fixture of page.rows) {
-      home.set(fixture.homeTeamName, (home.get(fixture.homeTeamName) ?? 0) + 1);
-      away.set(fixture.awayTeamName, (away.get(fixture.awayTeamName) ?? 0) + 1);
+      // `must`, not `?? ""`: these are DUEL fixtures and a null name would mean
+      // the join missed. Bucketing them under one empty key would hide that.
+      const homeName = must(fixture.homeTeamName, "a home team name");
+      const awayName = must(fixture.awayTeamName, "an away team name");
+      home.set(homeName, (home.get(homeName) ?? 0) + 1);
+      away.set(awayName, (away.get(awayName) ?? 0) + 1);
     }
     const names = [...new Set([...home.keys(), ...away.keys()])];
     expect(names.length).toBe(4);
@@ -319,8 +348,8 @@ describe("FIXTURE OPS REGRESSION — deterministic generation", () => {
       return rows.map((r) => ({
         seq: r.seq,
         round: r.round,
-        home: names.get(r.home),
-        away: names.get(r.away),
+        home: names.get(must(r.home, "a home team id")),
+        away: names.get(must(r.away, "an away team id")),
         kickoff: r.kickoff,
         ground: r.ground,
       }));
@@ -367,7 +396,7 @@ describe("FIXTURE OPS REGRESSION — lifecycle, conflicts, protection", () => {
     const free = teamIds.filter((id) => id !== existing.homeTeamId && id !== existing.awayTeamId);
     // A new fixture sharing a team, at the same instant, on the OTHER ground.
     const created = await createFixture(db, comp, owner, {
-      homeTeamId: existing.homeTeamId,
+      homeTeamId: must(existing.homeTeamId, "a duel fixture"),
       awayTeamId: must(free[0], "a free team"),
       groundId: existing.groundId === groundA ? groundB : groundA,
       kickoffAt: existing.kickoffAt ?? "2026-08-01T18:00",
@@ -499,8 +528,8 @@ describe("FIXTURE OPS REGRESSION — lifecycle, conflicts, protection", () => {
     const slot = { kickoffAt: victim.kickoffAt ?? "", groundId: victim.groundId ?? "" };
     expect((await cancelFixture(db, comp, victim.id, owner, "rain")).ok).toBe(true);
     const replacement = await createFixture(db, comp, owner, {
-      homeTeamId: victim.homeTeamId,
-      awayTeamId: victim.awayTeamId,
+      homeTeamId: must(victim.homeTeamId, "a duel fixture"),
+      awayTeamId: must(victim.awayTeamId, "a duel fixture"),
       groundId: slot.groundId,
       kickoffAt: slot.kickoffAt,
       durationMinutes: 120,
@@ -628,7 +657,11 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
     const before = (await fixtureStats(db, comp.id)).total;
     const csv =
       "home_team,away_team,kickoff,ground,duration_minutes\n" +
-      `${existing.homeTeamName},${existing.awayTeamName},${existing.kickoffAt.replace("T", " ")},${existing.groundName ?? ""},120`;
+      // `must`, not `?? ""`: a blank team name would import as a DIFFERENT
+      // fixture and the test would pass while proving nothing.
+      `${must(existing.homeTeamName, "a home team name")},` +
+      `${must(existing.awayTeamName, "an away team name")},` +
+      `${existing.kickoffAt.replace("T", " ")},${existing.groundName ?? ""},120`;
     const parsed = parseFixtureCsv(csv);
     expect(parsed.errors).toEqual([]);
     const dryRun = await importDryRun(db, comp, parsed.rows);
@@ -1093,5 +1126,112 @@ describe("RESULTS — who won, and the table derived from it", () => {
       await handle.sql.unsafe(`drop owned by ${role}`);
       await handle.sql.unsafe(`drop role if exists ${role}`);
     }
+  });
+});
+
+/**
+ * A FIXTURE IS A DUEL OR A LOBBY, NEVER HALF OF EACH (0058).
+ *
+ * Every sport here assumed two sides until battle royale, whose match is one
+ * lobby of up to twenty-five squads. `home_team_id` and `away_team_id` are
+ * nullable now, and the only thing standing between that and a fixture with a
+ * home and no away is a CHECK — so it is worth proving the database refuses it
+ * rather than trusting that no caller will try.
+ */
+describe("FIXTURE SHAPES — a duel or a lobby", () => {
+  it("accepts a lobby: no home, no away", async () => {
+    const [row] = await db
+      .insert(fixturesTable)
+      .values({
+        id: newId(),
+        orgId: org.id,
+        competitionId: comp.id,
+        fixtureNumber: `LOBBY-${RUN}-1`,
+        seq: 90_001,
+        createdBy: owner,
+      })
+      .returning({ id: fixturesTable.id, home: fixturesTable.homeTeamId });
+    expect(row?.home, "a lobby names no home").toBeNull();
+    await db.delete(fixturesTable).where(eq(fixturesTable.id, row?.id ?? ""));
+  });
+
+  it("refuses a fixture with a home and no away", async () => {
+    /*
+     * The state the CHECK exists for. Not a duel, not a lobby — a bug, and one
+     * that would reach `buildStandings` as a result with one side.
+     */
+    const teams = await db
+      .select({ id: teamsTable.id })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, comp.id))
+      .limit(1);
+    const said = await refusal(() =>
+      db.insert(fixturesTable).values({
+        id: newId(),
+        orgId: org.id,
+        competitionId: comp.id,
+        fixtureNumber: `HALF-${RUN}-1`,
+        seq: 90_002,
+        homeTeamId: must(teams[0], "a team").id,
+        createdBy: owner,
+      }),
+    );
+    expect(said, "the sides CHECK, by name").toContain("fixtures_sides_check");
+  });
+
+  it("refuses a placement that is not a finishing position", async () => {
+    const [fixture] = await db
+      .insert(fixturesTable)
+      .values({
+        id: newId(),
+        orgId: org.id,
+        competitionId: comp.id,
+        fixtureNumber: `LOBBY-${RUN}-2`,
+        seq: 90_003,
+        createdBy: owner,
+      })
+      .returning({ id: fixturesTable.id });
+    const [team] = await db
+      .select({ id: teamsTable.id })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, comp.id))
+      .limit(1);
+    const participant = {
+      fixtureId: must(fixture, "a lobby").id,
+      teamId: must(team, "a team").id,
+      orgId: org.id,
+      competitionId: comp.id,
+    };
+    // Nought is not a position, and a squad may legitimately have none yet.
+    const said = await refusal(() =>
+      db.insert(fixtureParticipants).values({ ...participant, placement: 0 }),
+    );
+    expect(said, "the placement CHECK, by name").toContain("placement_check");
+    await db.insert(fixtureParticipants).values({ ...participant, placement: null });
+    await db
+      .insert(fixtureParticipants)
+      .values({
+        ...participant,
+        teamId: must(team, "a team").id,
+        placement: 1,
+        score: { kills: 7 },
+      })
+      .onConflictDoUpdate({
+        target: [fixtureParticipants.fixtureId, fixtureParticipants.teamId],
+        set: { placement: 1, score: { kills: 7 } },
+      });
+    const [stored] = await db
+      .select()
+      .from(fixtureParticipants)
+      .where(eq(fixtureParticipants.fixtureId, must(fixture, "a lobby").id));
+    expect(stored?.placement).toBe(1);
+    expect(stored?.score).toEqual({ kills: 7 });
+    await db.delete(fixturesTable).where(eq(fixturesTable.id, must(fixture, "a lobby").id));
+    // The participants went with it — they ARE the fixture in this shape.
+    const left = await db
+      .select()
+      .from(fixtureParticipants)
+      .where(eq(fixtureParticipants.fixtureId, must(fixture, "a lobby").id));
+    expect(left, "ON DELETE CASCADE").toEqual([]);
   });
 });

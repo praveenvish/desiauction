@@ -326,6 +326,19 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
       // the match stands, and a stale result must not hold points open.
       continue;
     }
+    if (fixture.homeTeamId === null || fixture.awayTeamId === null) {
+      /*
+       * A LOBBY. Its result is not a scoreline between two sides — it is a
+       * placement per squad in `fixture_participants` — so there is nothing
+       * here to fold into a duel. Skipped rather than coerced: inventing a
+       * home and an away for twenty-five squads would put two of them in a
+       * match that never happened.
+       *
+       * The lobby fold is `foldLobby`, and the read that feeds it lands with
+       * the participant writer.
+       */
+      continue;
+    }
     inputs.push({
       homeTeamId: fixture.homeTeamId,
       awayTeamId: fixture.awayTeamId,

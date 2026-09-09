@@ -24,12 +24,18 @@ export interface FixtureSnapshot {
   readonly number: string;
   readonly seq: number;
   readonly round: number | null;
-  readonly homeTeamId: string;
-  readonly homeTeamName: string;
+  /**
+   * NULL ON A LOBBY (0058). A battle royale match is up to twenty-five squads
+   * in one lobby with no home and no away; its participants live in
+   * `fixture_participants`. Both are null together or neither is — the database
+   * enforces it — so a reader that has checked one has checked both.
+   */
+  readonly homeTeamId: string | null;
+  readonly homeTeamName: string | null;
   readonly homeTeamShort: string | null;
   readonly homeTeamColor: string | null;
-  readonly awayTeamId: string;
-  readonly awayTeamName: string;
+  readonly awayTeamId: string | null;
+  readonly awayTeamName: string | null;
   readonly awayTeamShort: string | null;
   readonly awayTeamColor: string | null;
   readonly groundId: string | null;
@@ -73,11 +79,11 @@ interface SnapshotRow {
   number: string;
   seq: number;
   round: number | null;
-  homeTeamId: string;
+  homeTeamId: string | null;
   homeTeamName: string | null;
   homeTeamShort: string | null;
   homeTeamColor: string | null;
-  awayTeamId: string;
+  awayTeamId: string | null;
   awayTeamName: string | null;
   awayTeamShort: string | null;
   awayTeamColor: string | null;
@@ -92,10 +98,17 @@ interface SnapshotRow {
 }
 
 function toSnapshot(row: SnapshotRow): FixtureSnapshot {
+  /*
+   * "Unknown" is for a DUEL whose team row is missing — a join that should have
+   * matched and did not. A LOBBY has no home and no away by construction, and
+   * naming those nulls "Unknown" would turn an accurate absence into a
+   * suspected fault on every battle royale fixture ever scheduled.
+   */
+  const lobby = row.homeTeamId === null;
   return Object.freeze({
     ...row,
-    homeTeamName: row.homeTeamName ?? "Unknown",
-    awayTeamName: row.awayTeamName ?? "Unknown",
+    homeTeamName: lobby ? null : (row.homeTeamName ?? "Unknown"),
+    awayTeamName: lobby ? null : (row.awayTeamName ?? "Unknown"),
   });
 }
 

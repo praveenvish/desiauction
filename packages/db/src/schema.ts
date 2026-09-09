@@ -887,6 +887,10 @@ export const fixtureResults = pgTable(
       home?: Record<string, number>;
       away?: Record<string, number>;
     }>(),
+    // A lobby's outcome lives in `fixture_participants`, not here: twenty-five
+    // squads do not fit a home/away pair, and `outcome` below has no word for
+    // "everybody played and nobody beat anybody".
+
     /** "DLS", "super over", "conceded" — how, when not simply the higher score. */
     method: text("method"),
     note: text("note"),
@@ -895,6 +899,34 @@ export const fixtureResults = pgTable(
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (table) => [index("fixture_results_competition_idx").on(table.competitionId)],
+);
+
+/**
+ * ONE SQUAD'S PLACE IN A LOBBY (0058).
+ *
+ * A battle royale match is not two sides — it is up to twenty-five squads in
+ * one lobby, ranked on where they finished and what they did there. The squads
+ * are SCHEDULED into the lobby (a group plays its matches together), so a row
+ * exists before anything is played and `placement`/`score` fill in when the
+ * result is recorded.
+ */
+export const fixtureParticipants = pgTable(
+  "fixture_participants",
+  {
+    fixtureId: char("fixture_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    /** 1 is the win. Null until the result is in; two squads may share one. */
+    placement: integer("placement"),
+    /** The squad's own numbers, in the pack's shape — `{ kills: 7 }`. */
+    score: jsonb("score").$type<Record<string, number>>(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.fixtureId, table.teamId] }),
+    index("fixture_participants_competition_idx").on(table.competitionId),
+  ],
 );
 
 export const fixtures = pgTable(
@@ -908,8 +940,15 @@ export const fixtures = pgTable(
     // Per-competition creation sequence: the number's source, unique under race.
     seq: integer("seq").notNull(),
     round: integer("round"),
-    homeTeamId: char("home_team_id", { length: 26 }).notNull(),
-    awayTeamId: char("away_team_id", { length: 26 }).notNull(),
+    /**
+     * NULL ON A LOBBY (0058). Every sport here assumed a fixture has two sides
+     * until battle royale, whose match is one lobby of up to twenty-five squads
+     * with no home and no away — the participants live in
+     * `fixture_participants`. A CHECK enforces both-or-neither, so a fixture is
+     * a duel or a lobby and never half of each.
+     */
+    homeTeamId: char("home_team_id", { length: 26 }),
+    awayTeamId: char("away_team_id", { length: 26 }),
     groundId: char("ground_id", { length: 26 }),
     // Local wall-clock "YYYY-MM-DDTHH:MM" (matches competitions.starts_on TEXT
     // discipline): lexicographic order IS chronological order, byte-stable for

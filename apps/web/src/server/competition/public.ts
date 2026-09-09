@@ -46,8 +46,9 @@ import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
 
 export interface PublicFixture {
   number: string;
-  homeTeamName: string;
-  awayTeamName: string;
+  /** Null on a lobby (0058): a battle royale match names no home and no away. */
+  homeTeamName: string | null;
+  awayTeamName: string | null;
   kickoffAt: string | null;
   groundName: string | null;
   venueName: string | null;
@@ -83,6 +84,8 @@ export interface PublicCompetitionView {
 function toPublicFixture(row: FixtureSnapshot): PublicFixture {
   return {
     number: row.number,
+    // Null on a lobby, which has no home and no away — the public fixture list
+    // renders the match without naming two sides it does not have.
     homeTeamName: row.homeTeamName,
     awayTeamName: row.awayTeamName,
     kickoffAt: row.kickoffAt,

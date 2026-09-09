@@ -174,8 +174,10 @@ export function serializeScheduleCsv(snapshot: ScheduleSnapshot): string {
     [
       f.number,
       f.round === null ? "" : String(f.round),
-      f.homeTeamName,
-      f.awayTeamName,
+      f.homeTeamName ?? "",
+      // Blank on a lobby rather than a placeholder: the fixture genuinely has
+      // no home and no away, and "Unknown" would read as missing data.
+      f.awayTeamName ?? "",
       f.kickoffAt ?? "",
       f.venueName ?? "",
       f.groundName ?? "",

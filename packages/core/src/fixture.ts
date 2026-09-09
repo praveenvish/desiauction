@@ -379,8 +379,9 @@ export const CONFLICT_SEVERITY: Record<ConflictType, ConflictSeverity> = {
 
 export interface FixtureForConflicts {
   id: string;
-  homeTeamId: string;
-  awayTeamId: string;
+  /** Null on a LOBBY (0058) — a battle royale match has no home and no away. */
+  homeTeamId: string | null;
+  awayTeamId: string | null;
   groundId: string | null;
   kickoffAt: string | null; // YYYY-MM-DDTHH:MM wall clock
   durationMinutes: number | null;
@@ -419,7 +420,23 @@ function overlaps(a: Interval, b: Interval): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
+/**
+ * A LOBBY SHARES NO TEAM WITH ANYTHING HERE.
+ *
+ * Both its team columns are null, and `null === null` is true — so without this
+ * guard every pair of lobbies scheduled at the same time would be reported as a
+ * team double-booking, on a fixture that names no team at all. The nulls are an
+ * absence, not a shared identity.
+ *
+ * A lobby's squads live in `fixture_participants` and this function cannot see
+ * them, so two overlapping lobbies drawing on the same squads are NOT caught
+ * here. They are still caught as a ground clash when they share a ground, which
+ * is how a venue-bound event actually collides.
+ */
 function sharesTeam(a: FixtureForConflicts, b: FixtureForConflicts): boolean {
+  if (a.homeTeamId === null || b.homeTeamId === null) {
+    return false;
+  }
   return (
     a.homeTeamId === b.homeTeamId ||
     a.homeTeamId === b.awayTeamId ||
@@ -428,7 +445,18 @@ function sharesTeam(a: FixtureForConflicts, b: FixtureForConflicts): boolean {
   );
 }
 
+/**
+ * The two teams that make a fixture a repeat of another.
+ *
+ * A LOBBY IS NEVER A DUPLICATE. Its columns are both null, so every lobby would
+ * key to the same "~" and a season's second match would be flagged as a repeat
+ * of its first. Keyed on the fixture's own id instead, which no other fixture
+ * can equal — a lobby is a duplicate of nothing.
+ */
 function pairKey(a: FixtureForConflicts): string {
+  if (a.homeTeamId === null || a.awayTeamId === null) {
+    return `lobby~${a.id}`;
+  }
   return [a.homeTeamId, a.awayTeamId].sort().join("~");
 }
 

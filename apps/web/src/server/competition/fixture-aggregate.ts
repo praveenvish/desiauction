@@ -190,8 +190,9 @@ export async function competitionConflicts(
 
 interface FixtureRow {
   id: string;
-  homeTeamId: string;
-  awayTeamId: string;
+  /** Null on a LOBBY (0058) — both together or neither, per the CHECK. */
+  homeTeamId: string | null;
+  awayTeamId: string | null;
   groundId: string | null;
   kickoffAt: string | null;
   durationMinutes: number | null;
