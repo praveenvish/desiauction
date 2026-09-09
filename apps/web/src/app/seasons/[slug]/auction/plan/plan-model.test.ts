@@ -1,9 +1,12 @@
-import { paise } from "@desiauction/core";
+import { paise, sportPackFor } from "@desiauction/core";
 import type { TargetState } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
 import { groupByPriority, roleFacts, rupeesFromPaise, searchPool } from "./plan-model";
+
+/** This suite's fixtures are cricket, so the season's roles are cricket's. */
+const CRICKET_ROLES = sportPackFor("cricket").roles.values.map((value) => value.key);
 
 function lot(over: Partial<PlanLotRow> & { registrationId: string }): PlanLotRow {
   return {
@@ -113,6 +116,7 @@ describe("roleFacts", () => {
       ],
       ["batter", "batter"],
       "me",
+      CRICKET_ROLES,
     );
     expect(facts.squad).toEqual([
       { role: "batter", count: 2 },
@@ -127,5 +131,30 @@ describe("roleFacts", () => {
       { role: "all_rounder", count: 0 },
       { role: "wicket_keeper", count: 1 },
     ]);
+  });
+
+  it("counts a FOOTBALL squad in football roles, with no cricket phantoms", () => {
+    /*
+     * The defect: `roleFacts` seeded its buckets from `REGISTRATION_ROLES` —
+     * cricket's four — so an owner planning a football auction read
+     * "0 batters · 0 bowlers · 0 all-rounders · 0 wicket-keepers" above their
+     * actual squad, and every real football role sorted alphabetically AFTER
+     * those phantoms, because cricket's order has no opinion about a defender.
+     */
+    const football = sportPackFor("football").roles.values.map((value) => value.key);
+    const facts = roleFacts(
+      [
+        lot({ registrationId: "a", role: "goalkeeper", status: "sold", soldToTeamId: "me" }),
+        lot({ registrationId: "b", role: "forward", status: "queued" }),
+      ],
+      ["defender"],
+      "me",
+      football,
+    );
+    // Exactly the season's roles, in the PACK's order — no cricket, none missing.
+    expect(facts.squad.map((entry) => entry.role)).toEqual(football);
+    expect(facts.squad).toContainEqual({ role: "goalkeeper", count: 1 });
+    expect(facts.squad).toContainEqual({ role: "defender", count: 1 });
+    expect(facts.remaining).toContainEqual({ role: "forward", count: 1 });
   });
 });

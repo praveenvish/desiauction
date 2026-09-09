@@ -1,5 +1,4 @@
 import {
-  REGISTRATION_ROLES,
   TARGET_PRIORITIES,
   TARGET_PRIORITY_LABELS,
   roleLabel,
@@ -157,20 +156,27 @@ export interface RoleFacts {
 
 /**
  * ROLE FACTS (Phase 1.5): two counts an owner would otherwise tally by hand.
- * `role` is the one player attribute that is always present and always one of
- * four, so this is a statement of the record, not an estimate — and it stays a
+ * This is a statement of the record, not an estimate — and it stays a
  * statement: which roles a squad NEEDS is the owner's call (or, later, the
- * auction's quotas), never this function's. Roles appear in the product's
+ * auction's quotas), never this function's. Roles appear in the SEASON's
  * order, zero counts included, so the line reads the same shape every time.
+ *
+ * `seasonRoles` used to be `REGISTRATION_ROLES`, which is cricket's four. In a
+ * football auction that seeded four phantom zeroes an owner never asked for —
+ * "0 batters · 0 bowlers · 0 all-rounders · 0 wicket-keepers" — and sorted
+ * every real football role after them, because cricket's order has no opinion
+ * about a defender. The comment above used to say a role "is always one of
+ * four", which was true of cricket and of nothing else.
  */
 export function roleFacts(
   lots: readonly PlanLotRow[],
   preSignedRoles: readonly string[],
   teamId: string,
+  seasonRoles: readonly string[],
 ): RoleFacts {
   const squad = new Map<string, number>();
   const remaining = new Map<string, number>();
-  for (const role of REGISTRATION_ROLES) {
+  for (const role of seasonRoles) {
     squad.set(role, 0);
     remaining.set(role, 0);
   }
@@ -194,8 +200,8 @@ export function roleFacts(
   const ordered = (counts: Map<string, number>): RoleCount[] =>
     [...counts.entries()]
       .sort(([a], [b]) => {
-        const ia = (REGISTRATION_ROLES as readonly string[]).indexOf(a);
-        const ib = (REGISTRATION_ROLES as readonly string[]).indexOf(b);
+        const ia = seasonRoles.indexOf(a);
+        const ib = seasonRoles.indexOf(b);
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
       })
       .map(([role, count]) => ({ role, count }));

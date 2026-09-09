@@ -8,6 +8,7 @@ import {
   type PlanReport,
   type PlanRules,
   type PlanState,
+  sportPackFor,
 } from "@desiauction/core";
 import { teams, withTenantDb } from "@desiauction/db";
 import { inArray } from "drizzle-orm";
@@ -89,6 +90,19 @@ export interface PlanView {
   targets: TargetRow[];
   /** Roles of the pre-signed players already on this team (icons, retained). */
   preSignedRoles: string[];
+  /**
+   * THE SEASON'S ROLES, in the pack's own order, as plain {key,label} pairs.
+   *
+   * `roleFacts` seeded its buckets from `REGISTRATION_ROLES` — cricket's four —
+   * so an owner planning a FOOTBALL auction was shown "0 batters · 0 bowlers ·
+   * 0 all-rounders · 0 wicket-keepers" above their actual squad, and their real
+   * roles sorted alphabetically after the phantoms because cricket's order had
+   * no opinion about a defender.
+   *
+   * Plain strings: a pack carries functions and cannot cross into the client
+   * component that renders this.
+   */
+  roles: { key: string; label: string }[];
   standing: { purseRemaining: number; squadSize: number };
   /** The fold, from rows alone (no lot on the block — the live room adds that). */
   state: PlanState;
@@ -179,6 +193,10 @@ export async function planView(
         lotMedia,
         targets,
         preSignedRoles,
+        roles: sportPackFor(gate.competition.sport).roles.values.map((value) => ({
+          key: value.key,
+          label: value.label,
+        })),
         standing,
         state,
         ...(report === null ? {} : { report }),

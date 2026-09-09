@@ -6,7 +6,6 @@ import {
   evaluatePlan,
   formatPaiseINR,
   paise,
-  roleLabel,
   type AuctionStatus,
   type PlanInput,
   type PlanState,
@@ -150,13 +149,21 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     [view.lots, targeted, query],
   );
   const purseLabel = money(view.planRules.pursePerTeam);
+  const roleKeys = useMemo(() => view.roles.map((role) => role.key), [view.roles]);
   const roles = useMemo(
-    () => roleFacts(view.lots, view.preSignedRoles, view.team.id),
-    [view.lots, view.preSignedRoles, view.team.id],
+    () => roleFacts(view.lots, view.preSignedRoles, view.team.id, roleKeys),
+    [view.lots, view.preSignedRoles, view.team.id, roleKeys],
   );
+  // The SEASON's labels. `roleLabel` asks cricket, so a football squad read
+  // "3 defenders" only by accident of the fallback lower-casing the key, and a
+  // pack whose label is not just its key prettified would have read wrong.
+  const labelOf = useMemo(() => {
+    const byKey = new Map(view.roles.map((role) => [role.key, role.label]));
+    return (role: string): string => byKey.get(role) ?? role.replace(/_/g, " ");
+  }, [view.roles]);
   const roleLine = (counts: { role: string; count: number }[]) =>
     counts
-      .map(({ role, count }) => `${String(count)} ${roleLabel(role)}${count === 1 ? "" : "s"}`)
+      .map(({ role, count }) => `${String(count)} ${labelOf(role)}${count === 1 ? "" : "s"}`)
       .join(" · ");
 
   const settle = (
@@ -390,7 +397,7 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
             <ul className="plan-search-results" data-testid="plan-search-results">
               {results.map((lot) => (
                 <li key={lot.registrationId} className="plan-result">
-                  <Identity lot={lot} media={view.lotMedia[lot.lotId]} />
+                  <Identity lot={lot} media={view.lotMedia[lot.lotId]} labelOf={labelOf} />
                   <Button
                     size="sm"
                     variant="secondary"
@@ -447,6 +454,7 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
                     key={row.id}
                     target={target}
                     row={row}
+                    labelOf={labelOf}
                     lot={lotsByRegistration.get(target.registrationId)}
                     media={target.lotId === null ? undefined : view.lotMedia[target.lotId]}
                     lots={view.lots}
@@ -479,9 +487,12 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
 function Identity({
   lot,
   media,
+  labelOf,
 }: {
   lot: PlanLotRow;
   media: { photoUrl: string | null; number: string | null } | undefined;
+  /** The SEASON's role labels — cricket's would misname every other sport. */
+  labelOf: (role: string) => string;
 }) {
   const name = nameOf(lot, lot.lotNumber);
   return (
@@ -495,7 +506,7 @@ function Identity({
       <div className="plan-identity-text">
         <span className="registration-name">{name}</span>
         <span className="plan-sub">
-          {lot.number} · {roleLabel(lot.role)} · base {money(lot.basePrice)}
+          {lot.number} · {labelOf(lot.role ?? "")} · base {money(lot.basePrice)}
         </span>
       </div>
     </div>
@@ -509,6 +520,7 @@ function TargetLine({
   media,
   lots,
   lotsByRegistration,
+  labelOf,
   draft,
   error,
   disabled,
@@ -524,6 +536,7 @@ function TargetLine({
   media: { photoUrl: string | null; number: string | null } | undefined;
   lots: PlanLotRow[];
   lotsByRegistration: Map<string, PlanLotRow>;
+  labelOf: (role: string) => string;
   draft: string;
   error: string | null;
   disabled: boolean;
@@ -545,7 +558,7 @@ function TargetLine({
     <li className="plan-row" data-testid={`plan-target-${id}`} data-outcome={target.outcome}>
       <div className="plan-row-head">
         {lot !== undefined ? (
-          <Identity lot={lot} media={media} />
+          <Identity lot={lot} media={media} labelOf={labelOf} />
         ) : (
           <div className="plan-identity">
             <div className="plan-identity-text">

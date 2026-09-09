@@ -1,3 +1,4 @@
+import { sportPackFor } from "@desiauction/core";
 import {
   auctionOwnerInvites,
   auctions,
@@ -92,6 +93,14 @@ export interface TeamCard {
 
 export interface TeamsWorkspace {
   competitionName: string;
+  /**
+   * The season's roles, in the pack's order, as plain {key,label} pairs.
+   *
+   * The roster's role tally sorted by `REGISTRATION_ROLES` and labelled with
+   * `roleLabel`, both of which are cricket's — a comment beside the sort even
+   * said "the pack declares the order" while using the wrong pack's.
+   */
+  roles: { key: string; label: string }[];
   teams: TeamCard[];
   /** Purse per team (paise); 0 when no auction is configured. Money-gated. */
   purseTotal?: number;
@@ -265,6 +274,10 @@ export async function teamsWorkspace(
 
   return {
     competitionName: competition.name,
+    roles: sportPackFor(competition.sport).roles.values.map((value) => ({
+      key: value.key,
+      label: value.label,
+    })),
     teams: cards,
     ...(options.money ? { purseTotal, squadMax } : {}),
     approvedPlayers: stats.approved,

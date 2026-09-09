@@ -1,6 +1,5 @@
 "use client";
 
-import { REGISTRATION_ROLES, roleLabel } from "@desiauction/core";
 import {
   Badge,
   Button,
@@ -463,6 +462,17 @@ function RosterDetail({
   const toast = useToast();
   const [exporting, startExport] = useTransition();
   const canManage = view.viewer.canManageTeams;
+  /**
+   * The SEASON's role labels. `roleLabel` asks cricket and falls back to the
+   * key with its underscores swapped, so a football roster read "midfielder"
+   * in a column of Title Case, and any pack whose label is not just its key
+   * prettified would have read plainly wrong.
+   */
+  const labelOf = useMemo(() => {
+    const byKey = new Map(view.roles.map((role) => [role.key, role.label]));
+    return (role: string | null): string =>
+      role === null ? "" : (byKey.get(role) ?? role.replace(/_/g, " "));
+  }, [view.roles]);
   const remaining =
     team.purseTotal !== undefined && team.spent !== undefined
       ? Math.max(0, team.purseTotal - team.spent)
@@ -484,13 +494,14 @@ function RosterDetail({
       counts.set(row.role, (counts.get(row.role) ?? 0) + 1);
     }
     // The pack declares the order; the design's "fixed order" IS that order.
-    // Widened to string because a roster row's role is whatever the row holds —
-    // an unknown one still sorts first, exactly as it did before.
-    const order: readonly string[] = REGISTRATION_ROLES;
+    // THIS SEASON's pack, that is — it used to be cricket's for every sport,
+    // under a comment that said the pack decides. An unknown role still sorts
+    // first, exactly as it did before.
+    const order: readonly string[] = view.roles.map((role) => role.key);
     return [...counts.entries()].sort(
       (a, b) => order.indexOf(a[0]) + 100 - (order.indexOf(b[0]) + 100),
     );
-  }, [roster]);
+  }, [roster, view.roles]);
 
   return (
     <>
@@ -582,7 +593,7 @@ function RosterDetail({
         <div className="team-tally">
           {tally.map(([role, count]) => (
             <span key={role} className="team-tally-chip">
-              {roleLabel(role)} <b>{count}</b>
+              {labelOf(role)} <b>{count}</b>
             </span>
           ))}
         </div>
@@ -633,7 +644,7 @@ function RosterDetail({
                           </span>
                         </span>
                       </td>
-                      <td>{roleLabel(row.role)}</td>
+                      <td>{labelOf(row.role)}</td>
                       {view.viewer.canSeeMoney ? (
                         <td className="roster-price">
                           {row.buyPrice !== undefined && row.buyPrice !== null
