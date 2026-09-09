@@ -4,7 +4,6 @@ import {
   COMPETITION_STATUSES,
   REGISTRATION_STATUSES,
   competitionTransition,
-  isRegistrationRole,
   isRejectionReason,
   isValidSeasonYear,
   nextSeasonName,
@@ -14,6 +13,7 @@ import {
   type RegistrationEvent,
   type RegistrationStatus,
 } from "./competition";
+import { CRICKET, isRoleIn } from "./sports";
 
 const READY = { hasName: true, hasDates: true, hasLocation: true };
 
@@ -146,8 +146,8 @@ describe("validation helpers", () => {
   });
 
   it("role and reason guards fail closed on unknown values", () => {
-    expect(isRegistrationRole("bowler")).toBe(true);
-    expect(isRegistrationRole("striker")).toBe(false);
+    expect(isRoleIn(CRICKET, "bowler")).toBe(true);
+    expect(isRoleIn(CRICKET, "striker")).toBe(false);
     expect(isRejectionReason("capacity")).toBe(true);
     expect(isRejectionReason("vibes")).toBe(false);
   });

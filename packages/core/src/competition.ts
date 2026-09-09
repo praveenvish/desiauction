@@ -6,7 +6,7 @@
  * Pure — no storage, no ambient time (a Clock is injected where time is needed).
  */
 
-import { CRICKET, CRICKET_ROLE_KEYS, isRoleIn } from "./sports";
+import { CRICKET_ROLE_KEYS } from "./sports";
 
 import type { CricketRole } from "./sports";
 
@@ -122,9 +122,10 @@ export type RegistrationRole = CricketRole;
 
 export const REGISTRATION_ROLES: readonly RegistrationRole[] = CRICKET_ROLE_KEYS;
 
-export function isRegistrationRole(value: string): value is RegistrationRole {
-  return isRoleIn(CRICKET, value);
-}
+/*
+ * `isRegistrationRole` lived here and is gone, for the reason `parseRole` did:
+ * a cricket-only question under a sport-neutral name. Use `isRoleIn(pack, …)`.
+ */
 
 const REGISTRATION_EDGES: Record<RegistrationStatus, ReadonlySet<RegistrationEvent["type"]>> = {
   draft: new Set(["submit"]),

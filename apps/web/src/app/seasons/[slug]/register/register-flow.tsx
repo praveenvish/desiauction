@@ -6,7 +6,6 @@ import {
   isMinor,
   BATTING_STYLES,
   BOWLING_STYLES,
-  REGISTRATION_ROLES,
   battingStyleLabel,
   bowlingStyleLabel,
   roleLabel,
@@ -97,6 +96,7 @@ export function RegisterFlow({
   phone,
   initialName,
   source,
+  roles,
   profileDefaults,
 }: {
   slug: string;
@@ -105,6 +105,18 @@ export function RegisterFlow({
   initialName: string;
   /** Share-attribution `?ref` from the landing URL; "" when direct. */
   source: string;
+  /**
+   * THE SEASON'S OWN ROLES, as plain {key,label} pairs.
+   *
+   * This dropdown was built from `REGISTRATION_ROLES` — an alias for CRICKET's
+   * four — so the registration form for a football season offered Batter,
+   * Bowler, All-rounder and Wicket-keeper, and a footballer had no role to
+   * pick. The sport packs shipped and this form never heard about it.
+   *
+   * Plain strings rather than the pack itself: a pack carries functions (a
+   * tiebreaker's `compute`) and cannot cross into a client component.
+   */
+  roles: readonly { key: string; label: string }[];
   /** PI-1: the person-level cricket profile, prefilling step 2. A device-local
    *  draft still wins over it — the draft is this season's newer intent. */
   profileDefaults: { role: string; dob: string; batting: string; bowling: string } | null;
@@ -335,9 +347,9 @@ export function RegisterFlow({
             {...(error !== null ? { error } : {})}
           >
             <option value="">Choose your role…</option>
-            {REGISTRATION_ROLES.map((entry) => (
-              <option key={entry} value={entry}>
-                {roleLabel(entry)}
+            {roles.map((entry) => (
+              <option key={entry.key} value={entry.key}>
+                {entry.label}
               </option>
             ))}
           </Select>

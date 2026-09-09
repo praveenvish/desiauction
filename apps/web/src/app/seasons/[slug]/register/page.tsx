@@ -1,4 +1,4 @@
-import { entryCategoryLabel, isRejectionReason, roleLabel } from "@desiauction/core";
+import { entryCategoryLabel, isRejectionReason, roleLabel, sportPackFor } from "@desiauction/core";
 import { Badge, ButtonLink, Card } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -287,6 +287,11 @@ export default async function RegisterPage({
             phone={session.phone}
             initialName={session.name ?? ""}
             source={source}
+            // The season's sport decides what a role is — see `RegisterFlow`.
+            roles={sportPackFor(landing.sport).roles.values.map((value) => ({
+              key: value.key,
+              label: value.label,
+            }))}
             profileDefaults={{
               role: sportProfile?.defaultRole ?? "",
               dob: personProfile.dateOfBirth ?? "",

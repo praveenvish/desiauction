@@ -160,6 +160,7 @@ export function RegistrationDashboardPanel({
   teams,
   filters,
   orphanPreSigned,
+  roles,
   registrationOpen,
   categoryFlags = {},
 }: {
@@ -169,6 +170,8 @@ export function RegistrationDashboardPanel({
   teams: NonNullable<RegistrationDashboard["teams"]>;
   filters: { search: string; status: string; team: string; sort: string };
   orphanPreSigned: OrphanPreSigned[];
+  /** The season's own roles — the add dialog offered cricket's to every sport. */
+  roles: readonly { key: string; label: string }[];
   registrationOpen: boolean;
   /** PI-1: organizer-channel category advisories, keyed by registration id. */
   categoryFlags?: NonNullable<RegistrationDashboard["categoryFlags"]>;
@@ -673,7 +676,7 @@ export function RegistrationDashboardPanel({
         >
           Import (CSV / photos)
         </Button>
-        <AddPlayerDialog slug={slug} />
+        <AddPlayerDialog slug={slug} roles={roles} />
       </div>
       <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
         <StatTile

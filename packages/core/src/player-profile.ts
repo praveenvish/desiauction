@@ -23,9 +23,7 @@ import {
   CRICKET_ROLE_KEYS,
   attributeOptionLabel,
   isAttributeValueIn,
-  isRoleIn,
   parseAttributeIn,
-  parseRoleIn,
   roleLabelIn,
 } from "./sports";
 
@@ -49,10 +47,6 @@ export function isBattingStyle(value: string): value is BattingStyle {
 
 export function isBowlingStyle(value: string): value is BowlingStyle {
   return isAttributeValueIn(CRICKET, "bowling_style", value);
-}
-
-function isPlayerRole(value: string): value is PlayerRole {
-  return isRoleIn(CRICKET, value);
 }
 
 /** Human labels for display (the DB stores the enum key). */
@@ -89,10 +83,19 @@ export function parseBowlingStyle(value: string): BowlingStyle | null {
   return found !== null && isBowlingStyle(found) ? found : null;
 }
 
-export function parseRole(value: string): PlayerRole | null {
-  const found = parseRoleIn(CRICKET, value);
-  return found !== null && isPlayerRole(found) ? found : null;
-}
+/*
+ * `parseRole` LIVED HERE AND IS GONE.
+ *
+ * It was `parseRoleIn(CRICKET, …)` under a name that reads like "parse a role",
+ * so four separate gates reached for it and every one of them ended up asking
+ * cricket about a football season: the eligibility evaluator, the registration
+ * writer, the CSV import and the organizer's add-by-hand dialog. Three of the
+ * four shipped sports could not admit a player by any route.
+ *
+ * The fix was to pass the season's pack, and leaving the old name exported
+ * would have left the trap armed for the next caller. Use `parseRoleIn(pack, …)`
+ * — it makes you name the sport you mean.
+ */
 
 /**
  * Label any batting OR bowling enum key (the two sets are disjoint), passing an

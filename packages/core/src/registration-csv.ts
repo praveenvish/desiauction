@@ -6,17 +6,18 @@
  * embedded newlines inside quotes are all handled.
  */
 
-import { type RegistrationRole } from "./competition";
+import { DEFAULT_SPORT, parseRoleIn, type SportPack } from "./sports";
 import { parseCsvDate, type DateOrder } from "./csv-date";
 import { normalizePhone } from "./phone";
 import { parseFeeStatus, parseRupeesToPaise, type FeeStatus } from "./money";
-import { deriveAge, parseBattingStyle, parseBowlingStyle, parseRole } from "./player-profile";
+import { deriveAge, parseBattingStyle, parseBowlingStyle } from "./player-profile";
 
 export interface CsvRegistrationRow {
   line: number; // 1-based source line (header = line 1)
   name: string;
   phone: string; // normalized E.164
-  role: RegistrationRole;
+  /** The PACK's role key. Not `RegistrationRole` — that is cricket's four. */
+  role: string;
   basePriceBand: string | null;
   /**
    * DA-28: the optional profile a player supplies when they self-register.
@@ -93,7 +94,14 @@ export interface PlayerFieldError {
 export type NewPlayerCheck =
   | {
       ok: true;
-      value: { name: string; phone: string; role: RegistrationRole; basePriceBand: string | null };
+      /**
+       * `role` is the PACK's key, not cricket's enum. It used to be typed
+       * `RegistrationRole` — an alias for `CricketRole` — which is why every
+       * football roster this product accepted was rejected at the door: the
+       * database column was opened to any sport in migration 0047 and the type
+       * in front of it was not.
+       */
+      value: { name: string; phone: string; role: string; basePriceBand: string | null };
     }
   | { ok: false; errors: PlayerFieldError[] };
 
@@ -103,10 +111,18 @@ export type NewPlayerCheck =
  * that a file would reject cannot slip in through the dialog (or vice versa).
  * Field-keyed so a form can render each message under its own input; the CSV
  * path joins them into its one-line-per-row message.
+ *
+ * THE PACK DECIDES WHAT A ROLE IS. This called `parseRole`, which asks CRICKET
+ * and nothing else — so "midfielder" was an invalid role in a football season,
+ * on every route a player can arrive by. The default is the default sport
+ * rather than a throw because most callers are cricket fixtures and a required
+ * argument on 58 call sites buys nothing; the production paths pass the
+ * season's own pack, and `sport-import.test.ts` holds them to it.
  */
 export function validateNewPlayer(
   input: NewPlayerInput,
   knownBands?: readonly string[],
+  pack: SportPack = DEFAULT_SPORT,
 ): NewPlayerCheck {
   const name = input.name.trim();
   const rawPhone = input.phone.trim();
@@ -125,9 +141,13 @@ export function validateNewPlayer(
   // not as a bare enum match — the same contract the styles got, and for the
   // same reason: this is the ONE validation truth, so the dialog and the file
   // now accept and refuse exactly the same vocabulary. See `parseRole`.
-  const role = parseRole(rawRole);
-  if (role === null) {
-    errors.push({ field: "role", message: `invalid role "${rawRole}"` });
+  // Empty and wrong are different answers — see `evaluateRegistration`.
+  const role = parseRoleIn(pack, rawRole);
+  if (rawRole === "" ? pack.roles.required : role === null) {
+    errors.push({
+      field: "role",
+      message: `invalid ${pack.label.toLowerCase()} role "${rawRole}"`,
+    });
   }
   if (
     band !== "" &&
@@ -148,8 +168,9 @@ export function validateNewPlayer(
       name,
       phone: phone.ok ? phone.phone : rawPhone,
       // Canonical from here on: the caller stores what the machine understands,
-      // never the spelling the file happened to use.
-      role: role as RegistrationRole,
+      // never the spelling the file happened to use. A sport whose pack does
+      // not require roles keeps the empty string rather than inventing one.
+      role: role ?? "",
       basePriceBand: band === "" ? null : band,
     },
   };
@@ -256,6 +277,14 @@ export interface CsvParseOptions {
    * a player silently landing on no team.
    */
   knownTeams?: readonly string[];
+  /**
+   * The season's sport. Omit for the default sport — see `validateNewPlayer`.
+   *
+   * Without this the parser judged every role against CRICKET, so a football
+   * club's roster imported ZERO rows: "invalid role" on midfielder, on
+   * goalkeeper, on every line, while the football pack recognised all of them.
+   */
+  pack?: SportPack;
 }
 
 /**
@@ -289,6 +318,7 @@ export function parseRegistrationRecords(
 ): CsvParseResult {
   const dateOrder = options?.dateOrder ?? "dmy";
   const now = options?.now;
+  const pack = options?.pack ?? DEFAULT_SPORT;
   const records = input.filter((fields) => !(fields.length === 1 && fields[0]?.trim() === ""));
   if (records.length === 0) {
     return { rows: [], errors: [{ line: 1, message: "The file is empty." }] };
@@ -391,6 +421,7 @@ export function parseRegistrationRecords(
     const check = validateNewPlayer(
       { name: rawName, phone: rawPhone, role: rawRole, basePriceBand: band },
       knownBands,
+      pack,
     );
     const rowErrors = check.ok ? [] : check.errors.map((error) => error.message);
     if (battingStyle !== "" && parsedBatting === null) {
@@ -474,7 +505,7 @@ export function parseRegistrationRecords(
       phone: phone.ok ? phone.phone : rawPhone,
       // Canonical, not as written: `check.ok` means the row passed, so its
       // parsed role is the one that reaches the database.
-      role: check.ok ? check.value.role : (rawRole as RegistrationRole),
+      role: check.ok ? check.value.role : rawRole,
       basePriceBand: band === "" ? null : band,
       dateOfBirth: parsedDob,
       // Canonical from here on, so the commit has nothing left to reject.

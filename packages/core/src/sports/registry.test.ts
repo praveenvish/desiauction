@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { REGISTRATION_ROLES, isRegistrationRole } from "../competition";
+import { REGISTRATION_ROLES } from "../competition";
 import {
   BATTING_STYLES,
   BOWLING_STYLES,
   PLAYER_ROLES,
   parseBattingStyle,
-  parseRole,
   roleLabel,
   styleLabel,
 } from "../player-profile";
 import {
   CRICKET,
+  isRoleIn,
   DEFAULT_SPORT,
   DEFAULT_SPORT_KEY,
   SPORTS,
@@ -87,9 +87,9 @@ describe("the pack and the types cannot drift apart", () => {
 
   it("agrees with the competition module about what a role is", () => {
     for (const role of roleKeys(CRICKET)) {
-      expect(isRegistrationRole(role)).toBe(true);
+      expect(isRoleIn(CRICKET, role)).toBe(true);
     }
-    expect(isRegistrationRole("goalkeeper")).toBe(false);
+    expect(isRoleIn(CRICKET, "goalkeeper")).toBe(false);
   });
 });
 
@@ -164,14 +164,14 @@ describe("reading a value the way a person wrote it", () => {
     for (const spelling of ["All Rounder", "all-rounder", "ALLROUNDER", "batting all rounder"]) {
       expect(parseRoleIn(CRICKET, spelling)).toBe("all_rounder");
     }
-    expect(parseRole("Wicket Keeper Batsman")).toBe("wicket_keeper");
-    expect(parseRole("Batsman")).toBe("batter");
-    expect(parseRole("leg spinner")).toBe("bowler");
+    expect(parseRoleIn(CRICKET, "Wicket Keeper Batsman")).toBe("wicket_keeper");
+    expect(parseRoleIn(CRICKET, "Batsman")).toBe("batter");
+    expect(parseRoleIn(CRICKET, "leg spinner")).toBe("bowler");
   });
 
   it("reports what it cannot place instead of guessing", () => {
     expect(parseRoleIn(CRICKET, "sweeper keeper")).toBeNull();
-    expect(parseRole("")).toBeNull();
+    expect(parseRoleIn(CRICKET, "")).toBeNull();
   });
 
   it("places a style from its token or the label an organizer was shown", () => {

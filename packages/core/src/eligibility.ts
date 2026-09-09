@@ -21,7 +21,8 @@
  * Pure: no IO, no ambient clock — `now` is injected (house rule 2.1).
  */
 
-import { isMinor, parseRole, type Gender } from "./player-profile";
+import { isMinor, type Gender } from "./player-profile";
+import { parseRoleIn, sportPackFor } from "./sports";
 
 export const ENTRY_CATEGORIES = ["open", "men", "women", "mixed"] as const;
 export type EntryCategory = (typeof ENTRY_CATEGORIES)[number];
@@ -70,8 +71,19 @@ export interface RegistrationEligibilityInput {
   /** The competition's lifecycle status (`registration_open` admits). */
   competitionStatus: string;
   entryCategory: EntryCategory;
-  /** Any spelling `parseRole` accepts. */
+  /** Any spelling the SEASON'S SPORT accepts. */
   role: string;
+  /**
+   * The season's sport key, which decides what a role is.
+   *
+   * REQUIRED, deliberately. This gate judged every role against cricket, so a
+   * football player picking "Midfielder" on a form the football pack itself had
+   * drawn was refused `invalid_role` — the sport packs shipped and no player
+   * could enter a season of three of the four. An optional field with a cricket
+   * default would have let the next caller reintroduce that in silence, so the
+   * compiler asks everybody instead.
+   */
+  sport: string;
   /** From the person-level profile; null = never asked. */
   gender: Gender | null;
   /** The DOB being registered WITH (the season's snapshot value). */
@@ -120,7 +132,24 @@ export function evaluateRegistration(input: RegistrationEligibilityInput): Eligi
     reasons.push("intake_closed");
   }
 
-  if (parseRole(input.role) === null) {
+  /*
+   * EMPTY AND WRONG ARE DIFFERENT ANSWERS.
+   *
+   * A role the sport does not have is always wrong. An ABSENT role is wrong
+   * only where the sport says every player has one — `roles.required` is a
+   * per-pack fact, and a sport with no meaningful playing position would have
+   * to invent one to satisfy a blanket rule.
+   *
+   * Written this way rather than `required && invalid` because that form stops
+   * checking ENTIRELY for an optional-role sport, and would wave through any
+   * string at all. The three gates that judge a role — this one, the
+   * registration writer and `validateNewPlayer` — say it the same way on
+   * purpose: three gates disagreeing about one question is how they all came
+   * to be asking cricket.
+   */
+  const pack = sportPackFor(input.sport);
+  const declared = input.role.trim();
+  if (declared === "" ? pack.roles.required : parseRoleIn(pack, declared) === null) {
     reasons.push("invalid_role");
   }
 

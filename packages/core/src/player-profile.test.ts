@@ -10,12 +10,12 @@ import {
   isBowlingStyle,
   isGender,
   isMinor,
-  parseRole,
   roleLabel,
   validateDateOfBirth,
   validateJerseyNumber,
   validateProfileLocation,
 } from "./player-profile";
+import { CRICKET, parseRoleIn } from "./sports";
 
 describe("player-profile styles", () => {
   it("recognizes known batting/bowling styles and rejects others", () => {
@@ -74,8 +74,8 @@ describe("isMinor (PRR P0-2 / DPDP §9)", () => {
 describe("parseRole — the vocabulary a registration form is actually filled in with", () => {
   it("round-trips every canonical role and its own label", () => {
     for (const role of PLAYER_ROLES) {
-      expect(parseRole(role)).toBe(role);
-      expect(parseRole(roleLabel(role))).toBe(role);
+      expect(parseRoleIn(CRICKET, role)).toBe(role);
+      expect(parseRoleIn(CRICKET, roleLabel(role))).toBe(role);
     }
   });
 
@@ -85,26 +85,26 @@ describe("parseRole — the vocabulary a registration form is actually filled in
    * errors — so an ordinary sheet imported nobody at all.
    */
   it("reads the spellings a Google Form produces", () => {
-    expect(parseRole("All Rounder")).toBe("all_rounder");
-    expect(parseRole("all-rounder")).toBe("all_rounder");
-    expect(parseRole("ALLROUNDER")).toBe("all_rounder");
-    expect(parseRole("Batsman")).toBe("batter");
-    expect(parseRole("Wicket Keeper")).toBe("wicket_keeper");
-    expect(parseRole("Wicket-Keeper Batsman")).toBe("wicket_keeper");
-    expect(parseRole("WK")).toBe("wicket_keeper");
-    expect(parseRole("Bowler ")).toBe("bowler");
+    expect(parseRoleIn(CRICKET, "All Rounder")).toBe("all_rounder");
+    expect(parseRoleIn(CRICKET, "all-rounder")).toBe("all_rounder");
+    expect(parseRoleIn(CRICKET, "ALLROUNDER")).toBe("all_rounder");
+    expect(parseRoleIn(CRICKET, "Batsman")).toBe("batter");
+    expect(parseRoleIn(CRICKET, "Wicket Keeper")).toBe("wicket_keeper");
+    expect(parseRoleIn(CRICKET, "Wicket-Keeper Batsman")).toBe("wicket_keeper");
+    expect(parseRoleIn(CRICKET, "WK")).toBe("wicket_keeper");
+    expect(parseRoleIn(CRICKET, "Bowler ")).toBe("bowler");
   });
 
   it("collapses a speciality to the role it is a kind of", () => {
-    expect(parseRole("Leg Spinner")).toBe("bowler");
-    expect(parseRole("Fast Bowler")).toBe("bowler");
-    expect(parseRole("Opening Batsman")).toBe("batter");
-    expect(parseRole("Middle Order")).toBe("batter");
+    expect(parseRoleIn(CRICKET, "Leg Spinner")).toBe("bowler");
+    expect(parseRoleIn(CRICKET, "Fast Bowler")).toBe("bowler");
+    expect(parseRoleIn(CRICKET, "Opening Batsman")).toBe("batter");
+    expect(parseRoleIn(CRICKET, "Middle Order")).toBe("batter");
   });
 
   it("returns null rather than guessing, so the caller can report the value", () => {
     for (const input of ["", "   ", "captain", "coach", "umpire", "player", "12", "all"]) {
-      expect(parseRole(input)).toBeNull();
+      expect(parseRoleIn(CRICKET, input)).toBeNull();
     }
   });
 
@@ -121,7 +121,7 @@ describe("parseRole — the vocabulary a registration form is actually filled in
       "  wicket   keeper  ",
       "Wicket Keeper",
     ]) {
-      expect(parseRole(spelling)).toBe("wicket_keeper");
+      expect(parseRoleIn(CRICKET, spelling)).toBe("wicket_keeper");
     }
   });
 
@@ -129,7 +129,7 @@ describe("parseRole — the vocabulary a registration form is actually filled in
     // The dialog and the file share one truth (`validateNewPlayer`); a spelling
     // one accepts is a spelling the other accepts.
     for (const spelling of ["All Rounder", "Batsman", "WK", "Fast Bowler"]) {
-      expect(parseRole(spelling)).toBe(parseRole(spelling.toUpperCase()));
+      expect(parseRoleIn(CRICKET, spelling)).toBe(parseRoleIn(CRICKET, spelling.toUpperCase()));
     }
   });
 });

@@ -2,14 +2,14 @@ import {
   deriveAge,
   isBattingStyle,
   isBowlingStyle,
-  isRegistrationRole,
+  isRoleIn,
   nameKey,
   normalizeShareSource,
   registrationNumber,
   registrationTransition,
   toCsv,
   type PhotoTarget,
-  type RegistrationRole,
+  sportPackFor,
   type RegistrationStatus,
 } from "@desiauction/core";
 import {
@@ -101,7 +101,8 @@ export async function reinstateWithdrawn(
   competitionId: string,
   personId: string,
   fresh: {
-    role: RegistrationRole;
+    /** The season's pack key — not cricket's four (migration 0047 opened it). */
+    role: string;
     // Both callers always pass these, absent or not, so `| undefined` rather
     // than optional (exactOptionalPropertyTypes).
     basePriceBand: string | null | undefined;
@@ -168,16 +169,27 @@ export async function submitRegistration(
   /** Raw `?ref` share source (bounded to an allowlist before it is persisted). */
   source?: string,
 ): Promise<SubmitResult> {
-  if (!isRegistrationRole(role)) {
-    return { ok: false, reason: "invalid_role" };
-  }
+  /*
+   * THE SEASON DECIDES WHAT A ROLE IS, so the season has to be read first.
+   *
+   * This checked `isRegistrationRole`, which asks CRICKET — the same
+   * cricket-only question the eligibility evaluator was asking one layer up, so
+   * a football role was refused twice over and no player could enter a season
+   * of any sport but one. The defense-in-depth is right; it was just asking
+   * about the wrong sport.
+   */
   const [competition] = await db
-    .select({ status: competitions.status })
+    .select({ status: competitions.status, sport: competitions.sport })
     .from(competitions)
     .where(eq(competitions.id, competitionId))
     .limit(1);
   if (competition === undefined || competition.status !== "registration_open") {
     return { ok: false, reason: "not_open" };
+  }
+  const pack = sportPackFor(competition.sport);
+  // Empty and wrong are different answers — see `evaluateRegistration`.
+  if (role.trim() === "" ? pack.roles.required : !isRoleIn(pack, role)) {
+    return { ok: false, reason: "invalid_role" };
   }
   const id = newId();
   // Unique (competition_id, person_id) — one registration per player per season.
@@ -261,7 +273,8 @@ export async function addPlayerByPhone(
   player: {
     name: string;
     phone: string;
-    role: RegistrationRole;
+    /** The season's pack key — not cricket's four (migration 0047 opened it). */
+    role: string;
     basePriceBand: string | null;
     profile?: PlayerProfileInput;
   },

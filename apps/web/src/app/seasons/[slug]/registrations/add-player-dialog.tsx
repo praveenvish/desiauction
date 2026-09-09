@@ -3,10 +3,8 @@
 import {
   BATTING_STYLES,
   BOWLING_STYLES,
-  REGISTRATION_ROLES,
   battingStyleLabel,
   bowlingStyleLabel,
-  roleLabel,
 } from "@desiauction/core";
 import { Button, Dialog, Field, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
@@ -19,10 +17,17 @@ import {
 } from "../../../../server/competition/actions";
 import { PlayerPhotoUploader } from "./player-photo-uploader";
 
+/**
+ * The blank form. `role` is filled from the SEASON's first role, not from a
+ * literal: it was `"batter"`, so a football season's dialog opened with a
+ * cricket role selected — a value its own dropdown no longer offered, and one
+ * the validator behind it refuses. An untouched form must submit something the
+ * season can accept.
+ */
 const EMPTY_FORM = {
   name: "",
   phone: "",
-  role: "batter",
+  role: "",
   basePriceBand: "",
   dateOfBirth: "",
   battingStyle: "",
@@ -38,11 +43,24 @@ type FieldErrors = Extract<AddPlayerActionResult, { ok: false }>["fieldErrors"];
  * optional photo for the row that now exists. The new player lands in
  * `submitted`; approving them stays a separate act on the dashboard.
  */
-export function AddPlayerDialog({ slug }: { slug: string }) {
+export function AddPlayerDialog({
+  slug,
+  roles,
+}: {
+  slug: string;
+  /**
+   * The season's own roles. Built from `REGISTRATION_ROLES` — cricket's four —
+   * so the organizer adding a footballer by hand was offered Batter, Bowler,
+   * All-rounder and Wicket-keeper, and the validator behind the dialog then
+   * refused whichever of them they picked.
+   */
+  roles: readonly { key: string; label: string }[];
+}) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const blank = { ...EMPTY_FORM, role: roles[0]?.key ?? "" };
+  const [form, setForm] = useState(blank);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(undefined);
   const [busy, setBusy] = useState(false);
   const [bands, setBands] = useState<readonly string[] | null>(null);
@@ -62,7 +80,7 @@ export function AddPlayerDialog({ slug }: { slug: string }) {
   const close = () => {
     setOpen(false);
     setCreated(null);
-    setForm(EMPTY_FORM);
+    setForm(blank);
     setFieldErrors(undefined);
   };
 
@@ -88,7 +106,7 @@ export function AddPlayerDialog({ slug }: { slug: string }) {
 
   const addAnother = () => {
     setCreated(null);
-    setForm(EMPTY_FORM);
+    setForm(blank);
   };
 
   return (
@@ -150,9 +168,9 @@ export function AddPlayerDialog({ slug }: { slug: string }) {
               {...(fieldErrors?.phone !== undefined ? { error: fieldErrors.phone } : {})}
             />
             <Select label="Playing role" name="role" value={form.role} onChange={set("role")}>
-              {REGISTRATION_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {roleLabel(role)}
+              {roles.map((role) => (
+                <option key={role.key} value={role.key}>
+                  {role.label}
                 </option>
               ))}
             </Select>

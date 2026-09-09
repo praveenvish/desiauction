@@ -16,6 +16,7 @@ function input(overrides: Partial<RegistrationEligibilityInput>): RegistrationEl
     competitionStatus: "registration_open",
     entryCategory: "open",
     role: "batter",
+    sport: "cricket",
     gender: null,
     dateOfBirth: null,
     guardianConsent: false,

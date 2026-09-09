@@ -1013,6 +1013,9 @@ export async function submitRegistrationAction(
   const verdict = evaluateRegistration({
     competitionStatus: competition.status,
     entryCategory: competition.entryCategory,
+    // The season's own sport decides what a role is. Judged against cricket,
+    // this refused every football, kabaddi and volleyball player at the door.
+    sport: competition.sport,
     role,
     gender: (await playerProfileFor(session.personId)).gender,
     dateOfBirth: profile.dateOfBirth === "" ? null : profile.dateOfBirth,
@@ -1270,6 +1273,7 @@ export async function registrationDashboard(
         const verdict = evaluateRegistration({
           competitionStatus: competition.status,
           entryCategory: competition.entryCategory,
+          sport: competition.sport,
           role: row.role ?? "",
           gender: genderOf.get(row.personId) ?? null,
           dateOfBirth: null,
@@ -1625,6 +1629,9 @@ export async function addPlayerAction(
       basePriceBand: input.basePriceBand,
     },
     await bandsFor(gate.competition.id),
+    // The add-by-hand dialog offers the season's roles; the validator behind it
+    // used to accept only cricket's, so the form and its own gate disagreed.
+    sportPackFor(gate.competition.sport),
   );
   if (!check.ok) {
     const fieldErrors: Partial<Record<PlayerField, string>> = {};
@@ -1898,6 +1905,8 @@ function parseUnderShape(
   csv: string,
   bands: readonly string[],
   teamNames: readonly string[],
+  /** The season's sport key — it decides what a role is. */
+  sport: string,
   shape: ImportShape | undefined,
 ): ReturnType<typeof parseRegistrationRecords> {
   const records = tokenizeCsv(csv);
@@ -1909,6 +1918,10 @@ function parseUnderShape(
   return parseRegistrationRecords(source, bands, {
     now: new Date(),
     knownTeams: teamNames,
+    // Without this the file's roles were judged against CRICKET, so a football
+    // club's roster imported zero rows — "invalid role" on every line, while
+    // the football pack recognised all of them.
+    pack: sportPackFor(sport),
     ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
   });
 }
@@ -1931,6 +1944,7 @@ export async function importPreviewAction(
     csv,
     await bandsFor(gate.competition.id),
     await teamNamesFor(gate.competition.id),
+    gate.competition.sport,
     shape,
   );
   if (result.rows.length === 0) {
@@ -2016,6 +2030,7 @@ export async function importCommitAction(
     csv,
     await bandsFor(gate.competition.id),
     await teamNamesFor(gate.competition.id),
+    gate.competition.sport,
     options?.shape,
   );
   if (parsed.errors.length > 0 && options?.skipInvalid !== true) {

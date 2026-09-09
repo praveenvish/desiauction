@@ -1,3 +1,4 @@
+import { sportPackFor } from "@desiauction/core";
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
@@ -59,6 +60,12 @@ export default async function RegistrationsPage({
             page={dashboard.page}
             teams={dashboard.teams}
             orphanPreSigned={dashboard.orphanPreSigned ?? []}
+            // Plain {key,label} pairs: a pack carries functions and cannot
+            // cross into a client component.
+            roles={sportPackFor(dashboard.competition.sport).roles.values.map((value) => ({
+              key: value.key,
+              label: value.label,
+            }))}
             registrationOpen={dashboard.registrationOpen}
             categoryFlags={dashboard.categoryFlags ?? {}}
             filters={{
