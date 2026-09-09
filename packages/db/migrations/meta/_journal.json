@@ -372,6 +372,27 @@
       "when": 1788192000000,
       "tag": "0052_basketball",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1788278400000,
+      "tag": "0053_box_cricket",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1788364800000,
+      "tag": "0054_esports",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1788451200000,
+      "tag": "0055_demo_box_cricket",
+      "breakpoints": true
     }
   ]
 }

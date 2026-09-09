@@ -18,6 +18,8 @@ import { KABADDI } from "./kabaddi";
 import { VOLLEYBALL } from "./volleyball";
 import { BASKETBALL } from "./basketball";
 import { HOCKEY } from "./hockey";
+import { BOX_CRICKET } from "./box-cricket";
+import { ESPORTS } from "./esports";
 
 import type { StandingsRules } from "../standings";
 
@@ -54,6 +56,8 @@ export const SPORTS: readonly SportPack[] = [
   VOLLEYBALL,
   HOCKEY,
   BASKETBALL,
+  BOX_CRICKET,
+  ESPORTS,
 ];
 
 /**

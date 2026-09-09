@@ -1835,6 +1835,11 @@ export const demoRequests = pgTable(
     sport: text("sport", {
       enum: [
         "cricket",
+        // Added when the pack shipped (0055). The registry and this list stay
+        // separate on purpose — but a sport we CAN run must be sayable here, or
+        // the organizer who runs it picks "cricket" and the demand signal for
+        // the format they actually run is lost.
+        "box_cricket",
         "football",
         "kabaddi",
         "volleyball",

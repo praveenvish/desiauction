@@ -61,7 +61,11 @@ test("the cricket profile saves, counts, and frames the career page", async ({ p
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
 
-  await page.getByLabel("Cricket playing role").selectOption("all_rounder");
+  // `exact`: /account renders a panel per registered sport, and box cricket's
+  // "Box cricket playing role" CONTAINS this label — `getByLabel` matches on a
+  // case-insensitive substring, so a loose match resolves to both selects. The
+  // labels are distinct to a reader; only the locator conflates them.
+  await page.getByLabel("Cricket playing role", { exact: true }).selectOption("all_rounder");
   await page.getByRole("button", { name: "Save cricket profile" }).click();
   await expect(page.getByText("Cricket profile saved")).toBeVisible();
 

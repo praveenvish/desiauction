@@ -46,6 +46,7 @@ type FieldErrors = Extract<AddPlayerActionResult, { ok: false }>["fieldErrors"];
 export function AddPlayerDialog({
   slug,
   roles,
+  rolesRequired,
 }: {
   slug: string;
   /**
@@ -55,11 +56,21 @@ export function AddPlayerDialog({
    * refused whichever of them they picked.
    */
   roles: readonly { key: string; label: string }[];
+  /**
+   * Whether this sport insists every player has one.
+   *
+   * Esports is the first shipped pack that does not: Valorant has positions,
+   * BGMI has different ones, a FIFA ladder has none. Without this the dialog
+   * opened on `roles[0]` and an organizer who never touched the select would
+   * stamp every hand-added player an In-game leader — a value they did not
+   * choose, in a sport that does not require one.
+   */
+  rolesRequired: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const blank = { ...EMPTY_FORM, role: roles[0]?.key ?? "" };
+  const blank = { ...EMPTY_FORM, role: rolesRequired ? (roles[0]?.key ?? "") : "" };
   const [form, setForm] = useState(blank);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(undefined);
   const [busy, setBusy] = useState(false);
@@ -168,6 +179,7 @@ export function AddPlayerDialog({
               {...(fieldErrors?.phone !== undefined ? { error: fieldErrors.phone } : {})}
             />
             <Select label="Playing role" name="role" value={form.role} onChange={set("role")}>
+              {rolesRequired ? null : <option value="">No particular role</option>}
               {roles.map((role) => (
                 <option key={role.key} value={role.key}>
                   {role.label}

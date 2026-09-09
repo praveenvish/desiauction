@@ -89,6 +89,14 @@ describe("a role means what the season's sport says it means", () => {
       ["basketball", "PG", "guard"],
       ["basketball", "5", "center"],
       ["basketball", "power forward", "forward"],
+      // Box cricket borrows cricket's vocabulary by reference, so cricket's
+      // spellings must place in it — if they stopped, the borrow broke.
+      ["box_cricket", "Wicket Keeper Batsman", "wicket_keeper"],
+      ["box_cricket", "leg spinner", "bowler"],
+      // "Support" is what this role is called everywhere; the LABEL is Anchor
+      // because the product has a Support page and one word cannot be both.
+      ["esports", "support", "anchor"],
+      ["esports", "shotcaller", "igl"],
     ] as const) {
       const csv = `name,phone,role\nPlayer One,9876543210,${written}`;
       const result = parseRegistrationCsv(csv, undefined, { pack: sportPackFor(sport) });
@@ -108,12 +116,16 @@ describe("a role means what the season's sport says it means", () => {
 });
 
 /**
- * A SPORT MAY DECLARE THAT IT HAS NO ROLES, and the contract has always allowed
- * it — `RoleVocabulary.required` is a per-pack fact, because a sport with no
- * meaningful playing position would otherwise have to invent one.
+ * A SPORT MAY DECLARE THAT IT HAS NO ROLES, and ESPORTS now does.
  *
- * No shipped pack does that yet, so this is the only place the branch can be
- * reached: `evaluateRegistration` and `submitRegistration` take a SPORT KEY and
+ * `RoleVocabulary.required` has been a per-pack fact since Phase 0 and nothing
+ * shipped had ever set it false, so this branch was reachable only from the
+ * synthetic pack below. Esports reaches it for real: Valorant has positions,
+ * BGMI has different ones, a FIFA ladder has none, so the four it offers are
+ * offered rather than demanded.
+ *
+ * The synthetic pack stays because it can be pointed at a vocabulary esports
+ * does not have, which is how the "present and wrong" case is tested: `evaluateRegistration` and `submitRegistration` take a SPORT KEY and
  * resolve the pack themselves, while `validateNewPlayer` takes the pack, so a
  * synthetic one can be handed to it. All three say the rule the same way.
  */
@@ -145,6 +157,24 @@ describe("a sport whose players have no position", () => {
     });
     expect(result.rows).toEqual([]);
     expect(result.errors[0]?.message).toContain('invalid roleless role "banana"');
+  });
+
+  it("accepts a blank role in ESPORTS, which is a shipped pack and not a fixture", () => {
+    // The branch, reached through the registry rather than a hand-built pack.
+    const result = parseRegistrationCsv("name,phone,role\nGhost,9876543210,", undefined, {
+      pack: sportPackFor("esports"),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.role).toBe("");
+  });
+
+  it("still places an esports role when the file names one", () => {
+    // Optional does not mean ignored: a roster that says "AWPer" gets a sniper.
+    const result = parseRegistrationCsv("name,phone,role\nGhost,9876543210,AWPer", undefined, {
+      pack: sportPackFor("esports"),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.role).toBe("sniper");
   });
 
   it("refuses a blank role where the sport DOES require one", () => {

@@ -67,6 +67,7 @@ export default async function RegistrationsPage({
               key: value.key,
               label: value.label,
             }))}
+            rolesRequired={sportPackFor(dashboard.competition.sport).roles.required}
             registrationOpen={dashboard.registrationOpen}
             categoryFlags={dashboard.categoryFlags ?? {}}
             filters={{

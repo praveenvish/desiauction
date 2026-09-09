@@ -42,6 +42,13 @@ export const DEMO_SOURCES = ["schedule-demo", "pricing", "landing", "help", "oth
  */
 export const DEMO_SPORTS = [
   "cricket",
+  /*
+   * Underscored, unlike "table-tennis" beside it, because this one IS a pack
+   * key (`box_cricket`) and a test holds every runnable sport to appearing
+   * here. The hyphenated entries name sports we cannot run yet and answer to
+   * nothing but this list.
+   */
+  "box_cricket",
   "football",
   "kabaddi",
   "volleyball",
