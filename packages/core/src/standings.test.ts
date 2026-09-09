@@ -11,6 +11,8 @@ import { ballsOf, oversOf } from "./sports/overs";
 import { FOOTBALL } from "./sports/football";
 import { KABADDI } from "./sports/kabaddi";
 import { VOLLEYBALL } from "./sports/volleyball";
+import { HOCKEY } from "./sports/hockey";
+import { BASKETBALL } from "./sports/basketball";
 import { standingsRulesOf } from "./sports";
 
 /*
@@ -461,5 +463,96 @@ describe("the table, in volleyball", () => {
       "Pitch",
       "Mat",
     ]);
+  });
+});
+
+/**
+ * BASKETBALL — the first scheme in this repo where LOSING is worth something.
+ *
+ * Every pack before it gives nothing for a loss, so `PointsPolicy` being four
+ * independent numbers rather than a ladder that assumes zero at the bottom had
+ * never actually been exercised. FIBA awards 2 for a win and 1 for a loss, and
+ * that is how basketball tables are read at every level.
+ */
+describe("the table, in basketball", () => {
+  const RULES = standingsRulesOf(BASKETBALL);
+  const game = (home: string, away: string, hp: number, ap: number) => ({
+    homeTeamId: home,
+    awayTeamId: away,
+    outcome: (hp > ap ? "home_win" : "away_win") as ResultOutcome,
+    homeScore: { points: hp },
+    awayScore: { points: ap },
+  });
+
+  it("gives the loser a point, which no other sport here does", () => {
+    const rows = buildStandings(TEAMS, [game(A, B, 80, 70)], RULES);
+    expect(rowFor(rows, A).points, "2 for the win").toBe(2);
+    expect(rowFor(rows, B).points, "1 for the loss — this is the sport").toBe(1);
+    // And a team that has not played still has nothing, so "1 for a loss" has
+    // not quietly become "1 for existing".
+    expect(rowFor(rows, C).points).toBe(0);
+  });
+
+  it("ranks on points, then point difference", () => {
+    const rows = buildStandings(
+      TEAMS,
+      [game(A, B, 100, 60), game(B, C, 90, 88), game(C, A, 70, 99)],
+      RULES,
+    );
+    // A won both (4). B won one and lost one (3). C lost both — and still has
+    // 2, because two losses are two points, which is the whole oddity.
+    expect(rows.map((row) => row.teamId)).toEqual([A, B, C]);
+    expect(rowFor(rows, A).points).toBe(4);
+    expect(rowFor(rows, B).points).toBe(3);
+    expect(rowFor(rows, C).points, "nil wins is not nil points here").toBe(2);
+    expect(rowFor(rows, C).tiebreakers["point_difference"]).toBe(-31);
+  });
+
+  it("lets a team that played more games sit level on points, which is the sport", () => {
+    /*
+     * The consequence of 2/1, named in the pack and asserted here so nobody
+     * later reads it as a bug: points are `2W + L`, which is `W + games played`.
+     * A is 2-0 and B is 1-3, and they are level on 4. Every FIBA table behaves
+     * this way and it resolves once the fixtures even out.
+     */
+    const rows = buildStandings(
+      TEAMS,
+      [
+        // A: two games, both won.
+        game(A, C, 80, 70),
+        game(A, C, 81, 71),
+        // B: three games, one won.
+        game(B, C, 90, 60),
+        game(C, B, 90, 60),
+        game(C, B, 91, 61),
+      ],
+      RULES,
+    );
+    expect(rowFor(rows, A).points, "2 wins in 2 games").toBe(4);
+    expect(rowFor(rows, B).points, "1 win in 3 games — level with A").toBe(4);
+  });
+});
+
+/** HOCKEY shares football's 3/1/0 and its goal-difference chain. */
+describe("the table, in hockey", () => {
+  const RULES = standingsRulesOf(HOCKEY);
+  const match = (home: string, away: string, hg: number, ag: number) => ({
+    homeTeamId: home,
+    awayTeamId: away,
+    outcome: (hg > ag ? "home_win" : hg < ag ? "away_win" : "draw") as ResultOutcome,
+    homeScore: { goals: hg },
+    awayScore: { goals: ag },
+  });
+
+  it("gives nothing for a loss, and one for a draw", () => {
+    const rows = buildStandings(TEAMS, [match(A, B, 3, 1), match(B, C, 2, 2)], RULES);
+    expect(rowFor(rows, A).points).toBe(3);
+    expect(rowFor(rows, B).points, "lost one, drew one").toBe(1);
+    expect(rowFor(rows, C).points).toBe(1);
+  });
+
+  it("separates teams level on points by goal difference", () => {
+    const rows = buildStandings(TEAMS, [match(A, C, 5, 0), match(B, C, 1, 0)], RULES);
+    expect(rows.map((row) => row.teamId).slice(0, 2), "A's +5 beats B's +1").toEqual([A, B]);
   });
 });

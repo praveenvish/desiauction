@@ -16,6 +16,8 @@ import { CRICKET } from "./cricket";
 import { FOOTBALL } from "./football";
 import { KABADDI } from "./kabaddi";
 import { VOLLEYBALL } from "./volleyball";
+import { BASKETBALL } from "./basketball";
+import { HOCKEY } from "./hockey";
 
 import type { StandingsRules } from "../standings";
 
@@ -45,7 +47,14 @@ export { VOLLEYBALL, VOLLEYBALL_ROLE_KEYS, VOLLEYBALL_HAND_KEYS } from "./volley
 export type { VolleyballRole, VolleyballHand } from "./volleyball";
 
 /** Every sport the platform can run. A pack each — see `types.ts` for the contract. */
-export const SPORTS: readonly SportPack[] = [CRICKET, FOOTBALL, KABADDI, VOLLEYBALL];
+export const SPORTS: readonly SportPack[] = [
+  CRICKET,
+  FOOTBALL,
+  KABADDI,
+  VOLLEYBALL,
+  HOCKEY,
+  BASKETBALL,
+];
 
 /**
  * The pack every caller resolves to until competitions carry a sport (Phase 1).

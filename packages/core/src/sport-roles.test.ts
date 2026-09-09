@@ -82,6 +82,13 @@ describe("a role means what the season's sport says it means", () => {
       ["kabaddi", "left corner", "defender"],
       ["volleyball", "outside hitter", "attacker"],
       ["cricket", "All Rounder", "all_rounder"],
+      // Hockey's own words for football's four lines.
+      ["hockey", "drag flicker", "defender"],
+      ["hockey", "half", "midfielder"],
+      // Half of amateur basketball writes the position NUMBER, not its name.
+      ["basketball", "PG", "guard"],
+      ["basketball", "5", "center"],
+      ["basketball", "power forward", "forward"],
     ] as const) {
       const csv = `name,phone,role\nPlayer One,9876543210,${written}`;
       const result = parseRegistrationCsv(csv, undefined, { pack: sportPackFor(sport) });
