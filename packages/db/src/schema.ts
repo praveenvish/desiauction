@@ -1846,7 +1846,9 @@ export const demoRequests = pgTable(
         "badminton",
         "basketball",
         "hockey",
-        "table-tennis",
+        // Renamed from "table-tennis" in 0057 — one identifier per sport, so
+        // its demand is not split across two buckets.
+        "table_tennis",
         "pickleball",
         "esports",
         "other",

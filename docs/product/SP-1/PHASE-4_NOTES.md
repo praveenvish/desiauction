@@ -171,15 +171,34 @@ about that sport rather than a failure of the library.
 
 ## 6 · What still blocks specific sports
 
-**Racquet sports** — badminton, table tennis, tennis, pickleball. A team tie is
-several **rubbers** (singles, doubles), not one scoreline, and
-`fixture_results.score` is `{ home, away }`. Needs `fixtureShape: "single" |
-"rubbers"` plus a score shape to match: a Phase-2-sized change, not a pack file.
-Everything else about them fits — they run as auction team leagues here.
+**Racquet sports — RETRACTED. They were never blocked.**
 
-**Shipped:** cricket, football, kabaddi, volleyball.
+This section said badminton, table tennis, tennis and pickleball needed
+`fixtureShape: "single" | "rubbers"` because "a team tie is several rubbers, not
+one scoreline". The premise is true and the conclusion did not follow, and it
+went unchecked for a fortnight while three of those sports sat on the demand
+form marked unbuildable.
 
-**Ready with no blockers:** hockey, basketball, box cricket, esports.
+A tie's RESULT is one scoreline per side — rubbers won, and games won inside
+them — which is the arrangement volleyball has had since Phase 4 with sets and
+points. `ScoreRecord` is `Record<string, number>`, the result form is generated
+from `scoreFields`, and `buildStandings` folds whatever the pack names. Badminton,
+table tennis and pickleball shipped in 0056 as ordinary pack files with **no code
+change at all**.
+
+What is genuinely unavailable is recording WHO played the third rubber and how
+it finished. That is a scorecard with line-ups, and no sport here has one —
+cricket cannot say who batted either. Racquet sports are no more limited than
+the six that shipped before them, which is what this note should have said.
+
+**Still genuinely blocked: BATTLE ROYALE** (BGMI, Free Fire). `FixtureResultInput`
+is `homeTeamId` / `awayTeamId` — strictly two-sided — and a lobby is twenty-five
+squads scored on placement plus kills. No arrangement of score fields fixes
+that; it needs an N-sided fixture, which is a real change to the fixtures table,
+the result writer, the standings fold and the fixtures UI.
+
+**Shipped:** cricket, football, kabaddi, volleyball, hockey, basketball, box
+cricket, esports, badminton, table tennis, pickleball — eleven.
 
 ## 7 · Verification of the terminology work
 

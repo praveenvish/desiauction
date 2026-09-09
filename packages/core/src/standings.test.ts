@@ -13,6 +13,7 @@ import { KABADDI } from "./sports/kabaddi";
 import { VOLLEYBALL } from "./sports/volleyball";
 import { HOCKEY } from "./sports/hockey";
 import { BASKETBALL } from "./sports/basketball";
+import { BADMINTON } from "./sports/badminton";
 import { standingsRulesOf } from "./sports";
 
 /*
@@ -554,5 +555,60 @@ describe("the table, in hockey", () => {
   it("separates teams level on points by goal difference", () => {
     const rows = buildStandings(TEAMS, [match(A, C, 5, 0), match(B, C, 1, 0)], RULES);
     expect(rows.map((row) => row.teamId).slice(0, 2), "A's +5 beats B's +1").toEqual([A, B]);
+  });
+});
+
+/**
+ * BADMINTON — the sport this repo recorded as BLOCKED for a fortnight, wrongly.
+ *
+ * `PHASE-4_NOTES.md` said racquet sports needed a new `fixtureShape` because "a
+ * team tie is several RUBBERS, not one scoreline". True, and the conclusion did
+ * not follow: a tie's RESULT is one scoreline per side — rubbers won, and games
+ * won inside them — which is exactly volleyball's sets and points. This file is
+ * the evidence, and it needed nothing that was not already here.
+ */
+describe("the table, in badminton", () => {
+  const RULES = standingsRulesOf(BADMINTON);
+  const tie = (home: string, away: string, hr: number, ar: number, hg: number, ag: number) => ({
+    homeTeamId: home,
+    awayTeamId: away,
+    outcome: (hr > ar ? "home_win" : "away_win") as ResultOutcome,
+    homeScore: { rubbers: hr, games: hg },
+    awayScore: { rubbers: ar, games: ag },
+  });
+
+  it("scores a five-rubber tie the way a scorer reads it off the sheet", () => {
+    const rows = buildStandings(TEAMS, [tie(A, B, 3, 2, 7, 5)], RULES);
+    expect(rowFor(rows, A).points).toBe(2);
+    expect(rowFor(rows, A).scored).toEqual({ rubbers: 3, games: 7 });
+    expect(rowFor(rows, A).tiebreakers["rubbers_difference"]).toBe(1);
+  });
+
+  it("separates teams level on ties by RUBBERS, then by games", () => {
+    /*
+     * The arrangement the old note said was unavailable. B and C have each won
+     * one tie and lost one; the rubber difference splits them, and games break
+     * a rubber tie — which is precisely how a badminton table is read.
+     */
+    const rows = buildStandings(
+      TEAMS,
+      [tie(A, B, 3, 0, 6, 1), tie(B, C, 3, 2, 7, 6), tie(C, A, 0, 3, 2, 6)],
+      RULES,
+    );
+    expect(rowFor(rows, A).points, "won both").toBe(4);
+    expect(rowFor(rows, B).points, "won one, lost one").toBe(2);
+    expect(rowFor(rows, C).points, "lost both — nothing for a loss here").toBe(0);
+    expect(rows.map((row) => row.teamId)).toEqual([A, B, C]);
+    // And the rubber difference is what would separate B from a team level on
+    // points, which is the arrangement the old note called unavailable. B won
+    // 3 rubbers across the two ties and conceded 5.
+    expect(rowFor(rows, B).tiebreakers["rubbers_difference"]).toBe(-2);
+  });
+
+  it("prints the tie as rubbers with games beside them", () => {
+    // `summariseSide` is the PACK's, not the rules' — `standingsRulesOf` carries
+    // only what the table's arithmetic needs.
+    const rows = buildStandings(TEAMS, [tie(A, B, 3, 1, 7, 3)], RULES);
+    expect(BADMINTON.standings.summariseSide(rowFor(rows, A).scored)).toBe("3 (7)");
   });
 });

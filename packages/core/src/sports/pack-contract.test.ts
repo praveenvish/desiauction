@@ -109,21 +109,33 @@ interface SeededSport {
   readonly migration: string;
 }
 
-const SEED =
-  /INSERT INTO "sports"[^;]*?VALUES\s*\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*(true|false)\s*,\s*(\d+)\s*\)/g;
+/**
+ * Every row of every `INSERT INTO "sports"`, including the multi-row form.
+ *
+ * This used to be one regex matching a single `VALUES (...)` tuple, which read
+ * the FIRST row of a multi-row insert and silently ignored the rest — so a
+ * migration seeding three sports registered one and the other two failed this
+ * test for a reason that was not their fault. A guardrail that partially reads
+ * its input is the same defect it exists to catch, so it is now two steps: find
+ * each statement, then take every tuple inside it.
+ */
+const STATEMENT = /INSERT INTO "sports"[^;]*?VALUES([^;]*);/gi;
+const TUPLE = /\(\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*(true|false)\s*,\s*(\d+)\s*\)/g;
 
 const seeded: SeededSport[] = readdirSync(MIGRATIONS)
   .filter((name) => name.endsWith(".sql"))
   .sort()
   .flatMap((name) =>
-    [...withoutSqlComments(readFileSync(resolve(MIGRATIONS, name), "utf8")).matchAll(SEED)].map(
-      (match) => ({
-        key: match[1] as string,
-        label: match[2] as string,
-        enabled: match[3] === "true",
-        order: Number(match[4]),
+    [
+      ...withoutSqlComments(readFileSync(resolve(MIGRATIONS, name), "utf8")).matchAll(STATEMENT),
+    ].flatMap((statement) =>
+      [...(statement[1] ?? "").matchAll(TUPLE)].map((row) => ({
+        key: row[1] as string,
+        label: row[2] as string,
+        enabled: row[3] === "true",
+        order: Number(row[4]),
         migration: name,
-      }),
+      })),
     ),
   );
 

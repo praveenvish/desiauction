@@ -55,7 +55,7 @@ export const DEMO_SPORTS = [
   "badminton",
   "basketball",
   "hockey",
-  "table-tennis",
+  "table_tennis",
   "pickleball",
   "esports",
   "other",
