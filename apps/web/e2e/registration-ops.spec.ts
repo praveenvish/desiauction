@@ -393,3 +393,81 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
   // Still four players — updated in place, never duplicated.
   await expect(page.getByTestId("stat-total")).toContainText("4");
 });
+
+/*
+ * VALUE MAPPING — the half of the mapping step that was missing.
+ *
+ * Column mapping translates the file's HEADERS. It does nothing about what is
+ * written UNDER them, and for a closed vocabulary that is the half that stops
+ * an import: a club whose price bands are "Category 1/2/3" against a season
+ * configured for A/B/C got `unknown base price band` on every row. The data
+ * path has existed since migration 0033 and `applyMapping` always applied it;
+ * there was simply no way to author one, so `{}` went out on every import.
+ *
+ * No alias table could have helped. Bands are configured per season and team
+ * names are invented per season, so nothing shipped in this repo can know them.
+ *
+ * REMEMBERING is deliberately not asserted here. Persisting the answer needs a
+ * second import of a file with the same signature, and the storage half
+ * (`org_import_mappings.value_maps`) already predates this work — what was
+ * missing, and what this covers, is authoring one at all.
+ */
+test("a file's own vocabulary is mapped onto the season's", async ({ page }) => {
+  const stamp = String(Date.now()).slice(-8);
+  await otpLogin(page, `73${stamp}`);
+
+  await page.goto("/orgs");
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Vocab Org ${stamp}`);
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page.getByTestId("org-name")).toBeVisible();
+
+  await page.goto("/seasons");
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Vocab Cup ${stamp}`);
+  await page.getByLabel("Location").fill("Malad");
+  await page.getByLabel("Starts on").fill("2026-08-01");
+  await page.getByLabel("Ends on").fill("2026-08-15");
+  await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page.getByTestId("competition-status")).toHaveText("draft");
+  await page.getByTestId("advance-status").click();
+  await page.getByTestId("advance-status").click();
+  await page.getByTestId("open-dashboard").click();
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+
+  // Three players, all banded in the club's own words. The season accepts
+  // A/B/C, so as written every one of these rows is refused.
+  const csv =
+    "name,phone,role,base_price_band\n" +
+    `Band One,6${stamp}1,batter,Category 1\n` +
+    `Band Two,6${stamp}2,bowler,Category 1\n` +
+    `Band Three,6${stamp}3,batter,Category 2`;
+  await page.getByTestId("open-import").click();
+  await page.getByTestId("import-textarea").evaluate((el, text) => {
+    (el as HTMLTextAreaElement).value = text;
+  }, csv);
+  await page.getByTestId("import-preview-btn").click();
+
+  // The screen names what it could not place, and how many rows it costs —
+  // which is the argument for doing anything about it.
+  const mapper = page.getByTestId("value-mapper");
+  await expect(mapper).toBeVisible({ timeout: 20_000 });
+  await expect(mapper).toContainText("Category 1");
+  await expect(mapper).toContainText("Category 2");
+
+  // NOTHING is pre-selected: "Category 1 means A" is obvious to a human and
+  // unguessable by us, and a wrong guess here reprices a player silently.
+  const first = page.getByTestId("value-select-base_price_band-category 1");
+  await expect(first).toHaveValue("");
+  await first.selectOption("A");
+  await page.getByTestId("value-select-base_price_band-category 2").selectOption("B");
+
+  await page.getByTestId("import-preview-btn").click();
+  // The list shrinks to nothing as it is answered — the property that tells the
+  // organizer their answers took effect.
+  await expect(page.getByTestId("import-preview")).toContainText("3 valid", { timeout: 20_000 });
+  await expect(page.getByTestId("value-mapper")).toHaveCount(0);
+
+  await page.getByTestId("import-commit").click();
+  await expect(page.getByTestId("stat-total")).toContainText("3");
+});

@@ -59,6 +59,8 @@ export {
 } from "./registration-csv";
 export { isAmbiguousDate, parseCsvDate } from "./csv-date";
 export { planImport, planImportRow } from "./import-diff";
+export { unplacedValues } from "./import-values";
+export type { ImportVocabulary, UnplacedValue, ValueOption } from "./import-values";
 export type {
   ExistingRegistration,
   FieldChange,

@@ -43,7 +43,10 @@ import {
   type TriageAction,
 } from "../../../../server/competition/actions";
 import { AddPlayerDialog } from "./add-player-dialog";
+import type { UnplacedValue, ValueMaps } from "@desiauction/core";
+
 import { ColumnMapper } from "./column-mapper";
+import { ValueMapper } from "./value-mapper";
 import { PhotoImportPanel } from "./photo-import";
 import { PlayerPhotoUploader } from "./player-photo-uploader";
 import { formatDateTime } from "../../../../lib/format-date";
@@ -195,6 +198,16 @@ export function RegistrationDashboardPanel({
   /* The mapping step. `inspection` null = we have not read the file's headers
      yet, which is the state the dialog opens in. */
   const [inspection, setInspection] = useState<ImportInspection | null>(null);
+  /*
+   * What the file's own vocabulary means in this season — "Category 1" is band
+   * A, "Arrows" is Andheri Arrows. The data path for this has existed since
+   * migration 0033 (`org_import_mappings.value_maps`) and `applyMapping` has
+   * always applied it; there was simply no way to author one, so it was sent as
+   * `{}` on every import.
+   */
+  const [valueMaps, setValueMaps] = useState<ValueMaps>({});
+  /** The values this season could not place — see `refreshPreview`. */
+  const [unplaced, setUnplaced] = useState<UnplacedValue[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [dateOrder, setDateOrder] = useState<DateOrder>("dmy");
   const [remember, setRemember] = useState(true);
@@ -476,6 +489,11 @@ export function RegistrationDashboardPanel({
     setInspection(null);
     setMapping({});
     setUsingSaved(false);
+    // A NEW file gets no answers from the last one. "Category 1 means band A"
+    // was true of the roster the organizer just imported; carrying it into the
+    // next file would rewrite values nobody looked at.
+    setValueMaps({});
+    setUnplaced([]);
   };
 
   const readCsvFile = (file: File) => {
@@ -491,6 +509,7 @@ export function RegistrationDashboardPanel({
 
   const shape = (): ImportShape => ({
     mapping,
+    valueMaps,
     dateOrder,
     policy: fileWins ? "file-wins" : "fill-blanks",
   });
@@ -526,6 +545,10 @@ export function RegistrationDashboardPanel({
       if (read.saved !== undefined) {
         active = read.saved.mapping;
         setDateOrder(read.saved.dateOrder);
+        // The saved VALUES too, which is the half that made saving worth it:
+        // a club whose bands are "Category 1/2/3" answers once, not once per
+        // season for the rest of the tournament's life.
+        setValueMaps(read.saved.valueMaps);
         setUsingSaved(true);
       } else {
         active = read.detected === undefined ? {} : mappingOf(read.detected);
@@ -539,13 +562,27 @@ export function RegistrationDashboardPanel({
         return;
       }
     }
-    setPreview(
-      await importPreviewAction(slug, text, {
-        mapping: active,
-        dateOrder,
-        policy: fileWins ? "file-wins" : "fill-blanks",
-      }),
-    );
+    // `active` rather than `shape()` because the mapping may have been settled
+    // a few lines above and `mapping` state has not caught up yet. Everything
+    // else comes from the shape, INCLUDING the value maps, which this call used
+    // to leave out — so an organizer's answer changed nothing until the second
+    // press, which reads as the feature not working.
+    await refreshPreview(text, { ...shape(), mapping: active });
+  };
+
+  /**
+   * Re-validate and keep the unplaced list, which outlives the preview.
+   *
+   * The list has to survive its own answers: mapping a value makes the preview
+   * stale, and a stale preview is cleared — but if the list lived on the
+   * preview it would vanish the instant the organizer touched it, halfway
+   * through a column of five. It is replaced only by a NEWER list, so it
+   * shrinks as it is filled in rather than disappearing.
+   */
+  const refreshPreview = async (text: string, active: ImportShape): Promise<void> => {
+    const result = await importPreviewAction(slug, text, active);
+    setPreview(result);
+    setUnplaced(result.unplaced);
   };
 
   /**
@@ -565,7 +602,7 @@ export function RegistrationDashboardPanel({
         signature: inspection.signature,
         label: null,
         mapping,
-        valueMaps: {},
+        valueMaps,
         dateOrder,
         scope: "org",
       });
@@ -593,7 +630,10 @@ export function RegistrationDashboardPanel({
         // Rows were left behind on purpose. Closing the dialog and wiping the
         // textarea would take away the only copy of WHICH rows, and the whole
         // point of skipping is that the organizer comes back to them.
-        setPreview(await importPreviewAction(slug, text));
+        // Under the SAME shape the commit just used: re-reading the leftover
+        // rows against no mapping at all would report every one of them broken
+        // for a reason the organizer had already fixed.
+        await refreshPreview(text, shape());
         return;
       }
       resetImport();
@@ -1689,6 +1729,21 @@ export function RegistrationDashboardPanel({
                           setMapping(next);
                           // The preview describes the OLD mapping the moment
                           // the mapping changes; showing it on would be a lie.
+                          setPreview(null);
+                          // And the unplaced values were computed under it.
+                          setValueMaps({});
+                          setUnplaced([]);
+                        }}
+                      />
+                      {/* The values, under the columns — the order the
+                          organizer meets them in: which column is this, then
+                          what do the words in it mean. */}
+                      <ValueMapper
+                        unplaced={unplaced}
+                        valueMaps={valueMaps}
+                        onChange={(next) => {
+                          setValueMaps(next);
+                          // The preview counted rows this answer just fixed.
                           setPreview(null);
                         }}
                       />

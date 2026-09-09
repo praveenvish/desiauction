@@ -16,6 +16,7 @@ import {
   slugifyName,
   tokenizeCsv,
   validateNewPlayer,
+  IMPORT_FIELDS,
   type ColumnMapping,
   type CsvRowError,
   type DateOrder,
@@ -27,6 +28,8 @@ import {
   type RegistrationStatus,
   parseRoleIn,
   sportPackFor,
+  unplacedValues,
+  type UnplacedValue,
   type ValueMaps,
 } from "@desiauction/core";
 import {
@@ -1690,6 +1693,16 @@ export interface ImportPreview {
   validCount: number;
   errors: CsvRowError[];
   /**
+   * Values this file uses that the SEASON cannot place, each with the legal
+   * answers — the other half of column mapping.
+   *
+   * Computed here rather than at inspection because it depends on the mapping:
+   * a column the organizer has just pointed at `base_price_band` is only then
+   * judged as a band. The preview already re-runs on every mapping change, so
+   * the list stays honest for free.
+   */
+  unplaced: UnplacedValue[];
+  /**
    * What committing would actually DO, against what is already stored. Absent
    * only when the file could not be read at all.
    *
@@ -1901,6 +1914,46 @@ export interface ImportShape {
  * (our own export, round-tripped) needs no translation and must keep working
  * untouched — so an absent mapping means "read it as written", not "guess".
  */
+/**
+ * The file as the parser reads it: our header names, values substituted.
+ *
+ * Split out of `parseUnderShape` because the preview needs the SAME records to
+ * work out which values it could not place — computing them twice, or from a
+ * different starting point, is how a screen ends up offering to fix a row the
+ * commit was never going to reject.
+ *
+ * VALUE MAPS APPLY EVEN WITHOUT A COLUMN MAPPING, which they did not. A file
+ * whose headers are already ours skips `applyMapping` entirely — correct, and
+ * the reason is documented on `parseUnderShape` — but that also skipped the
+ * value substitution, so an organizer who mapped "Category 1" to band A on a
+ * canonically-headed file watched their answer do nothing. An identity mapping
+ * is built for that case ONLY when there is something to substitute, so the
+ * untouched path stays untouched.
+ */
+function canonicalRecords(
+  csv: string,
+  shape: ImportShape | undefined,
+): readonly (readonly string[])[] {
+  const records = tokenizeCsv(csv);
+  const mapping = shape?.mapping;
+  const valueMaps = shape?.valueMaps;
+  if (mapping !== undefined && Object.keys(mapping).length > 0) {
+    return applyMapping(records, mapping, valueMaps);
+  }
+  if (valueMaps === undefined || Object.keys(valueMaps).length === 0) {
+    return records;
+  }
+  const header = (records[0] ?? []).map((cell) => cell.trim().toLowerCase());
+  const identity: ColumnMapping = {};
+  IMPORT_FIELDS.forEach((field) => {
+    const at = header.indexOf(field);
+    if (at !== -1) {
+      identity[field] = at;
+    }
+  });
+  return applyMapping(records, identity, valueMaps);
+}
+
 function parseUnderShape(
   csv: string,
   bands: readonly string[],
@@ -1909,12 +1962,7 @@ function parseUnderShape(
   sport: string,
   shape: ImportShape | undefined,
 ): ReturnType<typeof parseRegistrationRecords> {
-  const records = tokenizeCsv(csv);
-  const mapping = shape?.mapping;
-  const source =
-    mapping === undefined || Object.keys(mapping).length === 0
-      ? records
-      : applyMapping(records, mapping, shape?.valueMaps);
+  const source = canonicalRecords(csv, shape);
   return parseRegistrationRecords(source, bands, {
     now: new Date(),
     knownTeams: teamNames,
@@ -1934,21 +1982,33 @@ export async function importPreviewAction(
 ): Promise<ImportPreview> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
-    return { validCount: 0, errors: [{ line: 1, message: gate.error }] };
+    return { validCount: 0, errors: [{ line: 1, message: gate.error }], unplaced: [] };
   }
   const tooBig = oversized(csv);
   if (tooBig !== null) {
-    return { validCount: 0, errors: [{ line: 1, message: tooBig }] };
+    return { validCount: 0, errors: [{ line: 1, message: tooBig }], unplaced: [] };
   }
-  const result = parseUnderShape(
-    csv,
-    await bandsFor(gate.competition.id),
-    await teamNamesFor(gate.competition.id),
-    gate.competition.sport,
-    shape,
+  const bands = await bandsFor(gate.competition.id);
+  const teamNames = await teamNamesFor(gate.competition.id);
+  const result = parseUnderShape(csv, bands, teamNames, gate.competition.sport, shape);
+  /*
+   * The values this season cannot place, from the SAME records the parser read.
+   *
+   * Computed before the early return below, because a file whose every row
+   * failed is exactly the file this list exists for: 200 rows of "Category 1"
+   * against a season configured for A/B/C is 200 errors and one decision.
+   */
+  const unplaced = unplacedValues(
+    canonicalRecords(csv, shape),
+    {
+      pack: sportPackFor(gate.competition.sport),
+      bands,
+      teams: teamNames,
+    },
+    shape?.valueMaps ?? {},
   );
   if (result.rows.length === 0) {
-    return { validCount: 0, errors: result.errors };
+    return { validCount: 0, errors: result.errors, unplaced };
   }
   const policy = shape?.policy ?? "fill-blanks";
   const diff = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
@@ -1962,6 +2022,7 @@ export async function importPreviewAction(
   return {
     validCount: result.rows.length,
     errors: result.errors,
+    unplaced,
     diff: {
       counts: diff.counts,
       // Capped for the screen; the counts above are the whole truth and the
