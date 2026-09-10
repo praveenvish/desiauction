@@ -149,21 +149,45 @@ check(
 }
 
 // --- OTP (login is OTP-first; the dev inbox is gone in production) -----------
+//
+// TWO PROVIDERS ARE VALID, and this check used to name only one. It asserted
+// `OTP_PROVIDER === "msg91"`, so a correctly configured WhatsApp deployment
+// would have been REFUSED here — the gate failing the very thing it exists to
+// admit. Whichever is selected, the credentials CHECKED are that provider's.
+const otpProvider = env.OTP_PROVIDER ?? "(unset)";
 check(
   "OTP_PROVIDER",
-  env.OTP_PROVIDER === "msg91",
-  `OTP_PROVIDER=${env.OTP_PROVIDER ?? "(unset)"}`,
-  "set OTP_PROVIDER=msg91 — the dev sender is structurally absent in production, so login would be impossible",
+  otpProvider === "msg91" || otpProvider === "whatsapp",
+  `OTP_PROVIDER=${otpProvider}`,
+  "set OTP_PROVIDER=whatsapp (Meta Cloud API) or msg91 (SMS) — the dev sender is structurally absent in production, so login would be impossible",
 );
-check(
-  "MSG91-credentials",
-  typeof env.MSG91_AUTH_KEY === "string" &&
-    env.MSG91_AUTH_KEY.length > 0 &&
-    typeof env.MSG91_TEMPLATE_ID === "string" &&
-    env.MSG91_TEMPLATE_ID.length > 0,
-  "SMS provider credentials",
-  "set MSG91_AUTH_KEY and MSG91_TEMPLATE_ID",
-);
+const nonEmpty = (value) => typeof value === "string" && value.length > 0;
+if (otpProvider === "whatsapp") {
+  check(
+    "WhatsApp-credentials",
+    nonEmpty(env.WHATSAPP_PHONE_NUMBER_ID) &&
+      nonEmpty(env.WHATSAPP_ACCESS_TOKEN) &&
+      nonEmpty(env.WHATSAPP_TEMPLATE_NAME),
+    "WhatsApp Cloud API credentials",
+    "set WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN and WHATSAPP_TEMPLATE_NAME",
+  );
+  // Not a blocker: WhatsApp is the primary channel, SMS is the documented
+  // fallback (C-19). A deployment with no fallback still works — it just has
+  // nowhere to go when Meta is down, which the operator should decide knowingly.
+  warn(
+    "MSG91-fallback",
+    nonEmpty(env.MSG91_AUTH_KEY) && nonEmpty(env.MSG91_TEMPLATE_ID),
+    "SMS fallback credentials",
+    "set MSG91_AUTH_KEY and MSG91_TEMPLATE_ID so a WhatsApp outage is not a login outage",
+  );
+} else {
+  check(
+    "MSG91-credentials",
+    nonEmpty(env.MSG91_AUTH_KEY) && nonEmpty(env.MSG91_TEMPLATE_ID),
+    "SMS provider credentials",
+    "set MSG91_AUTH_KEY and MSG91_TEMPLATE_ID",
+  );
+}
 
 // --- Passkeys (RP mismatch silently breaks WebAuthn) -------------------------
 check(

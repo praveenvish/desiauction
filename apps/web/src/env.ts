@@ -43,7 +43,20 @@ const envSchema = z.object({
   // OTP delivery (PX-3): "dev" writes to /dev/inbox; "msg91" sends real SMS.
   // Production deploys MUST set msg91 + credentials (beta checklist §B) —
   // the dev sender is structurally invisible outside development.
-  OTP_PROVIDER: z.enum(["dev", "msg91"]).default("dev"),
+  /*
+   * `whatsapp` is Meta's Cloud API DIRECT — no BSP, no platform fee, and the
+   * channel doc C-19 always named first ("WhatsApp OTP first with SMS
+   * fallback"). `msg91` stays as the SMS fallback and is not deprecated.
+   */
+  OTP_PROVIDER: z.enum(["dev", "msg91", "whatsapp"]).default("dev"),
+  /** Meta phone number ID from the WhatsApp Business Account — not the number. */
+  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
+  /** Permanent system-user token. Rotate via SECRET_ROTATION.md. */
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  /** The approved AUTHENTICATION template's name. */
+  WHATSAPP_TEMPLATE_NAME: z.string().min(1).optional(),
+  /** Locale exactly as registered with Meta ("en", "en_US", "hi"). */
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().min(1).optional(),
   MSG91_AUTH_KEY: z.string().min(1).optional(),
   /**
    * The OTP flow's DLT template id, and ONLY the OTP flow's. Its registered
@@ -285,6 +298,23 @@ const productionSchema = envSchema
       "SYSTEM_DATABASE_URL must be a DIFFERENT role from DATABASE_URL (app = NOBYPASSRLS, system = BYPASSRLS)",
     path: ["SYSTEM_DATABASE_URL"],
   })
+  /*
+   * SELECTING A PROVIDER WITHOUT ITS CREDENTIALS IS A LOGIN OUTAGE, and it is
+   * one that only shows up when a real person tries to sign in. Refused at
+   * boot instead, the same way msg91's credentials are.
+   */
+  .refine(
+    (v) =>
+      v.OTP_PROVIDER !== "whatsapp" ||
+      (v.WHATSAPP_PHONE_NUMBER_ID !== undefined &&
+        v.WHATSAPP_ACCESS_TOKEN !== undefined &&
+        v.WHATSAPP_TEMPLATE_NAME !== undefined),
+    {
+      message:
+        "OTP_PROVIDER=whatsapp needs WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN and WHATSAPP_TEMPLATE_NAME — without them nobody can log in",
+      path: ["OTP_PROVIDER"],
+    },
+  )
   .refine((v) => !serving(v) || v.OTP_PROVIDER !== "dev", {
     message:
       "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=msg91 with credentials",
