@@ -4,6 +4,7 @@ import { Badge, Button, Card, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { DEMAND_SPORTS, demandSportBadge } from "../../../content/demand-sports";
 import { answerDemoRequestAction, cancelDemoAction } from "../../../server/admin/demo-actions";
 import type { DemoQueue, DemoQueueRow } from "../../../server/admin/demo-views";
 
@@ -74,24 +75,23 @@ const SIZE_WORDS: Record<string, string> = {
 };
 
 /**
- * The words for the SP-1 gate's answer. `cricket` is NOT dropped as the
- * unremarkable case: an operator reading this queue is counting, and a badge
- * that appears only for the interesting answers makes "cricket" and "asked
- * before we asked the question" look identical.
+ * The words for the SP-1 gate's answer, DERIVED from the one list rather than
+ * retyped here.
+ *
+ * This map was the third copy, and it was stale in exactly the way the form
+ * was: it still keyed on `table-tennis`, renamed `table_tennis` in 0057, and
+ * had never heard of `box_cricket` or `battle_royale`. The failure mode is
+ * quiet — an unknown key falls through to the raw string — so the operator
+ * counting demand read `table_tennis` in a row of ordinary words and had no
+ * reason to think anything was wrong.
+ *
+ * `cricket` is NOT dropped as the unremarkable case: an operator reading this
+ * queue is counting, and a badge that appears only for the interesting answers
+ * makes "cricket" and "asked before we asked the question" look identical.
  */
-const SPORT_WORDS: Record<string, string> = {
-  cricket: "cricket",
-  football: "football",
-  kabaddi: "kabaddi",
-  volleyball: "volleyball",
-  badminton: "badminton",
-  basketball: "basketball",
-  hockey: "hockey",
-  "table-tennis": "table tennis",
-  pickleball: "pickleball",
-  esports: "esports",
-  other: "another sport — see the note",
-};
+const SPORT_WORDS: Record<string, string> = Object.fromEntries(
+  DEMAND_SPORTS.map((sport) => [sport.key, demandSportBadge(sport)]),
+);
 
 const WINDOW_WORDS: Record<string, string> = {
   "weekday-evening": "weekday evenings",

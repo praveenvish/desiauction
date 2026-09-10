@@ -2,6 +2,8 @@ import { demoRequests, newId, type Db } from "@desiauction/db";
 import { normalizePhone } from "@desiauction/core";
 import { and, gt, eq, sql } from "drizzle-orm";
 
+import { DEMAND_SPORTS, type DemandSportKey } from "../../content/demand-sports";
+
 /**
  * THE REQUEST, VALIDATED AND RATE-LIMITED — everything except the IO.
  *
@@ -27,50 +29,22 @@ export const DEMO_SOURCES = ["schedule-demo", "pricing", "landing", "help", "oth
 /**
  * WHAT THEY ASKED FOR — the SP-1 gate's only instrument (migration 0045).
  *
+ * The list itself lives in `content/demand-sports.ts`, declared once with the
+ * words each surface needs, because it used to exist in five places and drifted
+ * twice in two days. That file explains the whole thing; this is the keys.
+ *
  * NOT the sport registry, and it must never be wired to one. `core`'s registry
- * names the sports the platform can RUN, which is cricket and nothing else;
- * this list is what somebody came here WANTING, so it has to offer sports we
- * cannot run yet. Pointing it at the registry would show a single option and
- * measure nothing — and the measurement is the entire reason the column exists.
- *
- * Ordered by expected volume, not alphabetically, because the top of a select
- * is where an honest answer is cheapest to give.
- *
- * `other` is deliberately last and deliberately vague. It is a tail-catcher:
- * the form's note field is where an unlisted sport gets named, and its help
- * text says so.
+ * names the sports the platform can RUN; this names what somebody came here
+ * WANTING, so it has to offer sports we cannot run yet. Pointing it at the
+ * registry would stop it measuring anything — and the measurement is the entire
+ * reason the column exists.
  */
-export const DEMO_SPORTS = [
-  "cricket",
-  /*
-   * Underscored, unlike "table-tennis" beside it, because this one IS a pack
-   * key (`box_cricket`) and a test holds every runnable sport to appearing
-   * here. The hyphenated entries name sports we cannot run yet and answer to
-   * nothing but this list.
-   */
-  "box_cricket",
-  "football",
-  "kabaddi",
-  "volleyball",
-  "badminton",
-  "basketball",
-  "hockey",
-  "table_tennis",
-  "pickleball",
-  "esports",
-  /*
-   * BGMI and Free Fire, and the biggest of the lot by player count. It arrives
-   * last on this list only because the list is ordered by the demand we have
-   * MEASURED, and this option has never been offered — the form could not ask.
-   */
-  "battle_royale",
-  "other",
-] as const;
+export const DEMO_SPORTS: readonly DemandSportKey[] = DEMAND_SPORTS.map((sport) => sport.key);
 
 export type TournamentSize = (typeof TOURNAMENT_SIZES)[number];
 export type PreferredWindow = (typeof PREFERRED_WINDOWS)[number];
 export type DemoSource = (typeof DEMO_SOURCES)[number];
-export type DemoSport = (typeof DEMO_SPORTS)[number];
+export type DemoSport = DemandSportKey;
 
 /**
  * Limits, in the shape `server/auth/otp.ts` set. Per-phone is the tight one

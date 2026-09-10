@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -109,8 +109,10 @@ describe("validateDemoRequest", () => {
   });
 
   it("keeps the sport list independent of the sports the platform can run", () => {
-    // core's registry knows cricket and nothing else. If this list is ever
-    // wired to it, the form offers one option and measures nothing.
+    // The registry names what the platform can RUN — twelve sports now. This
+    // list names what somebody came here WANTING, so it must stay LARGER: wire
+    // it to the registry and the question stops measuring the thing it exists
+    // to measure, because it can no longer be asked about a sport we can't run.
     expect(DEMO_SPORTS.length).toBeGreaterThan(SPORTS.length);
     for (const pack of SPORTS) {
       expect(DEMO_SPORTS).toContain(pack.key);
@@ -118,36 +120,109 @@ describe("validateDemoRequest", () => {
   });
 
   /**
-   * THE FORM OFFERS EXACTLY WHAT THE SERVER ACCEPTS.
+   * NOBODY RETYPES THE LIST.
    *
-   * The two lists are written in different files and nothing held them
-   * together, so they drifted twice: `table-tennis` was renamed `table_tennis`
-   * in 0057 everywhere except the form, which meant choosing Table tennis was
-   * REFUSED — the server rejects an unknown sport rather than folding it to
-   * "other", deliberately, because this is the answer that gets counted. And
-   * `box_cricket` was a valid answer nobody could give.
+   * The sports existed in five places — `DEMAND_SPORTS`, the form's `<option>`
+   * values, the admin queue's badge words, the drizzle enum and the database
+   * CHECK — and drifted twice in two days. `table_tennis` was renamed in 0057
+   * everywhere except the form, so choosing Table tennis was REFUSED (the
+   * server rejects an unknown sport rather than folding it to "other",
+   * deliberately, because this is the answer that gets counted); `box_cricket`
+   * was a valid answer nobody could give.
    *
-   * Both failures are silent from the inside: the type system cannot see into
-   * JSX option values, and every unit test here passes a value it made up.
+   * Three of the five are now derived from `content/demand-sports.ts`, so they
+   * cannot drift. The two below are SQL and cannot be derived, so they are read.
    *
    * Read with readFileSync rather than grep — a file holding a literal control
    * byte is classified as binary and skipped in silence, so a grep-based
    * guardrail passes by refusing to look.
    */
-  it("offers on the form exactly the sports the server will accept", () => {
-    const here = fileURLToPath(new URL(".", import.meta.url));
-    const form = readFileSync(
-      resolve(here, "../../components/marketing/demo-request-form.tsx"),
-      "utf8",
-    );
+  const repoFile = (path: string): string =>
+    readFileSync(resolve(fileURLToPath(new URL(".", import.meta.url)), path), "utf8");
+
+  it("renders the form's sports from the list rather than restating them", () => {
+    const form = repoFile("../../components/marketing/demo-request-form.tsx");
     // The sport select only, so the source and size selects on the same page
     // cannot lend it their values.
     const select = /<Select label="Which sport\?"[\s\S]*?<\/Select>/.exec(form)?.[0];
     expect(select).toBeDefined();
-    const offered = [...(select ?? "").matchAll(/<option value="([^"]*)"/g)]
+    /*
+     * The ONLY literal option is the empty "Choose a sport" placeholder, which
+     * is not a sport. A hardcoded sport here is the exact defect that shipped —
+     * a second copy of the list that looks right and is one rename behind.
+     */
+    const literal = [...(select ?? "").matchAll(/<option value="([^"]*)"/g)]
       .map((match) => match[1] ?? "")
       .filter((value) => value !== "");
-    expect([...offered].sort()).toEqual([...DEMO_SPORTS].sort());
+    expect(literal).toEqual([]);
+    expect(select).toContain("DEMAND_SPORTS.map");
+  });
+
+  it("builds the admin queue's badge words from the list rather than restating them", () => {
+    /*
+     * The third copy, and it was stale in exactly the way the form was — still
+     * keyed on `table-tennis`, never heard of `box_cricket` or `battle_royale`.
+     * It fails quietly: an unknown key falls through to the raw string, so the
+     * operator counting demand reads `table_tennis` in a row of ordinary words
+     * and has no reason to think anything is wrong. That operator's count is
+     * what decides which pack gets written next.
+     */
+    const panel = withoutComments(repoFile("../../app/admin/demos/demo-queue-panel.tsx"));
+    const map = /const SPORT_WORDS[\s\S]*?\n\n/.exec(panel)?.[0];
+    expect(map, "SPORT_WORDS is not shaped the way this test reads").toBeDefined();
+    expect(map).toContain("DEMAND_SPORTS.map");
+    expect([...(map ?? "").matchAll(/^\s*"?([a-z_]+)"?:\s*"/gm)].map((m) => m[1])).toEqual([]);
+  });
+
+  /**
+   * Comments are prose and prose may say anything.
+   *
+   * The schema's own note beside this column explains that an organizer whose
+   * sport is missing "picks \"cricket\" and the demand signal is lost" — a
+   * sentence about the column, quoting a key. Read raw, that quotation counts
+   * as a second cricket and fails the file for describing itself accurately.
+   * Same trap `sports/pack-contract.test.ts` fell into with SQL.
+   */
+  const withoutComments = (source: string): string =>
+    source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+
+  it("holds the drizzle enum to the list", () => {
+    const schema = withoutComments(repoFile("../../../../../packages/db/src/schema.ts"));
+    // The `sport` column of demo_requests, not any other text-with-enum column.
+    const column = /sport:\s*text\("sport",\s*\{[\s\S]*?\}\)/.exec(schema)?.[0];
+    expect(column, "demo_requests.sport is not shaped the way this test reads").toBeDefined();
+    const values = [...(column ?? "").matchAll(/"([a-z_]+)"/g)]
+      .map((match) => match[1] ?? "")
+      .filter((value) => value !== "sport");
+    expect([...values].sort()).toEqual([...DEMO_SPORTS].sort());
+  });
+
+  it("holds the database CHECK to the list", () => {
+    /*
+     * The LAST migration to define the constraint wins — it has been rewritten
+     * twice (0057 renamed a key, 0060 added battle royale), and reading the
+     * first one would hold the app to a list the database stopped using.
+     */
+    const dir = resolve(
+      fileURLToPath(new URL(".", import.meta.url)),
+      "../../../../../packages/db/migrations",
+    );
+    const defining = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .filter((name) =>
+        readFileSync(resolve(dir, name), "utf8").includes("demo_requests_sport_check"),
+      );
+    expect(defining.length, "no migration defines demo_requests_sport_check").toBeGreaterThan(0);
+    const latest = readFileSync(resolve(dir, defining[defining.length - 1] ?? ""), "utf8")
+      // SQL has comments, and the migrations here are heavily commented by
+      // design — an example list inside an explanation would be read as live.
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/--[^\n]*/g, " ");
+    const check = /demo_requests_sport_check[\s\S]*?IN \(([\s\S]*?)\)/.exec(latest)?.[1];
+    expect(check, "the CHECK is not shaped the way this test reads").toBeDefined();
+    const values = [...(check ?? "").matchAll(/'([a-z_]+)'/g)].map((match) => match[1] ?? "");
+    expect([...values].sort()).toEqual([...DEMO_SPORTS].sort());
   });
 
   it("records an unrecognised source as 'other' rather than losing the lead", () => {
