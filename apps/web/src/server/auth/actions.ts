@@ -62,10 +62,35 @@ import { describeUserAgent } from "./user-agent";
 
 const CHALLENGE_COOKIE = "da_pk_challenge";
 
+/**
+ * SECURE, EXCEPT ON THE REHEARSAL SERVER — which is not a server that serves people.
+ *
+ * `secure: true` is right and stays right: in production every cookie here rides
+ * HTTPS only. But the e2e harness runs a PRODUCTION BUILD over plain
+ * `http://localhost:3050`, and the two engines disagree about that. Chromium
+ * special-cases localhost as a trustworthy origin and sends Secure cookies over
+ * it anyway; WEBKIT DOES NOT, and follows the spec. So on Safari the whole
+ * suite could reach the OTP screen, verify, land on /onboarding — and then lose
+ * the session on the very next request, because the browser had accepted a
+ * cookie it would never send back.
+ *
+ * That made four fifths of the suite unrunnable on WebKit and looked exactly
+ * like a broken login. It is neither a product bug nor a WebKit bug.
+ *
+ * `ALLOW_INSECURE_LOCAL_PRODUCTION` is the existing name for precisely this
+ * situation and is fail-closed: `preflight-production.mjs` REFUSES to certify
+ * any environment that carries it ("the environment is not a production
+ * environment yet, whatever else it gets right"), `env.ts` prints a boot banner
+ * saying the process must never serve real people, and `server/db.ts` already
+ * branches on it. Reading it here adds no new escape hatch — it reuses the one
+ * the product already treats as disqualifying.
+ */
+const secureCookie = env.NODE_ENV === "production" && !env.ALLOW_INSECURE_LOCAL_PRODUCTION;
+
 async function setChallenge(challenge: string): Promise<void> {
   (await cookies()).set(CHALLENGE_COOKIE, challenge, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
+    secure: secureCookie,
     sameSite: "lax",
     maxAge: 300,
     path: "/",
@@ -107,14 +132,14 @@ async function issueSessionCookie(personId: string): Promise<void> {
   const session = await createSession(db, personId, agent);
   store.set(SESSION_COOKIE, session.token, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
+    secure: secureCookie,
     sameSite: "lax",
     expires: session.expiresAt,
     path: "/",
   });
   store.set(RETURNING_COOKIE, "1", {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
+    secure: secureCookie,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 365,
     path: "/",
