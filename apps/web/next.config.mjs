@@ -41,6 +41,18 @@ export default {
   // produce phantom 404s and ChunkLoadErrors in whichever one loses the race.
   // The harness sets NEXT_DIST_DIR so the two never share a build directory.
   ...(process.env["NEXT_DIST_DIR"] !== undefined ? { distDir: process.env["NEXT_DIST_DIR"] } : {}),
+  /*
+   * STANDALONE, because the web tier is a container now.
+   *
+   * Next traces the modules a build actually reaches and emits a self-contained
+   * server under `.next/standalone`. Without it a Docker image has to carry the
+   * whole pnpm workspace `node_modules` — hundreds of megabytes of dev
+   * dependencies, build tooling and every package this monorepo has ever
+   * installed — to run a server that needs a fraction of it. That is not just
+   * size: every one of those packages is attack surface on the box that serves
+   * auction night.
+   */
+  output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],

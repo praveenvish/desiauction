@@ -1,0 +1,117 @@
+# The whole platform on one host (DEPLOYMENT.md topology).
+#
+# Three app containers, a reverse proxy that terminates TLS, Postgres, and a
+# backup sidecar. Images are BUILT IN CI and pulled here — never built on the
+# production host: the Next.js build peaks at 4-8 GB, and a box sized for that
+# is a box you are paying for around the clock to use for ten minutes a week.
+#
+# Everything is pinned. `postgres:17-alpine` and not `:latest`, because a
+# database that silently majors on a `docker compose pull` is a data-loss
+# event, not an upgrade.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # ACME account + certificates; losing this re-issues
+      - caddy_config:/config
+    depends_on: [web, engine]
+
+  web:
+    image: ${REGISTRY}/web:${TAG}
+    restart: unless-stopped
+    env_file: [./web.env]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      # /readyz reflects DB reachability, not just "the process is up" (PRR P2).
+      test:
+        [
+          "CMD",
+          "/nodejs/bin/node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  engine:
+    image: ${REGISTRY}/engine:${TAG}
+    restart: unless-stopped
+    env_file: [./engine.env]
+    depends_on:
+      db: { condition: service_healthy }
+    # EXACTLY ONE. The engine is the single mutation authority and claims a
+    # Postgres advisory lock at boot; a second instance refuses to start by
+    # design. Scaling this is not a capacity lever, it is a crash loop.
+    deploy:
+      replicas: 1
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/nodejs/bin/node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  runner:
+    image: ${REGISTRY}/finops-runner:${TAG}
+    restart: unless-stopped
+    env_file: [./runner.env]
+    depends_on:
+      db: { condition: service_healthy }
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: [./db.env]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgresql.conf.d:/etc/postgresql/conf.d:ro
+    # THE KEEPALIVES ARE NOT OPTIONAL. A connection severed without a close —
+    # a VM restart, a network partition — leaves the engine's single-writer
+    # advisory lock held by a backend nobody is using, and every replacement
+    # engine refuses to boot. Observed idle for four hours once. With these,
+    # a severed holder is reaped in ~60s; without them, never.
+    command:
+      - postgres
+      - -c=tcp_keepalives_idle=30
+      - -c=tcp_keepalives_interval=10
+      - -c=tcp_keepalives_count=3
+      - -c=wal_level=replica
+      - -c=archive_mode=on
+      - -c=archive_command=pgbackrest --stanza=desiauction archive-push %p
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PITR. Migrations here are FORWARD-ONLY — there are no down migrations and
+  # there never have been — so a restore point is the only thing that can undo
+  # one. Archives go OFF THE BOX to Cloudflare R2: a backup on the same disk
+  # is not a backup.
+  pgbackrest:
+    image: woblerr/pgbackrest:latest
+    restart: unless-stopped
+    env_file: [./pgbackrest.env]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgbackrest_conf:/etc/pgbackrest
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+  pgbackrest_conf:

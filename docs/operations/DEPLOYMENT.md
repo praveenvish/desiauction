@@ -6,13 +6,25 @@ repo; founder externals (accounts, credentials, domains) are listed in
 
 ## Topology
 
+**TOPOLOGY CHANGED (2026-09-10): one self-hosted host, not Vercel + Fly.**
+The Fly workflows below are retained but unused; `deploy-host.yml` replaces
+them. The reason was cost at pre-revenue scale plus a preference for
+self-hosting; the reason it is *safe* is that nothing about the architecture
+assumed a platform — the engine was always one long-lived process and Postgres
+was always the only stateful component.
+
 | Unit | Where | Artifact | Workflow |
 |------|-------|----------|----------|
-| web | Vercel (Mumbai-first functions) | platform build | Vercel git integration (staging auto, production promote) |
-| engine | Fly.io `bom`, 1 machine/env | `apps/engine/Dockerfile` (distroless, non-root, 310 MB) | `.github/workflows/deploy-engine.yml` |
-| finops-runner | Fly.io `bom`, 1 machine/env | `apps/finops-runner/Dockerfile` (distroless, non-root, 244 MB) | `.github/workflows/deploy-finops-runner.yml` |
-| Postgres 17 | managed (PITR-capable) | `packages/db/migrations` + `apps/engine/drizzle` | migrate on release |
-| Object storage | S3-compatible | — | pre-deploy item (freeze §8.4) |
+| web | self-hosted container | `apps/web/Dockerfile` (standalone output, distroless, non-root) | `.github/workflows/deploy-host.yml` |
+| engine | same host, **exactly 1** | `apps/engine/Dockerfile` (distroless, non-root) | same |
+| finops-runner | same host | `apps/finops-runner/Dockerfile` (distroless, non-root) | same |
+| caddy | same host | `caddy:2-alpine` | TLS is automatic |
+| Postgres 17 | same host, `postgres:17-alpine` | `packages/db/migrations` + `apps/engine/drizzle` | migrate on release |
+| **PITR** | **pgBackRest → Cloudflare R2 (off-box)** | `ops/deploy/` | `pnpm restore:drill` is the proof |
+| Object storage | Cloudflare R2 (S3-compatible) | — | founder-provisioned |
+
+The stack is described in `ops/deploy/` — see its README for the env-file split
+and why images are built in CI rather than on the host.
 
 Both Fly workflows: staging auto-deploys on main push (path-filtered),
 production is `workflow_dispatch` only, and both no-op with a summary note

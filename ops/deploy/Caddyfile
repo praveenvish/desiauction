@@ -1,0 +1,14 @@
+# TLS is automatic: Caddy provisions and renews Let's Encrypt certificates and
+# redirects http→https. Nothing here needs a cron job or a renewal reminder.
+{$PUBLIC_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+# The engine on its own hostname, because ENGINE_ALLOWED_ORIGINS and the
+# browser's WebSocket origin check both key on it. wss:// is what the browser
+# gets, which is why this must be a real certificate and not a self-signed one.
+{$ENGINE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy engine:4000
+}

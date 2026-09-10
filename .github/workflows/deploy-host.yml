@@ -1,0 +1,115 @@
+# Deploy the three containers to the self-hosted host.
+#
+# Replaces the Fly workflows for web/engine/runner. Same discipline, different
+# target: images are built HERE (never on the production box), the live-auction
+# window is checked BEFORE anything is touched, and production is dispatch-only.
+name: deploy-host
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: staging or production
+        type: choice
+        options: [staging, production]
+        default: staging
+      deploy_anyway:
+        description: "Override the live-auction refusal (engine already broken, deploy IS the repair)"
+        type: boolean
+        default: false
+
+concurrency:
+  # Two deploys racing each other onto one host is how you get a half-swapped
+  # stack. Never cancel in progress — let the first finish.
+  group: deploy-host-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- THE C-22 GUARD, WHICH USED TO LIVE IN THE FLY WORKFLOWS ------------
+      #
+      # "No production deploy while any auction is LIVE." Redeploying the engine
+      # mid-auction stops the countdown in the room and drops every spectator
+      # socket. The Fly workflows enforced this and moving off Fly would have
+      # silently dropped it — the guard is the point, not the platform.
+      #
+      # An unreachable database is ALSO a refusal: it is not evidence the room
+      # is empty.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Refuse to deploy during a live auction
+        if: ${{ !inputs.deploy_anyway }}
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: node scripts/check-live-window.mjs
+      - name: Record that the freeze was overridden
+        if: ${{ inputs.deploy_anyway }}
+        run: |
+          echo "⚠️ The live-auction freeze was OVERRIDDEN for this deploy." >> "$GITHUB_STEP_SUMMARY"
+          echo "This is only correct when the engine is already broken and the deploy is the repair." >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Build the three images --------------------------------------------
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        run: |
+          set -euo pipefail
+          REG="ghcr.io/${GITHUB_REPOSITORY,,}"
+          TAG="${GITHUB_SHA::12}"
+          for app in web engine finops-runner; do
+            docker buildx build \
+              --file "apps/${app}/Dockerfile" \
+              --build-arg "APP_VERSION=${TAG}" \
+              --tag "${REG}/${app}:${TAG}" \
+              --push .
+          done
+          echo "REGISTRY=${REG}" >> "$GITHUB_ENV"
+          echo "TAG=${TAG}" >> "$GITHUB_ENV"
+
+      # --- Migrate, then swap -------------------------------------------------
+      #
+      # ORDER MATTERS AND IS FORWARD-ONLY. Migrations run before the new images
+      # serve traffic, and they cannot be rolled back — the restore point
+      # recorded in the deploy note is the only undo (DEPLOYMENT.md §Rollback).
+      - name: Migrate
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          pnpm --filter @desiauction/db db:migrate
+          pnpm --filter @desiauction/engine db:migrate
+
+      - name: Assert the grants still match the manifest
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: pnpm --filter @desiauction/web grants:verify
+
+      - name: Pull and restart on the host
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/desiauction
+            sed -i "s|^TAG=.*|TAG=${{ env.TAG }}|" .env
+            docker compose pull
+            # Engine first, then the rest: the engine hands its single-writer
+            # lease back on graceful SIGTERM and the replacement claims it at
+            # once. A brief overlap is normal — the new one exits 1 and retries.
+            docker compose up -d --no-deps engine
+            docker compose up -d
+            docker image prune -f
