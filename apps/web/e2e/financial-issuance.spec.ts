@@ -194,7 +194,22 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   // carries the two-act dialog that can say it on the record.
   await page.goto(`/seasons/${slug}/auction/cockpit`);
   await completeAuction(page, "cockpit-complete");
-  await page.goto(`/seasons/${slug}/auction`);
+  /*
+   * THE COCKPIT IS A LIVE SURFACE — it refreshes itself on engine events, so
+   * there is no quiet moment to leave from. `completeAuction` returns when the
+   * dialog closes, which only means the command was accepted; the page then
+   * re-navigates and cancels a plain `goto` ("interrupted by another
+   * navigation"). Chromium won that race, WebKit did not.
+   *
+   * Waiting for `cockpit-finished` proves the completion landed; committing the
+   * navigation stops the cockpit's own refresh cancelling it. The assertion
+   * below is unchanged and is still what proves we arrived.
+   *
+   * Same treatment as `settlement-experience.spec.ts` — this was the second
+   * copy of the pattern, and a sweep found no third.
+   */
+  await expect(page.getByTestId("cockpit-finished")).toBeVisible({ timeout: 20_000 });
+  await page.goto(`/seasons/${slug}/auction`, { waitUntil: "commit" });
   await expect(page.getByTestId("auction-status")).toHaveText("completed", { timeout: 20_000 });
 
   // --- Complete settlement, and CAPTURE a payment -----------------------------

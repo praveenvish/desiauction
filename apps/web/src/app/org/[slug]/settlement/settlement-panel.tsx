@@ -3,7 +3,8 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { Badge, Card, EmptyState, Field, Select, type BadgeTone } from "@desiauction/ui";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useFilterQuery } from "../../../../lib/use-filter-query";
 import { useMemo } from "react";
 
 import type { SettlementDashboard } from "../../../../server/settlement/actions";
@@ -40,11 +41,13 @@ function inr(value: number): string {
 }
 
 export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard }) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
 
-  const view = params.get("view") ?? "attention";
+  // Raw for the URL writer, resolved for filtering — see the finance register's
+  // note: a default nobody chose must not be written back into the address.
+  const rawView = params.get("view") ?? "";
+  const view = rawView === "" ? "attention" : rawView;
   const status = params.get("status") ?? "";
   const query = params.get("q") ?? "";
 
@@ -53,16 +56,13 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
     [dashboard.view.cases, view, status, query],
   );
 
-  /** Every control writes the URL — the view IS the address (deep links, §8). */
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params.toString());
-    if (value === "") {
-      next.delete(key);
-    } else {
-      next.set(key, value);
-    }
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-  };
+  /*
+   * Every control writes the URL — the view IS the address (deep links, §8) —
+   * and the server reads it back, so the write is debounced and built from
+   * these values rather than from a live `useSearchParams` snapshot. Same
+   * defect the finance register had; see `useFilterQuery`.
+   */
+  const { commit, search, setSearch } = useFilterQuery({ view: rawView, status, q: query });
 
   const { stats } = dashboard.view;
 
@@ -119,9 +119,10 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
             label="Search cases"
             type="search"
             placeholder="Season, case reference or status"
-            defaultValue={query}
+            // CONTROLLED — see the finance register's note.
+            value={search}
             onChange={(event) => {
-              setParam("q", event.target.value);
+              setSearch(event.target.value);
             }}
             data-testid="case-search"
           />
@@ -129,7 +130,7 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
             label="Status"
             value={status}
             onChange={(event) => {
-              setParam("status", event.target.value);
+              commit({ status: event.target.value });
             }}
             data-testid="status-filter"
           >

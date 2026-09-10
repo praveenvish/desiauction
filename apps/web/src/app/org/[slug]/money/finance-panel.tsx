@@ -11,7 +11,8 @@ import {
   type BadgeTone,
 } from "@desiauction/ui";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useFilterQuery } from "../../../../lib/use-filter-query";
 import { useMemo } from "react";
 
 import type { FinanceWorkspace } from "../../../../server/financial-operations/actions";
@@ -102,10 +103,20 @@ function inr(value: number): string {
 }
 
 export function FinancePanel({ slug, workspace }: { slug: string; workspace: FinanceWorkspace }) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const view = params.get("view") ?? "all";
+  /*
+   * TWO READINGS OF THE SAME PARAMS, and the difference matters.
+   *
+   * `view` below is the RESOLVED value — "all" when the URL says nothing — and
+   * that is what filters and renders. `useFilterQuery` is given the RAW value
+   * instead, because a default that was never chosen must not be written back:
+   * serialising it turns a cleared filter bar into `?view=all` rather than a
+   * bare address, and the saved-view links are built from `pathname` on the
+   * assumption that the bare address means "all".
+   */
+  const rawView = params.get("view") ?? "";
+  const view = rawView === "" ? "all" : rawView;
   const kind = params.get("kind") ?? "";
   const query = params.get("q") ?? "";
 
@@ -118,15 +129,13 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
   // that moves when you type in a search box is not a total.
   const totals = useMemo(() => registerTotals(register, board.fy), [register, board.fy]);
 
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params.toString());
-    if (value === "") {
-      next.delete(key);
-    } else {
-      next.set(key, value);
-    }
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-  };
+  /*
+   * The filter bar writes the URL and the SERVER reads it back, so the write
+   * has to be deliberate: a navigation per keystroke, built from a live
+   * `useSearchParams` snapshot, is what made clearing this box leave the empty
+   * state up for twenty seconds on Safari. `useFilterQuery` explains it.
+   */
+  const { commit, search, setSearch } = useFilterQuery({ view: rawView, kind, q: query });
 
   return (
     <>
@@ -322,9 +331,12 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
             label="Search documents"
             type="search"
             placeholder="Number, party, payment reference or digest"
-            defaultValue={query}
+            // CONTROLLED. With `defaultValue` the box kept whatever had been
+            // typed after a saved-view link dropped `q`, so it showed a term it
+            // was no longer filtering by.
+            value={search}
             onChange={(event) => {
-              setParam("q", event.target.value);
+              setSearch(event.target.value);
             }}
             data-testid="register-search"
           />
@@ -332,7 +344,8 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
             label="Kind"
             value={kind}
             onChange={(event) => {
-              setParam("kind", event.target.value);
+              // A chosen value, not a typed one — it lands at once.
+              commit({ kind: event.target.value });
             }}
             data-testid="kind-filter"
           >
