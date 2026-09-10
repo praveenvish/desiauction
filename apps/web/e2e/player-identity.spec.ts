@@ -150,6 +150,15 @@ test("a gendered category refuses a declared mismatch, and the profile fix opens
   await page.getByLabel("Gender").selectOption("female");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
+  /*
+   * The toast says the action was ACCEPTED; the page then refreshes itself from
+   * the server, and the `goto` below was being cancelled by that refresh on
+   * WebKit ("interrupted by another navigation to /account"). Reading the value
+   * back waits for the refresh AND proves the profile actually persisted —
+   * which the toast alone does not, and which is the fact the rest of this test
+   * depends on.
+   */
+  await expect(page.getByLabel("Gender")).toHaveValue("female");
 
   await page.goto(season.registerPath);
   await page.getByTestId("register-continue").click();

@@ -109,15 +109,16 @@ jobs:
       # ever run on Chromium. Per-commit CI stays Chromium-only because WebKit
       # doubles a ~5-minute run and the defects it catches (timing, layout) do
       # not appear per commit.
-      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright install --with-deps chromium webkit firefox
         working-directory: apps/web
       # ~29 specs SKIP here by design: `next start` forces NODE_ENV=production
       # and the /gallery family is dev-only, so those pages correctly 404. They
       # report as skipped, not failed.
-      - name: End-to-end journeys (Chromium + WebKit)
+      - name: End-to-end journeys (Chromium + WebKit + Firefox)
         run: npx playwright test
         working-directory: apps/web
         env:
           CI: "true"
-          # Adds the `webkit` project — see playwright.config.ts.
+          # Add the `webkit` and `firefox` projects — see playwright.config.ts.
           E2E_WEBKIT: "1"
+          E2E_FIREFOX: "1"

@@ -110,18 +110,37 @@ export default defineConfig({
    * was Apple's own Tab default, one was Chromium-only WebAuthn. All seven are
    * fixed or scoped at their source, so WebKit is now green.
    *
-   * WEBKIT IS OPT-IN, and deliberately: it doubles a ~5-minute run, and the
-   * defects it catches are timing and layout ones that do not appear per
-   * commit. `nightly-verify.yml` sets `E2E_WEBKIT=1` so it runs every night
-   * against the compiled server; locally, `E2E_WEBKIT=1 pnpm exec playwright
-   * test` or `--project=webkit`.
+   * FIREFOX'S FIRST RUN was 104 passed / 1 failed, and that one was a test
+   * that could not tell two rows apart: `passkeys.spec.ts` spoofed a second
+   * device as "Firefox on Windows", which is exactly what Playwright's Desktop
+   * Firefox calls itself, so the assertion that the revoked row had gone was
+   * looking at the device the test was still sitting on. Chromium passed only
+   * because it happens to call itself Chrome.
    *
-   * Firefox is installed and unexercised. Adding it is one more entry here
-   * once somebody has run it and read the failures — not before, because an
-   * engine nobody has looked at is a red suite waiting to be ignored.
+   * BOTH ARE OPT-IN, and deliberately: each roughly doubles a ~5-minute run,
+   * and the defects they catch are timing and layout ones that do not appear
+   * per commit. `nightly-verify.yml` sets both so they run every night against
+   * the compiled server; locally, `E2E_WEBKIT=1 pnpm exec playwright test`, or
+   * `--project=webkit` once the flag is set.
+   *
+   * Edge and real Safari/Edge WebAuthn stay founder-device items at staging —
+   * `passkeys.spec.ts` drives a Chrome DevTools Protocol virtual authenticator
+   * that has no cross-engine equivalent, so it is Chromium-only by
+   * construction.
    */
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    ...(process.env["E2E_FIREFOX"] === "1"
+      ? [
+          {
+            name: "firefox",
+            use: { ...devices["Desktop Firefox"] },
+            // Same reasoning as webkit below: more patience, identical
+            // assertions.
+            expect: { timeout: 15_000 },
+          },
+        ]
+      : []),
     ...(process.env["E2E_WEBKIT"] === "1"
       ? [
           {

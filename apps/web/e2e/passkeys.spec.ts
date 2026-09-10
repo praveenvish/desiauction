@@ -92,13 +92,27 @@ test("session management: a second device shows up and can be revoked", async ({
   const phone = `92${String(Date.now()).slice(-8)}`;
   await otpLogin(page, phone);
 
-  // A REAL user-agent, because the panel no longer prints raw ones. Sessions
-  // are labelled "Firefox on Windows" now rather than the first 48 characters
-  // of a UA string — a person recognising their own device is the entire point
-  // of the screen. "OtherDevice/1.0" parses to "Unknown device", which would
-  // make this assertion pass for the wrong reason on any unparsed session.
+  /*
+   * A REAL user-agent, because the panel no longer prints raw ones. Sessions
+   * are labelled "Samsung Internet on Android" now rather than the first 48
+   * characters of a UA string — a person recognising their own device is the
+   * entire point of the screen. "OtherDevice/1.0" parses to "Unknown device",
+   * which would make this assertion pass for the wrong reason.
+   *
+   * AND IT MUST NOT BE A LABEL THE TEST BROWSER ITSELF CAN WEAR. This used to
+   * spoof Firefox on Windows, which is exactly what Playwright's own Desktop
+   * Firefox reports — so on that engine BOTH sessions were "Firefox on
+   * Windows", and `not.toContainText` after the revoke failed against the
+   * device the test was still sitting on. The revoke had worked perfectly; the
+   * assertion could not tell the two rows apart. Chromium passed only because
+   * it happens to call itself Chrome.
+   *
+   * An Android phone is a label no desktop engine can report, and it is what
+   * most of this product's users would actually see in that list.
+   */
   const other = await browser.newContext({
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+    userAgent:
+      "Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36",
   });
   const otherPage = await other.newPage();
   await otpLogin(otherPage, phone);
@@ -106,12 +120,14 @@ test("session management: a second device shows up and can be revoked", async ({
 
   await page.reload();
   const panel = page.getByTestId("sessions-panel");
-  await expect(panel).toContainText("Firefox on Windows");
+  await expect(panel).toContainText("Samsung Internet on Android");
   await panel.getByRole("button", { name: "Revoke" }).first().click();
   // Signing another device out is irreversible, so it asks first. The click
   // above only OPENS that dialog; without answering it the session was never
   // revoked and the row stayed exactly where it was.
   await page.getByTestId("confirm-security-action").click();
-  await expect(panel).not.toContainText("Firefox on Windows");
+  await expect(panel).not.toContainText("Samsung Internet on Android");
+  // The panel's own words, which cannot collide with a device label at all.
+  await expect(panel).toContainText("This is the only device signed into your account");
   await expect(page.getByTestId("events-panel")).toContainText("A device was signed out");
 });
