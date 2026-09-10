@@ -156,6 +156,52 @@ test("invalid routes render the branded 404 — no crash, no leak", async ({ pag
   }
 });
 
+/*
+ * A MISTYPED URL MUST NOT MAKE THE SERVER FAIL 21 TIMES.
+ *
+ * The test above asserts the 404 renders and says "no crash" in its name. It
+ * could not see the crash: it watched the DOCUMENT response, and the failures
+ * are the RSC prefetches the router fires afterwards for every link in the
+ * shell. Twenty-one of them returned 500 from a single mistyped address.
+ *
+ * The two kinds of 404 are NOT the same, which is why this needs its own test.
+ * `/help/not-a-real-article` matches a real route (`help/[slug]`) that calls
+ * `notFound()`, so the router's tree keeps its shape. `/pricing/nonsense`
+ * matches NO route, so Next serves its internal `/_not-found` — and the tree it
+ * hands the client has no `action` key, because that synthetic route carries no
+ * parallel slots. Every prefetch sent from that page then dies inside Next
+ * reading `flightRouterState[1]["action"][0]` of undefined.
+ *
+ * The visitor still gets out — the router falls back to a hard navigation — so
+ * nothing fails visibly. What it costs is every onward link becoming a full
+ * page load, and twenty-one invented 500s per mistyped address in the logs and
+ * in Sentry, which is how a real outage becomes impossible to see.
+ *
+ * A mistyped address is the commonest 404 there is.
+ */
+test("a mistyped address does not make every onward link fail on the server", async ({ page }) => {
+  const failures: string[] = [];
+  page.on("response", (response) => {
+    if (response.status() >= 500) {
+      failures.push(`${String(response.status())} ${response.request().url()}`);
+    }
+  });
+
+  // A URL matching no route at all — not one that resolves and calls notFound().
+  const response = await page.goto("/pricing/nonsense");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByText("This page doesn't exist")).toBeVisible();
+  // The prefetches are fired after paint; give the router time to send them.
+  await page.waitForTimeout(2000);
+
+  // And getting out is a real client-side navigation, not a fallback reload.
+  await page.getByRole("link", { name: "Get help" }).click();
+  await expect(page).toHaveURL(/\/help/);
+  await page.waitForTimeout(500);
+
+  expect(failures, `the server failed on:\n${failures.join("\n")}`).toEqual([]);
+});
+
 test("search is navigation only and honest about no matches", async ({ page }) => {
   await page.goto("/search?q=zzzznothingmatchesthis");
   await expect(page.getByTestId("search-empty")).toBeVisible();
