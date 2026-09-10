@@ -41,6 +41,7 @@ import {
   addPlayerByPhone,
   duplicateNameKeys,
   exportRegistrationsCsv,
+  myRegistration,
   kitSummary,
   photoTargetsOf,
   queryRegistrations,
@@ -182,6 +183,106 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const waited = await transitionBatch(db, org.id, compId, [w], owner, { type: "waitlist" });
     expect(waited.applied).toEqual([w]);
     expect(await statusOf(db, w)).toBe("waitlisted");
+  });
+
+  /*
+   * INVARIANT 6, BOTH HALVES.
+   *
+   * Doc 42: "rejection requires a private reason ... reasons never render
+   * publicly, ever". Doc 48: the player sees decisions about themselves,
+   * "reasons excluded". The categories are spelled "duplicate, ineligible,
+   * withdrew, capacity, OTHER+NOTE" — so the note is required by the same
+   * sentence that makes it private.
+   *
+   * For a long time only the privacy half was true, and trivially: nothing
+   * could supply a note, so there was nothing to leak. Now that the note can be
+   * written, the privacy half needs a test rather than an accident.
+   */
+  describe("invariant 6 — the note is the organizer's, and only the organizer's", () => {
+    const SECRET = "he was banned by the district association in 2024";
+
+    async function personOf(registrationId: string): Promise<string> {
+      const [row] = await db
+        .select({ personId: registrationsTable.personId })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, registrationId))
+        .limit(1);
+      return row?.personId ?? "";
+    }
+
+    it("stores the note, shows it to the organizer, and withholds it from the player", async () => {
+      const id = await seed(compId, org.id, "Note A", "inv6a", "submitted");
+      const done = await transition(db, org.id, compId, id, owner, {
+        type: "reject",
+        reason: "other",
+        note: SECRET,
+      });
+      expect(done).toEqual({ ok: true, status: "rejected" });
+
+      // The column now holds what "other" meant.
+      const [stored] = await db
+        .select({ note: registrationsTable.rejectionNote })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, id))
+        .limit(1);
+      expect(stored?.note).toBe(SECRET);
+
+      // The organizer's own projection carries it back.
+      const rows = await queryRegistrations(db, compId, {
+        status: "rejected",
+        page: 1,
+        pageSize: 50,
+      });
+      const mine = rows.rows.find((row) => row.id === id);
+      expect(mine?.rejectionNote).toBe(SECRET);
+
+      /*
+       * And the player's does not — asserted over the WHOLE projection rather
+       * than one field name, because the thing invariant 6 forbids is the
+       * organizer's words reaching the player, not one particular key. A future
+       * field that happened to carry them would pass a `rejectionNote`
+       * undefined check and fail this one.
+       */
+      const theirs = await myRegistration(db, compId, await personOf(id));
+      expect(theirs).not.toBeNull();
+      expect(JSON.stringify(theirs)).not.toContain(SECRET);
+      // The CATEGORY is theirs — a respectful sentence is built from it.
+      expect(theirs?.rejectionReason).toBe("other");
+    });
+
+    it("clears the note on restore, with the rest of the rejection provenance", async () => {
+      const id = await seed(compId, org.id, "Note B", "inv6b", "submitted");
+      await transition(db, org.id, compId, id, owner, {
+        type: "reject",
+        reason: "other",
+        note: SECRET,
+      });
+      await transition(db, org.id, compId, id, owner, { type: "restore" });
+      const [row] = await db
+        .select({
+          reason: registrationsTable.rejectionReason,
+          note: registrationsTable.rejectionNote,
+        })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, id))
+        .limit(1);
+      // A note about a decision that has been undone is a stale accusation
+      // sitting on a live registration.
+      expect(row?.reason).toBeNull();
+      expect(row?.note).toBeNull();
+    });
+
+    it("leaves the note null when the organizer gave none", async () => {
+      const id = await seed(compId, org.id, "Note C", "inv6c", "submitted");
+      await transition(db, org.id, compId, id, owner, { type: "reject", reason: "capacity" });
+      const [row] = await db
+        .select({ note: registrationsTable.rejectionNote })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, id))
+        .limit(1);
+      // Null, not "": "they wrote nothing down" rather than "they wrote nothing".
+      expect(row?.note).toBeNull();
+    });
   });
 
   it("restore returns a rejected registration to submitted (the only exit)", async () => {

@@ -417,6 +417,14 @@ export interface RegistrationRow {
   // Surfaced for the IP-4 AuctionReady pool (additive projection field, M-IP4-1).
   basePriceBand: string | null;
   rejectionReason: string | null;
+  /**
+   * WHAT "OTHER" MEANT — the organizer's own words, and organizer-only.
+   *
+   * Invariant 6: the player is told a respectful sentence derived from the
+   * CATEGORY, never this. It is absent from `myRegistration` on purpose, and a
+   * regression test holds it absent.
+   */
+  rejectionNote: string | null;
   duplicateName: boolean;
   // Parity §3.2 profile. photoUrl is DPDP-gated: null unless photo_consent_at is
   // set (render gate, DPDP §5). age is derived from DOB, never stored.
@@ -704,6 +712,7 @@ export async function queryRegistrations(
       fatherName: registrations.fatherName,
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
+      rejectionNote: registrations.rejectionNote,
       photoKey: people.photoUrl,
       photoConsentAt: people.photoConsentAt,
       dateOfBirth: registrations.dateOfBirth,

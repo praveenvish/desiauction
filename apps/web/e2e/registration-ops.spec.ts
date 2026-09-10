@@ -308,6 +308,104 @@ test("an organizer adds one player by hand, then imports their photo by filename
   await expect(page.getByTestId("reg-table").locator("img").first()).toBeVisible();
 });
 
+/*
+ * DECLINING SOMEBODY, WHICH NOTHING HAS EVER EXERCISED IN A BROWSER.
+ *
+ * This file's own header has said "bulk approve / reject / waitlist" since
+ * M-IP3-2 and no test has ever opened the decline dialog. It is the most
+ * consequential thing on the screen — a person is told they are not in — and
+ * the only destructive act with no undo but Restore.
+ *
+ * INVARIANT 6 has two halves and both are checked here. The player is told a
+ * respectful sentence built from the CATEGORY; the organizer's own words are
+ * theirs alone and must not appear on the player's status page. Doc 42 spells
+ * the categories "duplicate, ineligible, withdrew, capacity, other+note" —
+ * `other` without a note records only that no category fitted, so the note is
+ * demanded there and the button stays disabled until it is given.
+ */
+test("declining for 'other' demands the reason, keeps it from the player, and shows it back", async ({
+  page,
+}) => {
+  await otpLogin(page, `85${STAMP}`);
+  await page.goto("/orgs");
+  await page.getByTestId("new-org").click();
+  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Decline Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page.getByTestId("org-name")).toBeVisible();
+
+  await page.goto("/seasons");
+  await page.getByTestId("new-season").click();
+  await page.getByLabel("Season name").filter({ visible: true }).fill(`Decline Cup ${STAMP}`);
+  await page.getByRole("button", { name: "Create season" }).click();
+  await page.getByTestId("open-dashboard").click();
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+
+  await page.getByTestId("open-add-player").click();
+  const addDialog = page.getByRole("dialog");
+  await addDialog.getByLabel("Full name").fill("Declined Player");
+  await addDialog.getByLabel("Mobile number").fill(`96${STAMP}`);
+  await page.getByTestId("add-player-submit").click();
+  await expect(page.getByTestId("added-number")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("add-player-done").click();
+  await expect(page.getByTestId("reg-table")).toContainText("Declined Player", { timeout: 20_000 });
+
+  await page
+    .getByTestId(/^decline-/)
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog");
+  const confirm = page.getByTestId("confirm-row-decline");
+  // Nothing chosen: the button cannot be pressed at all.
+  await expect(confirm).toBeDisabled();
+
+  // A category that speaks for itself needs no note...
+  await dialog.getByLabel("Reason (the player is told this)").selectOption("capacity");
+  await expect(confirm).toBeEnabled();
+
+  // ...but "other" on its own records nothing, so it is refused until it says
+  // what it was. This is the half of the rule that never existed.
+  await dialog.getByLabel("Reason (the player is told this)").selectOption("other");
+  await expect(confirm).toBeDisabled();
+
+  const PRIVATE = `district ban on file ${STAMP}`;
+  await dialog.getByLabel("What was the reason? (organizers only)").fill(PRIVATE);
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+
+  // The organizer gets their own words back, on the panel behind
+  // registration.review.
+  await page
+    .getByTestId("reg-table")
+    .getByRole("row", { name: /Declined Player/ })
+    .getByRole("button", { name: "Details" })
+    .click();
+  await expect(page.getByTestId("details-reason")).toContainText("Declined", { timeout: 20_000 });
+  await expect(page.getByTestId("details-reason-note")).toContainText(PRIVATE);
+
+  /*
+   * AND THE PLAYER DOES NOT. Their own status page is checked as THEM, in a
+   * second browser context — reading the organizer's DOM would prove nothing
+   * about what the player is served.
+   */
+  const seasonUrl = page.url().replace(/\/registrations.*$/, "");
+  const player = await page.context().browser()?.newContext();
+  if (player === undefined) {
+    throw new Error("could not open a second browser context");
+  }
+  try {
+    const theirPage = await player.newPage();
+    await otpLogin(theirPage, `96${STAMP}`);
+    await theirPage.goto(`${seasonUrl}/register`);
+    await expect(theirPage.getByTestId("my-rejection-reason")).toBeVisible({ timeout: 20_000 });
+    // They are told something respectful, built from the category...
+    await expect(theirPage.getByTestId("my-rejection-reason")).toContainText("Reason given");
+    // ...and the organizer's words are nowhere on the page. Invariant 6.
+    expect(await theirPage.content()).not.toContain(PRIVATE);
+  } finally {
+    await player.close();
+  }
+});
+
 test("registration operations dashboard: axe zero violations", async ({ page }) => {
   await otpLogin(page, `83${STAMP}`);
   await page.goto("/orgs");

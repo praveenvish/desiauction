@@ -8,7 +8,7 @@ import {
   evaluateRegistration,
   isEntryCategory,
   isMinor,
-  isRejectionReason,
+  rejectionEvent,
   parseRegistrationRecords,
   planImport,
   sampleRow,
@@ -715,14 +715,28 @@ async function reviewGate(
   return { ok: true, personId: session.personId, competition };
 }
 
-function triageEvent(action: TriageAction, reason?: string): RegistrationEvent | { error: string } {
-  if (action === "reject") {
-    if (reason === undefined || !isRejectionReason(reason)) {
-      return { error: "Choose a reason to reject." };
-    }
-    return { type: "reject", reason };
+/**
+ * WHAT "OTHER" MEANT, which until now was recorded nowhere.
+ *
+ * The rule itself is `rejectionEvent` in core, beside the event type that has
+ * declared `note?: string` all along — this module is `"use server"`, so a
+ * helper here could never be unit-tested. See that function for why `other`
+ * demands a note and the other four do not.
+ *
+ * INVARIANT 6 is not enforced here but where the projections are built: the
+ * player's own read model (`myRegistration`) does not select the column, and
+ * `registration-ops.regression.test.ts` holds it absent.
+ */
+function triageEvent(
+  action: TriageAction,
+  reason?: string,
+  note?: string,
+): RegistrationEvent | { error: string } {
+  if (action !== "reject") {
+    return { type: action };
   }
-  return { type: action };
+  const built = rejectionEvent(reason ?? "", note);
+  return built.ok ? built.event : { error: built.error };
 }
 
 export async function triageRegistrationAction(
@@ -730,12 +744,14 @@ export async function triageRegistrationAction(
   registrationId: string,
   action: TriageAction,
   reason?: string,
+  /** Organizer-only. Never reaches the player — invariant 6. */
+  note?: string,
 ): Promise<{ ok: boolean; error?: string; notified?: number; notifyFailed?: number }> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const event = triageEvent(action, reason);
+  const event = triageEvent(action, reason, note);
   if ("error" in event) {
     return { ok: false, error: event.error };
   }
@@ -803,6 +819,8 @@ export async function bulkTriageAction(
   registrationIds: string[],
   action: TriageAction,
   reason?: string,
+  /** Organizer-only, and one note for the whole batch. Invariant 6. */
+  note?: string,
 ): Promise<{
   ok: boolean;
   applied?: number;
@@ -815,7 +833,7 @@ export async function bulkTriageAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const event = triageEvent(action, reason);
+  const event = triageEvent(action, reason, note);
   if ("error" in event) {
     return { ok: false, error: event.error };
   }

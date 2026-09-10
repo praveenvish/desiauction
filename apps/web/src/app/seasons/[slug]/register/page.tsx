@@ -226,10 +226,18 @@ export default async function RegisterPage({
                 product had. */}
             {landing.mine.status === "rejected" && landing.mine.rejectionReason !== null ? (
               <p className="register-hint" data-testid="my-rejection-reason">
+                {/* NEVER THE RAW COLUMN. The fallback here used to echo
+                    `rejectionReason` verbatim when it was not one of the five
+                    categories. Unreachable today — the column is only ever
+                    written from the closed enum — but it is a free-text echo
+                    sitting on the one surface invariant 6 is about, and the
+                    thing invariant 6 forbids is exactly "the organizer's words
+                    reach the player". A generic sentence costs nothing and
+                    cannot leak. */}
                 <strong>Reason given:</strong>{" "}
                 {isRejectionReason(landing.mine.rejectionReason)
                   ? REASON_TO_PLAYER[landing.mine.rejectionReason]
-                  : landing.mine.rejectionReason}
+                  : "the organizer did not approve this registration"}
                 .
               </p>
             ) : null}

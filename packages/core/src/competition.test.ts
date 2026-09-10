@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   COMPETITION_STATUSES,
+  REJECTION_NOTE_LIMIT,
   REGISTRATION_STATUSES,
   competitionTransition,
   isRejectionReason,
   isValidSeasonYear,
   nextSeasonName,
   registrationTransition,
+  rejectionEvent,
   slugifyName,
   validateName,
   type RegistrationEvent,
@@ -67,6 +69,64 @@ describe("registration lifecycle machine", () => {
     expect(
       registrationTransition("submitted", { type: "reject", reason: "nonsense" as never }),
     ).toEqual({ ok: false, reason: "reason_required" });
+  });
+
+  /*
+   * "OTHER" WITHOUT A NOTE RECORDS NOTHING, and for a long time that was
+   * exactly what it did: `note?` was declared here, the aggregate stored it,
+   * the column existed — and no caller ever supplied one, so a decline for
+   * `other` said only that none of the four categories fitted. Doc 42 spells
+   * the list as "duplicate, ineligible, withdrew, capacity, other+note".
+   */
+  describe("rejectionEvent — the note that makes 'other' mean something", () => {
+    it("demands a note for 'other' and not for the four that speak for themselves", () => {
+      expect(rejectionEvent("other")).toEqual({
+        ok: false,
+        error: expect.stringContaining("records nothing") as string,
+      });
+      expect(rejectionEvent("other", "   ")).toEqual({
+        ok: false,
+        error: expect.stringContaining("records nothing") as string,
+      });
+      expect(rejectionEvent("other", "played for a rival club last season")).toEqual({
+        ok: true,
+        event: { type: "reject", reason: "other", note: "played for a rival club last season" },
+      });
+      for (const reason of ["duplicate", "ineligible", "withdrew", "capacity"]) {
+        expect(rejectionEvent(reason)).toEqual({ ok: true, event: { type: "reject", reason } });
+      }
+    });
+
+    it("keeps a note on the four optional categories when one is given", () => {
+      expect(rejectionEvent("capacity", "  waitlist was already 40 deep  ")).toEqual({
+        ok: true,
+        event: { type: "reject", reason: "capacity", note: "waitlist was already 40 deep" },
+      });
+    });
+
+    it("omits the key entirely rather than storing an empty note", () => {
+      // `note: ""` and no note are different things to every reader downstream:
+      // one says "the organizer wrote nothing", the other says "they wrote
+      // nothing down here". Only the second is true, and the column is nullable
+      // so that it can say so.
+      const built = rejectionEvent("capacity", "   ");
+      expect(built.ok && "note" in built.event).toBe(false);
+    });
+
+    it("caps the note rather than letting the column refuse the whole decision", () => {
+      const built = rejectionEvent("other", "x".repeat(REJECTION_NOTE_LIMIT + 500));
+      expect(built.ok).toBe(true);
+      expect(built.ok && "note" in built.event && built.event.note.length).toBe(
+        REJECTION_NOTE_LIMIT,
+      );
+    });
+
+    it("still refuses a category that is not one of the five", () => {
+      expect(rejectionEvent("nonsense", "with a note")).toEqual({
+        ok: false,
+        error: "Choose a reason to reject.",
+      });
+    });
   });
 
   it("waitlisted can still be approved or rejected", () => {

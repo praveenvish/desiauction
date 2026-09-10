@@ -35,7 +35,9 @@ export {
   COMPETITION_STATUSES,
   REGISTRATION_STATUSES,
   REGISTRATION_ROLES,
+  REJECTION_NOTE_LIMIT,
   REJECTION_REASONS,
+  rejectionEvent,
 } from "./competition";
 export type {
   CompetitionStatus,

@@ -108,6 +108,49 @@ export function isRejectionReason(value: string): value is RejectionReason {
   return (REJECTION_REASONS as readonly string[]).includes(value);
 }
 
+/** The organizer's own words about one decision. Doc 42's "other+note". */
+export const REJECTION_NOTE_LIMIT = 2000;
+
+/**
+ * BUILD A REJECTION, AND MAKE "OTHER" MEAN SOMETHING.
+ *
+ * `RegistrationEvent` has carried `note?: string` since this machine was
+ * written and the database column has always existed, but nothing ever supplied
+ * one — so a decline for `other` recorded only that no category fitted. Doc 42
+ * spells the categories as "duplicate, ineligible, withdrew, capacity,
+ * OTHER+NOTE": the note is not a decoration on `other`, it is the half that
+ * carries the meaning. Required there, optional for the four that already say
+ * what they are.
+ *
+ * INVARIANT 6 GOVERNS WHERE THE RESULT MAY GO. The player is told a respectful
+ * sentence derived from the CATEGORY; neither the raw category nor this note
+ * may reach them. That is enforced where the projections are built — the
+ * player's own read model does not select the column — not here.
+ *
+ * Here rather than in the web app because `"use server"` modules may only
+ * export async functions, so a rule living there cannot be unit-tested; and
+ * because this is a rule about the event, which is defined three lines up.
+ */
+export function rejectionEvent(
+  reason: string,
+  note?: string,
+): { ok: true; event: RegistrationEvent } | { ok: false; error: string } {
+  if (!isRejectionReason(reason)) {
+    return { ok: false, error: "Choose a reason to reject." };
+  }
+  const trimmed = (note ?? "").trim().slice(0, REJECTION_NOTE_LIMIT);
+  if (reason === "other" && trimmed === "") {
+    return {
+      ok: false,
+      error: "Say what the reason was — \u201cother\u201d on its own records nothing.",
+    };
+  }
+  return {
+    ok: true,
+    event: trimmed === "" ? { type: "reject", reason } : { type: "reject", reason, note: trimmed },
+  };
+}
+
 /**
  * THE PLAYING ROLES, DECLARED ONCE (Phase 0).
  *

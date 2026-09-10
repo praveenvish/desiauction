@@ -239,6 +239,14 @@ export function RegistrationDashboardPanel({
   // DA-35: no default. The reason was silently "duplicate", so every organizer
   // who did not open the select filed everybody as a duplicate.
   const [rejectReason, setRejectReason] = useState("");
+  /*
+   * The organizer's own words about one decision, and ORGANIZER-ONLY.
+   *
+   * Invariant 6: the player is told a respectful sentence derived from the
+   * CATEGORY, never this. The two reject dialogs share this state the way they
+   * already share `rejectReason` — the same decision, reached two ways.
+   */
+  const [rejectNote, setRejectNote] = useState("");
   const [cursor, setCursor] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [assignTeamId, setAssignTeamId] = useState("");
@@ -439,20 +447,28 @@ export function RegistrationDashboardPanel({
       [...selected.keys()],
       action,
       action === "reject" ? rejectReason : undefined,
+      action === "reject" ? rejectNote : undefined,
     );
     setBusy(false);
     announce(result, action);
     if (result.ok) {
       setSelected(new Map());
       setConfirmBulk(null);
+      setRejectNote("");
       router.refresh();
     }
   };
 
-  const runSingle = async (row: Row, action: TriageAction, reason?: string, focusKey?: string) => {
+  const runSingle = async (
+    row: Row,
+    action: TriageAction,
+    reason?: string,
+    focusKey?: string,
+    note?: string,
+  ) => {
     setBusy(true);
     restoreFocusRef.current = focusKey ?? null;
-    const result = await triageRegistrationAction(slug, row.id, action, reason);
+    const result = await triageRegistrationAction(slug, row.id, action, reason, note);
     setBusy(false);
     if (result.ok) {
       // DA-35: a single approval used to toast only on FAILURE — success was
@@ -468,6 +484,7 @@ export function RegistrationDashboardPanel({
         tone: (result.notifyFailed ?? 0) > 0 ? "danger" : "success",
       });
       setRowDecline(null);
+      setRejectNote("");
       router.refresh();
     } else {
       toast({ title: result.error ?? "Action failed.", tone: "danger" });
@@ -1079,6 +1096,10 @@ export function RegistrationDashboardPanel({
               size="sm"
               variant="danger"
               onClick={() => {
+                // Same reset the per-row door does: a note is about one
+                // decision and must not be inherited by the next.
+                setRejectReason("");
+                setRejectNote("");
                 setConfirmBulk("reject");
               }}
               loading={busy}
@@ -1174,6 +1195,9 @@ export function RegistrationDashboardPanel({
                   }
                   onDecline={() => {
                     setRejectReason("");
+                    // One player's private note must never open on the next
+                    // player's dialog.
+                    setRejectNote("");
                     setRowDecline(row);
                   }}
                   onIcon={() => {
@@ -1315,6 +1339,16 @@ export function RegistrationDashboardPanel({
                   <p className="reg-reason" data-testid="details-reason">
                     Declined — {REASON_LABEL[detail.rejectionReason] ?? detail.rejectionReason}. The
                     player was told this reason.
+                  </p>
+                ) : null}
+                {/* The words behind the category, read back to the people who
+                    can act on them. This panel is behind `registration.review`;
+                    the player's own status page carries no such field, by
+                    construction — invariant 6. */}
+                {detail.status === "rejected" && detail.rejectionNote !== null ? (
+                  <p className="reg-reason" data-testid="details-reason-note">
+                    <strong>Your note:</strong> {detail.rejectionNote}{" "}
+                    <span className="registration-phone">Organizers only — not shown to them.</span>
                   </p>
                 ) : null}
                 {/* HOW THEY PLAY.
@@ -1534,6 +1568,7 @@ export function RegistrationDashboardPanel({
         open={confirmBulk === "reject"}
         onClose={() => {
           setConfirmBulk(null);
+          setRejectNote("");
         }}
         title={`Decline ${String(selected.size)} registration${selected.size === 1 ? "" : "s"}?`}
         footer={
@@ -1542,6 +1577,7 @@ export function RegistrationDashboardPanel({
               variant="ghost"
               onClick={() => {
                 setConfirmBulk(null);
+                setRejectNote("");
               }}
             >
               Cancel
@@ -1549,7 +1585,9 @@ export function RegistrationDashboardPanel({
             <Button
               variant="danger"
               loading={busy}
-              disabled={rejectReason === ""}
+              disabled={
+                rejectReason === "" || (rejectReason === "other" && rejectNote.trim() === "")
+              }
               data-testid="confirm-bulk-reject"
               onClick={() => void runBulk("reject")}
             >
@@ -1584,6 +1622,32 @@ export function RegistrationDashboardPanel({
             </option>
           ))}
         </Select>
+        {/*
+          THE OTHER HALF OF "OTHER". Doc 42 spells the categories as
+          "duplicate, ineligible, withdrew, capacity, other+note" — the note is
+          not a decoration, it is what makes `other` mean anything. Required
+          there, optional for the four that already say what they mean.
+
+          ORGANIZER-ONLY, and the label says so out loud, because the select
+          directly above it says the opposite about the reason. Invariant 6: the
+          player is told a respectful sentence built from the CATEGORY and never
+          sees these words.
+        */}
+        <Field
+          label={
+            rejectReason === "other"
+              ? "What was the reason? (organizers only)"
+              : "Note for your own records (organizers only)"
+          }
+          name="bulk-reject-note"
+          help="The player never sees this. It is here so \u201cother\u201d still means something a month from now."
+          value={rejectNote}
+          required={rejectReason === "other"}
+          onChange={(event) => {
+            setRejectNote(event.target.value);
+          }}
+          data-testid="bulk-reject-note"
+        />
       </Dialog>
 
       {/* --- Review selection: the selection made inspectable. --- */}
@@ -1645,6 +1709,7 @@ export function RegistrationDashboardPanel({
         open={rowDecline !== null}
         onClose={() => {
           setRowDecline(null);
+          setRejectNote("");
         }}
         title={`Decline ${rowDecline?.name ?? "this registration"}?`}
         footer={
@@ -1653,6 +1718,7 @@ export function RegistrationDashboardPanel({
               variant="ghost"
               onClick={() => {
                 setRowDecline(null);
+                setRejectNote("");
               }}
             >
               Cancel
@@ -1660,11 +1726,19 @@ export function RegistrationDashboardPanel({
             <Button
               variant="danger"
               loading={busy}
-              disabled={rejectReason === ""}
+              disabled={
+                rejectReason === "" || (rejectReason === "other" && rejectNote.trim() === "")
+              }
               data-testid="confirm-row-decline"
               onClick={() => {
                 if (rowDecline !== null) {
-                  void runSingle(rowDecline, "reject", rejectReason, `decline-${rowDecline.id}`);
+                  void runSingle(
+                    rowDecline,
+                    "reject",
+                    rejectReason,
+                    `decline-${rowDecline.id}`,
+                    rejectNote,
+                  );
                 }
               }}
             >
@@ -1692,6 +1766,32 @@ export function RegistrationDashboardPanel({
             </option>
           ))}
         </Select>
+        {/*
+          THE OTHER HALF OF "OTHER". Doc 42 spells the categories as
+          "duplicate, ineligible, withdrew, capacity, other+note" — the note is
+          not a decoration, it is what makes `other` mean anything. Required
+          there, optional for the four that already say what they mean.
+
+          ORGANIZER-ONLY, and the label says so out loud, because the select
+          directly above it says the opposite about the reason. Invariant 6: the
+          player is told a respectful sentence built from the CATEGORY and never
+          sees these words.
+        */}
+        <Field
+          label={
+            rejectReason === "other"
+              ? "What was the reason? (organizers only)"
+              : "Note for your own records (organizers only)"
+          }
+          name="row-reject-note"
+          help="The player never sees this. It is here so \u201cother\u201d still means something a month from now."
+          value={rejectNote}
+          required={rejectReason === "other"}
+          onChange={(event) => {
+            setRejectNote(event.target.value);
+          }}
+          data-testid="row-reject-note"
+        />
       </Dialog>
 
       {/* --- Retention removes a player from the night exactly as an Icon
