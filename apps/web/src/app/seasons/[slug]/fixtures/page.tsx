@@ -65,6 +65,7 @@ export default async function FixturesPage({
           <SportTermsProvider terms={dashboard.terms}>
             <FixturesPanel
               scoreFields={dashboard.scoreFields}
+              fixtureShape={dashboard.fixtureShape}
               slug={slug}
               orgSlug={dashboard.orgSlug}
               isPublic={dashboard.competition.visibility === "public"}

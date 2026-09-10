@@ -128,16 +128,31 @@ export function DemoRequestForm({ source }: { source: string }) {
         <option value="" disabled>
           Choose a sport
         </option>
+        {/*
+          THESE VALUES ARE `DEMO_SPORTS`, EXACTLY. The server refuses a sport it
+          does not recognise rather than folding it to "other" — deliberately,
+          because this is the one answer on the page that gets counted — so an
+          option whose value has drifted is not a cosmetic mismatch, it is a
+          form that cannot be submitted.
+
+          Two had drifted. `table-tennis` was renamed to `table_tennis` in 0057
+          when the pack shipped, in the list and in the database CHECK but not
+          here, so choosing Table tennis was refused with a message about the
+          form; and `box_cricket` shipped as a pack and a valid answer without
+          ever being offered.
+        */}
         <option value="cricket">Cricket</option>
+        <option value="box_cricket">Box cricket</option>
         <option value="football">Football</option>
         <option value="kabaddi">Kabaddi</option>
         <option value="volleyball">Volleyball</option>
         <option value="badminton">Badminton</option>
         <option value="basketball">Basketball</option>
         <option value="hockey">Hockey</option>
-        <option value="table-tennis">Table tennis</option>
+        <option value="table_tennis">Table tennis</option>
         <option value="pickleball">Pickleball</option>
         <option value="esports">Esports</option>
+        <option value="battle_royale">Battle royale (BGMI, Free Fire)</option>
         <option value="other">Another sport</option>
       </Select>
 

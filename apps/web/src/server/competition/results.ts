@@ -392,6 +392,51 @@ export async function resultsOf(db: Db, competitionId: string): Promise<Map<stri
   return new Map(rows.map((row) => [row.fixtureId, toResultRow(row)]));
 }
 
+/** One squad in a lobby, as the placement form needs to draw it. */
+export interface LobbyParticipantRow {
+  readonly teamId: string;
+  readonly teamName: string;
+  readonly placement: number | null;
+  readonly score: Record<string, number> | null;
+}
+
+/**
+ * THE SQUADS IN ONE LOBBY, in the order they finished.
+ *
+ * The placement form is drawn from this and not from the season's team list:
+ * the squads that dropped into this lobby are a scheduled fact, and offering
+ * the scorer every team in the competition would invite them to place a squad
+ * that never played.
+ *
+ * Unplaced squads sort last rather than first. Before anything is recorded they
+ * are the whole list and the order does not matter; once a scorer is halfway
+ * through, the ones still to do belong at the bottom, under the ones done.
+ */
+export async function lobbyParticipantsOf(
+  db: Db,
+  orgId: string,
+  fixtureId: string,
+): Promise<readonly LobbyParticipantRow[]> {
+  const rows = await db
+    .select({
+      teamId: fixtureParticipants.teamId,
+      teamName: teams.name,
+      placement: fixtureParticipants.placement,
+      score: fixtureParticipants.score,
+    })
+    .from(fixtureParticipants)
+    .innerJoin(teams, eq(teams.id, fixtureParticipants.teamId))
+    .where(and(eq(fixtureParticipants.fixtureId, fixtureId), eq(fixtureParticipants.orgId, orgId)));
+  return [...rows]
+    .sort((a, b) => {
+      if (a.placement === b.placement) return a.teamName.localeCompare(b.teamName);
+      if (a.placement === null) return 1;
+      if (b.placement === null) return -1;
+      return a.placement - b.placement;
+    })
+    .map((row) => Object.freeze(row));
+}
+
 function toResultRow(row: typeof fixtureResults.$inferSelect): ResultRow {
   return {
     fixtureId: row.fixtureId,

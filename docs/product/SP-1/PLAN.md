@@ -69,7 +69,8 @@ definition — which is also the smallest possible widening of the read-only
 | Verdict | Sports | Why |
 |---------|--------|-----|
 | **Fits now** | Cricket · box cricket · football · kabaddi · hockey · volleyball · basketball · esports | Team leagues, squad formation, one score per fixture. A pack each. |
-| **Fits, Phase 2** | Badminton · table tennis · tennis · pickleball | Run as auction team leagues here, so they belong — but a team *tie* is several rubbers, not one scoreline. Needs `fixtureShape: "single" \| "rubbers"`. Build when a club asks. |
+| **Fits now** | Badminton · table tennis · pickleball | **Shipped 0056**, as ordinary pack files with no code change. This row read "Phase 2, needs `fixtureShape`" for a fortnight; a tie's result is one scoreline per side (rubbers won, games inside them), exactly as volleyball does sets and points. Retracted 2026-09-09. |
+| **Fits now** | Battle royale (BGMI · Free Fire) | **Shipped 0058–0059.** The one sport here that genuinely needed a new shape: a lobby of many squads with no home and no away, scored on placement plus kills. `fixtureShape: "lobby"` — see `PHASE-5_NOTES.md`. |
 | **Out of scope** | Individual ladders · athletics · chess opens · marathons | No team formation means no auction, which means none of this engine applies. That is a tournament platform, not this one. |
 
 ## 5 · Phases
@@ -94,9 +95,15 @@ Two things still block specific sports:
 
 - **Terminology** is now wired (`components/sport-terms.tsx`), but only `ground`
   actually varies between the packs that exist — see `PHASE-4_NOTES.md`.
-- **Racquet sports** (badminton, table tennis, tennis, pickleball) run a team tie
-  as several RUBBERS, not one scoreline. That needs `fixtureShape` and a score
-  shape to match — a Phase-2-sized change, not a pack file.
+- **Racquet sports** — this said a team tie runs as several RUBBERS and needs
+  `fixtureShape`, a Phase-2-sized change. Wrong, and repeated for a fortnight
+  before anybody probed it: badminton, table tennis and pickleball shipped in
+  0056 as pack files with no code change. Retracted 2026-09-09.
+- **Battle royale** was the claim of this kind that held up. A lobby of squads
+  with no home and no away is not reachable from `{ home, away }` however the
+  score fields are named, and it took the change this row predicted:
+  `fixtureShape: "lobby"`, `fixture_participants`, a fold over placements and a
+  fixtures UI (0058–0059, `PHASE-5_NOTES.md`).
 
 **Phase 0 is unconditional.** It has no migrations, no behaviour change, and it
 pays for itself by deleting a duplication defect that already shipped (§ the

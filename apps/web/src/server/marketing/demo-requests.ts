@@ -58,6 +58,12 @@ export const DEMO_SPORTS = [
   "table_tennis",
   "pickleball",
   "esports",
+  /*
+   * BGMI and Free Fire, and the biggest of the lot by player count. It arrives
+   * last on this list only because the list is ordered by the demand we have
+   * MEASURED, and this option has never been offered — the form could not ask.
+   */
+  "battle_royale",
   "other",
 ] as const;
 

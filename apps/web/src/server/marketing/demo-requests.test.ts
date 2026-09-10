@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { SPORTS } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
@@ -111,6 +115,39 @@ describe("validateDemoRequest", () => {
     for (const pack of SPORTS) {
       expect(DEMO_SPORTS).toContain(pack.key);
     }
+  });
+
+  /**
+   * THE FORM OFFERS EXACTLY WHAT THE SERVER ACCEPTS.
+   *
+   * The two lists are written in different files and nothing held them
+   * together, so they drifted twice: `table-tennis` was renamed `table_tennis`
+   * in 0057 everywhere except the form, which meant choosing Table tennis was
+   * REFUSED — the server rejects an unknown sport rather than folding it to
+   * "other", deliberately, because this is the answer that gets counted. And
+   * `box_cricket` was a valid answer nobody could give.
+   *
+   * Both failures are silent from the inside: the type system cannot see into
+   * JSX option values, and every unit test here passes a value it made up.
+   *
+   * Read with readFileSync rather than grep — a file holding a literal control
+   * byte is classified as binary and skipped in silence, so a grep-based
+   * guardrail passes by refusing to look.
+   */
+  it("offers on the form exactly the sports the server will accept", () => {
+    const here = fileURLToPath(new URL(".", import.meta.url));
+    const form = readFileSync(
+      resolve(here, "../../components/marketing/demo-request-form.tsx"),
+      "utf8",
+    );
+    // The sport select only, so the source and size selects on the same page
+    // cannot lend it their values.
+    const select = /<Select label="Which sport\?"[\s\S]*?<\/Select>/.exec(form)?.[0];
+    expect(select).toBeDefined();
+    const offered = [...(select ?? "").matchAll(/<option value="([^"]*)"/g)]
+      .map((match) => match[1] ?? "")
+      .filter((value) => value !== "");
+    expect([...offered].sort()).toEqual([...DEMO_SPORTS].sort());
   });
 
   it("records an unrecognised source as 'other' rather than losing the lead", () => {

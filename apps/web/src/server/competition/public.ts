@@ -49,6 +49,8 @@ export interface PublicFixture {
   /** Null on a lobby (0058): a battle royale match names no home and no away. */
   homeTeamName: string | null;
   awayTeamName: string | null;
+  /** How many squads are in the lobby. Zero on a duel, which names its two. */
+  squadCount: number;
   kickoffAt: string | null;
   groundName: string | null;
   venueName: string | null;
@@ -88,6 +90,7 @@ function toPublicFixture(row: FixtureSnapshot): PublicFixture {
     // renders the match without naming two sides it does not have.
     homeTeamName: row.homeTeamName,
     awayTeamName: row.awayTeamName,
+    squadCount: row.squadCount,
     kickoffAt: row.kickoffAt,
     groundName: row.groundName,
     venueName: row.venueName,

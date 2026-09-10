@@ -46,6 +46,17 @@ export interface FixtureSnapshot {
   readonly durationMinutes: number | null;
   readonly status: FixtureStatus;
   readonly cancelReason: string | null;
+  /**
+   * How many squads are in this lobby. Zero for a duel, which has two sides and
+   * no participants — the row renders "A vs B" from the columns above.
+   */
+  readonly squadCount: number;
+  /**
+   * How many of those squads have been PLACED. A lobby writes no
+   * `fixture_results` row, so this is the only thing that can tell a scored
+   * lobby from an unscored one, and the results worklist asks exactly that.
+   */
+  readonly placedCount: number;
 }
 
 const homeTeams = alias(teams, "home_teams");
@@ -72,6 +83,21 @@ const SNAPSHOT_COLUMNS = {
   durationMinutes: fixtures.durationMinutes,
   status: fixtures.status,
   cancelReason: fixtures.cancelReason,
+  /*
+   * How many squads are in the lobby, counted rather than joined: a lobby holds
+   * up to a hundred participants and joining them would multiply every fixture
+   * row by its squads. Zero on a duel, which has none.
+   *
+   * `::int` and not `::bigint`: postgres.js hands a bigint back as a STRING, and
+   * a string that types as `number` poisons every arithmetic reader downstream.
+   */
+  squadCount: sql<number>`(
+    select count(*) from fixture_participants fp where fp.fixture_id = ${fixtures.id}
+  )::int`,
+  placedCount: sql<number>`(
+    select count(*) from fixture_participants fp
+    where fp.fixture_id = ${fixtures.id} and fp.placement is not null
+  )::int`,
 };
 
 interface SnapshotRow {
@@ -95,6 +121,8 @@ interface SnapshotRow {
   durationMinutes: number | null;
   status: FixtureStatus;
   cancelReason: string | null;
+  squadCount: number;
+  placedCount: number;
 }
 
 function toSnapshot(row: SnapshotRow): FixtureSnapshot {

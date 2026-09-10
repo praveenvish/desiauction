@@ -23,6 +23,7 @@ import { ESPORTS } from "./esports";
 import { BADMINTON } from "./badminton";
 import { TABLE_TENNIS } from "./table-tennis";
 import { PICKLEBALL } from "./pickleball";
+import { BATTLE_ROYALE } from "./battle-royale";
 
 import type { StandingsRules } from "../standings";
 
@@ -64,6 +65,7 @@ export const SPORTS: readonly SportPack[] = [
   BADMINTON,
   TABLE_TENNIS,
   PICKLEBALL,
+  BATTLE_ROYALE,
 ];
 
 /**

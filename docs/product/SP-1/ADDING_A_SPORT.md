@@ -203,7 +203,34 @@ settlement, or any schema. All of it reads the pack.
 
 ## What is still not a pack file
 
-**Racquet sports** — badminton, table tennis, tennis, pickleball. A team tie is
-several **rubbers** (singles, doubles), not one scoreline, and
-`fixture_results.score` holds `{ home, away }`. That needs a new `fixtureShape`
-and a matching score shape: real work, not data.
+**Nothing that has been asked for.** Both claims this section used to carry are
+closed, and both are worth reading as a warning about inherited notes.
+
+**Racquet sports were never blocked.** This said a team tie is several rubbers
+rather than one scoreline and so needed a new `fixtureShape`. The first half is
+true and the conclusion did not follow: a tie's RESULT is one scoreline per side
+— rubbers won, and games won inside them — which is what volleyball has done
+with sets and points since Phase 4. Badminton, table tennis and pickleball
+shipped in 0056 as ordinary pack files with **no code change at all**.
+Retracted 2026-09-09, after a throwaway probe that should have been run when the
+claim was first written.
+
+**Battle royale was, and is not now.** A lobby is sixteen to twenty-five squads
+scored on placement plus kills, with no home and no away, and no arrangement of
+score fields reaches that — the shape was in the schema. `fixtureShape:
+"lobby"` (0058/0059) is what it needed: `fixture_participants`, nullable sides,
+a fold over placements, and a fixtures UI that draws a lobby. See
+`PHASE-5_NOTES.md`.
+
+**A lobby sport costs slightly more than a duel sport.** The pack file, the two
+lines in `sports/index.ts` and the seed migration are the same; the pack also
+sets `fixtureShape: "lobby"` and `standings.lobby` (placement points, and points
+per unit of any score field). Everything downstream — the create form, the
+placement form, the fold, the table — already reads those.
+
+## What genuinely has no home yet
+
+Recording **who** played: who batted, who took the third rubber, which four
+players were in the squad that placed second. That is a scorecard with line-ups,
+and no sport here has one — cricket cannot say who batted either. It is a
+missing feature for every sport equally, not a limit on any particular one.

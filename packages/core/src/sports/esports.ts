@@ -127,13 +127,17 @@ export const ESPORTS: SportPack = {
    *
    * BATTLE ROYALE — BGMI, Free Fire — has no two-sided fixture at all. Sixteen
    * to twenty-five squads drop into ONE lobby and are scored on placement plus
-   * kills; there is no home and no away. `fixture_results.score` is
-   * `{ home, away }`, so the shape cannot be expressed however the score fields
-   * are named, and no pack file can fix that.
+   * kills; there is no home and no away.
    *
-   * It is the same blocker racquet sports have from the other direction (a tie
-   * is several rubbers, not one scoreline): both need a `fixtureShape` the
-   * contract does not have. Named here rather than discovered by the first
-   * BGMI organizer who picks this sport and finds they cannot record a lobby.
+   * IT NOW HAS ITS OWN PACK. `battle-royale.ts` (SP-1 Phase 5) declares
+   * `fixtureShape: "lobby"`, which 0058 gave the contract: a lobby fixture
+   * carries no team ids, its squads live in `fixture_participants`, and its
+   * result is a placement each rather than one scoreline against another. The
+   * paragraph that used to stand here said no pack file could fix it, which was
+   * true — the fix was a shape, not a file.
+   *
+   * This pack stays where it is. Team shooters and battle royale are different
+   * competitions with different score sheets, and folding both into one
+   * "esports" would put an `if` in front of every rule in it.
    */
 };

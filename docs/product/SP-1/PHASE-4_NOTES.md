@@ -191,14 +191,22 @@ it finished. That is a scorecard with line-ups, and no sport here has one —
 cricket cannot say who batted either. Racquet sports are no more limited than
 the six that shipped before them, which is what this note should have said.
 
-**Still genuinely blocked: BATTLE ROYALE** (BGMI, Free Fire). `FixtureResultInput`
+**Then genuinely blocked: BATTLE ROYALE** (BGMI, Free Fire). `FixtureResultInput`
 is `homeTeamId` / `awayTeamId` — strictly two-sided — and a lobby is twenty-five
 squads scored on placement plus kills. No arrangement of score fields fixes
 that; it needs an N-sided fixture, which is a real change to the fixtures table,
 the result writer, the standings fold and the fixtures UI.
 
+**CLOSED 2026-09-10.** That paragraph was right about the reason and right about
+the cost — it was the four changes it names, in that order, and no more.
+`fixtureShape: "lobby"` shipped in 0058/0059; the pack is
+`sports/battle-royale.ts`. See `PHASE-5_NOTES.md`. Unlike the racquet claim
+above it, this one survived being probed, which is the difference between a
+limit that was measured and one that was repeated.
+
 **Shipped:** cricket, football, kabaddi, volleyball, hockey, basketball, box
-cricket, esports, badminton, table tennis, pickleball — eleven.
+cricket, esports, badminton, table tennis, pickleball — eleven. (Twelve from
+2026-09-10, with battle royale.)
 
 ## 7 · Verification of the terminology work
 

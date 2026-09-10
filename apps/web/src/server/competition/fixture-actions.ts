@@ -19,9 +19,13 @@ import { resolveTenant } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   isResultOutcome,
+  lobbyParticipantsOf,
   recordFixtureResult,
+  recordLobbyResult,
   resultsOf,
   standingsOf,
+  type LobbyParticipantRow,
+  type LobbyResultEntry,
   type StandingsView,
 } from "./results";
 import {
@@ -35,6 +39,7 @@ import {
   completeFixture,
   competitionConflicts,
   createFixture,
+  createLobbyFixture,
   discardDrafts,
   editFixture,
   generateFixtures,
@@ -50,6 +55,7 @@ import {
   type GenerateInput,
   type GeneratePreview,
   type LabelledConflict,
+  type LobbyFixtureInput,
   type ManualFixtureInput,
 } from "./fixture-aggregate";
 import { commitFixtureImport, importDryRun } from "./fixture-import";
@@ -308,6 +314,15 @@ export interface FixtureDashboardParams {
 export interface FixtureDashboard {
   /** The season's score components, as plain data for the client form. */
   scoreFields: readonly { key: string; label: string; help?: string }[];
+  /**
+   * HOW MANY SIDES THIS SEASON'S FIXTURES HAVE.
+   *
+   * `duel` is two — a home and an away, which every sport here assumed until
+   * battle royale. `lobby` is many: one match, up to a hundred squads, no
+   * home and no away. The panel needs it before it can draw either the create
+   * form or a fixture row, because "A vs B" is not a sentence about a lobby.
+   */
+  fixtureShape: "duel" | "lobby";
   /** What this season's sport calls things — plain data, so it may cross. */
   terms: {
     participant: readonly [string, string];
@@ -397,6 +412,7 @@ export async function fixtureDashboard(
       ...(groundList !== undefined ? { grounds: groundList } : {}),
       ...(conflicts !== undefined ? { conflicts } : {}),
       terms: sportPackFor(competition.sport).terms,
+      fixtureShape: sportPackFor(competition.sport).fixtureShape ?? "duel",
       scoreFields: sportPackFor(competition.sport).result.scoreFields.map((field) => ({
         key: field.key,
         label: field.entry?.label ?? field.label,
@@ -475,6 +491,37 @@ export async function createFixtureAction(
       unknown_ground: "Pick a ground from this organization.",
     }[result.reason];
     return { ok: false, error: message };
+  }
+  return { ok: true, number: result.number };
+}
+
+/**
+ * SCHEDULE A LOBBY — the create action for a sport with no home and no away.
+ *
+ * A separate action from `createFixtureAction` for the same reason the writer
+ * is a separate function: the two shapes refuse different things, and the
+ * sentences a user needs to read when refused are not the same sentences. "Pick
+ * two teams from this competition" is nonsense advice to somebody who just
+ * entered the same squad twice into a battle royale.
+ */
+export async function createLobbyAction(
+  slug: string,
+  input: LobbyFixtureInput,
+): Promise<{ ok: boolean; number?: string; error?: string }> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    createLobbyFixture(db, gate.competition, gate.personId, input),
+  );
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      invalid_input: "Pick between 2 and 100 squads, each one once, and check the kickoff.",
+      unknown_team: "Every squad must be one of this competition's teams.",
+      unknown_ground: "Pick a ground from this organization.",
+    };
+    return { ok: false, error: message[result.reason] };
   }
   return { ok: true, number: result.number };
 }
@@ -928,4 +975,104 @@ export async function recordResultAction(
     revalidatePath(`/seasons/${slug}/standings`);
     return { ok: true, amended: result.amended };
   });
+}
+
+/**
+ * THE SQUADS IN A LOBBY, fetched when the scorer opens one.
+ *
+ * Not carried on the dashboard: a season of lobbies is a season of squad lists,
+ * and shipping every one of them to draw a form the scorer opens once is the
+ * kind of read that makes a fixtures page slow for everybody. The dashboard
+ * carries the COUNT; this fetches the names.
+ */
+export async function lobbyParticipantsAction(
+  slug: string,
+  fixtureId: string,
+): Promise<readonly LobbyParticipantRow[]> {
+  const session = await currentSession();
+  if (session === null) {
+    return [];
+  }
+  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  if (competition === null) {
+    return [];
+  }
+  return inCompetitionOrg(session.personId, competition, (db) =>
+    lobbyParticipantsOf(db, competition.orgId, fixtureId),
+  );
+}
+
+/**
+ * RECORD A LOBBY — where every squad finished, and what it did there.
+ *
+ * The sibling of `recordResultAction`, and the same division of labour: the
+ * scorer types text, the server parses it against the pack, and the pack's
+ * bounds are the authority on whether a number is possible. Placements are
+ * parsed here too — a blank one is the scorer's "not yet", which the writer
+ * refuses as `incomplete` rather than silently filing a half-scored lobby.
+ */
+export async function recordLobbyResultAction(
+  slug: string,
+  fixtureId: string,
+  placements: readonly { teamId: string; placement: string; score?: Record<string, string> }[],
+): Promise<{ ok: boolean; error?: string | undefined; amended?: boolean | undefined }> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const pack = sportPackFor(gate.competition.sport);
+  const entries: LobbyResultEntry[] = [];
+  for (const row of placements) {
+    const place = Number.parseInt(row.placement.trim(), 10);
+    if (!Number.isInteger(place)) {
+      // A blank placement is not an error yet — it is a squad the scorer has
+      // not reached. Dropped here, the writer sees a short list and says
+      // `incomplete`, which names the actual problem: somebody is missing.
+      continue;
+    }
+    const score: Record<string, number> = {};
+    for (const field of pack.result.scoreFields) {
+      const raw = (row.score?.[field.key] ?? "").trim();
+      if (raw === "") {
+        continue;
+      }
+      const parsed = parseScoreField(pack, field.key, raw);
+      if (parsed === null) {
+        return {
+          ok: false,
+          error: `Check the ${field.label.toLowerCase()} — that is not a number.`,
+        };
+      }
+      score[field.key] = parsed;
+    }
+    entries.push({
+      teamId: row.teamId,
+      placement: place,
+      ...(Object.keys(score).length > 0 ? { score } : {}),
+    });
+  }
+
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    recordLobbyResult(db, {
+      orgId: gate.competition.orgId,
+      fixtureId,
+      actorId: gate.personId,
+      placements: entries,
+    }),
+  );
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      unknown_fixture: "That fixture is not in this competition.",
+      not_a_lobby: "That fixture has two sides. Record it as a match, not a lobby.",
+      not_played:
+        "That match has not been played. Publish it, start it and complete it before recording a result.",
+      incomplete: "Every squad in the lobby needs a placement before this can be saved.",
+      invalid_placement: "Placements run from 1 upwards, and no squad can finish below the last.",
+      impossible_score: "One of those numbers is outside what this sport allows.",
+    };
+    return { ok: false, error: message[result.reason] };
+  }
+  revalidatePath(`/seasons/${slug}/fixtures`);
+  revalidatePath(`/seasons/${slug}/standings`);
+  return { ok: true, amended: result.amended };
 }

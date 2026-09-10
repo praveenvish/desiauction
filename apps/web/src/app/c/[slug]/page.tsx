@@ -266,7 +266,12 @@ export default async function PublicCompetitionPage({
               {view.fixtures.map((fixture) => (
                 <li key={fixture.number} className="public-fixture">
                   <span className="public-fixture-teams">
-                    {fixture.homeTeamName} vs {fixture.awayTeamName}
+                    {/* A lobby has no home and no away, so "vs" is not a
+                        sentence about it — it is named by how many squads
+                        dropped in. */}
+                    {fixture.homeTeamName === null
+                      ? `${String(fixture.squadCount)} squads`
+                      : `${fixture.homeTeamName} vs ${fixture.awayTeamName ?? "TBA"}`}
                   </span>
                   <span className="public-fixture-when">
                     {fixture.kickoffAt !== null ? fixture.kickoffAt.replace("T", " ") : "TBA"}

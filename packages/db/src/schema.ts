@@ -1890,6 +1890,10 @@ export const demoRequests = pgTable(
         "table_tennis",
         "pickleball",
         "esports",
+        // Added when the pack shipped (0059/0060), and the first lobby sport —
+        // BGMI and Free Fire, the format with the largest player base of any
+        // here and the one the form has never been able to ask about.
+        "battle_royale",
         "other",
       ],
     }),

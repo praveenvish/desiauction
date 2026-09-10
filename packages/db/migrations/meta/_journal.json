@@ -414,6 +414,20 @@
       "when": 1788710400000,
       "tag": "0058_fixture_participants",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788796800000,
+      "tag": "0059_battle_royale",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788883200000,
+      "tag": "0060_demo_battle_royale",
+      "breakpoints": true
     }
   ]
 }

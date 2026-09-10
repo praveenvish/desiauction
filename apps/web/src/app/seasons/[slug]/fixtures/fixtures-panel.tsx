@@ -18,6 +18,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 
 import {
   createFixtureAction,
+  createLobbyAction,
   discardDraftsAction,
   exportFixturesAction,
   fixtureImportCommitAction,
@@ -87,6 +88,7 @@ export function FixturesPanel({
   canManage,
   filters,
   scoreFields,
+  fixtureShape,
 }: {
   slug: string;
   orgSlug: string;
@@ -95,6 +97,7 @@ export function FixturesPanel({
   page: FixtureDashboard["page"];
   teams: FixtureDashboard["teams"];
   scoreFields: FixtureDashboard["scoreFields"];
+  fixtureShape: FixtureDashboard["fixtureShape"];
   grounds?: FixtureDashboard["grounds"];
   conflicts?: FixtureDashboard["conflicts"];
   results: FixtureDashboard["results"];
@@ -102,6 +105,14 @@ export function FixturesPanel({
   filters: { status: string; team: string; ground: string; q: string; sort: string };
 }) {
   const terms = useSportTerms();
+  /*
+   * ONE MATCH, MANY SQUADS. A battle royale season has no home and no away, so
+   * three things change and nothing else does: a fixture row says how many
+   * squads dropped in rather than "A vs B", the create form picks a set instead
+   * of a pair, and there is no round robin to generate — a schedule of lobbies
+   * is a list of dates, not a pairing problem.
+   */
+  const isLobby = fixtureShape === "lobby";
   // Both arrive undefined without fixture.manage — the server omits the keys
   // rather than trusting this component to hide them.
   const grounds = groundsProp ?? [];
@@ -137,6 +148,7 @@ export function FixturesPanel({
   const [manGround, setManGround] = useState("");
   const [manKickoff, setManKickoff] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
+  const [manSquads, setManSquads] = useState<ReadonlySet<string>>(new Set<string>());
   const [importOpen, setImportOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
 
@@ -294,6 +306,35 @@ export function FixturesPanel({
       return result;
     }, "Fixture created");
 
+  const createLobby = () =>
+    act(async () => {
+      const result = await createLobbyAction(slug, {
+        teamIds: [...manSquads],
+        ...(manGround !== "" ? { groundId: manGround } : {}),
+        ...(manKickoff !== "" ? { kickoffAt: manKickoff } : {}),
+        durationMinutes: Number.parseInt(genDuration, 10) || 180,
+      });
+      if (result.ok) {
+        setManSquads(new Set<string>());
+        setManGround("");
+        setManKickoff("");
+        setManualOpen(false);
+      }
+      return result;
+    }, "Lobby created");
+
+  const toggleSquad = (teamId: string) => {
+    setManSquads((prev) => {
+      const next = new Set(prev);
+      if (next.has(teamId)) {
+        next.delete(teamId);
+      } else {
+        next.add(teamId);
+      }
+      return next;
+    });
+  };
+
   const lifecycle = (fixtureId: string, action: FixtureLifecycleAction) =>
     act(() => fixtureLifecycleAction(slug, fixtureId, action));
 
@@ -408,7 +449,7 @@ export function FixturesPanel({
         <Card data-testid="generate-panel">
           <div className="teams-head">
             <div className="teams-head-title">
-              <h2>Generate fixtures</h2>
+              <h2>{isLobby ? "Schedule lobbies" : "Generate fixtures"}</h2>
             </div>
             <Button
               size="sm"
@@ -418,17 +459,18 @@ export function FixturesPanel({
                 setManualOpen(true);
               }}
             >
-              + Add one fixture
+              + Add one {isLobby ? "lobby" : "fixture"}
             </Button>
           </div>
           <p className="competitions-hint">
-            Deterministic round robin over this season&apos;s teams — same inputs, same schedule,
-            every time. Generated fixtures land as drafts, and home and away are shared out evenly.
+            {isLobby
+              ? "Every match here is one lobby of many squads, so there is nothing to pair up and no round robin to generate. Add each lobby, choose the squads dropping into it, then schedule and publish the lot."
+              : "Deterministic round robin over this season's teams — same inputs, same schedule, every time. Generated fixtures land as drafts, and home and away are shared out evenly."}
           </p>
           {/* The blocked activation path, stated BEFORE the form rather than as
               one unlinked sentence buried inside it. An org with no venues can
               never generate, and "your organization page" was not a link. */}
-          {teams.length < 2 || grounds.length === 0 ? (
+          {!isLobby && (teams.length < 2 || grounds.length === 0) ? (
             <div className="dash-hint" data-testid="generate-blocked">
               <p>
                 {teams.length < 2
@@ -444,84 +486,90 @@ export function FixturesPanel({
               )}
             </div>
           ) : null}
+          {isLobby ? null : (
+            <>
+              <div className="date-row">
+                <Select
+                  label="Rounds"
+                  name="rounds"
+                  value={genRounds}
+                  onChange={(event) => {
+                    setGenRounds(event.target.value);
+                  }}
+                >
+                  <option value="1">Single round robin</option>
+                  <option value="2">Double round robin</option>
+                </Select>
+                <Field
+                  label="Start date"
+                  name="startDate"
+                  type="date"
+                  value={genStart}
+                  onChange={(event) => {
+                    setGenStart(event.target.value);
+                  }}
+                />
+                <Field
+                  label="Kickoff times"
+                  name="kickoffTimes"
+                  value={genTimes}
+                  onChange={(event) => {
+                    setGenTimes(event.target.value);
+                  }}
+                  placeholder="18:00,20:00"
+                />
+                <Field
+                  label="Duration (min)"
+                  name="duration"
+                  value={genDuration}
+                  onChange={(event) => {
+                    setGenDuration(event.target.value);
+                  }}
+                />
+              </div>
+              <fieldset className="ground-picker">
+                <legend>{terms.ground}s</legend>
+                {grounds.length === 0 ? (
+                  <p className="competitions-hint">
+                    No active grounds yet — <Link href={`/org/${orgSlug}/venues`}>add a venue</Link>{" "}
+                    and its grounds first.
+                  </p>
+                ) : (
+                  grounds.map((ground) => (
+                    <label key={ground.id} className="check-row">
+                      <input
+                        type="checkbox"
+                        checked={genGrounds.has(ground.id)}
+                        onChange={() => {
+                          setGenGrounds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(ground.id)) {
+                              next.delete(ground.id);
+                            } else {
+                              next.add(ground.id);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                      {ground.venueName} · {ground.name}
+                    </label>
+                  ))
+                )}
+              </fieldset>
+            </>
+          )}
           <div className="date-row">
-            <Select
-              label="Rounds"
-              name="rounds"
-              value={genRounds}
-              onChange={(event) => {
-                setGenRounds(event.target.value);
-              }}
-            >
-              <option value="1">Single round robin</option>
-              <option value="2">Double round robin</option>
-            </Select>
-            <Field
-              label="Start date"
-              name="startDate"
-              type="date"
-              value={genStart}
-              onChange={(event) => {
-                setGenStart(event.target.value);
-              }}
-            />
-            <Field
-              label="Kickoff times"
-              name="kickoffTimes"
-              value={genTimes}
-              onChange={(event) => {
-                setGenTimes(event.target.value);
-              }}
-              placeholder="18:00,20:00"
-            />
-            <Field
-              label="Duration (min)"
-              name="duration"
-              value={genDuration}
-              onChange={(event) => {
-                setGenDuration(event.target.value);
-              }}
-            />
-          </div>
-          <fieldset className="ground-picker">
-            <legend>{terms.ground}s</legend>
-            {grounds.length === 0 ? (
-              <p className="competitions-hint">
-                No active grounds yet — <Link href={`/org/${orgSlug}/venues`}>add a venue</Link> and
-                its grounds first.
-              </p>
-            ) : (
-              grounds.map((ground) => (
-                <label key={ground.id} className="check-row">
-                  <input
-                    type="checkbox"
-                    checked={genGrounds.has(ground.id)}
-                    onChange={() => {
-                      setGenGrounds((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(ground.id)) {
-                          next.delete(ground.id);
-                        } else {
-                          next.add(ground.id);
-                        }
-                        return next;
-                      });
-                    }}
-                  />
-                  {ground.venueName} · {ground.name}
-                </label>
-              ))
+            {isLobby ? null : (
+              <Button
+                onClick={() => void askToGenerate()}
+                loading={busy}
+                disabled={genStart === "" || genGrounds.size === 0}
+                data-testid="generate-fixtures"
+              >
+                Generate
+              </Button>
             )}
-          </fieldset>
-          <div className="date-row">
-            <Button
-              onClick={() => void askToGenerate()}
-              loading={busy}
-              disabled={genStart === "" || genGrounds.size === 0}
-              data-testid="generate-fixtures"
-            >
-              Generate
-            </Button>
             <Button
               variant="secondary"
               onClick={() =>
@@ -667,7 +715,7 @@ export function FixturesPanel({
           onClose={() => {
             setManualOpen(false);
           }}
-          title="Add a fixture"
+          title={isLobby ? "Add a lobby" : "Add a fixture"}
           size="wide"
           footer={
             <Button
@@ -681,36 +729,70 @@ export function FixturesPanel({
           }
         >
           <div className="fixtures-manual-form" data-testid="manual-panel">
-            <Select
-              label="Home team"
-              name="homeTeam"
-              value={manHome}
-              onChange={(event) => {
-                setManHome(event.target.value);
-              }}
-            >
-              <option value="">Choose…</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Away team"
-              name="awayTeam"
-              value={manAway}
-              onChange={(event) => {
-                setManAway(event.target.value);
-              }}
-            >
-              <option value="">Choose…</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </Select>
+            {isLobby ? (
+              /* A checklist, not two selects. The squads in a lobby are a set —
+                 the same squad cannot enter twice and there is no first or
+                 second slot — and a set is chosen by ticking it. */
+              <fieldset className="ground-picker" data-testid="squad-picker">
+                <legend>Squads in this lobby</legend>
+                {teams.length < 2 ? (
+                  <p className="competitions-hint">
+                    A lobby needs at least two squads.{" "}
+                    <Link href={`/seasons/${slug}/teams`}>Add teams</Link>
+                  </p>
+                ) : (
+                  teams.map((team) => (
+                    <label key={team.id} className="check-row">
+                      <input
+                        type="checkbox"
+                        checked={manSquads.has(team.id)}
+                        onChange={() => {
+                          toggleSquad(team.id);
+                        }}
+                        data-testid={`squad-${team.id}`}
+                      />
+                      {team.name}
+                    </label>
+                  ))
+                )}
+                <p className="competitions-hint" data-testid="squad-count">
+                  {manSquads.size} squad{manSquads.size === 1 ? "" : "s"} selected
+                </p>
+              </fieldset>
+            ) : (
+              <>
+                <Select
+                  label="Home team"
+                  name="homeTeam"
+                  value={manHome}
+                  onChange={(event) => {
+                    setManHome(event.target.value);
+                  }}
+                >
+                  <option value="">Choose…</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  label="Away team"
+                  name="awayTeam"
+                  value={manAway}
+                  onChange={(event) => {
+                    setManAway(event.target.value);
+                  }}
+                >
+                  <option value="">Choose…</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </Select>
+              </>
+            )}
             <Select
               label={terms.ground}
               name="manualGround"
@@ -736,12 +818,16 @@ export function FixturesPanel({
               }}
             />
             <Button
-              onClick={() => void createManual()}
+              onClick={() => void (isLobby ? createLobby() : createManual())}
               loading={busy}
-              disabled={manHome === "" || manAway === "" || manHome === manAway}
+              disabled={
+                isLobby
+                  ? manSquads.size < 2
+                  : manHome === "" || manAway === "" || manHome === manAway
+              }
               data-testid="add-fixture"
             >
-              Add fixture
+              Add {isLobby ? "lobby" : "fixture"}
             </Button>
           </div>
         </Dialog>
@@ -1127,25 +1213,46 @@ function FixtureRow({
           {fixture.number}
         </td>
         <td data-label="Fixture">
-          <span className="registration-name">
-            <span className="fx-team">
-              <span
-                className="fx-dot"
-                style={{ background: fixture.homeTeamColor ?? "var(--accent)" }}
-                aria-hidden
-              />
-              {fixture.homeTeamShort ?? fixture.homeTeamName}
+          {/* A LOBBY has no home and no away, so it cannot be read as "A vs B".
+              It is named by its size — the thing an organizer actually checks
+              on a battle royale schedule is whether the right number of squads
+              is in it — and by how far the scoring has got, because a lobby
+              writes no result row and this is the only place that shows. */}
+          {fixture.homeTeamId === null ? (
+            <span className="registration-name" data-testid={`lobby-${fixture.number}`}>
+              <span className="fx-team">
+                <span className="fx-dot" style={{ background: "var(--accent)" }} aria-hidden />
+                {fixture.squadCount} squads
+              </span>
+              {fixture.placedCount > 0 ? (
+                <span className="registration-phone">
+                  {fixture.placedCount === fixture.squadCount
+                    ? "all placed"
+                    : `${String(fixture.placedCount)} of ${String(fixture.squadCount)} placed`}
+                </span>
+              ) : null}
             </span>
-            <span className="fx-vs">vs</span>
-            <span className="fx-team">
-              <span
-                className="fx-dot"
-                style={{ background: fixture.awayTeamColor ?? "var(--accent)" }}
-                aria-hidden
-              />
-              {fixture.awayTeamShort ?? fixture.awayTeamName}
+          ) : (
+            <span className="registration-name">
+              <span className="fx-team">
+                <span
+                  className="fx-dot"
+                  style={{ background: fixture.homeTeamColor ?? "var(--accent)" }}
+                  aria-hidden
+                />
+                {fixture.homeTeamShort ?? fixture.homeTeamName}
+              </span>
+              <span className="fx-vs">vs</span>
+              <span className="fx-team">
+                <span
+                  className="fx-dot"
+                  style={{ background: fixture.awayTeamColor ?? "var(--accent)" }}
+                  aria-hidden
+                />
+                {fixture.awayTeamShort ?? fixture.awayTeamName}
+              </span>
             </span>
-          </span>
+          )}
         </td>
         <td data-label="Kickoff">
           {fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "—"}
