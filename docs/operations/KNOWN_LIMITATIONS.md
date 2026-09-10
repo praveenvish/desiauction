@@ -58,9 +58,20 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
   harness races Chromium had been winning by luck, one Apple keyboard default,
   one Chromium-only WebAuthn API. All fixed or scoped at source.
 
-  Still open: **Firefox** (the engine is installed and has never been run — it
-  is deliberately not in the config until somebody reads its failures, because
-  an unexamined engine is a red suite waiting to be ignored), **Edge**, and
+  **Firefox is green too** (104 passed on its first run; the one failure was a
+  test that spoofed a second device as "Firefox on Windows" — what Playwright's
+  own Firefox calls itself — so it could not tell the revoked row from the one
+  it was sitting on).
+
+  **BUT NEITHER RUNS IN THE NIGHTLY, and that is deliberate.** Across two full
+  405-test three-engine runs of the same code they produced DIFFERENT failures
+  each time, all in the live-auction path (engine service + WebSockets);
+  Chromium had zero failures across all four full runs. An intermittently red
+  nightly teaches everyone to ignore it. Both stay opt-in (`E2E_WEBKIT=1`,
+  `E2E_FIREFOX=1`) for deliberate use and go back into the nightly when that
+  flakiness is understood. **Chromium remains the certified engine.**
+
+  Still open: that live-auction flakiness on non-Chromium engines, **Edge**, and
   **real Safari/Edge WebAuthn**, which needs the founder's devices at staging
   because `passkeys.spec.ts` drives a Chrome DevTools Protocol virtual
   authenticator that has no cross-engine equivalent.

@@ -109,16 +109,31 @@ jobs:
       # ever run on Chromium. Per-commit CI stays Chromium-only because WebKit
       # doubles a ~5-minute run and the defects it catches (timing, layout) do
       # not appear per commit.
-      - run: npx playwright install --with-deps chromium webkit firefox
+      - run: npx playwright install --with-deps chromium
         working-directory: apps/web
       # ~29 specs SKIP here by design: `next start` forces NODE_ENV=production
       # and the /gallery family is dev-only, so those pages correctly 404. They
       # report as skipped, not failed.
-      - name: End-to-end journeys (Chromium + WebKit + Firefox)
+      - name: End-to-end journeys
         run: npx playwright test
         working-directory: apps/web
         env:
           CI: "true"
-          # Add the `webkit` and `firefox` projects — see playwright.config.ts.
-          E2E_WEBKIT: "1"
-          E2E_FIREFOX: "1"
+          # WEBKIT AND FIREFOX ARE NOT RUN HERE, and that is a retraction of a
+          # change made earlier the same day.
+          #
+          # Both engines are green when a spec is run deliberately, and both
+          # earned their keep: between them they exposed nine tests that were
+          # passing on timing luck rather than correctness. But across two full
+          # 405-test runs of the same code they produced DIFFERENT failures
+          # each time — conduct-ceremony on Firefox, financial-issuance on
+          # WebKit — all in the live-auction path, which is the one place the
+          # suite depends on a long-lived engine service and real WebSockets.
+          # Chromium had ZERO failures across all four full runs.
+          #
+          # An intermittently red nightly is worse than no nightly: this file's
+          # own header says a nightly that fails for its own harness teaches
+          # everyone to ignore it, and that is exactly what shipping this would
+          # have done. They stay available (`E2E_WEBKIT=1`, `E2E_FIREFOX=1`)
+          # for deliberate use, and go back in here when the live-auction
+          # flakiness is understood rather than tolerated.
