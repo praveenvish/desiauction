@@ -82,14 +82,24 @@ services:
     # advisory lock held by a backend nobody is using, and every replacement
     # engine refuses to boot. Observed idle for four hours once. With these,
     # a severed holder is reaped in ~60s; without them, never.
+    # `-c` and `key=value` as SEPARATE arguments. The `-c=key=value` form looks
+    # right and is not: Postgres parses the parameter name as empty and dies
+    # with `FATAL: unrecognized configuration parameter ""` in a restart loop.
+    # Caught by standing this stack up; it would have failed on first boot.
     command:
       - postgres
-      - -c=tcp_keepalives_idle=30
-      - -c=tcp_keepalives_interval=10
-      - -c=tcp_keepalives_count=3
-      - -c=wal_level=replica
-      - -c=archive_mode=on
-      - -c=archive_command=pgbackrest --stanza=desiauction archive-push %p
+      - -c
+      - tcp_keepalives_idle=30
+      - -c
+      - tcp_keepalives_interval=10
+      - -c
+      - tcp_keepalives_count=3
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=desiauction archive-push %p
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s

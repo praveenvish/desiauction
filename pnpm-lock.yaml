@@ -64,6 +64,9 @@ importers:
       postgres:
         specifier: ^3.4.0
         version: 3.4.9
+      ulidx:
+        specifier: ^2.4.0
+        version: 2.4.1
       ws:
         specifier: ^8.18.0
         version: 8.21.0
