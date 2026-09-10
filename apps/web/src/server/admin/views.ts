@@ -408,6 +408,10 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
     recentActivity(db, 12, [
       ADMIN_ACCESS_ACTION,
       "auth.login.otp",
+      // Excluded for the same reason as the others: the admin overview is for
+      // the platform doing things, not a scroll of people signing in. The audit
+      // explorer still shows every one.
+      "auth.login.email",
       "auth.otp.requested",
       "auth.login.passkey",
     ]),

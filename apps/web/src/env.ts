@@ -106,6 +106,19 @@ const envSchema = z.object({
    * provider needing a different body overrides `buildRequest` at the call
    * site rather than forking the adapter.
    */
+  /*
+   * WHICH MAILER, said out loud — the twin of `OTP_PROVIDER`.
+   *
+   * `createCodeMailer` used to choose by ABSENCE: no endpoint meant the dev
+   * inbox. That reads fine until you need a production-shaped build to use dev
+   * mail, which is exactly what the e2e suite is — and then the only way to get
+   * it is to delete your real credentials. The SMS path has had an explicit
+   * switch since PX-3 for the same reason.
+   *
+   * `auto` keeps every existing caller's behaviour byte for byte: real mailer
+   * when configured, dev inbox when not.
+   */
+  EMAIL_PROVIDER: z.enum(["auto", "dev", "http"]).default("auto"),
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),

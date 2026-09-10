@@ -428,6 +428,13 @@
       "when": 1788883200000,
       "tag": "0060_demo_battle_royale",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788969600000,
+      "tag": "0061_email_login_purpose",
+      "breakpoints": true
     }
   ]
 }

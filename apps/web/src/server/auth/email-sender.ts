@@ -104,10 +104,20 @@ const defaultTransport: MailTransport = async (url, init) => {
  * than being half-sent by a partly-configured provider.
  */
 export function createCodeMailer(db: Db): CodeMailer {
+  // Explicit beats inferred. `dev` forces the inbox even when real credentials
+  // are present — which is the only way a PRODUCTION-shaped build (the e2e
+  // suite) can exercise an email flow without deleting them. `auto` is the
+  // historical behaviour and stays the default, so nothing existing moves.
+  if (env.EMAIL_PROVIDER === "dev") {
+    return new DevInboxMailer(db);
+  }
   const endpoint = env.EMAIL_API_ENDPOINT;
   const apiKey = env.EMAIL_API_KEY;
   const from = env.EMAIL_FROM;
   if (endpoint === undefined || apiKey === undefined || from === undefined) {
+    if (env.EMAIL_PROVIDER === "http") {
+      throw new MailSendError("EMAIL_PROVIDER=http without endpoint, key and from address");
+    }
     return new DevInboxMailer(db);
   }
   return new HttpMailer({ endpoint, apiKey, from });

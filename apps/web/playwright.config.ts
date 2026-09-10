@@ -205,6 +205,12 @@ export default defineConfig({
         // Its OWN build directory: sharing .next with a developer's server on
         // :3000 corrupts the webpack pack cache for both.
         NEXT_DIST_DIR: ".next-e2e",
+        // Codes to the dev inbox, never to a real mailbox. A developer whose
+        // .env.local carries live Resend credentials would otherwise have the
+        // suite send actual email to test addresses on every run — and the
+        // email sign-in spec would fail against a domain that does not accept
+        // them. The SMS side has had OTP_PROVIDER=dev for the same reason.
+        EMAIL_PROVIDER: "dev",
         // `next start` boots with NODE_ENV=production, so apps/web's env guard
         // applies its PRODUCTION refinements and refuses to start on twelve of
         // them at once — a localhost PUBLIC_BASE_URL, OTP_PROVIDER=dev, no

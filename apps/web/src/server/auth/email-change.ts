@@ -110,6 +110,10 @@ export async function requestEmailVerification(
     personId: input.personId,
     email,
     codeHash: hashCode(code),
+    // Explicit, though it matches the column default: this flow's codes must
+    // never be consumable by sign-in, and saying so here means a future change
+    // to the default cannot silently widen what they prove.
+    purpose: "email_change",
     expiresAt: new Date(Date.now() + CODE_TTL_MS),
   });
   return { ok: true, email, code };
@@ -132,7 +136,13 @@ export async function confirmEmailVerification(
     .select()
     .from(emailVerifications)
     .where(
-      and(eq(emailVerifications.personId, input.personId), isNull(emailVerifications.consumedAt)),
+      and(
+        eq(emailVerifications.personId, input.personId),
+        // PURPOSE-BOUND. Without this a sign-in code mailed to the person
+        // would confirm an address change they never asked for.
+        eq(emailVerifications.purpose, "email_change"),
+        isNull(emailVerifications.consumedAt),
+      ),
     )
     .orderBy(desc(emailVerifications.createdAt))
     .limit(1);

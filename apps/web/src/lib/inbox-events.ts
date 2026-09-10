@@ -10,6 +10,7 @@
  */
 const LABELS: Record<string, string> = {
   "auth.login.otp": "Signed in with a one-time code",
+  "auth.login.email": "Signed in with a code sent to your email",
   // Written on EVERY sign-in, so it was the single most common raw key a new
   // account ever saw — half of a fresh inbox read `auth.otp.requested` in
   // monospace before the person had done anything but log in twice.

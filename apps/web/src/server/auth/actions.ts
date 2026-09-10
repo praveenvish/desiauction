@@ -26,6 +26,7 @@ import {
   requestEmailVerification,
   type EmailVerificationResult,
 } from "./email-change";
+import { requestEmailLogin, verifyEmailLogin } from "./email-login";
 import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
@@ -305,6 +306,106 @@ export async function verifyOtpAction(
   // flow (`/join/...`, `/owner-join/...`) still lands exactly where it was
   // going, because onboarding must never hijack an invite.
   if (target === "/home" && (result.name === null || result.name.trim() === "")) {
+    redirect("/onboarding");
+  }
+  redirect(target);
+}
+
+// --- Email sign-in (Phase 1) ------------------------------------------------
+//
+// The SECOND DOOR to the same person, added because Indian SMS needs DLT
+// registration with TRAI and email does not. Everything after verification is
+// the phone path's sequence, called in the same order for the same reasons —
+// security event, terms consent, session cookie, onboarding redirect. Two doors
+// that end anywhere different is how one of them becomes the weaker one.
+
+export interface EmailAuthFormState {
+  step: "email" | "code";
+  email: string;
+  next?: string;
+  error?: string;
+  notice?: string;
+}
+
+export async function requestEmailLoginAction(
+  _previous: EmailAuthFormState,
+  formData: FormData,
+): Promise<EmailAuthFormState> {
+  const email = formString(formData, "email");
+  const next = formString(formData, "next");
+  const base: EmailAuthFormState = { step: "email", email, ...(next !== "" ? { next } : {}) };
+  // `exactOptionalPropertyTypes` is on: spreading a state whose `error` is
+  // `string | undefined` is not the same as omitting the key, so every return
+  // below sets `error` explicitly rather than carrying an absent one through.
+  const result = await requestEmailLogin(db, { email, requestIp: await requestIp() });
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      "invalid-email": "Enter the email address on your account.",
+      "hourly-limit": "Too many codes for that address. Try again in an hour.",
+    };
+    return { ...base, error: message[result.reason] };
+  }
+  /*
+   * ADVANCES TO THE CODE STEP WHETHER OR NOT AN ACCOUNT EXISTS, and mails one
+   * only when it does. A form that stayed put for unknown addresses would be a
+   * membership oracle for anybody with a list of them — the reason
+   * `requestEmailLogin` returns no signal either.
+   */
+  if (result.code !== undefined) {
+    try {
+      await createCodeMailer(db).send(result.email, result.code);
+    } catch (error) {
+      if (error instanceof MailSendError) {
+        return { ...base, error: "We couldn't send that email right now. Try again shortly." };
+      }
+      throw error;
+    }
+  }
+  return { ...base, step: "code", email: result.email };
+}
+
+export async function verifyEmailLoginAction(
+  previous: EmailAuthFormState,
+  formData: FormData,
+): Promise<EmailAuthFormState> {
+  const code = formString(formData, "code");
+  const result = await verifyEmailLogin(db, { email: previous.email, code });
+  if (!result.ok) {
+    if (result.reason === "expired") {
+      return { ...previous, error: "That code has expired. Ask for a fresh one." };
+    }
+    if (result.reason === "locked") {
+      return { ...previous, error: "Too many wrong codes. Ask for a fresh one." };
+    }
+    return {
+      ...previous,
+      error:
+        result.attemptsLeft === undefined
+          ? "That code didn't match."
+          : `That code didn't match. ${String(result.attemptsLeft)} ${
+              result.attemptsLeft === 1 ? "attempt" : "attempts"
+            } left.`,
+    };
+  }
+  await logSecurityEvent(result.personId, "auth.login.email");
+  // Same try/catch discipline as the phone path: a consent-recording hiccup
+  // must never fail a login that already happened.
+  try {
+    await ensureTermsConsent(db, result.personId);
+  } catch (error) {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.captureException(error, { tags: { area: "terms-consent" } });
+  }
+  await issueSessionCookie(result.personId);
+  const target = safeNext(previous.next);
+  const [person] = await db
+    .select({ name: people.name })
+    .from(people)
+    .where(eq(people.id, result.personId))
+    .limit(1);
+  // The nameless-account redirect the phone path makes, for the same reason:
+  // /home would only bounce them to /onboarding anyway.
+  if (target === "/home" && (person?.name === null || person?.name.trim() === "")) {
     redirect("/onboarding");
   }
   redirect(target);

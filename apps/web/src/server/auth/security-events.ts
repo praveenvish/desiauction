@@ -11,6 +11,8 @@ import { dbHandle } from "../db";
 
 export type SecurityAction =
   | "auth.login.otp"
+  /** Signed in with a code sent to a verified mailbox (email sign-in). */
+  | "auth.login.email"
   | "auth.login.passkey"
   | "auth.otp.lockout"
   // PI-1 audit-gap closures. Requests, sign-outs and refused passkey

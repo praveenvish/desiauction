@@ -136,12 +136,26 @@ export const emailVerifications = pgTable(
       .references(() => people.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     codeHash: text("code_hash").notNull(),
+    /**
+     * What this code may prove — the email twin of `otp_codes.purpose`. A code
+     * minted to confirm an address must not sign anybody in, and a sign-in code
+     * must not silently confirm an address change. That bug already happened on
+     * the phone side once; this table is not going to repeat it.
+     */
+    purpose: text("purpose", { enum: ["email_change", "login"] })
+      .notNull()
+      .default("email_change"),
     expiresAt: ts("expires_at").notNull(),
     attempts: integer("attempts").notNull().default(0),
     consumedAt: ts("consumed_at"),
+    /** Per-IP throttling for the PUBLIC sign-in form — see 0061. */
+    requestIp: text("request_ip"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (table) => [index("email_verifications_person_idx").on(table.personId, table.createdAt)],
+  (table) => [
+    index("email_verifications_person_idx").on(table.personId, table.createdAt),
+    index("email_verifications_ip_idx").on(table.requestIp, table.createdAt),
+  ],
 );
 
 export const organizations = pgTable("organizations", {

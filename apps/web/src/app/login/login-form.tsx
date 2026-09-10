@@ -7,6 +7,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { requestOtpAction, verifyOtpAction, type AuthFormState } from "../../server/auth/actions";
 import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
+import { EmailLogin } from "./email-login";
 import { PasskeyLogin } from "./passkey-login";
 
 /** Matches the server's RESEND_COOLDOWN_MS (otp.ts) — display only; the
@@ -371,6 +372,9 @@ export function LoginPanel({
         ) : null}
       </form>
       {!returning && step === "phone" ? passkeyBlock : null}
+      {/* Only on the phone step: mid-code is not the moment to offer a second
+          door, and someone already holding an SMS code does not need one. */}
+      {step === "phone" ? <EmailLogin {...(next !== undefined ? { next } : {})} /> : null}
     </>
   );
 }
