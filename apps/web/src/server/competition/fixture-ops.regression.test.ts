@@ -25,7 +25,7 @@ import {
   venues as venuesTable,
   type DbHandle,
 } from "@desiauction/db";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
@@ -33,13 +33,14 @@ import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { canCompetition } from "./authz";
-import { recordFixtureResult, resultOf, standingsOf } from "./results";
+import { recordFixtureResult, resultOf, standingsOf, recordLobbyResult } from "./results";
 import { createCompetition, createTeam, type CompetitionSummary } from "./competitions";
 import {
   cancelFixture,
   competitionConflicts,
   completeFixture,
   createFixture,
+  createLobbyFixture,
   editFixture,
   generateFixtures,
   publishAllScheduled,
@@ -1233,5 +1234,115 @@ describe("FIXTURE SHAPES — a duel or a lobby", () => {
       .from(fixtureParticipants)
       .where(eq(fixtureParticipants.fixtureId, must(fixture, "a lobby").id));
     expect(left, "ON DELETE CASCADE").toEqual([]);
+  });
+});
+
+/**
+ * A LOBBY, ALL THE WAY THROUGH: scheduled, played, and in the league table.
+ *
+ * The pieces were built separately — the fold in core, the table in 0058, the
+ * writer here — and each was green on its own. This is the one that would catch
+ * them disagreeing: a squad scheduled into a lobby, placed when it finished,
+ * and its points read back out of `standingsOf`.
+ */
+describe("FIXTURE SHAPES — a lobby end to end", () => {
+  it("schedules many squads, records where they finished, and pays the table", async () => {
+    const squads = await db
+      .select({ id: teamsTable.id })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, comp.id))
+      .limit(4);
+    expect(squads.length, "four squads to drop in").toBe(4);
+    const ids = squads.map((row) => row.id);
+
+    const created = await createLobbyFixture(db, comp, owner, {
+      teamIds: ids,
+      kickoffAt: "2026-08-02T18:00",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    // A draft has not been played, and a result against one would put points on
+    // a match nobody turned up to — the same gate a duel result passes.
+    const early = await recordLobbyResult(db, {
+      orgId: org.id,
+      fixtureId: created.fixtureId,
+      actorId: owner,
+      placements: ids.map((teamId, i) => ({ teamId, placement: i + 1 })),
+    });
+    expect(early).toEqual({ ok: false, reason: "not_played" });
+
+    await db
+      .update(fixturesTable)
+      .set({ status: "completed" })
+      .where(eq(fixturesTable.id, created.fixtureId));
+
+    // A PARTIAL result is the dangerous one: the squads named take their points
+    // and the omitted ones silently read as not having played.
+    const partial = await recordLobbyResult(db, {
+      orgId: org.id,
+      fixtureId: created.fixtureId,
+      actorId: owner,
+      placements: [{ teamId: must(ids[0], "a squad"), placement: 1 }],
+    });
+    expect(partial).toEqual({ ok: false, reason: "incomplete" });
+
+    // Twenty-sixth of twenty-five is a typo, not a finish.
+    const impossible = await recordLobbyResult(db, {
+      orgId: org.id,
+      fixtureId: created.fixtureId,
+      actorId: owner,
+      placements: ids.map((teamId, i) => ({ teamId, placement: i === 0 ? 99 : i + 1 })),
+    });
+    expect(impossible).toEqual({ ok: false, reason: "invalid_placement" });
+
+    const recorded = await recordLobbyResult(db, {
+      orgId: org.id,
+      fixtureId: created.fixtureId,
+      actorId: owner,
+      placements: [
+        { teamId: must(ids[0], "a squad"), placement: 1, score: { kills: 8 } },
+        { teamId: must(ids[1], "a squad"), placement: 2, score: { kills: 3 } },
+        { teamId: must(ids[2], "a squad"), placement: 3, score: { kills: 1 } },
+        { teamId: must(ids[3], "a squad"), placement: 4, score: { kills: 0 } },
+      ],
+    });
+    expect(recorded).toEqual({ ok: true, amended: false });
+
+    const stored = await db
+      .select()
+      .from(fixtureParticipants)
+      .where(eq(fixtureParticipants.fixtureId, created.fixtureId));
+    expect(stored.length).toBe(4);
+    expect(
+      stored.every((row) => row.placement !== null),
+      "every squad placed",
+    ).toBe(true);
+
+    // Recording again is an AMENDMENT, not a second result.
+    const again = await recordLobbyResult(db, {
+      orgId: org.id,
+      fixtureId: created.fixtureId,
+      actorId: owner,
+      placements: ids.map((teamId, i) => ({ teamId, placement: i + 1 })),
+    });
+    expect(again).toEqual({ ok: true, amended: true });
+  });
+
+  it("refuses a lobby result on a duel, and a duel result on a lobby", async () => {
+    // The two shapes are not interchangeable, and the writers say so rather
+    // than writing something meaningless.
+    const [duel] = await db
+      .select({ id: fixturesTable.id })
+      .from(fixturesTable)
+      .where(and(eq(fixturesTable.competitionId, comp.id), isNotNull(fixturesTable.homeTeamId)))
+      .limit(1);
+    const said = await recordLobbyResult(db, {
+      orgId: org.id,
+      fixtureId: must(duel, "a duel fixture").id,
+      actorId: owner,
+      placements: [],
+    });
+    expect(said).toEqual({ ok: false, reason: "not_a_lobby" });
   });
 });

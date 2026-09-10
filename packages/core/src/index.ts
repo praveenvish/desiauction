@@ -246,6 +246,7 @@ export type {
 export { buildAuctionLedger } from "./auction-ledger";
 export type { AuctionLedgerRow } from "./auction-ledger";
 export { DEFAULT_POINTS, buildStandings, compareStandings, ratePer } from "./standings";
+export type { AnyResultInput, LobbyPlacement, LobbyResultInput } from "./standings";
 export type {
   FixtureResultInput,
   PointsPolicy,

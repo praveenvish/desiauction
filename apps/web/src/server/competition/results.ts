@@ -1,6 +1,7 @@
 import {
   auditLog,
   competitions,
+  fixtureParticipants,
   fixtureResults,
   fixtures,
   newId,
@@ -13,7 +14,8 @@ import {
   sportPackFor,
   standingsRulesOf,
   type SportPack,
-  type FixtureResultInput,
+  type AnyResultInput,
+  type LobbyPlacement,
   type ResultOutcome,
   type StandingsRow,
 } from "@desiauction/core";
@@ -105,6 +107,144 @@ function buildScore(
  * The audit row carries who changed it and when, which is the part worth
  * keeping.
  */
+/** One squad's finish, as a scorer reads it off the result screen. */
+export interface LobbyResultEntry {
+  teamId: string;
+  /** 1 is the win. Two squads may share a placement. */
+  placement: number;
+  score?: Record<string, number>;
+}
+
+export type RecordLobbyOutcome =
+  | { ok: true; amended: boolean }
+  | {
+      ok: false;
+      reason:
+        | "unknown_fixture"
+        | "not_a_lobby"
+        | "not_played"
+        | "incomplete"
+        | "invalid_placement"
+        | "impossible_score";
+    };
+
+/**
+ * RECORD A LOBBY: where every squad finished, and what it did there.
+ *
+ * The sibling of `recordFixtureResult` and deliberately separate, for the same
+ * reason `createLobbyFixture` is: the two shapes validate different things. A
+ * duel needs a winner backed by a score; a lobby needs every scheduled squad
+ * placed, because a table that silently drops one has quietly changed the
+ * competition.
+ *
+ * NO `fixture_results` ROW. That table holds a scoreline between two sides and
+ * its `outcome` has no word for "twenty-five squads played and nobody beat
+ * anybody". A lobby's result IS its participants' placements, which is where
+ * the standings read looks.
+ */
+export async function recordLobbyResult(
+  db: Db,
+  input: {
+    orgId: string;
+    fixtureId: string;
+    actorId: string;
+    placements: readonly LobbyResultEntry[];
+  },
+): Promise<RecordLobbyOutcome> {
+  const [fixture] = await db
+    .select({
+      id: fixtures.id,
+      competitionId: fixtures.competitionId,
+      status: fixtures.status,
+      homeTeamId: fixtures.homeTeamId,
+      sport: competitions.sport,
+    })
+    .from(fixtures)
+    .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
+    .where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.orgId, input.orgId)))
+    .limit(1);
+  if (fixture === undefined) {
+    return { ok: false, reason: "unknown_fixture" };
+  }
+  if (fixture.homeTeamId !== null) {
+    // A duel. Recording placements against it would put a finishing order on a
+    // match that has two sides and a winner.
+    return { ok: false, reason: "not_a_lobby" };
+  }
+  // The same gate a duel result passes: a result belongs to a match that
+  // happened, and a draft or cancelled fixture has not been played.
+  if (
+    fixture.status === "draft" ||
+    fixture.status === "scheduled" ||
+    fixture.status === "cancelled"
+  ) {
+    return { ok: false, reason: "not_played" };
+  }
+
+  const scheduled = await db
+    .select({ teamId: fixtureParticipants.teamId, placement: fixtureParticipants.placement })
+    .from(fixtureParticipants)
+    .where(eq(fixtureParticipants.fixtureId, input.fixtureId));
+  const expected = new Set(scheduled.map((row) => row.teamId));
+  const given = new Set(input.placements.map((entry) => entry.teamId));
+  /*
+   * EVERY SCHEDULED SQUAD, AND NO OTHERS. A partial result is the dangerous
+   * one: the squads named would take their points and the squads omitted would
+   * silently show as not having played, which is a different competition from
+   * the one that happened.
+   */
+  if (given.size !== input.placements.length || given.size !== expected.size) {
+    return { ok: false, reason: "incomplete" };
+  }
+  for (const teamId of given) {
+    if (!expected.has(teamId)) {
+      return { ok: false, reason: "incomplete" };
+    }
+  }
+  for (const entry of input.placements) {
+    // A placement is a position IN THIS LOBBY. Twenty-sixth of twenty-five is
+    // not a finish, it is a typo, and the CHECK below would take it.
+    if (
+      !Number.isInteger(entry.placement) ||
+      entry.placement < 1 ||
+      entry.placement > expected.size
+    ) {
+      return { ok: false, reason: "invalid_placement" };
+    }
+  }
+  const pack = sportPackFor(fixture.sport);
+  for (const entry of input.placements) {
+    if (!scoreWithinBounds(pack, entry.score ?? {})) {
+      return { ok: false, reason: "impossible_score" };
+    }
+  }
+
+  const amended = scheduled.some((row) => row.placement !== null);
+  await db.transaction(async (tx) => {
+    for (const entry of input.placements) {
+      await tx
+        .update(fixtureParticipants)
+        .set({ placement: entry.placement, score: entry.score ?? {} })
+        .where(
+          and(
+            eq(fixtureParticipants.fixtureId, input.fixtureId),
+            eq(fixtureParticipants.teamId, entry.teamId),
+          ),
+        );
+    }
+    await tx.insert(auditLog).values({
+      id: newId(),
+      actor: input.actorId,
+      action: amended ? "fixture.result_amended" : "fixture.result_recorded",
+      scopeType: "org",
+      scopeId: input.orgId,
+      subject: input.fixtureId,
+      meta: { shape: "lobby", squads: String(input.placements.length) },
+    });
+  });
+  return { ok: true, amended };
+}
+
 export async function recordFixtureResult(
   db: Db,
   input: {
@@ -317,7 +457,46 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
   ]);
 
   const sides = new Map(playedFixtures.map((row) => [row.id, row]));
-  const inputs: FixtureResultInput[] = [];
+  const inputs: AnyResultInput[] = [];
+
+  /*
+   * THE LOBBIES, folded from their participants.
+   *
+   * A lobby's result is not in `fixture_results` — see `recordLobbyResult` —
+   * so it is read straight off the squads. Only lobbies whose fixture is played
+   * count, the same authority a duel result answers to, and only squads that
+   * have actually been PLACED: a scheduled-but-unrecorded lobby would otherwise
+   * award every squad the points for finishing nowhere.
+   */
+  const lobbyIds = playedFixtures.filter((row) => row.homeTeamId === null).map((row) => row.id);
+  if (lobbyIds.length > 0) {
+    const participants = await db
+      .select({
+        fixtureId: fixtureParticipants.fixtureId,
+        teamId: fixtureParticipants.teamId,
+        placement: fixtureParticipants.placement,
+        score: fixtureParticipants.score,
+      })
+      .from(fixtureParticipants)
+      .where(inArray(fixtureParticipants.fixtureId, lobbyIds));
+    const byFixture = new Map<string, LobbyPlacement[]>();
+    for (const row of participants) {
+      if (row.placement === null) {
+        continue;
+      }
+      const list = byFixture.get(row.fixtureId) ?? [];
+      list.push({
+        teamId: row.teamId,
+        placement: row.placement,
+        ...(row.score !== null ? { score: row.score } : {}),
+      });
+      byFixture.set(row.fixtureId, list);
+    }
+    for (const placements of byFixture.values()) {
+      inputs.push({ placements });
+    }
+  }
+
   for (const result of resultRows) {
     const fixture = sides.get(result.fixtureId);
     if (fixture === undefined) {

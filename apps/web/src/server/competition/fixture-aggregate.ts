@@ -15,7 +15,15 @@ import {
   type FixtureStatus,
   type GeneratePlanInput,
 } from "@desiauction/core";
-import { auditLog, fixtures, grounds, newId, teams, type Db } from "@desiauction/db";
+import {
+  auditLog,
+  fixtureParticipants,
+  fixtures,
+  grounds,
+  newId,
+  teams,
+  type Db,
+} from "@desiauction/db";
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -591,6 +599,118 @@ export async function createFixture(
       scopeId: competition.orgId,
       subject: id,
       meta: { number },
+    });
+  });
+  return { ok: true, fixtureId: id, number };
+}
+
+export interface LobbyFixtureInput {
+  /** The squads dropping into this lobby. Scheduled, not discovered. */
+  teamIds: readonly string[];
+  groundId?: string;
+  kickoffAt?: string;
+  durationMinutes?: number;
+  round?: number;
+}
+
+export type CreateLobbyResult =
+  | { ok: true; fixtureId: string; number: string }
+  | { ok: false; reason: "invalid_input" | "unknown_team" | "unknown_ground" };
+
+/**
+ * SCHEDULE A LOBBY: one match, many squads, no home and no away.
+ *
+ * The sibling of `createFixture`, and deliberately a separate function rather
+ * than a mode of it. The two shapes validate different things — a duel refuses
+ * a team playing itself, a lobby refuses a squad entered twice — and folding
+ * them into one entry point would put an `if` at the top of every rule.
+ *
+ * Lands as a DRAFT, exactly as a hand-made duel does: scheduling is explicit
+ * here and publishing is a separate, deliberate act.
+ */
+export async function createLobbyFixture(
+  db: Db,
+  competition: CompetitionSummary,
+  actorId: string,
+  input: LobbyFixtureInput,
+): Promise<CreateLobbyResult> {
+  const unique = [...new Set(input.teamIds)];
+  /*
+   * TWO IS A CONTEST; one squad is a practice session. The upper bound matches
+   * the placement CHECK — a hundred squads in one lobby is a typo, not an
+   * event — and a duplicate is refused here rather than left to the primary
+   * key, so the caller gets a reason instead of a constraint name.
+   */
+  if (unique.length !== input.teamIds.length || unique.length < 2 || unique.length > 100) {
+    return { ok: false, reason: "invalid_input" };
+  }
+  if (input.kickoffAt !== undefined && !isValidKickoff(input.kickoffAt)) {
+    return { ok: false, reason: "invalid_input" };
+  }
+  if (
+    input.durationMinutes !== undefined &&
+    (!Number.isInteger(input.durationMinutes) ||
+      input.durationMinutes <= 0 ||
+      input.durationMinutes > 1440)
+  ) {
+    return { ok: false, reason: "invalid_input" };
+  }
+  const teamRows = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(and(eq(teams.competitionId, competition.id), inArray(teams.id, unique)));
+  if (teamRows.length !== unique.length) {
+    // A squad from another season, or one that has been deleted. Refused whole:
+    // a lobby missing a squad is a different match from the one asked for.
+    return { ok: false, reason: "unknown_team" };
+  }
+  if (input.groundId !== undefined) {
+    const [ground] = await db
+      .select({ id: grounds.id })
+      .from(grounds)
+      .where(and(eq(grounds.id, input.groundId), eq(grounds.orgId, competition.orgId)))
+      .limit(1);
+    if (ground === undefined) {
+      return { ok: false, reason: "unknown_ground" };
+    }
+  }
+  const seq = await nextSeq(db, competition.id);
+  const number = fixtureNumber(competitionCode(competition.name, competition.startsOn), seq);
+  const id = newId();
+  await db.transaction(async (tx) => {
+    await tx.insert(fixtures).values({
+      id,
+      orgId: competition.orgId,
+      competitionId: competition.id,
+      fixtureNumber: number,
+      seq,
+      round: input.round ?? null,
+      // NO HOME AND NO AWAY. `fixtures_sides_check` requires both or neither,
+      // so this is what makes the row a lobby rather than a broken duel.
+      homeTeamId: null,
+      awayTeamId: null,
+      groundId: input.groundId ?? null,
+      kickoffAt: input.kickoffAt ?? null,
+      durationMinutes: input.durationMinutes ?? null,
+      status: "draft",
+      createdBy: actorId,
+    });
+    await tx.insert(fixtureParticipants).values(
+      unique.map((teamId) => ({
+        fixtureId: id,
+        teamId,
+        orgId: competition.orgId,
+        competitionId: competition.id,
+      })),
+    );
+    await tx.insert(auditLog).values({
+      id: newId(),
+      actor: actorId,
+      action: "fixture.created",
+      scopeType: "org",
+      scopeId: competition.orgId,
+      subject: id,
+      meta: { number, shape: "lobby", squads: String(unique.length) },
     });
   });
   return { ok: true, fixtureId: id, number };
