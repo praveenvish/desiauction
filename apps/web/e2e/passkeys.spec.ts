@@ -30,6 +30,23 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
 }
 
 test("the founder journey: enroll passkey, sign out, passkey-only sign in", async ({ page }) => {
+  /*
+   * CHROMIUM ONLY, BY CONSTRUCTION. The virtual authenticator below is a Chrome
+   * DevTools Protocol feature; there is no equivalent in WebKit or Firefox, so
+   * this cannot be made cross-engine by rewriting it.
+   *
+   * TEST-scoped, never file-scoped: a bare `test.skip(cond)` at module level is
+   * Playwright's FILE skip, and this repo has been bitten by that before — a
+   * flag meant to exclude one photo test silently excluded a whole spec file
+   * (see registration-ops.spec.ts).
+   *
+   * Real Safari and Edge WebAuthn stay a founder-device item at staging,
+   * exactly as `docs/operations/KNOWN_LIMITATIONS.md` says.
+   */
+  test.skip(
+    test.info().project.name !== "chromium",
+    "WebAuthn virtual authenticators are a Chrome DevTools Protocol feature",
+  );
   const client = await page.context().newCDPSession(page);
   await client.send("WebAuthn.enable");
   await client.send("WebAuthn.addVirtualAuthenticator", {

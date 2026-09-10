@@ -103,13 +103,21 @@ jobs:
       # "Could not find a production build", two steps from its cause.
       - name: Build the server the suite will run against
         run: pnpm --filter @desiauction/web exec next build
-      - run: npx playwright install --with-deps chromium
+      # WebKit as well as Chromium — the nightly is where cross-browser lives.
+      # `KNOWN_LIMITATIONS.md` listed real cross-browser as an open verification
+      # gap and it was: with no `projects` block declared, 135 tests had only
+      # ever run on Chromium. Per-commit CI stays Chromium-only because WebKit
+      # doubles a ~5-minute run and the defects it catches (timing, layout) do
+      # not appear per commit.
+      - run: npx playwright install --with-deps chromium webkit
         working-directory: apps/web
       # ~29 specs SKIP here by design: `next start` forces NODE_ENV=production
       # and the /gallery family is dev-only, so those pages correctly 404. They
       # report as skipped, not failed.
-      - name: End-to-end journeys
+      - name: End-to-end journeys (Chromium + WebKit)
         run: npx playwright test
         working-directory: apps/web
         env:
           CI: "true"
+          # Adds the `webkit` project — see playwright.config.ts.
+          E2E_WEBKIT: "1"

@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * THE HALF OF THE SUITE THAT NEVER READ .env.local.
@@ -96,6 +96,56 @@ export default defineConfig({
     // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.
     baseURL: "http://localhost:3050",
   },
+  /*
+   * TWO ENGINES, AND UNTIL NOW THERE WERE NONE DECLARED AT ALL.
+   *
+   * With no `projects` block Playwright runs one unnamed default project, so
+   * 135 tests had only ever run on Chromium — `KNOWN_LIMITATIONS.md` lists real
+   * cross-browser as an open verification gap, and for a mobile-first product
+   * aimed at India, Safari had never been exercised once.
+   *
+   * The first WebKit run was 95 passed / 6 failed with ZERO product defects:
+   * five were harness races Chromium wins by luck (a `goto` issued into an
+   * in-flight client navigation; a `loading={busy}` button clicked twice), one
+   * was Apple's own Tab default, one was Chromium-only WebAuthn. All seven are
+   * fixed or scoped at their source, so WebKit is now green.
+   *
+   * WEBKIT IS OPT-IN, and deliberately: it doubles a ~5-minute run, and the
+   * defects it catches are timing and layout ones that do not appear per
+   * commit. `nightly-verify.yml` sets `E2E_WEBKIT=1` so it runs every night
+   * against the compiled server; locally, `E2E_WEBKIT=1 pnpm exec playwright
+   * test` or `--project=webkit`.
+   *
+   * Firefox is installed and unexercised. Adding it is one more entry here
+   * once somebody has run it and read the failures — not before, because an
+   * engine nobody has looked at is a red suite waiting to be ignored.
+   */
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    ...(process.env["E2E_WEBKIT"] === "1"
+      ? [
+          {
+            name: "webkit",
+            use: { ...devices["Desktop Safari"] },
+            /*
+             * MORE PATIENCE, NOT DIFFERENT ASSERTIONS.
+             *
+             * WebKit is meaningfully slower than Chromium here — same machine,
+             * same single worker, same compiled server — and a run of specs
+             * written against Playwright's 5s default produces failures that
+             * are scheduling rather than defects. Raising the wait for THIS
+             * project only keeps every assertion identical across engines and
+             * avoids sprinkling per-line timeouts into shared specs, which
+             * would weaken them for Chromium too.
+             *
+             * Still bounded, and deliberately: 15s surfaces a genuine
+             * WebKit-only hang, it just does not punish a slow paint.
+             */
+            expect: { timeout: 15_000 },
+          },
+        ]
+      : []),
+  ],
   webServer: [
     {
       command: PRECOMPILED

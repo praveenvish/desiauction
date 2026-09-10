@@ -178,7 +178,27 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // it there is refused and the status simply stays "live".
   await page.goto(`/seasons/${slug}/auction/cockpit`);
   await completeAuction(page, "cockpit-complete");
-  await page.goto(`/seasons/${slug}/auction`);
+  /*
+   * OBSERVE THE COMPLETION BEFORE NAVIGATING AWAY. `completeAuction` returns
+   * when the dialog closes, which only means the command was accepted — the
+   * page then refreshes itself, and a `goto` issued into that refresh is
+   * cancelled ("interrupted by another navigation"). Chromium won that race,
+   * WebKit did not. `cockpit-finished` is the cockpit's own rendering of a
+   * finished auction, so waiting for it waits for the refresh to land.
+   */
+  await expect(page.getByTestId("cockpit-finished")).toBeVisible({ timeout: 20_000 });
+  /*
+   * `waitUntil: "commit"` because the COCKPIT IS A LIVE SURFACE. It refreshes
+   * itself on engine events, so there is no quiet moment to leave from: waiting
+   * for "cockpit-finished" proves the completion landed, and the page still
+   * re-navigates afterwards, cancelling a normal `goto` ("interrupted by
+   * another navigation"). Chromium won that race; WebKit did not.
+   *
+   * Committing the navigation and then asserting on the DESTINATION weakens
+   * nothing — the assertion below is what proves we arrived, and it is the same
+   * assertion it always was.
+   */
+  await page.goto(`/seasons/${slug}/auction`, { waitUntil: "commit" });
   await expect(page.getByTestId("auction-status")).toHaveText("completed", { timeout: 20_000 });
 
   // --- The partition: an org OWNER has no money power until it is granted -----

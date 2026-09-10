@@ -451,6 +451,13 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
   await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   await page.getByTestId("advance-status").click();
+  // The intermediate state, asserted rather than assumed. Two clicks in a row
+  // race the button's own `loading={busy}` disable: Chromium happened to land
+  // both, WebKit landed one and the season stopped at "setup". The product was
+  // right — that is double-submit protection on a state-advancing control — and
+  // three specs had been winning the race by luck. Same pattern
+  // `auction-foundation.spec.ts` and this file's own first journey already use.
+  await expect(page.getByTestId("competition-status")).toHaveText("setup");
   await page.getByTestId("advance-status").click();
   await expect(page.getByTestId("competition-status")).toHaveText("registration open");
 
@@ -582,6 +589,13 @@ test("a file's own vocabulary is mapped onto the season's", async ({ page }) => 
   await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   await page.getByTestId("advance-status").click();
+  // The intermediate state, asserted rather than assumed. Two clicks in a row
+  // race the button's own `loading={busy}` disable: Chromium happened to land
+  // both, WebKit landed one and the season stopped at "setup". The product was
+  // right — that is double-submit protection on a state-advancing control — and
+  // three specs had been winning the race by luck. Same pattern
+  // `auction-foundation.spec.ts` and this file's own first journey already use.
+  await expect(page.getByTestId("competition-status")).toHaveText("setup");
   await page.getByTestId("advance-status").click();
   await page.getByTestId("open-dashboard").click();
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");

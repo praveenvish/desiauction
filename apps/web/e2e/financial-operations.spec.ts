@@ -194,6 +194,21 @@ test("founder demo: settle an auction → open Financial Operations → observe,
   await page.getByTestId("register-search").fill("no-such-party");
   await expect(page.getByText("Nothing matches this view")).toBeVisible();
   await page.getByTestId("register-search").fill("");
+  /*
+   * TWO ASSERTIONS, IN THIS ORDER, ON PURPOSE.
+   *
+   * Clearing the box calls `router.replace` with `q` deleted — no debounce, one
+   * replace per input event — and then the server re-renders the register. The
+   * `goto` below was being cancelled by that replace on WebKit.
+   *
+   * The URL is what the component controls, so it is asserted first: if it does
+   * not clear, the fault is the input handler. The register repopulating is the
+   * consequence, asserted second: if the URL clears and the rows do not come
+   * back, that is a real defect and this line is where it surfaces — which is
+   * why the wait is NOT hidden behind a single combined assertion.
+   */
+  await expect(page).toHaveURL(/\/money\?*$/, { timeout: 20_000 });
+  await expect(page.getByTestId("register-table")).toContainText("Cup Kings", { timeout: 20_000 });
 
   // A saved view is a URL.
   await page.goto(`/org/${orgSlug}/money?view=invoices`);
@@ -214,7 +229,9 @@ test("founder demo: settle an auction → open Financial Operations → observe,
 
   // A lane is a link.
   await page.getByTestId("lane-confirmed").click();
-  await expect(page).toHaveURL(/lane=confirmed/);
+  // `waitForURL`, not `toHaveURL`: the lane is a <Link>, so this is a client
+  // navigation to wait for rather than a value to poll.
+  await page.waitForURL(/lane=confirmed/);
   await expect(page.getByTestId("deliveries-table")).toBeVisible();
   await page.getByTestId("lane-failed").click();
   await expect(page.getByText("Nothing in this lane")).toBeVisible();

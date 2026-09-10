@@ -51,8 +51,18 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
 
 ## Verification gaps requiring the deploy target
 
-- **Real cross-browser**: Chromium is green across the full e2e suite; Firefox,
-  WebKit/Safari and Edge (and real Safari/Edge WebAuthn) need Playwright's other
-  engines and the founder's devices at staging.
+- **Real cross-browser**: ~~Chromium is green across the full e2e suite~~ —
+  **WEBKIT/SAFARI IS NOW GREEN TOO** (2026-09-10). `playwright.config.ts`
+  declares `chromium` and, behind `E2E_WEBKIT=1`, `webkit`; the nightly runs
+  both. The first WebKit run found **zero product defects** in 101 specs: five
+  harness races Chromium had been winning by luck, one Apple keyboard default,
+  one Chromium-only WebAuthn API. All fixed or scoped at source.
+
+  Still open: **Firefox** (the engine is installed and has never been run — it
+  is deliberately not in the config until somebody reads its failures, because
+  an unexamined engine is a red suite waiting to be ignored), **Edge**, and
+  **real Safari/Edge WebAuthn**, which needs the founder's devices at staging
+  because `passkeys.spec.ts` drives a Chrome DevTools Protocol virtual
+  authenticator that has no cross-engine equivalent.
 - **Real provider latencies** (SMS delivery time, S3 upload/download, live
   webhook round-trip): measured only against the live accounts.

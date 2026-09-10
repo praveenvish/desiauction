@@ -71,6 +71,13 @@ test("a football season admits players: the import reads the pack, not cricket",
   await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   await page.getByTestId("advance-status").click();
+  // The intermediate state, asserted rather than assumed. Two clicks in a row
+  // race the button's own `loading={busy}` disable: Chromium happened to land
+  // both, WebKit landed one and the season stopped at "setup". The product was
+  // right — that is double-submit protection on a state-advancing control — and
+  // three specs had been winning the race by luck. Same pattern
+  // `auction-foundation.spec.ts` and this file's own first journey already use.
+  await expect(page.getByTestId("competition-status")).toHaveText("setup");
   await page.getByTestId("advance-status").click();
   await expect(page.getByTestId("competition-status")).toHaveText("registration open");
 

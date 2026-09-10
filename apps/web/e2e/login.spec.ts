@@ -65,7 +65,25 @@ test("login page: axe zero violations, phone field focused on load", async ({ pa
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations, JSON.stringify(scan.violations, null, 2)).toEqual([]);
   // autoFocus puts the caret in the phone field immediately (keyboard-first).
+  // This half holds everywhere and is the claim in the test's name.
   await expect(page.getByLabel("Mobile number")).toBeFocused();
+
+  /*
+   * TAB REACHING THE BUTTON IS A CHROMIUM/FIREFOX FACT, NOT A PRODUCT ONE.
+   *
+   * macOS WebKit does not move focus to buttons or links on Tab unless the
+   * system's Full Keyboard Access is switched on — Apple's default across the
+   * entire web, and Playwright's WebKit mirrors it. Asserting it there would
+   * fail for a setting on the tester's Mac.
+   *
+   * Kept rather than deleted: on the engines that DO tab to controls, this
+   * still catches a tabindex or DOM-order mistake that would strand a
+   * keyboard user, and that is what it was written for.
+   */
+  test.skip(
+    test.info().project.name === "webkit",
+    "macOS WebKit skips buttons on Tab without Full Keyboard Access (Apple default)",
+  );
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Send code" })).toBeFocused();
 });

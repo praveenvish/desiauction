@@ -99,6 +99,10 @@ test("search navigates; the identity bar names every surface consistently", asyn
   await page.getByLabel("Organization name").filter({ visible: true }).fill(`Shell Org ${STAMP}`);
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org ${STAMP}`);
+  // Creating an org navigates to it client-side (see the @action/redirect
+  // note in docs); the heading can paint before the URL settles, and the
+  // `goto` below was cancelled by that navigation on WebKit.
+  await page.waitForURL(/\/org\//);
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();
   await page.getByLabel("Season name").filter({ visible: true }).fill(`Shell Cup ${STAMP}`);
@@ -190,7 +194,14 @@ test("public shell wraps anonymous pages; console routes stay gated", async ({ p
   await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeVisible();
   for (const route of ["/home", "/inbox", "/money"]) {
     await page.goto(route);
-    await expect(page).toHaveURL(/\/login/);
+    /*
+     * `waitForURL`, not `toHaveURL`. The gate redirects through the client
+     * router, so `goto` can resolve while that redirect is still in flight;
+     * `toHaveURL` then matches and the NEXT iteration's `goto` is cancelled by
+     * the redirect it never waited for. `waitForURL` waits for the navigation
+     * itself, which is the thing being asserted.
+     */
+    await page.waitForURL(/\/login/);
   }
 });
 
