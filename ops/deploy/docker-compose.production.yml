@@ -17,7 +17,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data # ACME account + certificates; losing this re-issues
       - caddy_config:/config
-    depends_on: [web, engine]
+    depends_on: [web, engine, minio]
 
   web:
     image: ${REGISTRY}/web:${TAG}
@@ -70,36 +70,111 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
-  db:
-    image: postgres:17-alpine
+  # OBJECT STORAGE, ON THIS BOX. Player photos and finops artifacts need a
+  # store both the web tier and the runner can reach, and the adapters written
+  # for them speak S3 — so the cheapest correct answer is an S3 server here
+  # rather than a second application path. No third party, no per-GB bill.
+  #
+  # WHY NOT THE FILESYSTEM. Two separate reasons, and only one of them is about
+  # topology. The finops store could work on one box with a shared volume. The
+  # MEDIA store cannot: `LocalStorage` writes into `public/_media` and serves it
+  # as a static path, but `public/` is baked at BUILD time, so a built server
+  # never serves what was written there at runtime. Uploads would land on disk
+  # and every photo would 404.
+  #
+  # PINNED BY DIGEST, not by tag. MinIO publishes only `RELEASE.<timestamp>`
+  # tags and `latest`, and `latest` is a moving target on a service that holds
+  # data. The digest is immutable — the same argument the file already makes
+  # for `postgres:17-alpine` over `:latest`, taken one step further because
+  # there is no stable tag to take instead.
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     restart: unless-stopped
-    env_file: [./db.env]
+    # NO PUBLISHED PORTS. Caddy is the only way in, so the console and the
+    # admin API are not exposed to the internet by an open firewall rule.
+    command: ["server", "/data"]
+    env_file: [./minio.env]
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Creates the two buckets and sets the ONE policy that differs between them.
+  # Runs to completion and exits; `docker compose up` re-runs it on every deploy
+  # and every step is idempotent.
+  minio-init:
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    env_file: [./minio.env]
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/desiauction-media
+        mc mb --ignore-existing local/desiauction-finops
+        mc mb --ignore-existing local/desiauction-backup
+        # THE MEDIA BUCKET IS PUBLICLY READABLE AND THE FINOPS BUCKET IS NOT.
+        # A player photo is served straight to a browser from MEDIA_PUBLIC_BASE,
+        # so anonymous GET is what makes it work. A finops artifact is a receipt
+        # register — it is reached only through a signed URL the web tier mints,
+        # and anonymous access to it would be a disclosure of somebody's money.
+        #
+        # GetObject ONLY, AND THAT IS THE WHOLE REASON THIS IS A POLICY DOCUMENT
+        # RATHER THAN `mc anonymous set download`. The shorthand grants
+        # ListBucket as well, which was verified against a real MinIO: an
+        # anonymous `GET /desiauction-media/?list-type=2` returned every key in
+        # the bucket. Photo keys carry the org and the subject id, so that is an
+        # enumeration of every club, every player and every photo on the
+        # platform — including the minors whose photos the product deliberately
+        # suppresses on its public pages. Reading a key you already know is the
+        # capability we want; discovering the keys is not.
+        cat > /tmp/media-policy.json <<'POLICY'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "AWS": ["*"] },
+              "Action": ["s3:GetObject"],
+              "Resource": ["arn:aws:s3:::desiauction-media/*"]
+            }
+          ]
+        }
+        POLICY
+        mc anonymous set-json /tmp/media-policy.json local/desiauction-media
+        mc anonymous set none local/desiauction-finops
+        # The WAL archive. Anonymous access here would be the whole database.
+        mc anonymous set none local/desiauction-backup
+        echo "buckets ready"
+
+  db:
+    # BUILT, not pulled from Docker Hub, for one reason: `archive_command` runs
+    # inside THIS container and `postgres:17-alpine` has no pgbackrest. Every
+    # segment failed with exit code 127, and Postgres does not recycle a WAL
+    # segment until it is archived — so the symptom is not "no backups", it is a
+    # disk that fills until the database stops accepting writes.
+    image: ${REGISTRY}/db:${DB_TAG}
+    restart: unless-stopped
+    # pgbackrest.env is read by the database too, not just the sidecar, because
+    # the archive command is a pgbackrest client and needs the same repo.
+    env_file: [./db.env, ./pgbackrest.env]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgresql.conf.d:/etc/postgresql/conf.d:ro
-    # THE KEEPALIVES ARE NOT OPTIONAL. A connection severed without a close —
-    # a VM restart, a network partition — leaves the engine's single-writer
-    # advisory lock held by a backend nobody is using, and every replacement
-    # engine refuses to boot. Observed idle for four hours once. With these,
-    # a severed holder is reaped in ~60s; without them, never.
-    # `-c` and `key=value` as SEPARATE arguments. The `-c=key=value` form looks
-    # right and is not: Postgres parses the parameter name as empty and dies
-    # with `FATAL: unrecognized configuration parameter ""` in a restart loop.
-    # Caught by standing this stack up; it would have failed on first boot.
-    command:
-      - postgres
-      - -c
-      - tcp_keepalives_idle=30
-      - -c
-      - tcp_keepalives_interval=10
-      - -c
-      - tcp_keepalives_count=3
-      - -c
-      - wal_level=replica
-      - -c
-      - archive_mode=on
-      - -c
-      - archive_command=pgbackrest --stanza=desiauction archive-push %p
+      # Shared with the pgbackrest sidecar. pgBackRest is a LOCAL tool: it reads
+      # PGDATA directly and talks to the cluster over libpq, so a sidecar that
+      # has the data directory but no socket fails with "unable to find primary
+      # cluster". Sharing the socket is what makes it a peer rather than a
+      # stranger holding a copy of the files.
+      - pgsocket:/var/run/postgresql
+    # Archive settings live in conf.d, NOT here — see 10-archive.conf. Passing
+    # them as `-c` flags deadlocks the first boot.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -108,20 +183,44 @@ services:
 
   # PITR. Migrations here are FORWARD-ONLY — there are no down migrations and
   # there never have been — so a restore point is the only thing that can undo
-  # one. Archives go OFF THE BOX to Cloudflare R2: a backup on the same disk
-  # is not a backup.
+  # one.
+  #
+  # THE REPO IS THE MinIO ON THIS BOX, and that is a deliberate, limited choice.
+  # A single-host deployment has nowhere else free to put it, so this protects
+  # the failure you are most likely to actually have — a bad migration, a
+  # dropped table, a bug that writes nonsense — and NOT the loss of the machine.
+  # Losing the disk loses the backups with it. The README says so in those
+  # words; moving repo1 off the box is a credentials change and nothing more.
   pgbackrest:
-    image: woblerr/pgbackrest:latest
+    image: ${REGISTRY}/db:${DB_TAG}
     restart: unless-stopped
     env_file: [./pgbackrest.env]
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - pgbackrest_conf:/etc/pgbackrest
+      - pgsocket:/var/run/postgresql
     depends_on:
       db: { condition: service_healthy }
+    # stanza-create is idempotent and runs on every boot, so a fresh volume
+    # becomes a working repo without an operator remembering a one-off command —
+    # the step most likely to be skipped is the step that makes the rest real.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        su postgres -c "pgbackrest --stanza=desiauction stanza-create" || true
+        su postgres -c "pgbackrest --stanza=desiauction check"
+        while true; do
+          # Sunday a full, otherwise a differential. Retention is set in
+          # pgbackrest.env; without it the repo grows until the disk is gone,
+          # which is the same ending as no backup by a slower road.
+          if [ "$$(date +%u)" = "7" ]; then TYPE=full; else TYPE=diff; fi
+          su postgres -c "pgbackrest --stanza=desiauction backup --type=$$TYPE" || true
+          sleep 86400
+        done
 
 volumes:
   pgdata:
+  pgsocket:
+  minio_data:
   caddy_data:
   caddy_config:
-  pgbackrest_conf:

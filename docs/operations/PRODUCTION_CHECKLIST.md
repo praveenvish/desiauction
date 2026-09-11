@@ -38,8 +38,14 @@ above them exist; ☑ are done and verified in-repo.
 
 ## 2 · Infrastructure (PRP-1 §2) — all ☐F then ☐E
 
-- ☐F Fly.io account + `FLY_API_TOKEN` org secret; apps `desiauction-engine-{staging,production}`, `desiauction-finops-runner-{staging,production}`
-- ☐F Vercel project + domains (`RP_ID`/`RP_ORIGINS` must match the public domain — passkeys break otherwise)
+- ☐F ONE Hetzner Cloud server, 4 vCPU / **8GB** — everything runs on it: web,
+  engine, runner, Postgres, MinIO, Caddy. 4GB will OOM under an auction.
+- ☐F Hetzner's backup add-on ON (~20% of the server). The pgBackRest repo is on
+  the same disk it backs up, so it recovers a bad migration and NOT a dead
+  machine. This is the only thing that covers the disk.
+- ☐F Domain + three DNS records at the host: `PUBLIC_DOMAIN`, `ENGINE_DOMAIN`,
+  `S3_DOMAIN` (`RP_ID`/`RP_ORIGINS` must match the public domain — passkeys
+  break otherwise)
 - ⚠ **`desiauction.in` is REGISTERED but PARKED, and cannot receive mail.**
   Checked 2026-08-27: `NS ns1/ns2.dns-parking.com`, `A 2.57.91.91`, **`MX` none**.
   Three separate things are waiting on this one piece of DNS:
@@ -119,7 +125,10 @@ above them exist; ☑ are done and verified in-repo.
 ## 4 · Observability (PRP-1 §4)
 
 - ☑ Sentry wired (web + engine) — ☐F production DSNs
-- ☑ Structured pino logs everywhere; Fly/Vercel aggregate by default
+- ☑ Structured pino logs everywhere — ☐E somewhere to READ them. A single
+  self-hosted host has no log aggregation by default, which a managed platform
+  would have given you for free. `docker compose logs` is the whole story until
+  something is wired.
 - ☐E Dashboards + alerts on: engine `/healthz`, bid-ack p95, WS fan-out,
   runner tick age, finops supervisor status, settlement meters, DB
   connections/replication, backup success (docs/56 SLOs). Alert on SILENCE
@@ -135,7 +144,8 @@ above them exist; ☑ are done and verified in-repo.
 - ☐E Settlement sweep scheduling (freeze §8.3) hosted beside settlement's writer once staging exists
 - ☐E finops writer-role credential + `finops_events` grant narrowing (freeze §8.2)
 - ☐E Quarterly PITR human drill #1 on staging, timed against RTO
-- ☐F TLS/certificates: platform-managed (Fly/Vercel) — confirm auto-renewal on the custom domains
+- ☑ TLS/certificates: Caddy provisions and renews Let's Encrypt automatically
+  for all three hostnames — ☐E confirm renewal once in production
 
 ## 6 · Performance certification (PRP-1 §6)
 
@@ -299,9 +309,9 @@ longer true. Verified after the merge: `pnpm verify` green, web integration
 **660/660**, engine integration **66/66**, all **31** migrations apply from an
 empty database.
 
-- ☑ **Engine split-brain closed.** The single-writer guarantee was `fly.toml`
-  plus discipline; a `fly scale 2`, a bluegreen strategy or an orchestrator
-  overlap put two timer authorities on one gavel. The engine now claims a
+- ☑ **Engine split-brain closed.** The single-writer guarantee was platform
+  configuration plus discipline; a scale-to-2, a bluegreen strategy or an
+  orchestrator overlap put two timer authorities on one gavel. The engine now claims a
   Postgres session-level advisory lock at boot and a second instance **refuses
   to start** (exit 1), re-asserting every 10s and dying if it loses the lease.
   Proven by booting two real engines. **Operational consequence: scaling the

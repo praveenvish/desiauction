@@ -6,12 +6,17 @@ repo; founder externals (accounts, credentials, domains) are listed in
 
 ## Topology
 
-**TOPOLOGY CHANGED (2026-09-10): one self-hosted host, not Vercel + Fly.**
-The Fly workflows below are retained but unused; `deploy-host.yml` replaces
-them. The reason was cost at pre-revenue scale plus a preference for
-self-hosting; the reason it is *safe* is that nothing about the architecture
-assumed a platform — the engine was always one long-lived process and Postgres
-was always the only stateful component.
+**ONE SELF-HOSTED HOST — not Vercel, not Fly.** Decided 2026-09-10; the Fly
+workflows and `fly.toml` files were deleted 2026-09-11 once `deploy-host.yml`
+had replaced them. A workflow that can only ever report a green no-op is worse
+than no workflow, and two of them were doing exactly that on every merge.
+
+The reason was cost at pre-revenue scale plus a preference for self-hosting; the
+reason it is *safe* is that nothing about the architecture assumed a platform —
+the engine was always one long-lived process and Postgres was always the only
+stateful component. Vercel could never have hosted two of the three services
+anyway: the engine is a long-lived WebSocket server holding a session-level
+advisory lock, and the runner is a persistent worker.
 
 | Unit | Where | Artifact | Workflow |
 |------|-------|----------|----------|
@@ -19,17 +24,24 @@ was always the only stateful component.
 | engine | same host, **exactly 1** | `apps/engine/Dockerfile` (distroless, non-root) | same |
 | finops-runner | same host | `apps/finops-runner/Dockerfile` (distroless, non-root) | same |
 | caddy | same host | `caddy:2-alpine` | TLS is automatic |
-| Postgres 17 | same host, `postgres:17-alpine` | `packages/db/migrations` + `apps/engine/drizzle` | migrate on release |
-| **PITR** | **pgBackRest → Cloudflare R2 (off-box)** | `ops/deploy/` | `pnpm restore:drill` is the proof |
-| Object storage | Cloudflare R2 (S3-compatible) | — | founder-provisioned |
+| Postgres 17 | same host, built from `ops/deploy/db/Dockerfile` | `packages/db/migrations` + `apps/engine/drizzle` | migrate on release |
+| **PITR** | **pgBackRest → MinIO on this box** | `ops/deploy/` | destroy-and-restore, verified 2026-09-11 |
+| Object storage | MinIO, same host | `ops/deploy/` | media + finops + WAL buckets |
+
+Postgres is BUILT rather than pulled: `archive_command` runs inside the database
+container and `postgres:17-alpine` has no pgbackrest, so every WAL segment failed
+and the disk would have filled until writes stopped. See `ops/deploy/README.md`.
+
+The backup repo is on the same disk it backs up. That protects a bad migration —
+the failure most likely to happen — and NOT the loss of the machine. Moving
+`repo1` off-box is a credentials change in `pgbackrest.env` and nothing else.
 
 The stack is described in `ops/deploy/` — see its README for the env-file split
 and why images are built in CI rather than on the host.
 
-Both Fly workflows: staging auto-deploys on main push (path-filtered),
-production is `workflow_dispatch` only, and both no-op with a summary note
-until `FLY_API_TOKEN` exists. Images verified locally 2026-07-16: both build
-and the runner boots, ticks against Postgres, and exits clean on SIGTERM.
+`deploy-host.yml` is `workflow_dispatch` only, builds all three images in CI
+(never on the production host), refuses to run while an auction is live, and
+swaps the engine first so its single-writer lease is handed over cleanly.
 
 ## Database bootstrap (fresh environment)
 
@@ -146,9 +158,10 @@ sockets drop and reconnect. The C-22 live-window check lands with IP-7.
 
 ### The engine is ONE process, and the database now enforces it
 
-The engine is the single mutation authority, and that was previously guaranteed
-only by `fly.toml` (`min_machines_running = 1`, `auto_stop_machines = false`)
-plus the discipline not to scale it. As of the 2026-08-26 audit it is enforced:
+The engine is the single mutation authority, and that was once guaranteed only
+by platform configuration plus the discipline not to scale it — which is exactly
+why it is no longer guaranteed that way. Compose declares `replicas: 1`, but
+that is a statement of intent, not the enforcement. As of the 2026-08-26 audit it is enforced:
 at boot the engine claims a **Postgres session-level advisory lock**
 (`apps/engine/src/single-writer.ts`) and **a second instance refuses to start**,
 exiting non-zero with `the single-writer lease is held elsewhere`.
@@ -225,9 +238,12 @@ this release ship a migration?"** (pre-deploy checklist item 2).
 ### Decision procedure
 
 1. **No migration in this release** → roll the image back and stop.
-   - web: platform instant rollback.
-   - engine/runner: `flyctl releases rollback --app <app>`. State lives in
-     Postgres, not the machine.
+   - All three: set `TAG=` to the previous image tag in `/opt/desiauction/.env`
+     on the host and `docker compose up -d`. Images are immutable and every
+     build is tagged with its commit, so the previous release is still in the
+     registry. State lives in Postgres, not the container.
+   - Leave `DB_TAG` alone — it tracks the database Dockerfile, not the release,
+     and rolling it back would restart Postgres for no reason.
    - This is the safe, boring case, and most releases are it.
 
 2. **The release shipped a migration** → an image rollback is only safe if the
