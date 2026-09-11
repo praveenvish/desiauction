@@ -207,7 +207,11 @@ describe("THE LONG SEASON NAME that silently swallowed every notice", () => {
       .from(otpInbox)
       .where(and(eq(otpInbox.phone, PLAYER), like(otpInbox.code, "DesiAuction:%")))
       .limit(1);
-    const link = (message?.body ?? "").split("Details: ")[1] ?? "";
+    // Matched, not split on a lead-in word: "Details: " was dropped from these
+    // notices to save nine characters on every send, and a test that locates
+    // the link by prose breaks when the prose changes for reasons that have
+    // nothing to do with what it is checking.
+    const link = /https?:\/\/\S+/.exec(message?.body ?? "")?.[0] ?? "";
     expect(link).not.toBe("");
     /*
      * THE SLUG MUST NOT BE IN IT. This is the property that makes the bug
