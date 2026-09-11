@@ -34,6 +34,10 @@ const PROD_OK: Raw = {
   OTP_PROVIDER: "msg91",
   MSG91_AUTH_KEY: "key",
   MSG91_TEMPLATE_ID: "template",
+  // Absent until now, which meant this "fully configured production
+  // environment" silently carried `ws://localhost:4000/ws` — a plaintext socket
+  // a page served over https refuses to open. Only preflight ever looked.
+  ENGINE_PUBLIC_WS_URL: "wss://engine.desiauction.in/ws",
   MEDIA_STORAGE: "bucket",
   MEDIA_PUBLIC_BASE: "https://media.desiauction.in",
   // PI-1 P5 (D1): the media bucket signer's credential set.
@@ -79,7 +83,9 @@ describe("web env — production refuses every dev-only default", () => {
   const CASES: [string, Raw, RegExp][] = [
     ["OTP_PROVIDER", { OTP_PROVIDER: "dev" }, /OTP_PROVIDER=dev/],
     ["MEDIA_STORAGE", { MEDIA_STORAGE: "local" }, /MEDIA_STORAGE=local/],
-    ["MEDIA_PUBLIC_BASE", { MEDIA_PUBLIC_BASE: undefined }, /MEDIA_PUBLIC_BASE/],
+    // MEDIA_PUBLIC_BASE is no longer in this table: it is DERIVED from the
+    // endpoint and the bucket, so leaving it out is now correct rather than
+    // fatal. The derivation is asserted below instead.
     // PI-1 P5 (D1): bucket mode without its signer credentials must refuse.
     ["MEDIA_S3 credentials", { MEDIA_S3_BUCKET: undefined }, /MEDIA_S3_BUCKET/],
     ["ENGINE_SECRET default", { ENGINE_SECRET: "dev-engine-secret" }, /ENGINE_SECRET/],
@@ -123,5 +129,98 @@ describe("web env — the two doors that must stay open", () => {
     ).not.toThrow();
     // …and the escape is off unless it is explicitly set.
     expect(() => parseEnv(raw({ ...DEV, NODE_ENV: "production" }))).toThrow(/invalid environment/);
+  });
+});
+
+/**
+ * WHAT THE DOMAIN DECIDES, DECIDED ONCE.
+ *
+ * Four settings were `PUBLIC_BASE_URL` and `MEDIA_S3_ENDPOINT` written out
+ * again in another shape, and typing a fact twice is how two valid values come
+ * to disagree. `RP_ID` was the dangerous one: nothing compared it to the URL
+ * being served — here or in `preflight:production`, where the only test was
+ * "not localhost" — so a domain typo deployed green and silently stopped every
+ * enrolled passkey from verifying.
+ */
+describe("web env — values the domain already decides", () => {
+  it("derives RP_ID and RP_ORIGINS from the URL actually served", () => {
+    const env = parseEnv(raw({ ...PROD_OK, RP_ID: undefined, RP_ORIGINS: undefined }));
+    expect(env.RP_ID).toBe("desiauction.in");
+    expect(env.RP_ORIGINS).toEqual(["https://desiauction.in"]);
+  });
+
+  it("takes the HOSTNAME, never the host — a port in RP_ID is rejected by browsers", () => {
+    const env = parseEnv(
+      raw({
+        ...PROD_OK,
+        ALLOW_INSECURE_LOCAL_PRODUCTION: "1",
+        PUBLIC_BASE_URL: "https://desiauction.in:8443",
+        RP_ID: undefined,
+      }),
+    );
+    expect(env.RP_ID).toBe("desiauction.in");
+  });
+
+  it("derives the media public base and the finops endpoint from the one MinIO", () => {
+    const env = parseEnv(
+      raw({ ...PROD_OK, MEDIA_PUBLIC_BASE: undefined, FINOPS_S3_ENDPOINT: undefined }),
+    );
+    expect(env.MEDIA_PUBLIC_BASE).toBe("https://s3.ap-south-1.amazonaws.com/desiauction-media");
+    expect(env.FINOPS_S3_ENDPOINT).toBe("https://s3.ap-south-1.amazonaws.com");
+  });
+
+  it("never overrides a value the operator set", () => {
+    // Derivation is a default, not a policy. The two settings were kept apart
+    // because they may legitimately differ.
+    const env = parseEnv(raw({ ...PROD_OK, FINOPS_S3_ENDPOINT: "https://other.example.in" }));
+    expect(env.FINOPS_S3_ENDPOINT).toBe("https://other.example.in");
+  });
+
+  it("treats an empty string as unset — a blank line in an env file is not a value", () => {
+    const env = parseEnv(raw({ ...PROD_OK, RP_ID: "   " }));
+    expect(env.RP_ID).toBe("desiauction.in");
+  });
+
+  it("REFUSES an RP_ID that is not the host being served", () => {
+    // The check that did not exist. Individually valid, mutually wrong, and
+    // undetectable from any log.
+    expect(() => parseEnv(raw({ ...PROD_OK, RP_ID: "desiauction.com" }))).toThrow(/RP_ID/);
+  });
+
+  it("ALLOWS a parent domain, which is how one credential covers subdomains", () => {
+    expect(() =>
+      parseEnv(
+        raw({
+          ...PROD_OK,
+          PUBLIC_BASE_URL: "https://app.desiauction.in",
+          RP_ID: "desiauction.in",
+          RP_ORIGINS: "https://app.desiauction.in",
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("REFUSES RP_ORIGINS that omits the origin the product is served from", () => {
+    expect(() => parseEnv(raw({ ...PROD_OK, RP_ORIGINS: "https://www.desiauction.in" }))).toThrow(
+      /RP_ORIGINS/,
+    );
+  });
+
+  it("REFUSES a plaintext engine socket in production", () => {
+    // A page served over https cannot open ws://. Live auctions break for
+    // everyone; every other surface looks perfect.
+    expect(() =>
+      parseEnv(raw({ ...PROD_OK, ENGINE_PUBLIC_WS_URL: "ws://engine.desiauction.in/ws" })),
+    ).toThrow(/wss:\/\//);
+  });
+
+  it("leaves development alone — nothing sets PUBLIC_BASE_URL locally", () => {
+    /*
+     * Load-bearing. `RP_ORIGINS` defaults to BOTH localhost ports and the e2e
+     * suite runs on the second one, so deriving unconditionally would have
+     * quietly dropped :3050 and broken the passkey specs.
+     */
+    const env = parseEnv(raw({ ...DEV }));
+    expect(env.RP_ORIGINS).toContain("http://localhost:3050");
   });
 });

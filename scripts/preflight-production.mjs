@@ -196,6 +196,34 @@ check(
   `RP_ID=${env.RP_ID ?? "(unset)"}`,
   "set RP_ID to the production domain (must suffix-match the browser host)",
 );
+/*
+ * AND THAT IT IS THE HOST ACTUALLY BEING SERVED.
+ *
+ * The check above only ever asked "is it not localhost", which a domain typo
+ * passes. `RP_ID=desiauction.com` while serving `https://desiauction.in`
+ * satisfied every gate here, deployed green, and silently stopped every
+ * enrolled passkey from verifying — a failure with no error, no log line and no
+ * symptom except users who cannot get in.
+ *
+ * A PARENT DOMAIN IS FINE: `desiauction.in` while serving
+ * `app.desiauction.in` is how one credential covers subdomains. The rule is
+ * that the served host must sit underneath RP_ID, not that they be identical.
+ */
+check(
+  "RP_ID-matches-host",
+  (() => {
+    if (typeof env.PUBLIC_BASE_URL !== "string" || typeof env.RP_ID !== "string") return false;
+    let host;
+    try {
+      host = new URL(env.PUBLIC_BASE_URL).hostname;
+    } catch {
+      return false;
+    }
+    return host === env.RP_ID || host.endsWith(`.${env.RP_ID}`);
+  })(),
+  `RP_ID=${env.RP_ID ?? "(unset)"} vs PUBLIC_BASE_URL=${env.PUBLIC_BASE_URL ?? "(unset)"}`,
+  "RP_ID must be the host PUBLIC_BASE_URL serves, or a domain it sits under — a mismatch breaks passkeys with no error",
+);
 check(
   "RP_ORIGINS-https",
   typeof env.RP_ORIGINS === "string" &&

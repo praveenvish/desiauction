@@ -406,6 +406,70 @@ const productionSchema = envSchema
     message: "RP_ID is still 'localhost' — passkeys cannot verify against a real hostname",
     path: ["RP_ID"],
   })
+  /*
+   * RP_ID MUST BE THE HOST, OR A DOMAIN THE HOST SITS UNDER.
+   *
+   * This is the check that was missing, and the reason it matters is that its
+   * absence is undetectable. `RP_ID` was only ever tested against the literal
+   * "localhost", so pointing it at a domain that simply is not the one being
+   * served passed here, passed `preflight:production`, and deployed green —
+   * after which every passkey already enrolled silently stopped verifying and
+   * no log said anything at all.
+   *
+   * A PARENT DOMAIN IS LEGITIMATE and deliberately still allowed: `RP_ID` of
+   * `desiauction.in` while serving `app.desiauction.in` is how one credential
+   * covers several subdomains. What cannot be allowed is an `RP_ID` the browser
+   * will refuse outright, which is anything the served host is not underneath.
+   */
+  .refine(
+    (v) => {
+      if (!serving(v)) return true;
+      let host: string;
+      try {
+        host = new URL(v.PUBLIC_BASE_URL).hostname;
+      } catch {
+        return true; // PUBLIC_BASE_URL has its own refinement; do not double-report.
+      }
+      return host === v.RP_ID || host.endsWith(`.${v.RP_ID}`);
+    },
+    {
+      message:
+        "RP_ID is not the host PUBLIC_BASE_URL serves, nor a domain it sits under — passkeys would fail silently for everyone already enrolled",
+      path: ["RP_ID"],
+    },
+  )
+  /*
+   * And the origin the browser will actually send has to be one we accept.
+   * `RP_ORIGINS` may list more (a www alias, a staging host); it may not omit
+   * the one the product is served from, which would refuse every ceremony
+   * started on the real site.
+   */
+  .refine(
+    (v) => {
+      if (!serving(v)) return true;
+      try {
+        return v.RP_ORIGINS.includes(new URL(v.PUBLIC_BASE_URL).origin);
+      } catch {
+        return true;
+      }
+    },
+    {
+      message:
+        "RP_ORIGINS does not include the origin of PUBLIC_BASE_URL — passkey ceremonies from the live site would be rejected",
+      path: ["RP_ORIGINS"],
+    },
+  )
+  /*
+   * A browser on an https page refuses a plaintext WebSocket. Getting this
+   * wrong breaks live auctions for everyone while every other surface looks
+   * perfect — checked at BOOT as well as in preflight, because preflight runs
+   * at deploy time and an env file can be edited on the box afterwards.
+   */
+  .refine((v) => !serving(v) || v.ENGINE_PUBLIC_WS_URL.startsWith("wss://"), {
+    message:
+      "ENGINE_PUBLIC_WS_URL must be wss:// in production — a page served over https cannot open a ws:// socket, so live auctions would fail and nothing else would",
+    path: ["ENGINE_PUBLIC_WS_URL"],
+  })
   .refine((v) => !serving(v) || v.RP_ORIGINS.every((o) => !/localhost|127\.0\.0\.1/.test(o)), {
     message: "RP_ORIGINS still contains a localhost origin",
     path: ["RP_ORIGINS"],
@@ -421,9 +485,75 @@ const productionSchema = envSchema
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * FILL IN WHAT THE DOMAIN ALREADY DECIDES.
+ *
+ * Four of these values are not independent facts — they are `PUBLIC_BASE_URL`
+ * and `MEDIA_S3_ENDPOINT` written out again in a different shape. Asking an
+ * operator to type them a second time buys nothing and costs the one failure
+ * mode this file exists to prevent: values that are each individually valid and
+ * mutually inconsistent, which no single-value check can catch.
+ *
+ * The sharpest example was `RP_ID`. Nothing compared it to `PUBLIC_BASE_URL` —
+ * both here and in `preflight:production` the only test was "not localhost" —
+ * so a domain typo passed every check, deployed green, and silently stopped
+ * passkeys working for everyone who had enrolled one. Nobody would have
+ * discovered that from a log.
+ *
+ * DERIVED ONLY WHEN THE OPERATOR SET THE SOURCE. Locally nothing sets
+ * `PUBLIC_BASE_URL`, so nothing is derived and the development defaults stand —
+ * which matters, because `RP_ORIGINS` defaults to BOTH localhost ports and the
+ * e2e suite runs on the second one. Deriving unconditionally would have quietly
+ * dropped :3050 and broken the passkey specs.
+ *
+ * Every derived value stays overridable. A parent domain covering subdomains is
+ * a legitimate `RP_ID`, so the refinements below check that an override is a
+ * suffix of the real host rather than demanding it be identical.
+ */
+function withDerived(raw: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...raw };
+  // An empty string is how a shell spells "unset"; treating it as a value is
+  // how a blank line in an env file becomes a mystery at boot.
+  const given = (key: string): string | undefined => {
+    const value = raw[key];
+    return value === undefined || value.trim() === "" ? undefined : value.trim();
+  };
+  const fill = (key: string, value: string): void => {
+    if (given(key) === undefined) {
+      out[key] = value;
+    }
+  };
+
+  const base = given("PUBLIC_BASE_URL");
+  if (base !== undefined) {
+    try {
+      const url = new URL(base);
+      // The HOSTNAME, never the host: `RP_ID` is a domain and a port in it is
+      // rejected by every WebAuthn implementation.
+      fill("RP_ID", url.hostname);
+      fill("RP_ORIGINS", url.origin);
+    } catch {
+      // Malformed — leave it for zod to report against the field the operator
+      // actually typed, rather than failing here about a derived one.
+    }
+  }
+
+  const mediaEndpoint = given("MEDIA_S3_ENDPOINT");
+  if (mediaEndpoint !== undefined) {
+    // One MinIO on one box serves both buckets. Still overridable: the two were
+    // kept as separate settings precisely because they may not always be.
+    fill("FINOPS_S3_ENDPOINT", mediaEndpoint);
+    const bucket = given("MEDIA_S3_BUCKET");
+    if (bucket !== undefined) {
+      fill("MEDIA_PUBLIC_BASE", `${mediaEndpoint.replace(/\/+$/, "")}/${bucket}`);
+    }
+  }
+  return out;
+}
+
 /** Exported for tests and the env:check script; apps import the singleton. */
 export function parseEnv(raw: NodeJS.ProcessEnv): Env {
-  const result = productionSchema.safeParse(raw);
+  const result = productionSchema.safeParse(withDerived(raw));
   if (!result.success) {
     const issues = result.error.issues
       .map((issue) => `  ${issue.path.join(".")}: ${issue.message}`)
