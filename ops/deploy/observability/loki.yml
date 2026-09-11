@@ -1,0 +1,58 @@
+# Loki, single binary, local filesystem. No object store and no clustering:
+# this is one box, and a log store that needs its own operational attention is a
+# second system to keep alive during the incident it exists to explain.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  log_level: warn # Loki narrating itself into the logs it collects is a loop.
+
+common:
+  path_prefix: /loki
+  # SINGLE BINARY MEANS EVERY COMPONENT IS THIS PROCESS, and the ring has to be
+  # told so. Left out, the ingester registers under the container's routable IP
+  # and the distributor — in the same process — tries to reach it over the
+  # network and times out. Loki then stays up, healthy-looking, and answers
+  # every push with a 500: "unable to get stream rates from ingester ...
+  # DeadlineExceeded". Found by running it rather than reading it.
+  instance_addr: 127.0.0.1
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # RETENTION IS THE WHOLE REASON THIS BLOCK EXISTS. Without it Loki keeps
+  # everything for ever and the disk ends exactly where the uncapped json-file
+  # driver would have ended, just more slowly and with more ceremony.
+  retention_period: 720h # 30 days
+  # An auction night is bursty by nature — every bid on every socket at once.
+  # The defaults are sized for a cluster ingesting from many senders; these are
+  # sized for one box that must not drop the minute an incident happens in.
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  retention_enabled: true # without this, retention_period above is decorative
+
+# Nothing to phone home about.
+analytics:
+  reporting_enabled: false
