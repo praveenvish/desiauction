@@ -12,3 +12,33 @@
 	encode zstd gzip
 	reverse_proxy engine:4000
 }
+
+# Object storage, on its own hostname (Hetzner-only topology).
+#
+# PUBLIC ON PURPOSE, and only as far as it has to be. Two different clients
+# need to reach this host and neither is server-side:
+#
+#   THE BROWSER UPLOADING A PHOTO. `presignUpload` signs a PUT against
+#   MEDIA_S3_ENDPOINT and hands that URL to the browser, and an AWS v4
+#   signature covers the Host header — so the endpoint the app signs for has to
+#   be the hostname the browser will actually call. Pointing it at the internal
+#   `minio:9000` produces URLs that are valid and unreachable.
+#
+#   THE BROWSER READING A PHOTO. The signer builds path-style URLs
+#   (`/<bucket>/<key>`), so MEDIA_PUBLIC_BASE is this origin plus the media
+#   bucket, and no rewrite is needed here.
+#
+# What stops this from being an open door is the bucket policy set by
+# `minio-init`, not this file: anonymous download on the media bucket, nothing
+# at all on the finops bucket. Writes need a signature in every case. That is
+# the same posture a public R2 bucket has.
+{$S3_DOMAIN} {
+	encode zstd gzip
+	# Photos and registers are already-compressed blobs and can be large; the
+	# default 100MB body limit is a browser-side upload failure waiting to
+	# happen, and the app's own allow-list is what actually bounds a file.
+	request_body {
+		max_size 25MB
+	}
+	reverse_proxy minio:9000
+}

@@ -17,7 +17,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data # ACME account + certificates; losing this re-issues
       - caddy_config:/config
-    depends_on: [web, engine]
+    depends_on: [web, engine, minio]
 
   web:
     image: ${REGISTRY}/web:${TAG}
@@ -69,6 +69,86 @@ services:
     env_file: [./runner.env]
     depends_on:
       db: { condition: service_healthy }
+
+  # OBJECT STORAGE, ON THIS BOX. Player photos and finops artifacts need a
+  # store both the web tier and the runner can reach, and the adapters written
+  # for them speak S3 — so the cheapest correct answer is an S3 server here
+  # rather than a second application path. No third party, no per-GB bill.
+  #
+  # WHY NOT THE FILESYSTEM. Two separate reasons, and only one of them is about
+  # topology. The finops store could work on one box with a shared volume. The
+  # MEDIA store cannot: `LocalStorage` writes into `public/_media` and serves it
+  # as a static path, but `public/` is baked at BUILD time, so a built server
+  # never serves what was written there at runtime. Uploads would land on disk
+  # and every photo would 404.
+  #
+  # PINNED BY DIGEST, not by tag. MinIO publishes only `RELEASE.<timestamp>`
+  # tags and `latest`, and `latest` is a moving target on a service that holds
+  # data. The digest is immutable — the same argument the file already makes
+  # for `postgres:17-alpine` over `:latest`, taken one step further because
+  # there is no stable tag to take instead.
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    # NO PUBLISHED PORTS. Caddy is the only way in, so the console and the
+    # admin API are not exposed to the internet by an open firewall rule.
+    command: ["server", "/data"]
+    env_file: [./minio.env]
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Creates the two buckets and sets the ONE policy that differs between them.
+  # Runs to completion and exits; `docker compose up` re-runs it on every deploy
+  # and every step is idempotent.
+  minio-init:
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    env_file: [./minio.env]
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/desiauction-media
+        mc mb --ignore-existing local/desiauction-finops
+        # THE MEDIA BUCKET IS PUBLICLY READABLE AND THE FINOPS BUCKET IS NOT.
+        # A player photo is served straight to a browser from MEDIA_PUBLIC_BASE,
+        # so anonymous GET is what makes it work. A finops artifact is a receipt
+        # register — it is reached only through a signed URL the web tier mints,
+        # and anonymous access to it would be a disclosure of somebody's money.
+        #
+        # GetObject ONLY, AND THAT IS THE WHOLE REASON THIS IS A POLICY DOCUMENT
+        # RATHER THAN `mc anonymous set download`. The shorthand grants
+        # ListBucket as well, which was verified against a real MinIO: an
+        # anonymous `GET /desiauction-media/?list-type=2` returned every key in
+        # the bucket. Photo keys carry the org and the subject id, so that is an
+        # enumeration of every club, every player and every photo on the
+        # platform — including the minors whose photos the product deliberately
+        # suppresses on its public pages. Reading a key you already know is the
+        # capability we want; discovering the keys is not.
+        cat > /tmp/media-policy.json <<'POLICY'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "AWS": ["*"] },
+              "Action": ["s3:GetObject"],
+              "Resource": ["arn:aws:s3:::desiauction-media/*"]
+            }
+          ]
+        }
+        POLICY
+        mc anonymous set-json /tmp/media-policy.json local/desiauction-media
+        mc anonymous set none local/desiauction-finops
+        echo "buckets ready"
 
   db:
     image: postgres:17-alpine
@@ -122,6 +202,7 @@ services:
 
 volumes:
   pgdata:
+  minio_data:
   caddy_data:
   caddy_config:
   pgbackrest_conf:
