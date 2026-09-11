@@ -3,7 +3,7 @@
 import { Button, Field } from "@desiauction/ui";
 import { useActionState, useEffect, useRef } from "react";
 
-import { formatPhone } from "../../lib/format-phone";
+import { personContact } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
 import { logoutAction, updateProfileAction } from "../../server/auth/actions";
 
@@ -17,7 +17,15 @@ import { logoutAction, updateProfileAction } from "../../server/auth/actions";
  * nothing, at the end of the funnel. Telemetry fires at submit for the same
  * reason: there is no render after the save to fire it in.
  */
-export function OnboardingPanel({ phone, next }: { phone: string; next: string }) {
+export function OnboardingPanel({
+  phone,
+  email,
+  next,
+}: {
+  phone: string | null;
+  email: string | null;
+  next: string;
+}) {
   const [state, formAction, pending] = useActionState(updateProfileAction, {});
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -54,7 +62,7 @@ export function OnboardingPanel({ phone, next }: { phone: string; next: string }
             server (`safeNext`) — a hidden field is user-controlled. */}
         <input type="hidden" name="next" value={next} />
         <p className="onboarding-hint">
-          Signed in as <strong>{formatPhone(phone)}</strong> — verified. ·{" "}
+          Signed in as <strong>{personContact({ phone, email })}</strong> — verified. ·{" "}
           <button
             type="button"
             className="onboarding-signout"

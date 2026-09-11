@@ -97,6 +97,7 @@ export default async function AccountPage() {
             <ProfilePanel
               personId={session.personId}
               phone={session.phone}
+              email={session.email}
               name={session.name}
               completeness={completeness}
               signOut={<SignOutButton logout={logoutAction} />}

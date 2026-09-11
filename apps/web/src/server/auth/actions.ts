@@ -353,7 +353,13 @@ export async function requestEmailLoginAction(
    */
   if (result.code !== undefined) {
     try {
-      await createCodeMailer(db).send(result.email, result.code, "login");
+      // `isNew` decides the WORDING and travels no further — see its doc on
+      // `EmailLoginRequest`. The state returned below is identical either way.
+      await createCodeMailer(db).send(
+        result.email,
+        result.code,
+        result.isNew === true ? "signup" : "login",
+      );
     } catch (error) {
       if (error instanceof MailSendError) {
         return { ...base, error: "We couldn't send that email right now. Try again shortly." };
@@ -377,6 +383,19 @@ export async function verifyEmailLoginAction(
     if (result.reason === "locked") {
       return { ...previous, error: "Too many wrong codes. Ask for a fresh one." };
     }
+    if (result.reason === "taken") {
+      /*
+       * The address is already on an account that never proved it. This code
+       * proves the MAILBOX, not that account, and adopting it would hand over
+       * somebody else's row to whoever typed the address into it. Says what is
+       * true and where to go — the other door still works.
+       */
+      return {
+        ...previous,
+        error:
+          "That address is already on an account. Sign in with the mobile number on it, then confirm the address from your account page.",
+      };
+    }
     return {
       ...previous,
       error:
@@ -387,7 +406,10 @@ export async function verifyEmailLoginAction(
             } left.`,
     };
   }
-  await logSecurityEvent(result.personId, "auth.login.email");
+  await logSecurityEvent(
+    result.personId,
+    result.created ? "auth.signup.email" : "auth.login.email",
+  );
   // Same try/catch discipline as the phone path: a consent-recording hiccup
   // must never fail a login that already happened.
   try {
@@ -885,7 +907,13 @@ export async function confirmPhoneChangeAction(
   return { step: "idle", done: true };
 }
 
-async function notifyPhoneChanged(previousPhone: string, newPhone: string): Promise<void> {
+async function notifyPhoneChanged(previousPhone: string | null, newPhone: string): Promise<void> {
+  if (previousPhone === null) {
+    // An email-anchored account attaching its FIRST number (0062). There is no
+    // old handset, so there is nobody to warn — and the security ledger row
+    // written by the caller records the attach either way.
+    return;
+  }
   const template = SMS_TEMPLATES["security.phone_changed"];
   const rendered = renderTemplate(template, { last4: newPhone.slice(-4) });
   if (!rendered.ok) {

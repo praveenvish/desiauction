@@ -9,7 +9,7 @@ import {
 } from "@desiauction/db";
 import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
-import { formatPhone } from "../../lib/format-phone";
+import { personLabel } from "../../lib/person-label";
 import { resolvedLots, rulesOf } from "../auction/live-summary";
 import { registrationStats } from "./registrations";
 import { teamsOf, type CompetitionSummary } from "./competitions";
@@ -58,7 +58,8 @@ export interface TeamsWorkspaceOptions {
 export interface TeamRosterRow {
   registrationId: string;
   name: string | null;
-  phone: string;
+  /** Nullable since 0062 — an email-anchored account has no phone. */
+  phone: string | null;
   role: string | null;
   /** Paise paid at auction; null for a pre-signed/icon slot with no hammer price. ABSENT without money sight. */
   buyPrice?: number | null;
@@ -178,13 +179,23 @@ export async function teamsWorkspace(
       // claimed their paddles — the normal end state, and what the demo data is
       // — rendered every card as ownerless while two people were bidding.
       db
-        .select({ teamId: paddles.teamId, name: people.name, phone: people.phone })
+        .select({
+          teamId: paddles.teamId,
+          name: people.name,
+          phone: people.phone,
+          email: people.email,
+        })
         .from(paddles)
         .innerJoin(people, eq(people.id, paddles.personId))
         .where(and(eq(paddles.auctionId, auction.id), isNull(paddles.releasedAt)))
         .orderBy(asc(paddles.paddleNumber)),
       db
-        .select({ teamId: auctionOwnerInvites.teamId, name: people.name, phone: people.phone })
+        .select({
+          teamId: auctionOwnerInvites.teamId,
+          name: people.name,
+          phone: people.phone,
+          email: people.email,
+        })
         .from(auctionOwnerInvites)
         .innerJoin(people, eq(people.id, auctionOwnerInvites.acceptedBy))
         .where(
@@ -209,7 +220,7 @@ export async function teamsWorkspace(
     // which is the one sentence that makes an organizer mint a second link on
     // auction night. The cockpit has always shown the phone; this now agrees.
     for (const owner of [...invited, ...paddleHolders]) {
-      const label = owner.name ?? formatPhone(owner.phone);
+      const label = personLabel(owner);
       ownerByTeam.set(owner.teamId, label);
     }
   }

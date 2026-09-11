@@ -3,7 +3,6 @@ import { Button, ButtonLink, Card } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { formatDate } from "../../../lib/format-date";
-import { formatPhone } from "../../../lib/format-phone";
 import { currentSession, logoutToAction } from "../../../server/auth/actions";
 import {
   acceptOwnerJoin,
@@ -37,7 +36,7 @@ export default async function OwnerJoinPage({ params }: { params: Promise<{ toke
   if (session === null) {
     redirect(`/login?next=/owner-join/${token}`);
   }
-  const { landing, viewerPhone } = await ownerJoinLandingView(token);
+  const { landing, viewerLabel } = await ownerJoinLandingView(token);
 
   const switchAccount = async () => {
     "use server";
@@ -89,7 +88,7 @@ export default async function OwnerJoinPage({ params }: { params: Promise<{ toke
         )}
 
         <form action={switchAccount} className="join-identity">
-          <span>Signed in as {formatPhone(viewerPhone)}. Not you?</span>{" "}
+          <span>Signed in as {viewerLabel}. Not you?</span>{" "}
           <button type="submit" className="join-linkbutton" data-testid="owner-join-switch-account">
             Sign out
           </button>

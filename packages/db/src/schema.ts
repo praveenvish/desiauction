@@ -25,7 +25,13 @@ const ts = (name: string) => timestamp(name, { withTimezone: true });
 
 export const people = pgTable("people", {
   id: id(),
-  phone: text("phone").notNull().unique(),
+  /**
+   * NULLABLE SINCE 0062, and still unique. A person is anchored by a phone, an
+   * email, or both — never neither (`people_reachable_check`). Postgres allows
+   * many NULLs under a unique constraint, so phone-less accounts do not collide
+   * while every real number still identifies exactly one person.
+   */
+  phone: text("phone").unique(),
   name: text("name"),
   // C-25 × DPDP (R-9): consent designed now, captured at IP-3 registration.
   photoConsentAt: ts("photo_consent_at"),
@@ -131,9 +137,16 @@ export const emailVerifications = pgTable(
   "email_verifications",
   {
     id: id(),
-    personId: char("person_id", { length: 26 })
-      .notNull()
-      .references(() => people.id, { onDelete: "cascade" }),
+    /**
+     * NULLABLE SINCE 0063, and only for `purpose: "login"` — a sign-UP code is
+     * minted before the account exists, and the person is created by the
+     * request that proves the code. `email_verifications_person_required_check`
+     * holds every `email_change` row to a person, because a code that confirms
+     * an address change on nobody is meaningless.
+     */
+    personId: char("person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "cascade",
+    }),
     email: text("email").notNull(),
     codeHash: text("code_hash").notNull(),
     /**

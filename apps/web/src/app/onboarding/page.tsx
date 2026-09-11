@@ -62,7 +62,7 @@ export default async function OnboardingPage({
           </ul>
         </aside>
         <div className="onboarding-panel">
-          <OnboardingPanel phone={session.phone} next={destination} />
+          <OnboardingPanel phone={session.phone} email={session.email} next={destination} />
         </div>
       </div>
     </main>

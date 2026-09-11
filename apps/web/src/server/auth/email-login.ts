@@ -1,6 +1,12 @@
 import { createHash, randomInt } from "node:crypto";
 
-import { emailVerifications, newId, people, type Db } from "@desiauction/db";
+import {
+  emailVerifications,
+  newId,
+  people,
+  writeSurvivingConstraint,
+  type Db,
+} from "@desiauction/db";
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { normalizeEmail } from "./email-change";
@@ -21,11 +27,26 @@ import { normalizeEmail } from "./email-change";
  * path is untouched and remains the route for players, whose registrations and
  * rosters key on a phone number.
  *
- * PHASE 1 IS SIGN-IN ONLY, DELIBERATELY. It authenticates people who ALREADY
- * exist and have a VERIFIED address. It creates nobody: `people.phone` is
- * `NOT NULL`, so an email-first signup needs a schema change, and that is
- * Phase 2's question — along with the harder one Phase 2 really has to answer,
- * which is what happens when one human ends up as two person rows.
+ * PHASE 2 ADDS SIGN-UP. 0062 made `people.phone` nullable behind a CHECK that
+ * an account is anchored by a phone, an email, or both — never neither — and
+ * 0063 let a login code exist before its person does. So an address nobody has
+ * used now gets a code like any other, and the request that PROVES that code
+ * is what creates the account. Nothing exists until the mailbox answers.
+ *
+ * WHAT PHASE 2 DOES NOT DO IS MERGE. Both credentials stay unique, and the two
+ * doors never fold two person rows into one: attaching a phone that already
+ * signs somebody else in is REFUSED (`confirmPhoneChange` → `taken`), and so is
+ * attaching such an address. Merging is not something this product can do
+ * safely — two rows may hold registrations in the same competition, paddles in
+ * the same auction, or opposing sides of a settlement, and no automatic rule
+ * decides which of those survives. Refusing is the only honest answer, and it
+ * leaves the person a support path instead of a silently wrong account.
+ *
+ * A PLAYER STILL NEEDS A PHONE. Not an authentication rule — an account with no
+ * number signs in perfectly well — but a product one, enforced in
+ * `submitRegistration`: a season reaches its players by SMS and by nothing
+ * else, so entering one we cannot text would approve, auction and sell somebody
+ * without ever telling them.
  */
 
 /** Fifteen minutes, matching email verification — mail is slower than SMS. */
@@ -49,16 +70,39 @@ function hashCode(code: string): string {
  * of addresses. `sent` says only that the request was accepted.
  */
 export type EmailLoginRequest =
-  | { ok: true; sent: true; email: string; code?: string; personId?: string }
+  | {
+      ok: true;
+      sent: true;
+      email: string;
+      code?: string;
+      personId?: string;
+      /**
+       * Whether this code will CREATE an account rather than open one.
+       *
+       * Present so the mail can say the right thing — "create your account"
+       * reads as an intrusion to somebody who already has one, and "sign in"
+       * reads as a mistake to somebody who does not. It travels to the mailbox
+       * and NOWHERE ELSE: the server action must never echo it to the browser,
+       * because a caller who does not own the address would learn from it
+       * exactly what the uniform result above exists to hide.
+       */
+      isNew?: boolean;
+    }
   | { ok: false; reason: "invalid-email" | "hourly-limit" };
 
 /**
- * Mint a sign-in code for a verified address.
+ * Mint a code for an address — to sign in, or to sign up.
  *
- * Returns `ok` for any well-formed address whether or not it belongs to
- * anybody. `code` and `personId` are present ONLY when there was a real
- * account to mint for — the caller mails a code when it has one and does
- * nothing when it does not, and either way tells the person the same thing.
+ * Returns `ok` for any well-formed address, and since Phase 2 it mints a code
+ * for every one of them: a known VERIFIED address gets a sign-in code carrying
+ * its `personId`, an unknown one gets a sign-up code carrying null, and the
+ * account is created only when that code comes back proved.
+ *
+ * The one address that gets NO code is a known but UNVERIFIED one. It cannot
+ * sign in (an unverified `people.email` is a string somebody typed, not proof
+ * of a mailbox) and it must not sign up either, because creating a second
+ * account on an address already sitting on a first one is the merge this
+ * product refuses to do. The caller says nothing different about it.
  */
 export async function requestEmailLogin(
   db: Db,
@@ -114,18 +158,24 @@ export async function requestEmailLogin(
    * means at most one person can match.
    */
   const [person] = await db
-    .select({ id: people.id })
+    .select({ id: people.id, verifiedAt: people.emailVerifiedAt })
     .from(people)
-    .where(and(eq(people.email, email), sql`${people.emailVerifiedAt} is not null`))
+    .where(eq(people.email, email))
     .limit(1);
-  if (person === undefined) {
+  if (person !== undefined && person.verifiedAt === null) {
+    // Claimed but unproved — see the doc above. Silent, and indistinguishable
+    // from every other outcome.
     return { ok: true, sent: true, email };
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await db.insert(emailVerifications).values({
     id: newId(),
-    personId: person.id,
+    // Null means "nobody yet" (0063). `verifyEmailLogin` creates the person
+    // when the code comes back proved, and not one moment sooner: minting the
+    // account here would let anyone manufacture `people` rows from a public
+    // form, and would take an address on behalf of somebody who never replies.
+    personId: person?.id ?? null,
     email,
     codeHash: hashCode(code),
     purpose: "login",
@@ -134,19 +184,24 @@ export async function requestEmailLogin(
       ? { requestIp: input.requestIp }
       : {}),
   });
-  return { ok: true, sent: true, email, code, personId: person.id };
+  return person === undefined
+    ? { ok: true, sent: true, email, code, isNew: true }
+    : { ok: true, sent: true, email, code, personId: person.id, isNew: false };
 }
 
 export type EmailLoginResult =
-  | { ok: true; personId: string }
-  | { ok: false; reason: "invalid" | "expired" | "locked"; attemptsLeft?: number };
+  | { ok: true; personId: string; created: boolean }
+  | { ok: false; reason: "invalid" | "expired" | "locked" | "taken"; attemptsLeft?: number };
 
 /**
- * Consume a sign-in code and say who it proves.
+ * Consume a code and say who it proves — creating that person if this is a
+ * sign-up.
  *
- * Deliberately does NOT create the session — `verifyOtp` does not either. The
+ * Deliberately does NOT create the SESSION — `verifyOtp` does not either. The
  * caller owns session minting, so both doors end at exactly the same place and
- * neither can drift into issuing a session the other would not.
+ * neither can drift into issuing a session the other would not. Creating the
+ * PERSON is different: it has to happen in the same breath as consuming the
+ * code, or a crash between the two would burn the proof and leave no account.
  */
 export async function verifyEmailLogin(
   db: Db,
@@ -209,5 +264,60 @@ export async function verifyEmailLogin(
   if (consumed === undefined) {
     return { ok: false, reason: "invalid" };
   }
-  return { ok: true, personId: consumed.personId };
+  if (consumed.personId !== null) {
+    return { ok: true, personId: consumed.personId, created: false };
+  }
+
+  /*
+   * A SIGN-UP CODE, NOW PROVED (0063). The mailbox answered, so the account it
+   * asked for gets made.
+   *
+   * The address is re-read rather than trusted from mint time, because minutes
+   * passed: somebody may have signed up on it through the other door, or an
+   * existing account may have attached and verified it. Either way that person
+   * is who this code proves, and signing them in is right — the code went to
+   * their mailbox. What must NOT happen is a second `people` row on the same
+   * address, which `people_email_unique` would refuse anyway; this exists so
+   * the refusal is a decision rather than a database error.
+   */
+  const [already] = await db
+    .select({ id: people.id, verifiedAt: people.emailVerifiedAt })
+    .from(people)
+    .where(eq(people.email, email))
+    .limit(1);
+  if (already !== undefined) {
+    // Claimed but never proved, by somebody who is not standing here: this code
+    // proves the MAILBOX, not that account. Refused rather than adopted — see
+    // the merge note at the top of this file.
+    return already.verifiedAt === null
+      ? { ok: false, reason: "taken" }
+      : { ok: true, personId: already.id, created: false };
+  }
+
+  const personId = newId();
+  const inserted = await writeSurvivingConstraint(db, (tx) =>
+    tx.insert(people).values({
+      id: personId,
+      // NO PHONE, and this is the whole point of 0062: `people_reachable_check`
+      // is satisfied by the verified address alone. They can attach a number
+      // later from the account page — and must, before registering as a player.
+      phone: null,
+      email,
+      emailVerifiedAt: new Date(),
+    }),
+  );
+  if (!inserted) {
+    // Lost a race with another sign-up on the same address between the read
+    // above and this insert. Whoever won holds the account; this code proved
+    // the same mailbox, so it opens it rather than failing the person.
+    const [winner] = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(eq(people.email, email))
+      .limit(1);
+    return winner === undefined
+      ? { ok: false, reason: "invalid" }
+      : { ok: true, personId: winner.id, created: false };
+  }
+  return { ok: true, personId, created: true };
 }

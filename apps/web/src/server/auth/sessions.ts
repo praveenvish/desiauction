@@ -73,7 +73,14 @@ export async function createSession(
 export interface SessionInfo {
   sessionId: string;
   personId: string;
-  phone: string;
+  /**
+   * NULLABLE SINCE 0062. A session belongs to a PERSON, and a person may be
+   * anchored by an email instead of a phone. Nothing about authorization reads
+   * this — `authz.ts` keys on `personId` alone — so a null here costs a screen
+   * a label, never a permission.
+   */
+  phone: string | null;
+  email: string | null;
   name: string | null;
 }
 
@@ -85,6 +92,7 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
       createdAt: sessions.createdAt,
       lastSeenAt: sessions.lastSeenAt,
       phone: people.phone,
+      email: people.email,
       name: people.name,
     })
     .from(sessions)
@@ -113,7 +121,13 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
       .set({ lastSeenAt: new Date(), expiresAt: new Date(slid) })
       .where(eq(sessions.id, row.sessionId));
   }
-  return { sessionId: row.sessionId, personId: row.personId, phone: row.phone, name: row.name };
+  return {
+    sessionId: row.sessionId,
+    personId: row.personId,
+    phone: row.phone,
+    email: row.email,
+    name: row.name,
+  };
 }
 
 export async function revokeSession(db: Db, sessionId: string): Promise<void> {

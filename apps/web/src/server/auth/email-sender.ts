@@ -25,7 +25,7 @@ import { env } from "../../env";
  * learn to ignore account mail, and it hands anyone who can trigger a login
  * code a ready-made cover story.
  */
-export type CodeMailPurpose = "email_change" | "login";
+export type CodeMailPurpose = "email_change" | "login" | "signup";
 
 export interface CodeMailer {
   send(email: string, code: string, purpose: CodeMailPurpose): Promise<void>;
@@ -36,6 +36,18 @@ export function codeMailCopy(
   code: string,
   purpose: CodeMailPurpose,
 ): { subject: string; text: string } {
+  if (purpose === "signup") {
+    /*
+     * A DIFFERENT PERSON IS READING THIS. "Sign-in code" to somebody who has no
+     * account reads as a mistake or a breach, and the closing sentence of the
+     * login copy — "your account is safe" — is about an account that does not
+     * exist. Both halves have to change together.
+     */
+    return {
+      subject: "Your DesiAuction sign-up code",
+      text: `Welcome to DesiAuction. Your sign-up code is ${code}. It expires in 15 minutes.\n\nEntering it creates your account on this address. If you did not ask for this, ignore this message — nothing is created until the code is used.`,
+    };
+  }
   if (purpose === "login") {
     return {
       subject: "Your DesiAuction sign-in code",

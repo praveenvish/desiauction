@@ -11,7 +11,7 @@ import {
   resolveKeyUp,
 } from "../../../../../components/auction/cockpit-keys";
 import { formatDateTime } from "../../../../../lib/format-date";
-import { formatPhone } from "../../../../../lib/format-phone";
+import { personContact } from "../../../../../lib/person-label";
 import { GavelButton, type GavelHandle } from "./gavel-button";
 import type { CockpitView, OwnerAcceptance } from "../../../../../server/auction/conduct-actions";
 import {
@@ -50,7 +50,7 @@ function commandId(): string {
 function describeAcceptor(who: OwnerAcceptance): string {
   return [
     who.name ?? "Unnamed account",
-    formatPhone(who.phone),
+    personContact(who),
     who.acceptedAt === null ? null : `accepted ${formatDateTime(who.acceptedAt)}`,
   ]
     .filter((part) => part !== null)
@@ -888,7 +888,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                             className="registration-phone"
                             data-testid={`grantable-phone-${entry.id}`}
                           >
-                            {formatPhone(who.phone)}
+                            {personContact(who)}
                           </span>
                         )}
                       </span>

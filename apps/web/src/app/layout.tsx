@@ -132,7 +132,12 @@ export default async function RootLayout({
         <ProductShell
           session={
             session !== null
-              ? { name: session.name, phone: session.phone, personId: session.personId }
+              ? {
+                  name: session.name,
+                  phone: session.phone,
+                  email: session.email,
+                  personId: session.personId,
+                }
               : null
           }
           orgs={orgs.map((org) => ({

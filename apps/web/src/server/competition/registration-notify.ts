@@ -286,7 +286,6 @@ export async function notifyDecision(
   db: Db,
   input: {
     orgId: string;
-    competitionSlug: string;
     competitionName: string;
     registrationIds: readonly string[];
     event: NotifiableEvent;
@@ -298,10 +297,61 @@ export async function notifyDecision(
   if (input.registrationIds.length === 0) {
     return { sent: 0, failed: 0, suppressed: 0 };
   }
-  const link = `${env.PUBLIC_BASE_URL}/seasons/${input.competitionSlug}/register`;
+  /*
+   * THE LINK CARRIES NO SEASON, AND THAT IS THE FIX.
+   *
+   * This was `${PUBLIC_BASE_URL}/seasons/${slug}/register`, and the `{link}`
+   * slot the operator gets is capped at 60 characters. Season slugs are
+   * `slugifyName(name)` (sliced to 40) plus a four-character id suffix, so the
+   * deep link ran to 85 characters at worst and 71 for a name as ordinary as
+   * "Bandra Premier League 2027". Over the cap `renderTemplate` refuses,
+   * `messageFor` returns null, and this function used to answer
+   * `{sent: 0, failed: 0, suppressed: 0}` — so approving forty players told
+   * forty nobody and reported it as nothing to do.
+   *
+   * A SHORTER DEEP LINK DOES NOT FIX IT, which is why the season is gone
+   * rather than abbreviated. Every shape that carries the slug can still
+   * overflow at the slug's own maximum: even `desiauction.in/c/<slug>` with no
+   * scheme reaches 62. Only a link with no variable part in it is safe BY
+   * CONSTRUCTION, and that is the property worth having here — a cap breach is
+   * invisible from the organizer's side, so it must be impossible rather than
+   * unlikely.
+   *
+   * The cost is one tap. `/home` lists the reader's registrations
+   * (`myRegistrations`), and the message has already named the season in
+   * `{competition}` — which was the whole complaint DA-35 made about the old
+   * bare login wall, and it is answered by the SMS itself rather than by the
+   * page it points at.
+   */
+  const link = `${env.PUBLIC_BASE_URL}/home`;
   const body = messageFor(input.event, input.competitionName, link, input.reason);
   if (body === null) {
-    return { sent: 0, failed: 0, suppressed: 0 };
+    /*
+     * UNRENDERABLE IS A FAILURE, NOT A NO-OP.
+     *
+     * Returning zeros here is what made the bug above invisible: the organizer
+     * read "0 notified, 0 failed" as "nobody needed telling". These people
+     * needed telling and were not told, so they are counted FAILED — the one
+     * number the organizer's toast already surfaces.
+     *
+     * Deliberately NOT `suppressed`. That word means "we decided not to text
+     * this person" — they sent STOP, or they have no number — and it is a
+     * settled state nobody needs to chase. This is the opposite: a template we
+     * could not compose, which is ours to fix and nobody else's to notice.
+     *
+     * So it is also reported. A slot overrun is a configuration fault that no
+     * amount of retrying clears, and it would otherwise reach us only as an
+     * organizer wondering why their players are quiet.
+     */
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.captureException(
+      new Error(`registration notice for "${input.event}" could not be rendered`),
+      {
+        tags: { area: "messaging", template: TEMPLATE_FOR_EVENT[input.event] },
+        extra: { linkLength: link.length, competitionNameLength: input.competitionName.length },
+      },
+    );
+    return { sent: 0, failed: input.registrationIds.length, suppressed: 0 };
   }
   const rows = await db
     .select({ id: registrations.id, phone: people.phone, personId: people.id })
@@ -313,6 +363,23 @@ export async function notifyDecision(
   let failed = 0;
   let suppressed = 0;
   for (const row of rows) {
+    /*
+     * NO PHONE, NO SMS — and that is not a failure either.
+     *
+     * Since 0062 a person can be anchored by email alone, so `people.phone` can
+     * be null. Counting those as FAILED would send an organizer chasing a
+     * delivery problem that does not exist, which is the same mistake the
+     * suppression branch below was written to avoid. They are suppressed: the
+     * decision still stands and their status page still shows it.
+     *
+     * (A player must supply a phone to register, so in practice this is the
+     * organizer who added a row by hand for somebody who has not registered
+     * yet — not a gap in player notification.)
+     */
+    if (row.phone === null) {
+      suppressed += 1;
+      continue;
+    }
     /*
      * The consent gate, before the send and not after it.
      *

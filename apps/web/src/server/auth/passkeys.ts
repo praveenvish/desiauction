@@ -30,8 +30,16 @@ export async function startEnrollment(db: Db, personId: string) {
   return generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: env.RP_ID,
-    userName: person.phone,
-    userDisplayName: person.name ?? person.phone,
+    /*
+     * WHAT THE AUTHENTICATOR SHOWS THE PERSON when it asks "which account?".
+     *
+     * Phone was the only possible answer until 0062; an email-anchored person
+     * has none. Falls back to the address, then to the person id — never to an
+     * empty string, because a passkey listed as "" in a password manager is one
+     * nobody can tell apart from another account's.
+     */
+    userName: person.phone ?? person.email ?? personId,
+    userDisplayName: person.name ?? person.phone ?? person.email ?? personId,
     attestationType: "none",
     excludeCredentials: existing.map((credential) => ({ id: credential.credentialId })),
     authenticatorSelection: {

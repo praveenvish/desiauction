@@ -16,7 +16,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { avatarColor } from "../../../components/avatar-color";
-import { formatPhone } from "../../../lib/format-phone";
 import {
   createInviteAction,
   issueGrantAction,
@@ -26,20 +25,7 @@ import {
   type OrgView,
 } from "../../../server/orgs/actions";
 import type { MemberRow } from "../../../server/orgs/orgs";
-
-/** Initials for the avatar — first code points of up to two words. */
-function initials(name: string | null, phone: string): string {
-  const parts = (name ?? phone).trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  return (
-    parts
-      .map((word) => {
-        const cp = word.codePointAt(0);
-        return cp === undefined ? "" : String.fromCodePoint(cp);
-      })
-      .join("")
-      .toUpperCase() || "—"
-  );
-}
+import { personContact, personInitials } from "../../../lib/person-label";
 
 /**
  * A capability set → the pill the row shows.
@@ -134,8 +120,9 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
       // string the user had just read off the row above.
       const haystack = [
         member.name ?? "",
-        member.phone,
-        formatPhone(member.phone),
+        member.phone ?? "",
+        member.email ?? "",
+        personContact(member),
         ...member.capabilitySets.map((set) => rolePill(set).label),
       ]
         .join(" ")
@@ -497,11 +484,11 @@ function MemberRowView({
           style={{ background: avatarColor(member.personId) }}
           aria-hidden
         >
-          {initials(member.name, member.phone)}
+          {personInitials(member)}
         </span>
         <span className="od-member-id">
           <strong>{name}</strong>
-          <span className="od-member-phone">{formatPhone(member.phone)}</span>
+          <span className="od-member-phone">{personContact(member)}</span>
         </span>
       </span>
       <span className="od-member-roles" role="cell">

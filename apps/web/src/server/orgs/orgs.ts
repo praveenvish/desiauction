@@ -110,7 +110,9 @@ export interface MemberGrant {
 export interface MemberRow {
   personId: string;
   name: string | null;
-  phone: string;
+  /** Nullable since 0062 — an email-anchored account has no phone. */
+  phone: string | null;
+  email: string | null;
   capabilitySets: string[];
   /** The same sets, each carrying the provenance the grants table records. */
   roles: MemberGrant[];
@@ -126,6 +128,7 @@ export async function membersOf(db: Db, orgId: string): Promise<MemberRow[]> {
       personId: orgMembers.personId,
       name: people.name,
       phone: people.phone,
+      email: people.email,
       joinedAt: orgMembers.joinedAt,
     })
     .from(orgMembers)
@@ -155,6 +158,7 @@ export async function membersOf(db: Db, orgId: string): Promise<MemberRow[]> {
       personId: row.personId,
       name: row.name,
       phone: row.phone,
+      email: row.email,
       joinedAt: (row.joinedAt instanceof Date
         ? row.joinedAt
         : new Date(String(row.joinedAt))

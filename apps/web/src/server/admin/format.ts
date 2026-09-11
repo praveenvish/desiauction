@@ -101,6 +101,20 @@ export function maskContact(contact: string): string {
 }
 
 /**
+ * A person's contact for a DIRECTORY, masked — whichever one they have.
+ *
+ * Since 0062 an account may be anchored by an email instead of a phone, and
+ * every admin list called `maskPhone` on a column that can now be null. The
+ * rule is the one `maskPhone` already argued for and is unchanged by which
+ * contact it is: a list answers "which row is this?", and the whole thing
+ * belongs on the one person's page an operator deliberately opened.
+ */
+export function maskPersonContact(person: { phone: string | null; email: string | null }): string {
+  const contact = person.phone ?? person.email;
+  return contact === null ? "—" : maskContact(contact);
+}
+
+/**
  * Lifecycle states, in words.
  *
  * Capability SETS are rendered verbatim on purpose — `org:owner` and

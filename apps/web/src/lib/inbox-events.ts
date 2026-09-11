@@ -11,6 +11,11 @@
 const LABELS: Record<string, string> = {
   "auth.login.otp": "Signed in with a one-time code",
   "auth.login.email": "Signed in with a code sent to your email",
+  // The FIRST line of an email-anchored account's ledger. Deliberately not
+  // folded into the sign-in label above: "where did this account come from?" is
+  // the question a security page is asked after something goes wrong, and a run
+  // of identical sign-in lines never answers it.
+  "auth.signup.email": "Account created with a code sent to your email",
   // Written on EVERY sign-in, so it was the single most common raw key a new
   // account ever saw — half of a fresh inbox read `auth.otp.requested` in
   // monospace before the person had done anything but log in twice.

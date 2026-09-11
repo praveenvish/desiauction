@@ -27,6 +27,8 @@ import {
 } from "@desiauction/db";
 import { and, asc, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 
+import { personLabel } from "../../lib/person-label";
+
 import type { SettlementDeps } from "./deps";
 import { caseFold, journalFold } from "./writer";
 
@@ -128,10 +130,10 @@ async function personNames(db: Db, ids: readonly string[]): Promise<Map<string, 
     return new Map();
   }
   const rows = await db
-    .select({ id: people.id, name: people.name, phone: people.phone })
+    .select({ id: people.id, name: people.name, phone: people.phone, email: people.email })
     .from(people)
     .where(inArray(people.id, unique));
-  return new Map(rows.map((row) => [row.id, row.name ?? row.phone]));
+  return new Map(rows.map((row) => [row.id, personLabel(row)]));
 }
 
 function nameOf(names: Map<string, string>, teamId: string): string {
@@ -351,10 +353,10 @@ async function actorNames(
     return new Map();
   }
   const rows = await db
-    .select({ id: people.id, name: people.name, phone: people.phone })
+    .select({ id: people.id, name: people.name, phone: people.phone, email: people.email })
     .from(people)
     .where(inArray(people.id, ids));
-  return new Map(rows.map((row) => [row.id, row.name ?? row.phone]));
+  return new Map(rows.map((row) => [row.id, personLabel(row)]));
 }
 
 /** Money events, said the way a treasurer would say them. */
@@ -574,7 +576,9 @@ export interface SettlementGrantRow {
   readonly grantId: string;
   readonly personId: string;
   readonly name: string | null;
-  readonly phone: string;
+  /** Nullable since 0062 — an email-anchored account has no phone. */
+  readonly phone: string | null;
+  readonly email: string | null;
   readonly capabilitySet: string;
   /** Who handed this role over — provenance the table has always stored. */
   readonly grantedByName: string | null;
@@ -597,6 +601,7 @@ export async function settlementGrantsOf(db: Db, orgId: string): Promise<Settlem
       personId: grants.personId,
       name: people.name,
       phone: people.phone,
+      email: people.email,
       capabilitySet: grants.capabilitySet,
       grantedBy: grants.grantedBy,
       grantedAt: grants.createdAt,
@@ -628,11 +633,12 @@ export async function settlementGrantsOf(db: Db, orgId: string): Promise<Settlem
       personId: row.personId,
       name: row.name,
       phone: row.phone,
+      email: row.email,
       capabilitySet: row.capabilitySet,
       grantedByName: granterNames.get(row.grantedBy) ?? null,
       grantedAt: iso(row.grantedAt),
     }))
-    .sort((a, b) => (a.name ?? a.phone).localeCompare(b.name ?? b.phone));
+    .sort((a, b) => personLabel(a).localeCompare(personLabel(b)));
 }
 
 /** Re-exported so screens never reach past this module into the domain. */

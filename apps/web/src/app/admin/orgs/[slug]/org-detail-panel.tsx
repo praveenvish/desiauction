@@ -2,7 +2,7 @@ import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
-import { formatCount, lifecycleLabel, maskPhone } from "../../../../server/admin/format";
+import { formatCount, lifecycleLabel, maskPersonContact } from "../../../../server/admin/format";
 import type { OrgDetail } from "../../../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, absoluteIst, statusTone } from "../../admin-ui";
 
@@ -191,11 +191,11 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                 <li key={member.personId}>
                   <span>
                     <Link href={`/admin/users/${member.personId}`} className="registration-name">
-                      {member.name ?? maskPhone(member.phone)}
+                      {member.name ?? maskPersonContact(member)}
                     </Link>
                     {/* A membership list is a directory; the whole number lives on the
                         one person's page. */}
-                    <span className="admin-meta">{maskPhone(member.phone)}</span>
+                    <span className="admin-meta">{maskPersonContact(member)}</span>
                   </span>
                   <RelativeTime at={member.joinedAt} />
                 </li>

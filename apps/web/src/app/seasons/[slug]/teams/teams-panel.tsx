@@ -632,7 +632,7 @@ function RosterDetail({
                           <span className="roster-avatar" aria-hidden>
                             {/* DA-23: the roster took the first TWO LETTERS of the first word,
                                 so Arjun Sharma read "AR" here and "AS" on Registrations. */}
-                            {initialsFor(row.name ?? row.phone).initials ?? "?"}
+                            {initialsFor(row.name ?? row.phone ?? "?").initials ?? "?"}
                           </span>
                           <span className="roster-person">
                             <span className="roster-name">
@@ -640,7 +640,11 @@ function RosterDetail({
                               {row.isCaptain ? <Badge tone="info">Captain</Badge> : null}
                               {row.isIcon ? <Badge tone="success">Icon</Badge> : null}
                             </span>
-                            <span className="roster-phone">{row.phone}</span>
+                            {/* A player always has one — `submitRegistration` refuses an
+                                account with no number, because SMS is the only way a
+                                season reaches them. The fallback is for the rows that
+                                predate that rule, not a state the product creates. */}
+                            <span className="roster-phone">{row.phone ?? "—"}</span>
                           </span>
                         </span>
                       </td>

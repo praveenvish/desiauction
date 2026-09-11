@@ -2,7 +2,6 @@ import { ButtonLink, Card } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { formatDate } from "../../../lib/format-date";
-import { formatPhone } from "../../../lib/format-phone";
 import { roleHelp, roleLabel } from "../../../lib/invite-roles";
 import { currentSession, logoutToAction } from "../../../server/auth/actions";
 import { acceptInviteAction, inviteLandingView } from "../../../server/orgs/actions";
@@ -30,7 +29,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
     // Anonymous stays a real redirect — the login flow carries `next` back here.
     redirect(`/login?next=/join/${token}`);
   }
-  const { landing, viewerPhone } = await inviteLandingView(token);
+  const { landing, viewerLabel } = await inviteLandingView(token);
 
   // "Not you?" — an invite link is a bearer token, and the handset that opens
   // it is often signed in as somebody else. Returns to THIS link afterwards.
@@ -82,7 +81,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
         )}
 
         <form action={switchAccount} className="join-identity">
-          <span>Signed in as {formatPhone(viewerPhone)}. Not you?</span>{" "}
+          <span>Signed in as {viewerLabel}. Not you?</span>{" "}
           <button type="submit" className="join-linkbutton" data-testid="join-switch-account">
             Sign out
           </button>

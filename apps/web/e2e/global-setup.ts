@@ -2,6 +2,9 @@ import { spawn } from "node:child_process";
 import { openSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { createDb, finopsJobs } from "@desiauction/db";
+import { and, eq, lt } from "drizzle-orm";
+
 // Warm the dev server's on-demand compiler before parallel workers start —
 // first-hit route compiles otherwise inject 10s+ of jitter into early tests.
 // Production servers (CI option) are pre-compiled; warming is then a no-op.
@@ -172,11 +175,87 @@ function startFinopsRunner(): void {
   }
 }
 
+/**
+ * The runner's own budget for picking work up — the same fifteen minutes the
+ * money board calls a stalled queue. A job that has been queued longer than
+ * this on a developer's machine is not work in progress; it is litter.
+ */
+const STALE_AFTER_MS = 15 * 60_000;
+
+/**
+ * CLEAR THE DEAD QUEUE, OR THE MONEY BOARD IS DEGRADED BEFORE THE SUITE STARTS.
+ *
+ * `financial-operations.spec.ts` asserts that the Financial Operations health
+ * board reads "healthy", and one of its lamps goes amber when this org's oldest
+ * queued job has been waiting past the runner's budget. That assertion is
+ * correct and the board was telling the truth — the queue really was stalled —
+ * but the reason had nothing to do with the product.
+ *
+ * A local database accumulates an organization per e2e run and never deletes
+ * one: 2,098 of them by the time this was written. Each gets its daily
+ * `export.daily` and `ops.attest-day` job enqueued, so a single day's scheduling
+ * lands ~2,500 jobs sharing one `not_before_ms`. The runner claims ten per tick
+ * and takes several seconds a tick, so draining that is twenty minutes of work
+ * that nothing ever asks for — and the demo org's own two jobs sat 97th and
+ * 2,062nd in claim order. The spec polls for forty seconds. It could not pass,
+ * and it had not been passing.
+ *
+ * So the litter goes before the runner starts. Deliberately NOT a wipe of
+ * `finops_jobs`:
+ *
+ *   QUEUED ONLY — a `done` row is the record that the work happened, and the
+ *   follower and the audit surfaces read it.
+ *
+ *   OLDER THAN THE RUNNER'S OWN BUDGET — anything newer might belong to a suite
+ *   running in another worktree against this same database, which is a thing
+ *   that happens here. Fifteen minutes is long past the point where a live test
+ *   is still waiting on a job.
+ *
+ * Jobs re-scheduled DURING the run are left alone and are fresh, so they do not
+ * trip the stalled check either. The board then reads healthy because the queue
+ * genuinely is.
+ */
+async function purgeStaleJobs(): Promise<void> {
+  const url =
+    process.env["DATABASE_URL"] ?? "postgres://desiauction:desiauction@localhost:5433/desiauction";
+  /*
+   * A DEVELOPER'S MACHINE, AND NOTHING ELSE. Deleting queued work is the right
+   * call for litter and the wrong call for a real backlog, so the one case this
+   * cannot be allowed to meet is a database that is not local. Skipped loudly
+   * rather than silently: a harness step that quietly does nothing is how the
+   * missing runner hid for so long.
+   */
+  if (!/@(localhost|127\.0\.0\.1)[:/]/.test(url)) {
+    console.warn("[e2e] not a local database — leaving finops_jobs alone");
+    return;
+  }
+  const handle = createDb(url);
+  try {
+    const purged = await handle.db
+      .delete(finopsJobs)
+      .where(
+        and(
+          eq(finopsJobs.state, "queued"),
+          lt(finopsJobs.createdAt, new Date(Date.now() - STALE_AFTER_MS)),
+        ),
+      )
+      .returning({ id: finopsJobs.id });
+    if (purged.length > 0) {
+      console.log(`[e2e] cleared ${String(purged.length)} stale queued finops jobs`);
+    }
+  } finally {
+    await handle.sql.end({ timeout: 5 });
+  }
+}
+
 /** Where the teardown looks for the runner it has to stop. */
 export const RUNNER_PID_FILE = fileURLToPath(new URL("./.finops-runner.pid", import.meta.url));
 
 export default async function globalSetup(): Promise<void> {
   const base = "http://localhost:3050";
+  // Before the runner, not after: it claims in `not_before_ms` order, so a
+  // runner started first spends its opening ticks on the litter this removes.
+  await purgeStaleJobs();
   startFinopsRunner();
   await warmRoutes(base);
   await warmSignIn(base);

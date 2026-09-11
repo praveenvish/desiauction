@@ -15,8 +15,15 @@ export interface PhotoTarget {
   /** Human-quotable reference, e.g. "R7K2M9". */
   number: string;
   name: string | null;
-  /** E.164; matching keys off the last 10 digits (the mobile itself). */
-  phone: string;
+  /**
+   * E.164; matching keys off the last 10 digits (the mobile itself).
+   *
+   * NULLABLE SINCE 0062 — an account can be anchored by an email instead. Such
+   * a target simply drops out of the phone rule (`push` already ignores an
+   * empty key), which is the correct behaviour and not a degradation: a file
+   * named after a number cannot be about somebody who has none.
+   */
+  phone: string | null;
   /** Already has a consented photo — matched, but flagged as a replacement. */
   hasPhoto: boolean;
 }
@@ -153,7 +160,7 @@ export function matchPhotoFiles(
   };
   for (const target of targets) {
     push(byNumber, target.number.toLowerCase(), target);
-    push(byPhone, phoneKey(target.phone), target);
+    push(byPhone, phoneKey(target.phone ?? ""), target);
     push(byName, nameToken(target.name ?? ""), target);
   }
 

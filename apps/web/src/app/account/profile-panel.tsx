@@ -5,14 +5,15 @@ import { Badge, Button, Card, Field, PlayerImage, useToast } from "@desiauction/
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, type ReactNode } from "react";
 
-import { formatPhone } from "../../lib/format-phone";
+import { personContact } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
 import { updateProfileAction } from "../../server/auth/actions";
 import { PhoneChange } from "./phone-change";
 
 export interface ProfilePanelProps {
   personId: string;
-  phone: string;
+  phone: string | null;
+  email: string | null;
   name: string | null;
   /** PI-1: computed server-side by core's profileCompleteness — never stored. */
   completeness: ProfileCompleteness;
@@ -44,7 +45,14 @@ const ITEM_LABELS: Record<ProfileItem, { label: string; hint?: string }> = {
  * This is now the ONE identity card on the page: the headless <dl> that used to
  * sit above it repeated the same phone and name with no heading of its own.
  */
-export function ProfilePanel({ personId, phone, name, completeness, signOut }: ProfilePanelProps) {
+export function ProfilePanel({
+  personId,
+  phone,
+  email,
+  name,
+  completeness,
+  signOut,
+}: ProfilePanelProps) {
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState(updateProfileAction, {});
@@ -83,7 +91,10 @@ export function ProfilePanel({ personId, phone, name, completeness, signOut }: P
               click away — and nine other surfaces — grouped it. `formatPhone`'s
               own doc comment names this screen.
             */}
-            <span data-testid="account-phone">{formatPhone(phone)}</span>{" "}
+            {/* Since 0062 an account may be anchored by an email instead, in
+                which case there is no number to be asked about — the address
+                that signs them in takes the line. */}
+            <span data-testid="account-phone">{personContact({ phone, email })}</span>{" "}
             <Badge tone="success">Verified</Badge>
           </p>
         </div>
