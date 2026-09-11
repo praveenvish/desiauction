@@ -16,14 +16,52 @@ import { env } from "../../env";
  * file exists on a disk nobody reads", and a verification code that vanishes
  * would leave a person staring at a form that can never be completed.
  */
+/**
+ * WHAT THE CODE IS FOR, because the message has to say so honestly.
+ *
+ * Sign-in reused the confirmation mail at first, so a person asking to log in
+ * got "Confirm your email for DesiAuction". That is not a cosmetic mismatch:
+ * account mail whose subject does not match what you just did is how people
+ * learn to ignore account mail, and it hands anyone who can trigger a login
+ * code a ready-made cover story.
+ */
+export type CodeMailPurpose = "email_change" | "login";
+
 export interface CodeMailer {
-  send(email: string, code: string): Promise<void>;
+  send(email: string, code: string, purpose: CodeMailPurpose): Promise<void>;
+}
+
+/** Subject and body per purpose — the only thing that differs between them. */
+export function codeMailCopy(
+  code: string,
+  purpose: CodeMailPurpose,
+): { subject: string; text: string } {
+  if (purpose === "login") {
+    return {
+      subject: "Your DesiAuction sign-in code",
+      // Names the action, and tells somebody who did NOT do it what it means:
+      // not "ignore this" — that is advice for spam — but that their address is
+      // known to someone. Their account is not at risk without this code.
+      text: `Your DesiAuction sign-in code is ${code}. It expires in 15 minutes.\n\nIf you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.`,
+    };
+  }
+  return {
+    subject: "Confirm your email for DesiAuction",
+    text: `Your DesiAuction confirmation code is ${code}. It expires in 15 minutes. If you did not ask for this, ignore this message.`,
+  };
 }
 
 export class DevInboxMailer implements CodeMailer {
   constructor(private readonly db: Db) {}
 
-  async send(email: string, code: string): Promise<void> {
+  /*
+   * The port's third argument decides the WORDING of a message. The dev inbox
+   * stores a code against a contact and sends nothing, so there is no wording
+   * to pick — but the signature has to match the port, or the two
+   * implementations stop being interchangeable.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async send(email: string, code: string, _purpose: CodeMailPurpose): Promise<void> {
     // `phone` is the inbox's contact column. It holds an address here, which is
     // honest for a development surface whose question is "what did this contact
     // receive" — and is exactly why the production verification codes live in
@@ -64,8 +102,9 @@ export class HttpMailer implements CodeMailer {
     },
   ) {}
 
-  async send(email: string, code: string): Promise<void> {
+  async send(email: string, code: string, purpose: CodeMailPurpose): Promise<void> {
     const transport = this.config.transport ?? defaultTransport;
+    const copy = codeMailCopy(code, purpose);
     let response: MailerHttpResponse;
     try {
       response = await transport(this.config.endpoint, {
@@ -77,11 +116,12 @@ export class HttpMailer implements CodeMailer {
         body: JSON.stringify({
           from: this.config.from,
           to: [email],
-          subject: "Confirm your email for DesiAuction",
-          // No link. A code the person types back proves the same thing a
-          // click does, cannot be followed out of a forwarded message, and
-          // does not train people to click links in mail about their account.
-          text: `Your DesiAuction confirmation code is ${code}. It expires in 15 minutes. If you did not ask for this, ignore this message.`,
+          subject: copy.subject,
+          // No link, either purpose. A code the person types back proves the
+          // same thing a click does, cannot be followed out of a forwarded
+          // message, and does not train people to click links in mail about
+          // their account.
+          text: copy.text,
         }),
       });
     } catch {

@@ -353,7 +353,7 @@ export async function requestEmailLoginAction(
    */
   if (result.code !== undefined) {
     try {
-      await createCodeMailer(db).send(result.email, result.code);
+      await createCodeMailer(db).send(result.email, result.code, "login");
     } catch (error) {
       if (error instanceof MailSendError) {
         return { ...base, error: "We couldn't send that email right now. Try again shortly." };
@@ -965,7 +965,7 @@ export async function requestEmailVerificationAction(
     return { step: previous.step, error: message[result.reason] };
   }
   try {
-    await createCodeMailer(db).send(result.email, result.code);
+    await createCodeMailer(db).send(result.email, result.code, "email_change");
   } catch (error) {
     if (error instanceof MailSendError) {
       // The code is already minted and will simply go unused. Saying so beats a
