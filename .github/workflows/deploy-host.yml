@@ -76,8 +76,24 @@ jobs:
               --tag "${REG}/${app}:${TAG}" \
               --push .
           done
+
+          # THE DATABASE IMAGE IS TAGGED BY ITS OWN CONTENT, not by the commit.
+          # Postgres carries pgbackrest because `archive_command` runs inside
+          # that container, so it has to be built — but it must NOT be rebuilt
+          # and swapped on every application deploy. `docker compose up -d` only
+          # recreates a container whose image changed, so a tag derived from the
+          # Dockerfile means the database is left alone until the Dockerfile
+          # itself changes. Restarting Postgres on every deploy is a small
+          # outage nobody asked for.
+          DB_TAG="$(cat ops/deploy/db/Dockerfile ops/deploy/db/initdb/* | shasum -a 256 | cut -c1-12)"
+          docker buildx build \
+            --file ops/deploy/db/Dockerfile \
+            --tag "${REG}/db:${DB_TAG}" \
+            --push ops/deploy/db
+
           echo "REGISTRY=${REG}" >> "$GITHUB_ENV"
           echo "TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "DB_TAG=${DB_TAG}" >> "$GITHUB_ENV"
 
       # --- Migrate, then swap -------------------------------------------------
       #
@@ -106,6 +122,13 @@ jobs:
             set -euo pipefail
             cd /opt/desiauction
             sed -i "s|^TAG=.*|TAG=${{ env.TAG }}|" .env
+            # DB_TAG changes only when the database Dockerfile does, so this is
+            # normally a no-op and `docker compose up -d` leaves Postgres alone.
+            if grep -q '^DB_TAG=' .env; then
+              sed -i "s|^DB_TAG=.*|DB_TAG=${{ env.DB_TAG }}|" .env
+            else
+              echo "DB_TAG=${{ env.DB_TAG }}" >> .env
+            fi
             docker compose pull
             # Engine first, then the rest: the engine hands its single-writer
             # lease back on graceful SIGTERM and the replacement claims it at

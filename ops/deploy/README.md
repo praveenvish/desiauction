@@ -31,7 +31,7 @@ Copy from the production template and split by service:
 - `db.env` — `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - `minio.env` — `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` (read by both `minio`
   and `minio-init`)
-- `pgbackrest.env` — credentials for the WAL archive **destination off this box**
+- `pgbackrest.env` — the WAL archive repo, read by BOTH `db` and `pgbackrest`
 - `.env` — `REGISTRY`, `TAG`, `PUBLIC_DOMAIN`, `ENGINE_DOMAIN`, `S3_DOMAIN`
 
 ### Object storage lives on this box
@@ -79,27 +79,88 @@ recoverable-ish; a finops artifact is a financial record.
 Each app refuses to boot on bad env, so a missing value fails fast and loudly
 rather than at a user's login.
 
-## PITR is the only rollback, so prove it works
+## PITR is the only rollback, and it is wired to the box
 
 Migrations are forward-only. There are no down migrations and there never have
 been, so the restore point is the only thing that can undo one. Migration 0058
 already dropped `NOT NULL` on both `fixtures` side columns — once one lobby
 exists, no image rollback recovers that.
 
-pgBackRest archives WAL **off the box**. A backup on the same disk is not a
-backup — and that is the one requirement a single-host topology cannot satisfy
-by itself, so the archive destination is a decision that has to be made rather
-than inherited. MinIO on this box does NOT qualify: it is the same disk.
+Two things had to be fixed before any of this was true, and both were silent:
 
-**You do not have PITR until a restore has been rehearsed.** The repo ships the
-drill:
+**`archive_command` runs inside the DATABASE container**, and `postgres:17-alpine`
+has no pgbackrest. Every segment failed with exit code 127. Postgres does not
+recycle a WAL segment until it is archived, so the symptom was never "backups
+are missing" — it was a disk filling until the database stopped accepting
+writes. Measured on the real image: 13 segments stuck `.ready`, 224MB of WAL
+against a 64MB target, still climbing. The database image is now built from
+`ops/deploy/db/Dockerfile` and carries pgbackrest.
+
+**Archive settings cannot be passed on the postgres command line.** The
+entrypoint starts a temporary server with those same flags to run initdb, and
+with `archive_mode=on` and no stanza yet its shutdown waits forever for WAL it
+cannot archive: "server does not shut down", and a first boot never completes.
+They live in `postgresql.conf.d/10-archive.conf`, made live by an initdb script
+that runs after initdb and before the real server.
+
+### The repo is the MinIO on this box
+
+A single-host deployment has nowhere else free to put it. Be exact about what
+that buys:
+
+- It DOES protect a bad migration, a dropped table, a bug that writes nonsense —
+  the failure you are most likely to actually have.
+- It does NOT protect the loss of the machine. The backups are on the disk they
+  are backing up.
+
+Moving `repo1` off the box later is a credentials change in `pgbackrest.env` and
+nothing else. Until then, the honest description of this deployment is "one
+machine, recoverable from its own mistakes, not from its own death".
+
+pgBackRest needs TLS for an S3 repo — `repo1-storage-verify-tls=n` only skips
+verification, it still speaks TLS, and MinIO here serves plain HTTP. So the repo
+points at `S3_DOMAIN` through Caddy, which already holds a real certificate:
+verification stays ON and there is no second certificate to manage.
 
 ```sh
-pnpm restore:drill
+PGBACKREST_STANZA=desiauction
+PGBACKREST_PG1_PATH=/var/lib/postgresql/data
+PGBACKREST_PG1_SOCKET_PATH=/var/run/postgresql
+PGBACKREST_REPO1_TYPE=s3
+PGBACKREST_REPO1_PATH=/pgbackrest
+PGBACKREST_REPO1_S3_BUCKET=desiauction-backup
+PGBACKREST_REPO1_S3_ENDPOINT=s3.example.in
+PGBACKREST_REPO1_S3_KEY=...
+PGBACKREST_REPO1_S3_KEY_SECRET=...
+PGBACKREST_REPO1_S3_REGION=us-east-1
+PGBACKREST_REPO1_S3_URI_STYLE=path
+PGBACKREST_REPO1_RETENTION_FULL=2
 ```
 
-Run it against the production stanza before the first real auction, and record
-the RTO. Until it passes you have a hope, not a backup.
+`PG1_SOCKET_PATH` is not decoration. pgBackRest is a local tool: it reads PGDATA
+directly and talks to the cluster over libpq, so the sidecar needs the socket as
+well as the files. Without it, `stanza-create` fails with "unable to find
+primary cluster" and the sidecar loops on an error that looks like a repo
+problem and is not.
+
+The sidecar runs `stanza-create` on every boot (idempotent), then `check`, then
+a weekly full and a daily differential. Creating the stanza automatically is
+deliberate: the step most likely to be skipped is the one that makes the rest
+real.
+
+### What was verified, and how
+
+Against the real compose data plane, from an empty volume:
+
+- first boot reaches healthy, `archive_mode` reads `on` from conf.d
+- `pg_stat_archiver` reports archived 5, failed 0
+- the sidecar creates the stanza, passes `check`, and takes a full backup
+- with a row written AFTER that backup, the entire PGDATA was deleted and
+  `pgbackrest restore` brought the cluster back **with that row** — it existed
+  only in WAL, so this is point-in-time recovery and not a file copy
+
+Re-run it on the production stanza before the first real auction and record the
+RTO. `pnpm restore:drill` exercises the separate `pg_dump` path, not this one.
 
 ## The engine is exactly one process
 
