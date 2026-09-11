@@ -38,11 +38,27 @@ above them exist; ☑ are done and verified in-repo.
 
 ## 2 · Infrastructure (PRP-1 §2) — all ☐F then ☐E
 
-- ☐F ONE Hetzner Cloud server, 4 vCPU / **8GB** — everything runs on it: web,
-  engine, runner, Postgres, MinIO, Caddy. 4GB will OOM under an auction.
-- ☐F Hetzner's backup add-on ON (~20% of the server). The pgBackRest repo is on
-  the same disk it backs up, so it recovers a bad migration and NOT a dead
-  machine. This is the only thing that covers the disk.
+- ☐F **Contabo Cloud VPS 10, Navi Mumbai** — 4 vCPU / 8GB / 100GB NVMe,
+  ~EUR 7.90/mo. Everything runs on it: web, engine, runner, Postgres, MinIO,
+  Caddy and the log stack. 4GB would OOM under an auction; 2 vCPU is where the
+  engine's timers and WebSocket fan-out start competing with Postgres.
+
+  IN INDIA, and that is the reason rather than the price. The product's
+  defining moment is forty people in a hall watching a countdown: ~20ms from
+  Mumbai against ~140ms from Europe. Latency is what a club judges in the
+  first ten minutes of a demo. There is also a live question — confirm it with
+  counsel — about whether RBI's payment-data circular obliges Indian storage
+  once Razorpay is handling collections.
+
+  NOTHING HERE IS PROVIDER-SPECIFIC. The stack is one compose file; moving is
+  three DNS records and an env file. Contabo bills monthly with no commitment,
+  so a month of real use is the cheapest way to test its one known weakness —
+  CPU oversubscription, which shows up as jitter and is the wrong failure mode
+  for a gavel. Watch steal during a rehearsal auction before trusting it.
+- ☐F **Contabo Auto Backup ON** (~EUR 1.15/mo): daily, stored OFF the server,
+  10 days retained. The pgBackRest repo lives on the same disk it backs up, so
+  it recovers a bad migration and NOT a dead machine — this add-on is the only
+  thing that covers the disk, and it is the cheapest line item on this page.
 - ☐F Domain + three DNS records at the host: `PUBLIC_DOMAIN`, `ENGINE_DOMAIN`,
   `S3_DOMAIN` (`RP_ID`/`RP_ORIGINS` must match the public domain — passkeys
   break otherwise)
