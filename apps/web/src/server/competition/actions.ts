@@ -799,7 +799,6 @@ async function notifyAffected(
     const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
       notifyDecision(db, {
         orgId: gate.competition.orgId,
-        competitionSlug: gate.competition.slug,
         competitionName: gate.competition.name,
         registrationIds,
         event: event.type,

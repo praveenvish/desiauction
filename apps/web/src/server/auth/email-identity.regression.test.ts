@@ -371,12 +371,6 @@ describe("THE NOTICE — a null phone is SUPPRESSED, never counted as failed", (
       db,
       {
         orgId: org.id,
-        // Deliberately SHORT. The approval template caps the link slot at 60
-        // characters, and this file's fixture slug plus the local base URL is
-        // 70 — `messageFor` would refuse to render, `notifyDecision` would
-        // return before reaching the branch under test, and the zeros would
-        // look exactly like the bug this test is here to catch.
-        competitionSlug: "cup",
         competitionName: "Cup",
         registrationIds: [registrationId],
         event: "approve",
