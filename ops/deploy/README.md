@@ -190,6 +190,64 @@ Against the real compose data plane, from an empty volume:
 Re-run it on the production stanza before the first real auction and record the
 RTO. `pnpm restore:drill` exercises the separate `pg_dump` path, not this one.
 
+## Reading the logs
+
+`docker compose logs` answers "what did this one container say", which is the
+wrong question during an incident. An auction breaking at 9pm is web, engine and
+runner interleaved, and matching three scrollbacks by eye is how a ten-minute
+diagnosis becomes an hour. Everything already emits structured pino JSON;
+nothing was collecting it.
+
+**Every container's logs are capped.** Docker's default `json-file` driver has
+NO size limit, so container logs grow until the disk is gone — the same ending
+as the WAL bug, by a slower road and with no warning either. `x-logs` at the top
+of the compose file sets three files of 20MB per service, so the whole stack is
+bounded at roughly 500MB. That part is not optional and is not about
+convenience.
+
+**Loki holds thirty days**, single binary, local filesystem — no object store,
+no clustering, no second database to keep alive during the incident it exists to
+explain. Retention is enforced by the compactor; without `retention_enabled` the
+`retention_period` is decorative and the disk ends where it would have anyway.
+
+**Grafana is NOT exposed to the internet.** It binds to the host's loopback:
+
+```sh
+ssh -L 3001:localhost:3001 <user>@<host>
+# then open http://localhost:3001
+```
+
+A public Grafana is another login to secure, another thing to patch, and another
+way into a box that serves money. For one operator an SSH tunnel is both safer
+and less work. The Loki datasource is provisioned from a file rather than
+clicked, because a datasource configured by hand lives in `grafana_data` and
+disappears the moment that volume is recreated — exactly when somebody is trying
+to read logs in a hurry.
+
+The query that earns the whole thing:
+
+```logql
+{job="docker", level="error"}          # every error, every service, one timeline
+{job="docker", service=~"web|engine"}  # an auction, both sides, interleaved
+```
+
+`level` is pino's number named — 50 error, 40 warn, 30 info, 20 debug. Anything
+that is not pino JSON (Caddy, Postgres, MinIO log plain text) is `unknown`
+rather than a literal `<no value>`, which is what the first version produced.
+
+Three things worth knowing before you rely on it:
+
+- **Alloy reads the Docker socket**, which is how a container id becomes
+  `engine`. `:ro` limits the file node, NOT the API — anything that can talk to
+  that socket can control Docker. It is pinned by digest, reachable from nothing
+  outside, and should be the first thing reconsidered if this box is ever shared
+  with something less trusted.
+- **It collects EVERY container on the host**, not just this stack. Correct for
+  a dedicated box; surprising if you put a second project beside it.
+- **These logs are on the box.** Like the backups, they are least available
+  exactly when the machine is gone. Shipping them off-box is a Loki endpoint
+  change, not a redesign.
+
 ## The engine is exactly one process
 
 It claims a Postgres advisory lock at boot and a second instance refuses to

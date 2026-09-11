@@ -1,0 +1,72 @@
+// Container logs -> Loki, labelled by the name a person would say out loud.
+//
+// The Docker socket is what turns a 64-character container id into "engine".
+// Without discovery the timeline is technically complete and practically
+// unreadable, which is the same as not having it during the ten minutes it
+// matters.
+
+// EVERY container on the host, not just this stack — which is right for a box
+// dedicated to this deployment, and worth knowing before you put anything else
+// on it. Verified in the probe: a second project's containers appeared in the
+// `service` dropdown immediately.
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  // Compose writes the service name here. `container_name` would carry the
+  // project prefix and change if the directory is ever renamed.
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  // Kept so a crash loop is visible as the SAME service restarting rather than
+  // as a new one appearing.
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  labels     = { job = "docker" }
+  forward_to = [loki.process.pino.receiver]
+}
+
+// Pino writes one JSON object per line with `level` as a NUMBER (30 info, 40
+// warn, 50 error). Lifting it to a label is what makes "show me only errors,
+// everywhere, around 21:04" a question you can ask.
+loki.process "pino" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.json {
+    expressions = { level = "level", msg = "msg" }
+  }
+
+  // Pino's numbers, named. The final branch is `unknown` and not `{{ .level }}`
+  // on purpose: Caddy, Postgres and MinIO log plain text, `stage.json` extracts
+  // nothing from those lines, and echoing the missing field back produced a
+  // literal `<no value>` label — observed in the probe, sitting in the level
+  // dropdown next to the real ones.
+  stage.template {
+    source   = "level_name"
+    template = "{{ if eq .level \"50\" }}error{{ else if eq .level \"40\" }}warn{{ else if eq .level \"30\" }}info{{ else if eq .level \"60\" }}fatal{{ else if eq .level \"20\" }}debug{{ else }}unknown{{ end }}"
+  }
+
+  stage.labels {
+    values = { level = "level_name" }
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

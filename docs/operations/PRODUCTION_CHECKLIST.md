@@ -125,10 +125,11 @@ above them exist; ☑ are done and verified in-repo.
 ## 4 · Observability (PRP-1 §4)
 
 - ☑ Sentry wired (web + engine) — ☐F production DSNs
-- ☑ Structured pino logs everywhere — ☐E somewhere to READ them. A single
-  self-hosted host has no log aggregation by default, which a managed platform
-  would have given you for free. `docker compose logs` is the whole story until
-  something is wired.
+- ☑ Structured pino logs everywhere, collected into Loki and read through
+  Grafana over an SSH tunnel (`ops/deploy/observability/`). Container logs are
+  size-capped, so they can no longer fill the disk; Loki holds 30 days.
+  ☐E ship them off-box — on-box logs are least available exactly when the
+  machine is gone, which is the same limitation the backups carry.
 - ☐E Dashboards + alerts on: engine `/healthz`, bid-ack p95, WS fan-out,
   runner tick age, finops supervisor status, settlement meters, DB
   connections/replication, backup success (docs/56 SLOs). Alert on SILENCE

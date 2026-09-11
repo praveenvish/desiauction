@@ -8,9 +8,25 @@
 # Everything is pinned. `postgres:17-alpine` and not `:latest`, because a
 # database that silently majors on a `docker compose pull` is a data-loss
 # event, not an upgrade.
+# EVERY CONTAINER'S LOGS ARE CAPPED. Docker's default `json-file` driver has NO
+# size limit, so container logs grow until the disk is gone — the same ending as
+# the WAL bug, by a slower road, and with no warning either. Three files of 20MB
+# per service is roughly a week of an auction season's chatter and at most
+# ~500MB across the stack.
+#
+# `<<: *logs` on each service below. Changing the policy is one edit here, not
+# eight, which is the only reason it will still be right in a year.
+x-logs: &logs
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "3"
+
 services:
   caddy:
     image: caddy:2-alpine
+    <<: *logs
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     volumes:
@@ -21,6 +37,7 @@ services:
 
   web:
     image: ${REGISTRY}/web:${TAG}
+    <<: *logs
     restart: unless-stopped
     env_file: [./web.env]
     depends_on:
@@ -41,6 +58,7 @@ services:
 
   engine:
     image: ${REGISTRY}/engine:${TAG}
+    <<: *logs
     restart: unless-stopped
     env_file: [./engine.env]
     depends_on:
@@ -65,6 +83,7 @@ services:
 
   runner:
     image: ${REGISTRY}/finops-runner:${TAG}
+    <<: *logs
     restart: unless-stopped
     env_file: [./runner.env]
     depends_on:
@@ -89,6 +108,7 @@ services:
   # there is no stable tag to take instead.
   minio:
     image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    <<: *logs
     restart: unless-stopped
     # NO PUBLISHED PORTS. Caddy is the only way in, so the console and the
     # admin API are not exposed to the internet by an open firewall rule.
@@ -108,6 +128,7 @@ services:
   # and every step is idempotent.
   minio-init:
     image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    <<: *logs
     env_file: [./minio.env]
     depends_on:
       minio: { condition: service_healthy }
@@ -160,6 +181,7 @@ services:
     # segment until it is archived — so the symptom is not "no backups", it is a
     # disk that fills until the database stops accepting writes.
     image: ${REGISTRY}/db:${DB_TAG}
+    <<: *logs
     restart: unless-stopped
     # pgbackrest.env is read by the database too, not just the sidecar, because
     # the archive command is a pgbackrest client and needs the same repo.
@@ -193,6 +215,7 @@ services:
   # words; moving repo1 off the box is a credentials change and nothing more.
   pgbackrest:
     image: ${REGISTRY}/db:${DB_TAG}
+    <<: *logs
     restart: unless-stopped
     env_file: [./pgbackrest.env]
     volumes:
@@ -218,8 +241,73 @@ services:
           sleep 86400
         done
 
+  # ONE TIMELINE ACROSS EVERY SERVICE.
+  #
+  # `docker compose logs` was the whole story, and it answers "what did this one
+  # container say" — which is the wrong question during an incident. An auction
+  # breaking at 9pm is web, engine and runner interleaved, and reading three
+  # scrollbacks by eye and matching timestamps is how a ten-minute diagnosis
+  # becomes an hour. Everything already emits structured pino JSON; nothing was
+  # collecting it.
+  #
+  # Loki in single-binary filesystem mode: no object store, no clustering, no
+  # second database to operate. It is the smallest thing that can answer "show
+  # me every service around 21:04".
+  loki:
+    image: grafana/loki@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
+    <<: *logs
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    user: "0:0" # owns its volume; the image's default uid cannot create the dirs
+    volumes:
+      - ./observability/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+
+  # Reads container logs and ships them to Loki with the service name attached.
+  #
+  # THE DOCKER SOCKET IS MOUNTED, AND THAT IS A REAL TRUST DECISION rather than
+  # a detail. It is how Alloy learns which container is `web` and which is
+  # `engine` — without it the labels are 64-character ids and the timeline is
+  # unreadable. `:ro` limits the file node, NOT the API: anything that can talk
+  # to this socket can control Docker. Alloy is therefore pinned by digest like
+  # everything else here, reachable from nothing outside, and should be the
+  # first thing removed if the box is ever shared with something less trusted.
+  alloy:
+    image: grafana/alloy@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
+    <<: *logs
+    restart: unless-stopped
+    command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on: [loki]
+
+  # NOT EXPOSED TO THE INTERNET, deliberately. Bound to the host's loopback, so
+  # it is reached with `ssh -L 3001:localhost:3001 <host>` and read at
+  # http://localhost:3001. A public Grafana is another login to secure, another
+  # thing to patch on a schedule, and another way into a box that serves money —
+  # for a single operator an SSH tunnel is both safer and less work.
+  grafana:
+    image: grafana/grafana@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    <<: *logs
+    restart: unless-stopped
+    ports: ["127.0.0.1:3001:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_SECURITY_ALLOW_EMBEDDING: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./observability/grafana-datasource.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - grafana_data:/var/lib/grafana
+    depends_on: [loki]
+
 volumes:
   pgdata:
+  loki_data:
+  grafana_data:
   pgsocket:
   minio_data:
   caddy_data:
