@@ -90,9 +90,32 @@ const SLOT = /\{([a-z0-9_]+)\}/g;
  * The five decision notices, all transactional: each is the direct consequence
  * of an action the recipient took. None may be sent for marketing.
  *
- * Slot budgets are deliberately tight. An SMS is 160 GSM-7 characters before it
- * splits and starts costing more, and a split transactional message is also
- * more likely to be scrubbed.
+ * WHAT THE SLOT BUDGETS ACTUALLY BUY, measured rather than asserted.
+ *
+ * An SMS is 160 GSM-7 characters before it splits into 153-character parts,
+ * each billed, and a split transactional message is also more likely to be
+ * scrubbed. This comment used to say the budgets were "deliberately tight" and
+ * the numbers did not support it: `link` was capped at 60 when the longest link
+ * this product can build is 27, and at their declared maxima FIVE of six
+ * templates ran past 160 — `registration.rejected` reached 246.
+ *
+ * The caps now describe what can actually arrive:
+ *
+ *   competition — `NAME_MAX_LENGTH`, the longest season name `validateName`
+ *                 accepts. Tied to it by test.
+ *   link        — `${PUBLIC_BASE_URL}/home`, which carries no variable part
+ *                 since the season came out of it. 40 covers a base URL of 35
+ *                 characters; production uses 27.
+ *   reason      — the longest sentence in `REASON_TO_PLAYER`. Tied by test.
+ *
+ * And the residue is a decision rather than an accident. With a season named
+ * the way seasons are actually named, every template is ONE segment. With the
+ * longest name the product accepts, four become two. Cutting that would mean
+ * cutting the sentences that say what a status MEANS — a player told only
+ * "you are on the waitlist", without "the organizer moves waitlisted players up
+ * if a place opens", reasonably reads it as a rejection. A second segment on a
+ * minority of seasons is the cheaper mistake. `templates.test.ts` holds every
+ * one of these numbers so the next edit has to justify itself.
  */
 export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
   "registration.approved": {
@@ -101,10 +124,10 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: You are approved for {competition}. You are in the player pool for auction day. Details: {link}",
+    body: "DesiAuction: You are approved for {competition}. You are in the player pool for auction day. {link}",
     slots: [
       { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 60 },
+      { name: "link", maxLength: 40 },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_APPROVED",
   },
@@ -114,10 +137,10 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: You are on the waitlist for {competition}. The organizer moves waitlisted players up if a place opens. Details: {link}",
+    body: "DesiAuction: You are on the waitlist for {competition}. The organizer moves waitlisted players up if a place opens. {link}",
     slots: [
       { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 60 },
+      { name: "link", maxLength: 40 },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_WAITLISTED",
   },
@@ -129,11 +152,11 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
     category: "transactional",
     // The reason is a slot, not five separate templates: DLT matches the fixed
     // text, and the reasons are a closed set we control (REASON_TO_PLAYER).
-    body: "DesiAuction: Your registration for {competition} was not approved - {reason}. Details: {link}",
+    body: "DesiAuction: Your registration for {competition} was not approved - {reason}. {link}",
     slots: [
       { name: "competition", maxLength: 60 },
-      { name: "reason", maxLength: 60 },
-      { name: "link", maxLength: 60 },
+      { name: "reason", maxLength: 50 },
+      { name: "link", maxLength: 40 },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_REJECTED",
   },
@@ -143,10 +166,10 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: Your registration for {competition} has been withdrawn. You can register again while intake is open. Details: {link}",
+    body: "DesiAuction: Your registration for {competition} has been withdrawn. You can register again while intake is open. {link}",
     slots: [
       { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 60 },
+      { name: "link", maxLength: 40 },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_WITHDRAWN",
   },
@@ -156,10 +179,10 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: Your registration for {competition} is back under review. Details: {link}",
+    body: "DesiAuction: Your registration for {competition} is back under review. {link}",
     slots: [
       { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 60 },
+      { name: "link", maxLength: 40 },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_RESTORED",
   },
