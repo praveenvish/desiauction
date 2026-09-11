@@ -24,10 +24,13 @@ Your job is to make that list unambiguous, ordered, and small enough to act on t
 
 ## The list, in dependency order (`docs/operations/PRODUCTION_CHECKLIST.md` §1–3)
 
-1. **One Hetzner Cloud server**, 4 vCPU / **8GB**, plus its backup add-on. Web,
-   engine, runner, Postgres, MinIO and Caddy all run on it. 4GB will OOM under
-   an auction; the add-on is the only thing covering the disk, because the
-   pgBackRest repo lives on that same disk.
+1. **Contabo Cloud VPS 10, Navi Mumbai** (4 vCPU / 8GB / 100GB, ~EUR 7.90/mo)
+   plus **Auto Backup** (~EUR 1.15/mo — daily, off-server, 10 days). Web,
+   engine, runner, Postgres, MinIO, Caddy and the log stack all run on it.
+   India for latency, not for price: ~20ms from Mumbai against ~140ms from
+   Europe, and the product is judged on a live countdown in a room. The backup
+   add-on is the only thing covering the disk, because the pgBackRest repo
+   lives on that same disk.
 2. **Domain plus three DNS records** at the host: `PUBLIC_DOMAIN`,
    `ENGINE_DOMAIN`, `S3_DOMAIN`. ⚠ `RP_ID` / `RP_ORIGINS` must match the public
    domain exactly, or **passkeys break**. Caddy issues the certificates.
