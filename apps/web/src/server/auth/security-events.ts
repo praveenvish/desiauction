@@ -13,6 +13,13 @@ export type SecurityAction =
   | "auth.login.otp"
   /** Signed in with a code sent to a verified mailbox (email sign-in). */
   | "auth.login.email"
+  /**
+   * The account was CREATED by that code (Phase 2 email sign-up). Its own row
+   * rather than a login: this is the first line of the person's ledger, and it
+   * is the one that answers "where did this account come from?" — which a run
+   * of identical `auth.login.email` rows never could.
+   */
+  | "auth.signup.email"
   | "auth.login.passkey"
   | "auth.otp.lockout"
   // PI-1 audit-gap closures. Requests, sign-outs and refused passkey

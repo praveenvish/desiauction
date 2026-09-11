@@ -86,7 +86,7 @@ test("a verified email is a second way into the same account", async ({ page }) 
   // SECONDARY, and collapsed: the ordinary path stays one field and one button.
   const email = page.getByTestId("email-login-address");
   await expect(email).toBeHidden();
-  await page.getByText("Sign in with your email instead").click();
+  await page.getByText("Use your email instead").click();
   await email.fill(EMAIL);
   await page.getByTestId("email-login-send").click();
 
@@ -109,9 +109,102 @@ test("an address nobody owns is answered exactly like one that exists", async ({
    * the wording never claims a code was sent.
    */
   await page.goto("/login");
-  await page.getByText("Sign in with your email instead").click();
+  await page.getByText("Use your email instead").click();
   await page.getByTestId("email-login-address").fill(`nobody${STAMP}@example.test`);
   await page.getByTestId("email-login-send").click();
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("email-login-sent")).toContainText("If ");
+});
+
+test("an address nobody owns creates the account it signs in to", async ({ page }) => {
+  /*
+   * PHASE 2 — the sign-UP half of the same door (migrations 0062 and 0063).
+   *
+   * The account is anchored by the ADDRESS and holds no phone at all, which is
+   * the whole point: Indian SMS needs DLT registration with TRAI before a
+   * single transactional message can be sent, and an organizer who cannot wait
+   * for that queue now has a way in that does not involve one.
+   *
+   * Note what this proves that the server test cannot: that the flow lands the
+   * person somewhere usable. A brand-new account has no name, so it must reach
+   * /onboarding rather than /home — the same redirect the phone door makes, for
+   * the same reason.
+   */
+  test.setTimeout(120_000);
+  const fresh = `newcomer${STAMP}@example.test`;
+
+  await page.goto("/login");
+  await page.getByText("Use your email instead").click();
+  await page.getByTestId("email-login-address").fill(fresh);
+  await page.getByTestId("email-login-send").click();
+  await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("email-login-code").fill(await mailedCode(fresh));
+  await page.getByTestId("email-login-verify").click();
+
+  // Nameless, so the door opens onto the name gate — never /home.
+  await expect(page).toHaveURL(/\/onboarding/, { timeout: 30_000 });
+
+  // ANCHORED BY THE ADDRESS AND NOTHING ELSE. If this row had a phone, 0062
+  // would not have been needed and the whole phase is theatre.
+  const handle = createDb(DATABASE_URL);
+  try {
+    const [row] = await handle.db
+      .select({ phone: people.phone, verifiedAt: people.emailVerifiedAt })
+      .from(people)
+      .where(eq(people.email, fresh))
+      .limit(1);
+    expect(row, "the code should have created the account").toBeDefined();
+    expect(row?.phone).toBeNull();
+    expect(row?.verifiedAt).not.toBeNull();
+  } finally {
+    await handle.sql.end({ timeout: 5 });
+  }
+});
+
+test("an email-anchored account is told to add a number before it can play", async ({ page }) => {
+  /*
+   * THE PLAYER RULE, at the surface a player actually meets.
+   *
+   * An account with no phone can organize, own a team and keep the books — all
+   * of that is worked through this website. It cannot enter a season, because a
+   * season reaches its players by SMS and by nothing else: approval, the
+   * auction-day summons, the sold message. Entering somebody we cannot text
+   * would approve, auction and sell them without ever telling them.
+   *
+   * Said BEFORE the form rather than at Submit, and with somewhere to go.
+   * `submitRegistration` refuses it at the server too — this is the half that
+   * does not waste three steps of someone's evening first.
+   */
+  test.setTimeout(120_000);
+  const player = `wouldbeplayer${STAMP}@example.test`;
+
+  await page.goto("/login");
+  await page.getByText("Use your email instead").click();
+  await page.getByTestId("email-login-address").fill(player);
+  await page.getByTestId("email-login-send").click();
+  await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("email-login-code").fill(await mailedCode(player));
+  await page.getByTestId("email-login-verify").click();
+  await expect(page).toHaveURL(/\/onboarding/, { timeout: 30_000 });
+
+  // The name gate identifies them by the ADDRESS, because there is no number to
+  // identify them by. Before 0062 this line read `formatPhone(null)` and would
+  // have greeted a brand-new organizer with a blank.
+  await expect(page.getByText(player, { exact: false }).first()).toBeVisible({ timeout: 20_000 });
+
+  // Through the gate — /account bounces a nameless account straight back here,
+  // so the name has to be given before the account page can be reached at all.
+  await page.getByRole("textbox").first().fill("Email Organizer");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).not.toHaveURL(/\/onboarding/, { timeout: 30_000 });
+
+  // The account page offers to ADD rather than to change — there is nothing to
+  // change yet, and promising to text the old number would be a promise to
+  // nobody.
+  await page.goto("/account");
+  await expect(page.getByTestId("open-phone-change")).toHaveText("Add mobile number", {
+    timeout: 20_000,
+  });
+  // And the contact line shows the address, not an empty cell.
+  await expect(page.getByTestId("account-phone")).toHaveText(player);
 });

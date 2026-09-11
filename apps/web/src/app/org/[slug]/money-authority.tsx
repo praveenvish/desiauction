@@ -4,7 +4,7 @@ import { Badge, Button, Card, Dialog, EmptyState, Select, useToast } from "@desi
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { formatPhone } from "../../../lib/format-phone";
+import { personInitials, personLabel } from "../../../lib/person-label";
 import {
   issueMoneyAuthorityAction,
   revokeMoneyAuthorityAction,
@@ -41,20 +41,6 @@ const ROLE_LABEL: Record<string, string> = {
   "settlement:officer": "Settlement officer",
   "settlement:controller": "Settlement controller",
 };
-
-/** Initials for the holder avatar — matches the members grid. */
-function authorityInitials(name: string | null, phone: string): string {
-  const parts = (name ?? phone).trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  return (
-    parts
-      .map((word) => {
-        const cp = word.codePointAt(0);
-        return cp === undefined ? "" : String.fromCodePoint(cp);
-      })
-      .join("")
-      .toUpperCase() || "—"
-  );
-}
 
 /** "24 Jul 2026" — the provenance line under a holder's name. */
 export function grantedLine(grantedByName: string | null, grantedAt: string | null): string | null {
@@ -119,10 +105,10 @@ export function MoneyAuthorityPanel({
               data-testid={`authority-${grant.personId}`}
             >
               <span className="od-authority-avatar" aria-hidden>
-                {authorityInitials(grant.name, grant.phone)}
+                {personInitials(grant)}
               </span>
               <span className="od-authority-id">
-                <span className="od-authority-name">{grant.name ?? formatPhone(grant.phone)}</span>
+                <span className="od-authority-name">{personLabel(grant)}</span>
                 {/* Who handed this over, and when — stored since the table
                     existed, shown nowhere until now. */}
                 {grantedLine(grant.grantedByName, grant.grantedAt) !== null ? (
@@ -165,7 +151,7 @@ export function MoneyAuthorityPanel({
               .filter((member) => !holders.has(member.personId))
               .map((member) => (
                 <option key={member.personId} value={member.personId}>
-                  {member.name ?? member.phone}
+                  {personLabel(member)}
                 </option>
               ))}
           </Select>
@@ -245,8 +231,8 @@ export function MoneyAuthorityPanel({
         }
       >
         <p data-testid="revoke-authority-consequence">
-          {revoking?.name ?? formatPhone(revoking?.phone ?? "")} can no longer open or verify
-          settlement cases, record a payment, or settle and close one for this organization.
+          {revoking === null ? "" : personLabel(revoking)} can no longer open or verify settlement
+          cases, record a payment, or settle and close one for this organization.
           {authority.grants.length === 1
             ? " They are the only person here who can, so until someone else is granted the role, no money can be recorded at all."
             : ""}

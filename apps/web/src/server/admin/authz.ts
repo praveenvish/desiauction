@@ -27,7 +27,9 @@ import { hasPlatformCapability } from "./capabilities";
 export interface AdminIdentity {
   readonly personId: string;
   readonly name: string | null;
-  readonly phone: string;
+  /** Nullable since 0062 — an operator may be anchored by an email. */
+  readonly phone: string | null;
+  readonly email: string | null;
 }
 
 export async function platformAdminGate(): Promise<AdminIdentity | null> {
@@ -41,7 +43,12 @@ export async function platformAdminGate(): Promise<AdminIdentity | null> {
   if (!admin) {
     return null;
   }
-  return { personId: session.personId, name: session.name, phone: session.phone };
+  return {
+    personId: session.personId,
+    name: session.name,
+    phone: session.phone,
+    email: session.email,
+  };
 }
 
 /**
@@ -64,7 +71,12 @@ export async function platformBillingGate(): Promise<AdminIdentity | null> {
   if (!allowed) {
     return null;
   }
-  return { personId: session.personId, name: session.name, phone: session.phone };
+  return {
+    personId: session.personId,
+    name: session.name,
+    phone: session.phone,
+    email: session.email,
+  };
 }
 
 /**
@@ -88,7 +100,12 @@ export async function platformDemoGate(): Promise<AdminIdentity | null> {
   if (!allowed) {
     return null;
   }
-  return { personId: session.personId, name: session.name, phone: session.phone };
+  return {
+    personId: session.personId,
+    name: session.name,
+    phone: session.phone,
+    email: session.email,
+  };
 }
 
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */

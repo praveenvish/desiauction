@@ -1085,7 +1085,12 @@ export async function submitRegistrationAction(
           ? "Registration for this competition is not open."
           : result.reason === "duplicate"
             ? "You've already registered for this competition — check your status."
-            : "Choose a valid playing role.",
+            : result.reason === "no_phone"
+              ? // The register page says this before the form is ever shown; this
+                // is the same rule held at the server, for the request that
+                // skipped the page.
+                "Add a mobile number to your account before registering as a player — organizers text you about your registration and on auction day."
+              : "Choose a valid playing role.",
     };
   }
   /*

@@ -30,7 +30,7 @@ import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { LEGAL_IDENTITY, legalIdentityPublished } from "../../content/company";
 import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
-import { formatPhone } from "../../lib/format-phone";
+import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
 import { BrandMark } from "./brand";
 import {
@@ -55,7 +55,9 @@ import "./product-shell.css";
 
 export interface ShellSession {
   name: string | null;
-  phone: string;
+  /** Nullable since 0062 — an email-anchored account has no phone. */
+  phone: string | null;
+  email: string | null;
   /**
    * Who is signed in. The bell's unread watermark is namespaced by it — one
    * origin-global key meant that on a shared handset, person A reading their
@@ -857,13 +859,14 @@ export function ProductShell({
             <Link className="shell-railuser" href="/account">
               <span className="shell-railuser-avatar">{initials}</span>
               <span className="shell-railuser-text">
-                <strong>{session.name ?? formatPhone(session.phone)}</strong>
+                <strong>{personLabel(session)}</strong>
                 {/* The second line used to hardcode "Organizer" — a role claim
                     the shell cannot know and stamped on every member, viewer
-                    and player alike. The phone is the one identity fact that is
-                    always true, and on the shared handsets this product targets
-                    it says WHICH account is signed in. */}
-                {session.name !== null ? <span>{formatPhone(session.phone)}</span> : null}
+                    and player alike. The CONTACT is the identity fact that is
+                    always true — phone or email, one of the two is guaranteed
+                    by `people_reachable_check` — and on the shared handsets
+                    this product targets it says WHICH account is signed in. */}
+                {session.name !== null ? <span>{personContact(session)}</span> : null}
               </span>
             </Link>
           }
@@ -933,9 +936,7 @@ export function ProductShell({
                 <PopoverMenu
                   label="Account menu"
                   trigger={<span className="shell-avatar">{initials}</span>}
-                  header={
-                    <span data-testid="shell-session-phone">{formatPhone(session.phone)}</span>
-                  }
+                  header={<span data-testid="shell-session-phone">{personContact(session)}</span>}
                   items={[
                     {
                       key: "account",
@@ -1011,7 +1012,7 @@ export function ProductShell({
             }}
             title="Menu"
           >
-            <div className="shell-drawer-session">{formatPhone(session.phone)}</div>
+            <div className="shell-drawer-session">{personContact(session)}</div>
             <ul className="shell-drawer-list">
               {orgs.map((org) => (
                 <li key={org.slug}>

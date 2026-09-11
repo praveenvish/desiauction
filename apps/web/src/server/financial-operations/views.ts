@@ -42,6 +42,8 @@ import {
 } from "@desiauction/financial-operations/server";
 import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
+import { personLabel } from "../../lib/person-label";
+
 import { DELIVERY_LANES } from "./deliveries";
 
 /**
@@ -700,7 +702,9 @@ export interface FinanceGrantRow {
   readonly grantId: string;
   readonly personId: string;
   readonly name: string | null;
-  readonly phone: string;
+  /** Nullable since 0062 — an email-anchored account has no phone. */
+  readonly phone: string | null;
+  readonly email: string | null;
   readonly capabilitySet: string;
   /** Who handed this role over — provenance the table has always stored. */
   readonly grantedByName: string | null;
@@ -724,6 +728,7 @@ export async function financeGrantsOf(db: Db, orgId: string): Promise<FinanceGra
       personId: grants.personId,
       name: people.name,
       phone: people.phone,
+      email: people.email,
       capabilitySet: grants.capabilitySet,
       grantedBy: grants.grantedBy,
       grantedAt: grants.createdAt,
@@ -744,11 +749,12 @@ export async function financeGrantsOf(db: Db, orgId: string): Promise<FinanceGra
       personId: row.personId,
       name: row.name,
       phone: row.phone,
+      email: row.email,
       capabilitySet: row.capabilitySet,
       grantedByName: granterNames.get(row.grantedBy) ?? null,
       grantedAt: isoOf(row.grantedAt),
     }))
-    .sort((a, b) => (a.name ?? a.phone).localeCompare(b.name ?? b.phone));
+    .sort((a, b) => personLabel(a).localeCompare(personLabel(b)));
 }
 
 /**

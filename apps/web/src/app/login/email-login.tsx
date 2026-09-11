@@ -41,7 +41,7 @@ export function EmailLogin({ next }: { next?: string }) {
         setOpen(event.currentTarget.open);
       }}
     >
-      <summary>Sign in with your email instead</summary>
+      <summary>Use your email instead</summary>
       <form action={formAction} className="login-email-form">
         {next !== undefined ? <input type="hidden" name="next" value={next} /> : null}
         {state.step === "email" ? (
@@ -56,8 +56,10 @@ export function EmailLogin({ next }: { next?: string }) {
               defaultValue={state.email}
               // Says the condition out loud. The server cannot tell you whether
               // an address is on an account — that would be a membership oracle
-              // for anyone with a list of addresses — so the form has to.
-              help="Works if this address is confirmed on your account."
+              // for anyone with a list of addresses — so the form has to. Since
+              // Phase 2 it also has to say that a NEW address is welcome here,
+              // or somebody without an account has no reason to try this door.
+              help="Sign in, or start a new account, with an address you can read."
               {...(state.error !== undefined ? { error: state.error } : {})}
               data-testid="email-login-address"
             />
@@ -78,12 +80,25 @@ export function EmailLogin({ next }: { next?: string }) {
               {...(state.error !== undefined ? { error: state.error } : {})}
               data-testid="email-login-code"
             />
-            {/* Deliberately not "we sent a code to X" — the step advances the
-                same way whether or not that address is on an account, and a
-                confident "sent" for an address we mailed nothing to would be a
-                lie. This says what was attempted. */}
+            {/*
+              STILL CONDITIONAL, AND STILL FOR THE SAME REASON — but the
+              condition changed with Phase 2 and the sentence had to follow.
+
+              It used to read "if this is confirmed on an account", which was
+              true when an unknown address was mailed nothing. It is not true
+              any more: an unknown address now gets a SIGN-UP code, and telling
+              somebody creating an account that nothing may have been sent
+              reads as a failure of the thing they just did.
+
+              What is still conditional is the one case that gets no mail — an
+              address claimed on an account that never confirmed it. So the
+              hedge stays, worded around reaching the mailbox rather than
+              around finding an account, which is the fact this form must not
+              disclose either way.
+            */}
             <p className="login-hint" data-testid="email-login-sent">
-              If {state.email} is confirmed on an account, a code is on its way.
+              If we can reach {state.email}, a code is on its way. New here? Entering it creates
+              your account.
             </p>
             <Button type="submit" loading={pending} size="touch" data-testid="email-login-verify">
               Verify and continue

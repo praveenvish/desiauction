@@ -185,3 +185,38 @@ describe("matchPhotoFiles — filenames as a Drive export writes them", () => {
     expect(match?.ok === true ? match.target.registrationId : null).toBe("reg_decoy");
   });
 });
+
+/**
+ * A TARGET WITH NO PHONE (0062).
+ *
+ * An email-anchored account has no number. The indexer read `target.phone`
+ * unconditionally, so one such target made `matchPhotoFiles` THROW — taking
+ * the whole batch down, including the files that matched by number or name.
+ * The other two rules must go on working, and a phone-shaped filename must
+ * simply not find them.
+ */
+describe("a target with no phone", () => {
+  const NO_PHONE: PhotoTarget = { ...ROHIT, phone: null };
+  const ALSO_NO_PHONE: PhotoTarget = {
+    registrationId: "reg-np2",
+    number: "RNP002",
+    name: "Shubman Gill",
+    phone: null,
+    hasPhoto: false,
+  };
+
+  it("still matches on its registration number", () => {
+    const [result] = matchPhotoFiles(["RNP001.jpg"], [{ ...NO_PHONE, number: "RNP001" }]);
+    expect(result?.ok === true && result.rule).toBe("number");
+  });
+
+  it("still matches on its name", () => {
+    const [result] = matchPhotoFiles(["rohit-sharma.jpg"], [NO_PHONE, ALSO_NO_PHONE]);
+    expect(result?.ok === true && result.rule).toBe("name");
+  });
+
+  it("is not reachable by a phone-shaped filename", () => {
+    const [result] = matchPhotoFiles(["9876543210.jpg"], [NO_PHONE, ALSO_NO_PHONE]);
+    expect(result?.ok).toBe(false);
+  });
+});

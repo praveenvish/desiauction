@@ -314,6 +314,23 @@ export async function notifyDecision(
   let suppressed = 0;
   for (const row of rows) {
     /*
+     * NO PHONE, NO SMS — and that is not a failure either.
+     *
+     * Since 0062 a person can be anchored by email alone, so `people.phone` can
+     * be null. Counting those as FAILED would send an organizer chasing a
+     * delivery problem that does not exist, which is the same mistake the
+     * suppression branch below was written to avoid. They are suppressed: the
+     * decision still stands and their status page still shows it.
+     *
+     * (A player must supply a phone to register, so in practice this is the
+     * organizer who added a row by hand for somebody who has not registered
+     * yet — not a gap in player notification.)
+     */
+    if (row.phone === null) {
+      suppressed += 1;
+      continue;
+    }
+    /*
      * The consent gate, before the send and not after it.
      *
      * A decision notice is transactional — it is the direct consequence of

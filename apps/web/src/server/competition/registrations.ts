@@ -44,7 +44,7 @@ type Writer = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export type SubmitResult =
   | { ok: true; registrationId: string }
-  | { ok: false; reason: "invalid_role" | "not_open" | "duplicate" };
+  | { ok: false; reason: "invalid_role" | "not_open" | "duplicate" | "no_phone" };
 
 /** Optional self-declared player profile captured at registration (parity §3.2).
  * Each field is validated here; invalid values are dropped, never persisted. */
@@ -186,6 +186,30 @@ export async function submitRegistration(
     .limit(1);
   if (competition === undefined || competition.status !== "registration_open") {
     return { ok: false, reason: "not_open" };
+  }
+  /*
+   * A PLAYER NEEDS A PHONE, and this is the server-side half of saying so.
+   *
+   * Email sign-in (0062) lets somebody hold an account with no number. That is
+   * fine for an organizer, a team owner or a treasurer — every one of those
+   * roles is worked through this website. A PLAYER is different: the whole
+   * back half of the product reaches them by SMS and by nothing else. The
+   * approval and rejection notices, the auction-day summons, the sold message,
+   * the roster export the organizer rings down — all of it is `people.phone`,
+   * and `registrationsForNotify` suppresses a null rather than failing, so an
+   * email-only player would be entered, approved, auctioned and never told.
+   *
+   * Refused rather than quietly entered, and refused HERE rather than only in
+   * the form, because the form is a suggestion and this is the rule. The
+   * account page's attach flow is the way through, and the screen says so.
+   */
+  const [applicant] = await db
+    .select({ phone: people.phone })
+    .from(people)
+    .where(eq(people.id, personId))
+    .limit(1);
+  if (applicant === undefined || applicant.phone === null) {
+    return { ok: false, reason: "no_phone" };
   }
   const pack = sportPackFor(competition.sport);
   // Empty and wrong are different answers — see `evaluateRegistration`.
@@ -369,7 +393,12 @@ export interface RegistrationRow {
   number: string;
   personId: string;
   name: string | null;
-  phone: string;
+  /**
+   * NULLABLE SINCE 0062 for the rows that predate the rule, never for a new
+   * one: `submitRegistration` refuses an account with no number, because SMS
+   * is the only channel a season reaches a player on.
+   */
+  phone: string | null;
   role: string | null;
   status: RegistrationStatus;
   teamId: string | null;
@@ -1069,7 +1098,9 @@ export async function exportRegistrationsCsv(
     rows.map((r) => [
       r.number,
       r.name ?? "",
-      r.phone,
+      // Blank rather than "null" in a spreadsheet cell: an export is read by a
+      // person, and an email-anchored player (0062) simply has no number.
+      r.phone ?? "",
       r.role ?? "",
       r.status,
       r.team ?? "",

@@ -15,6 +15,8 @@ import {
 } from "@desiauction/db";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
+import { personLabel } from "../../lib/person-label";
+
 import { currentSession } from "../auth/actions";
 import { systemDb } from "../db";
 import { sendEngineCommand } from "./engine-client";
@@ -276,17 +278,23 @@ export async function ownerJoinPreview(token: string): Promise<OwnerJoinPreview 
  */
 export async function ownerJoinLandingView(token: string): Promise<{
   landing: OwnerJoinLanding;
-  viewerPhone: string;
+  /**
+   * WHO the handset is signed in as, in words — not a number. The screen asks
+   * "Not you?" on a shared phone, so it needs whatever this account answers to:
+   * since 0062 that may be an email, and `formatPhone(null)` would have asked
+   * the question about nobody.
+   */
+  viewerLabel: string;
 }> {
   const session = await currentSession();
   if (session === null) {
-    return { landing: { state: "invalid" }, viewerPhone: "" };
+    return { landing: { state: "invalid" }, viewerLabel: "" };
   }
   return {
     // The session is already in hand, so this goes straight to the private
     // resolver rather than paying for a second cookie-and-session read.
     landing: await resolveOwnerJoinLanding(session.personId, token),
-    viewerPhone: session.phone,
+    viewerLabel: personLabel(session),
   };
 }
 

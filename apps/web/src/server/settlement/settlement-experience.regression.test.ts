@@ -101,6 +101,7 @@ import {
   type SettlementActor,
 } from "./writer";
 import { purgeOrg } from "../test-support/purge-org";
+import { personLabel } from "../../lib/person-label";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -454,8 +455,11 @@ describe("PX-7 · Money authority — settlement is reachable from the product",
     const rows = await settlementGrantsOf(db, org.id);
     const sets = rows.map((row) => row.capabilitySet).sort();
     expect(sets).toEqual(["settlement:controller", "settlement:officer"]);
-    // The panel renders people, so the read must carry them.
-    expect(rows.every((row) => row.phone.length > 0)).toBe(true);
+    // The panel renders people, so the read must carry enough to NAME them.
+    // Asserted through `personLabel` rather than `row.phone.length`: since 0062
+    // a holder may be anchored by an email, and the invariant the panel needs
+    // is "this row renders as somebody", not "this row has a phone".
+    expect(rows.every((row) => personLabel(row) !== "Unnamed account")).toBe(true);
     // `org:owner` is a grant on the same table — and must NOT appear here.
     expect(sets).not.toContain("org:owner");
   });

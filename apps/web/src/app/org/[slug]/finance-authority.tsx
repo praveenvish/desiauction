@@ -4,7 +4,7 @@ import { Badge, Button, Card, Dialog, EmptyState, Select, useToast } from "@desi
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { formatPhone } from "../../../lib/format-phone";
+import { personInitials, personLabel } from "../../../lib/person-label";
 import { grantedLine } from "./money-authority";
 import {
   issueFinanceAuthorityAction,
@@ -50,20 +50,6 @@ const ROLE_LABEL: Record<string, string> = {
   "finops:accountant": "Accountant",
   "finops:controller": "Finance controller",
 };
-
-/** Initials for the holder avatar — matches the members grid. */
-function authorityInitials(name: string | null, phone: string): string {
-  const parts = (name ?? phone).trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  return (
-    parts
-      .map((word) => {
-        const cp = word.codePointAt(0);
-        return cp === undefined ? "" : String.fromCodePoint(cp);
-      })
-      .join("")
-      .toUpperCase() || "—"
-  );
-}
 
 export function FinanceAuthorityPanel({
   slug,
@@ -112,10 +98,10 @@ export function FinanceAuthorityPanel({
               data-testid={`finance-authority-${grant.personId}`}
             >
               <span className="od-authority-avatar" aria-hidden>
-                {authorityInitials(grant.name, grant.phone)}
+                {personInitials(grant)}
               </span>
               <span className="od-authority-id">
-                <span className="od-authority-name">{grant.name ?? formatPhone(grant.phone)}</span>
+                <span className="od-authority-name">{personLabel(grant)}</span>
                 {grantedLine(grant.grantedByName, grant.grantedAt) !== null ? (
                   <span className="od-authority-provenance">
                     {grantedLine(grant.grantedByName, grant.grantedAt)}
@@ -156,7 +142,7 @@ export function FinanceAuthorityPanel({
               .filter((member) => !holders.has(member.personId))
               .map((member) => (
                 <option key={member.personId} value={member.personId}>
-                  {member.name ?? member.phone}
+                  {personLabel(member)}
                 </option>
               ))}
           </Select>
@@ -233,8 +219,8 @@ export function FinanceAuthorityPanel({
         }
       >
         <p data-testid="revoke-finance-consequence">
-          {revoking?.name ?? formatPhone(revoking?.phone ?? "")} can no longer issue receipts or
-          invoices, send or retry a delivery, or open and close the books for this organization.
+          {revoking === null ? "" : personLabel(revoking)} can no longer issue receipts or invoices,
+          send or retry a delivery, or open and close the books for this organization.
           {authority.grants.length === 1
             ? " They are the only person here who can, so the finance workspace becomes invisible to everyone until someone else is granted the role."
             : ""}

@@ -809,7 +809,9 @@ export interface OrgDetail {
   readonly members: readonly {
     personId: string;
     name: string | null;
-    phone: string;
+    /** Nullable since 0062 — an email-anchored account has no phone. */
+    phone: string | null;
+    email: string | null;
     joinedAt: Date;
   }[];
   readonly grants: readonly {
@@ -862,6 +864,7 @@ export async function organizationDetail(db: Db, slug: string): Promise<OrgDetai
         personId: orgMembers.personId,
         name: people.name,
         phone: people.phone,
+        email: people.email,
         joinedAt: orgMembers.joinedAt,
       })
       .from(orgMembers)
@@ -918,7 +921,9 @@ export async function organizationDetail(db: Db, slug: string): Promise<OrgDetai
 export interface UserDirectoryRow {
   readonly id: string;
   readonly name: string | null;
-  readonly phone: string;
+  /** Nullable since 0062 — an email-anchored account has no phone. */
+  readonly phone: string | null;
+  readonly email: string | null;
   readonly createdAt: Date;
   readonly orgs: number;
   readonly activeGrants: number;
@@ -966,8 +971,27 @@ export async function userDirectory(
   filter: UserDirectoryFilter = "all",
 ): Promise<UserDirectory> {
   const term = query.trim();
+  /*
+   * NAME, PHONE, **AND ADDRESS** — the third one added with 0062.
+   *
+   * An account can be anchored by an email now, and until this line included it
+   * such a person was unreachable from the only directory the platform has: no
+   * phone to match, and often no name either until they finish onboarding. An
+   * operator who was handed the address had no way to find the row at all,
+   * which is the one thing this screen exists to do.
+   *
+   * `ilike` on a NULL column yields NULL rather than false, and `or` treats
+   * that as "not a match" — so a person missing either contact still matches on
+   * whichever one they have.
+   */
   const search =
-    term === "" ? undefined : or(ilike(people.name, `%${term}%`), ilike(people.phone, `%${term}%`));
+    term === ""
+      ? undefined
+      : or(
+          ilike(people.name, `%${term}%`),
+          ilike(people.phone, `%${term}%`),
+          ilike(people.email, `%${term}%`),
+        );
   // PI-1 P6: profile-aware facets. EXISTS subqueries, so the directory stays
   // one indexed pass (registrations_person_idx / player_profiles_person_uq).
   const facet =
@@ -985,6 +1009,7 @@ export async function userDirectory(
       id: people.id,
       name: people.name,
       phone: people.phone,
+      email: people.email,
       createdAt: people.createdAt,
       orgs: sql<number>`(select count(*)::int from org_members m where m.person_id = people.id)`,
       activeGrants: sql<number>`(select count(*)::int from grants g where g.person_id = people.id and g.revoked_at is null)`,
@@ -1064,7 +1089,14 @@ export interface UserGrantRow {
 }
 
 export interface UserDetail {
-  readonly person: { id: string; name: string | null; phone: string; createdAt: Date };
+  readonly person: {
+    id: string;
+    name: string | null;
+    /** Nullable since 0062 — an email-anchored account has no phone. */
+    phone: string | null;
+    email: string | null;
+    createdAt: Date;
+  };
   readonly orgs: readonly { slug: string; name: string; joinedAt: Date }[];
   readonly grants: readonly UserGrantRow[];
   readonly activity: readonly ActivityRow[];
@@ -1092,7 +1124,13 @@ export interface UserDetail {
 
 export async function userDetail(db: Db, personId: string): Promise<UserDetail | null> {
   const [person] = await db
-    .select({ id: people.id, name: people.name, phone: people.phone, createdAt: people.createdAt })
+    .select({
+      id: people.id,
+      name: people.name,
+      phone: people.phone,
+      email: people.email,
+      createdAt: people.createdAt,
+    })
     .from(people)
     .where(eq(people.id, personId))
     .limit(1);

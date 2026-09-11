@@ -1,7 +1,7 @@
 import { Card, EmptyState } from "@desiauction/ui";
 import Link from "next/link";
 
-import { formatCount, maskPhone } from "../../../server/admin/format";
+import { formatCount, maskPersonContact } from "../../../server/admin/format";
 import type { UserDirectory } from "../../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
 
@@ -105,7 +105,7 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                             "which row is this?" — and the whole number is on
                             the one person's page an operator chose to open. */}
                         <span className="registration-phone admin-meta">
-                          {maskPhone(row.phone)}
+                          {maskPersonContact(row)}
                         </span>
                       </td>
                       <td data-label="Organizations" className="admin-count admin-num">

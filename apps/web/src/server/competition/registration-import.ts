@@ -91,7 +91,20 @@ export async function existingForImport(
     // hidden every one of them from the re-import plan.
     .leftJoin(teams, eq(teams.id, registrations.teamId))
     .where(and(eq(registrations.competitionId, competitionId), inArray(people.phone, [...phones])));
-  return new Map(rows.map(({ phone, ...rest }) => [phone, rest]));
+  /*
+   * Keyed by phone, and the key must never be null.
+   *
+   * The query above filters `inArray(people.phone, phones)` on real numbers, so
+   * a phone-less person (possible since 0062) cannot match it — but the type
+   * says `string | null`, and a null key would silently collapse EVERY such
+   * person into one bucket. Dropping them explicitly states the invariant
+   * instead of trusting the WHERE clause to keep holding it.
+   */
+  return new Map(
+    rows
+      .filter((row): row is typeof row & { phone: string } => row.phone !== null)
+      .map(({ phone, ...rest }) => [phone, rest]),
+  );
 }
 
 /** The column set a planned change touches, as drizzle values. */

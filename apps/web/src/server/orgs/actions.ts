@@ -16,6 +16,8 @@ import {
 import { isFinopsCapabilitySet } from "@desiauction/financial-operations";
 import { isSettlementCapabilitySet } from "@desiauction/settlement";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+
+import { personLabel } from "../../lib/person-label";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -683,12 +685,13 @@ export async function invitePreview(token: string) {
  */
 export async function inviteLandingView(token: string): Promise<{
   landing: InviteLanding;
-  viewerPhone: string;
+  /** Who the handset is signed in as, in words — see `ownerJoinLandingView`. */
+  viewerLabel: string;
 }> {
   const session = await requireSession();
   // Pre-tenant token path (documented exception): runs on the system pool.
   const landing = await inviteLanding(systemDb, session.personId, token);
-  return { landing, viewerPhone: session.phone };
+  return { landing, viewerLabel: personLabel(session) };
 }
 
 export async function acceptInviteAction(token: string): Promise<void> {

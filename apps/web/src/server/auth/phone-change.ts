@@ -89,7 +89,12 @@ export async function requestPhoneChange(
 }
 
 export type PhoneChangeResult =
-  | { ok: true; previousPhone: string; newPhone: string }
+  /**
+   * `previousPhone` is NULL when there was no previous phone — this same flow
+   * is how an email-anchored account (0062) ATTACHES its first number. Nothing
+   * is announced in that case, because there is no old handset to warn.
+   */
+  | { ok: true; previousPhone: string | null; newPhone: string }
   | {
       ok: false;
       reason: "invalid-phone" | "invalid" | "expired" | "locked" | "taken" | "no-person";
@@ -97,8 +102,21 @@ export type PhoneChangeResult =
     };
 
 /**
- * Complete the change. The code proves the handset; the session proves the
- * account.
+ * Complete the change — or the first ATTACH.
+ *
+ * The code proves the handset; the session proves the account. Since 0062 a
+ * person may arrive here holding no phone at all, having signed in by email:
+ * every step below already reads correctly for that case (`same-number` cannot
+ * match a null, the collision check is unchanged, the update writes the first
+ * number rather than the next one), so attaching needs no second flow — which
+ * is the point. A parallel "attach" path would have been a second place for the
+ * collision rule to drift out of step with this one.
+ *
+ * THE COLLISION IS REFUSED, NEVER MERGED. Both credentials stay unique: if the
+ * number already signs somebody in, this returns `taken` and nothing moves.
+ * Folding two accounts together is not something this product can do safely —
+ * they may hold registrations in the same competition, paddles in the same
+ * auction, or opposing sides of a settlement.
  */
 export async function confirmPhoneChange(
   db: Db,

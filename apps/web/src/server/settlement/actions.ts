@@ -460,7 +460,12 @@ export async function settlementDashboard(orgSlug: string): Promise<SettlementDa
 export interface MoneyAuthorityView {
   readonly org: OrgSummary;
   readonly grants: readonly SettlementGrantRow[];
-  readonly members: readonly { personId: string; name: string | null; phone: string }[];
+  readonly members: readonly {
+    personId: string;
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+  }[];
   /** Whether the VIEWER may hand out money authority — the frozen `grant.issue`. */
   readonly canIssue: boolean;
   /** Whether the VIEWER may open the settlement desk — gates the org page's link. */
@@ -498,15 +503,19 @@ export async function moneyAuthority(orgSlug: string): Promise<MoneyAuthorityVie
     const members = canIssue ? await membersOf(db, org.id) : [];
     return {
       org,
-      // Who holds the keys is a fact every member is entitled to — a phone is
-      // not. The holder rows render `name ?? phone`, so redacting the number
-      // for anyone who cannot issue costs the panel nothing and keeps the
-      // directory out of a payload it has no business being in.
-      grants: granted.map((grant) => (canIssue ? grant : { ...grant, phone: "" })),
+      // Who holds the keys is a fact every member is entitled to — a CONTACT is
+      // not. The holder rows render a name first, so redacting both the phone
+      // and the email for anyone who cannot issue costs the panel nothing and
+      // keeps the directory out of a payload it has no business being in.
+      // Email joined the redaction with 0062: it is the second thing an
+      // account can be anchored by, and leaving it out would have reopened
+      // exactly the leak the phone redaction was written to close.
+      grants: granted.map((grant) => (canIssue ? grant : { ...grant, phone: null, email: null })),
       members: members.map((member) => ({
         personId: member.personId,
         name: member.name,
         phone: member.phone,
+        email: member.email,
       })),
       canIssue,
       canView,

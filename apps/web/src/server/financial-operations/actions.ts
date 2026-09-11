@@ -342,7 +342,12 @@ export async function financeGate(orgSlug: string): Promise<OrgSummary | null> {
 export interface FinanceAuthorityView {
   readonly org: OrgSummary;
   readonly grants: readonly FinanceGrantRow[];
-  readonly members: readonly { personId: string; name: string | null; phone: string }[];
+  readonly members: readonly {
+    personId: string;
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+  }[];
   /** Whether the VIEWER may hand out finance authority — the frozen `grant.issue`. */
   readonly canIssue: boolean;
   /** Whether the VIEWER may open the finance workspace — gates the org page's link. */
@@ -374,13 +379,14 @@ export async function financeAuthority(orgSlug: string): Promise<FinanceAuthorit
     const members = canIssue ? await membersOf(db, org.id) : [];
     return {
       org,
-      // Same redaction as the settlement panel: the holder's name, not their
-      // number, unless the reader can actually hand the role out.
-      grants: granted.map((grant) => (canIssue ? grant : { ...grant, phone: "" })),
+      // Same redaction as the settlement panel: the holder's name, not either
+      // of their contacts, unless the reader can actually hand the role out.
+      grants: granted.map((grant) => (canIssue ? grant : { ...grant, phone: null, email: null })),
       members: members.map((member) => ({
         personId: member.personId,
         name: member.name,
         phone: member.phone,
+        email: member.email,
       })),
       canIssue,
       canView,

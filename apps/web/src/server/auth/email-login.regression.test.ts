@@ -7,7 +7,7 @@
 // is an account-takeover. The phone side learned this the hard way
 // (`otp-purpose.regression.test.ts`); this is the email twin.
 import { createDb, emailVerifications, newId, people, type DbHandle } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, like } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
@@ -36,6 +36,14 @@ async function seed(email: string, verified: boolean): Promise<string> {
 }
 
 afterAll(async () => {
+  /*
+   * BY EMAIL FIRST, and this is not belt-and-braces. A sign-up row has a NULL
+   * `person_id` (0063), so the person-scoped delete below cannot see it — and
+   * the address it holds is the thing the next run collides on. Deleting by the
+   * run's address prefix reaches every row this file made, owned or not.
+   */
+  await db.delete(emailVerifications).where(like(emailVerifications.email, `%${RUN}@example.test`));
+  await db.delete(people).where(like(people.email, `%${RUN}@example.test`));
   if (personIds.length > 0) {
     await db.delete(emailVerifications).where(inArray(emailVerifications.personId, personIds));
     await db.delete(people).where(inArray(people.id, personIds));
@@ -54,7 +62,7 @@ describe("EMAIL SIGN-IN — the second door to the same person", () => {
     const result = await verifyEmailLogin(db, { email: VERIFIED, code: code ?? "" });
     // The SAME personId the phone path would produce. Authorization keys on
     // this and cannot tell which door was used.
-    expect(result).toEqual({ ok: true, personId });
+    expect(result).toEqual({ ok: true, personId, created: false });
   });
 
   it("refuses an UNVERIFIED address without saying so", async () => {
@@ -71,12 +79,23 @@ describe("EMAIL SIGN-IN — the second door to the same person", () => {
   });
 
   it("answers identically for an address nobody owns (no enumeration)", async () => {
-    // A mailbox is a far better guess than a phone number, so a login form that
-    // says "no such account" is a membership oracle for anyone with a list.
-    const request = await requestEmailLogin(db, { email: `nobody${RUN}@example.test` });
-    expect(request.ok).toBe(true);
-    expect(request.ok && request.sent).toBe(true);
-    expect(request.ok && request.code).toBeUndefined();
+    /*
+     * A mailbox is a far better guess than a phone number, so a login form that
+     * says "no such account" is a membership oracle for anyone with a list.
+     *
+     * Phase 2 MINTS for the unknown address rather than staying silent — it is
+     * a sign-up — so the property is no longer "no code". It is that the two
+     * outcomes are indistinguishable in everything that leaves this function
+     * for the browser. The only field that differs, `isNew`, exists to pick the
+     * mail's wording and is documented as never being echoed; the test below
+     * holds the action to that.
+     */
+    const unknown = await requestEmailLogin(db, { email: `nobody${RUN}@example.test` });
+    const known = await requestEmailLogin(db, { email: VERIFIED });
+    expect(unknown.ok && known.ok).toBe(true);
+    const shape = (r: typeof unknown): unknown =>
+      r.ok ? { ok: r.ok, sent: r.sent, hasCode: r.code !== undefined } : { ok: r.ok };
+    expect(shape(unknown)).toEqual(shape(known));
   });
 });
 
@@ -137,7 +156,11 @@ describe("CODE HANDLING — the ordinary guarantees, held", () => {
     const personId = await seed(email, true);
     const request = await requestEmailLogin(db, { email });
     const code = request.ok ? (request.code ?? "") : "";
-    expect(await verifyEmailLogin(db, { email, code })).toEqual({ ok: true, personId });
+    expect(await verifyEmailLogin(db, { email, code })).toEqual({
+      ok: true,
+      personId,
+      created: false,
+    });
     expect(await verifyEmailLogin(db, { email, code })).toEqual({ ok: false, reason: "invalid" });
   });
 
@@ -153,5 +176,131 @@ describe("CODE HANDLING — the ordinary guarantees, held", () => {
       .limit(1);
     expect(row?.hash).toBeDefined();
     expect(row?.hash).not.toBe(code);
+  });
+});
+
+/*
+ * PHASE 2 — the account an address creates.
+ *
+ * 0062 made `people.phone` nullable behind a CHECK that an account is anchored
+ * by a phone, an email, or both; 0063 let a login code exist before its person
+ * does. Together they make email SIGN-UP possible, and every test below is one
+ * of the ways that could go wrong.
+ */
+describe("EMAIL SIGN-UP — the account the mailbox creates", () => {
+  it("creates nobody until the code comes back proved", async () => {
+    const email = `fresh${RUN}@example.test`;
+    const request = await requestEmailLogin(db, { email });
+    expect(request.ok && request.isNew).toBe(true);
+
+    // The whole point of 0063: minting the person here would let anyone
+    // manufacture `people` rows from a public form, one per guess, and would
+    // take the address on behalf of somebody who never replies.
+    const before = await db.select({ id: people.id }).from(people).where(eq(people.email, email));
+    expect(before).toHaveLength(0);
+
+    const code = request.ok ? (request.code ?? "") : "";
+    const result = await verifyEmailLogin(db, { email, code });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.created).toBe(true);
+
+    const [made] = await db
+      .select({ id: people.id, phone: people.phone, verifiedAt: people.emailVerifiedAt })
+      .from(people)
+      .where(eq(people.email, email));
+    expect(made?.id).toBe(result.ok ? result.personId : "");
+    // NO PHONE — this is 0062's entire reason for existing. The account is
+    // anchored by the address alone, and `people_reachable_check` is satisfied.
+    expect(made?.phone).toBeNull();
+    // Verified BY the code, not claimed: this person just proved the mailbox.
+    expect(made?.verifiedAt).not.toBeNull();
+  });
+
+  it("holds the row that carried no person, so the ledger is not a lie", async () => {
+    const email = `pending${RUN}@example.test`;
+    const request = await requestEmailLogin(db, { email });
+    const [pending] = await db
+      .select({ personId: emailVerifications.personId })
+      .from(emailVerifications)
+      .where(and(eq(emailVerifications.email, email), isNull(emailVerifications.personId)));
+    expect(pending, "a sign-up code must be mintable with no person").toBeDefined();
+
+    const code = request.ok ? (request.code ?? "") : "";
+    await verifyEmailLogin(db, { email, code });
+  });
+
+  it("signs the SAME person in the second time — it does not make two", async () => {
+    const email = `twice${RUN}@example.test`;
+    const first = await requestEmailLogin(db, { email });
+    const firstResult = await verifyEmailLogin(db, {
+      email,
+      code: first.ok ? (first.code ?? "") : "",
+    });
+    expect(firstResult.ok && firstResult.created).toBe(true);
+
+    const second = await requestEmailLogin(db, { email });
+    // Now a KNOWN, verified address — an ordinary sign-in, not a second account.
+    expect(second.ok && second.isNew).toBe(false);
+    const secondResult = await verifyEmailLogin(db, {
+      email,
+      code: second.ok ? (second.code ?? "") : "",
+    });
+    expect(secondResult.ok && secondResult.created).toBe(false);
+    expect(secondResult.ok && secondResult.personId).toBe(
+      firstResult.ok ? firstResult.personId : "",
+    );
+
+    const rows = await db.select({ id: people.id }).from(people).where(eq(people.email, email));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("REFUSES to adopt an account that claimed the address but never proved it", async () => {
+    /*
+     * The merge this product does not do. Somebody typed this address into
+     * their account page and never confirmed it; a stranger who owns the
+     * mailbox then asks to sign in. The code proves the MAILBOX — it does not
+     * prove anything about that account, whose owner signs in by phone — so
+     * handing it over would be an account takeover dressed as a convenience.
+     *
+     * The refusal happens at request time (no code is minted at all), which is
+     * also why it cannot be used to enumerate: the response is the uniform one.
+     */
+    const email = `claimed${RUN}@example.test`;
+    await seed(email, false);
+    const request = await requestEmailLogin(db, { email });
+    expect(request.ok).toBe(true);
+    expect(request.ok && request.code).toBeUndefined();
+
+    const rows = await db.select({ id: people.id }).from(people).where(eq(people.email, email));
+    expect(rows, "no second row on a taken address").toHaveLength(1);
+  });
+
+  it("refuses a sign-up code once somebody else has claimed the address unproved", async () => {
+    /*
+     * The window between minting and proving. The code was legitimately minted
+     * for a free address; before it came back, an existing account claimed that
+     * address without verifying it. The mailbox owner still holds a valid code
+     * — and must still not be given the other account.
+     */
+    const email = `raced${RUN}@example.test`;
+    const request = await requestEmailLogin(db, { email });
+    const code = request.ok ? (request.code ?? "") : "";
+    await seed(email, false);
+
+    const result = await verifyEmailLogin(db, { email, code });
+    expect(result).toEqual({ ok: false, reason: "taken" });
+  });
+
+  it("signs in rather than failing when the address became a real account meanwhile", async () => {
+    // Same window, benign end: somebody signed up through the other door and
+    // VERIFIED this address. The code proved the same mailbox, so it opens that
+    // account instead of erroring at a person who did nothing wrong.
+    const email = `overtaken${RUN}@example.test`;
+    const request = await requestEmailLogin(db, { email });
+    const code = request.ok ? (request.code ?? "") : "";
+    const personId = await seed(email, true);
+
+    const result = await verifyEmailLogin(db, { email, code });
+    expect(result).toEqual({ ok: true, personId, created: false });
   });
 });

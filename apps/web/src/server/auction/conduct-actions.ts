@@ -76,8 +76,13 @@ export interface OwnerAcceptance {
   inviteId: string;
   personId: string;
   name: string | null;
-  /** E.164 as stored; the panel formats it. Never blank for a real account. */
-  phone: string;
+  /**
+   * E.164 as stored; the panel formats it. NULL since 0062 for a team owner who
+   * signs in by email — a team owner works the auction through this website, so
+   * unlike a player they need no number.
+   */
+  phone: string | null;
+  email: string | null;
   /** ISO. */
   acceptedAt: string | null;
   /**
@@ -119,6 +124,7 @@ async function ownerAcceptancesOf(
       acceptedAt: auctionOwnerInvites.acceptedAt,
       name: people.name,
       phone: people.phone,
+      email: people.email,
       memberOrgId: orgMembers.orgId,
     })
     .from(auctionOwnerInvites)
@@ -139,6 +145,7 @@ async function ownerAcceptancesOf(
     personId: row.personId ?? "",
     name: row.name,
     phone: row.phone,
+    email: row.email,
     acceptedAt: row.acceptedAt === null ? null : row.acceptedAt.toISOString(),
     stillMember: row.memberOrgId !== null,
   }));

@@ -294,6 +294,31 @@ export default async function RegisterPage({
               </p>
             ) : null}
           </Card>
+        ) : session.phone === null ? (
+          /*
+           * SIGNED IN BY EMAIL, WITH NO NUMBER (0062).
+           *
+           * Said here rather than letting them fill in three steps and meet a
+           * refusal at Submit. A player is reached by SMS and by nothing else —
+           * the approval, the auction-day summons, the sold message — so a
+           * registration with no number would be accepted, approved, auctioned
+           * and never announced to the one person it is about.
+           * `submitRegistration` refuses it at the server too; this is the half
+           * that gives them somewhere to go.
+           */
+          <Card>
+            <p role="alert" data-testid="registration-needs-phone">
+              Add a mobile number to your account before you register as a player.
+            </p>
+            <p className="register-hint">
+              Organizers text you about your registration and again on auction day, and that is the
+              only way they reach you — so a season entry needs a number we can use. It takes a
+              minute: we send a six-digit code to confirm the handset is yours.
+            </p>
+            <p className="register-hint">
+              <ButtonLink href="/account">Add your mobile number</ButtonLink>
+            </p>
+          </Card>
         ) : (
           <RegisterFlow
             slug={slug}

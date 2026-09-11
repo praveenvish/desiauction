@@ -3,7 +3,7 @@ import { roleLabelIn, sportPackFor } from "@desiauction/core";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
-import { formatPhone } from "../../../../lib/format-phone";
+import { personContact } from "../../../../lib/person-label";
 import { formatCount } from "../../../../server/admin/format";
 import type { UserDetail } from "../../../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, absoluteIst } from "../../admin-ui";
@@ -35,7 +35,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
         {/* The ONE surface that shows the whole number — an operator arrived
             here on purpose, for one person. The directory shows four digits. */}
         <p className="dash-hint">
-          {formatPhone(person.phone)} · <span className="admin-id">{person.id}</span> · joined{" "}
+          {personContact(person)} · <span className="admin-id">{person.id}</span> · joined{" "}
           {absoluteIst(person.createdAt)}
         </p>
       </header>

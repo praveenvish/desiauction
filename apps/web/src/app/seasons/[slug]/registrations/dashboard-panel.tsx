@@ -51,7 +51,7 @@ import { ValueMapper } from "./value-mapper";
 import { PhotoImportPanel } from "./photo-import";
 import { PlayerPhotoUploader } from "./player-photo-uploader";
 import { formatDateTime } from "../../../../lib/format-date";
-import { formatPhone } from "../../../../lib/format-phone";
+import { personContact, personLabel } from "../../../../lib/person-label";
 import type {
   OrphanPreSigned,
   KitSizeCount,
@@ -2307,7 +2307,7 @@ function RegRow({
         <input
           type="checkbox"
           className="reg-check"
-          aria-label={`Select ${row.name ?? formatPhone(row.phone)}`}
+          aria-label={`Select ${personLabel(row)}`}
           checked={checked}
           onChange={onToggle}
         />
@@ -2343,7 +2343,7 @@ function RegRow({
               ) : null}
             </span>
             {/* DA-35: the fourth screen to echo raw E.164 back at a human. */}
-            <span className="registration-phone">{formatPhone(row.phone)}</span>
+            <span className="registration-phone">{personContact(row)}</span>
             {row.duplicateName ? (
               <Badge tone="warning" data-testid="dup-flag">
                 possible duplicate
