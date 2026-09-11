@@ -56,17 +56,45 @@ MEDIA_STORAGE=bucket
 MEDIA_S3_ENDPOINT=https://s3.example.in
 MEDIA_S3_REGION=us-east-1          # MinIO ignores it; the signer requires one
 MEDIA_S3_BUCKET=desiauction-media
-MEDIA_PUBLIC_BASE=https://s3.example.in/desiauction-media
 MEDIA_S3_ACCESS_KEY_ID=...         # MINIO_ROOT_USER, or a scoped MinIO user
 MEDIA_S3_SECRET_ACCESS_KEY=...
 
 FINOPS_ARTIFACT_STORE=bucket
-FINOPS_S3_ENDPOINT=https://s3.example.in
 FINOPS_S3_REGION=us-east-1
 FINOPS_S3_BUCKET=desiauction-finops
 FINOPS_S3_ACCESS_KEY_ID=...
 FINOPS_S3_SECRET_ACCESS_KEY=...
 ```
+
+`MEDIA_PUBLIC_BASE` and `FINOPS_S3_ENDPOINT` are NOT in that list on purpose.
+They are derived — the public base from the endpoint and the bucket, the finops
+endpoint from the media one, because a single-host deployment has one MinIO.
+Both stay overridable; setting either wins. See "Values the domain decides".
+
+### Values the domain decides
+
+Four settings used to be `PUBLIC_BASE_URL` and `MEDIA_S3_ENDPOINT` written out
+again in a different shape, and a fact typed twice is how two valid values come
+to disagree:
+
+| Derived              | From                                    |
+| -------------------- | --------------------------------------- |
+| `RP_ID`              | the hostname of `PUBLIC_BASE_URL`       |
+| `RP_ORIGINS`         | the origin of `PUBLIC_BASE_URL`         |
+| `MEDIA_PUBLIC_BASE`  | `MEDIA_S3_ENDPOINT` + `MEDIA_S3_BUCKET` |
+| `FINOPS_S3_ENDPOINT` | `MEDIA_S3_ENDPOINT`                     |
+
+`RP_ID` is why this matters more than tidiness. Nothing compared it to the URL
+being served — here or in `preflight:production`, where the only test was "not
+localhost" — so a domain typo passed every gate, deployed green, and silently
+stopped every enrolled passkey from verifying. No error, no log line, no symptom
+except people who cannot get in. An override is now checked against the real
+host; a parent domain is still allowed, because that is how one credential
+covers subdomains.
+
+`ENGINE_ALLOWED_ORIGINS` is NOT derived: it lives in `engine.env`, a different
+process that never sees the web tier's settings. Set it to the same origin as
+`PUBLIC_BASE_URL` by hand.
 
 The media bucket is anonymously readable and the finops bucket is not — that
 single difference is set by `minio-init` and is what makes a photo load in a
