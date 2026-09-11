@@ -13,7 +13,7 @@ import {
  * THE SINGLE-WRITER LEASE (audit 2026-08-26).
  *
  * The engine's whole correctness model is "one writer", and until this lease
- * existed that was enforced by fly.toml and human discipline — a `fly scale 2`
+ * existed that was enforced by platform config and human discipline — a scale-to-2
  * or a bluegreen deploy put two timer authorities on one gavel. These tests pin
  * the contract against a stubbed `sql` so they stay fast and hermetic; the
  * behaviour against a real database (second instance refused, lock released on

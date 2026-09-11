@@ -30,7 +30,7 @@ worst all shared "Detectability: poor". These five close exactly those:
 ## 1 · Service health
 
 **Signal:** `GET /healthz` (liveness) and `GET /readyz` (readiness) on web and
-engine. Both exist and are already wired into `fly.toml`'s checks.
+engine. Both exist and are already wired into the compose healthchecks.
 
 **Alert when:** `/readyz` returns non-200 for 2 consecutive minutes on any
 service, or `/healthz` fails at all.
@@ -74,8 +74,8 @@ request (`server/logger.ts`).
 
 **Alert when:** `healthy` is false for 15 minutes.
 
-**Why this is the subtle one.** The runner has no HTTP surface — its `fly.toml`
-says so deliberately, because killing it loses nothing. That also means nothing
+**Why this is the subtle one.** The runner has no HTTP surface — deliberately,
+because killing it loses nothing, which is why compose gives it no healthcheck. That also means nothing
 watches it. Health used to be `dead === 0`, which answers "did anything fail
 loudly" and scores a *stopped* runner as perfect: a crashed or never-deployed
 runner produces no dead jobs at all. It now also fails when the oldest queued

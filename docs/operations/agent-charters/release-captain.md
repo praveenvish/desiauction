@@ -38,7 +38,7 @@ pnpm preflight:production                        # cross-service production conf
 
 **Does this release ship a migration?**
 
-- **No migration:** rollback is an app-image swap. `flyctl releases rollback` for engine and runner (machines are stateless, all state in Postgres); the web platform has instant immutable-build rollback.
+- **No migration:** rollback is an app-image swap — set `TAG=` back to the previous commit in the host's `.env` and `docker compose up -d`. Containers are stateless; all state is in Postgres.
 - **Migration:** rollback is **not free**. Migrations are forward-only; there are no down migrations. It means expand/contract or a restore to a pre-deploy restore point. Migration `0019_tournaments` renames a table and drops a column — past that point, revert is not a revert. The three-branch rollback decision procedure is in `docs/operations/DEPLOYMENT.md`.
 
 If a release carries a migration and no restore point is provisioned, that is a **NO-GO**, and it is currently a live blocking row in `docs/parity/RELEASE_RISK_REGISTER.md` (R-D1).

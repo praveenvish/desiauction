@@ -6,7 +6,7 @@ import type postgres from "postgres";
  * The engine holds every live auction's state in memory and applies commands
  * through a per-auction FIFO queue, which makes it the single mutation
  * authority — but only WITHIN one process. Across processes the guarantee was
- * `fly.toml` (`min_machines_running = 1`, `auto_stop_machines = false`) plus
+ * platform configuration (a `fly.toml`, in the deployment of the day) plus
  * human discipline, and nothing in the code stopped a second instance: a
  * `fly scale 2` for "capacity", a bluegreen deploy strategy, or an orchestrator
  * that briefly overlaps old and new would put TWO timer authorities on one

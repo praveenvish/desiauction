@@ -24,10 +24,17 @@ Your job is to make that list unambiguous, ordered, and small enough to act on t
 
 ## The list, in dependency order (`docs/operations/PRODUCTION_CHECKLIST.md` §1–3)
 
-1. **Fly.io** — account plus `FLY_API_TOKEN` org secret; apps `desiauction-engine-{staging,production}` and `desiauction-finops-runner-{staging,production}`.
-2. **Vercel** — project and domains. ⚠ `RP_ID` / `RP_ORIGINS` must match the public domain exactly, or **passkeys break**.
-3. **Managed Postgres 17**, Mumbai region, PITR enabled, daily dumps to a *separate credential or account* than the primary.
-4. **S3-compatible object storage** plus durable storage roots. Until this exists, finops artifacts (receipts, invoices, exports) persist on instance disk, not durable storage.
+1. **One Hetzner Cloud server**, 4 vCPU / **8GB**, plus its backup add-on. Web,
+   engine, runner, Postgres, MinIO and Caddy all run on it. 4GB will OOM under
+   an auction; the add-on is the only thing covering the disk, because the
+   pgBackRest repo lives on that same disk.
+2. **Domain plus three DNS records** at the host: `PUBLIC_DOMAIN`,
+   `ENGINE_DOMAIN`, `S3_DOMAIN`. ⚠ `RP_ID` / `RP_ORIGINS` must match the public
+   domain exactly, or **passkeys break**. Caddy issues the certificates.
+3. **Postgres 17 and object storage are IN the stack**, not bought — see
+   `ops/deploy/`. Postgres is built with pgbackrest because the archive command
+   runs inside that container; MinIO holds the media, finops and WAL buckets.
+   Nothing to provision, but the restore drill still has to be run once.
 5. → then engineering can proceed: DB bootstrap (migrations → **all four** roles → `grants:verify` → `rls:verify`), flip `DATABASE_URL`s to the four-role recipe, first staging deploy of all three services plus smoke.
 6. **Razorpay** production keys plus `RAZORPAY_WEBHOOK_SECRET` (≥16 chars), and one live staging transaction end to end: order → webhook → capture → discharge.
 7. **SMS provider (MSG91 or equivalent)** — ⚠ **go-live-critical. Login is OTP-first and only the dev-inbox sender exists. Without this, nobody can sign in at all.** Note that Indian SMS requires DLT registration and KYC, which takes time — **start this first even though it sits at position 7**, because its lead time is the longest.
