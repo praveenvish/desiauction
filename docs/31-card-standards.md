@@ -25,6 +25,10 @@ Inspection without navigation (16 return-context partner): 480px right slide-ove
 - Keyboard: `↑/↓` moves peek through the underlying list (review-queue ergonomics — registration triage lives on this); `Esc` returns focus to the originating row (13).
 - Peeks are URL-addressable (`?peek={id}`) so triage sessions survive reload and are shareable.
 
+## Interactive cards (2026-09-13)
+
+`Card interactive` is the only hover language a card has: −2px lift, `shadow-2`, stronger border, `focus-visible` ring, `scale(0.995)` on press; no lift where hover does not exist. Anchors and buttons that *are* a card use `cardClassName({ interactive: true })` rather than nesting a Card. Screens do not draw their own card hovers. `elevation` is `flat | raised | floating` (`none | shadow-1 | shadow-2` at rest).
+
 ## Rules
 
 - Radius `lg`, padding `space-5` (dense: `space-4`), elevation per theme (10).

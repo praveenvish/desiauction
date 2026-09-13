@@ -261,7 +261,7 @@ export default async function TournamentsPage({
           <Card>
             <div className="tg-firstrun" data-testid="tournaments-empty">
               <span className="tg-firstrun-glyph" aria-hidden>
-                🏆
+                <IconTrophy size={32} />
               </span>
               <h2>Run your first auction</h2>
               <p>
@@ -280,7 +280,7 @@ export default async function TournamentsPage({
                   </FormDialog>
                   <FormDialog
                     title="New one-off season"
-                    triggerLabel="or start a one-off season →"
+                    triggerLabel="or start a one-off season"
                     triggerAsLink
                     triggerClassName="tg-firstrun-alt"
                     /* The same handle the populated page's "+ New season"

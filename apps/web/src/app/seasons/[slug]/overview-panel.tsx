@@ -10,6 +10,8 @@ import {
   Select,
   useToast,
   VisuallyHidden,
+  IconArrowRight,
+  IconCheck,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
@@ -349,7 +351,10 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
             {secondary.label}
           </ButtonLink>
           {view.auctionLive ? (
-            <ButtonLink href={`/seasons/${slug}/auction/live`}>Go to live auction →</ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction/live`}>
+              Go to live auction
+              <IconArrowRight size={16} className="icon-trail" />
+            </ButtonLink>
           ) : null}
         </div>
       </header>
@@ -375,7 +380,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
                   {...(state === "now" ? { "aria-current": "step" as const } : {})}
                 >
                   <span className="season-step-mark" aria-hidden>
-                    {state === "done" ? "✓" : String(index + 1)}
+                    {state === "done" ? <IconCheck size={14} /> : String(index + 1)}
                   </span>
                   <span className="season-step-label">{label}</span>
                   {/* The only carrier of state used to be aria-hidden, so a
@@ -472,7 +477,10 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
             data-testid="pending-tile"
           >
             <span className="season-tile-value season-tile-warn">{view.pendingPlayers}</span>
-            <span className="season-tile-label">Awaiting your review →</span>
+            <span className="season-tile-label">
+              Awaiting your review
+              <IconArrowRight size={16} className="icon-trail" />
+            </span>
           </Link>
         ) : null}
         <div className="season-tile">
@@ -507,7 +515,8 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           <div className="season-card-head">
             <h2>{view.lotsSold > 0 && view.viewer.canSeeMoney ? "Top teams by spend" : "Teams"}</h2>
             <Link className="season-inline-link" href={`/seasons/${slug}/teams`}>
-              All teams →
+              All teams
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>
           </div>
           {view.topTeams.length === 0 ? (
@@ -667,8 +676,9 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           {previewable ? (
             <Link className="season-inline-link" href={`/c/${slug}`} data-testid="open-public-page">
               {view.competition.visibility === "public"
-                ? "View the public page →"
-                : "Preview the public page →"}
+                ? "View the public page"
+                : "Preview the public page"}
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>
           ) : null}
           {view.viewer.canManage ? (
@@ -733,7 +743,8 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           {previewable ? (
             <p>
               <Link className="season-inline-link" href={`/c/${slug}`} target="_blank">
-                Preview it first →
+                Preview it first
+                <IconArrowRight size={16} className="icon-trail" />
               </Link>
             </p>
           ) : null}

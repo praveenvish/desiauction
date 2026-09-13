@@ -1,4 +1,4 @@
-import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
+import { Badge, ButtonLink, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
@@ -221,7 +221,8 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                 ))}
               </ul>
               <Link href={`/admin/audit?scopeId=${org.id}`} className="admin-meta">
-                All audit for this organization →
+                All audit for this organization
+                <IconArrowRight size={16} className="icon-trail" />
               </Link>
             </>
           )}

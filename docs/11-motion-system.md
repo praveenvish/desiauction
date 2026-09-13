@@ -46,6 +46,19 @@ UNSOLD, by contrast: 400ms total — neutral ink stamp, brisk fade, immediate ne
 
 On resync after a gap: the surface shows "Catching up…" and new events replay compressed (max 600ms total, batched — never a fake replay of every bid), landing on current truth with a single confirmation pulse. Emotional beat 2 (04) depends on this feeling *certain*, not theatrical.
 
+## Foundation primitives (2026-09-13)
+
+| Primitive | What it is | Rules |
+|-----------|-----------|-------|
+| `Card interactive` | The one hover/active/focus set for a card that is a target | Transform + shadow only; no lift on `(hover: none)` |
+| `Tilt` | Pointer-tracked depth (≤ `depth-tilt`), optional glare and lift | Fine pointers only; inert on touch and under reduced motion; no React state per move |
+| `Reveal` / `.da-reveal` | Scroll-linked entrance for below-the-fold content, staggered by `--reveal-index` | `view()` timeline, `backwards` fill, **transform only** — text never animates opacity (the contrast scans sample every frame) |
+| `.da-stagger` | First-paint settle for children already on screen, 60ms apart within `duration-slow` | Transform only; reduced motion → none |
+
+### Sound (foundation)
+
+Sound is a room feature, not a phone feature. The engine (`@desiauction/ui` `soundEngine`) synthesises every cue — no audio files — and is inert until a real gesture unlocks it (`useSoundPreference().setEnabled(true)` inside the click). The choice is device-local (`da-sound`), off by default. Cues: `opening`, `bid`, `extension`, `warning`, `sold`, `complete`. **UNSOLD has no cue** (C-23). Defaults per surface are decided where the surface is built: board and stage-mode on, cockpit and overlay opt-in, phones opt-in.
+
 ## Reduced motion (C-15)
 
 `prefers-reduced-motion`: all movement replaced by opacity crossfades ≤ 120ms; counters jump to final value; ceremonies become a static gold frame + text change (the *information* of ceremony, none of the motion); timer ring becomes a numeric countdown only. Parity is a release gate (69), not a nice-to-have.

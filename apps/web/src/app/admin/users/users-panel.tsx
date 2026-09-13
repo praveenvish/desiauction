@@ -1,4 +1,4 @@
-import { Card, EmptyState } from "@desiauction/ui";
+import { Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatCount, maskPersonContact } from "../../../server/admin/format";
@@ -134,7 +134,8 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                 <span className="admin-meta">End of the list.</span>
               ) : (
                 <Link href={nextHref} data-testid="admin-user-next">
-                  Next 50 →
+                  Next 50
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               )}
             </nav>

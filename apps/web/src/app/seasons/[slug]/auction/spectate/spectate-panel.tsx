@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type AuctionStatus } from "@desiauction/core";
-import { Badge, Card } from "@desiauction/ui";
+import { Badge, Card, IconArrowRight } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
 import { PageStatus } from "../../../../../components/shell/page-status";
@@ -442,7 +442,8 @@ export function SpectatePanel({
       <p className="spectate-footer stage-hide" data-testid="spectate-footer">
         <span>This auction is running on DesiAuction. Yours can too.</span>
         <a href="/" data-testid="spectate-footer-cta">
-          Run your own auction →
+          Run your own auction
+          <IconArrowRight size={16} className="icon-trail" />
         </a>
       </p>
     </div>

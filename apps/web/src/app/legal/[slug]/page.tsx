@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { IconArrowLeft } from "@desiauction/ui";
 
 import { env } from "../../../env";
 import { Prose } from "../../../content/blocks";
@@ -42,7 +43,7 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
     <main className="content-page content-narrow">
       <p className="article-meta no-print">
         <Link href="/legal" className="prose-link">
-          <span aria-hidden="true">←</span> All legal documents
+          <IconArrowLeft size={16} className="icon-lead" /> All legal documents
         </Link>
       </p>
       <h1>{doc.title}</h1>

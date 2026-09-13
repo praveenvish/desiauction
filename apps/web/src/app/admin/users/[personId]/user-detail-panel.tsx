@@ -1,4 +1,4 @@
-import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
+import { Badge, ButtonLink, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import { roleLabelIn, sportPackFor } from "@desiauction/core";
 import Link from "next/link";
 
@@ -175,7 +175,8 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                 ))}
               </ul>
               <Link href={`/admin/audit?actor=${person.id}`} className="admin-meta">
-                Everything this person did →
+                Everything this person did
+                <IconArrowRight size={16} className="icon-trail" />
               </Link>
             </>
           )}

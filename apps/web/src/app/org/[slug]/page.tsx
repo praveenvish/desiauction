@@ -7,6 +7,8 @@ import {
   AnnouncerProvider,
   ToastProvider,
   VisuallyHidden,
+  IconArrowRight,
+  IconCheck,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { enabledSports } from "../../../server/competition/sports";
@@ -180,7 +182,7 @@ function OrgLadder({ rungs, current }: { rungs: OrgRung[]; current: number }) {
           return (
             <li key={rung.key} className={`od-rung od-rung--${state}`}>
               <span className="od-rung-mark" aria-hidden>
-                {rung.done ? "✓" : rung.step}
+                {rung.done ? <IconCheck size={14} /> : rung.step}
               </span>
               <span className="od-rung-text">
                 <strong>
@@ -439,7 +441,10 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
         <Card className="od-panel">
           <div className="od-panel-head">
             <h2>Live &amp; open now</h2>
-            <Link href={`/org/${slug}#tournaments`}>All tournaments →</Link>
+            <Link href={`/org/${slug}#tournaments`}>
+              All tournaments
+              <IconArrowRight size={16} className="icon-trail" />
+            </Link>
           </div>
           {liveOpen.length === 0 ? (
             <p className="competitions-hint">Nothing live or taking entries right now.</p>
@@ -453,7 +458,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                       {row.tone === "live" ? "Live" : "Open"}
                     </Badge>
                     <span className="od-live-go" aria-hidden>
-                      →
+                      <IconArrowRight size={16} aria-hidden />
                     </span>
                   </Link>
                 </li>
@@ -507,7 +512,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
               size="touch"
               data-testid="open-venues"
             >
-              Venues →
+              Venues
+              <IconArrowRight size={16} className="icon-trail" />
             </ButtonLink>
           ) : null}
         </div>
@@ -577,7 +583,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                 </span>
               </span>
               <span className="od-moneydoor-go" aria-hidden>
-                →
+                <IconArrowRight size={16} aria-hidden />
               </span>
             </Link>
           ) : null}

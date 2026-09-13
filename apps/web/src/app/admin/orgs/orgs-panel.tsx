@@ -1,4 +1,4 @@
-import { Badge, Card, EmptyState } from "@desiauction/ui";
+import { Badge, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatCount } from "../../../server/admin/format";
@@ -194,7 +194,8 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                 <span className="admin-meta">End of the list.</span>
               ) : (
                 <Link href={nextHref} data-testid="admin-org-next">
-                  Next 50 →
+                  Next 50
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               )}
             </nav>

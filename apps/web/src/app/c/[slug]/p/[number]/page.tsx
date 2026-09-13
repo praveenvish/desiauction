@@ -1,5 +1,5 @@
 import { roleLabelIn, sportPackFor, styleLabel } from "@desiauction/core";
-import { Badge, ButtonLink, PlayerImage } from "@desiauction/ui";
+import { Badge, ButtonLink, PlayerImage, IconArrowLeft } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -198,7 +198,7 @@ export default async function PlayerProfilePage({
               </ButtonLink>
             ) : null}
             <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg">
-              ← Back to {player.competitionName}
+              <IconArrowLeft size={18} /> Back to {player.competitionName}
             </ButtonLink>
           </div>
         </section>

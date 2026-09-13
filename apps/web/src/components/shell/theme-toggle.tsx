@@ -1,5 +1,6 @@
 "use client";
 
+import { IconMoon, IconSun } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
 /**
@@ -56,26 +57,7 @@ export function ThemeToggle() {
         setTheme(next);
       }}
     >
-      {ready && theme === "floodlight" ? (
-        <svg viewBox="0 0 24 24" fill="none" width={18} height={18} aria-hidden>
-          <circle cx="12" cy="12" r="4.4" stroke="currentColor" strokeWidth="1.8" />
-          <path
-            d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" fill="none" width={18} height={18} aria-hidden>
-          <path
-            d="M20 14.2A8 8 0 1 1 9.8 4a6.3 6.3 0 0 0 10.2 10.2z"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
+      {ready && theme === "floodlight" ? <IconSun size={18} /> : <IconMoon size={18} />}
     </button>
   );
 }

@@ -11,6 +11,8 @@ import {
   paintOnFill,
   useToast,
   initialsFor,
+  IconArrowRight,
+  IconArrowLeft,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -441,7 +443,8 @@ function TeamGridCard({
           className="team-card-link team-card-cover"
           data-testid={`open-roster-${team.id}`}
         >
-          {view.viewer.canSeeRoster ? "Prepare roster →" : "Open team →"}
+          {view.viewer.canSeeRoster ? "Prepare roster" : "Open team"}
+          <IconArrowRight size={16} className="icon-trail" />
         </Link>
       </div>
     </article>
@@ -506,7 +509,7 @@ function RosterDetail({
   return (
     <>
       <Link href={`/seasons/${slug}/teams`} className="teams-back">
-        ← All teams
+        <IconArrowLeft size={16} className="icon-lead" /> All teams
       </Link>
 
       <header className="team-detail-head">

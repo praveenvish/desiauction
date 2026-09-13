@@ -9,6 +9,8 @@ import {
   Money,
   SectionHeader,
   VisuallyHidden,
+  IconArrowRight,
+  IconCheck,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -900,7 +902,8 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
               href={`/seasons/${liveRow.competitionSlug}/auction/live`}
               data-testid="home-enter-room"
             >
-              {liveDone ? "Close out the auction →" : "Enter auction room →"}
+              {liveDone ? "Close out the auction" : "Enter auction room"}
+              <IconArrowRight size={16} className="icon-trail" />
             </ButtonLink>
           </section>
         ) : null}
@@ -984,7 +987,7 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                                 <span>{row.detail}</span>
                               </span>
                               <span className="home-go" aria-hidden>
-                                →
+                                <IconArrowRight size={16} aria-hidden />
                               </span>
                             </Link>
                           </li>
@@ -1410,7 +1413,8 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                  * empty cricket career and told them that was their record.
                  */
                 <Link href={`/me/${careerSport}`} data-testid="home-career-link">
-                  My {careerSportLabel} →
+                  My {careerSportLabel}
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               }
             />
@@ -1534,7 +1538,7 @@ function SetupLadder({ rungs, current }: { rungs: SetupRung[]; current: number }
           return (
             <li key={rung.key} className={`home-rung home-rung--${state}`}>
               <span className="home-rung-mark" aria-hidden>
-                {rung.done ? "✓" : index + 1}
+                {rung.done ? <IconCheck size={14} /> : index + 1}
               </span>
               <span className="home-rung-text">
                 <strong>

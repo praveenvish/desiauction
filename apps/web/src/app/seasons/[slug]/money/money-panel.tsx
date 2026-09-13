@@ -14,6 +14,7 @@ import {
   useToast,
   VisuallyHidden,
   type BadgeTone,
+  IconCheck,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -135,7 +136,7 @@ function CaseStepper({ status }: { status: string }) {
             {...(state === "current" ? { "aria-current": "step" as const } : {})}
           >
             <span className="case-step-mark" aria-hidden>
-              {state === "done" ? "✓" : String(index + 1)}
+              {state === "done" ? <IconCheck size={14} /> : String(index + 1)}
             </span>
             {step.label}
             {state === "done" ? <VisuallyHidden> (done)</VisuallyHidden> : null}

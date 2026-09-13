@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type PlanState } from "@desiauction/core";
-import { Badge, ButtonLink, Card } from "@desiauction/ui";
+import { Badge, ButtonLink, Card, IconTrophy } from "@desiauction/ui";
 import { useEffect, useRef, useState } from "react";
 
 import type { AuctionRules, ResolvedLot } from "../../../../server/auction/live-summary";
@@ -384,7 +384,9 @@ export function AuctionSummaryCard({
   const teams = [...snapshot.paddles].sort((a, b) => (b.committed ?? 0) - (a.committed ?? 0));
   return (
     <Card data-testid="auction-summary">
-      <h2>That&apos;s a wrap 🎉</h2>
+      <h2>
+        <IconTrophy size={20} className="icon-lead" /> That&apos;s a wrap
+      </h2>
       <p className="competitions-hint">
         {viewerTeamName !== null
           ? `Congratulations, ${viewerTeamName} — your squad is set.`

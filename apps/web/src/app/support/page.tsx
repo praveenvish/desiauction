@@ -4,6 +4,7 @@ import Link from "next/link";
 import { env } from "../../env";
 import { SUPPORT } from "../../content/support";
 import "../content.css";
+import { IconArrowRight } from "@desiauction/ui";
 
 export const metadata: Metadata = {
   title: "Support · DesiAuction",
@@ -49,7 +50,8 @@ export default function SupportPage() {
               <p>{issue.body}</p>
               <p>
                 <Link href={issue.link.href} className="prose-link">
-                  {issue.link.label} →
+                  {issue.link.label}
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               </p>
             </div>

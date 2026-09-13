@@ -1,4 +1,4 @@
-import { Card, EmptyState } from "@desiauction/ui";
+import { Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/format";
@@ -117,7 +117,8 @@ export function AuditPanel({ page }: { page: AuditPage }) {
                 <span className="admin-meta">End of the matching events.</span>
               ) : (
                 <Link href={nextHref} data-testid="admin-audit-next">
-                  Older 100 →
+                  Older 100
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               )}
             </nav>

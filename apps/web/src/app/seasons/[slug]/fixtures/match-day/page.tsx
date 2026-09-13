@@ -1,5 +1,5 @@
 import { addDays } from "@desiauction/core";
-import { ButtonLink, Card, ToastProvider } from "@desiauction/ui";
+import { ButtonLink, Card, ToastProvider, IconArrowRight, IconArrowLeft } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -42,11 +42,12 @@ export default async function MatchDayPage({
             <nav className="calendar-nav" aria-label="Match day">
               <span className="date-row">
                 <Link href={dayHref(addDays(view.date, -1))} className="calendar-tab">
-                  ← previous day
+                  <IconArrowLeft size={16} className="icon-lead" /> previous day
                 </Link>
                 <strong data-testid="match-day-date">{formatWallDate(view.date)}</strong>
                 <Link href={dayHref(addDays(view.date, 1))} className="calendar-tab">
-                  next day →
+                  next day
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               </span>
             </nav>

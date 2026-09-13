@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useToast } from "@desiauction/ui";
+import { Button, useToast, IconCheck } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
 /**
@@ -77,7 +77,14 @@ export function ShareRegistration({ slug, open }: { slug: string; open: boolean 
           aria-label="Public registration link"
         />
         <Button size="sm" variant="secondary" onClick={() => void copy()} disabled={url === ""}>
-          {copied ? "Copied ✓" : "Copy"}
+          {copied ? (
+            <>
+              Copied
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Copy"
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void share()} disabled={url === ""}>
           Share

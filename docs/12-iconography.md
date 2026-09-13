@@ -6,6 +6,10 @@
 
 **Lucide** (ISC license): consistent 24px grid, 1.5px stroke, open, tree-shakable. One library only — the previous product's audit found four coexisting icon idioms; here, non-Lucide SVGs are lint-banned outside `@da/ui/icons` (64).
 
+## As built (2026-09-13)
+
+One hand-drawn set on the Lucide grid ships from `@desiauction/ui` (`packages/ui/src/icons/icons.tsx`): 1.6 stroke, 20px default, `size` prop for 16/22/24. The former shell and marketing sets are merged into it; `shell/icons.tsx` and `components/marketing/icons.tsx` remain as re-exports. Typed glyphs (`→`, `←`, `✓`, `★`) and emoji are no longer used for UI meaning — `IconArrowRight` with `.icon-trail`, `IconArrowLeft` with `.icon-lead`, `IconCheck`, `IconStar`/`IconStarOutline` replace them.
+
 ## Usage rules
 
 - Sizes: 16 (inline/dense), 20 (default UI), 24 (headers, empty states), 32+ (live surfaces only).

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@desiauction/ui";
+import { Button, IconCheck } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
 /**
@@ -65,7 +65,14 @@ export function SharePlayer({ playerName }: { playerName: string }) {
           aria-label={`Public page for ${playerName}`}
         />
         <Button size="sm" variant="secondary" onClick={() => void copy()} disabled={url === ""}>
-          {copied ? "Copied ✓" : "Copy"}
+          {copied ? (
+            <>
+              Copied
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Copy"
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void share()} disabled={url === ""}>
           Share

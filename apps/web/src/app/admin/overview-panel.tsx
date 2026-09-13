@@ -1,5 +1,5 @@
 import type { OutcomeMetrics } from "@desiauction/core";
-import { Badge, Card, EmptyState } from "@desiauction/ui";
+import { Badge, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { ADMIN_ACCESS_ACTION } from "../../server/admin/capabilities";
@@ -141,14 +141,16 @@ export function OverviewPanel({
               </Badge>
             </div>
             <Link href="/admin/health" className="admin-meta">
-              Platform health →
+              Platform health
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>{" "}
             {/* The door this console lacked. Whether the deployment holds the
                 registered DLT ids it needs is a health fact like any other —
                 without an id a message shape does not send at all — and it was
                 answerable only by reading a running process's environment. */}
             <Link href="/admin/messaging" className="admin-meta" data-testid="admin-messaging-link">
-              Messaging →
+              Messaging
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>
           </div>
         </Card>
@@ -183,7 +185,8 @@ export function OverviewPanel({
                 </span>
                 {row.href !== null ? (
                   <Link href={row.href} className="admin-meta">
-                    Inspect →
+                    Inspect
+                    <IconArrowRight size={16} className="icon-trail" />
                   </Link>
                 ) : null}
               </li>
@@ -210,7 +213,8 @@ export function OverviewPanel({
               ))}
             </ul>
             <Link href="/admin/audit" className="admin-meta">
-              Open the audit explorer →
+              Open the audit explorer
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>{" "}
             {/* Administration records its own page views, so this list would
                 otherwise fill with an admin watching themselves refresh. They
@@ -220,7 +224,8 @@ export function OverviewPanel({
               className="admin-meta"
               data-testid="admin-access-log-link"
             >
-              Administration&rsquo;s own access log →
+              Administration&rsquo;s own access log
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>
           </>
         )}

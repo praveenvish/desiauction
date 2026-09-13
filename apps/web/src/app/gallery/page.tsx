@@ -5,6 +5,7 @@ import "./gallery.css";
 import { AnnouncerProvider, semanticTokenNames, ToastProvider } from "@desiauction/ui";
 import { useState } from "react";
 
+import { DepthDemo } from "./depth-demo";
 import { IdentityDemo } from "./identity-demo";
 import { MotionDemo } from "./motion-demo";
 import { PrimitivesDemo } from "./primitives-demo";
@@ -225,6 +226,7 @@ export default function GalleryPage() {
           <IdentityDemo />
           <MotionDemo />
           <PrimitivesDemo />
+          <DepthDemo />
         </main>
       </ToastProvider>
     </AnnouncerProvider>

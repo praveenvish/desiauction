@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconArrowLeft } from "@desiauction/ui";
 
 import { Prose, tocOf, type Block } from "../../content/blocks";
 
@@ -27,7 +28,7 @@ export function ArticleView({
         <Link href={backHref} className="prose-link">
           {/* The two page files already hide the glyph; this shared component
               did not, so a screen reader read the arrow character aloud. */}
-          <span aria-hidden="true">←</span> {backLabel}
+          <IconArrowLeft size={16} className="icon-lead" /> {backLabel}
         </Link>
       </p>
       <h1>{title}</h1>

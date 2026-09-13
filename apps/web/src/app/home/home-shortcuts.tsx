@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, SectionHeader } from "@desiauction/ui";
+import { Card, SectionHeader, IconStar, IconStarOutline } from "@desiauction/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -123,7 +123,7 @@ function ShortcutCard({
           onTogglePin(competition.slug);
         }}
       >
-        {pinned ? "★" : "☆"}
+        {pinned ? <IconStar size={18} /> : <IconStarOutline size={18} />}
       </button>
     </Card>
   );

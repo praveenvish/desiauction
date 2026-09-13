@@ -18,6 +18,7 @@ import {
   Tabs,
   useToast,
   VisuallyHidden,
+  IconCheck,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -2459,7 +2460,14 @@ function RegRow({
           data-focus-key={`icon-${row.id}`}
           data-testid={`icon-toggle-${row.personId}`}
         >
-          {row.isIcon ? "Icon ✓" : "Icon"}
+          {row.isIcon ? (
+            <>
+              Icon
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Icon"
+          )}
         </Button>
         {/* Retention is NOT exclusive with either of its neighbours, and the
             button says so by never being disabled. You retain last season's
@@ -2478,7 +2486,14 @@ function RegRow({
           data-focus-key={`retain-${row.id}`}
           data-testid={`retain-toggle-${row.personId}`}
         >
-          {row.isRetained ? "Retained ✓" : "Retain"}
+          {row.isRetained ? (
+            <>
+              Retained
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Retain"
+          )}
         </Button>
         <Button
           size="sm"
@@ -2494,7 +2509,14 @@ function RegRow({
           data-focus-key={`captain-${row.id}`}
           data-testid={`captain-toggle-${row.personId}`}
         >
-          {row.isCaptain ? "Captain ✓" : "Captain"}
+          {row.isCaptain ? (
+            <>
+              Captain
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Captain"
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={onDetails}>
           Details
