@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { env } from "../../env";
+import { PageIntro } from "../../components/marketing/page-intro";
 import { LEGAL_DOCUMENTS } from "../../content/legal";
 import "../content.css";
 
@@ -15,11 +16,11 @@ export const metadata: Metadata = {
 export default function LegalIndexPage() {
   return (
     <main className="content-page">
-      <h1>Legal centre</h1>
-      <p className="content-lead">
-        The documents that govern using DesiAuction. Each is a beta draft under legal review — the
-        current version and date are on every page.
-      </p>
+      <PageIntro
+        kicker="Terms, privacy & policies"
+        title="Legal centre"
+        lead="The documents that govern using DesiAuction. Each is a beta draft under legal review — the current version and date are on every page."
+      />
       {/* The eight card titles were h3 directly under the page h1 — a skipped
           level on the index of the documents a reader reaches when something
           has gone wrong. `heading-order` is best-practice rather than wcag2aa,

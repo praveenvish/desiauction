@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { env } from "../../env";
+import { PageIntro } from "../../components/marketing/page-intro";
 import { RELEASES } from "../../content/releases";
 import { slugify } from "../../lib/slug";
 import "../content.css";
@@ -15,34 +16,42 @@ export const metadata: Metadata = {
 export default function ReleasesPage() {
   return (
     <main className="content-page content-narrow">
-      <h1>Release notes</h1>
-      <p className="content-lead">
-        {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
-            developer string, not a version a reader should ever meet. */}
-        What each update delivered.
-        {env.APP_VERSION !== "dev" ? (
+      <PageIntro
+        kicker="What's new"
+        title="Release notes"
+        lead={
           <>
-            {" "}
-            Running version <code>{env.APP_VERSION}</code>.
+            {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
+                developer string, not a version a reader should ever meet. */}
+            What each update delivered.
+            {env.APP_VERSION !== "dev" ? (
+              <>
+                {" "}
+                Running version <code>{env.APP_VERSION}</code>.
+              </>
+            ) : null}
           </>
-        ) : null}
-      </p>
-      {RELEASES.map((release) => {
-        const releaseId = `release-${slugify(release.version)}`;
-        return (
-          <section key={release.version} className="release" aria-labelledby={releaseId}>
-            <h2 id={releaseId}>{release.title}</h2>
-            <p className="release-meta">
-              {release.version} · {release.date}
-            </p>
-            <ul>
-              {release.highlights.map((highlight) => (
-                <li key={highlight}>{highlight}</li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+        }
+      />
+      <ol className="release-timeline">
+        {RELEASES.map((release) => {
+          const releaseId = `release-${slugify(release.version)}`;
+          return (
+            <li key={release.version} className="release" aria-labelledby={releaseId}>
+              <p className="release-meta">
+                <span className="release-version">{release.version}</span>
+                <span>{release.date}</span>
+              </p>
+              <h2 id={releaseId}>{release.title}</h2>
+              <ul>
+                {release.highlights.map((highlight) => (
+                  <li key={highlight}>{highlight}</li>
+                ))}
+              </ul>
+            </li>
+          );
+        })}
+      </ol>
     </main>
   );
 }

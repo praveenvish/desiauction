@@ -4443,3 +4443,62 @@ body:has(.landing.mk) .mk-hero {
   outline-offset: 4px;
   border-radius: var(--radius-md);
 }
+
+/* --- Premium pass, 2026-09-13: content pages ------------------------------- */
+
+/* A page hero with centred copy — /features, /pricing. The rules that used to
+   be inline styles on the two call sites. */
+.mk-hero--page .mk-hero-copy {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.mk-hero--page .mk-kicker {
+  justify-content: center;
+}
+
+.mk-hero--page .mk-lead {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* The page-title size for an inner page: a step below the landing's h1, still
+   the display face, still above the 30px floor at every width. */
+.mk-h1--page {
+  font-size: clamp(2.25rem, 5vw, 64px);
+}
+
+/* A segmented section whose panels are wide compositions (a two-column row, a
+   table) rather than a card grid: the strip gets a little more room below. */
+.mk-segmented--wide [role="tabpanel"] {
+  margin-top: clamp(var(--space-6), 4vw, var(--space-10));
+}
+
+/* The panel's h2 on /features: the group title, one step below the page's h1. */
+.mk-segmented .mk-show h2 {
+  margin-top: 0;
+}
+
+/* The pricing tail sits under the pledge with the same rule the money band
+   uses on the landing. Its inner sections lose the margins they carried as
+   stand-alone bands. */
+.mk-pricing-tail {
+  margin-top: clamp(var(--space-8), 4vw, var(--space-12));
+  padding-top: clamp(var(--space-6), 3vw, var(--space-10));
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mk-pricing-tail .mk-procure,
+.mk-pricing-tail .mk-faq {
+  margin-top: 0;
+}
+
+.mk-pricing-tail .mk-faq .mk-segment-title {
+  margin-bottom: clamp(var(--space-4), 2vw, var(--space-6));
+}
+
+/* The stage's bid row inside a features vignette: no trailing margin, it is
+   the row's own last child. Replaces an inline style. */
+.mk-stage-bid--flat {
+  margin-bottom: 0;
+}

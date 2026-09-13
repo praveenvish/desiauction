@@ -1,4 +1,5 @@
-import { ButtonLink } from "@desiauction/ui";
+import { ButtonLink, SoldStamp } from "@desiauction/ui";
+import { HashTabs } from "../../components/marketing/hash-tabs";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -71,12 +72,14 @@ const VIGNETTES: Record<string, ReactNode> = {
         <span>Live room · Lot 23</span>
       </div>
       <div className="mk-vignette-body">
-        <div className="mk-stage-bid" style={{ marginBottom: 0 }}>
+        {/* The same stamp the live room lands (theatre pass) — the vignette's
+            "SOLD" used to be a span whose class no longer exists. */}
+        <div className="mk-stage-bid mk-stage-bid--flat">
           <span>
             <span className="mk-stage-bid-label">Winning bid</span>
             <span className="mk-stage-amount">₹85,000</span>
           </span>
-          <span className="mk-stage-sold">SOLD</span>
+          <SoldStamp size="md" hammer={false} className="mk-stage-stamp" />
         </div>
         <div className="mk-vrow">
           <span>
@@ -169,47 +172,52 @@ const VIGNETTES: Record<string, ReactNode> = {
 export default function FeaturesPage() {
   return (
     <main className="mk">
-      <section className="mk-hero" data-theme="floodlight">
+      <section className="mk-hero mk-hero--page" data-theme="floodlight">
         <div className="mk-container mk-center">
-          <div className="mk-hero-copy" style={{ maxWidth: 720, margin: "0 auto" }}>
-            <p className="mk-kicker" style={{ justifyContent: "center" }}>
-              The full platform
-            </p>
-            <h1 className="mk-h1" style={{ fontSize: "clamp(2.25rem, 5vw, 64px)" }}>
-              Everything a tournament needs
-            </h1>
-            <p className="mk-lead" style={{ marginLeft: "auto", marginRight: "auto" }}>
-              {LANDING.hero.sub}
-            </p>
+          <div className="mk-hero-copy">
+            <p className="mk-kicker">The full platform</p>
+            <h1 className="mk-h1 mk-h1--page">Everything a tournament needs</h1>
+            <p className="mk-lead">{LANDING.hero.sub}</p>
           </div>
         </div>
       </section>
 
-      <section className="mk-band" style={{ paddingTop: 0 }}>
+      {/* THE FOUR GROUPS AS TABS. They are exactly parallel — a title, a
+          checklist, a vignette of the surface — and stacked they were a
+          3,100px scroll through four identical rows. Behind a segmented
+          control each is one screen, the strip reads as the platform's table
+          of contents, and the panel is in the address bar (#the-live-auction)
+          so it can be pointed at. Every panel stays in the DOM. */}
+      <section className="mk-band mk-band--panel" aria-label="What the platform does">
         <div className="mk-container">
-          {FEATURE_GROUPS.map((group, index) => {
-            const headingId = `feature-${slugify(group.title)}`;
-            return (
-              <section
-                key={group.title}
-                className={`mk-show${index % 2 === 1 ? " mk-show--flip" : ""}`}
-                aria-labelledby={headingId}
-              >
-                <div>
-                  <h2 id={headingId}>{group.title}</h2>
-                  <ul className="mk-checklist">
-                    {group.features.map((feature) => (
-                      <li key={feature}>
-                        <IconCheck />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="mk-show-visual">{VIGNETTES[group.title]}</div>
-              </section>
-            );
-          })}
+          <div className="mk-segmented mk-segmented--wide">
+            <HashTabs
+              label="Feature groups"
+              tabs={FEATURE_GROUPS.map((group) => {
+                const id = slugify(group.title);
+                return {
+                  id,
+                  label: group.title,
+                  content: (
+                    <div className="mk-show mk-show--flush">
+                      <div>
+                        <h2 id={`feature-${id}`}>{group.title}</h2>
+                        <ul className="mk-checklist">
+                          {group.features.map((feature) => (
+                            <li key={feature}>
+                              <IconCheck />
+                              {feature}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="mk-show-visual">{VIGNETTES[group.title]}</div>
+                    </div>
+                  ),
+                };
+              })}
+            />
+          </div>
         </div>
       </section>
 

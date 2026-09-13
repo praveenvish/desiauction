@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { IconArrowLeft } from "@desiauction/ui";
 
 import { env } from "../../../env";
-import { Prose } from "../../../content/blocks";
 import { LEGAL_DOCUMENTS, legalDocument } from "../../../content/legal";
+import { ArticleView } from "../../help/article-view";
 import "../../content.css";
 
 export function generateStaticParams(): { slug: string }[] {
@@ -40,18 +38,13 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
     notFound();
   }
   return (
-    <main className="content-page content-narrow">
-      <p className="article-meta no-print">
-        <Link href="/legal" className="prose-link">
-          <IconArrowLeft size={16} className="icon-lead" /> All legal documents
-        </Link>
-      </p>
-      <h1>{doc.title}</h1>
-      <p className="article-meta">
-        Effective {doc.effective} · version {doc.versions[0]?.version}
-      </p>
-      <Prose blocks={doc.blocks} />
-
+    <ArticleView
+      title={doc.title}
+      meta={`Effective ${doc.effective} · version ${doc.versions[0]?.version ?? ""}`}
+      blocks={doc.blocks}
+      backHref="/legal"
+      backLabel="All legal documents"
+    >
       <section className="content-section" aria-labelledby="version-history">
         <h2 id="version-history" className="prose-h2">
           Version history
@@ -67,6 +60,6 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
           ))}
         </dl>
       </section>
-    </main>
+    </ArticleView>
   );
 }

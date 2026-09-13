@@ -1,4 +1,5 @@
 import { ButtonLink } from "@desiauction/ui";
+import { HashTabs } from "../../components/marketing/hash-tabs";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -89,9 +90,7 @@ export default function PricingPage() {
         <div className="mk-container">
           <div className="mk-band-head mk-band-head--center mk-center">
             <p className="mk-kicker">One pass per tournament</p>
-            <h1 className="mk-h1" style={{ fontSize: "clamp(2.25rem, 5vw, 64px)" }}>
-              {PRICING.h1}
-            </h1>
+            <h1 className="mk-h1 mk-h1--page">{PRICING.h1}</h1>
             <p className="mk-lead">{PRICING.sub}</p>
           </div>
 
@@ -161,60 +160,10 @@ export default function PricingPage() {
             })}
           </div>
 
-          {/* Three cards are three pitches; a table is one decision. The wrapper
-              scrolls on its own rather than pushing the document sideways, and
-              carries tabindex because a scroll region a mouse can reach has to
-              be reachable from a keyboard too (axe: scrollable-region-focusable). */}
-          <div className="mk-compare-wrap" tabIndex={0} role="group" aria-label="Tier comparison">
-            <table className="mk-compare">
-              <caption className="mk-compare-caption">{PRICING.comparison.caption}</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Feature</th>
-                  {PRICING.tiers.map((tier) => (
-                    <th key={tier.name} scope="col">
-                      {tier.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {PRICING.comparison.rows.map((row) => (
-                  <tr key={row.label}>
-                    <th scope="row">{row.label}</th>
-                    {row.cells.map((cell, index) => (
-                      <td key={PRICING.tiers[index]?.name ?? String(index)}>
-                        <CompareCell value={cell} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                {/* Read off `tiers`, never re-typed: the table cannot quote a
-                    price the cards above have stopped quoting. */}
-                <tr className="mk-compare-price">
-                  <th scope="row">Price</th>
-                  {PRICING.tiers.map((tier) => (
-                    <td key={tier.name}>
-                      {tier.price}
-                      <span className="mk-compare-cadence">{tier.cadence}</span>
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          {/* Phone-only (CSS-gated): at rest the wrapper shows one column and a
-              clipped sliver of the next, and nothing else said the other tiers
-              were there to swipe to. */}
-          <p className="mk-compare-hint" aria-hidden>
-            Swipe sideways to compare tiers.
-          </p>
-          <p className="mk-compare-note">{PRICING.comparison.note}</p>
-
           {/* Was a 26px caption line wedged between the tier grid and the FAQ —
               the load-bearing sentence of the entire pricing model, set smaller
               than the copy around it. It is a block now, and it answers the
-              question the table above has just raised. */}
+              question the tiers above have just raised. */}
           <section className="mk-pledge" aria-labelledby="pricing-pledge">
             <span className="mk-pledge-icon">
               <IconShieldCheck />
@@ -227,52 +176,139 @@ export default function PricingPage() {
             </div>
           </section>
 
-          <section className="mk-procure" aria-labelledby="pricing-procurement">
-            <div className="mk-procure-head">
-              <p className="mk-kicker">{PRICING.procurement.kicker}</p>
-              <h2 id="pricing-procurement" className="mk-h2">
-                {PRICING.procurement.h2}
-              </h2>
-              <p className="mk-lead">{PRICING.procurement.intro}</p>
-            </div>
-            <ul className="mk-procure-list">
-              {PRICING.procurement.points.map((point) => (
-                <li key={point.title}>
-                  <IconFileCheck />
-                  <h3>{point.title}</h3>
-                  <p>{point.body}</p>
-                </li>
-              ))}
-            </ul>
-            <div className="mk-procure-gap">
-              <p>{PRICING.procurement.gap}</p>
-              <ButtonLink href={PRICING.procurement.cta.href} variant="secondary">
-                {PRICING.procurement.cta.label}
-              </ButtonLink>
-            </div>
-          </section>
-
-          <section className="mk-faq" aria-labelledby="pricing-faq">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <h2 id="pricing-faq" className="mk-h2">
-                Questions
-              </h2>
-            </div>
-            {PRICING.faqs.map((faq) => (
-              <details key={faq.question} className="mk-faq-item">
-                <summary>{faq.question}</summary>
-                <p>{faq.answer}</p>
-                {faq.link === undefined ? null : (
-                  <p className="mk-faq-link">
-                    <Link href={faq.link.href}>
-                      {faq.link.label}
-                      <IconArrowRight width={16} height={16} />
-                    </Link>
-                  </p>
-                )}
-              </details>
-            ))}
-          </section>
+          {/* THE TAIL, AS ONE SECTION. The comparison table, the procurement
+              answers and the questions were three stacked blocks with three
+              heads, each restating the tiers above; a visitor reads at most one
+              of them. Behind a segmented control they are the three ways to
+              check the decision — compare, buy through a committee, ask — and
+              the page ends where the decision is made instead of a screen
+              later. All three stay in the DOM; the table is still read off
+              `tiers`, so it cannot quote a price the cards have retired. */}
+          <div className="mk-segmented mk-segmented--wide mk-pricing-tail">
+            <HashTabs
+              label="Before you decide"
+              tabs={[
+                {
+                  id: "compare",
+                  label: "Compare tiers",
+                  content: (
+                    <>
+                      {/* Three cards are three pitches; a table is one decision. The wrapper
+                    scrolls on its own rather than pushing the document sideways, and
+                    carries tabindex because a scroll region a mouse can reach has to
+                    be reachable from a keyboard too (axe: scrollable-region-focusable). */}
+                      <div
+                        className="mk-compare-wrap"
+                        tabIndex={0}
+                        role="group"
+                        aria-label="Tier comparison"
+                      >
+                        <table className="mk-compare">
+                          <caption className="mk-compare-caption">
+                            {PRICING.comparison.caption}
+                          </caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">Feature</th>
+                              {PRICING.tiers.map((tier) => (
+                                <th key={tier.name} scope="col">
+                                  {tier.name}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {PRICING.comparison.rows.map((row) => (
+                              <tr key={row.label}>
+                                <th scope="row">{row.label}</th>
+                                {row.cells.map((cell, index) => (
+                                  <td key={PRICING.tiers[index]?.name ?? String(index)}>
+                                    <CompareCell value={cell} />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                            {/* Read off `tiers`, never re-typed: the table cannot quote a
+                          price the cards above have stopped quoting. */}
+                            <tr className="mk-compare-price">
+                              <th scope="row">Price</th>
+                              {PRICING.tiers.map((tier) => (
+                                <td key={tier.name}>
+                                  {tier.price}
+                                  <span className="mk-compare-cadence">{tier.cadence}</span>
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* Phone-only (CSS-gated): at rest the wrapper shows one column and a
+                    clipped sliver of the next, and nothing else said the other tiers
+                    were there to swipe to. */}
+                      <p className="mk-compare-hint" aria-hidden>
+                        Swipe sideways to compare tiers.
+                      </p>
+                      <p className="mk-compare-note">{PRICING.comparison.note}</p>
+                    </>
+                  ),
+                },
+                {
+                  id: "organizations",
+                  label: PRICING.procurement.kicker,
+                  content: (
+                    <section className="mk-procure" aria-labelledby="pricing-procurement">
+                      <div className="mk-procure-head">
+                        <h2 id="pricing-procurement" className="mk-h2">
+                          {PRICING.procurement.h2}
+                        </h2>
+                        <p className="mk-lead">{PRICING.procurement.intro}</p>
+                      </div>
+                      <ul className="mk-procure-list">
+                        {PRICING.procurement.points.map((point) => (
+                          <li key={point.title}>
+                            <IconFileCheck />
+                            <h3>{point.title}</h3>
+                            <p>{point.body}</p>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mk-procure-gap">
+                        <p>{PRICING.procurement.gap}</p>
+                        <ButtonLink href={PRICING.procurement.cta.href} variant="secondary">
+                          {PRICING.procurement.cta.label}
+                        </ButtonLink>
+                      </div>
+                    </section>
+                  ),
+                },
+                {
+                  id: "questions",
+                  label: "Questions",
+                  content: (
+                    <section className="mk-faq" aria-labelledby="pricing-faq">
+                      <h2 id="pricing-faq" className="mk-segment-title">
+                        Questions
+                      </h2>
+                      {PRICING.faqs.map((faq) => (
+                        <details key={faq.question} className="mk-faq-item">
+                          <summary>{faq.question}</summary>
+                          <p>{faq.answer}</p>
+                          {faq.link === undefined ? null : (
+                            <p className="mk-faq-link">
+                              <Link href={faq.link.href}>
+                                {faq.link.label}
+                                <IconArrowRight width={16} height={16} />
+                              </Link>
+                            </p>
+                          )}
+                        </details>
+                      ))}
+                    </section>
+                  ),
+                },
+              ]}
+            />
+          </div>
         </div>
       </section>
 

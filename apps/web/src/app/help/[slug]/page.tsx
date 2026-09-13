@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { IconArrowLeft } from "@desiauction/ui";
 
 import { env } from "../../../env";
 import { FAQS, HELP_ARTICLES, helpArticle, helpCategory } from "../../../content/help";
+import { PageIntro } from "../../../components/marketing/page-intro";
 import { ArticleView } from "../article-view";
 import "../../content.css";
 
@@ -43,12 +42,11 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
   if (slug === "faq") {
     return (
       <main className="content-page content-narrow">
-        <p className="article-meta no-print">
-          <Link href="/help" className="prose-link">
-            <IconArrowLeft size={16} className="icon-lead" /> All help
-          </Link>
-        </p>
-        <h1>Frequently asked questions</h1>
+        <PageIntro
+          title="Frequently asked questions"
+          lead="Quick answers to the things people ask most."
+          back={{ href: "/help", label: "All help" }}
+        />
         <div className="content-section">
           {FAQS.map((faq) => (
             <details key={faq.question} className="faq-item">
