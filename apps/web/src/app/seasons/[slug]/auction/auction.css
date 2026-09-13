@@ -508,7 +508,10 @@
   align-items: center;
   gap: 2px;
   margin-top: var(--space-2);
-  font-family: var(--font-display);
+  /* The text face: the display face is reserved for >=30px, marks and
+     numerals (type-scale.test.ts), and this is a franchise's name in a
+     sentence-sized line. Weight carries it. */
+  font-family: var(--font-text);
   font-size: var(--text-xl-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);

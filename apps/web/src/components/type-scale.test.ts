@@ -59,8 +59,9 @@ const ALLOW = [
   // The console summary row's figure. Same case again: a count, compacted to
   // 24px so a row of five tiles fits above the fold.
   ".stat-value",
-  // Ceremony graphics: a stamp and the name it lands on.
-  ".mk-stage-sold",
+  // Ceremony graphics: the name the stamp lands on. (The stamp itself is
+  // `SoldStamp` in @desiauction/ui, which sets the face and the size in
+  // separate rules and is a mark, not a sentence.)
   ".mk-stage-name",
   // The design gallery's own type specimen must be able to show the face.
   ".type-sample",
