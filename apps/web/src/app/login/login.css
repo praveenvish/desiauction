@@ -73,11 +73,17 @@
 }
 
 .login-scene-inner {
-  max-width: 34rem;
-  padding: var(--space-16) clamp(var(--space-8), 6vw, var(--space-20));
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 38rem;
+  padding: var(--space-12) clamp(var(--space-8), 5vw, var(--space-16));
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+}
+
+.login-scene-line {
+  max-width: 14ch;
 }
 
 .login-scene-kicker {
@@ -99,31 +105,44 @@
   color: var(--text-heading);
 }
 
+/* The stage, borrowed from the landing: the product's own choreography as the
+   scene. It floats on the wash with the fourth shadow rung — the one element
+   this column is about. */
+.login-scene-stage {
+  width: 100%;
+  max-width: 28rem;
+}
+
+/* The marks as pills, the same shape the landing hero gives them. */
 .login-scene-marks {
   list-style: none;
-  margin: var(--space-2) 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-2);
   color: var(--text-secondary);
-  font-size: var(--text-md-size);
+  font-size: var(--text-sm-size);
 }
 
 .login-scene-marks li {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in srgb, var(--accent-sheen) 16%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
 }
 
 .login-scene-marks li::before {
   content: "";
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--radius-full);
   background: var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 /* The form column. */
@@ -255,7 +274,7 @@
 /* The account-creating consent line. This screen mints accounts and said
    nothing about the terms under which it does. */
 .login-consent {
-  margin: calc(var(--space-1) * -1) 0 0;
+  margin: 0;
   color: var(--text-muted);
   font-size: var(--text-xs-size);
   line-height: var(--text-sm-line);
@@ -301,15 +320,21 @@
   max-width: 424px;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  justify-content: center;
+  gap: var(--space-2);
   color: var(--text-secondary);
   font-size: var(--text-sm-size);
 }
 
 .login-trust li {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in srgb, var(--accent-sheen) 16%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
 }
 
 .login-trust li::before {
@@ -363,25 +388,48 @@
 /* The secondary door. Quiet by default — phone is the primary path and this
    must not compete with it — but a real target size once open. */
 .login-email {
-  margin-top: var(--space-4);
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-3);
+  margin: 0;
 }
 
+/* The summary dressed as the door beside the passkey: same height, same
+   quiet weight, so the two read as a pair. */
 .login-email > summary {
+  box-sizing: border-box;
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  padding: var(--space-2) 0;
-  /* 44px minimum touch target even though it renders as text (UX-1). */
-  min-height: 44px;
+  list-style: none;
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-medium);
+  transition:
+    border-color var(--duration-instant) var(--ease-out),
+    color var(--duration-instant) var(--ease-out);
 }
 
-.login-email > summary:hover,
+.login-email > summary::-webkit-details-marker {
+  display: none;
+}
+
+.login-email > summary:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
 .login-email > summary:focus-visible {
-  color: var(--text);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.login-email[open] > summary {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--surface-sunken);
 }
 
 .login-email-form {
@@ -389,4 +437,96 @@
   flex-direction: column;
   gap: var(--space-3);
   padding-top: var(--space-2);
+}
+
+/* --- Premium pass, 2026-09-13 --------------------------------------------- */
+
+/* The other doors, stacked. Side by side in a 424px card both labels broke
+   to two lines, and a door that wraps reads as a broken button; one column of
+   two quiet 44px rows is calmer and still three blocks fewer than the rule,
+   button, rule and text it replaced. */
+.login-doors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.login-doors-label {
+  margin: 0 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-doors .passkey-login > * {
+  width: 100%;
+}
+
+/* The step change. phone → code enters from the right; going back enters from
+   the left. Transform only: text keeps its computed contrast on every frame. */
+.login-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .login-step[data-step="code"] {
+    animation: login-step-forward var(--duration-slow) var(--ease-out) backwards;
+  }
+
+  .login-step[data-step="phone"] {
+    animation: login-step-back var(--duration-base) var(--ease-out) backwards;
+  }
+}
+
+@keyframes login-step-forward {
+  from {
+    transform: translateX(var(--space-6));
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes login-step-back {
+  from {
+    transform: translateX(calc(-1 * var(--space-4)));
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+/* The code, drawn as six boxes. One input — pasting an SMS, autofill from the
+   keyboard's one-time-code suggestion and every e2e locator keep working —
+   dressed with a monospace face and a tracking wide enough that each digit
+   sits in its own cell of the striped background. */
+.login-form input[name="code"] {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl-size);
+  line-height: 1;
+  letter-spacing: 0.9em;
+  text-align: center;
+  text-indent: 0.9em;
+  min-height: 56px;
+  font-variant-numeric: tabular-nums;
+  caret-color: var(--accent);
+}
+
+.login-form input[name="code"]::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* When the heading has no sub-line under it (the plain phone step), the form
+   starts one rung lower so the label is not glued to the display type. */
+.login-panel h1 + form {
+  margin-top: var(--space-5);
 }

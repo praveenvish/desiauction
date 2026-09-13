@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { currentSession } from "../../server/auth/actions";
 import { RETURNING_COOKIE } from "../../server/auth/sessions";
 import { safeNext } from "../../server/auth/redirect";
+import { LANDING } from "../../content/marketing";
+import { HeroStage } from "../../components/marketing/hero-stage";
 import { LoginPanel } from "./login-form";
+// The scene runs the landing's stage card, whose dress lives in the shared
+// public design layer — the same import every other public page makes.
+import "../marketing.css";
 import "./login.css";
 
 export const metadata = { title: "Sign in · DesiAuction" };
@@ -56,7 +61,11 @@ export default async function LoginPage({
   return (
     <main className="login" data-theme="floodlight">
       {/* The floodlit brand panel. The scenery is decorative; the marks are not,
-          so only the ornament carries aria-hidden. */}
+          so only the ornament carries aria-hidden. Since the premium pass the
+          scene is the product itself: the same scripted stage the landing
+          runs — three franchises calling, the price rolling, gold SOLD — so a
+          visitor at the gate sees the room they are signing in to, not three
+          bullet points about it. */}
       <aside className="login-scene">
         <div className="login-scene-inner">
           <p className="login-scene-kicker" aria-hidden="true">
@@ -67,6 +76,12 @@ export default async function LoginPage({
             <br />
             answers to your number.
           </p>
+          {/* The landing's own demo wrapper (pedestal glow, card, truth label),
+              so the card sits on its stage here exactly as it does there. */}
+          <div className="mk-hero-demo login-scene-stage" aria-hidden="true">
+            <HeroStage script={LANDING.hero.script} teams={LANDING.hero.demoTeams} />
+            <p className="mk-stage-note">{LANDING.hero.demoLabel}</p>
+          </div>
           <ul className="login-scene-marks" aria-label="What you are signing in to">
             {TRUST_MARKS.map((mark) => (
               <li key={mark}>{mark}</li>

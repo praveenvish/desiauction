@@ -201,30 +201,27 @@ export function LoginPanel({
   const locked = step === "code" && state.locked === true;
   const grouped = formatPhone(phone);
 
-  const passkeyBlock = (
-    <>
-      <div className="login-divider" aria-hidden="true">
-        <span>or</span>
-      </div>
-      <PasskeyLogin />
-    </>
-  );
-
   return (
     <>
       <h1>{step === "code" ? "Enter your code" : returning ? "Welcome back" : "Sign in"}</h1>
       {/* Server-rendered, this line could not see which step it was sitting
           above: it still read "One mobile number is all it takes" after the
           code had been sent. It moved into the client with the step. */}
-      <p className="login-sub">
-        {step === "code"
-          ? `We sent a 6-digit code to ${grouped}. It can take up to 30 seconds.`
-          : honoredNext
-            ? "Sign in to continue where you were headed."
-            : returning
-              ? "Use your passkey, or we'll text a fresh code to your mobile."
-              : "One mobile number is all it takes — we'll text you a code."}
-      </p>
+      {/* Only when it says something the field below does not. On the plain
+          phone step the field's own help line ("We'll text a 6-digit code…")
+          already carries the promise, and the panel used to say it twice, one
+          line apart. The code step and the two special arrivals keep theirs. */}
+      {step === "code" ? (
+        <p className="login-sub">
+          We sent a 6-digit code to {grouped}. It can take up to 30 seconds.
+        </p>
+      ) : honoredNext ? (
+        <p className="login-sub">Sign in to continue where you were headed.</p>
+      ) : returning ? (
+        <p className="login-sub">
+          Use your passkey, or we&apos;ll text a fresh code to your mobile.
+        </p>
+      ) : null}
       {/* A returning visitor's fastest route was buried under an "OR" rule,
           below the form they did not need. On the code step it is noise —
           they are three digits from being signed in — so it is absent. */}
@@ -271,52 +268,58 @@ export function LoginPanel({
             You look offline — check your connection and try again.
           </p>
         ) : null}
-        {step === "phone" ? (
-          <Field
-            key="phone"
-            ref={inputRef}
-            label="Mobile number"
-            name="phone"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel"
-            placeholder="98765 43210"
-            required
-            autoFocus
-            defaultValue={phone}
-            {...(state.error !== undefined ? { error: state.error } : {})}
-            help="We'll send a 6-digit code. India (+91) only for now."
-          />
-        ) : (
-          <>
-            <input type="hidden" name="phone" value={phone} />
+        {/* Keyed on the step so the wrapper remounts and its entrance replays:
+            phone → code slides in from the right, "use a different number"
+            slides back from the left (transform only; none under reduced
+            motion). The fields keep their own keys and focus behaviour. */}
+        <div key={step} className="login-step" data-step={step}>
+          {step === "phone" ? (
             <Field
-              key="code"
+              key="phone"
               ref={inputRef}
-              label="6-digit code"
-              name="code"
+              label="Mobile number"
+              name="phone"
+              type="tel"
               inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="123456"
-              maxLength={6}
+              autoComplete="tel"
+              placeholder="98765 43210"
               required
               autoFocus
-              // The SMS is "Your DesiAuction code is 744588", and pasting it
-              // whole is the fastest thing a phone can do. It used to be
-              // rejected outright; the digits are extracted instead.
-              onPaste={(event) => {
-                const digits = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-                if (digits === "") {
-                  return;
-                }
-                event.preventDefault();
-                event.currentTarget.value = digits;
-              }}
+              defaultValue={phone}
               {...(state.error !== undefined ? { error: state.error } : {})}
-              help="Valid for 5 minutes. Didn't get it? Check your SMS, then resend."
+              help="We'll text a 6-digit code. Indian numbers (+91) only for now."
             />
-          </>
-        )}
+          ) : (
+            <>
+              <input type="hidden" name="phone" value={phone} />
+              <Field
+                key="code"
+                ref={inputRef}
+                label="6-digit code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                maxLength={6}
+                required
+                autoFocus
+                // The SMS is "Your DesiAuction code is 744588", and pasting it
+                // whole is the fastest thing a phone can do. It used to be
+                // rejected outright; the digits are extracted instead.
+                onPaste={(event) => {
+                  const digits = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                  if (digits === "") {
+                    return;
+                  }
+                  event.preventDefault();
+                  event.currentTarget.value = digits;
+                }}
+                {...(state.error !== undefined ? { error: state.error } : {})}
+                help="Valid for 5 minutes. Didn't get it? Check your SMS, then resend."
+              />
+            </>
+          )}
+        </div>
         {state.supportLink === true ? (
           <p className="login-error-help">
             <Link href="/support">Contact support</Link>
@@ -371,10 +374,20 @@ export function LoginPanel({
           </div>
         ) : null}
       </form>
-      {!returning && step === "phone" ? passkeyBlock : null}
-      {/* Only on the phone step: mid-code is not the moment to offer a second
-          door, and someone already holding an SMS code does not need one. */}
-      {step === "phone" ? <EmailLogin {...(next !== undefined ? { next } : {})} /> : null}
+      {/* THE OTHER DOORS, in one row. The panel used to stack an "or" rule, a
+          full-width passkey button, another rule and a "use your email" line
+          under the form — eight blocks under one heading in a 424px column.
+          Now one quiet label and the two doors side by side; the email door
+          still opens in place (it is the same <details>, so it works before
+          hydration), taking the full row when it does. Only on the phone step:
+          mid-code is not the moment to offer a second door. */}
+      {step === "phone" ? (
+        <div className="login-doors" data-testid="login-doors">
+          <p className="login-doors-label">Other ways to sign in</p>
+          {!returning ? <PasskeyLogin /> : null}
+          <EmailLogin {...(next !== undefined ? { next } : {})} />
+        </div>
+      ) : null}
     </>
   );
 }
