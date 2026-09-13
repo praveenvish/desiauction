@@ -333,8 +333,16 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   // hand. Shown only to somebody who can actually climb them.
   const canManageOrg = view.viewer.canCreateTournament;
   const editionNeedingTeams = editions.find((edition) => edition.teams === 0) ?? editions[0];
+  /*
+   * A SEASON THAT HAS NOT REACHED REGISTRATION YET — not merely one that is not
+   * open right now. The old test was `status !== "registration_open"`, which
+   * matches a season whose registration has CLOSED and whose auction has been
+   * conducted and completed, and then points "Open registration" at it.
+   */
+  const reachedRegistration = (status: string): boolean =>
+    status === "registration_open" || status === "registration_closed";
   const editionToOpen =
-    editions.find((edition) => edition.status !== "registration_open") ?? editions[0];
+    editions.find((edition) => !reachedRegistration(edition.status)) ?? editions[0];
   const rungs: OrgRung[] = [
     {
       key: "tournament",
@@ -383,7 +391,20 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       step: 5,
       title: "Open registration",
       blurb: "Players sign up, you approve them, and they become the auction pool.",
-      done: editions.some((edition) => edition.status === "registration_open"),
+      /*
+       * DONE MEANS "YOU HAVE DONE IT", NOT "IT IS HAPPENING RIGHT NOW".
+       *
+       * This asked whether some season is CURRENTLY `registration_open`, so the
+       * rung un-completed itself the moment registration closed — and the whole
+       * ladder came back, on a club that had already run and completed an
+       * auction, telling the owner to open registration and offering the button.
+       * `/home`'s equivalent rung tests `registrations > 0` and was right all
+       * along; this one tested the transient state instead of the durable fact.
+       *
+       * `registration_closed` counts because the machine only reaches it
+       * THROUGH `registration_open` — closing is proof the step was taken.
+       */
+      done: editions.some((edition) => reachedRegistration(edition.status)),
       cta:
         editionToOpen === undefined ? null : (
           <ButtonLink href={`/seasons/${editionToOpen.slug}`} size="touch">

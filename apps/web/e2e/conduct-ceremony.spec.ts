@@ -263,6 +263,14 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   // --- Gavel → SOLD ceremony → compensating UNDO → back on the block ----------
   // v1.1 (G2): the gavel is a HOLD, not a click. Prove the safety property
   // first — a plain click must NOT close the lot — then close it properly.
+  // Whoever is actually on the block — lot order is deterministic for a pool
+  // but the registration NUMBERS behind it are not (see auction-experience.spec).
+  // Read from the ceremony stage: the cockpit renders the stage for the lot on
+  // the block and never a LotHero, so `.lot-hero-name` never appears here.
+  const signedName = (
+    (await organizer.getByTestId("ceremony-player").first().textContent()) ?? ""
+  ).trim();
+  expect(signedName.length).toBeGreaterThan(0);
   await organizer.getByTestId("cockpit-gavel").click();
   await expect(organizer.getByTestId("ceremony")).not.toHaveAttribute("data-phase", "sold", {
     timeout: 2_000,
@@ -274,6 +282,20 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(bigScreen.getByTestId("ceremony")).toHaveAttribute("data-phase", "sold", {
     timeout: 20_000,
   });
+  // THE COCKPIT'S OWN POOL MOVES ON THE SALE — WITHOUT A RELOAD.
+  //
+  // The panels below the block (pool, squads, purse slots) were fed the
+  // server-rendered `view.resolved` as it stood when the cockpit was opened,
+  // while /live and /spectate folded each outcome in through `useLiveFeed`. So
+  // the one screen belonging to the person running the room was the only one
+  // that never moved: after two sales it still read "Sold 0", and spectators
+  // had the right numbers all night.
+  //
+  // No `reload()` on purpose — a reload is what HID this, because it re-seeds
+  // the panels from the server and they look correct again immediately after.
+  await expect(organizer.getByTestId("pool-sold")).toHaveText("1", { timeout: 20_000 });
+  await expect(organizer.getByTestId("pool-summary")).not.toContainText("Total spend ₹0");
+  await expect(organizer.getByTestId("squad-board")).toContainText(signedName);
   // DA-P0-5: undo reverses a sale, a squad and a team's money in front of a
   // hall, so it asks first and NAMES what it is about to reverse.
   await organizer.getByTestId("cockpit-undo").click();

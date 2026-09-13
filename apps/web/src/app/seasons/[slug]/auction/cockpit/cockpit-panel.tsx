@@ -26,7 +26,7 @@ import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
-import { AuctionProgress } from "../live-experience";
+import { AuctionProgress, useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
@@ -68,6 +68,22 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const { snapshot, connection, remainingMs, ceremony, stale, offline } = useAuctionSocket(
     view.wsUrl,
   );
+  /*
+   * THE CONDUCTOR'S OWN SCREEN WAS THE STALE ONE.
+   *
+   * `/live` and `/spectate` both fed their pool, purse and squad panels from
+   * `useLiveFeed`, which folds each outcome off the socket into the
+   * server-rendered list. The cockpit passed `view.resolved` straight through —
+   * the value as it was when the page loaded — so every one of those panels
+   * froze at the moment the conductor opened it.
+   *
+   * Observed on a four-lot auction: after two lots had sold the pool read
+   * "Sold 1 · Unsold 1 · Remaining 1". Not merely out of date — three of four
+   * lots, a total that cannot be right, on the one screen whose job is to tell
+   * the person running the room where the night has got to. Spectators had the
+   * correct numbers the whole time.
+   */
+  const feed = useLiveFeed(view.resolved, snapshot);
   // The conductor hears the room too: opt-in, off by default (doc 11 sound).
   useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   /**
@@ -690,6 +706,12 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   any bid standing on the lot. It cannot be undone, and it is the only way to close
                   an auction that has a frozen lot on it.
                 </p>
+                {finished ? (
+                  <p className="competitions-hint" data-testid="resolve-blocked">
+                    This auction has ended. These lots stay as they finished — the ledger and the
+                    replay are the record now.
+                  </p>
+                ) : null}
                 <ol className="cockpit-queue">
                   {view.view.lots
                     .filter((entry) => entry.status === "frozen" || entry.status === "unsold")
@@ -711,7 +733,16 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                               )
                             }
                             loading={pending === `requeue-${entry.id}`}
-                            disabled={stale}
+                            /* `finished` for the same reason "Invite owner"
+                               carries it: the control was offered on a
+                               completed auction, directly under a banner
+                               saying nothing here can be opened or undone, and
+                               clicking it did NOTHING AT ALL. The engine
+                               refuses the command — the record is safe — but
+                               the refusal never reached the screen, so the
+                               conductor's only evidence was a button that did
+                               not respond. */
+                            disabled={stale || finished}
                             data-testid={`requeue-${entry.lotNumber}`}
                           >
                             Requeue
@@ -729,7 +760,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                 )
                               }
                               loading={pending === `withdraw-${entry.id}`}
-                              disabled={stale}
+                              disabled={stale || finished}
                               data-testid={`withdraw-frozen-${entry.lotNumber}`}
                             >
                               Withdraw
@@ -953,10 +984,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             snapshot={snapshot}
             teams={view.teams}
             rules={view.rules}
-            squadSizes={squadSizesOf(view.teams, view.preSigned, view.resolved)}
+            squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
           />
 
-          <PoolSummary snapshot={snapshot} resolved={view.resolved} preSigned={view.preSigned} />
+          <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={view.preSigned} />
         </div>
       </div>
 
@@ -964,7 +995,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         roles={view.roles}
         teams={view.teams}
         preSigned={view.preSigned}
-        resolved={view.resolved}
+        resolved={feed.resolved}
         snapshot={snapshot}
         squadMax={view.rules.squadMax}
       />
