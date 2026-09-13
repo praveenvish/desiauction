@@ -1,0 +1,91 @@
+.drift {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  /* How far a mote climbs. The stage sets this to its own height; a phone
+     card can leave the default. */
+  --drift-height: 360px;
+}
+
+.mote {
+  position: absolute;
+  bottom: -4%;
+  /* One column per index, spread across the width. */
+  left: calc((var(--i) + 0.5) * (100% / var(--n)));
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--ceremony-gold);
+  box-shadow: 0 0 8px
+    color-mix(in srgb, var(--ceremony-glow, var(--ceremony-gold)) 60%, transparent);
+  opacity: 0;
+  --sway: 0px;
+  --rise: calc(var(--drift-height) * 0.78);
+  /* Off the scale on purpose: the rise must outlast the 1800 ms ceremony so
+     motes are still climbing as the frame settles, and the stagger below adds
+     up to ~1 s on top. motion-ok: choreographed against duration-ceremony. */
+  animation: mote-rise 2600ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 42ms);
+}
+
+/* Deterministic variety by position, not by chance. */
+.mote:nth-child(5n + 1) {
+  --sway: -12px;
+}
+
+.mote:nth-child(5n + 2) {
+  --sway: 8px;
+}
+
+.mote:nth-child(5n + 4) {
+  --sway: -6px;
+}
+
+.mote:nth-child(5n) {
+  --sway: 14px;
+}
+
+.mote:nth-child(4n + 1) {
+  --rise: calc(var(--drift-height) * 0.62);
+}
+
+.mote:nth-child(4n + 3) {
+  --rise: calc(var(--drift-height) * 0.94);
+}
+
+.mote:nth-child(3n) {
+  width: 3px;
+  height: 3px;
+  background: var(--ceremony-glow, var(--ceremony-gold));
+}
+
+.mote:nth-child(4n) {
+  width: 7px;
+  height: 7px;
+  background: var(--ceremony-gold-deep, var(--ceremony-gold));
+}
+
+@keyframes mote-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.6);
+  }
+
+  18% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--sway), calc(-1 * var(--rise)), 0) scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drift {
+    display: none;
+  }
+}

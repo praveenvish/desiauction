@@ -9,6 +9,7 @@ import { DepthDemo } from "./depth-demo";
 import { IdentityDemo } from "./identity-demo";
 import { MotionDemo } from "./motion-demo";
 import { PrimitivesDemo } from "./primitives-demo";
+import { TheatreDemo } from "./theatre-demo";
 
 // M-IP1-1 gallery: token sheet + type ramp + theme flip (IP-1_DESIGN §13).
 // The e2e sweep (gallery.spec.ts) measures contrast on the pairs below.
@@ -227,6 +228,7 @@ export default function GalleryPage() {
           <MotionDemo />
           <PrimitivesDemo />
           <DepthDemo />
+          <TheatreDemo />
         </main>
       </ToastProvider>
     </AnnouncerProvider>

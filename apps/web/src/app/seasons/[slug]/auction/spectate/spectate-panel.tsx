@@ -19,6 +19,7 @@ import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
+import { useCeremonySound } from "../use-ceremony-sound";
 import { ShareAuction } from "./share-auction";
 
 import type { TeamIdentity } from "../purse-board";
@@ -159,6 +160,7 @@ export function SpectatePanel({
 }) {
   const { snapshot, connection, remainingMs, ceremony, stale, offline, clock } =
     useAuctionSocket(wsUrl);
+  useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   const feed = useLiveFeed(resolved, snapshot);
   const [hydrated, setHydrated] = useState(false);
   // PX-6 large-screen mode: the projector view — ceremony only, huge type.
@@ -310,6 +312,7 @@ export function SpectatePanel({
           ceremony={ceremony}
           remainingMs={remainingMs}
           lotMedia={lotMedia}
+          stampSize={stage ? "stage" : "lg"}
         />
       ) : (
         <div className="stage-hide">

@@ -48,6 +48,14 @@ export { AnnouncerProvider, useAnnouncer } from "./live/announcer";
 export type { Announce, AnnounceChannel } from "./live/announcer";
 export { VisuallyHidden } from "./live/visually-hidden";
 
+// The auction theatre (PREMIUM-1): the primitives every SOLD shares.
+export { RollingNumber } from "./theatre/rolling-number";
+export type { RollingNumberProps } from "./theatre/rolling-number";
+export { SoldStamp, HammerStrike } from "./theatre/sold-stamp";
+export type { SoldStampProps, StampTone, StampSize } from "./theatre/sold-stamp";
+export { GoldDrift } from "./theatre/gold-drift";
+export type { GoldDriftProps } from "./theatre/gold-drift";
+
 export { paintOnFill, relativeLuminance, textOnFill } from "./identity/fill-contrast";
 export type { FillPaint, FillTextToken } from "./identity/fill-contrast";
 export { placeholderIdentity, initialsFor } from "./identity/placeholder";

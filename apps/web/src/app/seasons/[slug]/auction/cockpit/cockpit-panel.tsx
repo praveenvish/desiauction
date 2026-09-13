@@ -29,6 +29,7 @@ import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { AuctionProgress } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
+import { useCeremonySound } from "../use-ceremony-sound";
 
 // THE AUCTION COCKPIT (M-IP4-3). The organizer's control room: open, pause,
 // resume, open ANY queued lot (order control = skip/bring-forward, doc 41),
@@ -67,6 +68,8 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const { snapshot, connection, remainingMs, ceremony, stale, offline } = useAuctionSocket(
     view.wsUrl,
   );
+  // The conductor hears the room too: opt-in, off by default (doc 11 sound).
+  useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   /**
    * DA: one global `busy` flag disabled 21 buttons at once — including the
    * gavel — for the duration of ANY command. The key names the single control

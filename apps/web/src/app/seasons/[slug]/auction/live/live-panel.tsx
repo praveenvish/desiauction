@@ -29,6 +29,7 @@ import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
+import { useCeremonySound } from "../use-ceremony-sound";
 
 // The live client (M-IP4-2, rewired M-IP4-3). This component DECIDES NOTHING:
 // it renders the broadcast AuctionSnapshot (shared socket hook), sends
@@ -51,6 +52,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
   const { snapshot, connection, remainingMs, version, ceremony, drift, stale, offline, clock } =
     useAuctionSocket(view.wsUrl);
   const feed = useLiveFeed(view.resolved, snapshot);
+  useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   // The device being offline is as good a reason to stop taking bids as the
   // socket being down — both mean the snapshot on screen is a memory.
   const readOnly = stale;

@@ -424,27 +424,31 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* Phase accents — deterministic, token-only. */
+/* --- THE SOLD CEREMONY: four beats in 1800ms (doc 11, C-5) ---------------
+ *
+ *   0–150     the freeze   one soft gold flash behind the name; the face leans in
+ *   150–600   the stamp    the gavel strikes, gold SOLD lands with a spring
+ *   600–1400  the facts    the price, then the buyer, roll in
+ *   1400–1800 the settle   the glow recedes to a thin gold frame
+ *
+ * The stamp and the gavel are `SoldStamp` in @desiauction/ui and carry their
+ * own clock (strike on the slow rung, landing on the emphatic one); this file
+ * times the stage around them with the same tokens. Decoration is aria-hidden
+ * and removed under reduced motion; text moves by transform only, never by
+ * opacity or colour, so contrast holds at every sampled frame (doc 13). */
+
+/* Rest state = the settled frame, so reduced motion lands here directly. */
 .ceremony-sold {
   border-color: var(--ceremony-gold);
   box-shadow:
     0 0 0 1px var(--ceremony-gold),
     var(--shadow-2);
+  animation:
+    ceremony-enter var(--duration-slow) var(--ease-out),
+    ceremony-settle var(--duration-emphatic) var(--ease-out) both;
+  animation-delay: 0ms, calc(var(--duration-ceremony) - var(--duration-emphatic));
 }
 
-/* SOLD announces at display size: 24px counts as WCAG large text, where the
-   deep gold's ratio meets AA (doc 13) — the moment earns the prominence. */
-.ceremony-sold .ceremony-title {
-  color: var(--ceremony-gold-deep);
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-semibold);
-}
-
-/* --- SOLD celebration: decorative gold burst ------------------------------- */
-/* Fully decorative (aria-hidden) and behind the announced content (z-index 0).
-   Motion only — no text ever animates, so contrast holds at every frame (doc
-   13 AA). The whole layer is removed under prefers-reduced-motion below; the
-   static gold border on `.ceremony-sold` is the moment's non-motion marker. */
 .ceremony-celebration {
   position: absolute;
   inset: 0;
@@ -452,10 +456,9 @@
   overflow: hidden;
   border-radius: inherit;
   pointer-events: none;
-  /* Fall distance; the fullscreen stage overrides this for a taller cascade. */
-  --fall: 340px;
 }
 
+/* Beat 1 — the freeze. */
 .ceremony-glow {
   position: absolute;
   inset: 0;
@@ -465,44 +468,85 @@
     transparent 62%
   );
   opacity: 0;
-  /* OFF THE SCALE ON PURPOSE: 1600ms is tuned to outlast `ceremony-fall`
-     (1500ms + up to 660ms of per-piece stagger) so the glow is still there
-     when the last confetti lands. These two are a choreography, not drift —
-     moving either onto a token breaks the relationship between them.
-     motion-ok: paired with ceremony-fall; the numbers are a choreography. */
-  animation: ceremony-glow-pulse 1600ms var(--ease-out) forwards;
+  animation: ceremony-glow-pulse var(--duration-ceremony) var(--ease-out) forwards;
 }
 
-.ceremony-confetti {
-  position: absolute;
-  top: -8%;
-  left: calc((var(--i) + 0.5) * (100% / 30));
-  width: 7px;
-  height: 12px;
-  border-radius: 2px;
-  background: var(--ceremony-gold);
-  opacity: 0;
-  /* Deterministic drift: pieces near the left lean left, right lean right —
-     a fountain spread, no randomness, identical on every surface. */
-  --drift: calc((var(--i) - 14.5) * 3px);
-  /* Paired with `ceremony-glow-pulse` above — see the note there before
-     replacing this with a duration token.
-     motion-ok: paired with ceremony-glow-pulse above. */
-  animation: ceremony-fall 1500ms var(--ease-out) forwards;
-  animation-delay: calc(var(--i) * 22ms);
+.ceremony-sold .ceremony-backdrop img {
+  animation: ceremony-focus var(--duration-ceremony) var(--ease-out) both;
 }
 
-.ceremony-confetti:nth-child(2n) {
-  background: var(--ceremony-gold-deep);
+/* Beat 3's atmosphere: gold climbs the height of the stage. */
+.ceremony-drift {
+  --drift-height: 420px;
 }
-.ceremony-confetti:nth-child(3n) {
-  background: var(--live, var(--accent));
+
+/* Beat 2 — the stamp takes the title's place. */
+.ceremony-title--stamp {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 var(--space-1);
+  letter-spacing: normal;
+  color: inherit;
 }
-.ceremony-confetti:nth-child(5n) {
-  background: color-mix(in srgb, var(--ceremony-gold) 55%, #fff);
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
+
+/* Beat 3 — the facts. The name settles as the stamp lands, the price arrives
+   at 520ms, the buyer at 840ms. */
+.ceremony-sold .ceremony-player {
+  animation: ceremony-fact var(--duration-emphatic) var(--ease-out) both;
+  animation-delay: var(--duration-base);
+}
+
+.ceremony-sold .ceremony-bid {
+  animation: sold-arrive var(--duration-emphatic) var(--ease-out) both;
+  animation-delay: var(--duration-emphatic);
+  transform-origin: 50% 100%;
+}
+
+.ceremony-leader--sold {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  animation: ceremony-fact var(--duration-emphatic) var(--ease-out) both;
+  animation-delay: var(--duration-dramatic);
+}
+
+.ceremony-leader-kicker {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+/* A new lot enters line by line: transform only, 60ms apart. */
+@media (prefers-reduced-motion: no-preference) {
+  .ceremony-reveal > * {
+    animation: ceremony-fact var(--duration-slow) var(--ease-out) backwards;
+    animation-delay: calc(var(--reveal-i, 0) * 60ms);
+  }
+
+  .ceremony-reveal > :nth-child(2) {
+    --reveal-i: 1;
+  }
+
+  .ceremony-reveal > :nth-child(3) {
+    --reveal-i: 2;
+  }
+
+  .ceremony-reveal > :nth-child(4) {
+    --reveal-i: 3;
+  }
+
+  .ceremony-reveal > :nth-child(n + 5) {
+    --reveal-i: 4;
+  }
 }
 
 @keyframes ceremony-glow-pulse {
@@ -510,32 +554,63 @@
     opacity: 0;
     transform: scale(0.6);
   }
+
   22% {
     opacity: 1;
   }
+
   100% {
     opacity: 0;
     transform: scale(1.15);
   }
 }
 
-@keyframes ceremony-fall {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) rotate(0deg);
+@keyframes ceremony-focus {
+  from {
+    transform: scale(1);
   }
-  12% {
-    opacity: 1;
+
+  to {
+    transform: scale(1.05);
   }
-  100% {
-    opacity: 0;
-    transform: translate3d(var(--drift), var(--fall), 0) rotate(540deg);
+}
+
+@keyframes ceremony-fact {
+  from {
+    transform: translateY(0.35em) scale(0.96);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+/* Beat 4 — shadow only: the wide glow of the moment narrows to the frame. */
+@keyframes ceremony-settle {
+  from {
+    box-shadow:
+      0 0 0 2px var(--ceremony-gold),
+      0 0 56px color-mix(in srgb, var(--ceremony-glow, var(--ceremony-gold)) 45%, transparent);
+  }
+
+  to {
+    box-shadow:
+      0 0 0 1px var(--ceremony-gold),
+      var(--shadow-2);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ceremony-celebration {
     display: none;
+  }
+
+  .ceremony-sold,
+  .ceremony-sold .ceremony-backdrop img,
+  .ceremony-sold .ceremony-player,
+  .ceremony-sold .ceremony-bid,
+  .ceremony-leader--sold {
+    animation: none;
   }
 }
 
@@ -705,6 +780,7 @@
 
 /* --- the lot on the block ------------------------------------------------- */
 .lot-hero {
+  position: relative;
   border: 1px solid var(--border-interactive);
   border-radius: var(--radius-xl);
   background: linear-gradient(150deg, var(--surface-overlay), var(--surface-sunken));
@@ -922,6 +998,20 @@
   .lot-ring-num {
     font-size: 30px;
   }
+
+  /* THE NAME GETS THE ROOM. Measured at 390px: face 96 + gap 16 + ring 96 left
+     the name column 84px wide, and "Kumar" at 28px broke as "Kuma / r" beside
+     the clock. The identity block now asks for 240px before it will share the
+     row, so on a phone the ring steps down to its own row (right-aligned, the
+     clock in the corner) and the name has the full width; from ~430px up the
+     row holds all three as before. */
+  .lot-hero-identity {
+    flex: 1 1 240px;
+  }
+
+  .lot-ring {
+    margin-left: auto;
+  }
 }
 
 .lot-ring-track {
@@ -935,12 +1025,21 @@
   stroke: var(--accent);
   stroke-width: 8;
   stroke-linecap: round;
+  /* The slow rung on the offset so an anti-snipe extension visibly REFILLS the
+     ring (doc 11: "the bid bought time") rather than snapping to full. */
   transition:
-    stroke-dashoffset var(--duration-base) linear,
+    stroke-dashoffset var(--duration-slow) linear,
     stroke var(--duration-fast) var(--ease-out);
 }
 
-.lot-ring[data-hot="true"] .lot-ring-value {
+/* URGENCY IN TIERS, never a blink (doc 11): under ten seconds the ring turns
+   to warning and breathes at a walking pulse; under five it turns to danger and
+   the breath quickens. The number keeps its colour tier and never scales. */
+.lot-ring[data-tier="warning"] .lot-ring-value {
+  stroke: var(--warning-base);
+}
+
+.lot-ring[data-tier="critical"] .lot-ring-value {
   stroke: var(--danger-base);
 }
 
@@ -962,8 +1061,33 @@
   font-variant-numeric: tabular-nums;
 }
 
-.lot-ring[data-hot="true"] .lot-ring-num {
+.lot-ring[data-tier="warning"] .lot-ring-num {
+  color: var(--warning-base);
+}
+
+.lot-ring[data-tier="critical"] .lot-ring-num {
   color: var(--danger-base);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lot-ring[data-tier="warning"] > svg {
+    animation: ring-breathe var(--duration-pulse) ease-in-out infinite;
+  }
+
+  .lot-ring[data-tier="critical"] > svg {
+    animation: ring-breathe var(--duration-dramatic) ease-in-out infinite;
+  }
+}
+
+@keyframes ring-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.045);
+  }
 }
 
 .lot-ring-unit {
@@ -1953,13 +2077,9 @@
   display: none;
 }
 
-/* Fullscreen broadcast: the confetti cascades the height of the stage. */
-.stage-mode .ceremony-celebration {
-  --fall: 82vh;
-}
-.stage-mode .ceremony-confetti {
-  width: 10px;
-  height: 17px;
+/* Fullscreen broadcast: the drift climbs the height of the wall. */
+.stage-mode .ceremony-drift {
+  --drift-height: 92vh;
 }
 
 /* Every size is bounded by the SHORT edge as well as the long one. Sizing a
@@ -2394,12 +2514,92 @@
     animation: bid-arrive var(--duration-base) var(--ease-out) both;
   }
 
-  /* The hammer price. One per lot, so it can afford the weight the live figure
-     cannot — and `--duration-emphatic` is the rung that exists for exactly this
-     gap between a state change and a celebration. */
-  .ceremony-sold .ceremony-bid {
-    animation: sold-arrive var(--duration-emphatic) var(--ease-out) both;
-    transform-origin: 50% 100%;
+  /* The leading team changes hands: the chip steps in from the left. */
+  .lot-hero-lead {
+    animation: lead-arrive var(--duration-base) var(--ease-out) both;
+  }
+
+  /* A NEW LOT REVEALS ITSELF (doc 11 premium register): the face, then the
+     kicker, the name, the meta, the clock and the money, 60ms apart. The hero
+     is keyed on the lot, so this plays once per player and never on a bid. */
+  .lot-hero-figure,
+  .lot-hero-kicker,
+  .lot-hero-name,
+  .lot-hero-meta,
+  .lot-ring,
+  .lot-hero-money {
+    animation: lot-reveal var(--duration-slow) var(--ease-out) backwards;
+  }
+
+  .lot-hero-kicker {
+    animation-delay: 60ms;
+  }
+
+  .lot-hero-name {
+    animation-delay: 120ms;
+  }
+
+  .lot-hero-meta {
+    animation-delay: 180ms;
+  }
+
+  .lot-ring {
+    animation-delay: 240ms;
+  }
+
+  .lot-hero-money {
+    animation-delay: 300ms;
+  }
+}
+
+/* A BID LANDS: one gold sweep on the hero's frame (doc 11 "a 1px volt pulse
+   sweeps the lot frame once"). The span is keyed on the bid id, so each new
+   bid remounts it and the sweep replays; shadow only, nothing else moves. */
+.lot-hero-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: lot-pulse var(--duration-slow) var(--ease-out) both;
+}
+
+@keyframes lot-pulse {
+  from {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 36px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+
+  to {
+    box-shadow:
+      0 0 0 0 transparent,
+      0 0 0 transparent;
+  }
+}
+
+@keyframes lead-arrive {
+  from {
+    transform: translateX(-8px);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes lot-reveal {
+  from {
+    transform: translateY(var(--space-3)) scale(0.985);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lot-hero-pulse {
+    animation: none;
   }
 }
 
@@ -2427,4 +2627,11 @@
   display: inline-flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* --- the sound switch in the shell strip ---------------------------------- */
+.ribbon-sound {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
 }
