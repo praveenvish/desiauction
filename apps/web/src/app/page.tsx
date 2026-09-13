@@ -1,5 +1,6 @@
-import { ButtonLink, VisuallyHidden } from "@desiauction/ui";
+import { ButtonLink, IconArrowRight as IconTrail, Tabs, VisuallyHidden } from "@desiauction/ui";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { env } from "../env";
 import { LANDING, PRICING, TRUST_MARKS } from "../content/marketing";
@@ -82,7 +83,8 @@ const STAGE_ICONS = [
 
 /**
  * The landing page, rebuilt to the 2026-07-24 Product Creation Council
- * blueprint. Seven sections, one CTA, and the page's only proof is the product
+ * blueprint and restructured 2026-09-13 (premium pass): SIX sections, one CTA,
+ * and the page's only proof is the product
  * visibly working plus candor — no testimonials, no stat bar, no capability
  * grid, no photography. The hero stage is a scripted replay (HeroStage): a
  * static-asset simulation labelled as such, with zero server dependency, whose
@@ -103,6 +105,16 @@ const STAGE_ICONS = [
  *   2. Anything the repository could not evidence is written AND flagged with a
  *      `TODO(founder):` in ../content/marketing.ts, never invented and never
  *      quietly dropped. Grep that file for the fact-check list.
+ *
+ * 2026-09-13 — nine bands became six, without dropping a sentence. The page
+ * was 6,889px on a phone: three of the nine were the same three-across card
+ * grid, three ended in the identical ghost button, and the proof strip and the
+ * pricing preview each paid a full band of padding for a few lines. Now the
+ * proof marks ride inside the hero; "how the night runs" and "when things go
+ * wrong" are two panels of ONE section behind a segmented control (both stay
+ * in the DOM); the receipt and the pricing preview share the money band; and
+ * the bands that used to end in a button end in an inline link, so the only
+ * buttons on the page are the two asks — hero and closing.
  */
 export default function LandingPage() {
   return (
@@ -140,6 +152,25 @@ export default function LandingPage() {
                   </ButtonLink>
                 </div>
                 <p className="mk-hero-note">{LANDING.hero.ctaNote}</p>
+                {/* The proof marks — verifiable capabilities, never metrics —
+                    used to be a band of their own under the hero. Inside it they
+                    are read in the same breath as the promise, and the page is
+                    one band shorter. */}
+                {/* tabIndex: on a phone the row scrolls sideways, and a
+                    scrollable region has to be reachable by keyboard (axe
+                    scrollable-region-focusable). The list is labelled, so
+                    landing on it reads as "Platform capabilities, list". */}
+                <ul className="mk-hero-proof" aria-label="Platform capabilities" tabIndex={0}>
+                  {TRUST_MARKS.map((mark, index) => {
+                    const Icon = TRUST_ICONS[index] ?? IconCheck;
+                    return (
+                      <li key={mark}>
+                        <Icon width={14} height={14} />
+                        <span>{mark}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
               <div className="mk-hero-demo">
                 <HeroStage script={LANDING.hero.script} teams={LANDING.hero.demoTeams} />
@@ -152,42 +183,21 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Full-width proof strip: verifiable capabilities, never metrics. */}
-        <section
-          className="mk-band mk-proof-band"
-          data-theme="floodlight"
-          aria-label="Platform capabilities"
-        >
-          <div className="mk-container">
-            <ul className="mk-proof">
-              {TRUST_MARKS.map((mark, index) => {
-                const Icon = TRUST_ICONS[index] ?? IconCheck;
-                return (
-                  <li key={mark}>
-                    <span className="mk-proof-tile">
-                      <Icon />
-                    </span>
-                    <span>{mark}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </section>
-
-        {/* --- 1b · Live tournaments: the page's only unsimulated proof -----
-            Placed directly under the capability strip, and kept on the
-            floodlight, because the proof band deliberately has NO bottom
-            padding — it is built to flow into the dark band beneath it. A light
-            band here would have butted the capability marks against a hard
-            edge. It also earns its position rhetorically: the strip above
-            claims, this one evidences, and only then does the page start
-            explaining. Renders nothing when the directory is empty or the
-            database is unreachable, which restores exactly today's layout. */}
+        {/* --- 2 · Live tournaments: the page's only unsimulated proof -----
+            Directly under the hero, on the floodlight, so the promise above is
+            followed by evidence before the page starts explaining. Renders
+            nothing when the directory is empty or the database is unreachable,
+            which restores exactly the six-band layout. */}
         <LiveTournaments />
 
-        {/* --- 2 · The night in three beats -------------------------------- */}
-        <section className="mk-band" id="how" aria-labelledby="how-heading">
+        {/* --- 3 · The night: how it runs, and what happens when it goes wrong.
+            Two sections became one. Both were a heading over a three-across
+            grid, back to back; behind a segmented control they read as the two
+            halves of one argument — the plan, then the failure modes — and the
+            visitor who only wants the plan is not scrolled through both. Every
+            card of both panels stays in the DOM: the control is a lens, never a
+            gate, and a screen reader lands on a real tablist. */}
+        <section className="mk-band mk-band--panel" id="how" aria-labelledby="how-heading">
           <div className="mk-container">
             <div className="mk-panel">
               <div className="mk-band-head mk-band-head--center mk-center">
@@ -196,78 +206,86 @@ export default function LandingPage() {
                   {LANDING.beats.h2}
                 </h2>
               </div>
-              <ol className="mk-steps">
-                {LANDING.beats.steps.map((step, index) => {
-                  const Icon = BEAT_ICONS[index] ?? IconGavel;
-                  return (
-                    <li key={step.title}>
-                      <div className="mk-step-top">
-                        <span className="mk-icon-tile">
-                          <Icon />
-                        </span>
-                      </div>
-                      <div className="mk-swap">
-                        <h3>{step.title}</h3>
-                        <p>{step.body}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
+              <div className="mk-segmented">
+                <Tabs
+                  label="The night"
+                  tabs={[
+                    {
+                      id: "how",
+                      label: "How it runs",
+                      content: (
+                        <ol className="mk-steps">
+                          {LANDING.beats.steps.map((step, index) => {
+                            const Icon = BEAT_ICONS[index] ?? IconGavel;
+                            return (
+                              <li key={step.title}>
+                                <div className="mk-step-top">
+                                  <span className="mk-icon-tile">
+                                    <Icon />
+                                  </span>
+                                </div>
+                                <div className="mk-swap">
+                                  <h3>{step.title}</h3>
+                                  <p>{step.body}</p>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      ),
+                    },
+                    {
+                      id: "worst",
+                      label: LANDING.worst.kicker,
+                      content: (
+                        <>
+                          <h3 className="mk-segment-title">{LANDING.worst.h2}</h3>
+                          <div className="mk-cards">
+                            {LANDING.worst.items.map((item, index) => {
+                              const Icon = WORST_ICONS[index] ?? IconBolt;
+                              return (
+                                <div key={item.title} className="mk-card mk-swapcard">
+                                  <span className="mk-icon-tile">
+                                    <Icon />
+                                  </span>
+                                  {/*
+                                   * TITLE AND BODY TRADE PLACES; THE ICON DOES NOT MOVE.
+                                   * Both are always in the DOM and neither is aria-hidden,
+                                   * so a screen reader reads the card whole — the crossfade
+                                   * is an affordance, not a gate.
+                                   */}
+                                  <div className="mk-swap">
+                                    <h4>{item.title}</h4>
+                                    <p>{item.body}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="mk-center mk-rehearse">
+                            {LANDING.worst.rehearse}{" "}
+                            <Link href="/login" className="mk-inline-link">
+                              Start rehearsing
+                              <IconTrail size={16} className="icon-trail" />
+                            </Link>
+                          </p>
+                        </>
+                      ),
+                    },
+                  ]}
+                />
+              </div>
               <p className="mk-center mk-panel-actions">
-                <ButtonLink href="/features" variant="ghost">
+                <Link href="/features" className="mk-inline-link">
                   Explore all features
-                  <IconArrowRight width={16} height={16} />
-                </ButtonLink>
+                  <IconTrail size={16} className="icon-trail" />
+                </Link>
               </p>
             </div>
           </div>
         </section>
 
-        {/* --- 3 · Built for the worst moment of the night ------------------ */}
-        <section className="mk-band mk-band--sunken" aria-labelledby="worst-heading">
-          <div className="mk-container">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">{LANDING.worst.kicker}</p>
-              <h2 id="worst-heading" className="mk-h2">
-                {LANDING.worst.h2}
-              </h2>
-            </div>
-            <div className="mk-cards">
-              {LANDING.worst.items.map((item, index) => {
-                const Icon = WORST_ICONS[index] ?? IconBolt;
-                return (
-                  <div key={item.title} className="mk-card mk-swapcard">
-                    <span className="mk-icon-tile">
-                      <Icon />
-                    </span>
-                    {/*
-                     * TITLE AND BODY TRADE PLACES; THE ICON DOES NOT MOVE.
-                     *
-                     * Both are always in the DOM and neither is aria-hidden, so
-                     * a screen reader reads the card whole — the crossfade is an
-                     * affordance, not a gate. Where there is no hover to give,
-                     * or motion is unwelcome, they simply stack and both show.
-                     */}
-                    <div className="mk-swap">
-                      <h3>{item.title}</h3>
-                      <p>{item.body}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mk-center mk-rehearse">
-              {LANDING.worst.rehearse}{" "}
-              <ButtonLink href="/login" variant="ghost">
-                Start rehearsing
-                <IconArrowRight width={16} height={16} />
-              </ButtonLink>
-            </p>
-          </div>
-        </section>
-
-        {/* --- 3b · Beyond auction night: the whole lifecycle ---------------
+        {/* --- 4 · Beyond auction night: the whole lifecycle ---------------
             The page sold one night; an organizer running a six-week league read
             that as "this cannot run my league" and left. Ten stages, one line
             each, and — as load-bearing as the list — the paragraph that says
@@ -288,9 +306,8 @@ export default function LandingPage() {
               <p className="mk-lead">{LANDING.lifecycle.sub}</p>
             </div>
             {/* `mk-lifecycle`, not `mk-stage*`: the hero card owns that prefix
-                (.mk-stage-name, .mk-stage-lot, .mk-stage-sold …) and a second,
-                unrelated "stage" in the same stylesheet would be a trap for
-                whoever edits it next. */}
+                and a second, unrelated "stage" in the same stylesheet would be a
+                trap for whoever edits it next. */}
             <ol className="mk-lifecycle">
               {LANDING.lifecycle.stages.map((stage, index) => {
                 const Icon = STAGE_ICONS[index] ?? IconCheck;
@@ -317,10 +334,18 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* --- 4 · The morning after: the receipt -------------------------- */}
-        <section className="mk-band" aria-labelledby="money-heading">
+        {/* --- 5 · Money: the morning after, and what it costs -------------
+            The receipt and the pricing preview were two bands with two heads
+            and two closing buttons, about the same subject: the rupee. One
+            band now: the receipt makes the argument, the tiers answer the
+            question it raises. Tiers are read from PRICING so this page can
+            never quote a price /pricing has retired, and the two paid tiers
+            show their real "Published at GA" placeholder. Deliberately WITHOUT
+            the pricing page's "Most popular" flag: with zero customers,
+            popularity is precisely the claim this page is not allowed to make. */}
+        <section className="mk-band mk-band--sunken" aria-labelledby="money-heading">
           <div className="mk-container">
-            <div className="mk-show">
+            <div className="mk-show mk-show--flush">
               <div>
                 <p className="mk-kicker">{LANDING.money.kicker}</p>
                 <h2 id="money-heading" className="mk-h2">
@@ -341,66 +366,55 @@ export default function LandingPage() {
                 </figure>
               </div>
             </div>
+            <div className="mk-money-pricing" aria-labelledby="pricing-heading">
+              <div className="mk-money-pricing-head">
+                <div>
+                  <p className="mk-kicker">{LANDING.pricingPreview.kicker}</p>
+                  <h3 id="pricing-heading" className="mk-money-pricing-title">
+                    {LANDING.pricingPreview.h2}
+                  </h3>
+                </div>
+                <p className="mk-money-pricing-sub">{LANDING.pricingPreview.sub}</p>
+              </div>
+              <div className="mk-tiers mk-tiers--preview">
+                {PRICING.tiers.map((tier) => {
+                  const tierId = `home-tier-${slugify(tier.name)}`;
+                  return (
+                    <section
+                      key={tier.name}
+                      className={`mk-tier${tier.featured === true ? " mk-tier--featured" : ""}`}
+                      aria-labelledby={tierId}
+                    >
+                      <h4 id={tierId}>{tier.name}</h4>
+                      <p className="mk-tier-price">
+                        {/* Same rule as /pricing: the display slot is set for a
+                            numeral, so a tier whose price is a sentence drops to
+                            text scale instead of dwarfing the tier that has one. */}
+                        <span
+                          className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
+                        >
+                          {tier.price}
+                        </span>
+                        <span className="mk-tier-cadence">{tier.cadence}</span>
+                      </p>
+                      <p className="mk-tier-limits">{tier.limits}</p>
+                    </section>
+                  );
+                })}
+              </div>
+              <p className="mk-trustline">
+                <IconShieldCheck />
+                <span>{PRICING.trustLine}</span>
+                <Link href={LANDING.pricingPreview.cta.href} className="mk-inline-link">
+                  {LANDING.pricingPreview.cta.label}
+                  <IconTrail size={16} className="icon-trail" />
+                </Link>
+              </p>
+            </div>
           </div>
         </section>
 
-        {/* --- 4b · Pricing preview ----------------------------------------
-            The page answered none of a guest's commercial questions. Tiers are
-            read from PRICING so the home page can never quote a price /pricing
-            has retired, and the two paid tiers show their real "Published at
-            GA" placeholder rather than a number nobody has decided.
-            Deliberately WITHOUT the pricing page's "Most popular" flag: with
-            zero customers, popularity is precisely the kind of claim this page
-            is not allowed to make. */}
-        <section className="mk-band mk-band--sunken" aria-labelledby="pricing-heading">
-          <div className="mk-container">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">{LANDING.pricingPreview.kicker}</p>
-              <h2 id="pricing-heading" className="mk-h2">
-                {LANDING.pricingPreview.h2}
-              </h2>
-              <p className="mk-lead">{LANDING.pricingPreview.sub}</p>
-            </div>
-            <div className="mk-tiers mk-tiers--preview">
-              {PRICING.tiers.map((tier) => {
-                const tierId = `home-tier-${slugify(tier.name)}`;
-                return (
-                  <section
-                    key={tier.name}
-                    className={`mk-tier${tier.featured === true ? " mk-tier--featured" : ""}`}
-                    aria-labelledby={tierId}
-                  >
-                    <h3 id={tierId}>{tier.name}</h3>
-                    <p className="mk-tier-price">
-                      {/* Same rule as /pricing: the display slot is set for a
-                          numeral, so a tier whose price is a sentence drops to
-                          text scale instead of dwarfing the tier that has one. */}
-                      <span
-                        className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
-                      >
-                        {tier.price}
-                      </span>
-                      <span className="mk-tier-cadence">{tier.cadence}</span>
-                    </p>
-                    <p className="mk-tier-limits">{tier.limits}</p>
-                  </section>
-                );
-              })}
-            </div>
-            <p className="mk-trustline">
-              <IconShieldCheck />
-              <span>{PRICING.trustLine}</span>
-            </p>
-            <p className="mk-center mk-panel-actions">
-              <ButtonLink href={LANDING.pricingPreview.cta.href} variant="ghost">
-                {LANDING.pricingPreview.cta.label}
-                <IconArrowRight width={16} height={16} />
-              </ButtonLink>
-            </p>
-          </div>
-        </section>
-
-        {/* --- 5 · Closing CTA ---------------------------------------------- */}
+        {/* --- 6 · Closing CTA ---------------------------------------------- */}
         <section className="mk-band mk-cta-band" data-theme="floodlight" aria-labelledby="beta">
           <div className="mk-cta-photo" aria-hidden="true" />
           {/* The hero's atmosphere returns for the closing scene. */}
