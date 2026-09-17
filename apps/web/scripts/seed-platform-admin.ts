@@ -40,8 +40,9 @@ import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capa
  *   pnpm --filter @desiauction/web seed:admin -- <phone>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:billing <phone>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:demo <phone>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:support <phone>
  */
-const SETS = ["platform:admin", "platform:billing", "platform:demo"] as const;
+const SETS = ["platform:admin", "platform:billing", "platform:demo", "platform:support"] as const;
 const setFlagAt = process.argv.indexOf("--set");
 const requestedSet = setFlagAt === -1 ? "platform:admin" : process.argv[setFlagAt + 1];
 if (!(SETS as readonly string[]).includes(requestedSet ?? "")) {

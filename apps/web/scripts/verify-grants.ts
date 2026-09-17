@@ -131,6 +131,11 @@ const APP_WRITES_UNPROTECTED = [
   "demo_availability",
   "demo_blackouts",
   "demo_bookings",
+  // FR-1 (0064): a guest can file a problem report, so these are no-RLS for
+  // the same reason as the demo tables — and the operator desk and retention
+  // sweep write them on the same pool.
+  "problem_reports",
+  "problem_report_screenshots",
 ];
 
 /**
@@ -179,7 +184,7 @@ function expectations(allTables: string[]): Expectation[] {
         table,
         verb,
         allowed: true,
-        why: "the public demo form and the operator desk both write on the app pool (no RLS to bypass)",
+        why: "public forms (demo, problem report) and their operator desks write on the app pool (no RLS to bypass)",
       });
     }
   }

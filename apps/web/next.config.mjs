@@ -57,7 +57,23 @@ export default {
   poweredByHeader: false,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],
   headers() {
-    return Promise.resolve([{ source: "/:path*", headers: securityHeaders }]);
+    return Promise.resolve([
+      { source: "/:path*", headers: securityHeaders },
+      // FR-1: a problem-report screenshot is a picture of somebody's screen,
+      // served to one operator. Config headers REPLACE a route handler's own
+      // header of the same name, so the stricter policy the route sets was
+      // being overwritten by the site-wide one above — measured, not assumed.
+      // A later rule wins for the same key, so it is restated here.
+      {
+        source: "/admin/reports/:reportId/screenshot",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'none'; frame-ancestors 'none'; sandbox",
+          },
+        ],
+      },
+    ]);
   },
   redirects() {
     // A competition is now called a season — the thing that runs, under a

@@ -47,6 +47,7 @@ import {
   pageIdentity,
   shellKind,
 } from "./nav";
+import { useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
 import { ShellStatusContext } from "./page-status";
 import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
@@ -261,6 +262,7 @@ export function ProductShell({
 }: ProductShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const reportProblem = useReportProblem();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
   /**
@@ -677,6 +679,9 @@ export function ProductShell({
               { label: "Help centre", href: "/help" },
               { label: "FAQ", href: "/help/faq" },
               { label: "Contact support", href: "/support" },
+              // Opens the report dialog over THIS page (the provider intercepts
+              // the hash), so the screenshot is of what they were looking at.
+              { label: "Report a problem", href: "#report-a-problem" },
               { label: "Search the site", href: "/search" },
             ],
           },
@@ -866,7 +871,7 @@ export function ProductShell({
                     always true — phone or email, one of the two is guaranteed
                     by `people_reachable_check` — and on the shared handsets
                     this product targets it says WHICH account is signed in. */}
-                {session.name !== null ? <span>{personContact(session)}</span> : null}
+                {session.name !== null ? <span data-private>{personContact(session)}</span> : null}
               </span>
             </Link>
           }
@@ -936,7 +941,11 @@ export function ProductShell({
                 <PopoverMenu
                   label="Account menu"
                   trigger={<span className="shell-avatar">{initials}</span>}
-                  header={<span data-testid="shell-session-phone">{personContact(session)}</span>}
+                  header={
+                    <span data-testid="shell-session-phone" data-private>
+                      {personContact(session)}
+                    </span>
+                  }
                   items={[
                     {
                       key: "account",
@@ -951,6 +960,11 @@ export function ProductShell({
                       onSelect: () => {
                         router.push("/help");
                       },
+                    },
+                    {
+                      key: "report-problem",
+                      label: "Report a problem",
+                      onSelect: reportProblem,
                     },
                     // PX-1 01 §3: "(Admin: + Platform admin.)" — absent, not
                     // disabled, for everyone else. The surface 404s regardless;
@@ -1012,7 +1026,9 @@ export function ProductShell({
             }}
             title="Menu"
           >
-            <div className="shell-drawer-session">{personContact(session)}</div>
+            <div className="shell-drawer-session" data-private>
+              {personContact(session)}
+            </div>
             <ul className="shell-drawer-list">
               {orgs.map((org) => (
                 <li key={org.slug}>
@@ -1030,6 +1046,20 @@ export function ProductShell({
                 <Link href="/help" className="shell-drawer-link">
                   Help
                 </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="shell-drawer-link"
+                  onClick={() => {
+                    // Close the drawer first: the screenshot is of the page,
+                    // not of the menu that was covering it.
+                    setDrawerOpen(false);
+                    reportProblem();
+                  }}
+                >
+                  Report a problem
+                </button>
               </li>
               {isAdmin ? (
                 <li>

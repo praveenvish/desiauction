@@ -158,6 +158,13 @@ const envSchema = z.object({
    */
   SETTLEMENT_JOB_SECRET: z.string().min(16).optional(),
   /**
+   * FR-1 feedback sweep (`POST /api/jobs/feedback`): today the problem-report
+   * retention purge (screenshots and addresses at ninety days, reports at
+   * twenty-four months); Phase 3 adds the review-request sweep to the same door.
+   * Same fail-closed posture as DEMO_JOB_SECRET — unset is a 404.
+   */
+  FEEDBACK_JOB_SECRET: z.string().min(16).optional(),
+  /**
    * The key demo booking links are DERIVED from (HMAC over the request id).
    *
    * A random token would be unrecoverable once hashed, which the reminder sweep

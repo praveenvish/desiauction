@@ -253,6 +253,9 @@ export const ADMIN_TABS: CompetitionTab[] = [
   // tab is present for everyone, the page 404s without the grant. Which tabs
   // you can SEE must not be a map of which grants you hold.
   { key: "demos", label: "Demos", href: "/admin/demos" },
+  // Reports sits behind `platform:support`, same rule again: present for
+  // everyone, 404 without the grant.
+  { key: "reports", label: "Reports", href: "/admin/reports" },
 ];
 
 export function activeAdminTab(pathname: string): string {
@@ -276,6 +279,9 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/demos")) {
     return "demos";
+  }
+  if (pathname.startsWith("/admin/reports")) {
+    return "reports";
   }
   return "overview";
 }
@@ -387,6 +393,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   // Longest-first: availability must not be labelled "Demos".
   [/^\/admin\/demos\/availability$/, "Demo availability"],
   [/^\/admin\/demos$/, "Demos"],
+  [/^\/admin\/reports$/, "Reports"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.

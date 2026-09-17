@@ -71,7 +71,10 @@ export type AdminSurface =
   /** The demo desk (DEMO-1), behind `platform:demo`. Opening it reads the name
    *  and mobile number of somebody who is not a customer, which is precisely
    *  the kind of read this log exists for. */
-  | "demos";
+  | "demos"
+  /** The problem-report desk (FR-1), behind `platform:support`. Opening it
+   *  reads people's reply addresses and pictures of their screens. */
+  | "reports";
 
 /**
  * Record that an administrator opened a surface.

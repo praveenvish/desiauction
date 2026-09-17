@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ReportProblemButton } from "../../components/report-problem/report-problem";
 import { env } from "../../env";
 import { SUPPORT } from "../../content/support";
 import "../content.css";
@@ -65,6 +66,7 @@ export default function SupportPage() {
             <li key={item}>{item}</li>
           ))}
         </ul>
+        <ReportProblemButton>Report a problem</ReportProblemButton>
       </section>
 
       <section className="content-section" aria-labelledby="status">

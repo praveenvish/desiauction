@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -2014,3 +2015,67 @@ export const demoBookings = pgTable(
     index("demo_bookings_request_idx").on(table.demoRequestId),
   ],
 );
+
+/** Raw bytes. Postgres `bytea`, surfaced to the app as a Node `Buffer`. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+/**
+ * SOMEBODY TELLING US SOMETHING IS BROKEN (FR-1, migration 0064).
+ *
+ * No RLS and no org, like `demo_requests`: a guest can file one, and a signed-in
+ * report is about the platform rather than a tenant. Readers are operators
+ * holding `platform:support`. The page URL arrives already stripped of its
+ * query string and token segments, and `context` is a closed, size-capped set
+ * of keys — both enforced in `apps/web/src/server/support/problem-reports.ts`.
+ */
+export const problemReports = pgTable(
+  "problem_reports",
+  {
+    id: id(),
+    /** Null for a guest, and nulled if the person is ever deleted. */
+    personId: char("person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    replyEmail: text("reply_email"),
+    category: text("category", { enum: ["bug", "confusing", "idea", "other"] }).notNull(),
+    description: text("description").notNull(),
+    pageUrl: text("page_url").notNull(),
+    context: jsonb("context").$type<Record<string, string>>().notNull().default({}),
+    /** Throttling only; cleared by the retention sweep. */
+    requestIp: text("request_ip"),
+    status: text("status", { enum: ["new", "triaged", "fixed", "wont_fix", "duplicate"] })
+      .notNull()
+      .default("new"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    /** Null exactly while `status` is new (CHECK). */
+    triagedAt: ts("triaged_at"),
+    triagedBy: char("triaged_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    index("problem_reports_created_idx").on(table.createdAt),
+    index("problem_reports_person_idx").on(table.personId, table.createdAt),
+    index("problem_reports_ip_idx").on(table.requestIp, table.createdAt),
+  ],
+);
+
+/**
+ * The picture that came with a report (0064) — in the database, not the media
+ * store, because the media store serves every key from a public base URL.
+ * At most a megabyte, one per report, cascades with it, purged after 90 days.
+ */
+export const problemReportScreenshots = pgTable("problem_report_screenshots", {
+  reportId: char("report_id", { length: 26 })
+    .primaryKey()
+    .references(() => problemReports.id, { onDelete: "cascade" }),
+  contentType: text("content_type", {
+    enum: ["image/jpeg", "image/png", "image/webp"],
+  }).notNull(),
+  bytes: bytea("bytes").notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});

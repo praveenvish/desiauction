@@ -63,6 +63,7 @@ import {
   userDirectory,
 } from "./views";
 import { passQueue } from "./passes";
+import { reportQueue } from "./report-views";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -432,6 +433,11 @@ describe("PX-9 · The read-only guarantee, proved at runtime", () => {
     // behind its own grant, and the queue that feeds it is a projection like
     // every other one. Driven here so it can never quietly start mutating.
     const passes = await passQueue(ro);
+    // FR-1: the problem-report queue is a projection like the rest; its one
+    // write lives in server/support/report-desk.ts.
+    const reports = await reportQueue(ro);
+    expect(Array.isArray(reports.open)).toBe(true);
+    expect(Array.isArray(reports.closed)).toBe(true);
     expect(Array.isArray(passes.open)).toBe(true);
     expect(Array.isArray(passes.recent)).toBe(true);
   }, 120_000);
