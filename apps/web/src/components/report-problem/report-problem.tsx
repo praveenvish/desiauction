@@ -58,7 +58,10 @@ function takeSnapshot(): Snapshot {
     // The server strips the query string, fragment and token segments; the
     // pathname shown in the dialog is stripped the same way for display.
     pageUrl: window.location.href,
-    pathname: window.location.pathname.replace(/\/(join|owner-join|demo)\/[^/]+/, "/$1/[redacted]"),
+    pathname: window.location.pathname.replace(
+      /\/(join|owner-join|demo|review)\/[^/]+/,
+      "/$1/[redacted]",
+    ),
     context: {
       viewport: `${String(window.innerWidth)}×${String(window.innerHeight)} @${String(window.devicePixelRatio)}x`,
       userAgent: navigator.userAgent,

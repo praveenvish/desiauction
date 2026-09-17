@@ -1,6 +1,6 @@
 # FR-1 — Problem reports and reviews
 
-**Status:** Phase 1 BUILT (2026-09-17, uncommitted on `feature/fr1-feedback`); Phases 2–5 planned. **Author:** engineering. **Planned:** 2026-09-17.
+**Status:** Phases 1–2 BUILT (2026-09-17, on `feature/fr1-feedback`); Phases 3–5 planned. **Author:** engineering. **Planned:** 2026-09-17.
 **Founder decisions:** taken 2026-09-17 — "go with your recommendations" (§8).
 
 ---
@@ -153,3 +153,48 @@ typecheck, depcruise, format, production build green; browser-verified guest
 footer flow, signed-in submit (row + 96 KB JPEG), 404 partition without the
 grant, desk triage, gated image headers, and phone masking on a real
 registrations table. Not yet run: Playwright e2e for this flow.
+
+## 10. Phase 2 — what shipped, and where the plan was wrong
+
+**Shipped.** Migration `0065_platform_reviews` (`review_requests`, `reviews`,
+no RLS, `subject_type` pinned to `platform` by CHECK so Phase 4 widens a
+constraint instead of reshaping tables); `server/reviews/*` (HMAC link tokens
+under `REVIEW_TOKEN_SECRET`, one ask per person via unique index + ON CONFLICT,
+validation, page state, submit-while-pending, moderation, the desk's ask flow);
+`/review/[token]` (public, noindex, unknown → 404, expired and closed said
+plainly); `/admin/reviews` (ask by email or number, copyable link, publish/hide,
+who-was-asked with sent/opened/reviewed); a `feedback` topic on /account that
+the ask honours through `maySend`.
+
+**Decisions made while building:**
+
+1. *The desk shares `platform:support`* with Reports — both are what people told
+   us; a fifth grant would be ceremony.
+2. *An ask always yields a link*, even when mail cannot go (no email, mail
+   unconfigured): most organizers live on WhatsApp. An opted-out person gets no
+   link on the desk, so an operator cannot route around their choice.
+3. *Deleting a person deletes their review* (CASCADE): the words are theirs.
+4. *Date of birth for the minor check* is the profile's, else the latest
+   registration's — read on the system pool, because registrations are tenant
+   rows and under the app role a minor would look undated.
+5. *A moderated review is frozen*: `ON CONFLICT … DO UPDATE … WHERE status =
+   'pending'`, so a submit that read "pending" a moment before publish cannot
+   overwrite what was published.
+
+**Found by running it:** React resets a form's uncontrolled fields when its
+action settles, so the page thanked the person and showed an empty form. The
+action now echoes the submitted values and the form remounts from them.
+
+**Also found:** `.env.local` carries a real Resend key, so a local dev server
+SENDS REAL MAIL. Browser checks from here on run with the `EMAIL_*` lines
+stripped from the env file.
+
+**Operator setup before live:** set `REVIEW_TOKEN_SECRET` (32+ chars; the dev
+default is refused in production); re-run the role recipe and `grants:verify`
+after 0065.
+
+**Verification.** 13 unit + 15 DB regression tests (reviews); admin read-only
+proof extended to `reviewDesk`; 255 tests across the touched suites green; lint,
+typecheck, depcruise, format, production build green; browser-verified ask →
+link → write → edit → publish → link closed, the /account switch, and the form
+at 320px. Not yet run: Playwright e2e for either phase.

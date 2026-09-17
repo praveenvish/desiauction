@@ -64,6 +64,7 @@ import {
 } from "./views";
 import { passQueue } from "./passes";
 import { reportQueue } from "./report-views";
+import { reviewDesk } from "./review-views";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -438,6 +439,10 @@ describe("PX-9 · The read-only guarantee, proved at runtime", () => {
     const reports = await reportQueue(ro);
     expect(Array.isArray(reports.open)).toBe(true);
     expect(Array.isArray(reports.closed)).toBe(true);
+    // FR-1 Phase 2: the review desk is a projection too.
+    const desk = await reviewDesk(ro);
+    expect(Array.isArray(desk.pending)).toBe(true);
+    expect(Array.isArray(desk.asks)).toBe(true);
     expect(Array.isArray(passes.open)).toBe(true);
     expect(Array.isArray(passes.recent)).toBe(true);
   }, 120_000);

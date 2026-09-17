@@ -55,7 +55,7 @@ const CONTEXT_VALUE_LIMIT = 300;
  * every operator can read. Keep in step with `app/*\/[token]`; the unit test
  * reads the app directory so a new token route cannot be forgotten silently.
  */
-export const TOKEN_ROUTE_PREFIXES = ["join", "owner-join", "demo"] as const;
+export const TOKEN_ROUTE_PREFIXES = ["join", "owner-join", "demo", "review"] as const;
 
 export const REDACTED = "[redacted]";
 

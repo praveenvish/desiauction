@@ -68,6 +68,9 @@ export function shellKind(pathname: string): ShellKind {
     // with a live session — without this the person's own demo would arrive
     // framed in the organizer console.
     pathname.startsWith("/demo/") ||
+    // Same for a review link (FR-1): it is read in a mail client's browser,
+    // signed in or not, and is a public page either way.
+    pathname.startsWith("/review/") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/careers") ||
     pathname.startsWith("/case-studies") ||
@@ -256,6 +259,9 @@ export const ADMIN_TABS: CompetitionTab[] = [
   // Reports sits behind `platform:support`, same rule again: present for
   // everyone, 404 without the grant.
   { key: "reports", label: "Reports", href: "/admin/reports" },
+  // Reviews shares `platform:support` with Reports — both are what people told
+  // us — and follows the same present-for-everyone, 404-without-grant rule.
+  { key: "reviews", label: "Reviews", href: "/admin/reviews" },
 ];
 
 export function activeAdminTab(pathname: string): string {
@@ -282,6 +288,9 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/reports")) {
     return "reports";
+  }
+  if (pathname.startsWith("/admin/reviews")) {
+    return "reviews";
   }
   return "overview";
 }
@@ -394,6 +403,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/demos\/availability$/, "Demo availability"],
   [/^\/admin\/demos$/, "Demos"],
   [/^\/admin\/reports$/, "Reports"],
+  [/^\/admin\/reviews$/, "Reviews"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.

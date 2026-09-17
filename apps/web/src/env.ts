@@ -178,6 +178,13 @@ const envSchema = z.object({
    */
   DEMO_TOKEN_SECRET: z.string().min(8).default("dev-demo-token-secret"),
   /**
+   * FR-1 review links (`/review/[token]`) are an HMAC of the request id under
+   * this key, for the reason DEMO_TOKEN_SECRET gives: a resend must rebuild the
+   * link, and storing it would hand a leaked backup every review page. The dev
+   * default is refused when serving, exactly like the demo key's.
+   */
+  REVIEW_TOKEN_SECRET: z.string().min(8).default("dev-review-token-secret"),
+  /**
    * Razorpay. All three together or the gateway is simply absent and every
    * payment stays on the manual adapters — a half-configured gateway that
    * accepts orders it cannot reconcile is worse than no gateway.
@@ -399,6 +406,15 @@ const productionSchema = envSchema
   .refine((v) => !serving(v) || v.DEMO_TOKEN_SECRET.length >= 32, {
     message: "DEMO_TOKEN_SECRET must be at least 32 characters in production",
     path: ["DEMO_TOKEN_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.REVIEW_TOKEN_SECRET !== "dev-review-token-secret", {
+    message:
+      "REVIEW_TOKEN_SECRET must be set explicitly in production (review links are derived from it)",
+    path: ["REVIEW_TOKEN_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.REVIEW_TOKEN_SECRET.length >= 32, {
+    message: "REVIEW_TOKEN_SECRET must be at least 32 characters in production",
+    path: ["REVIEW_TOKEN_SECRET"],
   })
   .refine((v) => !serving(v) || v.ENGINE_SECRET.length >= 32, {
     message: "ENGINE_SECRET must be at least 32 characters in production",

@@ -607,7 +607,10 @@ export function ProductShell({
     // five-column sitemap footer, which at 390px was HALF the page under a
     // single 300px card. Same compact treatment as /login.
     const atGate =
-      pathname === "/login" || pathname.startsWith("/join/") || pathname.startsWith("/owner-join/");
+      pathname === "/login" ||
+      pathname.startsWith("/join/") ||
+      pathname.startsWith("/owner-join/") ||
+      pathname.startsWith("/review/");
     // …but only /login takes the fill treatment (it is a floodlight surface;
     // see the login polish note). The invitation cards stay on daylight.
     const atLoginGate = pathname === "/login";

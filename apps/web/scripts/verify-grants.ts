@@ -136,6 +136,10 @@ const APP_WRITES_UNPROTECTED = [
   // sweep write them on the same pool.
   "problem_reports",
   "problem_report_screenshots",
+  // FR-1 Phase 2 (0065): the review page's principal is a link token, not a
+  // tenant, and platform reviews belong to no organization.
+  "review_requests",
+  "reviews",
 ];
 
 /**

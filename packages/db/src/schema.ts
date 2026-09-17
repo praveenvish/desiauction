@@ -2079,3 +2079,81 @@ export const problemReportScreenshots = pgTable("problem_report_screenshots", {
   bytes: bytea("bytes").notNull(),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
+
+/**
+ * ASKING SOMEBODY HOW IT WENT (FR-1 Phase 2, migration 0065).
+ *
+ * One ask per person per subject (unique index) — asking again re-sends the
+ * same link. The link token is an HMAC of this row's id under
+ * REVIEW_TOKEN_SECRET; only its SHA-256 is stored. No RLS: the principal on the
+ * review page is the token, and a platform review belongs to no organization.
+ */
+export const reviewRequests = pgTable(
+  "review_requests",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    /** Phase 2 is the platform only; Phase 4 widens the CHECK. */
+    subjectType: text("subject_type", { enum: ["platform"] })
+      .notNull()
+      .default("platform"),
+    source: text("source", {
+      enum: ["manual_admin", "manual_org", "auction_completed", "season_completed"],
+    }).notNull(),
+    requestedBy: char("requested_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    tokenHash: text("token_hash").notNull().unique("review_requests_token_hash_uq"),
+    /** The address the ask went to; null when the link was shared by hand. */
+    sentTo: text("sent_to"),
+    sentAt: ts("sent_at"),
+    openedAt: ts("opened_at"),
+    expiresAt: ts("expires_at").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("review_requests_person_subject_uq").on(table.personId, table.subjectType),
+    index("review_requests_created_idx").on(table.createdAt),
+  ],
+);
+
+/**
+ * A REVIEW (FR-1 Phase 2, migration 0065). Held `pending` until an operator
+ * publishes or hides it. `mayQuote` is the author's permission to show it
+ * publicly, and a quote needs `displayName` (CHECK). Deleting the person
+ * deletes the review — the words are theirs.
+ */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: id(),
+    requestId: char("request_id", { length: 26 })
+      .notNull()
+      .unique("reviews_request_uq")
+      .references(() => reviewRequests.id, { onDelete: "cascade" }),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    subjectType: text("subject_type", { enum: ["platform"] })
+      .notNull()
+      .default("platform"),
+    rating: smallint("rating").notNull(),
+    wentWell: text("went_well"),
+    improve: text("improve"),
+    mayQuote: boolean("may_quote").notNull().default(false),
+    displayName: text("display_name"),
+    displayOrg: text("display_org"),
+    status: text("status", { enum: ["pending", "published", "hidden"] })
+      .notNull()
+      .default("pending"),
+    moderatedAt: ts("moderated_at"),
+    moderatedBy: char("moderated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("reviews_status_created_idx").on(table.status, table.createdAt)],
+);
