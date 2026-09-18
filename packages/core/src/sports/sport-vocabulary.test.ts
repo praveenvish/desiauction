@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { SPORTS } from ".";
 
@@ -132,17 +132,35 @@ function code(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 }
 
+function inCode(stripped: string, pattern: RegExp): string[] {
+  return [...stripped.matchAll(new RegExp(pattern.source, "g"))].map((match) => match[0]);
+}
+
 function matches(source: string, pattern: RegExp): string[] {
-  return [...code(source).matchAll(new RegExp(pattern.source, "g"))].map((match) => match[0]);
+  return inCode(code(source), pattern);
 }
 
 describe("a sport's words live in its pack and nowhere else", () => {
+  /*
+   * Read and strip the tree ONCE. Each check used to walk and read every file
+   * under apps/web and five packages again — about 0.4s alone, but past the
+   * 5s test budget when turbo runs every package's suite at once, so the
+   * check failed as a timeout on a clean tree.
+   */
+  let scanned: { path: string; code: string }[] = [];
+  beforeAll(() => {
+    scanned = sourceFiles().map((file) => ({
+      path: relative(REPO, file),
+      code: code(readFileSync(file, "utf8")),
+    }));
+  }, 60_000);
+
   it("finds no second copy of the playing-role list", () => {
     const offenders: string[] = [];
-    for (const file of sourceFiles()) {
-      const found = new Set(matches(readFileSync(file, "utf8"), QUOTED_ROLE));
+    for (const file of scanned) {
+      const found = new Set(inCode(file.code, QUOTED_ROLE));
       if (found.size > 1) {
-        offenders.push(`${relative(REPO, file)} — ${[...found].join(" ")}`);
+        offenders.push(`${file.path} — ${[...found].join(" ")}`);
       }
     }
     expect(offenders, "read roles from the sport pack, do not re-list them").toEqual([]);
@@ -150,9 +168,9 @@ describe("a sport's words live in its pack and nowhere else", () => {
 
   it("finds no role label written outside the pack", () => {
     const offenders: string[] = [];
-    for (const file of sourceFiles()) {
-      for (const hit of new Set(matches(readFileSync(file, "utf8"), QUOTED_LABEL))) {
-        offenders.push(`${relative(REPO, file)} — ${hit}`);
+    for (const file of scanned) {
+      for (const hit of new Set(inCode(file.code, QUOTED_LABEL))) {
+        offenders.push(`${file.path} — ${hit}`);
       }
     }
     expect(offenders, "call roleLabel(); a second spelling is how the last one drifted").toEqual(
@@ -162,9 +180,9 @@ describe("a sport's words live in its pack and nowhere else", () => {
 
   it("finds no batting or bowling style token outside the pack", () => {
     const offenders: string[] = [];
-    for (const file of sourceFiles()) {
-      for (const hit of new Set(matches(readFileSync(file, "utf8"), QUOTED_STYLE))) {
-        offenders.push(`${relative(REPO, file)} — ${hit}`);
+    for (const file of scanned) {
+      for (const hit of new Set(inCode(file.code, QUOTED_STYLE))) {
+        offenders.push(`${file.path} — ${hit}`);
       }
     }
     expect(offenders, "read styles from the sport pack").toEqual([]);
@@ -185,6 +203,6 @@ describe("a sport's words live in its pack and nowhere else", () => {
 
   /* The scan is worthless if the walk silently covers nothing. */
   it("actually walks the product", () => {
-    expect(sourceFiles().length).toBeGreaterThan(200);
+    expect(scanned.length).toBeGreaterThan(200);
   });
 });
