@@ -27,7 +27,8 @@ async function seed(email: string, verified: boolean): Promise<string> {
   const id = newId();
   await db.insert(people).values({
     id,
-    phone: `+9189${RUN}${String(personIds.length)}`.slice(0, 14),
+    // Two index digits: the old one-digit suffix, sliced to 14, repeated at 10.
+    phone: `+9189${RUN.slice(-6)}${String(personIds.length).padStart(2, "0")}`,
     email,
     ...(verified ? { emailVerifiedAt: new Date() } : {}),
   });
@@ -302,5 +303,24 @@ describe("EMAIL SIGN-UP — the account the mailbox creates", () => {
 
     const result = await verifyEmailLogin(db, { email, code });
     expect(result).toEqual({ ok: true, personId, created: false });
+  });
+
+  it("a sign-in code minted for the OLD address dies when the address changes", async () => {
+    const oldEmail = `moving${RUN}@example.test`;
+    const newEmail = `moved${RUN}@example.test`;
+    const personId = await seed(oldEmail, true);
+    const login = await requestEmailLogin(db, { email: oldEmail });
+    const staleCode = login.ok ? (login.code ?? "") : "";
+
+    const change = await requestEmailVerification(db, { personId, email: newEmail });
+    const changeCode = change.ok ? (change.code ?? "") : "";
+    expect(await confirmEmailVerification(db, { personId, code: changeCode })).toEqual({
+      ok: true,
+      email: newEmail,
+    });
+
+    // The old mailbox no longer belongs to this account and must not open it.
+    const result = await verifyEmailLogin(db, { email: oldEmail, code: staleCode });
+    expect(result.ok).toBe(false);
   });
 });

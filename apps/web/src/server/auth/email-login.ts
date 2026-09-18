@@ -234,23 +234,33 @@ export async function verifyEmailLogin(
   if (candidate.attempts >= MAX_ATTEMPTS) {
     return { ok: false, reason: "locked" };
   }
+  /*
+   * RESERVE AN ATTEMPT BEFORE COMPARING, right guess or wrong. The bump is
+   * conditional on the row still being under the cap and unconsumed, so a
+   * parallel burst gets at most the remaining budget of reservations and the
+   * rest are refused without their guess ever being compared. Guarding only the
+   * WRONG branch let the right guess in a burst of thousands pass the snapshot
+   * read above and consume the code past the cap.
+   */
+  const [reserved] = await db
+    .update(emailVerifications)
+    .set({ attempts: sql`${emailVerifications.attempts} + 1` })
+    .where(
+      and(
+        eq(emailVerifications.id, candidate.id),
+        lt(emailVerifications.attempts, MAX_ATTEMPTS),
+        isNull(emailVerifications.consumedAt),
+      ),
+    )
+    .returning({ attempts: emailVerifications.attempts });
+  if (reserved === undefined) {
+    return { ok: false, reason: "locked" };
+  }
   if (candidate.codeHash !== hashCode(input.code)) {
-    /*
-     * The bump is CONDITIONAL on the row still being under the cap, so two
-     * racing guesses cannot both read four attempts and both write five. The
-     * update returns nothing when another request already took the last one.
-     */
-    const [bumped] = await db
-      .update(emailVerifications)
-      .set({ attempts: sql`${emailVerifications.attempts} + 1` })
-      .where(
-        and(eq(emailVerifications.id, candidate.id), lt(emailVerifications.attempts, MAX_ATTEMPTS)),
-      )
-      .returning({ attempts: emailVerifications.attempts });
-    if (bumped === undefined || bumped.attempts >= MAX_ATTEMPTS) {
+    if (reserved.attempts >= MAX_ATTEMPTS) {
       return { ok: false, reason: "locked" };
     }
-    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - bumped.attempts };
+    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - reserved.attempts };
   }
   /*
    * Consumed conditionally too: a correct code presented twice concurrently
@@ -265,6 +275,17 @@ export async function verifyEmailLogin(
     return { ok: false, reason: "invalid" };
   }
   if (consumed.personId !== null) {
+    // The person was bound when the code was MINTED, minutes ago. If the
+    // address has since left that account (an email change), the old mailbox
+    // must not still open it — re-read, never trust mint time.
+    const [holder] = await db
+      .select({ email: people.email })
+      .from(people)
+      .where(eq(people.id, consumed.personId))
+      .limit(1);
+    if (holder === undefined || holder.email === null || normalizeEmail(holder.email) !== email) {
+      return { ok: false, reason: "invalid" };
+    }
     return { ok: true, personId: consumed.personId, created: false };
   }
 
