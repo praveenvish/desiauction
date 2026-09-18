@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@desiauction/ui";
+import { Button, IconLock } from "@desiauction/ui";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -42,6 +42,7 @@ export function PasskeyLogin({ next }: { next?: string }) {
         loading={busy}
         data-testid="passkey-login"
       >
+        <IconLock size={18} className="icon-lead" />
         Sign in with a passkey
       </Button>
       {error !== null ? <p className="passkey-error">{error}</p> : null}

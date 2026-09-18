@@ -7,13 +7,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { requestOtpAction, verifyOtpAction, type AuthFormState } from "../../server/auth/actions";
 import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
-import {
-  LoginConsent,
-  LoginFrame,
-  pasteDigits,
-  useResendCountdown,
-  writeLoginUrl,
-} from "./login-shared";
+import { LoginFrame, pasteDigits, useResendCountdown, writeLoginUrl } from "./login-shared";
 
 /** Matches the server's RESEND_COOLDOWN_MS (otp.ts) — display only; the
  * server enforces the real limit. */
@@ -145,7 +139,9 @@ export function PhoneSignIn({
         atStart
           ? honoredNext
             ? "Sign in to continue where you were headed."
-            : "One mobile number is all it takes — we'll text you a 6-digit code."
+            : returning
+              ? "Use your passkey, or we'll text you a code."
+              : "We'll text you a 6-digit code — no password needed."
           : `We sent a 6-digit code to ${formatPhone(phone)}. It can take up to 30 seconds.`
       }
       method="phone"
@@ -197,7 +193,6 @@ export function PhoneSignIn({
             inputMode="numeric"
             autoComplete="tel"
             placeholder="98765 43210"
-            required
             autoFocus
             defaultValue={phone}
             {...(state.error !== undefined ? { error: state.error } : {})}
@@ -215,7 +210,6 @@ export function PhoneSignIn({
               autoComplete="one-time-code"
               placeholder="123456"
               maxLength={6}
-              required
               autoFocus
               onPaste={pasteDigits}
               {...(state.error !== undefined ? { error: state.error } : {})}
@@ -240,7 +234,6 @@ export function PhoneSignIn({
         >
           {atStart ? "Send code" : "Verify and continue"}
         </Button>
-        {atStart ? <LoginConsent /> : null}
         {!atStart ? (
           <div className="login-resend-row">
             <Button

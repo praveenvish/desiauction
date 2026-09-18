@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClassName, IconMail, IconPhone } from "@desiauction/ui";
 import Link from "next/link";
 import { useEffect, useState, type ClipboardEvent, type ReactNode } from "react";
 
@@ -88,46 +89,54 @@ export function pasteDigits(event: ClipboardEvent<HTMLInputElement>): void {
 }
 
 /**
- * The two doors, as links rather than buttons.
+ * The other door, offered once and quietly — below the form, not above it.
  *
- * A link works before hydration and on a device that never runs the bundle,
- * keeps `next` across the switch, and makes each door addressable — support can
- * send "/login?method=email" to somebody whose SMS is not arriving.
+ * It used to be an Email | Mobile segmented control above the field, weighted
+ * like the form itself, for a choice most people never make. Now the page leads
+ * with one field and one button, and the alternative waits under "or" beside
+ * the passkey. Still a link: it works before hydration, keeps `next`, and makes
+ * each door addressable (support can send "/login?method=email").
  */
-function MethodTabs({ method, next }: { method: LoginMethod; next?: string }) {
-  const href = (target: LoginMethod) => {
-    const params = new URLSearchParams({ method: target });
-    if (next !== undefined) {
-      params.set("next", next);
-    }
-    return `/login?${params.toString()}`;
-  };
+function OtherDoor({ method, next }: { method: LoginMethod; next?: string }) {
+  const other: LoginMethod = method === "email" ? "phone" : "email";
+  const params = new URLSearchParams({ method: other });
+  if (next !== undefined) {
+    params.set("next", next);
+  }
   return (
-    <nav className="login-methods" aria-label="How to sign in" data-testid="login-methods">
-      {(["email", "phone"] as const).map((target) => (
-        <Link
-          key={target}
-          href={href(target)}
-          replace
-          scroll={false}
-          className="login-method"
-          aria-current={method === target ? "page" : undefined}
-          data-testid={`login-method-${target}`}
-        >
-          {target === "email" ? "Email" : "Mobile"}
-        </Link>
-      ))}
-    </nav>
+    <Link
+      href={`/login?${params.toString()}`}
+      replace
+      scroll={false}
+      className={buttonClassName({ variant: "secondary", size: "touch" })}
+      data-testid={`login-method-${other}`}
+    >
+      {other === "phone" ? (
+        <IconPhone size={18} className="icon-lead" />
+      ) : (
+        <IconMail size={18} className="icon-lead" />
+      )}
+      {other === "phone" ? "Use mobile number" : "Use email instead"}
+    </Link>
+  );
+}
+
+function Divider({ label }: { label: string }) {
+  return (
+    <div className="login-divider" aria-hidden="true">
+      <span>{label}</span>
+    </div>
   );
 }
 
 /**
- * Everything around a sign-in form: heading, one sentence, the door switch and
- * the passkey — placed by whether this device has signed in before.
+ * Everything around a sign-in form, in the order a person needs it.
  *
- * On the CODE step all of that steps aside. Somebody six digits from signed in
- * does not need a second door, and a passkey button above the code field reads
- * as the thing to press.
+ * A RETURNING device leads with its passkey — one tap, no code — and the form
+ * follows under "or continue with …". Everyone else leads with the form. The
+ * alternatives (the other door, and the passkey for a first visit) sit below,
+ * then the terms. On the CODE step all of that steps aside: somebody six
+ * digits from signed in needs the field and nothing competing with it.
  */
 export function LoginFrame({
   title,
@@ -149,6 +158,7 @@ export function LoginFrame({
   next?: string;
   children: ReactNode;
 }) {
+  const nextProp = next !== undefined ? { next } : {};
   return (
     <>
       <h1>{title}</h1>
@@ -157,20 +167,24 @@ export function LoginFrame({
       </p>
       {atStart && returning ? (
         <div className="login-fast">
-          <PasskeyLogin {...(next !== undefined ? { next } : {})} />
-          <div className="login-divider" aria-hidden="true">
-            <span>or</span>
-          </div>
+          {/* Secondary even here: "returning" means this browser signed in
+              before, not that it holds a passkey — gold stays with the one
+              action that always works. */}
+          <PasskeyLogin {...nextProp} />
+          <Divider
+            label={method === "email" ? "or continue with email" : "or continue with mobile"}
+          />
         </div>
       ) : null}
-      {atStart ? <MethodTabs method={method} {...(next !== undefined ? { next } : {})} /> : null}
       {children}
-      {atStart && !returning ? (
+      {atStart ? (
         <>
-          <div className="login-divider" aria-hidden="true">
-            <span>or</span>
+          <Divider label="or" />
+          <div className="login-alternatives">
+            <OtherDoor method={method} {...nextProp} />
+            {returning ? null : <PasskeyLogin {...nextProp} />}
           </div>
-          <PasskeyLogin {...(next !== undefined ? { next } : {})} />
+          <LoginConsent />
         </>
       ) : null}
     </>

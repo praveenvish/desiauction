@@ -360,50 +360,23 @@
   margin: 0;
 }
 
-/* THE DOOR SWITCH — Email | Mobile, one segmented control.
-   Links, not buttons: they work before hydration and keep `next`. The active
-   door is the one with aria-current, so the style follows the semantics and
-   a screen reader announces "current page" rather than a colour. */
-.login-methods {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  margin: 0 0 var(--space-5);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
-
-.login-method {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* 44px: a touch target, not a text link (UX-1). */
-  min-height: 44px;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
+/* The one line for a first visit, under the button it applies to. */
+.login-hint {
+  margin: 0;
+  text-align: center;
+  color: var(--text-muted);
   font-size: var(--text-sm-size);
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+  line-height: var(--text-sm-line);
 }
 
-.login-method:hover {
-  color: var(--text-heading);
+/* The other ways in — the other door, and the passkey on a first visit —
+   stacked as equals below "or", so neither reads as the main path. */
+.login-alternatives {
+  display: grid;
+  gap: var(--space-3);
 }
 
-.login-method[aria-current="page"] {
-  /* A tint of the accent, not the accent itself: gold is the primary button's
-     colour, and the door switch must not compete with "Email me a code". */
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface-raised));
-  color: var(--text-heading);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-
-.login-method:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+.login-alternatives + .login-consent {
+  margin-top: var(--space-6);
+  text-align: center;
 }

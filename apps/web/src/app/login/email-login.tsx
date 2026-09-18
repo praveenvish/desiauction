@@ -9,13 +9,7 @@ import {
   type EmailAuthFormState,
 } from "../../server/auth/actions";
 import { track } from "../../lib/telemetry";
-import {
-  LoginConsent,
-  LoginFrame,
-  pasteDigits,
-  useResendCountdown,
-  writeLoginUrl,
-} from "./login-shared";
+import { LoginFrame, pasteDigits, useResendCountdown, writeLoginUrl } from "./login-shared";
 
 /** Display only — `requestEmailLogin` holds the real per-address budget. */
 const RESEND_COOLDOWN_S = 30;
@@ -122,7 +116,9 @@ export function EmailSignIn({
         atStart
           ? honoredNext
             ? "Sign in to continue where you were headed."
-            : "We'll email you a 6-digit code. New here? It creates your account."
+            : returning
+              ? "Use your passkey, or we'll email you a code."
+              : "We'll email you a 6-digit code — no password needed."
           : // Conditional on reaching the mailbox, never on finding an account —
             // the one address mailed nothing (claimed on an account that never
             // confirmed it) must read exactly like every other.
@@ -163,7 +159,6 @@ export function EmailSignIn({
             placeholder="you@example.com"
             autoCapitalize="none"
             spellCheck={false}
-            required
             autoFocus
             defaultValue={email}
             {...(state.error !== undefined ? { error: state.error } : {})}
@@ -181,7 +176,6 @@ export function EmailSignIn({
               autoComplete="one-time-code"
               placeholder="123456"
               maxLength={6}
-              required
               autoFocus
               onPaste={pasteDigits}
               help="Valid for 15 minutes. Not in your inbox? Check spam or promotions."
@@ -200,7 +194,13 @@ export function EmailSignIn({
         >
           {atStart ? "Email me a code" : "Verify and continue"}
         </Button>
-        {atStart ? <LoginConsent /> : null}
+        {atStart && !returning ? (
+          // Said once, under the button it applies to, and only to a device
+          // that has never signed in — a returning one does not need telling.
+          <p className="login-hint" data-testid="email-login-new-hint">
+            New to DesiAuction? The same code creates your account.
+          </p>
+        ) : null}
         {!atStart ? (
           <div className="login-resend-row">
             <Button

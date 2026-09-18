@@ -85,7 +85,7 @@ test("a verified email is a second way into the same account", async ({ page }) 
   await page.goto("/login?method=email");
   // One door open at a time: the email door is the current one, and it is the
   // only form on the page.
-  await expect(page.getByTestId("login-method-email")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("login-method-phone")).toBeVisible();
   await expect(page.getByTestId("login-form")).toHaveCount(0);
   const email = page.getByTestId("email-login-address");
   await email.fill(EMAIL);

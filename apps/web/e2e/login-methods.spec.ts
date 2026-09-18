@@ -39,12 +39,14 @@ async function axeClean(page: Page, surface: string): Promise<void> {
   expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
-test("the email door is one field and one button, and the mobile door is one tab away", async ({
+test("the email door is one field and one button, and the mobile door is one link away", async ({
   page,
 }) => {
   await page.goto("/login?method=email&next=%2Fhelp");
-  await expect(page.getByTestId("login-method-email")).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("email-login-address")).toBeVisible();
+  // The other door is offered once, below the form — not as a switch above it.
+  await expect(page.getByTestId("login-method-phone")).toHaveText(/Use mobile number/);
+  await expect(page.getByTestId("login-method-email")).toHaveCount(0);
   await expect(page.getByTestId("email-login-send")).toHaveText("Email me a code");
   // Only one form: the phone form is not stacked underneath.
   await expect(page.getByTestId("login-form")).toHaveCount(0);
@@ -59,7 +61,28 @@ test("the email door is one field and one button, and the mobile door is one tab
   await expect(page).toHaveURL(/next=%2Fhelp/);
   await expect(page.getByLabel("Mobile number")).toBeVisible();
   await expect(page.getByTestId("email-login-form")).toHaveCount(0);
+  // …and the way back.
+  await expect(page.getByTestId("login-method-email")).toHaveText(/Use email instead/);
   await axeClean(page, "/login?method=phone");
+});
+
+test("a first visit is told the code creates an account; a returning device is not", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/login?method=email");
+  await expect(page.getByTestId("email-login-new-hint")).toBeVisible();
+  await expect(page.locator("h1")).toHaveText("Sign in");
+
+  // The cookie a completed sign-in leaves behind (sessions.ts RETURNING_COOKIE).
+  await context.addCookies([{ name: "da_returning", value: "1", url: page.url() }]);
+  await page.reload();
+  await expect(page.locator("h1")).toHaveText("Welcome back");
+  await expect(page.getByTestId("email-login-new-hint")).toHaveCount(0);
+  // Its passkey leads, above the form.
+  const passkey = await page.getByTestId("passkey-login").boundingBox();
+  const field = await page.getByTestId("email-login-address").boundingBox();
+  expect(passkey !== null && field !== null && passkey.y < field.y).toBe(true);
 });
 
 test("the email code step survives a reload, and a new address becomes an account", async ({
