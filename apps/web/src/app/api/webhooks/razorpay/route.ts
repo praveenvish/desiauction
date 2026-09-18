@@ -6,6 +6,7 @@ import { dbHandle } from "../../../../server/db";
 import { settlementDeps } from "../../../../server/settlement/deps";
 import { handleRazorpayWebhook } from "../../../../server/settlement/webhook";
 import { withRequestId } from "../../../../server/logger";
+import { readCapped } from "../../../../lib/read-capped";
 
 /**
  * PAYMENT GATEWAY INGRESS — where a Razorpay callback actually lands.
@@ -39,7 +40,12 @@ async function handle(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
   const signature = request.headers.get("x-razorpay-signature") ?? "";
-  const rawBody = await request.text();
+  // Razorpay events are a few KB. Read under a cap: this runs BEFORE the
+  // signature check, so an unbounded read is a memory budget for anyone.
+  const rawBody = await readCapped(request, 256 * 1024);
+  if (rawBody === null) {
+    return NextResponse.json({ error: "Payload too large." }, { status: 413 });
+  }
 
   /*
    * The deps handed in FIRST are used only to reach the gateway adapter, which

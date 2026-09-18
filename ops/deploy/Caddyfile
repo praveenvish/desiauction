@@ -2,6 +2,13 @@
 # redirects http→https. Nothing here needs a cron job or a renewal reminder.
 {$PUBLIC_DOMAIN} {
 	encode zstd gzip
+	# No legitimate request to the web tier is large: server actions stop at
+	# Next's 1 MB, photos go straight to object storage on a presigned URL, and
+	# webhooks are a few KB. Without a ceiling, a chunked POST to an
+	# unauthenticated route streams until the container runs out of memory.
+	request_body {
+		max_size 10MB
+	}
 	reverse_proxy web:3000
 }
 
