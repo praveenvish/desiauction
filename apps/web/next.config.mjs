@@ -53,6 +53,10 @@ export default {
    */
   output: "standalone",
   reactStrictMode: true,
+  // The floating "N" dev-tools badge renders on every dev page and repeats down
+  // any full-page screenshot — it was being read as part of the product in
+  // design reviews. Dev-only either way; production never shows it.
+  devIndicators: false,
   poweredByHeader: false,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],
   /*

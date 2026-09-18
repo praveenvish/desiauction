@@ -88,3 +88,29 @@
     transform: none;
   }
 }
+
+/* ==========================================================================
+   CONSOLE CARDS ARE SECTIONS (launch polish, Phase 4).
+   The console stacked a bordered, shadowed box around every table, list and
+   form — the "card soup" of a template admin. Inside the console a resting
+   Card now sits ON the page: a hairline above, space around, no box. The
+   one contained surface a page keeps is the next-step panel (its own class),
+   plus what is genuinely a target (interactive) or an overlay (floating).
+   ========================================================================== */
+:global([data-surface="console"]) .card:not(.floating):not(.interactive) {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+:global([data-surface="console"]) .default:not(.floating):not(.interactive),
+:global([data-surface="console"]) .dense:not(.floating):not(.interactive) {
+  padding-inline: 0;
+}
+
+/* A section inside a section needs no second rule. */
+:global([data-surface="console"]) .card .card:not(.floating):not(.interactive) {
+  border-top: 0;
+}

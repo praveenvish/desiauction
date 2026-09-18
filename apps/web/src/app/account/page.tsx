@@ -29,6 +29,16 @@ import "./account.css";
 
 export const metadata = { title: "Account · DesiAuction" };
 
+const ACCOUNT_SECTIONS: [string, string][] = [
+  ["profile", "Profile"],
+  ["player", "Player profile"],
+  ["sports", "Sports"],
+  ["email", "Email"],
+  ["security", "Sign-in & security"],
+  ["notifications", "Notifications"],
+  ["data", "Your data"],
+];
+
 export default async function AccountPage() {
   const session = await currentSession();
   if (session === null) {
@@ -90,6 +100,17 @@ export default async function AccountPage() {
     <AnnouncerProvider>
       <ToastProvider>
         <main className="account">
+          {/* Settings read like settings: a section index on the left, the
+              sections beside it — not one narrow column floating mid-page. */}
+          <nav className="account-nav" aria-label="Account sections">
+            <ul>
+              {ACCOUNT_SECTIONS.map(([id, label]) => (
+                <li key={id}>
+                  <a href={`#${id}`}>{label}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
           <div className="account-stack">
             {/*
             The "Active session" badge that used to sit here consulted nothing:
@@ -103,28 +124,40 @@ export default async function AccountPage() {
             list between the h1 and "Profile". One identity card now.
           */}
             <PageIntro />
-            <ProfilePanel
-              personId={session.personId}
-              phone={session.phone}
-              email={session.email}
-              name={session.name}
-              completeness={completeness}
-              signOut={<SignOutButton logout={logoutAction} />}
-            />
+            <section id="profile" className="account-section" aria-label="Profile">
+              <ProfilePanel
+                personId={session.personId}
+                phone={session.phone}
+                email={session.email}
+                name={session.name}
+                completeness={completeness}
+                signOut={<SignOutButton logout={logoutAction} />}
+              />
+            </section>
             {/* PI-1: the durable identity, right under the account identity it
               extends. Prefills every future registration. */}
-            <PersonProfilePanel profile={cricketProfile} />
+            <section id="player" className="account-section" aria-label="Player profile">
+              <PersonProfilePanel profile={cricketProfile} />
+            </section>
             {/* SP-1 Phase 3: "how you play" has a different answer in each
               sport. This used to render one panel per sport the PLATFORM runs,
               which was four and became eight; it now renders the ones this
               person plays, and offers the rest one at a time. */}
-            <SportProfiles forms={sportForms} />
+            <section id="sports" className="account-section" aria-label="Sports">
+              <SportProfiles forms={sportForms} />
+            </section>
             {/* Beside the identity it belongs to, and above Security: this is a
               contact route the product will actually use, not a credential. */}
-            <Card>
-              <EmailVerify current={email.email} verified={email.verified} />
-            </Card>
-            {security !== null ? <SecurityPanels security={security} /> : null}
+            <section id="email" className="account-section" aria-label="Email">
+              <Card>
+                <EmailVerify current={email.email} verified={email.verified} />
+              </Card>
+            </section>
+            {security !== null ? (
+              <section id="security" className="account-section" aria-label="Sign-in and security">
+                <SecurityPanels security={security} />
+              </section>
+            ) : null}
 
             {/*
             NOTIFICATIONS — disclosure AND, now, real switches.
@@ -140,7 +173,7 @@ export default async function AccountPage() {
             beside them: knowing what we send is not the same as being able to
             stop it, and a person deserves both.
           */}
-            <Card className="account-card" data-testid="notifications-panel">
+            <Card className="account-card" id="notifications" data-testid="notifications-panel">
               <h2>Notifications</h2>
               <p className="account-prose">
                 We use your mobile number for two things, and nothing else. We never sell it, and we
@@ -179,7 +212,7 @@ export default async function AccountPage() {
             page nobody opens. A manual, staffed process is defensible at beta
             scale. An undiscoverable one is not. This is the discoverable one.
           */}
-            <Card className="account-card" data-testid="your-data-panel">
+            <Card className="account-card" id="data" data-testid="your-data-panel">
               <h2>Your data</h2>
               <p className="account-prose">
                 You can ask us to delete your account. Where your data appears only in your own

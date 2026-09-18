@@ -681,3 +681,77 @@ a.wordmark:hover .wordmark-glyph {
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* ==========================================================================
+   DAYLIGHT CONSOLE (launch polish, Phase 4): a quiet, light rail.
+   The navy slab with a struck-gold active pill read as a template; the
+   console now sits on a white page with a warm-white rail and a hairline.
+   The rail's own rules keep reading the --identity-* variables — they are
+   simply re-pointed inside the rail, in daylight only. Floodlight (the dark
+   console) keeps the navy rail.
+   ========================================================================== */
+@media (min-width: 720px) {
+  :global([data-theme="daylight"]) .shell {
+    /* The rail column paints the full page height, so a long page never shows
+       the rail stopping halfway down (it is sticky at 100dvh inside). */
+    background: linear-gradient(
+      to right,
+      var(--surface) 247px,
+      var(--border-subtle) 247px,
+      var(--border-subtle) 248px,
+      var(--surface-raised) 248px
+    );
+  }
+
+  :global([data-theme="daylight"]) .rail {
+    --identity-field: var(--surface);
+    --identity-field-deep: var(--surface);
+    --identity-glyph: var(--text-heading);
+    --identity-line-soft: var(--border-subtle);
+    --identity-accent: var(--accent);
+    --identity-accent-soft: var(--text-accent);
+
+    background: var(--surface);
+    border-right-color: var(--border-subtle);
+  }
+
+  :global([data-theme="daylight"]) .rail-item {
+    color: var(--text-secondary);
+  }
+
+  :global([data-theme="daylight"]) .rail-item:hover {
+    background: var(--surface-sunken);
+    color: var(--text-heading);
+  }
+
+  :global([data-theme="daylight"]) .rail-item-active,
+  :global([data-theme="daylight"]) .rail-item-active:hover {
+    background: var(--surface-sunken);
+    background-image: none;
+    color: var(--text-heading);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+  }
+
+  /* The one touch of gold in the rail: where you are. */
+  :global([data-theme="daylight"]) .rail-item-active .rail-icon {
+    color: var(--accent);
+  }
+
+  :global([data-theme="daylight"]) .rail-group-label {
+    color: var(--text-secondary);
+  }
+
+  :global([data-theme="daylight"]) .rail-badge,
+  :global([data-theme="daylight"]) .rail-item-active .rail-badge {
+    background: var(--accent-subtle);
+    color: var(--text-accent);
+  }
+}
+
+/* The content area IS the page (all widths): every page wrapper that painted
+   var(--surface) — the old grey slab behind boxed cards — resolves to white
+   here, while the rail outside keeps the warm surface. */
+:global([data-theme="daylight"]) .body {
+  --surface: var(--surface-raised);
+  background: var(--surface-raised);
+}

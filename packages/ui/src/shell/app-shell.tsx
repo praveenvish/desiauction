@@ -124,7 +124,9 @@ export function AppShell({
     </Link>
   );
   return (
-    <div className={styles["shell"]}>
+    // The console's own surface: quieter primitives (an ink primary instead of
+    // the marketing gold) key on this, so public and live shells are untouched.
+    <div className={styles["shell"]} data-surface="console">
       <a className={styles["skip"]} href="#main-content">
         Skip to content
       </a>

@@ -265,7 +265,8 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
               <span className="security-actions">
                 {!session.current ? (
                   <Button
-                    variant="danger"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => {
                       setDialogError(null);
                       setPending({ kind: "revoke-session", session });
@@ -297,7 +298,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
           ) : null}
           {others.length > 0 ? (
             <Button
-              variant="danger"
+              variant="secondary"
               data-testid="revoke-other-sessions"
               onClick={() => {
                 setDialogError(null);
