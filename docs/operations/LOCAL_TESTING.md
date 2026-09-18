@@ -88,3 +88,58 @@ Every journey step above is also covered by an automated suite:
 | Payment failure/recovery | `pnpm demo:payment-recovery` |
 | Fiscal close | `pnpm demo:fiscal-close` |
 | Replay/recovery certification | `pnpm --filter @desiauction/engine test:integration` |
+
+## "uncaughtException: [Error: aborted] { code: 'ECONNRESET' }" — fixed, not noise
+
+Running Playwright against the precompiled server used to print, about once
+per sign-in:
+
+```
+[WebServer] [Error: aborted] { code: 'ECONNRESET' }
+[WebServer]  ⨯ uncaughtException:  [Error: aborted] { code: 'ECONNRESET' }
+```
+
+It looked like harness noise and was not. Traced on 2026-09-18 with a
+`--require` preload on `next start` (request, response and listener tracing):
+
+- **Which request:** always the "Verify and continue" server action,
+  `POST /login?step=code…`. Next had already sent `303` with
+  `x-action-redirect` and was still streaming the body when the browser stopped
+  reading it. The one spec test that never signs in ("privilege escalation")
+  never printed it. Aborted `GET` prefetches in the same run did not either.
+- **Where the error came from:** `abortIncoming (node:_http_server)`. Node
+  destroys an incoming request whose socket closes mid-response, and emits
+  `error` on it. It was uncaught because at that moment the request had **zero**
+  `error` listeners, although Next's router adds `req.on('error', noop)` to
+  every request (`router-server.js`) and nothing ever called
+  `removeListener`.
+- **Why it had none:** our middleware runs on the Node runtime
+  (`src/middleware.ts`), so for any request with a body Next clones the body for
+  it and then calls `getCloneableBody().finalize()`
+  (`next/dist/server/next-server.js`). `replaceRequestBody` copies every
+  enumerable property of a `PassThrough` onto the request, **including
+  `_events`**, which replaces the request's whole listener table. That is
+  unfixed upstream as of `next@latest` and `16.0.0`.
+- **Why it mattered in production:** Next's own `uncaughtException` handlers
+  keep the process alive, so nothing crashed. But with `SENTRY_DSN` set,
+  Sentry's `onUncaughtException` integration records the first one as a
+  **fatal** event, which [ALERTS](ALERTS.md) pages on. After that first one it
+  stops capturing uncaught exceptions for the life of the process, so one user
+  on a flaky mobile connection would hide a later real crash.
+
+**Fix:** `patches/next@15.5.25.patch` (pnpm `patchedDependencies`) re-attaches
+a no-op `error` listener right after `replaceRequestBody`, restoring what the
+router intended. The Dockerfiles copy `patches/` before the frozen install.
+After the fix, the same traced run shows the same four aborted sign-in actions
+and **zero** uncaught exceptions. `src/server/next-client-abort.test.ts`
+drives Next's module directly and fails on an unpatched Next.
+
+**When upgrading Next:** pnpm refuses to install if the patch no longer
+applies. Check whether upstream fixed `getCloneableBody` (the test will pass
+without the patch) and drop the patch if so.
+
+**If the line appears again,** find the request with a preload that logs
+`res.on("close")` for responses where `!res.writableFinished`. Playwright's
+config overwrites `NODE_OPTIONS`, so start `next start` yourself on :3050 with
+the preload; the harness reuses a running server. Kill the old server by PORT:
+it renames itself `next-server`, so `pkill -f "next start"` misses it.

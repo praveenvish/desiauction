@@ -6,6 +6,8 @@ FROM node:24-slim AS build
 WORKDIR /repo
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+# The lockfile pins patchedDependencies (patches/); a frozen install refuses without them.
+COPY patches ./patches
 COPY packages ./packages
 COPY apps/web ./apps/web
 RUN pnpm install --frozen-lockfile --filter @desiauction/web...
