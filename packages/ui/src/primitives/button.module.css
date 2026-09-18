@@ -1,4 +1,9 @@
 .button {
+  /* A <button> is border-box by the browser's own stylesheet; an <a> is not.
+     ButtonLink shares this class, so without this line every link-button came
+     out 18px taller than the button beside it (min-height + padding + border),
+     measured side by side on /login. */
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
