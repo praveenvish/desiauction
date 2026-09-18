@@ -136,11 +136,22 @@ export class HttpMailer implements CodeMailer {
           text: copy.text,
         }),
       });
-    } catch {
-      throw new MailSendError("mail provider unreachable");
+    } catch (error) {
+      // The CAUSE is the diagnosis. "unreachable" alone hid a corporate TLS
+      // proxy (SELF_SIGNED_CERT_IN_CHAIN) behind "couldn't send" for a whole
+      // afternoon. A code or message, never the request (it carries the key).
+      const cause =
+        error instanceof Error
+          ? ((error.cause as { code?: string } | undefined)?.code ?? error.message)
+          : "unknown";
+      throw new MailSendError(`mail provider unreachable (${cause})`);
     }
     if (response.status >= 400) {
-      throw new MailSendError(`mail provider rejected send (${String(response.status)})`);
+      // The provider's own reason — "domain not verified", "restricted key" —
+      // is short and names no recipient. Bounded all the same.
+      throw new MailSendError(
+        `mail provider rejected send (${String(response.status)}: ${response.body.slice(0, 200)})`,
+      );
     }
   }
 }
