@@ -98,3 +98,44 @@ export async function sendReviewArrived(
     ...reviewArrivedMail(review, personName),
   });
 }
+
+/**
+ * The ask about ONE season (Phase 4). Different from the platform ask in the
+ * one way that matters: what they write may be shown on the season's public
+ * page, so the mail says so before they click — nobody should learn that from
+ * the form.
+ */
+export function seasonAskMail(input: {
+  name: string | null;
+  seasonName: string;
+  orgName: string;
+  role: "player" | "owner";
+  link: string;
+}): { subject: string; text: string } {
+  const days = Math.round(REVIEW_LINK_TTL_MS / 86_400_000);
+  // Season and club names are organizer-typed; keep the subject to one line.
+  const season = input.seasonName.replace(/[\r\n]+/g, " ").slice(0, 80);
+  return {
+    subject: `How was ${season}?`,
+    text: [
+      input.name === null ? "Hi," : `Hi ${input.name},`,
+      "",
+      input.role === "owner"
+        ? `You bid for a team in ${season}, run by ${input.orgName}.`
+        : `You played in ${season}, run by ${input.orgName}.`,
+      "How did it go? Other players and owners deciding whether to join next time",
+      "would like to know. Two minutes:",
+      "",
+      `  ${input.link}`,
+      "",
+      "Once our team has read it, your review may appear on the season's public page.",
+      "It carries your name only if you tick the box that says so; otherwise it says",
+      input.role === "owner" ? '"A team owner".' : '"A player".',
+      "",
+      `The link is yours and works for ${String(days)} days. Don't want to be asked?`,
+      `Switch off "Feedback requests" at ${env.PUBLIC_BASE_URL}/account`,
+      "",
+      "— DesiAuction",
+    ].join("\n"),
+  };
+}

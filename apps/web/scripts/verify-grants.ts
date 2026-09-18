@@ -140,6 +140,8 @@ const APP_WRITES_UNPROTECTED = [
   // tenant, and platform reviews belong to no organization.
   "review_requests",
   "reviews",
+  // FR-1 Phase 4 (0070): a reader's report on a public review, no tenant.
+  "review_reports",
 ];
 
 /**

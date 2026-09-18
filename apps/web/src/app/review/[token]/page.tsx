@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { db } from "../../../server/db";
 import { markAskOpened, reviewPageState } from "../../../server/reviews/reviews";
+import { seasonRef } from "../../../server/reviews/season";
 import { ReviewForm } from "./review-form";
 import "../../content.css";
 import "./review.css";
@@ -50,7 +51,18 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
     );
   }
 
+  // A season's name lives in tenant tables; resolve it once, for either state.
+  const season =
+    state.subject.type === "competition" ? await seasonRef(state.subject.competitionId) : null;
+  if (state.subject.type === "competition" && season === null) {
+    // The season was deleted under the link (the ask cascades with it, so this
+    // is a race, not a state) — nothing left to review.
+    notFound();
+  }
+
   if (state.kind === "closed") {
+    const onShow =
+      season !== null && season.visibility === "public" && state.review.status === "published";
     return (
       <main className="content-page content-narrow">
         <h1>Thanks — we have your review</h1>
@@ -63,9 +75,15 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
           .
         </p>
         <p className="prose-p">
-          <Link href="/" className="prose-link">
-            Back to DesiAuction
-          </Link>
+          {onShow ? (
+            <Link href={`/c/${season.slug}`} className="prose-link">
+              See {season.name}&apos;s page
+            </Link>
+          ) : (
+            <Link href="/" className="prose-link">
+              Back to DesiAuction
+            </Link>
+          )}
         </p>
       </main>
     );
@@ -73,17 +91,40 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
 
   await markAskOpened(db, state.requestId);
 
+  if (season !== null && state.subject.type === "competition") {
+    return (
+      <main className="content-page content-narrow">
+        <h1>How was {season.name}?</h1>
+        <p className="content-lead">
+          Run by {season.orgName}. Players and owners deciding whether to join next time will read
+          this. Once our team has read it, it may appear on the season&apos;s public page — with
+          your name only if you tick the box, otherwise as{" "}
+          {state.subject.role === "owner" ? "“A team owner”" : "“A player”"}.
+        </p>
+        <ReviewForm
+          token={token}
+          variant="season"
+          suggestedName={state.personName}
+          existing={state.review}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="content-page content-narrow">
       <h1>How has DesiAuction worked for you?</h1>
       <p className="content-lead">
-        {state.personName === null
-          ? ""
-          : `Thanks for running your tournament with us, ${state.personName}. `}
+        {state.personName === null ? "" : `Thanks for using DesiAuction, ${state.personName}. `}
         Two minutes, and every word is read. Nothing is shown to anyone unless you say we may quote
         it.
       </p>
-      <ReviewForm token={token} suggestedName={state.personName} existing={state.review} />
+      <ReviewForm
+        token={token}
+        variant="platform"
+        suggestedName={state.personName}
+        existing={state.review}
+      />
     </main>
   );
 }

@@ -225,6 +225,14 @@
     "apps/web/src/server/reviews/review-sweep.ts": {
       "class": "by-design",
       "reason": "FR-1. System sweep, the same class as settlement/coordination-sweep: a read-only candidate query across every org (closed auctions, finished seasons, organizer grants, paddles) on the system pool, then writes only to the no-RLS review tables. Behind FEEDBACK_JOB_SECRET."
+    },
+    "apps/web/src/server/reviews/season.ts": {
+      "class": "by-design",
+      "reason": "FR-1 Phase 4. Tournament reviews: the public season page's read (visibility-gated on the system pool, like competition/public.ts), the participant lookup the sweep and the club's Ask button share (registrations and paddles across one season, system pool), and writes only to review_requests / reviews / review_reports, which carry no RLS."
+    },
+    "apps/web/src/server/reviews/season-actions.ts": {
+      "class": "debt",
+      "reason": "FR-1 Phase 4. Same shape as competition/fixture-actions: resolveCompetition runs on the system pool (membership proven) before the tenant boundary opens for the competition.manage check. The review reads are on no-RLS tables. PA-1R Phase 3.4."
     }
   }
 }

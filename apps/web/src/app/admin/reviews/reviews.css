@@ -113,3 +113,17 @@
   gap: var(--space-2);
   align-items: center;
 }
+
+.review-row-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.review-row-reports ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+}

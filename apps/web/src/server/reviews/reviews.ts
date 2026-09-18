@@ -182,10 +182,15 @@ export async function askForPlatformReview(
     tokenHash: hashReviewToken(tokenForReviewRequest(id)),
     expiresAt,
   });
-  const target = [reviewRequests.personId, reviewRequests.subjectType];
+  // 0070 split the unique index in two partial ones; ON CONFLICT must name the
+  // same predicate or Postgres cannot match it to an index.
+  const target = [reviewRequests.personId];
+  const where = sql`${reviewRequests.subjectType} = 'platform'`;
   let requestId: string;
   if (input.reissue === false) {
-    const [row] = await insert.onConflictDoNothing({ target }).returning({ id: reviewRequests.id });
+    const [row] = await insert
+      .onConflictDoNothing({ target, where })
+      .returning({ id: reviewRequests.id });
     if (row === undefined) {
       const [existing] = await db
         .select({ id: reviewRequests.id })
@@ -203,7 +208,7 @@ export async function askForPlatformReview(
     }
   } else {
     const [row] = await insert
-      .onConflictDoUpdate({ target, set: { expiresAt } })
+      .onConflictDoUpdate({ target, targetWhere: where, set: { expiresAt } })
       .returning({ id: reviewRequests.id });
     requestId = row?.id ?? id;
   }
@@ -218,6 +223,56 @@ export async function askForPlatformReview(
     created: requestId === id,
     alreadyReviewed: existing !== undefined,
   };
+}
+
+export type SeasonRole = "player" | "owner";
+
+/**
+ * Ask a person about ONE season (Phase 4). Never re-issues: an ask about a
+ * season is made once, by whichever of the sweep or the organizer's button
+ * reaches them first, and `created: false` tells the caller not to mail again.
+ */
+export async function askForSeasonReview(
+  db: Db,
+  input: {
+    personId: string;
+    competitionId: string;
+    orgId: string;
+    role: SeasonRole;
+    source: "manual_org" | "auction_completed" | "season_completed";
+    requestedBy: string | null;
+    now?: Date;
+  },
+): Promise<{
+  readonly requestId: string | null;
+  readonly link: string | null;
+  readonly created: boolean;
+}> {
+  const now = input.now ?? new Date();
+  const id = newId();
+  const [row] = await db
+    .insert(reviewRequests)
+    .values({
+      id,
+      personId: input.personId,
+      subjectType: "competition",
+      competitionId: input.competitionId,
+      orgId: input.orgId,
+      role: input.role,
+      source: input.source,
+      requestedBy: input.requestedBy,
+      tokenHash: hashReviewToken(tokenForReviewRequest(id)),
+      expiresAt: new Date(now.getTime() + REVIEW_LINK_TTL_MS),
+    })
+    .onConflictDoNothing({
+      target: [reviewRequests.personId, reviewRequests.competitionId],
+      where: sql`${reviewRequests.subjectType} = 'competition'`,
+    })
+    .returning({ id: reviewRequests.id });
+  if (row === undefined) {
+    return { requestId: null, link: null, created: false };
+  }
+  return { requestId: row.id, link: reviewLink(row.id), created: true };
 }
 
 /** Record where and when the ask was mailed. */
@@ -254,9 +309,20 @@ export type ReviewPageState =
       readonly requestId: string;
       readonly personId: string;
       readonly personName: string | null;
+      readonly subject: ReviewSubject;
       readonly review: ExistingReview | null;
     }
-  | { readonly kind: "closed"; readonly review: ExistingReview };
+  | { readonly kind: "closed"; readonly review: ExistingReview; readonly subject: ReviewSubject };
+
+/** What a request is about. Names are resolved separately (they live in tenant tables). */
+export type ReviewSubject =
+  | { readonly type: "platform" }
+  | {
+      readonly type: "competition";
+      readonly competitionId: string;
+      readonly orgId: string;
+      readonly role: SeasonRole;
+    };
 
 /**
  * What the page behind a token should show. A review an operator has already
@@ -276,6 +342,10 @@ export async function reviewPageState(
       personId: reviewRequests.personId,
       expiresAt: reviewRequests.expiresAt,
       personName: people.name,
+      subjectType: reviewRequests.subjectType,
+      competitionId: reviewRequests.competitionId,
+      orgId: reviewRequests.orgId,
+      role: reviewRequests.role,
     })
     .from(reviewRequests)
     .innerJoin(people, eq(people.id, reviewRequests.personId))
@@ -284,6 +354,13 @@ export async function reviewPageState(
   if (row === undefined) {
     return { kind: "unknown" };
   }
+  const subject: ReviewSubject =
+    row.subjectType === "competition" &&
+    row.competitionId !== null &&
+    row.orgId !== null &&
+    row.role !== null
+      ? { type: "competition", competitionId: row.competitionId, orgId: row.orgId, role: row.role }
+      : { type: "platform" };
   const [review] = await db
     .select({
       id: reviews.id,
@@ -299,7 +376,7 @@ export async function reviewPageState(
     .where(eq(reviews.requestId, row.requestId))
     .limit(1);
   if (review !== undefined && review.status !== "pending") {
-    return { kind: "closed", review };
+    return { kind: "closed", review, subject };
   }
   if (row.expiresAt <= now) {
     return { kind: "expired" };
@@ -309,6 +386,7 @@ export async function reviewPageState(
     requestId: row.requestId,
     personId: row.personId,
     personName: row.personName,
+    subject,
     review: review ?? null,
   };
 }
@@ -438,20 +516,33 @@ export async function submitReview(
     return { ok: false, reason: state.kind };
   }
   const id = newId();
+  // A season review is one piece of writing, signed or not: "what to improve"
+  // and a club name are platform questions and are never stored for a season.
+  const body: ValidReview =
+    state.subject.type === "competition" ? { ...review, improve: null, displayOrg: null } : review;
+  const subjectColumns =
+    state.subject.type === "competition"
+      ? {
+          subjectType: "competition" as const,
+          competitionId: state.subject.competitionId,
+          orgId: state.subject.orgId,
+          role: state.subject.role,
+        }
+      : { subjectType: "platform" as const };
   const [row] = await db
     .insert(reviews)
     .values({
       id,
       requestId: state.requestId,
       personId: state.personId,
-      subjectType: "platform",
-      ...review,
+      ...subjectColumns,
+      ...body,
       createdAt: now,
       updatedAt: now,
     })
     .onConflictDoUpdate({
       target: reviews.requestId,
-      set: { ...review, updatedAt: now },
+      set: { ...body, updatedAt: now },
       // The same race as above, closed at the database: a review an operator
       // moderated between the read and this write is not overwritten.
       setWhere: sql`${reviews.status} = 'pending'`,

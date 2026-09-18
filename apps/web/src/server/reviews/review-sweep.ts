@@ -5,6 +5,7 @@ import { maySend } from "../messaging/consent";
 import { transactionalMailer } from "../messaging/transactional-mail";
 import { reviewAskMail, type AskAudience } from "./review-mail";
 import { askForPlatformReview, isKnownMinor, markAskSent } from "./reviews";
+import { askSeason, seasonRef } from "./season";
 
 /**
  * ASKING WITHOUT BEING TOLD TO (FR-1 Phase 3).
@@ -141,6 +142,46 @@ export async function autoAskCandidates(
   }));
 }
 
+/**
+ * Seasons owed a tournament ask right now (Phase 4), with who is owed it:
+ * an auction that closed owes its OWNERS; a season that finished owes its
+ * players AND owners. Same window, same ledger-derived moments as above.
+ */
+export async function seasonsOwedAsks(now: Date = new Date()): Promise<
+  readonly {
+    competitionId: string;
+    roles: ("player" | "owner")[];
+    source: "auction_completed" | "season_completed";
+  }[]
+> {
+  const until = new Date(now.getTime() - ASK_DELAY_MS).toISOString();
+  const from = new Date(now.getTime() - ASK_LOOKBACK_MS).toISOString();
+  const rows = await systemDb.execute<{
+    competition_id: string;
+    source: "auction_completed" | "season_completed";
+  }>(sql`
+    select a.competition_id, 'auction_completed' as source
+    from auctions a
+    join auction_events e on e.auction_id = a.id and e.type = 'AuctionClosed'
+    where a.status in ('completed', 'reconciled')
+    group by a.competition_id
+    having min(e.created_at) between ${from}::timestamptz and ${until}::timestamptz
+    union all
+    select f.competition_id, 'season_completed'
+    from fixtures f
+    group by f.competition_id
+    having bool_and(f.status in ('completed', 'cancelled'))
+      and bool_or(f.status = 'completed')
+      and max(coalesce(f.completed_at, f.cancelled_at))
+        between ${from}::timestamptz and ${until}::timestamptz
+  `);
+  return rows.map((row) => ({
+    competitionId: row.competition_id.trim(),
+    source: row.source,
+    roles: row.source === "season_completed" ? ["player", "owner"] : ["owner"],
+  }));
+}
+
 export interface SweepResult {
   readonly considered: number;
   readonly asked: number;
@@ -148,6 +189,9 @@ export interface SweepResult {
   readonly optedOut: number;
   readonly minors: number;
   readonly mailFailed: number;
+  /** Phase 4: tournament asks, sharing the same per-run budget. */
+  readonly seasonAsked: number;
+  readonly seasonMailed: number;
 }
 
 export async function sweepReviewAsks(now: Date = new Date()): Promise<SweepResult> {
@@ -201,5 +245,39 @@ export async function sweepReviewAsks(now: Date = new Date()): Promise<SweepResu
     }
   }
 
-  return { considered: candidates.length, asked, mailed, optedOut, minors, mailFailed };
+  // Tournament asks spend whatever the platform asks left of the budget.
+  let seasonAsked = 0;
+  let seasonMailed = 0;
+  for (const owed of await seasonsOwedAsks(now)) {
+    const remaining = ASK_BATCH_LIMIT - asked - seasonAsked;
+    if (remaining <= 0) {
+      break;
+    }
+    const season = await seasonRef(owed.competitionId);
+    if (season === null) {
+      continue;
+    }
+    const result = await askSeason(season, {
+      roles: owed.roles,
+      source: owed.source,
+      requestedBy: null,
+      now,
+      budget: remaining,
+    });
+    seasonAsked += result.asked;
+    seasonMailed += result.mailed;
+    optedOut += result.optedOut;
+    mailFailed += result.mailFailed;
+  }
+
+  return {
+    considered: candidates.length,
+    asked,
+    mailed,
+    optedOut,
+    minors,
+    mailFailed,
+    seasonAsked,
+    seasonMailed,
+  };
 }

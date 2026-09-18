@@ -4,7 +4,11 @@ import { Badge, Button, Card, EmptyState, Field, useToast, VisuallyHidden } from
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { askForReviewAction, moderateReviewAction } from "../../../server/admin/review-actions";
+import {
+  askForReviewAction,
+  dismissReportsAction,
+  moderateReviewAction,
+} from "../../../server/admin/review-actions";
 import type { DeskAsk, DeskReview, ReviewDesk } from "../../../server/admin/review-views";
 import type { AskOutcome } from "../../../server/reviews/desk";
 
@@ -147,6 +151,14 @@ function AskCard() {
   );
 }
 
+const REASON_WORDS: Record<string, string> = {
+  abusive: "Abusive or hateful",
+  false: "False or misleading",
+  personal_info: "Shares personal details",
+  spam: "Spam or advert",
+  other: "Something else",
+};
+
 function ReviewRow({ review }: { review: DeskReview }) {
   const toast = useToast();
   const router = useRouter();
@@ -176,19 +188,39 @@ function ReviewRow({ review }: { review: DeskReview }) {
             </span>
           </p>
           <p className="competitions-hint">
+            {review.seasonName === null
+              ? "About DesiAuction"
+              : `About ${review.seasonName} · ${review.role === "owner" ? "team owner" : "player"}`}
+          </p>
+          <p className="competitions-hint">
             {review.personName ?? "No name on file"} · {day(review.createdAt)}
             {review.updatedAt.getTime() - review.createdAt.getTime() > 60_000
               ? ` · edited ${day(review.updatedAt)}`
               : ""}
           </p>
         </div>
-        <Badge tone={review.mayQuote ? "success" : "neutral"}>
-          {review.mayQuote ? "may quote" : "not for quoting"}
-        </Badge>
+        <span className="review-row-badges">
+          {review.reports.length > 0 ? (
+            <Badge tone="danger">
+              {review.reports.length} {review.reports.length === 1 ? "report" : "reports"}
+            </Badge>
+          ) : null}
+          <Badge tone={review.mayQuote ? "success" : "neutral"}>
+            {review.seasonName === null
+              ? review.mayQuote
+                ? "may quote"
+                : "not for quoting"
+              : review.mayQuote
+                ? "signed"
+                : "unsigned"}
+          </Badge>
+        </span>
       </div>
       {review.wentWell !== null ? (
         <div>
-          <p className="review-row-label">What went well</p>
+          <p className="review-row-label">
+            {review.seasonName === null ? "What went well" : "Their review"}
+          </p>
           <p className="review-row-text">{review.wentWell}</p>
         </div>
       ) : null}
@@ -204,7 +236,46 @@ function ReviewRow({ review }: { review: DeskReview }) {
           {review.displayOrg === null ? "" : `, ${review.displayOrg}`}
         </p>
       ) : null}
+      {review.organizerReply !== null ? (
+        <div>
+          <p className="review-row-label">The club&apos;s reply</p>
+          <p className="review-row-text">{review.organizerReply}</p>
+        </div>
+      ) : null}
+      {review.reports.length > 0 ? (
+        <div className="review-row-reports">
+          <p className="review-row-label">Why readers reported it</p>
+          <ul>
+            {review.reports.map((report, index) => (
+              <li key={index}>
+                <strong>{REASON_WORDS[report.reason] ?? report.reason}</strong>
+                {report.note === null ? null : ` — ${report.note}`}{" "}
+                <span className="competitions-hint">{day(report.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="review-row-actions">
+        {review.reports.length > 0 && review.status === "published" ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={pending}
+            onClick={() => {
+              start(async () => {
+                const result = await dismissReportsAction(review.id);
+                toast({
+                  title: result.ok ? result.summary : result.error,
+                  tone: result.ok ? "success" : "danger",
+                });
+                router.refresh();
+              });
+            }}
+          >
+            Keep it up
+          </Button>
+        ) : null}
         {review.status !== "published" ? (
           <Button
             size="sm"

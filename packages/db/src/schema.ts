@@ -2095,10 +2095,17 @@ export const reviewRequests = pgTable(
     personId: char("person_id", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "cascade" }),
-    /** Phase 2 is the platform only; Phase 4 widens the CHECK. */
-    subjectType: text("subject_type", { enum: ["platform"] })
+    /** 0070: a request is about the platform or about one competition. */
+    subjectType: text("subject_type", { enum: ["platform", "competition"] })
       .notNull()
       .default("platform"),
+    /** Set exactly when the subject is a competition (CHECK in 0070). */
+    competitionId: char("competition_id", { length: 26 }).references(() => competitions.id, {
+      onDelete: "cascade",
+    }),
+    orgId: char("org_id", { length: 26 }),
+    /** The part the person had in the season; signs an unnamed public review. */
+    role: text("role", { enum: ["player", "owner"] }),
     source: text("source", {
       enum: ["manual_admin", "manual_org", "auction_completed", "season_completed"],
     }).notNull(),
@@ -2114,7 +2121,13 @@ export const reviewRequests = pgTable(
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("review_requests_person_subject_uq").on(table.personId, table.subjectType),
+    // One platform ask per person, and one per person per season (0070).
+    uniqueIndex("review_requests_platform_uq")
+      .on(table.personId)
+      .where(sql`${table.subjectType} = 'platform'`),
+    uniqueIndex("review_requests_competition_uq")
+      .on(table.personId, table.competitionId)
+      .where(sql`${table.subjectType} = 'competition'`),
     index("review_requests_created_idx").on(table.createdAt),
   ],
 );
@@ -2136,9 +2149,14 @@ export const reviews = pgTable(
     personId: char("person_id", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "cascade" }),
-    subjectType: text("subject_type", { enum: ["platform"] })
+    subjectType: text("subject_type", { enum: ["platform", "competition"] })
       .notNull()
       .default("platform"),
+    competitionId: char("competition_id", { length: 26 }).references(() => competitions.id, {
+      onDelete: "cascade",
+    }),
+    orgId: char("org_id", { length: 26 }),
+    role: text("role", { enum: ["player", "owner"] }),
     rating: smallint("rating").notNull(),
     wentWell: text("went_well"),
     improve: text("improve"),
@@ -2152,8 +2170,43 @@ export const reviews = pgTable(
     moderatedBy: char("moderated_by", { length: 26 }).references(() => people.id, {
       onDelete: "set null",
     }),
+    /** A season's organizer may answer a published review; never edit it (0070). */
+    organizerReply: text("organizer_reply"),
+    organizerReplyAt: ts("organizer_reply_at"),
+    organizerReplyBy: char("organizer_reply_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (table) => [index("reviews_status_created_idx").on(table.status, table.createdAt)],
+);
+
+/**
+ * A reader's report that a public review should come down (FR-1 Phase 4,
+ * migration 0070). Queues for operators; nothing is removed automatically.
+ */
+export const reviewReports = pgTable(
+  "review_reports",
+  {
+    id: id(),
+    reviewId: char("review_id", { length: 26 })
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    reason: text("reason", {
+      enum: ["abusive", "false", "personal_info", "spam", "other"],
+    }).notNull(),
+    note: text("note"),
+    /** Throttling only. */
+    reporterIp: text("reporter_ip"),
+    reporterPersonId: char("reporter_person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    resolvedAt: ts("resolved_at"),
+    resolvedBy: char("resolved_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [index("review_reports_ip_idx").on(table.reporterIp, table.createdAt)],
 );

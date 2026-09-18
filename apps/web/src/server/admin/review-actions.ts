@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { askByContact, moderate, type AskOutcome } from "../reviews/desk";
+import { askByContact, dismissReports, moderate, type AskOutcome } from "../reviews/desk";
 import type { ModerationResult } from "../reviews/reviews";
 import { platformSupportGate } from "./authz";
 
@@ -42,6 +42,21 @@ export async function moderateReviewAction(
     return { ok: false, error: "That isn't a status we record." };
   }
   const result = await moderate(reviewId, status, operator.personId);
+  if (result.ok) {
+    revalidatePath("/admin/reviews");
+  }
+  return result;
+}
+
+export async function dismissReportsAction(reviewId: string): Promise<ModerationResult> {
+  const operator = await platformSupportGate();
+  if (operator === null) {
+    return { ok: false, error: "Not available." };
+  }
+  if (typeof reviewId !== "string") {
+    return { ok: false, error: "There are no open reports on that review." };
+  }
+  const result = await dismissReports(reviewId, operator.personId);
   if (result.ok) {
     revalidatePath("/admin/reviews");
   }

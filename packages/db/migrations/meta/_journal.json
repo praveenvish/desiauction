@@ -463,6 +463,13 @@
       "when": 1789315200000,
       "tag": "0065_platform_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1789747200000,
+      "tag": "0070_tournament_reviews",
+      "breakpoints": true
     }
   ]
 }

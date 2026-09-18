@@ -72,7 +72,7 @@ describe("rail", () => {
 });
 
 describe("competition tabs", () => {
-  it("builds the six organizer tabs and resolves the active one", () => {
+  it("builds the seven organizer tabs and resolves the active one", () => {
     const tabs = competitionTabs("mpl");
     expect(tabs.map((tab) => tab.key)).toEqual([
       "overview",
@@ -82,12 +82,15 @@ describe("competition tabs", () => {
       // The table sits beside the fixtures it is derived from.
       "standings",
       "auction",
+      // FR-1: what players and owners said, at the end of the season's story.
+      "reviews",
     ]);
     expect(activeCompetitionTab("/seasons/mpl", "mpl")).toBe("overview");
     expect(activeCompetitionTab("/seasons/mpl/teams", "mpl")).toBe("teams");
     expect(activeCompetitionTab("/seasons/mpl/registrations", "mpl")).toBe("registrations");
     expect(activeCompetitionTab("/seasons/mpl/fixtures/calendar", "mpl")).toBe("fixtures");
     expect(activeCompetitionTab("/seasons/mpl/standings", "mpl")).toBe("standings");
+    expect(activeCompetitionTab("/seasons/mpl/reviews", "mpl")).toBe("reviews");
     expect(activeCompetitionTab("/seasons/mpl/auction/ledger", "mpl")).toBe("auction");
     // Readiness lives with the auction preparation context.
     expect(activeCompetitionTab("/seasons/mpl/readiness", "mpl")).toBe("auction");
@@ -113,6 +116,7 @@ describe("competition tabs", () => {
       "fixtures",
       "standings",
       "auction",
+      "reviews",
       "money",
     ]);
     expect(tabs.at(-1)?.href).toBe("/seasons/mpl/money");

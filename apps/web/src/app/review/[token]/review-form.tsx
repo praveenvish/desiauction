@@ -30,12 +30,22 @@ const RATINGS: readonly { value: number; words: string }[] = [
   { value: 5, words: "Excellent" },
 ];
 
+/**
+ * `season` is a tournament review (Phase 4): one piece of writing that may be
+ * shown on the season's public page, signed with a name only on request. It
+ * does not ask "what should we improve" (a question for the platform, not the
+ * club) or for a club name.
+ */
+export type ReviewFormVariant = "platform" | "season";
+
 export function ReviewForm({
   token,
+  variant,
   suggestedName,
   existing,
 }: {
   token: string;
+  variant: ReviewFormVariant;
   suggestedName: string | null;
   existing: ExistingReview | null;
 }) {
@@ -81,6 +91,7 @@ export function ReviewForm({
       key={state.version ?? 0}
       formAction={formAction}
       token={token}
+      variant={variant}
       state={state}
       values={values}
       errorFor={errorFor}
@@ -93,6 +104,7 @@ export function ReviewForm({
 function ReviewFields({
   formAction,
   token,
+  variant,
   state,
   values,
   errorFor,
@@ -101,6 +113,7 @@ function ReviewFields({
 }: {
   formAction: (formData: FormData) => void;
   token: string;
+  variant: ReviewFormVariant;
   state: ReviewFormState;
   values: ReviewFormValues;
   errorFor: (name: string) => string | undefined;
@@ -149,22 +162,35 @@ function ReviewFields({
         ) : null}
       </fieldset>
 
-      <TextArea
-        id="review-went-well"
-        name="wentWell"
-        label="What went well?"
-        placeholder="The part that saved you time, or the moment the room noticed."
-        defaultValue={values.wentWell}
-        error={errorFor("wentWell")}
-      />
-      <TextArea
-        id="review-improve"
-        name="improve"
-        label="What should we improve?"
-        placeholder="Where you got stuck, or what you had to do outside DesiAuction."
-        defaultValue={values.improve}
-        error={errorFor("improve")}
-      />
+      {variant === "season" ? (
+        <TextArea
+          id="review-went-well"
+          name="wentWell"
+          label="Your review"
+          placeholder="How it was run, how the auction felt, whether you'd play or bid again."
+          defaultValue={values.wentWell}
+          error={errorFor("wentWell")}
+        />
+      ) : (
+        <>
+          <TextArea
+            id="review-went-well"
+            name="wentWell"
+            label="What went well?"
+            placeholder="The part that saved you time, or the moment the room noticed."
+            defaultValue={values.wentWell}
+            error={errorFor("wentWell")}
+          />
+          <TextArea
+            id="review-improve"
+            name="improve"
+            label="What should we improve?"
+            placeholder="Where you got stuck, or what you had to do outside DesiAuction."
+            defaultValue={values.improve}
+            error={errorFor("improve")}
+          />
+        </>
+      )}
 
       <div className="review-quote">
         <label className="review-check">
@@ -177,7 +203,11 @@ function ReviewFields({
               setMayQuote(event.currentTarget.checked);
             }}
           />
-          <span>DesiAuction may quote this review publicly, with the name below.</span>
+          <span>
+            {variant === "season"
+              ? "Show my name with this review."
+              : "DesiAuction may quote this review publicly, with the name below."}
+          </span>
         </label>
         {mayQuote ? (
           <div className="review-quote-fields">
@@ -189,13 +219,15 @@ function ReviewFields({
               defaultValue={values.displayName}
               error={errorFor("displayName")}
             />
-            <Field
-              label="Club or tournament (optional)"
-              name="displayOrg"
-              maxLength={120}
-              defaultValue={values.displayOrg}
-              error={errorFor("displayOrg")}
-            />
+            {variant === "platform" ? (
+              <Field
+                label="Club or tournament (optional)"
+                name="displayOrg"
+                maxLength={120}
+                defaultValue={values.displayOrg}
+                error={errorFor("displayOrg")}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>

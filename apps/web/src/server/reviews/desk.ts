@@ -1,6 +1,7 @@
 import { db, systemDb } from "../db";
 import { maySend } from "../messaging/consent";
 import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
+import { resolveReports } from "./season";
 import { reviewAskMail } from "./review-mail";
 import {
   askForPlatformReview,
@@ -103,10 +104,32 @@ export async function askByContact(
   return { ...base, delivery: deliveryFor(outcome) };
 }
 
+/**
+ * Publish or hide. Hiding also answers any open reports on the review — the
+ * answer to "this should not be up" is that it is not up any more.
+ */
 export async function moderate(
   reviewId: string,
   status: string,
   operatorId: string,
 ): Promise<ModerationResult> {
-  return moderateReview(db, reviewId, status, operatorId);
+  const result = await moderateReview(db, reviewId, status, operatorId);
+  if (result.ok && status === "hidden") {
+    await resolveReports(reviewId, operatorId);
+  }
+  return result;
+}
+
+/** Keep the review up and close its reports: somebody objected, we read it, it stays. */
+export async function dismissReports(
+  reviewId: string,
+  operatorId: string,
+): Promise<ModerationResult> {
+  const count = await resolveReports(reviewId, operatorId);
+  return count === 0
+    ? { ok: false, error: "There are no open reports on that review." }
+    : {
+        ok: true,
+        summary: count === 1 ? "Report dismissed." : `${String(count)} reports dismissed.`,
+      };
 }

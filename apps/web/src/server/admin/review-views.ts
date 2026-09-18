@@ -1,5 +1,12 @@
-import { people, reviewRequests, reviews, type Db } from "@desiauction/db";
-import { desc, eq } from "drizzle-orm";
+import {
+  competitions,
+  people,
+  reviewReports,
+  reviewRequests,
+  reviews,
+  type Db,
+} from "@desiauction/db";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { systemDb } from "../db";
 
@@ -24,6 +31,13 @@ export interface DeskReview {
   readonly status: "pending" | "published" | "hidden";
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  /** Phase 4: null for a platform review. */
+  readonly seasonName: string | null;
+  readonly seasonSlug: string | null;
+  readonly role: "player" | "owner" | null;
+  readonly organizerReply: string | null;
+  /** Open (unresolved) reader reports, newest first. */
+  readonly reports: readonly { reason: string; note: string | null; createdAt: Date }[];
 }
 
 export interface DeskAsk {
@@ -62,11 +76,48 @@ export async function reviewDesk(db: Db = systemDb): Promise<ReviewDesk> {
       status: reviews.status,
       createdAt: reviews.createdAt,
       updatedAt: reviews.updatedAt,
+      seasonName: competitions.name,
+      seasonSlug: competitions.slug,
+      role: reviews.role,
+      organizerReply: reviews.organizerReply,
     })
     .from(reviews)
     .innerJoin(people, eq(people.id, reviews.personId))
+    .leftJoin(competitions, eq(competitions.id, reviews.competitionId))
     .orderBy(desc(reviews.createdAt))
     .limit(LIMIT);
+
+  const reportRows =
+    rows.length === 0
+      ? []
+      : await db
+          .select({
+            reviewId: reviewReports.reviewId,
+            reason: reviewReports.reason,
+            note: reviewReports.note,
+            createdAt: reviewReports.createdAt,
+          })
+          .from(reviewReports)
+          .where(
+            and(
+              inArray(
+                reviewReports.reviewId,
+                rows.map((row) => row.id),
+              ),
+              isNull(reviewReports.resolvedAt),
+            ),
+          )
+          .orderBy(desc(reviewReports.createdAt));
+  const reportsByReview = new Map<string, DeskReview["reports"][number][]>();
+  for (const report of reportRows) {
+    const list = reportsByReview.get(report.reviewId) ?? [];
+    list.push({ reason: report.reason, note: report.note, createdAt: report.createdAt });
+    reportsByReview.set(report.reviewId, list);
+  }
+  const shaped: DeskReview[] = rows.map((row) => ({
+    ...row,
+    reports: reportsByReview.get(row.id) ?? [],
+  }));
 
   const askRows = await db
     .select({
@@ -87,9 +138,13 @@ export async function reviewDesk(db: Db = systemDb): Promise<ReviewDesk> {
     .limit(LIMIT);
 
   return {
-    pending: rows.filter((row) => row.status === "pending"),
-    published: rows.filter((row) => row.status === "published"),
-    hidden: rows.filter((row) => row.status === "hidden"),
+    // Reported reviews come first within their list: a report is somebody
+    // waiting on us, the same as a pending review is.
+    pending: shaped.filter((row) => row.status === "pending"),
+    published: shaped
+      .filter((row) => row.status === "published")
+      .sort((a, b) => b.reports.length - a.reports.length),
+    hidden: shaped.filter((row) => row.status === "hidden"),
     asks: askRows.map(({ reviewId, ...ask }) => ({ ...ask, reviewed: reviewId !== null })),
   };
 }

@@ -320,6 +320,10 @@ export function competitionTabs(slug: string, canSettle = false): CompetitionTab
     // officers can open is not a league table.
     { key: "standings", label: "Table", href: `${base}/standings`, testId: "open-standings" },
     { key: "auction", label: "Auction", href: `${base}/auction`, testId: "open-auction" },
+    // FR-1: what players and owners said. For everyone who can see the season,
+    // like the Table — published reviews are public anyway; only the club's
+    // owners get the reply and ask controls, and nobody here sees an unread one.
+    { key: "reviews", label: "Reviews", href: `${base}/reviews`, testId: "open-reviews" },
     ...(canSettle ? [{ key: "money", label: "Money", href: `${base}/money` }] : []),
   ];
 }
@@ -373,6 +377,9 @@ export function activeCompetitionTab(pathname: string, slug: string): string {
   if (pathname.startsWith(`${base}/standings`)) {
     return "standings";
   }
+  if (pathname.startsWith(`${base}/reviews`)) {
+    return "reviews";
+  }
   if (pathname.startsWith(`${base}/auction`) || pathname.startsWith(`${base}/readiness`)) {
     return "auction";
   }
@@ -418,6 +425,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/fixtures\/calendar$/, "Calendar"],
   [/\/fixtures\/match-day$/, "Match day"],
   [/\/fixtures$/, "Fixtures"],
+  [/\/reviews$/, "Reviews"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
   [/\/auction\/engine$/, "Engine"],

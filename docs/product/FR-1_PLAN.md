@@ -1,6 +1,6 @@
 # FR-1 — Problem reports and reviews
 
-**Status:** Phases 1–3 BUILT (2026-09-17/18, on `feature/fr1-feedback`); Phases 4–5 planned. **Author:** engineering. **Planned:** 2026-09-17.
+**Status:** Phases 1–4 BUILT (2026-09-17/18, on `feature/fr1-feedback`); Phase 5 planned. **Author:** engineering. **Planned:** 2026-09-17.
 **Founder decisions:** taken 2026-09-17 — "go with your recommendations" (§8).
 
 ---
@@ -94,7 +94,8 @@ sent by `POST /api/jobs/review-requests`, gated by `maySend` under a new
 | Migration | Table | RLS |
 |---|---|---|
 | 0064 | `problem_reports` | none (stranger-authored, like `demo_requests`) |
-| 0065 | `review_requests`, `reviews`, `review_reports` | tournament reviews tenant-scoped |
+| 0065 | `review_requests`, `reviews` | none (link-token principal) |
+| 0070 | season subject on both, `review_reports` | none — see §13 |
 
 Journal `when` = previous + 86400000 (silent-skip trap). Role script re-run and
 the production-role probe for each.
@@ -254,3 +255,56 @@ Also: that branch's 0069 adds FKs on attribution columns; on the shared local
 database, `consent.regression` and `admin-foundation.regression` fail from THIS
 branch because the database is ahead of it. Not a defect here; re-run after the
 branches meet.
+
+## 13. Phase 4 — what shipped, and where the plan was wrong
+
+**Shipped.** Migration `0070_tournament_reviews` (numbered after the parallel
+branch's 0066–0069, claimed by message): a request/review may be about a
+COMPETITION, carrying its org and the person's ROLE (player/owner); the one
+unique index becomes two partial ones (one platform ask ever, one per season);
+`organizer_reply` on reviews; `review_reports`. `server/reviews/season.ts`
+(who is owed an ask, asking, the public read, reply, report, resolve);
+`/c/[slug]` gains "What players and owners said"; a **Reviews** tab on every
+season (`/seasons/[slug]/reviews`) with the club's Ask card and reply control;
+the operator desk shows the season, the role, the club's reply, and open
+reports (reported reviews sort first; "Keep it up" dismisses, "Hide" resolves).
+
+**Who is asked about a season:** approved players with a KNOWN adult date of
+birth; every paddle holder not known to be a minor; one ask per person per
+season; somebody who played and bid is asked once, as an owner; anybody who
+runs the season (org:owner/org:staff on its org, or on the season) is never
+asked. The sweep asks OWNERS when the auction closes and players + owners when
+the season finishes; the club's button asks both, once a week at most.
+
+**What the public sees:** published reviews of a PUBLIC season, and only once
+there are at least three — below that, "A team owner" on a small season is as
+good as a name. Unsigned reviews are signed with the role. The club sees every
+published review on its tab (it may need to reply), never an unread one, and
+cannot edit, hide or delete anything.
+
+**Where the plan was wrong:**
+
+1. *"Tournament reviews tenant-scoped (RLS)."* The review page's principal is a
+   link token and the public read is gated by visibility, exactly like
+   `/c/[slug]` itself; RLS would have had no tenant to key on. `org_id` is kept
+   for reads, not isolation.
+2. *Organizers were not excluded* in the first draft of the participant query,
+   though the module header promised it — caught by the Phase 3 regression
+   test ("an organizer who also held a paddle is asked once") failing the
+   moment the sweep started sending season asks too.
+3. *`check:posture` had never been run on this branch* (it is a CI step, not
+   part of `verify`). Phases 1–3 added nine unlisted pool reaches; fixed in
+   8adc542. Phase 4 adds one by-design entry and ONE DEBT entry
+   (`season-actions.ts`, the same resolveCompetition-on-system-pool shape as
+   `fixture-actions.ts`) — debt count 8 → 9.
+
+**Verification.** 19 DB regression tests (season asks, eligibility, the two
+partial indexes, the public floor, reply scoping, report throttle and
+resolution, sweep); 237 tests across touched suites; lint, typecheck,
+depcruise, format, posture, motion, grants:verify (69 tables), posture:verify,
+production build. Browser, end to end on a throwaway public season: Ask 5 → four
+reviews written through their links → three published → public section (4.7,
+signed and unsigned bylines, pending one absent) → reader report → club reply →
+desk shows the report and its reason, sorted first → "Keep it up" clears it.
+Found and fixed in the browser: the summary's rounded stars read "4.7, 5 out of
+5" to a screen reader; now decorative beside the exact number.
