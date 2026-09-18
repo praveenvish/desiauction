@@ -1,0 +1,101 @@
+/* FR-1 — the report desk. Loaded after admin.css, which owns the console frame. */
+
+.report-queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.report-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.report-row-who {
+  min-width: 0;
+}
+
+.report-row-title {
+  margin: 0 0 var(--space-1);
+  color: var(--text-primary);
+  font-size: var(--text-base-size);
+}
+
+.report-row-tags,
+.report-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Browser-supplied text: never a link, and never allowed to widen the desk. */
+.report-row-page {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+}
+
+.report-row-description {
+  margin: 0;
+  padding: var(--space-3);
+  border-left: 2px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.report-row-context {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm-size);
+}
+
+.report-row-context dt {
+  color: var(--text-secondary);
+}
+
+.report-row-context dd {
+  margin: 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* The row is a column flex box, which stretches a lone button to full width. */
+.report-row > button {
+  align-self: flex-start;
+}
+
+.report-row-shot {
+  display: block;
+  max-width: 40rem;
+}
+
+.report-row-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}

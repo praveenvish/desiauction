@@ -6,6 +6,7 @@ import { SPORTS } from "@desiauction/core";
 import { env } from "../env";
 import { LANDING } from "../content/marketing";
 import { LiveTournaments } from "../components/marketing/live-tournaments";
+import { LandingVoices } from "../components/marketing/landing-voices";
 import { AuctionLab, HomeMotion } from "../components/marketing/guest-home";
 import {
   IconArrowRight,
@@ -351,6 +352,12 @@ export default function LandingPage() {
 
         <Suspense fallback={null}>
           <LiveTournaments />
+        </Suspense>
+
+        {/* FR-1: real, permitted quotes — absent until there is one, and absent
+            when the database is (same guard as the strip above). */}
+        <Suspense fallback={null}>
+          <LandingVoices />
         </Suspense>
 
         <section className={styles.betaSection} aria-labelledby="beta-title">

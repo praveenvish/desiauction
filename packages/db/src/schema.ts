@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -2129,4 +2130,199 @@ export const demoBookings = pgTable(
     index("demo_bookings_slot_idx").on(table.slotStart),
     index("demo_bookings_request_idx").on(table.demoRequestId),
   ],
+);
+
+/** Raw bytes. Postgres `bytea`, surfaced to the app as a Node `Buffer`. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+/**
+ * SOMEBODY TELLING US SOMETHING IS BROKEN (FR-1, migration 0064).
+ *
+ * No RLS and no org, like `demo_requests`: a guest can file one, and a signed-in
+ * report is about the platform rather than a tenant. Readers are operators
+ * holding `platform:support`. The page URL arrives already stripped of its
+ * query string and token segments, and `context` is a closed, size-capped set
+ * of keys — both enforced in `apps/web/src/server/support/problem-reports.ts`.
+ */
+export const problemReports = pgTable(
+  "problem_reports",
+  {
+    id: id(),
+    /** Null for a guest, and nulled if the person is ever deleted. */
+    personId: char("person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    replyEmail: text("reply_email"),
+    category: text("category", { enum: ["bug", "confusing", "idea", "other"] }).notNull(),
+    description: text("description").notNull(),
+    pageUrl: text("page_url").notNull(),
+    context: jsonb("context").$type<Record<string, string>>().notNull().default({}),
+    /** Throttling only; cleared by the retention sweep. */
+    requestIp: text("request_ip"),
+    status: text("status", { enum: ["new", "triaged", "fixed", "wont_fix", "duplicate"] })
+      .notNull()
+      .default("new"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    /** Null exactly while `status` is new (CHECK). */
+    triagedAt: ts("triaged_at"),
+    triagedBy: char("triaged_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    index("problem_reports_created_idx").on(table.createdAt),
+    index("problem_reports_person_idx").on(table.personId, table.createdAt),
+    index("problem_reports_ip_idx").on(table.requestIp, table.createdAt),
+  ],
+);
+
+/**
+ * The picture that came with a report (0064) — in the database, not the media
+ * store, because the media store serves every key from a public base URL.
+ * At most a megabyte, one per report, cascades with it, purged after 90 days.
+ */
+export const problemReportScreenshots = pgTable("problem_report_screenshots", {
+  reportId: char("report_id", { length: 26 })
+    .primaryKey()
+    .references(() => problemReports.id, { onDelete: "cascade" }),
+  contentType: text("content_type", {
+    enum: ["image/jpeg", "image/png", "image/webp"],
+  }).notNull(),
+  bytes: bytea("bytes").notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+/**
+ * ASKING SOMEBODY HOW IT WENT (FR-1 Phase 2, migration 0065).
+ *
+ * One ask per person per subject (unique index) — asking again re-sends the
+ * same link. The link token is an HMAC of this row's id under
+ * REVIEW_TOKEN_SECRET; only its SHA-256 is stored. No RLS: the principal on the
+ * review page is the token, and a platform review belongs to no organization.
+ */
+export const reviewRequests = pgTable(
+  "review_requests",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    /** 0070: a request is about the platform or about one competition. */
+    subjectType: text("subject_type", { enum: ["platform", "competition"] })
+      .notNull()
+      .default("platform"),
+    /** Set exactly when the subject is a competition (CHECK in 0070). */
+    competitionId: char("competition_id", { length: 26 }).references(() => competitions.id, {
+      onDelete: "cascade",
+    }),
+    orgId: char("org_id", { length: 26 }),
+    /** The part the person had in the season; signs an unnamed public review. */
+    role: text("role", { enum: ["player", "owner"] }),
+    source: text("source", {
+      enum: ["manual_admin", "manual_org", "auction_completed", "season_completed"],
+    }).notNull(),
+    requestedBy: char("requested_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    tokenHash: text("token_hash").notNull().unique("review_requests_token_hash_uq"),
+    /** The address the ask went to; null when the link was shared by hand. */
+    sentTo: text("sent_to"),
+    sentAt: ts("sent_at"),
+    openedAt: ts("opened_at"),
+    expiresAt: ts("expires_at").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    // One platform ask per person, and one per person per season (0070).
+    uniqueIndex("review_requests_platform_uq")
+      .on(table.personId)
+      .where(sql`${table.subjectType} = 'platform'`),
+    uniqueIndex("review_requests_competition_uq")
+      .on(table.personId, table.competitionId)
+      .where(sql`${table.subjectType} = 'competition'`),
+    index("review_requests_created_idx").on(table.createdAt),
+  ],
+);
+
+/**
+ * A REVIEW (FR-1 Phase 2, migration 0065). Held `pending` until an operator
+ * publishes or hides it. `mayQuote` is the author's permission to show it
+ * publicly, and a quote needs `displayName` (CHECK). Deleting the person
+ * deletes the review — the words are theirs.
+ */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: id(),
+    requestId: char("request_id", { length: 26 })
+      .notNull()
+      .unique("reviews_request_uq")
+      .references(() => reviewRequests.id, { onDelete: "cascade" }),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    subjectType: text("subject_type", { enum: ["platform", "competition"] })
+      .notNull()
+      .default("platform"),
+    competitionId: char("competition_id", { length: 26 }).references(() => competitions.id, {
+      onDelete: "cascade",
+    }),
+    orgId: char("org_id", { length: 26 }),
+    role: text("role", { enum: ["player", "owner"] }),
+    rating: smallint("rating").notNull(),
+    wentWell: text("went_well"),
+    improve: text("improve"),
+    mayQuote: boolean("may_quote").notNull().default(false),
+    displayName: text("display_name"),
+    displayOrg: text("display_org"),
+    status: text("status", { enum: ["pending", "published", "hidden"] })
+      .notNull()
+      .default("pending"),
+    moderatedAt: ts("moderated_at"),
+    moderatedBy: char("moderated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    /** A season's organizer may answer a published review; never edit it (0070). */
+    organizerReply: text("organizer_reply"),
+    organizerReplyAt: ts("organizer_reply_at"),
+    organizerReplyBy: char("organizer_reply_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("reviews_status_created_idx").on(table.status, table.createdAt)],
+);
+
+/**
+ * A reader's report that a public review should come down (FR-1 Phase 4,
+ * migration 0070). Queues for operators; nothing is removed automatically.
+ */
+export const reviewReports = pgTable(
+  "review_reports",
+  {
+    id: id(),
+    reviewId: char("review_id", { length: 26 })
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    reason: text("reason", {
+      enum: ["abusive", "false", "personal_info", "spam", "other"],
+    }).notNull(),
+    note: text("note"),
+    /** Throttling only. */
+    reporterIp: text("reporter_ip"),
+    reporterPersonId: char("reporter_person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    resolvedAt: ts("resolved_at"),
+    resolvedBy: char("resolved_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [index("review_reports_ip_idx").on(table.reporterIp, table.createdAt)],
 );

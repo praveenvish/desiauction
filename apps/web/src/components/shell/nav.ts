@@ -68,6 +68,9 @@ export function shellKind(pathname: string): ShellKind {
     // with a live session — without this the person's own demo would arrive
     // framed in the organizer console.
     pathname.startsWith("/demo/") ||
+    // Same for a review link (FR-1): it is read in a mail client's browser,
+    // signed in or not, and is a public page either way.
+    pathname.startsWith("/review/") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/careers") ||
     pathname.startsWith("/case-studies") ||
@@ -256,6 +259,12 @@ export const ADMIN_TABS: CompetitionTab[] = [
   // Erasure sits behind `platform:privacy`, on the same rule as the two above.
   { key: "erasure", label: "Erasure", href: "/admin/erasure" },
   { key: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
+  // Reports sits behind `platform:support`, same rule again: present for
+  // everyone, 404 without the grant.
+  { key: "reports", label: "Reports", href: "/admin/reports" },
+  // Reviews shares `platform:support` with Reports — both are what people told
+  // us — and follows the same present-for-everyone, 404-without-grant rule.
+  { key: "reviews", label: "Reviews", href: "/admin/reviews" },
 ];
 
 export function activeAdminTab(pathname: string): string {
@@ -286,6 +295,12 @@ export function activeAdminTab(pathname: string): string {
   if (pathname.startsWith("/admin/newsletter")) {
     return "newsletter";
   }
+  if (pathname.startsWith("/admin/reports")) {
+    return "reports";
+  }
+  if (pathname.startsWith("/admin/reviews")) {
+    return "reviews";
+  }
   return "overview";
 }
 
@@ -314,6 +329,10 @@ export function competitionTabs(slug: string, canSettle = false): CompetitionTab
     // officers can open is not a league table.
     { key: "standings", label: "Table", href: `${base}/standings`, testId: "open-standings" },
     { key: "auction", label: "Auction", href: `${base}/auction`, testId: "open-auction" },
+    // FR-1: what players and owners said. For everyone who can see the season,
+    // like the Table — published reviews are public anyway; only the club's
+    // owners get the reply and ask controls, and nobody here sees an unread one.
+    { key: "reviews", label: "Reviews", href: `${base}/reviews`, testId: "open-reviews" },
     ...(canSettle ? [{ key: "money", label: "Money", href: `${base}/money` }] : []),
   ];
 }
@@ -367,6 +386,9 @@ export function activeCompetitionTab(pathname: string, slug: string): string {
   if (pathname.startsWith(`${base}/standings`)) {
     return "standings";
   }
+  if (pathname.startsWith(`${base}/reviews`)) {
+    return "reviews";
+  }
   if (pathname.startsWith(`${base}/auction`) || pathname.startsWith(`${base}/readiness`)) {
     return "auction";
   }
@@ -398,6 +420,8 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/demos$/, "Demos"],
   [/^\/admin\/erasure$/, "Erasure requests"],
   [/^\/admin\/newsletter$/, "Newsletter"],
+  [/^\/admin\/reports$/, "Reports"],
+  [/^\/admin\/reviews$/, "Reviews"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.
@@ -412,6 +436,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/fixtures\/calendar$/, "Calendar"],
   [/\/fixtures\/match-day$/, "Match day"],
   [/\/fixtures$/, "Fixtures"],
+  [/\/reviews$/, "Reviews"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
   [/\/auction\/engine$/, "Engine"],

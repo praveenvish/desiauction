@@ -158,6 +158,13 @@ const envSchema = z.object({
    */
   SETTLEMENT_JOB_SECRET: z.string().min(16).optional(),
   /**
+   * FR-1 feedback sweep (`POST /api/jobs/feedback`): the problem-report
+   * retention purge (screenshots and addresses at ninety days, reports at
+   * twenty-four months) and the automatic review-ask sweep (Phase 3).
+   * Same fail-closed posture as DEMO_JOB_SECRET — unset is a 404.
+   */
+  FEEDBACK_JOB_SECRET: z.string().min(16).optional(),
+  /**
    * The key demo booking links are DERIVED from (HMAC over the request id).
    *
    * A random token would be unrecoverable once hashed, which the reminder sweep
@@ -170,6 +177,13 @@ const envSchema = z.object({
    * that default is refused when actually serving — see the refinements below.
    */
   DEMO_TOKEN_SECRET: z.string().min(8).default("dev-demo-token-secret"),
+  /**
+   * FR-1 review links (`/review/[token]`) are an HMAC of the request id under
+   * this key, for the reason DEMO_TOKEN_SECRET gives: a resend must rebuild the
+   * link, and storing it would hand a leaked backup every review page. The dev
+   * default is refused when serving, exactly like the demo key's.
+   */
+  REVIEW_TOKEN_SECRET: z.string().min(8).default("dev-review-token-secret"),
   /**
    * Razorpay. All three together or the gateway is simply absent and every
    * payment stays on the manual adapters — a half-configured gateway that
@@ -405,6 +419,15 @@ const productionSchema = envSchema
   .refine((v) => !serving(v) || v.DEMO_TOKEN_SECRET.length >= 32, {
     message: "DEMO_TOKEN_SECRET must be at least 32 characters in production",
     path: ["DEMO_TOKEN_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.REVIEW_TOKEN_SECRET !== "dev-review-token-secret", {
+    message:
+      "REVIEW_TOKEN_SECRET must be set explicitly in production (review links are derived from it)",
+    path: ["REVIEW_TOKEN_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.REVIEW_TOKEN_SECRET.length >= 32, {
+    message: "REVIEW_TOKEN_SECRET must be at least 32 characters in production",
+    path: ["REVIEW_TOKEN_SECRET"],
   })
   .refine((v) => !serving(v) || v.ENGINE_SECRET.length >= 32, {
     message: "ENGINE_SECRET must be at least 32 characters in production",

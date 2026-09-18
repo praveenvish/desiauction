@@ -56,13 +56,12 @@ export const SUPPORT = {
   ],
   bugReporting: {
     title: "Reporting a bug",
-    intro: "A good report gets a fast fix. When something breaks, tell us:",
+    intro:
+      "The fastest way is Report a problem — in the footer of every public page, and in your account menu once you're signed in. Open it on the page that went wrong: it sends us that page's address, your device and browser, and a screenshot you can check or remove first. In the report, tell us:",
     checklist: [
       "What you were doing, step by step, when it happened.",
       "What you expected, and what happened instead.",
-      "The competition or organization name, and roughly when.",
-      "Your device and browser (for example, “iPhone, Safari”).",
-      "A screenshot if you can — it often shows us the answer immediately.",
+      "The competition or organization name, if it's about one.",
     ],
   },
 } as const;

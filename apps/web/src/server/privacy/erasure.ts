@@ -16,7 +16,9 @@ import {
   people,
   playerProfiles,
   playerSportProfiles,
+  problemReports,
   registrations,
+  reviewRequests,
   sessions,
   withTenantDb,
   type Db,
@@ -40,7 +42,9 @@ import { storage } from "../media";
  * WHAT IS DELETED (the person's own profile):
  *   sessions, passkeys, notification preferences, the person-level and
  *   per-sport player profiles, email-verification and OTP codes for their
- *   addresses, their newsletter subscription, and their photo in storage.
+ *   addresses, their newsletter subscription, their photo in storage, and every
+ *   review we asked them for (the request row; its review goes with it by
+ *   CASCADE, 0065) — what they wrote was theirs, and it signs with their role.
  *
  * WHAT IS ANONYMIZED (shared records keep their shape, lose the person):
  *   `people` — name, phone, email and photo emptied, `erased_at` stamped;
@@ -48,6 +52,8 @@ import { storage } from "../media";
  *   father's name, kit sizes, jersey, playing styles, sport attributes) and the
  *   organizer's free-text note about them. Role, status, team and fee amounts
  *   stay: they are the club's record of a season, not facts about a person.
+ *   `problem_reports` — the report is about the platform and stays; its reply
+ *   address, the one way it could still reach them, is emptied.
  *
  * WHAT IS KEPT, AND WHY:
  *   memberships and grants end (removed / revoked), but the auction ledger,
@@ -284,6 +290,16 @@ export async function executeErasure(input: {
       await tx.delete(emailVerifications).where(eq(emailVerifications.email, email));
       await tx.delete(newsletterSubscribers).where(eq(newsletterSubscribers.email, email));
     }
+
+    // --- What they told us (FR-1) -----------------------------------------------
+    // Both tables carry no RLS (0064, 0065), so no club needs naming here. The
+    // people row is scrubbed, never deleted, so their ON DELETE rules never fire:
+    // this is the constructive version of those rules.
+    await tx.delete(reviewRequests).where(eq(reviewRequests.personId, personId));
+    await tx
+      .update(problemReports)
+      .set({ replyEmail: null })
+      .where(eq(problemReports.personId, personId));
 
     // --- Consent: kept as evidence, with a withdrawal for everything granted ----
     const purposes = await tx

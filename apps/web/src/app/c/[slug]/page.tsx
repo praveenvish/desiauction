@@ -9,6 +9,7 @@ import { publicCompetitionView, publicShowcase } from "../../../server/competiti
 import { serializeJsonLd } from "../../../server/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import { formatDateRange } from "../format";
+import { PublicSeasonReviews } from "../../../components/reviews/season-reviews";
 import { ShowcaseGrid } from "./showcase-grid";
 import "../../marketing.css";
 import "../directory.css";
@@ -293,6 +294,9 @@ export default async function PublicCompetitionPage({
             ) : null}
           </section>
         ) : null}
+
+        {/* FR-1: absent until a public season has three published reviews. */}
+        <PublicSeasonReviews slug={view.slug} orgName={view.orgName} />
 
         <section className="public-section" aria-labelledby="contact-heading">
           <h2 id="contact-heading">Questions?</h2>

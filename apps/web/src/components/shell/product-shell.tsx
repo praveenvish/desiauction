@@ -48,6 +48,7 @@ import {
   pageIdentity,
   shellKind,
 } from "./nav";
+import { useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
 import { ShellStatusContext } from "./page-status";
 import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
@@ -284,6 +285,7 @@ export function ProductShell({
   // notice the route changed.
   const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null);
   const drawerOpen = drawerOpenOn === pathname;
+  const reportProblem = useReportProblem();
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
   /**
    * The action a page PUBLISHES, which is now an override rather than the only
@@ -622,7 +624,10 @@ export function ProductShell({
     // five-column sitemap footer, which at 390px was HALF the page under a
     // single 300px card. Same compact treatment as /login.
     const atGate =
-      pathname === "/login" || pathname.startsWith("/join/") || pathname.startsWith("/owner-join/");
+      pathname === "/login" ||
+      pathname.startsWith("/join/") ||
+      pathname.startsWith("/owner-join/") ||
+      pathname.startsWith("/review/");
     // …but only /login takes the fill treatment (it is a floodlight surface;
     // see the login polish note). The invitation cards stay on daylight.
     const atLoginGate = pathname === "/login";
@@ -707,6 +712,9 @@ export function ProductShell({
               { label: "Help centre", href: "/help" },
               { label: "FAQ", href: "/help/faq" },
               { label: "Contact support", href: "/support" },
+              // Opens the report dialog over THIS page (the provider intercepts
+              // the hash), so the screenshot is of what they were looking at.
+              { label: "Report a problem", href: "#report-a-problem" },
               { label: "Search the site", href: "/search" },
             ],
           },
@@ -908,7 +916,7 @@ export function ProductShell({
                     always true — phone or email, one of the two is guaranteed
                     by `people_reachable_check` — and on the shared handsets
                     this product targets it says WHICH account is signed in. */}
-                {session.name !== null ? <span>{personContact(session)}</span> : null}
+                {session.name !== null ? <span data-private>{personContact(session)}</span> : null}
               </span>
             </Link>
           }
@@ -978,7 +986,11 @@ export function ProductShell({
                 <PopoverMenu
                   label="Account menu"
                   trigger={<span className="shell-avatar">{initials}</span>}
-                  header={<span data-testid="shell-session-phone">{personContact(session)}</span>}
+                  header={
+                    <span data-testid="shell-session-phone" data-private>
+                      {personContact(session)}
+                    </span>
+                  }
                   items={[
                     {
                       key: "account",
@@ -993,6 +1005,11 @@ export function ProductShell({
                       onSelect: () => {
                         router.push("/help");
                       },
+                    },
+                    {
+                      key: "report-problem",
+                      label: "Report a problem",
+                      onSelect: reportProblem,
                     },
                     // PX-1 01 §3: "(Admin: + Platform admin.)" — absent, not
                     // disabled, for everyone else. The surface 404s regardless;
@@ -1054,7 +1071,9 @@ export function ProductShell({
             }}
             title="Menu"
           >
-            <div className="shell-drawer-session">{personContact(session)}</div>
+            <div className="shell-drawer-session" data-private>
+              {personContact(session)}
+            </div>
             <ul className="shell-drawer-list">
               {orgs.map((org) => (
                 <li key={org.slug}>
@@ -1072,6 +1091,20 @@ export function ProductShell({
                 <Link href="/help" className="shell-drawer-link">
                   Help
                 </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="shell-drawer-link"
+                  onClick={() => {
+                    // Close the drawer first: the screenshot is of the page,
+                    // not of the menu that was covering it.
+                    setDrawerOpenOn(null);
+                    reportProblem();
+                  }}
+                >
+                  Report a problem
+                </button>
               </li>
               {isAdmin ? (
                 <li>

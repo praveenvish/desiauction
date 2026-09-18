@@ -81,6 +81,8 @@ let target = "";
 let orgA = "";
 let orgB = "";
 let seasonA = "";
+let reviewRequestId = "";
+let problemReportId = "";
 
 beforeAll(async () => {
   operator = await person("Privacy Operator", 1);
@@ -137,6 +139,18 @@ beforeAll(async () => {
   await sql`insert into player_profiles (id, person_id, gender) values (${newId()}, ${target}, 'male')`;
   await sql`insert into consent_records (id, person_id, purpose, granted, source)
             values (${newId()}, ${target}, 'publication', true, 'registration')`;
+  // What they told us (FR-1): a review we asked for and they wrote, and a
+  // problem report with a way to answer them.
+  reviewRequestId = newId();
+  await sql`insert into review_requests (id, person_id, source, token_hash, expires_at)
+            values (${reviewRequestId}, ${target}, 'manual_admin', ${`erasure-${RUN}`},
+                    now() + interval '30 days')`;
+  await sql`insert into reviews (id, request_id, person_id, rating, went_well)
+            values (${newId()}, ${reviewRequestId}, ${target}, 5, 'ERASEME')`;
+  problemReportId = newId();
+  await sql`insert into problem_reports (id, person_id, reply_email, category, description, page_url)
+            values (${problemReportId}, ${target}, ${`erase-${RUN}@example.test`}, 'bug',
+                    'The board froze', '/home')`;
 }, 60_000);
 
 afterAll(async () => {
@@ -144,6 +158,8 @@ afterAll(async () => {
     await purgeOrg(owner, orgId);
   }
   if (people.length > 0) {
+    await sql`delete from problem_reports where person_id = any(${people})`;
+    await sql`delete from review_requests where person_id = any(${people})`;
     await sql`delete from erasure_requests where person_id = any(${people})`;
     await sql`delete from consent_records where person_id = any(${people})`;
     await sql`delete from registrations where person_id = any(${people})`;
@@ -241,6 +257,14 @@ describe("POSTURE — erasure under the app role", () => {
     const [request] = await sql<{ status: string; decided_by: string }[]>`
       select status, decided_by from erasure_requests where id = ${requestId}`;
     expect(request).toEqual({ status: "completed", decided_by: operator });
+
+    // What they told us: the review goes with its request; the problem report
+    // is about the platform and stays, without its way to reach them.
+    expect((await sql`select 1 from review_requests where id = ${reviewRequestId}`).length).toBe(0);
+    expect((await sql`select 1 from reviews where request_id = ${reviewRequestId}`).length).toBe(0);
+    const [report] = await sql<{ reply_email: string | null; description: string }[]>`
+      select reply_email, description from problem_reports where id = ${problemReportId}`;
+    expect(report).toEqual({ reply_email: null, description: "The board froze" });
   });
 
   it("refuses the sole owner of a club rather than orphaning it", async () => {

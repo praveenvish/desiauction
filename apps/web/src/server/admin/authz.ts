@@ -135,6 +135,32 @@ export async function platformPrivacyGate(): Promise<AdminIdentity | null> {
   };
 }
 
+/**
+ * THE FIFTH DOOR — the support desk (FR-1): problem reports and reviews.
+ *
+ * Separate from every gate above: behind it are people's own words about what
+ * went wrong, their reply addresses, and screenshots of their screens. Returns
+ * null the same way, for the same reason.
+ */
+export async function platformSupportGate(): Promise<AdminIdentity | null> {
+  const session = await currentSession();
+  if (session === null) {
+    return null;
+  }
+  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
+    hasPlatformCapability(await grantsFor(db, session.personId), "platform.support"),
+  );
+  if (!allowed) {
+    return null;
+  }
+  return {
+    personId: session.personId,
+    name: session.name,
+    phone: session.phone,
+    email: session.email,
+  };
+}
+
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */
 export async function isPlatformAdmin(): Promise<boolean> {
   return (await platformAdminGate()) !== null;

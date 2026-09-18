@@ -57,10 +57,10 @@ import type { GrantLike } from "@desiauction/core";
  * out-of-band or it does not exist.
  */
 export type PlatformCapability =
-  "platform.admin" | "platform.pass" | "platform.demo" | "platform.privacy";
+  "platform.admin" | "platform.pass" | "platform.demo" | "platform.privacy" | "platform.support";
 
 export type PlatformCapabilitySet =
-  "platform:admin" | "platform:billing" | "platform:demo" | "platform:privacy";
+  "platform:admin" | "platform:billing" | "platform:demo" | "platform:privacy" | "platform:support";
 
 const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   "platform:admin": ["platform.admin"],
@@ -98,6 +98,15 @@ const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
    * inherits both structural locks unchanged.
    */
   "platform:privacy": ["platform.privacy"],
+  /**
+   * THE FIFTH SET (FR-1). Behind it: what people typed when something broke,
+   * their reply addresses, and pictures of their screens — squads, purses and
+   * names included. Seeing the platform does not license reading those, and
+   * answering demo requests does not either. Same two structural locks as every
+   * set above: the pinned singleton scope, and a grant the app role cannot
+   * insert. Seeded out-of-band or it does not exist.
+   */
+  "platform:support": ["platform.support"],
 };
 
 export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
@@ -105,6 +114,7 @@ export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
   "platform:billing",
   "platform:demo",
   "platform:privacy",
+  "platform:support",
 ];
 
 /** The singleton scope. `scope_id` is char(26); this is the nil ULID. */

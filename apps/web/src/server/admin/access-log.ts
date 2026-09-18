@@ -77,7 +77,12 @@ export type AdminSurface =
   | "erasure"
   /** The product-news list: a count, and an export of every address on it. */
   | "newsletter"
-  | "newsletter-export";
+  | "newsletter-export"
+  /** The problem-report desk (FR-1), behind `platform:support`. Opening it
+   *  reads people's reply addresses and pictures of their screens. */
+  | "reports"
+  /** The review desk (FR-1 Phase 2), also behind `platform:support`. */
+  | "reviews";
 
 /**
  * Record that an administrator opened a surface.

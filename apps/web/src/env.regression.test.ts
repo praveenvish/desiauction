@@ -57,6 +57,7 @@ const PROD_OK: Raw = {
   SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
   ENGINE_SECRET: "x".repeat(48),
   DEMO_TOKEN_SECRET: "d".repeat(48),
+  REVIEW_TOKEN_SECRET: "r".repeat(48),
   PUBLIC_BASE_URL: "https://desiauction.in",
   RP_ID: "desiauction.in",
   RP_ORIGINS: "https://desiauction.in",
