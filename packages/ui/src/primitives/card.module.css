@@ -100,9 +100,15 @@
 :global([data-surface="console"]) .card:not(.floating):not(.interactive) {
   background: transparent;
   border: 0;
-  border-top: 1px solid var(--border-subtle);
   border-radius: 0;
   box-shadow: none;
+}
+
+/* The hairline goes BETWEEN sections only: the first section on a page drew a
+   stray rule right under the header, and a section after a heading drew a
+   second one. */
+:global([data-surface="console"]) * + .card:not(.floating):not(.interactive) {
+  border-top: 1px solid var(--border-subtle);
 }
 
 :global([data-surface="console"]) .default:not(.floating):not(.interactive),

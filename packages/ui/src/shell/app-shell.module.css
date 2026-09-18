@@ -703,6 +703,17 @@ a.wordmark:hover .wordmark-glyph {
     );
   }
 
+  /* Floodlight: the same full-height column, in the navy rail's own colour. */
+  :global([data-theme="floodlight"]) .shell {
+    background: linear-gradient(
+      to right,
+      var(--identity-field-deep) 247px,
+      var(--identity-line-soft) 247px,
+      var(--identity-line-soft) 248px,
+      var(--surface) 248px
+    );
+  }
+
   :global([data-theme="daylight"]) .rail {
     --identity-field: var(--surface);
     --identity-field-deep: var(--surface);
@@ -754,4 +765,20 @@ a.wordmark:hover .wordmark-glyph {
 :global([data-theme="daylight"]) .body {
   --surface: var(--surface-raised);
   background: var(--surface-raised);
+}
+
+/* Floodlight rail (launch polish, Phase 4): the navy stays, the struck-gold
+   glowing pill goes — a quiet fill with the gold on the icon, as in daylight. */
+@media (min-width: 720px) {
+  :global([data-theme="floodlight"]) .rail-item-active,
+  :global([data-theme="floodlight"]) .rail-item-active:hover {
+    background: color-mix(in srgb, var(--identity-glyph) 10%, transparent);
+    background-image: none;
+    color: var(--identity-glyph);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--identity-glyph) 12%, transparent);
+  }
+
+  :global([data-theme="floodlight"]) .rail-item-active .rail-icon {
+    color: var(--identity-accent);
+  }
 }

@@ -47,7 +47,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             />
           ) : (
             <div className="table-scroll">
-              <table className="reg-table" data-testid="standings-table">
+              <table className="reg-table standings-table" data-testid="standings-table">
                 <thead>
                   <tr>
                     <th scope="col">#</th>

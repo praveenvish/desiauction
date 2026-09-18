@@ -26,3 +26,21 @@
 .action {
   margin-top: var(--space-3);
 }
+
+/* Console (launch polish, Phase 4): an empty state is a quiet, left-aligned
+   note with its action — a centred block half a screen tall read as a broken
+   page, and on a dense desk it pushed the real content below the fold. */
+:global([data-surface="console"]) .empty {
+  align-items: flex-start;
+  text-align: left;
+  padding: var(--space-4) 0;
+}
+
+:global([data-surface="console"]) .title {
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+}
+
+:global([data-surface="console"]) .action {
+  margin-top: var(--space-1);
+}

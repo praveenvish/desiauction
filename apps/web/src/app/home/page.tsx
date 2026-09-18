@@ -50,10 +50,9 @@ const REG_TONE: Record<string, Tone> = {
 
 function statusTone(status: string): Tone {
   switch (status) {
-    case "setup":
-      return "info";
+    // The console's one colour grammar — see STATUS_TONE in season-card.
     case "registration_open":
-      return "success";
+      return "info";
     case "registration_closed":
       return "warning";
     default:
@@ -97,7 +96,7 @@ function seasonBadge(row: { status: string; settlement: "settling" | "settled" |
     return { label: "Settled", tone: "success" };
   }
   if (row.settlement === "settling") {
-    return { label: "Settling", tone: "info" };
+    return { label: "Settling", tone: "warning" };
   }
   return { label: statusLabel(row.status), tone: statusTone(row.status) };
 }

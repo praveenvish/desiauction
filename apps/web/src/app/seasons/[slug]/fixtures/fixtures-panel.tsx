@@ -917,7 +917,7 @@ export function FixturesPanel({
               </option>
             ))}
           </Select>
-          <Button type="submit" data-testid="search-submit">
+          <Button type="submit" variant="secondary" data-testid="search-submit">
             Search
           </Button>
         </form>

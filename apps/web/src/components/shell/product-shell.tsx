@@ -63,6 +63,7 @@ import { ShellStatusContext } from "./page-status";
 import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
 import { ThemeToggle } from "./theme-toggle";
 import "./product-shell.css";
+import "./console.css";
 
 export interface ShellSession {
   name: string | null;

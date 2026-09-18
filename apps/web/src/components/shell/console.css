@@ -1,0 +1,198 @@
+/* ==========================================================================
+   CONSOLE-WIDE POLISH (launch polish, Phase 4).
+   Shared causes found by the full-surface design review (desktop, phone,
+   dark): one rule here fixes a pattern on many pages. Every rule is scoped
+   to the console surface (AppShell's data-surface) so public and live
+   shells are untouched.
+   ========================================================================== */
+
+/* One left edge. Page wrappers added their own 24px inside the shell's
+   gutter, so tabbed pages sat at 296px while titles and tabs sat at 272 —
+   and on a phone the content lost 48px to a double inset. */
+[data-surface="console"] .registrations-dash,
+[data-surface="console"] .org-home {
+  padding-inline: 0;
+}
+
+/* Stat tiles are a ruled figure strip, not a row of boxes (≈20 pages). */
+[data-surface="console"] .stat-row {
+  gap: 0;
+  border-block: 1px solid var(--border-subtle);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+[data-surface="console"] .stat-tile {
+  height: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start;
+  padding: var(--space-4) var(--space-5) var(--space-4) 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-surface="console"] .stat-row > * + * .stat-tile,
+[data-surface="console"] .stat-row > .stat-tile + .stat-tile {
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+[data-surface="console"] .stat-value {
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+[data-surface="console"] .stat-tile-link[data-active="true"] .stat-tile {
+  outline: 0;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+[data-surface="console"] .stat-tile-link:hover .stat-tile {
+  background: var(--surface-sunken);
+}
+
+/* Tables: one header style everywhere — sentence case, quiet, no band. */
+[data-surface="console"] .reg-table thead th {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+/* Native controls follow the theme: gold checks and radios, and dark
+   pickers in the dark theme (the date icon was invisible, the checkboxes
+   were glaring white squares). */
+[data-surface="console"] input[type="checkbox"],
+[data-surface="console"] input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+/* The shell's primary action steps back when the page leads with a next-step
+   banner: one ink button per screen, and the banner's is the one. */
+[data-surface="console"]:has(.home-next) [data-page-action] button,
+[data-surface="console"]:has(.home-next) [data-page-action] a {
+  background: var(--surface-raised);
+  background-image: none;
+  color: var(--text-heading);
+  border-color: var(--border-strong);
+  box-shadow: none;
+}
+
+/* Grey slabs. A filled grey box read as "disabled" or "a second card inside
+   the card"; the review counted eleven. Notes become ruled text, key-value
+   wells become a ruled grid, and only a warning keeps a tint — its own. */
+[data-surface="console"] .admin-readonly,
+[data-surface="console"] .teams-notice,
+[data-surface="console"] .auction-feasibility:not(.is-short) {
+  padding: 0 0 0 var(--space-3);
+  border: 0;
+  border-inline-start: 2px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-surface="console"] .attention-item {
+  padding: var(--space-3) 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-surface="console"] .kv-grid div,
+[data-surface="console"] .evidence-grid div {
+  padding: var(--space-2) 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-surface="console"] .override-well,
+[data-surface="console"] .share-reg {
+  padding: var(--space-4) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-surface="console"] .cockpit-warn {
+  border-color: var(--warning-base);
+  background: var(--warning-subtle);
+}
+
+/* The season overview's figure tiles: the same ruled strip as every other
+   figure row in the console, two to a line on a phone rather than four
+   full-width boxes stacked down the screen. */
+[data-surface="console"] .season-tiles {
+  gap: 0;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  border-block: 1px solid var(--border-subtle);
+}
+
+[data-surface="console"] .season-tile {
+  padding: var(--space-4) var(--space-5) var(--space-4) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-surface="console"] .season-tile + .season-tile {
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+[data-surface="console"] .season-tile-link {
+  box-shadow: inset 0 -2px 0 var(--warning-base);
+}
+
+[data-surface="console"] .season-tile-value {
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 599px) {
+  [data-surface="console"] .season-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-surface="console"] .season-tile:nth-child(odd) {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+
+  [data-surface="console"] .season-tile:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
+/* On a phone the figure strip is two to a line; the divider belongs between
+   the pair, not on whichever tile happened to start the second row. */
+@media (max-width: 599px) {
+  [data-surface="console"] .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-surface="console"] .stat-row > :nth-child(odd) .stat-tile,
+  [data-surface="console"] .stat-row > .stat-tile:nth-child(odd) {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+
+  [data-surface="console"] .stat-row > :nth-child(n + 3) .stat-tile,
+  [data-surface="console"] .stat-row > .stat-tile:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
+/* Side-by-side cards in a grid are columns, not a stack: the "between
+   sections" hairline landed on the second column only. (The :not()s lift
+   this over the console card rule.) */
+[data-surface="console"] .season-cards > :not(.x-a):not(.x-b):not(.x-c) {
+  border-top: 0;
+}

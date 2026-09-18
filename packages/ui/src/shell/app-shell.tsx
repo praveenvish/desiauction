@@ -179,7 +179,9 @@ export function AppShell({
             {/* Under 720px it wraps to its own full-width row rather than
                 competing with the title for a 390px bar. */}
             {pageAction !== undefined ? (
-              <div className={styles["page-action"]}>{pageAction}</div>
+              <div className={styles["page-action"]} data-page-action>
+                {pageAction}
+              </div>
             ) : null}
             <div className={styles["top-actions"]}>{topActions}</div>
           </div>

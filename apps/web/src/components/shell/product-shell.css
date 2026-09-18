@@ -284,3 +284,9 @@
   background: var(--accent-subtle);
   color: var(--text-accent);
 }
+
+/* The contact line was 55% of the heading ink — 3.86:1 on the warm rail,
+   under AA for 12px text. The rail's secondary ink passes. */
+[data-theme="daylight"] .shell-railuser-text span {
+  color: var(--text-secondary);
+}
