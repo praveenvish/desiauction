@@ -10,6 +10,7 @@ import {
   platformCapabilitiesOf,
   type PlatformCapability,
 } from "./capabilities";
+import { grantsOfPerson } from "../request-cache";
 
 /**
  * The one door into Platform Administration (PX-1 02 G1).
@@ -47,9 +48,7 @@ async function gateOn(capability: PlatformCapability): Promise<AdminIdentity | n
   if (session === null) {
     return null;
   }
-  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
-    hasPlatformCapability(await grantsFor(db, session.personId), capability),
-  );
+  const allowed = hasPlatformCapability(await grantsOfPerson(session.personId), capability);
   if (!allowed) {
     return null;
   }

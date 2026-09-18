@@ -36,7 +36,9 @@ const MAX_PER_PERSON_PER_HOUR = 10;
 const MAX_PER_IP_PER_HOUR = 10;
 const HOUR_MS = 60 * 60 * 1000;
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// No `?`, `&`, `%` or `#`: the address is later placed in a `mailto:` link on
+// the operator's desk, where those characters would smuggle in cc/bcc/body.
+const EMAIL_PATTERN = /^[^\s@?&%#]+@[^\s@?&%#]+\.[^\s@?&%#]+$/;
 
 /**
  * THE CONTEXT, AS A CLOSED SET.

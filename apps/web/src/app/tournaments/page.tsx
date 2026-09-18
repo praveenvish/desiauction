@@ -50,16 +50,19 @@ export default async function TournamentsPage({
 }) {
   // The sports currently switched on — the picker renders only when there is
   // more than one (SP-1 Phase 1).
-  const sportOptions = await enabledSports();
   const session = await currentSession();
   if (session === null) {
     redirect("/login?next=/tournaments");
   }
-  const params = await searchParams;
+  // Independent reads, together (they were four awaits in series).
+  const [sportOptions, params, view] = await Promise.all([
+    enabledSports(),
+    searchParams,
+    tournamentsView(),
+  ]);
   // `?view=seasons` and nothing else; anything unrecognised means the default,
   // so a mangled link lands on the hierarchy rather than an error.
   const mode: ViewMode = params.view === "seasons" ? "seasons" : "grouped";
-  const view = await tournamentsView();
   const isEmpty = view.tournaments.length === 0 && view.standalone.length === 0;
   // Membership is not permission. Every create affordance on this page is gated
   // on the orgs this person may actually create in — `org:staff` holds

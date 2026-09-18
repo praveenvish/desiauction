@@ -23,7 +23,7 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 
 import { dbHandle } from "../db";
 import { logger } from "../logger";
@@ -296,10 +296,19 @@ export async function executeErasure(input: {
     // people row is scrubbed, never deleted, so their ON DELETE rules never fire:
     // this is the constructive version of those rules.
     await tx.delete(reviewRequests).where(eq(reviewRequests.personId, personId));
+    // By person AND by address: a report filed as a guest carries no person id,
+    // only the address they typed — which is still theirs to have erased.
     await tx
       .update(problemReports)
       .set({ replyEmail: null })
-      .where(eq(problemReports.personId, personId));
+      .where(
+        before?.email !== null && before?.email !== undefined
+          ? or(
+              eq(problemReports.personId, personId),
+              eq(problemReports.replyEmail, before.email.toLowerCase()),
+            )
+          : eq(problemReports.personId, personId),
+      );
 
     // --- Consent: kept as evidence, with a withdrawal for everything granted ----
     const purposes = await tx

@@ -224,10 +224,22 @@ describe("the mail", () => {
     expect(subject).toContain("Line one");
   });
 
-  it("tells the reporter what we got without promising a fix", () => {
-    const { text } = reporterAcknowledgement(valid({ replyEmail: "ravi@example.com" }));
-    expect(text).toContain("The bid button did nothing");
+  it("acknowledges without promising a fix — and never repeats what was typed", () => {
+    // Echoing the description made the form a way to mail any text, from us,
+    // to any address typed into it.
+    const { text } = reporterAcknowledgement(
+      valid({ replyEmail: "ravi@example.com", description: "Verify at https://evil.example" }),
+    );
+    expect(text).not.toContain("evil.example");
     expect(text.toLowerCase()).not.toContain("will be fixed");
+  });
+
+  it("refuses an address that would smuggle fields into the desk's mailto link", () => {
+    const result = validateProblemReport(
+      { ...input, replyEmail: "a@b.co?cc=attacker@x.com&body=hi" },
+      "https://desiauction.in",
+    );
+    expect(result.ok).toBe(false);
   });
 });
 

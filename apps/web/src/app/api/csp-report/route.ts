@@ -1,5 +1,6 @@
 import { redactReportedUrl } from "../../../lib/csp";
 import { logger } from "../../../server/logger";
+import { readCapped } from "../../../lib/read-capped";
 
 /**
  * WHERE BROWSERS REPORT WHAT THE SCRIPT POLICY BLOCKED — or, in Report-Only,
@@ -65,14 +66,13 @@ function violationsIn(body: unknown): Violation[] {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const declared = Number(request.headers.get("content-length") ?? "0");
-  if (declared > MAX_BYTES) {
+  let text: string | null;
+  try {
+    text = await readCapped(request, MAX_BYTES);
+  } catch {
     return new Response(null, { status: 204 });
   }
-  let text: string;
-  try {
-    text = (await request.text()).slice(0, MAX_BYTES);
-  } catch {
+  if (text === null) {
     return new Response(null, { status: 204 });
   }
   let body: unknown;

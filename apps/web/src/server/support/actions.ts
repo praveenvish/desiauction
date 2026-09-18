@@ -100,7 +100,16 @@ export async function submitProblemReportAction(
     session === null
       ? "a guest"
       : `${session.name ?? "a signed-in person"} (${session.email ?? session.phone ?? session.personId})`;
-  const outcomes = await sendProblemReportMail(report, reportId, reporterLabel);
+  // A receipt only to the signed-in person's OWN address (people.email is
+  // written only once verified), and only when that is the address they gave.
+  const receiptTo =
+    session?.email !== null &&
+    session?.email !== undefined &&
+    report.replyEmail !== null &&
+    report.replyEmail === session.email.toLowerCase()
+      ? report.replyEmail
+      : null;
+  const outcomes = await sendProblemReportMail(report, reportId, reporterLabel, receiptTo);
   if (outcomes.support === "failed" || outcomes.reporter === "failed") {
     logger().error({ problemReportId: reportId, ...outcomes }, "support.report_mail_failed");
   }

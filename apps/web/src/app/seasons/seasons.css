@@ -671,8 +671,10 @@ p + .date-row {
   }
 
   /* The labelled value takes the remaining width and wraps inside it, rather
-     than pushing itself off the card's right edge. */
-  .reg-table td > *:not(::before) {
+     than pushing itself off the card's right edge. (`td > *` — the old
+     `*:not(::before)` is not valid CSS, so browsers dropped the whole rule;
+     a pseudo-element is never a child element anyway.) */
+  .reg-table td > * {
     min-width: 0;
   }
 

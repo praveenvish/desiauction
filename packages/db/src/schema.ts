@@ -214,6 +214,8 @@ export const emailVerifications = pgTable(
   (table) => [
     index("email_verifications_person_idx").on(table.personId, table.createdAt),
     index("email_verifications_ip_idx").on(table.requestIp, table.createdAt),
+    // The platform-wide send ceiling counts the last hour across every address.
+    index("email_verifications_created_idx").on(table.createdAt),
   ],
 );
 
@@ -292,6 +294,8 @@ export const otpCodes = pgTable(
   (table) => [
     index("otp_codes_phone_idx").on(table.phone, table.createdAt),
     index("otp_codes_ip_idx").on(table.requestIp, table.createdAt),
+    // The platform-wide send ceiling counts the last hour across every phone.
+    index("otp_codes_created_idx").on(table.createdAt),
   ],
 );
 

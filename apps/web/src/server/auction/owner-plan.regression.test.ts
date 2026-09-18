@@ -21,6 +21,7 @@ import {
 } from "@desiauction/core";
 import {
   auctionEvents as auctionEventsTable,
+  auctionOwnerInvites,
   auctionTeamTargetRevisions,
   auctionTeamTargets,
   auctions as auctionsTable,
@@ -57,6 +58,7 @@ import {
   type CompetitionSummary,
 } from "../competition/competitions";
 import { featureEnabled, setAuctionFeature } from "../feature-settings";
+import { participantTeamIds } from "./live-actions";
 import { createOrg } from "../orgs/orgs";
 import { auctionReady } from "./auction-ready";
 import { rulesOf } from "./live-summary";
@@ -471,6 +473,44 @@ describe("MY PLAN — plans are per team", () => {
       }),
     ).toEqual({ ok: false, reason: "unknown_target" });
     expect((await targetsOf(db, auction.id, teamA)).map((t) => t.maxBid)).toEqual([30_000_000]);
+  });
+});
+
+describe("MY PLAN — holding a paddle does not unlock someone else's plan", () => {
+  it("a paddle holder cannot open a team whose owner invite somebody else accepted", async () => {
+    // The conductor can issue themselves any team's paddle (IssuePaddle names
+    // the clicking organizer). Here ownerA holds teamA's paddle, but ownerB
+    // accepted teamA's owner invite: ownerA may still BID for teamA, and must
+    // not read or write the plan that belongs to ownerB.
+    const inviteId = newId();
+    await db.insert(auctionOwnerInvites).values({
+      id: inviteId,
+      orgId: org.id,
+      auctionId: auction.id,
+      teamId: teamA,
+      tokenHash: `test-${RUN}-${inviteId}`,
+      createdBy: organizer,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      acceptedBy: ownerB,
+      acceptedAt: new Date(),
+    });
+    try {
+      const holder = await participantTeamIds(db, auction.id, ownerA);
+      expect(holder.all).toContain(teamA);
+      expect(holder.plan).not.toContain(teamA);
+
+      const owner = await participantTeamIds(db, auction.id, ownerB);
+      expect(owner.plan).toContain(teamA);
+      // ownerB's own paddle team is nobody else's: still theirs to plan.
+      expect(owner.plan).toContain(teamB);
+    } finally {
+      await db.delete(auctionOwnerInvites).where(eq(auctionOwnerInvites.id, inviteId));
+    }
+  });
+
+  it("a held paddle for a team nobody else owns still opens its plan", async () => {
+    const holder = await participantTeamIds(db, auction.id, ownerA);
+    expect(holder.plan).toContain(teamA);
   });
 });
 

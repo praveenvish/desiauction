@@ -41,7 +41,7 @@ export type PhoneChangeRequest =
   | { ok: true }
   | {
       ok: false;
-      reason: "invalid-phone" | "same-number" | "cooldown" | "hourly-limit";
+      reason: "invalid-phone" | "same-number" | "cooldown" | "hourly-limit" | "busy";
     };
 
 /**
@@ -57,7 +57,7 @@ export type PhoneChangeRequest =
 export async function requestPhoneChange(
   db: Db,
   sender: OtpSender,
-  input: { personId: string; newPhone: string; requestIp?: string | null },
+  input: { personId: string; newPhone: string; requestIp?: string | null; globalPerHour?: number },
 ): Promise<PhoneChangeRequest> {
   const normalized = normalizePhone(input.newPhone);
   if (!normalized.ok) {
@@ -84,6 +84,7 @@ export async function requestPhoneChange(
     normalized.phone,
     input.requestIp ?? null,
     "phone_change",
+    input.globalPerHour,
   );
   return sent.ok ? { ok: true } : { ok: false, reason: sent.reason };
 }

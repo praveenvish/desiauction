@@ -35,21 +35,27 @@ export default async function AccountPage() {
     // PX-3 session-expiry UX: come back exactly here after signing in.
     redirect("/login?next=/account");
   }
-  const security = await accountSecurity();
-  const settings = await notificationSettings();
-  const email = await accountEmail();
-  const erasure = await myErasureRequest();
-  const cricketProfile = await playerProfileFor(session.personId);
-  /*
-   * One form per enabled sport, built from its pack. The specs are flattened to
-   * plain `{ key, label }` here because the packs carry functions and a
-   * function cannot cross into a client component.
-   */
-  const sportProfiles = await sportProfilesFor(session.personId);
-  // Which of them this person actually plays — a profile they filled in, or a
-  // season they entered. Every pack is still built; `SportProfiles` decides
-  // which to show and offers the rest one at a time.
-  const played = await sportsPlayedBy(session.personId);
+  // Independent reads, together: they were eight awaits in a row, so the page
+  // cost the SUM of eight round trips. Completeness needs the passkey count,
+  // so it follows.
+  const [security, settings, email, erasure, cricketProfile, sportProfiles, played] =
+    await Promise.all([
+      accountSecurity(),
+      notificationSettings(),
+      accountEmail(),
+      myErasureRequest(),
+      playerProfileFor(session.personId),
+      /*
+       * One form per enabled sport, built from its pack. The specs are flattened
+       * to plain `{ key, label }` here because the packs carry functions and a
+       * function cannot cross into a client component.
+       */
+      sportProfilesFor(session.personId),
+      // Which of them this person actually plays — a profile they filled in, or
+      // a season they entered. Every pack is still built; `SportProfiles`
+      // decides which to show and offers the rest one at a time.
+      sportsPlayedBy(session.personId),
+    ]);
   const sportForms = SPORTS.map((pack) => {
     const held = sportProfiles.find((profile) => profile.sport === pack.key);
     return {

@@ -82,6 +82,23 @@ export interface SessionInfo {
   phone: string | null;
   email: string | null;
   name: string | null;
+  /** When this session was signed in — the proof-of-presence clock for step-up. */
+  signedInAt: Date;
+}
+
+/**
+ * STEP-UP: how recently a session must have been signed in to add a way back in.
+ *
+ * Adding a passkey, moving the phone and changing the email each create a
+ * credential that SURVIVES "sign out other devices". Gated on the session
+ * alone, a stolen cookie (a shared phone, a café laptop) could plant one and
+ * come back after the victim cleaned up. Requiring a sign-in in the last
+ * fifteen minutes means the person at the keyboard just proved themselves.
+ */
+export const STEP_UP_WINDOW_MS = 15 * 60 * 1000;
+
+export function signedInRecently(session: SessionInfo, now: number = Date.now()): boolean {
+  return now - session.signedInAt.getTime() <= STEP_UP_WINDOW_MS;
 }
 
 export async function getSessionByToken(db: Db, token: string): Promise<SessionInfo | null> {
@@ -127,6 +144,7 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
     phone: row.phone,
     email: row.email,
     name: row.name,
+    signedInAt: row.createdAt,
   };
 }
 

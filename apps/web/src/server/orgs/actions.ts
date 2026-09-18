@@ -50,6 +50,7 @@ import {
   type MemberRow,
   type OrgSummary,
 } from "./orgs";
+import { orgsOfPerson } from "../request-cache";
 
 // Org-scoped internal RPC (IP-2 D7). Every action resolves the tenant from
 // the slug, requires the capability, then acts — no other path exists.
@@ -76,9 +77,7 @@ async function resolveTenantScoped(personId: string, slug: string): Promise<OrgS
 
 export async function myOrgs(): Promise<OrgSummary[]> {
   const session = await requireSession();
-  return withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    orgsFor(db, session.personId),
-  );
+  return orgsOfPerson(session.personId);
 }
 
 export interface OrgCard extends OrgSummary {

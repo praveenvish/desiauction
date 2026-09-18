@@ -435,6 +435,15 @@ export function IconPhone(props: IconProps) {
   );
 }
 
+export function IconMail(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="m3.5 7 8.5 6.25L20.5 7" />
+    </svg>
+  );
+}
+
 export function IconCamera(props: IconProps) {
   return (
     <svg {...base(props)}>

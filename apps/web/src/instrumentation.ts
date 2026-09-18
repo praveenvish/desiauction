@@ -23,6 +23,11 @@ export async function register(): Promise<void> {
          * disagree about what is sensitive.
          */
         beforeSend: (event) => scrub(event) as typeof event,
+        // Transactions are NOT errors and never pass through beforeSend. Their
+        // spans record outgoing URLs (url.full / url.query) — the SMS provider's
+        // carries the one-time code and the mobile — and incoming paths that are
+        // capability links. Same scrub, second door.
+        beforeSendTransaction: (event) => scrub(event) as typeof event,
       });
     }
     // PRR P1-1: prove RLS tenant isolation is actually load-bearing before this
