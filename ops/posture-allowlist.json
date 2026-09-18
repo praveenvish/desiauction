@@ -64,7 +64,7 @@
     },
     "apps/web/src/server/admin/pass-actions.ts": {
       "class": "by-design",
-      "reason": "Platform billing: resolves a tier change for any org, gated by platform:billing."
+      "reason": "Platform billing: the system pool answers slug to club only (an operator is a member of no club); the tier change itself runs inside withTenantDb for that club, on the app role, gated by platform:billing."
     },
     "apps/web/src/server/admin/pass-views.ts": {
       "class": "by-design",
@@ -209,6 +209,18 @@
     "apps/web/src/server/reviews/voices.ts": {
       "class": "by-design",
       "reason": "FR-1 Phase 5. The landing page's quotes: published, author-permitted PLATFORM reviews, read by an unauthenticated visitor. reviews carries no RLS and a platform review belongs to no org, so there is no tenant to scope to."
+    },
+    "apps/web/src/server/admin/moderation-views.ts": {
+      "class": "by-design",
+      "reason": "0072. Platform moderation desk projection (read-only): every public season and every held one, across all clubs \u2014 cross-tenant by definition, gated by platform:moderation."
+    },
+    "apps/web/src/server/admin/moderation-actions.ts": {
+      "class": "by-design",
+      "reason": "0072. The system pool answers one read \u2014 slug to club, which a platform operator (a member of no club) cannot ask otherwise. The hold itself is written inside withTenantDb for that club, on the app role."
+    },
+    "apps/web/src/server/admin/live-watch.ts": {
+      "class": "by-design",
+      "reason": "Platform administration live board and auction watch \u2014 cross-tenant by definition, read-only, gated by platform:admin; same shape as admin/actions.ts."
     }
   }
 }

@@ -86,6 +86,14 @@ module.exports = {
       to: { path: "^apps/web/src/server/admin/access-log\\.ts$" },
     },
     {
+      name: "admin-never-imports-engine-commands",
+      comment:
+        "Administration WATCHES live auctions; it never conducts one. `engine-client` carries the command sender and the websocket ticket signer; the read-only engine fetches live in `engine-reads`, which is all the live board needs. The day an admin surface needs to send a command, this fails and the conversation happens at review.",
+      severity: "error",
+      from: { path: "^apps/web/src/(server|app)/admin" },
+      to: { path: "^apps/web/src/server/auction/engine-client\\.ts$" },
+    },
+    {
       name: "admin-never-imports-finops-commands",
       comment:
         "PX-9: the finops server barrel carries the WRITER alongside the snapshots. Administration's views may consume snapshots (imported by name), but nothing under admin may reach the command surface of a domain package.",

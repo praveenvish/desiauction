@@ -41,14 +41,14 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
         <form className="admin-filters" method="get" role="search" data-testid="admin-org-search">
           <div className="admin-filter-grow">
             <label className="stat-label" htmlFor="admin-org-q">
-              Search organizations
+              Search organizations, seasons and tournaments
             </label>
             <input
               id="admin-org-q"
               name="q"
               type="search"
               defaultValue={query}
-              placeholder="Name or slug"
+              placeholder="Club, season or tournament"
               className="admin-search-input"
             />
           </div>
@@ -137,6 +137,11 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                           {row.name}
                         </Link>
                         <span className="admin-id">{row.slug}</span>
+                        {row.matchedSeason !== null ? (
+                          <span className="admin-match" data-testid="admin-org-matched-season">
+                            Matched: {row.matchedSeason}
+                          </span>
+                        ) : null}
                       </td>
                       <td data-label="Seasons" className="admin-count admin-num">
                         {formatCount(row.competitions)}

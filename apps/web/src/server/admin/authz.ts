@@ -4,7 +4,12 @@ import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
 import { grantsFor } from "../orgs/authz";
 import { recordAdminAccess, type AdminSurface } from "./access-log";
-import { hasPlatformCapability } from "./capabilities";
+import {
+  hasPlatformCapability,
+  PLATFORM_CAPABILITY_SETS,
+  platformCapabilitiesOf,
+  type PlatformCapability,
+} from "./capabilities";
 
 /**
  * The one door into Platform Administration (PX-1 02 G1).
@@ -32,15 +37,20 @@ export interface AdminIdentity {
   readonly email: string | null;
 }
 
-export async function platformAdminGate(): Promise<AdminIdentity | null> {
+/**
+ * Every door here is the same evaluation with a different key: resolve the
+ * session, read the person's OWN grants under RLS, and answer with an identity
+ * or with null. One implementation, so the six doors cannot drift apart.
+ */
+async function gateOn(capability: PlatformCapability): Promise<AdminIdentity | null> {
   const session = await currentSession();
   if (session === null) {
     return null;
   }
-  const admin = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
-    hasPlatformCapability(await grantsFor(db, session.personId), "platform.admin"),
+  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
+    hasPlatformCapability(await grantsFor(db, session.personId), capability),
   );
-  if (!admin) {
+  if (!allowed) {
     return null;
   }
   return {
@@ -49,6 +59,10 @@ export async function platformAdminGate(): Promise<AdminIdentity | null> {
     phone: session.phone,
     email: session.email,
   };
+}
+
+export async function platformAdminGate(): Promise<AdminIdentity | null> {
+  return gateOn("platform.admin");
 }
 
 /**
@@ -61,22 +75,7 @@ export async function platformAdminGate(): Promise<AdminIdentity | null> {
  * is a map.
  */
 export async function platformBillingGate(): Promise<AdminIdentity | null> {
-  const session = await currentSession();
-  if (session === null) {
-    return null;
-  }
-  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
-    hasPlatformCapability(await grantsFor(db, session.personId), "platform.pass"),
-  );
-  if (!allowed) {
-    return null;
-  }
-  return {
-    personId: session.personId,
-    name: session.name,
-    phone: session.phone,
-    email: session.email,
-  };
+  return gateOn("platform.pass");
 }
 
 /**
@@ -90,22 +89,7 @@ export async function platformBillingGate(): Promise<AdminIdentity | null> {
  * door that announces itself is a map.
  */
 export async function platformDemoGate(): Promise<AdminIdentity | null> {
-  const session = await currentSession();
-  if (session === null) {
-    return null;
-  }
-  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
-    hasPlatformCapability(await grantsFor(db, session.personId), "platform.demo"),
-  );
-  if (!allowed) {
-    return null;
-  }
-  return {
-    personId: session.personId,
-    name: session.name,
-    phone: session.phone,
-    email: session.email,
-  };
+  return gateOn("platform.demo");
 }
 
 /**
@@ -117,22 +101,7 @@ export async function platformDemoGate(): Promise<AdminIdentity | null> {
  * carry that power by accident. Returns null the same way as the others.
  */
 export async function platformPrivacyGate(): Promise<AdminIdentity | null> {
-  const session = await currentSession();
-  if (session === null) {
-    return null;
-  }
-  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
-    hasPlatformCapability(await grantsFor(db, session.personId), "platform.privacy"),
-  );
-  if (!allowed) {
-    return null;
-  }
-  return {
-    personId: session.personId,
-    name: session.name,
-    phone: session.phone,
-    email: session.email,
-  };
+  return gateOn("platform.privacy");
 }
 
 /**
@@ -143,22 +112,41 @@ export async function platformPrivacyGate(): Promise<AdminIdentity | null> {
  * null the same way, for the same reason.
  */
 export async function platformSupportGate(): Promise<AdminIdentity | null> {
+  return gateOn("platform.support");
+}
+
+/**
+ * THE SIXTH DOOR — the moderation desk, which can take a public page down.
+ *
+ * Overriding an organizer's decision to publish their own season is its own act
+ * of trust, so it is its own grant. Returns null the same way as the others.
+ */
+export async function platformModerationGate(): Promise<AdminIdentity | null> {
+  return gateOn("platform.moderate");
+}
+
+/**
+ * Which desks the signed-in person holds — for the Overview's "waiting on your
+ * desks" card, so it lists only work this operator can actually pick up. Read
+ * under RLS exactly like the gates; an empty set for anyone else.
+ */
+export async function heldPlatformCapabilities(): Promise<ReadonlySet<PlatformCapability>> {
   const session = await currentSession();
   if (session === null) {
-    return null;
+    return new Set();
   }
-  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
-    hasPlatformCapability(await grantsFor(db, session.personId), "platform.support"),
-  );
-  if (!allowed) {
-    return null;
-  }
-  return {
-    personId: session.personId,
-    name: session.name,
-    phone: session.phone,
-    email: session.email,
-  };
+  return withTenantDb(dbHandle, { personId: session.personId }, async (db) => {
+    const grants = await grantsFor(db, session.personId);
+    const held = new Set<PlatformCapability>();
+    for (const set of PLATFORM_CAPABILITY_SETS) {
+      for (const capability of platformCapabilitiesOf(set)) {
+        if (hasPlatformCapability(grants, capability)) {
+          held.add(capability);
+        }
+      }
+    }
+    return held;
+  });
 }
 
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */

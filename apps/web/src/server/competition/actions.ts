@@ -69,6 +69,7 @@ import {
   cloneCompetition,
   createCompetition,
   createTeam,
+  holdBlocker,
   publishBlockers,
   setCompetitionVisibility,
   setTeamCoach,
@@ -127,6 +128,7 @@ import {
   type RegistrationStats,
   type TimelineEntry,
 } from "./registrations";
+import { seasonHoldOf, type SeasonHold } from "../moderation/season-hold";
 
 // Org-scoped internal RPC (C-14, IP-3_DESIGN D1). Every action resolves the
 // session, then the tenant, then the capability, then acts — no other path.
@@ -328,6 +330,8 @@ export interface SeasonOverviewView extends SeasonOverview {
   };
   /** What still stands between this season and a public page (DA-12). */
   publishBlockers: PublishBlocker[];
+  /** Whether DesiAuction has taken the public page down (0072). Managers only. */
+  platformHold: SeasonHold | null;
 }
 
 export async function competitionView(slug: string): Promise<CompetitionView | null> {
@@ -379,7 +383,12 @@ export async function seasonOverviewView(slug: string): Promise<SeasonOverviewVi
     // (`competition.manage`); the books are `settlement.view`. Neither one is
     // implied by mere membership, which is what the old payload assumed.
     const canSeeMoney = canManage || canSettle;
-    const overview = await seasonOverview(db, competition, { money: canSeeMoney });
+    const [overview, hold] = await Promise.all([
+      seasonOverview(db, competition, { money: canSeeMoney }),
+      // The reason is addressed to the people who run the season, not to every
+      // member — gate the data, not the button.
+      canManage ? seasonHoldOf(db, competition.id) : Promise.resolve(null),
+    ]);
     return {
       ...overview,
       // `canSeeMoney` and `canSettle` are NOT the same answer, and the overview
@@ -390,7 +399,11 @@ export async function seasonOverviewView(slug: string): Promise<SeasonOverviewVi
       // was handed the page's primary call to action at the end of the night
       // and taken to "LOST BALL · This page doesn't exist".
       viewer: { canManage, canReview, canSeeMoney, canSettle },
-      publishBlockers: publishBlockers(competition),
+      publishBlockers:
+        hold === null
+          ? publishBlockers(competition)
+          : [holdBlocker(hold.reason), ...publishBlockers(competition)],
+      platformHold: hold,
     };
   });
 }
@@ -556,6 +569,14 @@ export async function setCompetitionVisibilityAction(
     return { ok: false, error: "You can't manage this competition." };
   }
   if (visibility === "public") {
+    // A platform hold first: 0072's CHECK would refuse the write anyway, but as
+    // a constraint violation inside the tenant transaction — this says why.
+    const hold = await inCompetitionOrg(session.personId, competition, (db) =>
+      seasonHoldOf(db, competition.id),
+    );
+    if (hold !== null) {
+      return { ok: false, error: holdBlocker(hold.reason).message };
+    }
     const blockers = publishBlockers(competition);
     if (blockers.length > 0) {
       return { ok: false, error: blockers[0]?.message ?? "This season isn't ready to publish." };

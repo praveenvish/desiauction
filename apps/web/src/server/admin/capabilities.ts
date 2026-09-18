@@ -57,10 +57,20 @@ import type { GrantLike } from "@desiauction/core";
  * out-of-band or it does not exist.
  */
 export type PlatformCapability =
-  "platform.admin" | "platform.pass" | "platform.demo" | "platform.privacy" | "platform.support";
+  | "platform.admin"
+  | "platform.pass"
+  | "platform.demo"
+  | "platform.privacy"
+  | "platform.support"
+  | "platform.moderate";
 
 export type PlatformCapabilitySet =
-  "platform:admin" | "platform:billing" | "platform:demo" | "platform:privacy" | "platform:support";
+  | "platform:admin"
+  | "platform:billing"
+  | "platform:demo"
+  | "platform:privacy"
+  | "platform:support"
+  | "platform:moderation";
 
 const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   "platform:admin": ["platform.admin"],
@@ -107,6 +117,19 @@ const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
    * insert. Seeded out-of-band or it does not exist.
    */
   "platform:support": ["platform.support"],
+  /**
+   * THE SIXTH SET: the moderation desk, which can take a public page down.
+   *
+   * Anybody with an email can open a club and publish a season to the open
+   * web, where search engines index it — and until this set existed the
+   * platform had no way to take one down short of editing the database by
+   * hand. Unlisting is a different act from every other power here: it
+   * overrides an organizer's own publishing decision about their own season.
+   * Seeing the platform does not license that, and neither does answering a
+   * customer. Held deliberately, seeded out-of-band like the other five, with
+   * both structural locks unchanged.
+   */
+  "platform:moderation": ["platform.moderate"],
 };
 
 export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
@@ -115,6 +138,7 @@ export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
   "platform:demo",
   "platform:privacy",
   "platform:support",
+  "platform:moderation",
 ];
 
 /** The singleton scope. `scope_id` is char(26); this is the nil ULID. */

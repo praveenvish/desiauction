@@ -82,7 +82,13 @@ export type AdminSurface =
    *  reads people's reply addresses and pictures of their screens. */
   | "reports"
   /** The review desk (FR-1 Phase 2), also behind `platform:support`. */
-  | "reviews";
+  | "reviews"
+  /** Every auction running right now, across every club. */
+  | "live"
+  /** One auction, watched: lots, bids and every team's purse. */
+  | "auction"
+  /** The moderation desk (0072), behind `platform:moderation`. */
+  | "moderation";
 
 /**
  * Record that an administrator opened a surface.

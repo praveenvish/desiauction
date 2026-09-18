@@ -498,6 +498,13 @@
       "when": 1789747200000,
       "tag": "0070_tournament_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1789920000000,
+      "tag": "0072_competition_platform_hold",
+      "breakpoints": true
     }
   ]
 }

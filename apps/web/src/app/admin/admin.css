@@ -140,6 +140,14 @@ td .admin-id {
   display: block;
 }
 
+/* Why a row matched a search it does not literally contain. */
+.admin-match {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
 .admin-evidence {
   font-family: var(--font-mono);
   font-size: var(--text-xs-size);
@@ -459,4 +467,168 @@ td .admin-id {
 .admin-sport-count {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   The live board and the auction watch.
+   --------------------------------------------------------------------------- */
+
+/* How fresh the screen is — the line that tells a quiet auction from a board
+   that stopped refreshing. The dot is static on purpose: a pulse on a screen
+   left open all night is noise, and "Refreshing automatically" already says it. */
+.admin-live-fresh {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.admin-live-fresh.is-warning {
+  color: var(--warning-strong);
+}
+
+.admin-live-fresh.is-danger {
+  color: var(--danger-strong);
+}
+
+.admin-live-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--live);
+}
+
+.admin-live-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-live-list.is-compact {
+  gap: var(--space-2);
+}
+
+.admin-live-room {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.admin-live-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.admin-live-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.admin-live-name {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.admin-live-name .admin-meta {
+  font-weight: 400;
+}
+
+.admin-watch-title {
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+}
+
+/* Label over value, as many across as fit — five facts on a desktop row,
+   two on a phone, never a horizontal scroll. */
+.admin-live-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.admin-live-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-live-facts dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.admin-live-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* Something is wrong in the room. Said in words, never by colour alone. */
+.admin-live-trouble {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--danger-base);
+  border-radius: var(--radius-sm);
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+  font-size: var(--text-sm-size);
+}
+
+.admin-tile-danger {
+  border-color: var(--danger-base);
+}
+
+.admin-tile-danger .stat-value {
+  color: var(--danger-strong);
+}
+
+/* Times and ranges are words, not mono figures — they must fit a phone tile. */
+.stat-value.admin-vital {
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+}
+
+/* A status badge that is also the way in (the auction column on an org). */
+.admin-badge-link {
+  display: inline-flex;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+.admin-badge-link:hover {
+  outline: 1px solid var(--border-interactive);
+  outline-offset: 2px;
+}
+
+.admin-badge-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

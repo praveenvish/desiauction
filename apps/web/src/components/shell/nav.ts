@@ -241,6 +241,8 @@ export const PUBLIC_DESTINATIONS: readonly {
  */
 export const ADMIN_TABS: CompetitionTab[] = [
   { key: "overview", label: "Overview", href: "/admin" },
+  // Second, because on an auction night it is the only tab that matters.
+  { key: "live", label: "Live", href: "/admin/live" },
   { key: "orgs", label: "Organizations", href: "/admin/orgs" },
   { key: "users", label: "Users", href: "/admin/users" },
   { key: "audit", label: "Audit", href: "/admin/audit" },
@@ -258,6 +260,8 @@ export const ADMIN_TABS: CompetitionTab[] = [
   { key: "demos", label: "Demos", href: "/admin/demos" },
   // Erasure sits behind `platform:privacy`, on the same rule as the two above.
   { key: "erasure", label: "Erasure", href: "/admin/erasure" },
+  // Moderation sits behind `platform:moderation`, on the same rule again.
+  { key: "moderation", label: "Moderation", href: "/admin/moderation" },
   { key: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
   // Reports sits behind `platform:support`, same rule again: present for
   // everyone, 404 without the grant.
@@ -268,6 +272,13 @@ export const ADMIN_TABS: CompetitionTab[] = [
 ];
 
 export function activeAdminTab(pathname: string): string {
+  // An auction is reached from the live board, so it lights the board's tab.
+  if (pathname.startsWith("/admin/live") || pathname.startsWith("/admin/auctions")) {
+    return "live";
+  }
+  if (pathname.startsWith("/admin/moderation")) {
+    return "moderation";
+  }
   if (pathname.startsWith("/admin/orgs")) {
     return "orgs";
   }
@@ -422,6 +433,9 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/newsletter$/, "Newsletter"],
   [/^\/admin\/reports$/, "Reports"],
   [/^\/admin\/reviews$/, "Reviews"],
+  [/^\/admin\/live$/, "Live"],
+  [/^\/admin\/auctions\/[^/]+$/, "Auction"],
+  [/^\/admin\/moderation$/, "Moderation"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.

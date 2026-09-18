@@ -25,7 +25,8 @@ import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
 import { storage } from "../media";
-import { engineWsUrl, fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-client";
+import { engineWsUrl } from "./engine-client";
+import { fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-reads";
 import { auctionMemberGate, liveGate } from "./live-actions";
 import {
   preSignedPlayers,

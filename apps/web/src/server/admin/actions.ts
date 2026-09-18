@@ -5,7 +5,8 @@ import type { OutcomeMetrics } from "@desiauction/core";
 import { env } from "../../env";
 import { systemDb } from "../db";
 import { webFinopsDeps } from "../financial-operations/deps";
-import { platformAdminGate } from "./authz";
+import { heldPlatformCapabilities, platformAdminGate } from "./authz";
+import { deskQueue, desksHeld, type DeskItem } from "./desk-queue";
 import {
   auditExplorer,
   messagingOverview,
@@ -58,6 +59,18 @@ export async function adminOverview(): Promise<PlatformOverview | null> {
     return null;
   }
   return platformOverview(deps(), systemDb);
+}
+
+/**
+ * The Overview's "waiting on your desks" card: open work on the desks THIS
+ * operator holds. `held` is read under RLS, like every gate.
+ */
+export async function adminDeskQueue(): Promise<{ items: DeskItem[]; desks: number } | null> {
+  if ((await platformAdminGate()) === null) {
+    return null;
+  }
+  const held = await heldPlatformCapabilities();
+  return { items: await deskQueue(systemDb, held), desks: desksHeld(held) };
 }
 
 /**

@@ -3,7 +3,15 @@ import { Badge, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { ADMIN_ACCESS_ACTION } from "../../server/admin/capabilities";
-import { actorLabel, formatCount, lifecycleLabel, waitedFor } from "../../server/admin/format";
+import type { DeskItem } from "../../server/admin/desk-queue";
+import {
+  actorLabel,
+  countNoun,
+  formatCount,
+  lifecycleLabel,
+  waitedFor,
+} from "../../server/admin/format";
+import type { LiveBoard } from "../../server/admin/live-views";
 import type { PlatformOverview } from "../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, statusTone } from "./admin-ui";
 
@@ -27,14 +35,22 @@ const SOURCE_LABELS: Record<string, string> = {
 export function OverviewPanel({
   overview,
   outcomes,
+  live,
+  desks,
 }: {
   overview: PlatformOverview;
   outcomes: OutcomeMetrics;
+  live: LiveBoard;
+  desks: { items: readonly DeskItem[]; desks: number };
 }) {
   const { totals, runnerVerdict, followers, attention, recent, liveAuctions } = overview;
   return (
     <>
       <ReadOnlyNotice />
+
+      <LiveNow live={live} />
+
+      {desks.desks > 0 ? <DeskCard items={desks.items} /> : null}
 
       <section aria-labelledby="admin-totals">
         <h2 className="admin-section-title" id="admin-totals">
@@ -231,6 +247,92 @@ export function OverviewPanel({
         )}
       </Card>
     </>
+  );
+}
+
+const ROOM_WORDS: Record<LiveBoard["running"][number]["state"], string> = {
+  active: "bidding",
+  quiet: "quiet",
+  paused: "paused",
+  stale: "silent",
+};
+
+/**
+ * What is live, first — before totals, before outcomes. On an auction night it
+ * is the only question; on any other day it answers itself in one line.
+ */
+function LiveNow({ live }: { live: LiveBoard }) {
+  const shown = live.running.slice(0, 5);
+  return (
+    <Card data-testid="admin-live-now">
+      <div className="admin-live-head">
+        <h2 className="admin-section-title">Live now</h2>
+        <Link href="/admin/live" className="admin-meta" data-testid="admin-live-board-link">
+          Open the live board
+          <IconArrowRight size={16} className="icon-trail" />
+        </Link>
+      </div>
+      {shown.length === 0 ? (
+        <p className="admin-meta">
+          No auction is running right now.
+          {live.stale.length > 0
+            ? ` ${countNoun(live.stale.length, "auction")} marked live ${live.stale.length === 1 ? "was" : "were"} never closed.`
+            : ""}
+        </p>
+      ) : (
+        <ul className="admin-live-list is-compact">
+          {shown.map((row) => (
+            <li key={row.auctionId} className="admin-live-row">
+              <span className="admin-live-name">
+                <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
+                <span className="admin-meta">
+                  {row.orgName} · {ROOM_WORDS[row.state]}
+                </span>
+              </span>
+              <span className="admin-meta">
+                {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in 5 min
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {live.running.length > shown.length ? (
+        <p className="admin-meta">
+          And {formatCount(live.running.length - shown.length)} more on the live board.
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
+/** Work on the desks this operator holds — the one card here they can act on. */
+function DeskCard({ items }: { items: readonly DeskItem[] }) {
+  return (
+    <Card data-testid="admin-desks">
+      <h2 className="admin-section-title">Waiting on your desks</h2>
+      {items.length === 0 ? (
+        <p className="admin-meta">Your desks are clear.</p>
+      ) : (
+        <ul className="admin-attention">
+          {items.map((item) => (
+            <li key={item.key} data-testid={`admin-desk-${item.key}`}>
+              <span className="admin-attention-subject">
+                <span>{countNoun(item.count, item.label[0], item.label[1])}</span>
+                {item.oldestAt !== null ? (
+                  <span className="admin-attention-kind">
+                    oldest <RelativeTime at={item.oldestAt} />
+                  </span>
+                ) : null}
+              </span>
+              <Link href={item.href} className="admin-meta">
+                Open
+                <IconArrowRight size={16} className="icon-trail" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

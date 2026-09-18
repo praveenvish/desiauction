@@ -252,6 +252,10 @@ It is the whole product in one evening:
    `platform:privacy` holder, granted with
    `pnpm --filter @desiauction/web seed:admin -- --set platform:privacy <phone>`)
    carries it out.
+7. During step 4 the operator watches the room on `/admin/live` and its
+   `/admin/auctions/[id]` page, and the numbers agree with the organizer's own
+   Auction tab. A `platform:moderation` holder takes the season's public page
+   down and lifts the hold again (see [ADMIN_OPERATIONS](ADMIN_OPERATIONS.md)).
 
 **Proof:** every step done by a real person on a real device, and no new
 Sentry issue. The next morning, a backup of that night is listed off-host.

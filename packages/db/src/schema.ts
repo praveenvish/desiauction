@@ -671,6 +671,18 @@ export const competitions = pgTable(
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
+    /**
+     * THE PLATFORM HOLD (0072). Set by the moderation desk when a public season
+     * page is taken down; cleared when the hold is lifted. While it is set the
+     * season cannot be public — a CHECK, not a convention — so no publishing
+     * path, present or future, can put it back on the open web. The organizer
+     * sees the reason; lifting the hold does not republish.
+     */
+    platformHoldAt: ts("platform_hold_at"),
+    platformHoldReason: text("platform_hold_reason"),
+    platformHoldBy: char("platform_hold_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("competitions_org_idx").on(table.orgId),

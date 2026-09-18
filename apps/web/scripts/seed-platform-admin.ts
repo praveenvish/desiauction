@@ -35,7 +35,8 @@ import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capa
  * somebody will pick up the phone. `platform:privacy` decides account-erasure
  * requests and runs the erasure, which cannot be undone. `platform:support`
  * reads what people told us — problem reports and reviews — and decides which
- * reviews are published. None of the five is a superset of another.
+ * reviews are published. `platform:moderation` may unlist a public season
+ * page and lift that hold. None of the six is a superset of another.
  *
  * All are platform-scoped, and RLS makes all equally uninsertable by the
  * application role: this script is the only route.
@@ -45,6 +46,7 @@ import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capa
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:demo <phone>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:privacy <phone>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:support <phone>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:moderation <phone>
  */
 const SETS = [
   "platform:admin",
@@ -52,6 +54,7 @@ const SETS = [
   "platform:demo",
   "platform:privacy",
   "platform:support",
+  "platform:moderation",
 ] as const;
 const setFlagAt = process.argv.indexOf("--set");
 const requestedSet = setFlagAt === -1 ? "platform:admin" : process.argv[setFlagAt + 1];

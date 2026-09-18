@@ -647,6 +647,12 @@ export interface OrgDirectoryRow {
   /** Whether the org has DECLARED a finops profile — the platform's own flag. */
   readonly financeDeclared: boolean;
   readonly lastActivityAt: Date | null;
+  /**
+   * When the search matched one of the org's seasons or tournaments rather than
+   * the org itself, the newest such name — so the row says WHY it is here. A
+   * support email names the tournament far more often than the club.
+   */
+  readonly matchedSeason: string | null;
 }
 
 export type OrgFilter = "all" | "finance" | "settling" | "quiet";
@@ -718,6 +724,14 @@ async function orgCursor(db: Db, after: string | undefined): Promise<SQL | undef
   );
 }
 
+/**
+ * A search term as a LIKE pattern body: `%`, `_` and the escape character
+ * itself match literally, so "u_19" finds "u_19" rather than "u119".
+ */
+function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
 export async function organizationDirectory(
   db: Db,
   options: {
@@ -729,10 +743,16 @@ export async function organizationDirectory(
   const query = (options.query ?? "").trim();
   const filter = options.filter ?? "all";
   const clauses: SQL[] = [];
+  const pattern = `%${escapeLike(query)}%`;
   if (query !== "") {
+    // Hand-written aliases, never `${table.col}` inside a raw template (PX-9
+    // finding: drizzle emits it unqualified, binding a correlated subquery to
+    // the wrong table).
     const match = or(
-      ilike(organizations.name, `%${query}%`),
-      ilike(organizations.slug, `%${query}%`),
+      ilike(organizations.name, pattern),
+      ilike(organizations.slug, pattern),
+      sql`exists (select 1 from competitions c where c.org_id = organizations.id and (c.name ilike ${pattern} or c.slug ilike ${pattern}))`,
+      sql`exists (select 1 from tournaments t where t.org_id = organizations.id and (t.name ilike ${pattern} or t.slug ilike ${pattern}))`,
     );
     if (match !== undefined) {
       clauses.push(match);
@@ -763,6 +783,20 @@ export async function organizationDirectory(
       lastActivityAt: sql<
         string | null
       >`(select max(al.at) from audit_log al where al.scope_id = organizations.id)`,
+      matchedSeason:
+        query === ""
+          ? sql<string | null>`null::text`
+          : sql<
+              string | null
+            >`case when organizations.name ilike ${pattern} or organizations.slug ilike ${pattern} then null else (
+              select m.name from (
+                select c.name, c.created_at from competitions c
+                  where c.org_id = organizations.id and (c.name ilike ${pattern} or c.slug ilike ${pattern})
+                union all
+                select t.name, t.created_at from tournaments t
+                  where t.org_id = organizations.id and (t.name ilike ${pattern} or t.slug ilike ${pattern})
+              ) m order by m.created_at desc limit 1
+            ) end`,
     })
     .from(organizations)
     .where(pageWhere)
@@ -800,7 +834,11 @@ export interface OrgCompetitionRow {
   readonly visibility: string;
   readonly createdAt: Date;
   readonly auctionStatus: string | null;
+  /** The same auction's id, for the watch page (/admin/auctions/[id]). */
+  readonly auctionId: string | null;
   readonly caseStatus: string | null;
+  /** DesiAuction has taken the season's public page down (0072). */
+  readonly held: boolean;
 }
 
 export interface OrgDetail {
@@ -852,6 +890,10 @@ export async function organizationDetail(db: Db, slug: string): Promise<OrgDetai
         auctionStatus: sql<
           string | null
         >`(select a.status from auctions a where a.competition_id = competitions.id order by a.created_at desc limit 1)`,
+        auctionId: sql<
+          string | null
+        >`(select a.id from auctions a where a.competition_id = competitions.id order by a.created_at desc limit 1)`,
+        held: sql<boolean>`competitions.platform_hold_at is not null`,
         caseStatus: sql<
           string | null
         >`(select sc.status from settlement_cases sc where sc.competition_id = competitions.id and sc.status <> 'voided' limit 1)`,

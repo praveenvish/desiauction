@@ -645,14 +645,24 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
       <Card className="season-publish-card" data-testid="visibility-row">
         <div className="season-card-head">
           <h2>Public page</h2>
-          <Badge tone={view.competition.visibility === "public" ? "success" : "neutral"}>
-            {view.competition.visibility === "public" ? "LIVE" : "Not listed"}
-          </Badge>
+          {view.platformHold !== null ? (
+            <Badge tone="danger" data-testid="platform-hold-badge">
+              Taken down
+            </Badge>
+          ) : (
+            <Badge tone={view.competition.visibility === "public" ? "success" : "neutral"}>
+              {view.competition.visibility === "public" ? "LIVE" : "Not listed"}
+            </Badge>
+          )}
         </div>
         <p className="competitions-hint">
-          {view.competition.visibility === "public"
-            ? "This season is listed publicly at /c/" + slug + " — anyone can see it and share it."
-            : "Publishing puts this season on the public directory, where players and spectators can find it."}
+          {view.platformHold !== null
+            ? "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
+            : view.competition.visibility === "public"
+              ? "This season is listed publicly at /c/" +
+                slug +
+                " — anyone can see it and share it."
+              : "Publishing puts this season on the public directory, where players and spectators can find it."}
         </p>
         {view.viewer.canManage && !canPublish && view.competition.visibility !== "public" ? (
           <ul className="season-blockers" data-testid="publish-blockers">
