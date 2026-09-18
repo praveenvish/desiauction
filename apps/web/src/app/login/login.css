@@ -360,33 +360,50 @@
   margin: 0;
 }
 
-/* The secondary door. Quiet by default — phone is the primary path and this
-   must not compete with it — but a real target size once open. */
-.login-email {
-  margin-top: var(--space-4);
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-3);
+/* THE DOOR SWITCH — Email | Mobile, one segmented control.
+   Links, not buttons: they work before hydration and keep `next`. The active
+   door is the one with aria-current, so the style follows the semantics and
+   a screen reader announces "current page" rather than a colour. */
+.login-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  margin: 0 0 var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
 }
 
-.login-email > summary {
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  padding: var(--space-2) 0;
-  /* 44px minimum touch target even though it renders as text (UX-1). */
-  min-height: 44px;
+.login-method {
   display: flex;
   align-items: center;
+  justify-content: center;
+  /* 44px: a touch target, not a text link (UX-1). */
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
-.login-email > summary:hover,
-.login-email > summary:focus-visible {
-  color: var(--text);
+.login-method:hover {
+  color: var(--text-heading);
 }
 
-.login-email-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-2);
+.login-method[aria-current="page"] {
+  /* A tint of the accent, not the accent itself: gold is the primary button's
+     colour, and the door switch must not compete with "Email me a code". */
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-raised));
+  color: var(--text-heading);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.login-method:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

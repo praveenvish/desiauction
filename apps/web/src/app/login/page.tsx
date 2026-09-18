@@ -1,10 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { env } from "../../env";
 import { currentSession } from "../../server/auth/actions";
 import { RETURNING_COOKIE } from "../../server/auth/sessions";
 import { safeNext } from "../../server/auth/redirect";
 import { LoginPanel } from "./login-form";
+import type { LoginMethod } from "./login-shared";
 import "./login.css";
 
 export const metadata = { title: "Sign in · DesiAuction" };
@@ -36,7 +38,7 @@ const TRUST_MARKS = [
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; step?: string; to?: string }>;
+  searchParams: Promise<{ next?: string; step?: string; to?: string; method?: string }>;
 }) {
   const [session, params, cookieStore] = await Promise.all([
     currentSession(),
@@ -52,7 +54,16 @@ export default async function LoginPage({
   // lands on /home — the security held, but the sentence above the form was
   // still telling the visitor they were being taken somewhere else.
   const honoredNext = next !== undefined && safeNext(next) === next && next !== "/home";
-  const initialStep = params.step === "code" && params.to !== undefined ? "code" : "phone";
+  const initialStep = params.step === "code" && params.to !== undefined ? "code" : "start";
+  // Which door. An explicit `?method=` wins; a code-step link that predates it
+  // (`?step=code&to=+91…`) is recognisably a phone one; everything else opens
+  // on LOGIN_DEFAULT_METHOD — email until SMS is live.
+  const method: LoginMethod =
+    params.method === "email" || params.method === "phone"
+      ? params.method
+      : initialStep === "code" && params.to?.startsWith("+") === true
+        ? "phone"
+        : env.LOGIN_DEFAULT_METHOD;
   return (
     <main className="login" data-theme="floodlight">
       {/* The floodlit brand panel. The scenery is decorative; the marks are not,
@@ -78,8 +89,9 @@ export default async function LoginPage({
         <div className="login-panel">
           <LoginPanel
             {...(next !== undefined ? { next } : {})}
+            method={method}
             initialStep={initialStep}
-            initialPhone={params.to ?? ""}
+            initialTo={params.to ?? ""}
             honoredNext={honoredNext}
             returning={cookieStore.get(RETURNING_COOKIE) !== undefined}
           />

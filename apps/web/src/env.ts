@@ -50,6 +50,14 @@ const envSchema = z.object({
    */
   OTP_PROVIDER: z.enum(["dev", "msg91", "whatsapp"]).default("dev"),
   /**
+   * Which door /login opens on. `email` until SMS is live: Indian SMS needs DLT
+   * registration before a single code can be sent, and an email code needs
+   * nothing. Flip to `phone` once OTP_PROVIDER carries a live provider. Either
+   * way the other door is one tab away, and `/login?method=…` overrides it.
+   * No passwords either way (C-24) — both doors send a one-time code.
+   */
+  LOGIN_DEFAULT_METHOD: z.enum(["email", "phone"]).default("email"),
+  /**
    * Platform-wide ceiling on sign-in codes minted per hour, per channel (SMS and
    * email counted separately). Stops the platform being used to pump SMS from
    * rotating addresses; see DEFAULT_GLOBAL_PER_HOUR in server/auth/otp.ts.

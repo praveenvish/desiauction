@@ -30,6 +30,20 @@ person exists). Passkeys ([PASSKEYS.md](PASSKEYS.md)) are the structural OTP-cos
 reducer after first login. All entry points are Next server actions (internal RPC,
 C-14/D7) — no public auth REST exists.
 
+**Two doors, one open at a time (2026-09-18).** Email one-time codes
+(`server/auth/email-login.ts`, 0062/0063) sign people in and up as well as phone codes
+do, and the same session results either way. `/login` opens on
+`LOGIN_DEFAULT_METHOD` — **`email` until SMS is live** (Indian SMS needs DLT
+registration before a single code can be sent; email needs none), then `phone`. The
+other door is one tab away, and `/login?method=email|phone` opens either directly. A
+player still needs a verified mobile before registering (`submitRegistration`).
+
+**C-24 reaffirmed, 2026-09-18.** Email + password was proposed again as the default
+login while SMS is blocked. The founder chose email + one-time code instead: no password
+is stored, reset or reusable, so the threat model's "N/A — no passwords" rows and the
+DPDP inventory's "passwords: never collected" stay true. Revisit only as a founder
+product decision, with PI-1 `02_GAP_ANALYSIS.md` §1.1 as the starting point.
+
 ## 2 · Phone normalization (`packages/core/src/phone.ts`)
 
 One canonical shape enters the system: **E.164 `+91XXXXXXXXXX`**. `normalizePhone()`

@@ -31,6 +31,7 @@ import { requestEmailLogin, verifyEmailLogin } from "./email-login";
 import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
+import { logger } from "../logger";
 import { safeNext } from "./redirect";
 import { ensureTermsConsent } from "./terms-consent";
 import {
@@ -392,6 +393,7 @@ export async function requestEmailLoginAction(
       );
     } catch (error) {
       if (error instanceof MailSendError) {
+        logger().warn({ reason: error.message }, "email.send_failed");
         return { ...base, error: "We couldn't send that email right now. Try again shortly." };
       }
       throw error;
@@ -518,9 +520,16 @@ export async function startPasskeyLoginAction(): Promise<PublicKeyCredentialRequ
   return options;
 }
 
+/**
+ * `target` is where to go next, decided HERE with the same `safeNext` the code
+ * paths redirect through — the passkey button used to push /home whatever the
+ * page had been asked to continue to, so "sign in to continue where you were
+ * headed" was false for exactly the fastest way in.
+ */
 export async function finishPasskeyLoginAction(
   response: AuthenticationResponseJSON,
-): Promise<{ ok: boolean }> {
+  next?: string,
+): Promise<{ ok: false } | { ok: true; target: string }> {
   const challenge = await takeChallenge();
   if (challenge === null) {
     return { ok: false };
@@ -535,7 +544,7 @@ export async function finishPasskeyLoginAction(
     return { ok: false };
   }
   await issueSessionCookie(result.personId);
-  return { ok: true };
+  return { ok: true, target: safeNext(next) };
 }
 
 /**
@@ -1053,6 +1062,7 @@ export async function requestEmailVerificationAction(
     await createCodeMailer(db).send(result.email, result.code, "email_change");
   } catch (error) {
     if (error instanceof MailSendError) {
+      logger().warn({ reason: error.message }, "email.send_failed");
       // The code is already minted and will simply go unused. Saying so beats a
       // crash screen, and beats a code step for a message that never arrived.
       return { step: "idle", error: "We couldn't send that email right now. Try again shortly." };

@@ -82,11 +82,12 @@ test("a verified email is a second way into the same account", async ({ page }) 
     .click();
   await expect(page).toHaveURL(/\/(login|$)/, { timeout: 20_000 });
 
-  await page.goto("/login");
-  // SECONDARY, and collapsed: the ordinary path stays one field and one button.
+  await page.goto("/login?method=email");
+  // One door open at a time: the email door is the current one, and it is the
+  // only form on the page.
+  await expect(page.getByTestId("login-method-email")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("login-form")).toHaveCount(0);
   const email = page.getByTestId("email-login-address");
-  await expect(email).toBeHidden();
-  await page.getByText("Use your email instead").click();
   await email.fill(EMAIL);
   await page.getByTestId("email-login-send").click();
 
@@ -108,8 +109,7 @@ test("an address nobody owns is answered exactly like one that exists", async ({
    * oracle for anybody holding a list of them. The step advances either way and
    * the wording never claims a code was sent.
    */
-  await page.goto("/login");
-  await page.getByText("Use your email instead").click();
+  await page.goto("/login?method=email");
   await page.getByTestId("email-login-address").fill(`nobody${STAMP}@example.test`);
   await page.getByTestId("email-login-send").click();
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
@@ -133,8 +133,7 @@ test("an address nobody owns creates the account it signs in to", async ({ page 
   test.setTimeout(120_000);
   const fresh = `newcomer${STAMP}@example.test`;
 
-  await page.goto("/login");
-  await page.getByText("Use your email instead").click();
+  await page.goto("/login?method=email");
   await page.getByTestId("email-login-address").fill(fresh);
   await page.getByTestId("email-login-send").click();
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
@@ -178,8 +177,7 @@ test("an email-anchored account is told to add a number before it can play", asy
   test.setTimeout(120_000);
   const player = `wouldbeplayer${STAMP}@example.test`;
 
-  await page.goto("/login");
-  await page.getByText("Use your email instead").click();
+  await page.goto("/login?method=email");
   await page.getByTestId("email-login-address").fill(player);
   await page.getByTestId("email-login-send").click();
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });

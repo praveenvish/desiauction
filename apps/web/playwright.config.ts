@@ -211,6 +211,11 @@ export default defineConfig({
         // email sign-in spec would fail against a domain that does not accept
         // them. The SMS side has had OTP_PROVIDER=dev for the same reason.
         EMAIL_PROVIDER: "dev",
+        // Production opens /login on the email door until SMS is live. Some
+        // thirty specs sign in through the phone door by its label, so the
+        // harness pins it; login-methods.spec.ts proves the email default
+        // itself through `?method=email`.
+        LOGIN_DEFAULT_METHOD: "phone",
         // `next start` boots with NODE_ENV=production, so apps/web's env guard
         // applies its PRODUCTION refinements and refuses to start on twelve of
         // them at once — a localhost PUBLIC_BASE_URL, OTP_PROVIDER=dev, no
