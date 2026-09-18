@@ -107,7 +107,10 @@ services:
   # for `postgres:17-alpine` over `:latest`, taken one step further because
   # there is no stable tag to take instead.
   minio:
-    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    # quay.io, not Docker Hub: MinIO removed minio/minio and minio/mc from Docker
+    # Hub (404 as of 2026-09-18), taking these pinned digests with it. The same
+    # digests are published on quay.io, so the image is byte-for-byte unchanged.
+    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     <<: *logs
     restart: unless-stopped
     # NO PUBLISHED PORTS. Caddy is the only way in, so the console and the
@@ -127,7 +130,7 @@ services:
   # Runs to completion and exits; `docker compose up` re-runs it on every deploy
   # and every step is idempotent.
   minio-init:
-    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     <<: *logs
     env_file: [./minio.env]
     depends_on:

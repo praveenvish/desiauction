@@ -2,13 +2,29 @@
 // on any failure. `--no-apps` limits the check to infrastructure (used by
 // setup:local before the app processes exist).
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const noApps = process.argv.includes("--no-apps");
 const sh = (cmd) => spawnSync(cmd, { shell: true, encoding: "utf8" }).status === 0;
 const http = (url) => sh(`curl -sf --max-time 3 ${url} > /dev/null`);
 
+// The port the database is published on: DB_PORT from the shell or .env.local,
+// else compose's own default. Only the label; the probe runs inside the container.
+const dbPort = (() => {
+  if (process.env.DB_PORT !== undefined) return process.env.DB_PORT;
+  try {
+    const envFile = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
+    return /^DB_PORT=(\d+)\s*$/m.exec(envFile)?.[1] ?? "5433";
+  } catch {
+    return "5433";
+  }
+})();
+
 const checks = [
-  ["database (postgres:5433)", () => sh("docker compose exec -T db pg_isready -U desiauction")],
+  [
+    `database (postgres:${dbPort})`,
+    () => sh("docker compose exec -T db pg_isready -U desiauction"),
+  ],
   ["storage  (minio:9000)", () => http("http://localhost:9000/minio/health/live")],
   ...(noApps
     ? []
