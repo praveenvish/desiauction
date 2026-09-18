@@ -20,8 +20,9 @@ import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { canCompetition } from "../competition/authz";
-import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
-import { dbHandle, systemDb } from "../db";
+import { type CompetitionSummary } from "../competition/competitions";
+import { resolveMemberCompetition } from "../competition/resolve";
+import { dbHandle } from "../db";
 import { featureEnabled } from "../feature-settings";
 import { storage } from "../media";
 import { announceAuctionOutcomes } from "./auction-notify";
@@ -147,7 +148,7 @@ export async function liveGate(slug: string): Promise<LiveGate | null> {
  */
 export async function auctionMemberGate(slug: string): Promise<LiveGate | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }

@@ -12,8 +12,8 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
-import { competitionForRegistration, resolveCompetition } from "../competition/competitions";
-import { dbHandle, systemDb } from "../db";
+import { publicCompetitionBySlug, resolveMemberCompetition } from "../competition/resolve";
+import { dbHandle } from "../db";
 import {
   ForbiddenError,
   clearPlayerPhoto,
@@ -50,7 +50,7 @@ export async function requestMediaUpload(input: UploadRequestInput): Promise<Upl
   if (!check.ok) {
     return { ok: false, error: check.error };
   }
-  const competition = await resolveCompetition(systemDb, session.personId, input.slug);
+  const competition = await resolveMemberCompetition(session.personId, input.slug);
   if (competition === null) {
     return { ok: false, error: "Competition not found." };
   }
@@ -98,7 +98,7 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
   if (session === null) {
     return { ok: false, error: "Please sign in." };
   }
-  const competition = await resolveCompetition(systemDb, session.personId, input.slug);
+  const competition = await resolveMemberCompetition(session.personId, input.slug);
   if (competition === null) {
     return { ok: false, error: "Competition not found." };
   }
@@ -174,7 +174,7 @@ export async function removePlayerPhoto(
   if (session === null) {
     return { ok: false, error: "Please sign in." };
   }
-  const competition = await resolveCompetition(systemDb, session.personId, input.slug);
+  const competition = await resolveMemberCompetition(session.personId, input.slug);
   if (competition === null) {
     return { ok: false, error: "Competition not found." };
   }
@@ -248,7 +248,7 @@ export async function requestOwnPhotoUpload(input: {
   if (!check.ok) {
     return { ok: false, error: check.error };
   }
-  const competition = await competitionForRegistration(systemDb, input.slug);
+  const competition = await publicCompetitionBySlug(input.slug);
   if (competition === null || competition.status !== "registration_open") {
     return { ok: false, error: "Registration is not open for this competition." };
   }
@@ -268,7 +268,7 @@ export async function attachOwnPhoto(input: { slug: string; key: string }): Prom
   if (session === null) {
     return { ok: false, error: "Please sign in." };
   }
-  const competition = await competitionForRegistration(systemDb, input.slug);
+  const competition = await publicCompetitionBySlug(input.slug);
   if (competition === null || competition.status !== "registration_open") {
     return { ok: false, error: "Registration is not open." };
   }

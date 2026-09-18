@@ -49,6 +49,7 @@ import { cache } from "react";
 
 import { auctionOf } from "@desiauction/auction";
 import { recordConsent } from "../messaging/consent";
+import { logger } from "../logger";
 
 import { currentSession } from "../auth/actions";
 import {
@@ -58,7 +59,7 @@ import {
   upsertSportProfile,
 } from "../player/profile";
 import { personSeasonsInOrg } from "../player/career";
-import { dbHandle, systemDb } from "../db";
+import { dbHandle } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { canSettlement } from "../settlement/authz";
 import { orgsFor } from "../orgs/orgs";
@@ -66,12 +67,9 @@ import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   advanceCompetition,
   cloneCompetition,
-  competitionForRegistration,
-  competitionsForPerson,
   createCompetition,
   createTeam,
   publishBlockers,
-  resolveCompetition,
   setCompetitionVisibility,
   setTeamCoach,
   updateTeamDetails,
@@ -82,6 +80,12 @@ import {
   type PublishBlocker,
   type TeamSummary,
 } from "./competitions";
+import {
+  memberCompetitions,
+  publicCompetitionBySlug,
+  publicRegistrationFactsBySlug,
+  resolveMemberCompetition,
+} from "./resolve";
 import { isSportEnabled } from "./sports";
 import {
   addNote,
@@ -109,7 +113,6 @@ import {
   kitSummary,
   orphanPreSigned,
   photoTargetsOf,
-  publicRegistrationFacts,
   queryRegistrations,
   recordRegistrationExport,
   registrationStats,
@@ -150,12 +153,12 @@ function formString(formData: FormData, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-/** Membership-gated slug → competition (system pool; the join is the gate). */
+/** Membership-gated slug → competition — the pre-tenant read lives in `resolve.ts`. */
 async function resolveCompetitionScoped(
   personId: string,
   slug: string,
 ): Promise<CompetitionSummary | null> {
-  return resolveCompetition(systemDb, personId, slug);
+  return resolveMemberCompetition(personId, slug);
 }
 
 function inCompetitionOrg<T>(
@@ -185,8 +188,8 @@ const competitionsViewOnce = cache(async (): Promise<CompetitionsView> => {
   const session = await requireSession();
   const [orgs, competitions] = await Promise.all([
     withTenantDb(dbHandle, { personId: session.personId }, (db) => orgsFor(db, session.personId)),
-    // Cross-org union scoped by the membership join — system pool by design.
-    competitionsForPerson(systemDb, session.personId),
+    // Cross-org union scoped by the membership join (see `resolve.ts`).
+    memberCompetitions(session.personId),
   ]);
   return { orgs: orgs.map((o) => ({ id: o.id, name: o.name })), competitions };
 });
@@ -649,7 +652,9 @@ export async function createTeamAction(
   // settlement sealed. A fifth team appearing after the hammer fell left the
   // season permanently inconsistent — five teams against a four-team auction
   // and a four-team reconciled case — and with no delete, unfixable.
-  const auction = await auctionOf(systemDb, competition.id);
+  const auction = await inCompetitionOrg(session.personId, competition, (db) =>
+    auctionOf(db, competition.id),
+  );
   if (auction !== null && auction.status !== "scheduled") {
     return {
       ok: false,
@@ -877,7 +882,7 @@ export interface RegistrationLanding {
 export async function registrationLanding(slug: string): Promise<RegistrationLanding | null> {
   const session = await requireSession();
   // Public landing lookup (documented no-membership read) — system pool.
-  const competition = await competitionForRegistration(systemDb, slug);
+  const competition = await publicCompetitionBySlug(slug);
   if (competition === null) {
     return null;
   }
@@ -912,7 +917,7 @@ export interface RegistrationPreview {
  * season, which keeps the login redirect as the behaviour for those.
  */
 export async function registrationPreview(slug: string): Promise<RegistrationPreview | null> {
-  const facts = await publicRegistrationFacts(systemDb, slug);
+  const facts = await publicRegistrationFactsBySlug(slug);
   if (facts === null) {
     return null;
   }
@@ -950,8 +955,17 @@ export async function registrationPreview(slug: string): Promise<RegistrationPre
  *
  * The same sentence the team lock uses, for the same reason.
  */
-async function auctionLocksRoster(competitionId: string): Promise<boolean> {
-  const auction = await auctionOf(systemDb, competitionId);
+async function auctionLocksRoster(
+  personId: string,
+  competition: { id: string; orgId: string },
+): Promise<boolean> {
+  // Inside the season's own boundary. For the one caller who is a PLAYER rather
+  // than a member (withdrawing themselves) that is still correct: the server
+  // resolved the season from the public link and opens its org's boundary to
+  // read one fact about it, exactly as `submitRegistration` does to write.
+  const auction = await inCompetitionOrg(personId, competition, (db) =>
+    auctionOf(db, competition.id),
+  );
   return auction !== null && auction.status !== "scheduled";
 }
 
@@ -961,7 +975,7 @@ export async function withdrawMyRegistrationAction(
   slug: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSession();
-  const competition = await competitionForRegistration(systemDb, slug);
+  const competition = await publicCompetitionBySlug(slug);
   if (competition === null) {
     return { ok: false, error: "This season is not available." };
   }
@@ -973,7 +987,7 @@ export async function withdrawMyRegistrationAction(
   }
   // A player cannot withdraw themselves out from under a live auction: they may
   // already be a lot, or already sold and paid for.
-  if (await auctionLocksRoster(competition.id)) {
+  if (await auctionLocksRoster(session.personId, competition)) {
     return {
       ok: false,
       error: "The auction has started — ask the organizer to withdraw you.",
@@ -1002,7 +1016,7 @@ export async function submitRegistrationAction(
   formData: FormData,
 ): Promise<{ error?: string; done?: boolean }> {
   const session = await requireSession();
-  const competition = await competitionForRegistration(systemDb, slug);
+  const competition = await publicCompetitionBySlug(slug);
   if (competition === null) {
     return { error: "This competition is not available." };
   }
@@ -1082,21 +1096,60 @@ export async function submitRegistrationAction(
     };
   }
   const source = formString(formData, "source");
-  const result = await withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    (db) =>
-      submitRegistration(
-        db,
-        competition.id,
-        competition.orgId,
-        session.personId,
-        role,
-        undefined,
-        profile,
-        source,
-      ),
-  );
+  const consentText = formString(formData, "publicationConsentText");
+  const guardianWording = formString(formData, "guardianConsentText");
+  /*
+   * THE REGISTRATION AND WHAT THE PERSON AGREED TO COMMIT TOGETHER, OR NOT AT ALL.
+   *
+   * The consent rows used to be written AFTER this transaction, through the
+   * system pool, inside a catch that swallowed every failure. Under the
+   * production role recipe `desiauction_system` holds no INSERT on
+   * `consent_records` (ops/db/create-app-role.sql), so that write failed on
+   * every registration and the catch hid it: players — minors among them —
+   * were entered, approved and auctioned with no publication consent, no SMS
+   * consent and no guardian consent on record, while every local suite, which
+   * connects as the database owner, stayed green.
+   *
+   * Written here instead, in the same tenant transaction as the row they are
+   * about, on the app role that can write them. A consent record for a
+   * registration that failed cannot exist (it rolls back with it), and a
+   * registration without its consent record cannot exist either — which for a
+   * child's guardian consent (DPDP §9) is the only acceptable pairing.
+   */
+  let result: Awaited<ReturnType<typeof submitRegistration>>;
+  try {
+    result = await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId: competition.orgId },
+      async (db) => {
+        const entered = await submitRegistration(
+          db,
+          competition.id,
+          competition.orgId,
+          session.personId,
+          role,
+          undefined,
+          profile,
+          source,
+        );
+        if (entered.ok) {
+          await recordRegistrationConsents(db, {
+            personId: session.personId,
+            slug,
+            publicationWording: consentText === "" ? null : consentText,
+            guardian: minor ? { name: guardianName, wording: guardianWording || null } : null,
+          });
+        }
+        return entered;
+      },
+    );
+  } catch (error) {
+    logger().error(
+      { err: error, competitionId: competition.id, personId: session.personId },
+      "registration.submit_failed",
+    );
+    return { error: "We couldn't save your registration just now. Please try again." };
+  }
   if (!result.ok) {
     return {
       error:
@@ -1125,10 +1178,9 @@ export async function submitRegistrationAction(
    *                      happens to this registration. That is the agreement,
    *                      and it is recorded rather than assumed.
    *
-   * After the write, never before: a consent record for a registration that
-   * failed is a claim about something that did not happen. And never fatal —
-   * the registration has committed, and losing the evidence must not lose the
-   * registration. It is logged as a gap instead.
+   * Written in the SAME transaction as the registration — see the note at the
+   * write above for why "after, and never fatal" was the wrong rule: under the
+   * production roles it meant "never".
    */
   /*
    * PI-1 write-back: "remember these answers" ticked means the season's
@@ -1174,49 +1226,57 @@ export async function submitRegistrationAction(
       // The profile is a convenience; the registration is the fact.
     }
   }
-  try {
-    const consentText = formString(formData, "publicationConsentText");
-    await recordConsent(systemDb, {
-      personId: session.personId,
-      purpose: "publication",
-      granted: true,
-      source: "registration",
-      evidence: {
-        competition: slug,
-        wording: consentText === "" ? null : consentText,
-      },
-    });
-    await recordConsent(systemDb, {
-      personId: session.personId,
-      purpose: "sms.transactional",
-      granted: true,
-      source: "registration",
-      evidence: {
-        competition: slug,
-        basis: "gave a mobile number to be told the outcome of this registration",
-      },
-    });
-    // PRR P0-2: the guardian consent record for a minor — timestamped, with the
-    // guardian's name and the wording actually shown, so "who consented, to
-    // what, when" is answerable later (DPDP §9 verifiable-consent evidence).
-    if (minor) {
-      await recordConsent(systemDb, {
-        personId: session.personId,
-        purpose: "guardian.consent",
-        granted: true,
-        source: "registration",
-        evidence: {
-          competition: slug,
-          guardianName,
-          wording: formString(formData, "guardianConsentText") || null,
-        },
-      });
-    }
-  } catch {
-    // Evidence must never be the thing that fails a registration that has
-    // already committed — the same rule the decision notices follow.
-  }
   return { done: true };
+}
+
+/**
+ * The consent rows a self-registration creates, on the transaction it rides.
+ *
+ * Three agreements, each its own row, because each answers a different
+ * question later: what they agreed would be PUBLISHED (with the sentence they
+ * read, not a version number), that they gave a number to be TEXTED about this
+ * registration, and — for a player under 18 — which guardian consented, in
+ * what words (PRR P0-2, DPDP §9 verifiable-consent evidence).
+ */
+async function recordRegistrationConsents(
+  db: Db,
+  input: {
+    personId: string;
+    slug: string;
+    publicationWording: string | null;
+    guardian: { name: string; wording: string | null } | null;
+  },
+): Promise<void> {
+  await recordConsent(db, {
+    personId: input.personId,
+    purpose: "publication",
+    granted: true,
+    source: "registration",
+    evidence: { competition: input.slug, wording: input.publicationWording },
+  });
+  await recordConsent(db, {
+    personId: input.personId,
+    purpose: "sms.transactional",
+    granted: true,
+    source: "registration",
+    evidence: {
+      competition: input.slug,
+      basis: "gave a mobile number to be told the outcome of this registration",
+    },
+  });
+  if (input.guardian !== null) {
+    await recordConsent(db, {
+      personId: input.personId,
+      purpose: "guardian.consent",
+      granted: true,
+      source: "registration",
+      evidence: {
+        competition: input.slug,
+        guardianName: input.guardian.name,
+        wording: input.guardian.wording,
+      },
+    });
+  }
 }
 
 // --- Registration operations dashboard (M-IP3-2) -----------------------------
@@ -1508,7 +1568,7 @@ export async function assignTeamAction(
   } catch {
     return { ok: false, error: "You can't assign teams here." };
   }
-  if (await auctionLocksRoster(competition.id)) {
+  if (await auctionLocksRoster(session.personId, competition)) {
     return { ok: false, error: ROSTER_LOCKED };
   }
   await inCompetitionOrg(session.personId, competition, (db) =>
@@ -1553,7 +1613,7 @@ export async function markRegistrationAction(
     return { ok: false, error: "You can't manage players here." };
   }
   // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
-  if (marksFreezeWithRoster(marks) && (await auctionLocksRoster(competition.id))) {
+  if (marksFreezeWithRoster(marks) && (await auctionLocksRoster(session.personId, competition))) {
     return { ok: false, error: ROSTER_LOCKED };
   }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
@@ -1607,7 +1667,9 @@ export async function updateTeamAction(
   } catch {
     return { ok: false, error: "You can't manage teams here." };
   }
-  const auction = await auctionOf(systemDb, competition.id);
+  const auction = await inCompetitionOrg(session.personId, competition, (db) =>
+    auctionOf(db, competition.id),
+  );
   if (auction !== null && auction.status !== "scheduled") {
     return {
       ok: false,
@@ -1694,7 +1756,7 @@ export async function addPlayerAction(
       role: input.role ?? "",
       basePriceBand: input.basePriceBand,
     },
-    await bandsFor(gate.competition.id),
+    await bandsFor(gate.personId, gate.competition),
     // The add-by-hand dialog offers the season's roles; the validator behind it
     // used to accept only cricket's, so the form and its own gate disagreed.
     sportPackFor(gate.competition.sport),
@@ -1734,7 +1796,7 @@ export async function addPlayerAction(
 /** The bands the Add-player form may offer — same source of truth as the CSV path. */
 export async function competitionBandsAction(slug: string): Promise<readonly string[]> {
   const gate = await reviewGate(slug);
-  return gate.ok ? bandsFor(gate.competition.id) : [];
+  return gate.ok ? bandsFor(gate.personId, gate.competition) : [];
 }
 
 // --- Bulk photo import: the match targets (files are matched client-side) ----
@@ -1823,8 +1885,13 @@ function oversized(csv: string): string | null {
  * auction exists the config is not yet locked, so the defaults are the honest
  * answer; afterwards the auction's own bands are.
  */
-async function bandsFor(competitionId: string): Promise<readonly string[]> {
-  const auction = await auctionOf(systemDb, competitionId);
+async function bandsFor(
+  personId: string,
+  competition: { id: string; orgId: string },
+): Promise<readonly string[]> {
+  const auction = await inCompetitionOrg(personId, competition, (db) =>
+    auctionOf(db, competition.id),
+  );
   return Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands);
 }
 
@@ -1836,11 +1903,16 @@ async function bandsFor(competitionId: string): Promise<readonly string[]> {
  * never seen the season. Without this a misspelt "Andheri Arrow" would import
  * as no team at all — the player silently teamless, the file reported clean.
  */
-async function teamNamesFor(competitionId: string): Promise<readonly string[]> {
-  const rows = await systemDb
-    .select({ name: teamsTable.name })
-    .from(teamsTable)
-    .where(eq(teamsTable.competitionId, competitionId));
+async function teamNamesFor(
+  personId: string,
+  competition: { id: string; orgId: string },
+): Promise<readonly string[]> {
+  const rows = await inCompetitionOrg(personId, competition, (db) =>
+    db
+      .select({ name: teamsTable.name })
+      .from(teamsTable)
+      .where(eq(teamsTable.competitionId, competition.id)),
+  );
   return rows.map((row) => row.name);
 }
 
@@ -1902,7 +1974,7 @@ export async function importInspectAction(slug: string, csv: string): Promise<Im
     sample: sampleRow(records),
     detected: detectMapping(headers),
     signature,
-    bands: [...(await bandsFor(gate.competition.id))],
+    bands: [...(await bandsFor(gate.personId, gate.competition))],
     ...(saved !== null ? { saved } : {}),
   };
 }
@@ -2051,8 +2123,8 @@ export async function importPreviewAction(
   if (tooBig !== null) {
     return { validCount: 0, errors: [{ line: 1, message: tooBig }], unplaced: [] };
   }
-  const bands = await bandsFor(gate.competition.id);
-  const teamNames = await teamNamesFor(gate.competition.id);
+  const bands = await bandsFor(gate.personId, gate.competition);
+  const teamNames = await teamNamesFor(gate.personId, gate.competition);
   const result = parseUnderShape(csv, bands, teamNames, gate.competition.sport, shape);
   /*
    * The values this season cannot place, from the SAME records the parser read.
@@ -2152,8 +2224,8 @@ export async function importCommitAction(
   // row list the browser sent, only the file plus the mapping it approved.
   const parsed = parseUnderShape(
     csv,
-    await bandsFor(gate.competition.id),
-    await teamNamesFor(gate.competition.id),
+    await bandsFor(gate.personId, gate.competition),
+    await teamNamesFor(gate.personId, gate.competition),
     gate.competition.sport,
     options?.shape,
   );
@@ -2182,7 +2254,7 @@ export async function importCommitAction(
    * a drafted player's team is decided ON auction night.
    */
   if (marksFreezeWithRoster(squadMarksIn(parsed.rows))) {
-    if (await auctionLocksRoster(gate.competition.id)) {
+    if (await auctionLocksRoster(gate.personId, gate.competition)) {
       return {
         ok: false,
         error:

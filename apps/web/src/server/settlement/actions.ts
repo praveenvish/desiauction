@@ -14,8 +14,9 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { currentSession } from "../auth/actions";
-import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
-import { dbHandle, systemDb } from "../db";
+import { type CompetitionSummary } from "../competition/competitions";
+import { resolveMemberCompetition } from "../competition/resolve";
+import { dbHandle } from "../db";
 import { can, grantsFor } from "../orgs/authz";
 import { membersOf, resolveTenant, type OrgSummary } from "../orgs/orgs";
 import { parseRupees, RUPEE_PARSE_MESSAGES } from "./amount";
@@ -198,7 +199,7 @@ interface MoneyGate {
 /** Membership + settlement.view: the one door onto every competition money screen. */
 async function moneyGate(slug: string): Promise<MoneyGate | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -609,7 +610,7 @@ async function command(
   ) => Promise<Ack>,
 ): Promise<ActionResult> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: messageFor("not_authorized") };
   }

@@ -19,9 +19,10 @@ import { withTenantDb, type Db } from "@desiauction/db";
 
 import { currentSession } from "../auth/actions";
 import { canCompetition, requireCompetitionCapability } from "../competition/authz";
-import { resolveCompetition, type CompetitionSummary } from "../competition/competitions";
+import { type CompetitionSummary } from "../competition/competitions";
+import { resolveMemberCompetition } from "../competition/resolve";
 import { ownedTeamIdsOn } from "../competition/posters";
-import { dbHandle, systemDb } from "../db";
+import { dbHandle } from "../db";
 import { featureEnabled, setAuctionFeature } from "../feature-settings";
 import { auctionReadiness, createAuction, type AuctionRecord } from "@desiauction/auction";
 import { auctionOf, auctionView, type AuctionView, type PaddleView } from "@desiauction/auction";
@@ -65,7 +66,7 @@ async function conductGate(
   { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
 > {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
@@ -254,7 +255,7 @@ function feasibilityOf(
 
 export async function auctionDashboard(slug: string): Promise<AuctionDashboard | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -532,11 +533,15 @@ async function guardFailureDetail(slug: string, command: string): Promise<string
   if (!gate.ok) {
     return "The auction isn't ready for that yet.";
   }
-  const auction = await auctionOf(systemDb, gate.competition.id);
-  if (auction === null) {
+  // Inside the season's own boundary, like every other read in this module —
+  // this was the one that reached past it to the bypass pool.
+  const readiness = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const auction = await auctionOf(db, gate.competition.id);
+    return auction === null ? null : auctionReadiness(db, auction.id, auction);
+  });
+  if (readiness === null) {
     return "The auction isn't ready for that yet.";
   }
-  const readiness = await auctionReadiness(systemDb, auction.id, auction);
   if (command === "open") {
     if (readiness.paddleCount < 2) {
       return `Only ${String(readiness.paddleCount)} paddle(s) issued — an auction needs at least two teams ready to bid.`;

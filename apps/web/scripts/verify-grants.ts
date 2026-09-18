@@ -142,7 +142,15 @@ const APP_WRITES_UNPROTECTED = [
  * account page's profile form and a 500 in production, so it is asserted by
  * name rather than trusted to default privileges.
  */
-const APP_WRITES_PERSON = ["player_profiles"];
+/*
+ * `consent_records` joined 2026-09-18. Self-registration wrote consent through
+ * the SYSTEM pool, which holds no INSERT here, and a catch hid the refusal — so
+ * under this recipe every registration committed with no consent on record,
+ * a minor's guardian consent included. The write now rides the app role inside
+ * the registration's own transaction, and this line is what keeps that grant
+ * from being assumed again.
+ */
+const APP_WRITES_PERSON = ["player_profiles", "consent_records"];
 
 function expectations(allTables: string[]): Expectation[] {
   const out: Expectation[] = [];
