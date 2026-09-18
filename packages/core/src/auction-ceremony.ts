@@ -32,7 +32,19 @@ export interface CeremonyState {
 }
 
 /** Ordered decision — earlier rules dominate (recovery > pause > lot moments). */
-export function deriveCeremony(prev: AuctionSnapshot | null, next: AuctionSnapshot): CeremonyState {
+export function deriveCeremony(
+  prev: AuctionSnapshot | null,
+  next: AuctionSnapshot,
+  /**
+   * The moment the surface is showing right now, when it has one.
+   *
+   * Optional, and only consulted for frames that carry no new moment — see the
+   * steady-state branch at the bottom. Two consecutive snapshots cannot always
+   * tell "nothing happened" from "the moment before this one was an
+   * extension", and the first answer was being given for both.
+   */
+  current?: CeremonyState,
+): CeremonyState {
   if (prev !== null && next.recoveries > prev.recoveries) {
     return { phase: "recovered", key: `recovered-${String(next.recoveries)}` };
   }
@@ -71,6 +83,32 @@ export function deriveCeremony(prev: AuctionSnapshot | null, next: AuctionSnapsh
   }
   if (lot.currentBid !== null && lot.currentBid.bidId !== (prevLot.currentBid?.bidId ?? null)) {
     return { phase: "bid", key: `bid-${lot.currentBid.bidId}` };
+  }
+  /*
+   * A FRAME WITH NO NEW MOMENT MUST NOT REPLACE THE ONE ON SCREEN.
+   *
+   * Every anti-snipe extension used to be announced for about a quarter of a
+   * second. The bid that extends a lot sets its clock to exactly the extension
+   * window and puts it back `on_block`; on the engine's very next 250 ms tick
+   * that remainder is, by definition, inside the window, so the watchdog flips
+   * the lot to `closing_soon` and broadcasts again. That second frame has the
+   * same bid and the same extension count — nothing a person would call a new
+   * moment — but it reached this branch, which answered "bid" under a NEW key.
+   * Every surface keyed on it re-fired: the stage replaced "Timer extended"
+   * with a second bid announcement, and the live region read the bid out twice.
+   *
+   * Found by `conduct-ceremony.spec.ts`, which intermittently saw "bid" where it
+   * expected "extension": it passed whenever its polling happened to land
+   * inside those 250 ms, so the flaky test was the only witness telling the
+   * truth. The extension now stays up until something actually happens — a new
+   * bid, another extension, the lot resolving or changing.
+   */
+  if (
+    current !== undefined &&
+    current.phase === "extension" &&
+    current.key === `extension-${lot.lotId}-${String(lot.extensions)}`
+  ) {
+    return current;
   }
   // Steady state: keep presenting the lot (opening pose without re-triggering).
   return {

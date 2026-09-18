@@ -188,8 +188,12 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
             if (frame.version >= versionRef.current) {
               versionRef.current = frame.version;
               setVersion(frame.version);
-              setCeremony(deriveCeremony(prevRef.current, frame.snapshot));
-              prevRef.current = frame.snapshot;
+              // `prev` is captured here, not read inside the updater: React may
+              // run the updater after the ref below has already moved on.
+              const prev = prevRef.current;
+              const next = frame.snapshot;
+              setCeremony((current) => deriveCeremony(prev, next, current));
+              prevRef.current = next;
               setSnapshot(frame.snapshot);
             }
           }
