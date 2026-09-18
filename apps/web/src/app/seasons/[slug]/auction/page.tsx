@@ -104,7 +104,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     them either. */}
                 {status !== null && dashboard.viewer.planAvailable ? (
                   <ButtonLink
-                    href={`/seasons//auction/plan`}
+                    href={`/seasons/${slug}/auction/plan`}
                     variant="secondary"
                     size="touch"
                     data-testid="open-plan"
