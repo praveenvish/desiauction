@@ -43,14 +43,18 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
 - Web DB pool `max: 10`; the admin health page fans out one snapshot set per
   finance-declared org in parallel. Fine at beta scale; size against the staging
   perf run.
-- **The daily-ops schedule fan-out is O(finance-declared orgs)**, one round trip
-  each. `runSchedulesOnce` firing the slot twice took **12.8 s against 74 finops
-  profiles** on a developer's long-lived database — the same shape as the admin
-  health page above, and the first of the two to be measured rather than
-  assumed. Harmless at beta volumes and not a correctness problem (the derived
-  dedupe key makes every fire idempotent), but it is the runner's scaling wall
-  and it should be batched, or sharded across ticks, before a few hundred
-  paying orgs exist.
+- **The daily-ops schedule fan-out is O(finance-declared orgs), by design.**
+  `runSchedulesOnce` walks `listOrgIds()` and enqueues one job per org per
+  slot, one round trip each. That is the IP-6 design, not an oversight: every
+  org's schedule must fire, so the tenant list IS the work list (ADR-3; the
+  freeze ledger, `IP-6_FREEZE.md` §10 A-1, left this loop alone on purpose
+  when it converted the two discovery scans that were NOT). Firing a slot
+  twice took **12.8 s against 74 finops profiles** on a developer's long-lived
+  database, on a runner whose slots are hours apart, and every fire is
+  idempotent through its derived dedupe key. If paying orgs ever reach the
+  hundreds, the change is a freeze amendment in the A-1 style (one batched
+  `insert … on conflict do nothing` per slot, re-proven on the IP-6 corpus),
+  not a redesign.
 - **Production perf certification not yet run** on production hardware. Local
   baselines (PVP-1 §4) pass all budgets but do not substitute.
 
