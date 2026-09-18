@@ -55,6 +55,20 @@ export default {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],
+  /*
+   * PINO RUNS FROM node_modules, NOT FROM A BUNDLE.
+   *
+   * In development the logger writes through a `pino-pretty` transport, and a
+   * pino transport runs in a worker thread that pino starts from its own file
+   * on disk (thread-stream's `lib/worker.js`). Bundled by webpack, that path
+   * points into `.next/server/vendor-chunks/lib/worker.js`, which does not
+   * exist: every logger start threw "Cannot find module …/worker.js" as an
+   * uncaughtException, the worker died, and dev logs went nowhere. Next 15.5's
+   * built-in external list does not include pino, so it is listed here. In
+   * production there is no transport, and standalone tracing still copies pino
+   * into the server's node_modules.
+   */
+  serverExternalPackages: ["pino", "pino-pretty"],
   headers() {
     return Promise.resolve([
       { source: "/:path*", headers: securityHeaders },
