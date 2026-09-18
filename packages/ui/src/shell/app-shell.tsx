@@ -24,6 +24,8 @@ export interface ShellNavItem {
   active?: boolean;
   /** Optional count chip (e.g. unread notifications). */
   badge?: number;
+  /** Happening now (an auction in progress): a LIVE marker instead of a count. */
+  live?: boolean;
 }
 
 export interface AppShellProps {
@@ -264,7 +266,12 @@ export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationIt
       >
         <span className={styles["rail-icon"]}>{item.icon}</span>
         <span className={styles["rail-label"]}>{item.label}</span>
-        {item.badge !== undefined && item.badge > 0 ? (
+        {item.live === true ? (
+          <span className={styles["rail-live"]}>
+            <span className={styles["rail-live-dot"]} aria-hidden />
+            Live
+          </span>
+        ) : item.badge !== undefined && item.badge > 0 ? (
           <span className={styles["rail-badge"]}>{item.badge}</span>
         ) : null}
       </Link>

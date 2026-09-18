@@ -6,6 +6,11 @@ import {
   Drawer,
   IconBell,
   IconArrowRight,
+  IconGavel,
+  IconGlobe,
+  IconList,
+  IconShieldCheck,
+  IconStar,
   IconChevronDown,
   IconHelp,
   IconHome,
@@ -47,6 +52,9 @@ import {
   orgMoneyTabs,
   pageIdentity,
   shellKind,
+  railFor,
+  roleNavGroups,
+  type ShellRoles,
 } from "./nav";
 import { useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
@@ -101,6 +109,8 @@ export interface ProductShellProps {
   serverAction?: ReactNode;
   /** PX-9: holder of `platform.admin` — reveals the one door into administration. */
   isAdmin?: boolean;
+  /** What this person does here (server/roles) — decides what the rail offers. */
+  roles?: ShellRoles | null;
   /** Newest person-scoped event timestamp (ISO) — drives the bell's unread dot. */
   latestEventAt?: string | null;
   /** The existing logout server action, passed through from the server layout. */
@@ -167,6 +177,14 @@ function BellLink({
     </Link>
   );
 }
+
+const ROLE_ICONS: Record<"team" | "plan" | "room" | "sports" | "find", ReactNode> = {
+  team: <IconUsers />,
+  plan: <IconList />,
+  room: <IconGavel />,
+  sports: <IconStar />,
+  find: <IconGlobe />,
+};
 
 const RAIL_ICONS: Record<string, ReactNode> = {
   home: <IconHome />,
@@ -274,6 +292,7 @@ export function ProductShell({
   competitions,
   serverAction,
   isAdmin = false,
+  roles = null,
   latestEventAt = null,
   logout,
   children,
@@ -768,7 +787,7 @@ export function ProductShell({
   }
 
   const activeKey = activeRailKey(pathname);
-  const nav: ShellNavItem[] = RAIL.map((item) => ({
+  const nav: ShellNavItem[] = railFor(roles).map((item) => ({
     ...item,
     icon: RAIL_ICONS[item.key],
     active: item.key === activeKey,
@@ -864,6 +883,18 @@ export function ProductShell({
         <AppShell
           nav={nav}
           navGroups={[
+            ...roleNavGroups(roles, pathname).map((group) => ({
+              key: group.key,
+              label: group.label,
+              items: group.items.map((item) => ({
+                key: item.key,
+                label: item.label,
+                href: item.href,
+                icon: ROLE_ICONS[item.icon],
+                active: item.active === true,
+                ...(item.live === true ? { live: true } : {}),
+              })),
+            })),
             {
               key: "utility",
               items: [
@@ -881,6 +912,19 @@ export function ProductShell({
                   icon: <IconSettings />,
                   active: pathname.startsWith("/account"),
                 },
+                // The same door the avatar menu offers, where an operator looks
+                // for it first; rendered on the same `isAdmin` evaluation.
+                ...(isAdmin
+                  ? [
+                      {
+                        key: "admin",
+                        label: "Platform admin",
+                        href: "/admin",
+                        icon: <IconShieldCheck />,
+                        active: pathname.startsWith("/admin"),
+                      },
+                    ]
+                  : []),
               ],
             },
           ]}

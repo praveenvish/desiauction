@@ -20,6 +20,7 @@ import { currentSession, logoutAction } from "../server/auth/actions";
 import { latestSecurityEventAt } from "../server/auth/security-events";
 import { competitionsView } from "../server/competition/actions";
 import { myOrgs } from "../server/orgs/actions";
+import { currentTeam, rolesOf } from "../server/roles/roles";
 import { finopsOrgIds } from "../server/financial-operations/actions";
 import { settlementOrgIds } from "../server/settlement/actions";
 
@@ -110,7 +111,7 @@ export default async function RootLayout({
   // PX-9 adds `isAdmin` to the same one-shot fan-out: the avatar menu's Platform
   // admin door is revealed by the SAME evaluation the surface gates on, so the
   // nav and the console can never disagree about who is staff.
-  const [orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, isAdmin] =
+  const [orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, isAdmin, roles] =
     session !== null
       ? await Promise.all([
           myOrgs(),
@@ -119,8 +120,30 @@ export default async function RootLayout({
           finopsOrgIds().then((ids) => new Set(ids)),
           latestSecurityEventAt(session.personId).then((at) => at?.toISOString() ?? null),
           adminNavVisible(),
+          rolesOf(session.personId),
         ])
-      : [[], null, new Set<string>(), new Set<string>(), null, false];
+      : [[], null, new Set<string>(), new Set<string>(), null, false, null];
+  // What the rail OFFERS this person (server/roles) — never what it allows.
+  const team = roles !== null ? currentTeam(roles) : null;
+  const shellRoles =
+    roles === null
+      ? null
+      : {
+          team:
+            team === null
+              ? null
+              : {
+                  name: team.teamName,
+                  seasonSlug: team.competitionSlug,
+                  live: team.auctionStatus === "live" || team.auctionStatus === "paused",
+                },
+          plays: roles.plays,
+          onlyPlays:
+            roles.plays &&
+            roles.organizes.length === 0 &&
+            roles.memberOf.length === 0 &&
+            roles.owns.length === 0,
+        };
 
   const orgSlugById = new Map(orgs.map((org) => [org.id, org.slug]));
   const competitions = (competitionsView_?.competitions ?? []).map((competition) => ({
@@ -176,6 +199,7 @@ export default async function RootLayout({
             competitions={competitions}
             serverAction={action}
             isAdmin={isAdmin}
+            roles={shellRoles}
             latestEventAt={latestEventAt}
             logout={logoutAction}
           >

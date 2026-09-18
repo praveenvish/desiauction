@@ -408,6 +408,27 @@ async function main(): Promise<void> {
   const created = await createAuction(db, cup, ready, founder, DEFAULT_AUCTION_CONFIG);
   if (!created.ok) throw new Error(`createAuction: ${created.reason}`);
   let auction = (await auctionOf(db, cupId)) as AuctionRecord;
+  // Two TEAM OWNERS, as an accepted owner invite leaves them (acceptOwnerJoin
+  // writes exactly these fields), so every role the console distinguishes can
+  // be signed into from a fresh setup: Bidder A owns Cup Kings, Bidder B owns
+  // Cup Chargers. The founder still holds both paddles below — the
+  // conductor-on-a-laptop case — which is precisely what the plan-privacy rule
+  // (planTeamIds) has to keep from turning into a view of the owners' plans.
+  for (const [index, key] of (["bidderA", "bidderB"] as const).entries()) {
+    const team = cupTeams[index];
+    if (team === undefined) continue;
+    await db.insert(auctionOwnerInvites).values({
+      id: newId(),
+      orgId,
+      auctionId: auction.id,
+      teamId: team.id,
+      tokenHash: `seed-demo-${auction.id}-${team.id}`,
+      createdBy: founder,
+      expiresAt: new Date(Date.now() + 30 * 86_400_000),
+      acceptedBy: ids[key] as string,
+      acceptedAt: new Date(),
+    });
+  }
   const cupPaddles: string[] = [];
   for (const team of cupTeams) {
     const issued = await issuePaddle(db, auction, founder, team.id, founder);
@@ -645,8 +666,8 @@ DEMO DATA READY (repeatable — rerun any time)
     founder: "org:owner + settlement:controller + finops:controller + platform:admin",
     admin: "org:owner (NOT a platform admin — /admin 404s for them)",
     organizer: "org:staff",
-    bidderA: "viewer (claims a paddle via owner invite)",
-    bidderB: "viewer (claims a paddle via owner invite)",
+    bidderA: "viewer · owner of Cup Kings (demo-cup-settled)",
+    bidderB: "viewer · owner of Cup Chargers (demo-cup-settled)",
     bidderC: "viewer (claims a paddle via owner invite)",
     viewer: "viewer",
   };

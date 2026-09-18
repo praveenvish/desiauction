@@ -631,6 +631,27 @@ a.wordmark:hover .wordmark-glyph {
     0 10px 22px -10px color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
+/* An auction in progress: the rail says so where the room is, in words, with
+   the product's live colour on the dot only (the word carries the meaning). */
+.rail-live {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: auto;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rail-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--live);
+}
+
 .rail-badge {
   flex: none;
   min-width: 20px;

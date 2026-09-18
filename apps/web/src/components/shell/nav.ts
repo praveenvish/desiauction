@@ -677,3 +677,92 @@ export function liveExit(pathname: string, hasSession: boolean): { href: string;
   }
   return { href: `/seasons/${match.slug}/auction`, label: "Leave auction" };
 }
+
+/**
+ * WHAT THE RAIL OFFERS, BY ROLE (launch polish, Phase 2).
+ *
+ * The facts come from `server/roles/roles.ts`; this only decides what to show.
+ * Offering is not allowing — every surface still gates itself — but a rail that
+ * offers a player "Tournaments" and "Organizations" (both empty for them) and
+ * nothing about the season they are actually in reads as "not for you".
+ */
+export interface ShellRoles {
+  /** The team this person owns and should see first, if any. */
+  team: { name: string; seasonSlug: string; live: boolean } | null;
+  /** Plays anywhere: a registration or a player profile. */
+  plays: boolean;
+  /** Plays and does NOTHING else — no club membership, no team. */
+  onlyPlays: boolean;
+}
+
+export interface RoleNavItem {
+  key: string;
+  label: string;
+  href: string;
+  icon: "team" | "plan" | "room" | "sports" | "find";
+  live?: boolean;
+  active?: boolean;
+}
+
+export interface RoleNavGroup {
+  key: string;
+  label: string;
+  items: RoleNavItem[];
+}
+
+/**
+ * The primary rail for this person. Someone who only plays has no use for the
+ * organizer's index pages; everyone else — including a brand-new account, who
+ * may be an organizer about to start — keeps the four.
+ */
+export function railFor(roles: ShellRoles | null): RailTarget[] {
+  if (roles?.onlyPlays === true) {
+    return RAIL.filter((item) => item.key === "home" || item.key === "help");
+  }
+  return RAIL;
+}
+
+export function roleNavGroups(roles: ShellRoles | null, pathname: string): RoleNavGroup[] {
+  if (roles === null) return [];
+  const groups: RoleNavGroup[] = [];
+  if (roles.team !== null) {
+    const base = `/seasons/${roles.team.seasonSlug}`;
+    groups.push({
+      key: "team",
+      label: "My team",
+      items: [
+        { key: "team", label: roles.team.name, href: `${base}/teams`, icon: "team" },
+        { key: "plan", label: "My plan", href: `${base}/auction/plan`, icon: "plan" },
+        {
+          key: "room",
+          label: "Auction room",
+          href: `${base}/auction/live`,
+          icon: "room",
+          live: roles.team.live,
+        },
+      ],
+    });
+  }
+  if (roles.plays) {
+    groups.push({
+      key: "play",
+      label: "Play",
+      items: [
+        { key: "sports", label: "My sports", href: "/me", icon: "sports" },
+        { key: "find", label: "Find tournaments", href: "/c", icon: "find" },
+      ],
+    });
+  }
+  // Active state by exact section: the team items are all under /seasons/{slug},
+  // so a prefix match would light all three at once.
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({
+      ...item,
+      active:
+        item.key === "sports"
+          ? pathname === "/me" || pathname.startsWith("/me/")
+          : pathname === item.href || pathname.startsWith(`${item.href}/`),
+    })),
+  }));
+}
