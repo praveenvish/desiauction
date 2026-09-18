@@ -25,10 +25,14 @@ import { organizerScheduleView } from "../../server/competition/fixture-actions"
 import { myRegistrations } from "../../server/competition/public";
 import { homeDashboard } from "../../server/home/dashboard";
 import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
+import { currentTeam, rolesOf } from "../../server/roles/roles";
 import type { HomeDashboardData, HomeStages } from "../../server/home/dashboard";
 import { CreateOrgForm } from "../orgs/create-org-form";
 import { CreateTournamentForm } from "../tournaments/create-tournament-form";
 import { HomeShortcuts } from "./home-shortcuts";
+import { chooseNextStep } from "./next-step";
+import { NextStepBanner } from "./next-step-banner";
+import { OwnerSection } from "./owner-section";
 import "./home.css";
 
 export const metadata = { title: "Home · DesiAuction" };
@@ -632,14 +636,26 @@ export default async function HomePage() {
 }
 
 async function HomeBody({ personId, name }: { personId: string; name: string }) {
-  const [view, schedule, registrationsMine, dash, hasProfile, completeness] = await Promise.all([
-    competitionsView(),
-    organizerScheduleView(),
-    myRegistrations(personId),
-    homeDashboard(),
-    hasPlayerProfile(personId),
-    profileCompletenessFor(personId),
-  ]);
+  const [view, schedule, registrationsMine, dash, hasProfile, completeness, roles] =
+    await Promise.all([
+      competitionsView(),
+      organizerScheduleView(),
+      myRegistrations(personId),
+      homeDashboard(),
+      hasPlayerProfile(personId),
+      profileCompletenessFor(personId),
+      rolesOf(personId),
+    ]);
+  /*
+   * WHO IS READING (launch polish, Phase 2). The organizer dashboard below —
+   * lifecycle, attention, money, seasons, activity — is for people who MANAGE a
+   * club. A team owner, a plain member and a player used to get it too, with an
+   * offer to create tournaments they had no power to create.
+   */
+  const manages = roles.organizes.length > 0;
+  const brandNew =
+    !manages && roles.memberOf.length === 0 && roles.owns.length === 0 && !roles.plays;
+  const team = currentTeam(roles);
   // PI-1: nudge only someone the platform can see IS a player (a registration
   // or a profile row); a pure organizer's home never asks for a bowling style.
   const showProfileNudge =
@@ -671,9 +687,11 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
   // ordering between its items. `Promise.all` collapses it to one.
   // The live hero's read rides in the same batch: it depends on nothing the
   // scan does, and awaiting it first added one more round trip in series.
-  const scanned = view.competitions.slice(0, ATTENTION_SCAN_LIMIT);
+  // Only managers are asked what is waiting on them: for anyone else every
+  // row would come back empty after a composite read per season.
+  const scanned = manages ? view.competitions.slice(0, ATTENTION_SCAN_LIMIT) : [];
   const [liveBoard, scannedRows] = await Promise.all([
-    liveRow === null
+    liveRow === null || !manages
       ? Promise.resolve(null)
       : auctionDashboard(liveRow.competitionSlug).then((board) => board?.overview ?? null),
     Promise.all(scanned.map((competition) => attentionFor(competition, dash))),
@@ -689,11 +707,23 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
   const liveCount = dash.auctions.filter((auction) => auction.status === "live").length;
 
   // Portfolio context belongs in the header line, not in a card of its own.
-  const headline = [
-    `${String(dash.stats.competitions)} season${dash.stats.competitions === 1 ? "" : "s"}`,
-    ...(openCount > 0 ? [`${String(openCount)} accepting entries`] : []),
-    ...(liveCount > 0 ? [`${String(liveCount)} auction live now`] : []),
-  ].join(" · ");
+  const headline = manages
+    ? [
+        `${String(dash.stats.competitions)} season${dash.stats.competitions === 1 ? "" : "s"}`,
+        ...(openCount > 0 ? [`${String(openCount)} accepting entries`] : []),
+        ...(liveCount > 0 ? [`${String(liveCount)} auction live now`] : []),
+      ].join(" · ")
+    : [
+        ...(team !== null ? [`Owner · ${team.teamName}`] : []),
+        ...(roles.plays
+          ? [
+              `${String(registrationsMine.length)} season${registrationsMine.length === 1 ? "" : "s"} played`,
+            ]
+          : []),
+        ...(roles.memberOf.length > 0 && team === null
+          ? [`Member of ${roles.memberOf.map((club) => club.name).join(", ")}`]
+          : []),
+      ].join(" · ") || "Welcome";
 
   /* ---- where this organizer actually is ---------------------------------
    *
@@ -790,7 +820,26 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
   // "first unfinished rung exists" would then keep the ladder on screen over a
   // mature account with a live auction behind it.
   const currentRung = rungs.findIndex((rung) => !rung.done);
-  const laddering = currentRung !== -1 && !(rungs[rungs.length - 1]?.done ?? false);
+  // The ladder is an ORGANIZER's first-run guide. A brand-new account chooses a
+  // path first (the next-step banner); a player or a member never climbs it.
+  const laddering = manages && currentRung !== -1 && !(rungs[rungs.length - 1]?.done ?? false);
+
+  const latest = registrationsMine[registrationsMine.length - 1] ?? null;
+  const nextStep = laddering
+    ? null
+    : chooseNextStep({
+        ownedTeam: team,
+        managedLive:
+          manages && liveRow !== null
+            ? { competitionSlug: liveRow.competitionSlug, competitionName: liveRow.competitionName }
+            : null,
+        attention,
+        latestEntry:
+          latest === null
+            ? null
+            : { competitionName: latest.competitionName, status: latest.status },
+        brandNew,
+      });
 
   /* ---- which panels have earned their space ------------------------------
    *
@@ -806,7 +855,10 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
     (value) => value > 0,
   ).length;
   const showChart = chartDays >= 2;
-  const showAttention = !laddering;
+  // The banner already leads with the first thing waiting; the panel lists only
+  // what comes after it, and steps aside entirely when nothing does.
+  const restAttention = nextStep?.key === "organizer-attention" ? attention.slice(1) : attention;
+  const showAttention = !laddering && (nextStep === null || restAttention.length > 0);
   const showMoney = moneyTotal > 0;
   const showSeasons = dash.top.length > 0;
   const showAuctions = otherAuctions.length > 0 || (!laddering && liveRow === null);
@@ -830,10 +882,12 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
           render instead of growing a row once hydration published it here. */}
 
       {laddering ? <SetupLadder rungs={rungs} current={currentRung} /> : null}
+      {nextStep !== null ? <NextStepBanner step={nextStep} /> : null}
+      {team !== null ? <OwnerSection team={team} /> : null}
 
       <>
         {/* ---- the night in progress: nothing outranks a live auction ---- */}
-        {liveRow !== null ? (
+        {manages && liveRow !== null ? (
           <section
             className={`home-live${liveDone ? " home-live--done" : ""}`}
             aria-labelledby="home-live-name"
@@ -925,35 +979,39 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
             teaching device on the screen — the whole product in one row — and
             it used to appear only once the reader already understood the
             model. */}
-        <section
-          className={`home-flow${laddering ? " home-flow--map" : ""}`}
-          aria-label="Season lifecycle"
-        >
-          {lifecycleFor(dash).map((stage, index) => {
-            const count = stage.count;
-            return (
-              <Fragment key={stage.key}>
-                {index > 0 ? <span className="home-step-sep" aria-hidden /> : null}
-                <Link
-                  href={stage.href}
-                  className={`home-step${count > 0 ? " home-step--on" : ""}`}
-                  style={{ ["--step" as string]: String(index + 1) }}
-                >
-                  <span className={`home-ic home-ic--${stage.tone} home-ic--sm`}>{stage.icon}</span>
-                  <span className="home-step-text">
-                    <span className="home-step-head">
-                      <span className="home-step-name">{stage.name}</span>
-                      <span className="home-step-count">{count}</span>
+        {manages ? (
+          <section
+            className={`home-flow${laddering ? " home-flow--map" : ""}`}
+            aria-label="Season lifecycle"
+          >
+            {lifecycleFor(dash).map((stage, index) => {
+              const count = stage.count;
+              return (
+                <Fragment key={stage.key}>
+                  {index > 0 ? <span className="home-step-sep" aria-hidden /> : null}
+                  <Link
+                    href={stage.href}
+                    className={`home-step${count > 0 ? " home-step--on" : ""}`}
+                    style={{ ["--step" as string]: String(index + 1) }}
+                  >
+                    <span className={`home-ic home-ic--${stage.tone} home-ic--sm`}>
+                      {stage.icon}
                     </span>
-                    <span className="home-step-blurb">{stage.detail}</span>
-                  </span>
-                </Link>
-              </Fragment>
-            );
-          })}
-        </section>
+                    <span className="home-step-text">
+                      <span className="home-step-head">
+                        <span className="home-step-name">{stage.name}</span>
+                        <span className="home-step-count">{count}</span>
+                      </span>
+                      <span className="home-step-blurb">{stage.detail}</span>
+                    </span>
+                  </Link>
+                </Fragment>
+              );
+            })}
+          </section>
+        ) : null}
 
-        {showLeft || showRight ? (
+        {manages && (showLeft || showRight) ? (
           <div className={`home-main${showLeft && showRight ? "" : " home-main--single"}`}>
             {/* ================= LEFT ================= */}
             {showLeft ? (
@@ -961,28 +1019,30 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                 {showAttention ? (
                   <Card
                     data-testid="attention-queue"
-                    className={attention.length > 0 ? "home-panel home-panel--alert" : "home-panel"}
+                    className={
+                      restAttention.length > 0 ? "home-panel home-panel--alert" : "home-panel"
+                    }
                   >
                     <div className="home-head">
                       <SectionHeader title="Needs attention" />
-                      {attention.length > 0 ? (
+                      {restAttention.length > 0 ? (
                         <span className="home-count" aria-live="polite">
-                          {attention.length}
+                          {restAttention.length}
                           <VisuallyHidden>
                             {" "}
-                            item{attention.length === 1 ? "" : "s"} needing attention
+                            item{restAttention.length === 1 ? "" : "s"} needing attention
                           </VisuallyHidden>
                         </span>
                       ) : null}
                     </div>
-                    {attention.length === 0 ? (
+                    {restAttention.length === 0 ? (
                       <PanelEmpty
                         icon={<Glyph d={G.check} />}
                         text="All clear — nothing is waiting on you."
                       />
                     ) : (
                       <ul className="home-list">
-                        {attention.map((row) => (
+                        {restAttention.map((row) => (
                           <li key={row.key}>
                             <Link href={row.href} className="home-attn">
                               <span className="home-ic home-ic--warn home-ic--sm">
@@ -1376,6 +1436,38 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
               </div>
             ) : null}
           </div>
+        ) : null}
+
+        {/* A member who manages nothing still belongs to a club: its seasons,
+            as plain doors, without the organizer's figures or offers. */}
+        {!manages && view.competitions.length > 0 ? (
+          <section className="home-member" aria-labelledby="home-member-title">
+            <header className="home-flat-head">
+              <h2 id="home-member-title" className="home-flat-title">
+                Seasons in your {roles.memberOf.length === 1 ? "club" : "clubs"}
+              </h2>
+            </header>
+            <ul className="home-rows">
+              {view.competitions.map((competition) => (
+                <li key={competition.id}>
+                  <Link href={`/seasons/${competition.slug}`} className="home-row">
+                    <span className="home-row-main">
+                      <strong>{competition.name}</strong>
+                      <span>{competition.orgName}</span>
+                    </span>
+                    {(() => {
+                      const top = dash.top.find((row) => row.slug === competition.slug);
+                      const badge = seasonBadge({
+                        status: competition.status,
+                        settlement: top?.settlement ?? null,
+                      });
+                      return <Badge tone={badge.tone}>{badge.label}</Badge>;
+                    })()}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         <HomeShortcuts
