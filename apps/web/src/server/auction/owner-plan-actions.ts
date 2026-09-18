@@ -67,7 +67,7 @@ async function planGate(
   if (gate === null) {
     return null;
   }
-  const teamId = pickPlanTeam(gate.myTeamIds, requestedTeamId);
+  const teamId = pickPlanTeam(gate.planTeamIds, requestedTeamId);
   return teamId === null ? null : { gate, teamId };
 }
 
@@ -137,7 +137,7 @@ export async function planView(
         db
           .select({ id: teams.id, name: teams.name })
           .from(teams)
-          .where(inArray(teams.id, gate.myTeamIds)),
+          .where(inArray(teams.id, gate.planTeamIds)),
         planLots(db, gate.auction.id),
         targetsOf(db, gate.auction.id, gated.teamId),
         preSignedPlayers(db, gate.competition.id),

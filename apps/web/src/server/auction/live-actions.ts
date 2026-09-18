@@ -15,7 +15,7 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -65,6 +65,8 @@ interface LiveGate {
    * not being in it.
    */
   myTeamIds: string[];
+  /** Teams whose private plan this person may open — see participantTeamIds. */
+  planTeamIds: string[];
 }
 
 /**
@@ -75,8 +77,12 @@ interface LiveGate {
  * already hold its paddle. Mere org membership is not one of them — which is
  * the whole point of this function existing.
  */
-async function participantTeamIds(dbc: Db, auctionId: string, personId: string): Promise<string[]> {
-  const [ownedRows, grantRows, paddleRows] = await Promise.all([
+export async function participantTeamIds(
+  dbc: Db,
+  auctionId: string,
+  personId: string,
+): Promise<{ all: string[]; plan: string[] }> {
+  const [ownedRows, grantRows, paddleRows, ownedByOthers] = await Promise.all([
     dbc
       .select({ teamId: auctionOwnerInvites.teamId })
       .from(auctionOwnerInvites)
@@ -107,8 +113,33 @@ async function participantTeamIds(dbc: Db, auctionId: string, personId: string):
           isNull(paddles.releasedAt),
         ),
       ),
+    dbc
+      .select({ teamId: auctionOwnerInvites.teamId })
+      .from(auctionOwnerInvites)
+      .where(
+        and(
+          eq(auctionOwnerInvites.auctionId, auctionId),
+          isNotNull(auctionOwnerInvites.acceptedBy),
+          ne(auctionOwnerInvites.acceptedBy, personId),
+          isNull(auctionOwnerInvites.revokedAt),
+        ),
+      ),
   ]);
-  return [...new Set([...ownedRows, ...grantRows, ...paddleRows].map((row) => row.teamId))];
+  const all = [...new Set([...ownedRows, ...grantRows, ...paddleRows].map((row) => row.teamId))];
+  /*
+   * WHOSE PLAN MAY THIS PERSON OPEN — a narrower question than "which paddles
+   * may they raise". Holding a paddle is something a conductor can arrange for
+   * themselves (IssuePaddle hardcodes the clicking organizer as holder), so it
+   * cannot be what unlocks a team's private plan when somebody ELSE accepted
+   * that team's owner invite: the organizer would otherwise read and edit the
+   * owner's max bids by issuing themselves the paddle. Owner invite and paddle
+   * grant are acts naming this person; a held paddle counts only for a team
+   * nobody else owns (the conductor running an ownerless team from a laptop).
+   */
+  const others = new Set(ownedByOthers.map((row) => row.teamId));
+  const named = new Set([...ownedRows, ...grantRows].map((row) => row.teamId));
+  const plan = all.filter((teamId) => named.has(teamId) || !others.has(teamId));
+  return { all, plan };
 }
 
 /**
@@ -161,7 +192,7 @@ export async function auctionMemberGate(slug: string): Promise<LiveGate | null> 
         return null;
       }
       const scope = { orgId: competition.orgId, competitionId: competition.id };
-      const [canConduct, canOverride, myTeamIds] = await Promise.all([
+      const [canConduct, canOverride, teamsOf] = await Promise.all([
         canCompetition(db, session.personId, scope, "auction.conduct"),
         canCompetition(db, session.personId, scope, "auction.override"),
         participantTeamIds(db, auction.id, session.personId),
@@ -172,7 +203,8 @@ export async function auctionMemberGate(slug: string): Promise<LiveGate | null> 
         auction,
         canConduct,
         canOverride,
-        myTeamIds,
+        myTeamIds: teamsOf.all,
+        planTeamIds: teamsOf.plan,
       };
     },
   );
@@ -274,7 +306,7 @@ async function livePlanFor(
   db: Db,
   gate: LiveGate,
 ): Promise<{ available: boolean; plan: LivePlan | null }> {
-  if (gate.myTeamIds.length === 0) {
+  if (gate.planTeamIds.length === 0) {
     return { available: false, plan: null };
   }
   const feature = await featureEnabled(db, "my_plan", {
@@ -286,10 +318,10 @@ async function livePlanFor(
   }
   const [lotRows, ...targetLists] = await Promise.all([
     planLots(db, gate.auction.id),
-    ...gate.myTeamIds.map((teamId) => targetsOf(db, gate.auction.id, teamId)),
+    ...gate.planTeamIds.map((teamId) => targetsOf(db, gate.auction.id, teamId)),
   ]);
   const targetsByTeam = Object.fromEntries(
-    gate.myTeamIds.map((teamId, index) => [teamId, targetLists[index] ?? []]),
+    gate.planTeamIds.map((teamId, index) => [teamId, targetLists[index] ?? []]),
   );
   const anyTargets = Object.values(targetsByTeam).some((list) => list.length > 0);
   return {
