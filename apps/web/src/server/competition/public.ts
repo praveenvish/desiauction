@@ -1,4 +1,4 @@
-import { deriveAge, isMinor } from "@desiauction/core";
+import { deriveAge, describeAttributes, isMinor } from "@desiauction/core";
 import {
   auctionEvents,
   auctions,
@@ -167,6 +167,15 @@ export interface ShowcasePlayer {
   age: number | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
+  /**
+   * The season's OTHER optional detail, already labelled by its sport pack.
+   *
+   * Cricket's two styles keep the named fields above — they predate the
+   * registry and have consumers of their own. Every sport since writes here,
+   * and until now the public card had no way to show a footballer's preferred
+   * foot because nothing collected it and nothing read it.
+   */
+  attributes: { key: string; label: string; value: string }[];
   /** Consent-gated (null unless photo_consent_at is set — DPDP §5). */
   photoUrl: string | null;
   /**
@@ -185,6 +194,7 @@ interface ShowcaseRow {
   dateOfBirth: string | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
+  attributes: unknown;
   photoKey: string | null;
   photoConsentAt: Date | null;
   teamId: string | null;
@@ -204,7 +214,7 @@ interface ShowcaseRow {
  * flag is checked FIRST because it is the fact that decides biddability; the
  * team assignment only decides which name to print.
  */
-function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
+function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePlayer {
   // PRR P0-2 (DPDP Act 2023 §9): a minor's personal data may not be published on
   // a public, unauthenticated surface. This is the one chokepoint the public
   // player page AND the OG/Twitter share card both read, so suppressing the
@@ -220,6 +230,12 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
     age: minor ? null : deriveAge(r.dateOfBirth, now),
     battingStyle: r.battingStyle,
     bowlingStyle: r.bowlingStyle,
+    // Nothing here is a minor's data: these are playing facts, not identity,
+    // and they sit outside the `minor` gate for the same reason `role` does.
+    attributes: describeAttributes(
+      sport,
+      (r.attributes ?? {}) as Readonly<Record<string, unknown>>,
+    ),
     photoUrl:
       !minor && r.photoConsentAt !== null && r.photoKey !== null
         ? storage.readUrl(r.photoKey)
@@ -272,6 +288,9 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
     .select({
       id: competitions.id,
       visibility: competitions.visibility,
+      // The season's sport, so its own attributes can be labelled in its own
+      // words rather than dropped for want of a dictionary.
+      sport: competitions.sport,
     })
     .from(competitions)
     .where(eq(competitions.slug, slug))
@@ -291,6 +310,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
       dateOfBirth: registrations.dateOfBirth,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
+      attributes: registrations.attributes,
       photoKey: people.photoUrl,
       photoConsentAt: people.photoConsentAt,
       teamId: registrations.teamId,
@@ -312,7 +332,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
   // row to ride on when the set is empty.
   const total = rows[0]?.poolSize ?? 0;
   return {
-    players: rows.map((r) => toShowcasePlayer(r, now)),
+    players: rows.map((r) => toShowcasePlayer(r, now, comp.sport)),
     total,
     truncated: total > rows.length,
   };
@@ -377,6 +397,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
       dateOfBirth: registrations.dateOfBirth,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
+      attributes: registrations.attributes,
       photoKey: people.photoUrl,
       photoConsentAt: people.photoConsentAt,
       teamId: registrations.teamId,
@@ -419,7 +440,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
     .orderBy(desc(competitions.startsOn))
     .limit(6);
   return {
-    ...toShowcasePlayer(row, new Date()),
+    ...toShowcasePlayer(row, new Date(), comp.sport),
     competitionName: comp.name,
     competitionSlug: comp.slug,
     sport: comp.sport,

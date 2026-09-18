@@ -143,6 +143,31 @@ module.exports = {
     },
   ],
   options: {
+    /*
+     * GENERATED OUTPUT IS NOT ARCHITECTURE.
+     *
+     * Nothing excluded build directories, so every run cruised `.next`,
+     * `.next-e2e` and every `dist/` alongside the source it exists to police —
+     * webpack chunks, the standalone server trace, the esbuild bundles. That is
+     * not merely wasted work: it is thousands of generated modules whose import
+     * graph is a bundler's business and not a boundary anybody wrote, and it
+     * grew the run past the default V8 heap, so `pnpm verify` aborted with
+     * "Reached heap limit" on any machine that had built the app — the gate
+     * failing precisely because the thing it guards had been compiled.
+     *
+     * `.local` is here for the same reason and is the bigger half: it is the
+     * gitignored scratch directory (`apps/web/.local`), and on this machine it
+     * was 996 of the 1,999 modules the cruise walked — untracked experiments
+     * with their own `@ts-ignore`s, dwarfing the 532 real modules of
+     * `apps/web/src`. It does not exist in CI, which is exactly why the heap
+     * crash only ever happened to a developer and never to the gate.
+     *
+     * Measured on this tree: a heap crash before, 987 modules in seconds
+     * after, with `apps/web/src` coverage unchanged at 532.
+     */
+    exclude: {
+      path: "(^|/)(\\.next|\\.next-e2e|\\.local|dist|coverage|playwright-report|test-results)/",
+    },
     doNotFollow: { path: "node_modules" },
     tsPreCompilationDeps: true,
     enhancedResolveOptions: {

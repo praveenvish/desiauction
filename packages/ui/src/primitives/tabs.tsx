@@ -57,6 +57,18 @@ export function Tabs({ tabs, selectedId, defaultTabId, onSelect, label }: TabsPr
 
   return (
     <div>
+      {/*
+        THE TABLIST IS NOT SUPPOSED TO BE FOCUSABLE.
+
+        jsx-a11y wants a tabIndex on anything carrying an interactive role. The
+        ARIA Authoring Practices say the opposite for this one: a tablist is a
+        container, focus belongs to the tabs inside it, and exactly one of them
+        is in the tab order at a time. Giving the list its own tab stop would add
+        a dead stop before every tab strip in the product. The arrow-key handler
+        lives here because the event bubbles from the focused tab, which is
+        precisely the pattern the APG describes.
+      */}
+      {/* eslint-disable-next-line jsx-a11y/interactive-supports-focus */}
       <div
         ref={listRef}
         role="tablist"

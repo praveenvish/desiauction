@@ -9,9 +9,9 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
 | Area | State | Impact | Closure |
 |------|-------|--------|---------|
 | SMS (OTP) | Adapter built (`msg91`); no live account wired locally | **Login is OTP-first — SMS is go-live-critical.** Without it, nobody can sign in. | Founder provisions MSG91 (or equiv); set `OTP_PROVIDER=msg91` + creds; preflight enforces it. |
-| Object storage | Local filesystem adapter; S3-compatible store not wired | Finops artifacts (receipts/invoices/exports) persist on the instance disk, not durable object storage. | Founder provisions S3-compatible bucket; set `FINOPS_STORAGE_DIR` to it. |
+| Object storage | **Wired.** `MEDIA_STORAGE=bucket` speaks S3, and `ops/deploy/docker-compose.production.yml` runs MinIO beside the app with both buckets created by an init step. The `local` filesystem adapter remains the DEFAULT, so an unconfigured deploy still writes to instance disk. | On the default, finops artifacts and player photos persist on the instance disk rather than durable object storage. | Set `MEDIA_STORAGE=bucket` and the four `MEDIA_S3_*` values at deploy; `preflight:production` checks them. |
 | Payments | Razorpay adapter built + forgery-tested; never run against the live gateway | Gateway collection unavailable; **manual capture (cash/UPI/bank) works fully** and is the beta path. | Founder provisions Razorpay live keys + webhook secret; one live staging transaction. |
-| Email | Not implemented (deliberately out of scope) | No email notifications; in-app inbox + SMS are the channels. | Post-beta; the finops dispatch port already models the channel. |
+| Email | **Implemented** (this row was two milestones stale). There is an HTTP mailer (`EMAIL_PROVIDER`, Resend on `mail.desiauction.in`), email sign-in and sign-up, address verification, demo-request and booking mail, the finops delivery channel, and a provider callback route that ingests bounces and complaints. | None as a capability gap. The provider ACCOUNT is still founder-held: with no `EMAIL_API_KEY` the mailer stays "unconfigured", which is the safe state and means nothing is sent. | Founder sets `EMAIL_API_KEY`; see [EMAIL_SETUP](EMAIL_SETUP.md). DMARC is still `p=none` — see PRODUCTION_CHECKLIST §3. |
 | WhatsApp | Not implemented | No WhatsApp notifications. | Post-beta; dispatch port models it. |
 | Error tracking | Sentry wired (guarded); DSNs not set locally | Missing DSN is a silent no-op — errors are not captured until set. | Founder sets `SENTRY_DSN` in web + engine. |
 | Metrics/alerting | Designed (docs/56 SLOs); not provisioned | No dashboards or alerts until deploy-time. | Founder provisions on Fly/Vercel; wire alert-on-silence. |
@@ -46,6 +46,14 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
 - Web DB pool `max: 10`; the admin health page fans out one snapshot set per
   finance-declared org in parallel. Fine at beta scale; size against the staging
   perf run.
+- **The daily-ops schedule fan-out is O(finance-declared orgs)**, one round trip
+  each. `runSchedulesOnce` firing the slot twice took **12.8 s against 74 finops
+  profiles** on a developer's long-lived database — the same shape as the admin
+  health page above, and the first of the two to be measured rather than
+  assumed. Harmless at beta volumes and not a correctness problem (the derived
+  dedupe key makes every fire idempotent), but it is the runner's scaling wall
+  and it should be batched, or sharded across ticks, before a few hundred
+  paying orgs exist.
 - **Production perf certification not yet run** on production hardware. Local
   baselines (PVP-1 §4) pass all budgets but do not substitute.
 
@@ -77,3 +85,11 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
   authenticator that has no cross-engine equivalent.
 - **Real provider latencies** (SMS delivery time, S3 upload/download, live
   webhook round-trip): measured only against the live accounts.
+- **The React Compiler's lint rules are not on.** `eslint-plugin-react-hooks` v7
+  ships the compiler's own analyses (`immutability`, `refs`,
+  `set-state-in-effect`, `purity`) in its recommended preset. The two contracts
+  whose violations are bugs by definition — `rules-of-hooks` and
+  `exhaustive-deps` — ARE enforced, repo-wide, and were clean after four real
+  fixes. The compiler rules flag another ~20 sites, several of them deliberate
+  (the ref-based 10 Hz auction clock exists precisely to avoid re-rendering a
+  room). Adopting them is a design conversation, not a switch.

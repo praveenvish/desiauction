@@ -1383,6 +1383,16 @@ export function RegistrationDashboardPanel({
                       <dd>{detail.bowlingStyle.replace(/_/g, " ")}</dd>
                     </div>
                   ) : null}
+                  {/* Whatever else the SEASON'S sport asks about — a preferred
+                      foot, a raiding side. Labelled by the pack on the server,
+                      so this renders any sport without knowing any of them.
+                      Empty for cricket, whose two are the named rows above. */}
+                  {detail.attributes.map((attribute) => (
+                    <div key={attribute.key}>
+                      <dt>{attribute.label}</dt>
+                      <dd>{attribute.value}</dd>
+                    </div>
+                  ))}
                   <div>
                     <dt>Team</dt>
                     <dd>{detail.teamName ?? "—"}</dd>

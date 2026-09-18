@@ -30,6 +30,7 @@ import {
   type RegistrationStatus,
   parseRoleIn,
   sportPackFor,
+  splitAttributeWrite,
   unplacedValues,
   type UnplacedValue,
   type ValueMaps,
@@ -1018,10 +1019,29 @@ export async function submitRegistrationAction(
     return { error: "Please confirm you understand what becomes public before you register." };
   }
   const role = formString(formData, "role");
+  /*
+   * THE SEASON'S SPORT DECIDES WHAT ELSE IS ASKED (SP-1 Phase 3).
+   *
+   * This read two fixed fields — `battingStyle` and `bowlingStyle` — so a
+   * football registration's answers had no field to arrive in, and
+   * `registrations.attributes` (the column the pack contract names as the home
+   * of every sport after cricket) had no writer anywhere in the product.
+   *
+   * The form now posts one `attr.<key>` per attribute the pack declares. Read
+   * back the same way: by asking the PACK what it declared, never by trusting
+   * the keys that turned up in the request.
+   */
+  const packForSeason = sportPackFor(competition.sport);
+  const attributeAnswers: Record<string, string> = {};
+  for (const attribute of packForSeason.attributes) {
+    const value = formString(formData, `attr.${attribute.key}`);
+    if (value !== "") {
+      attributeAnswers[attribute.key] = value;
+    }
+  }
   const profile = {
     dateOfBirth: formString(formData, "dateOfBirth"),
-    battingStyle: formString(formData, "battingStyle"),
-    bowlingStyle: formString(formData, "bowlingStyle"),
+    attributes: attributeAnswers,
   };
   const minor = isMinor(profile.dateOfBirth === "" ? null : profile.dateOfBirth, new Date());
   const guardianName = formString(formData, "guardianName").trim();
@@ -1129,14 +1149,21 @@ export async function submitRegistrationAction(
         ...current,
         dateOfBirth: profile.dateOfBirth === "" ? current.dateOfBirth : profile.dateOfBirth,
       });
-      const pack = sportPackFor(competition.sport);
+      const pack = packForSeason;
       const held = await sportProfileFor(session.personId, pack.key);
-      const attributes = { ...held.attributes };
-      if (profile.battingStyle !== "") {
-        attributes["batting_style"] = profile.battingStyle;
-      }
-      if (profile.bowlingStyle !== "") {
-        attributes["bowling_style"] = profile.bowlingStyle;
+      // Every answer the pack recognises, not the two cricket happens to have.
+      // `splitAttributeWrite` is the same validator the registration row uses,
+      // so a value good enough to store is good enough to remember.
+      const write = splitAttributeWrite(pack, profile.attributes);
+      const attributes = { ...held.attributes, ...write.json };
+      for (const attribute of pack.attributes) {
+        if (attribute.storage.kind !== "column") {
+          continue;
+        }
+        const value = write.columns[attribute.storage.column];
+        if (value !== undefined) {
+          attributes[attribute.key] = value;
+        }
       }
       await upsertSportProfile(session.personId, {
         sport: pack.key,

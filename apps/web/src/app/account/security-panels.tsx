@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Badge,
   Button,
@@ -338,7 +339,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
             <p className="security-note" data-testid="events-truncated">
               Showing the {String(security.events.length)} most recent of{" "}
               {String(security.eventsTotal)} events. Need the full history?{" "}
-              <a href="/support">Ask support</a>.
+              <Link href="/support">Ask support</Link>.
             </p>
           ) : null}
         </div>

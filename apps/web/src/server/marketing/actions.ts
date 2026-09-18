@@ -22,6 +22,52 @@ import { logger } from "../logger";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * THE ONE PUBLIC WRITE WITH NO CEILING ON IT.
+ *
+ * Every other anonymous write in this product is throttled — `requestOtp`
+ * counts codes per phone and per IP, `isThrottled` counts demo requests per
+ * phone and per day — and this one, reachable by anyone from the footer of
+ * every public page, was not. Each distinct address is a new row, so the unique
+ * index does not bound anything: a script can write as many rows as it can
+ * invent addresses, and the table has no retention sweep to age them out.
+ *
+ * IN MEMORY, AND THE LIMITATION IS THE POINT RATHER THAN AN OVERSIGHT. The
+ * database-backed throttles above count rows in the table they protect;
+ * `newsletter_subscribers` has no `request_ip` column, so counting per address
+ * there would need a migration, and a migration is a heavier change than this
+ * risk justifies. A per-process bucket is exact on the one-replica topology
+ * `ops/deploy/docker-compose.production.yml` actually runs, and degrades to
+ * "per instance" rather than to "none" if that ever becomes two. When the
+ * column lands, this should become the same row count as its neighbours.
+ */
+const SUBSCRIBE_MAX_PER_IP_PER_HOUR = 5;
+const SUBSCRIBE_WINDOW_MS = 60 * 60 * 1000;
+const subscribeBuckets = new Map<string, number[]>();
+
+function subscribeThrottled(ip: string | null, now: number): boolean {
+  if (ip === null) {
+    return false;
+  }
+  // Sweep every bucket, not only this caller's: without it the map grows by one
+  // entry per distinct address forever, which is the same unbounded growth one
+  // level up.
+  for (const [key, stamps] of subscribeBuckets) {
+    const live = stamps.filter((at) => now - at < SUBSCRIBE_WINDOW_MS);
+    if (live.length === 0) {
+      subscribeBuckets.delete(key);
+    } else {
+      subscribeBuckets.set(key, live);
+    }
+  }
+  const recent = subscribeBuckets.get(ip) ?? [];
+  if (recent.length >= SUBSCRIBE_MAX_PER_IP_PER_HOUR) {
+    return true;
+  }
+  subscribeBuckets.set(ip, [...recent, now]);
+  return false;
+}
+
 export async function subscribeNewsletterAction(
   _previous: { error?: string; success?: boolean },
   formData: FormData,
@@ -29,6 +75,12 @@ export async function subscribeNewsletterAction(
   const email = formData.get("email");
   if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
     return { error: "Enter a valid email address." };
+  }
+  // A refusal reads as the ordinary success screen, exactly as `requestOtp` and
+  // `requestDemo` do: telling a script which of its attempts were counted is
+  // telling it the shape of the limit.
+  if (subscribeThrottled(await requestIp(), Date.now())) {
+    return { success: true };
   }
   try {
     await db

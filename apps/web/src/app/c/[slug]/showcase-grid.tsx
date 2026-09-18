@@ -2,7 +2,7 @@
 
 import { ButtonLink, Dialog, PlayerImage } from "@desiauction/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
   filterSortPlayers,
@@ -294,6 +294,15 @@ export function ShowcaseGrid({
                   <dd>{selected.bowlingStyle.replace(/_/g, " ")}</dd>
                 </>
               ) : null}
+              {/* Whatever else this season's sport asks about, in its own
+                  words. Labelled on the server by the pack, so this renders a
+                  footballer's preferred foot without ever hearing of football. */}
+              {selected.attributes.map((attribute) => (
+                <Fragment key={attribute.key}>
+                  <dt>{attribute.label}</dt>
+                  <dd>{attribute.value}</dd>
+                </Fragment>
+              ))}
               <dt>Status</dt>
               <dd>
                 {selected.status === "available"

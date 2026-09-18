@@ -1,16 +1,8 @@
 "use client";
 
-import {
-  isBattingStyle,
-  isBowlingStyle,
-  isMinor,
-  BATTING_STYLES,
-  BOWLING_STYLES,
-  battingStyleLabel,
-  bowlingStyleLabel,
-} from "@desiauction/core";
+import { isMinor, type AttributeOption } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select } from "@desiauction/ui";
-import { useEffect, useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 
 import { formatPhone } from "../../../../lib/format-phone";
 import { track } from "../../../../lib/telemetry";
@@ -57,10 +49,21 @@ const GUARDIAN_REQUIRED =
 interface Draft {
   role: string;
   dob: string;
-  batting: string;
-  bowling: string;
+  /** Keyed by the SEASON'S pack attribute keys — see the note on the props. */
+  attributes: Record<string, string>;
 }
 
+/**
+ * Two older shapes still live in people's browsers and both are read back.
+ *
+ * A draft is device-local and can be weeks old: the very first version stored a
+ * bare role string, and the version after it stored `{ role, dob, batting,
+ * bowling }` — cricket's two styles as named fields, because at the time there
+ * was no other sport. Those two keys are lifted into the attribute map under
+ * the keys cricket's pack actually declares, so somebody who started a cricket
+ * registration before this change and finishes it after does not silently lose
+ * both answers on the step that shows them nothing missing.
+ */
 function readDraft(slug: string): Draft | null {
   const saved = window.localStorage.getItem(draftKey(slug));
   if (saved === null || saved === "") {
@@ -69,18 +72,40 @@ function readDraft(slug: string): Draft | null {
   try {
     const parsed: unknown = JSON.parse(saved);
     if (typeof parsed === "object" && parsed !== null) {
-      const record = parsed as Partial<Draft>;
+      // Everything here is `unknown` deliberately: this is JSON from a browser
+      // store, which may hold any of three historical shapes and may have been
+      // edited by hand. Nothing is trusted until it has been checked.
+      const record = parsed as {
+        role?: unknown;
+        dob?: unknown;
+        attributes?: unknown;
+        batting?: unknown;
+        bowling?: unknown;
+      };
+      const attributes: Record<string, string> = {};
+      if (typeof record.attributes === "object" && record.attributes !== null) {
+        for (const [key, value] of Object.entries(record.attributes)) {
+          if (typeof value === "string") {
+            attributes[key] = value;
+          }
+        }
+      }
+      if (typeof record.batting === "string" && record.batting !== "") {
+        attributes["batting_style"] ??= record.batting;
+      }
+      if (typeof record.bowling === "string" && record.bowling !== "") {
+        attributes["bowling_style"] ??= record.bowling;
+      }
       return {
         role: typeof record.role === "string" ? record.role : "",
         dob: typeof record.dob === "string" ? record.dob : "",
-        batting: typeof record.batting === "string" ? record.batting : "",
-        bowling: typeof record.bowling === "string" ? record.bowling : "",
+        attributes,
       };
     }
   } catch {
     // Drafts written before this shape were a bare role string.
   }
-  return { role: saved, dob: "", batting: "", bowling: "" };
+  return { role: saved, dob: "", attributes: {} };
 }
 
 /**
@@ -96,6 +121,7 @@ export function RegisterFlow({
   initialName,
   source,
   roles,
+  attributes,
   profileDefaults,
 }: {
   slug: string;
@@ -116,17 +142,34 @@ export function RegisterFlow({
    * tiebreaker's `compute`) and cannot cross into a client component.
    */
   roles: readonly { key: string; label: string }[];
-  /** PI-1: the person-level cricket profile, prefilling step 2. A device-local
-   *  draft still wins over it — the draft is this season's newer intent. */
-  profileDefaults: { role: string; dob: string; batting: string; bowling: string } | null;
+  /**
+   * THE SEASON'S OWN OPTIONAL PLAYER DETAIL, as plain {key,label,options} data.
+   *
+   * This form asked every registrant for a batting style and a bowling style,
+   * in cricket's words, whatever the season's sport was — so a footballer was
+   * offered "Right-arm fast" and was never asked which foot they kick with, a
+   * kabaddi raider was asked both, and `registrations.attributes` (the column
+   * the pack contract says every sport after cricket writes to) had no writer
+   * anywhere in the product. The dropdown for roles was fixed when the packs
+   * shipped; these two were missed because they are not roles.
+   *
+   * Cricket is unchanged by this: its pack declares the same two attributes,
+   * with the same labels and the same options, and records that they live in
+   * their own columns — so the form renders what it always rendered and the
+   * writer still fills `batting_style` and `bowling_style`.
+   */
+  attributes: readonly AttributeOption[];
+  /** PI-1: the person-level profile for THIS sport, prefilling step 2. A
+   *  device-local draft still wins over it — the draft is this season's newer
+   *  intent. */
+  profileDefaults: { role: string; dob: string; attributes: Record<string, string> } | null;
 }) {
   const [name, setName] = useState(initialName);
   const [nameDone, setNameDone] = useState(initialName.trim() !== "");
   const [role, setRole] = useState(profileDefaults?.role ?? "");
   // Optional player profile (parity §3.2). Not gated — a bare role still submits.
   const [dob, setDob] = useState(profileDefaults?.dob ?? "");
-  const [batting, setBatting] = useState(profileDefaults?.batting ?? "");
-  const [bowling, setBowling] = useState(profileDefaults?.bowling ?? "");
+  const [attrs, setAttrs] = useState<Record<string, string>>(profileDefaults?.attributes ?? {});
   // PI-1 write-back: on by default, an act of the submit, never of the draft.
   const [remember, setRemember] = useState(true);
   // PRR P0-2: guardian consent, required only when the entered DOB is under 18.
@@ -156,8 +199,7 @@ export function RegisterFlow({
     if (saved !== null) {
       setRole(saved.role);
       setDob(saved.dob);
-      setBatting(saved.batting);
-      setBowling(saved.bowling);
+      setAttrs(saved.attributes);
       if (initialName.trim() !== "") {
         setStep("review");
         setRestored(true);
@@ -166,7 +208,7 @@ export function RegisterFlow({
   }, [slug, initialName]);
 
   const saveDraft = (next: Partial<Draft>) => {
-    const current = readDraft(slug) ?? { role, dob, batting, bowling };
+    const current = readDraft(slug) ?? { role, dob, attributes: attrs };
     window.localStorage.setItem(draftKey(slug), JSON.stringify({ ...current, ...next }));
   };
 
@@ -227,11 +269,17 @@ export function RegisterFlow({
         formData.set("guardianConsent", "true");
         formData.set("guardianConsentText", GUARDIAN_CONSENT_LABEL);
       }
-      if (batting !== "") {
-        formData.set("battingStyle", batting);
-      }
-      if (bowling !== "") {
-        formData.set("bowlingStyle", bowling);
+      /*
+       * One namespaced field per attribute the SEASON'S pack declares, and
+       * nothing else. A value left over in a draft for an attribute this sport
+       * does not have is simply never sent; the server re-validates every key
+       * and value against the same pack regardless.
+       */
+      for (const attribute of attributes) {
+        const value = attrs[attribute.key] ?? "";
+        if (value !== "") {
+          formData.set(`attr.${attribute.key}`, value);
+        }
       }
       if (source !== "") {
         formData.set("source", source);
@@ -407,38 +455,26 @@ export function RegisterFlow({
               ) : null}
             </div>
           ) : null}
-          <Select
-            label="Batting style (optional)"
-            name="battingStyle"
-            value={batting}
-            onChange={(event) => {
-              setBatting(event.target.value);
-              saveDraft({ batting: event.target.value });
-            }}
-          >
-            <option value="">Not specified</option>
-            {BATTING_STYLES.map((style) => (
-              <option key={style} value={style}>
-                {battingStyleLabel(style)}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Bowling style (optional)"
-            name="bowlingStyle"
-            value={bowling}
-            onChange={(event) => {
-              setBowling(event.target.value);
-              saveDraft({ bowling: event.target.value });
-            }}
-          >
-            <option value="">Not specified</option>
-            {BOWLING_STYLES.map((style) => (
-              <option key={style} value={style}>
-                {bowlingStyleLabel(style)}
-              </option>
-            ))}
-          </Select>
+          {attributes.map((attribute) => (
+            <Select
+              key={attribute.key}
+              label={`${attribute.label} (optional)`}
+              name={`attr.${attribute.key}`}
+              value={attrs[attribute.key] ?? ""}
+              onChange={(event) => {
+                const next = { ...attrs, [attribute.key]: event.target.value };
+                setAttrs(next);
+                saveDraft({ attributes: next });
+              }}
+            >
+              <option value="">Not specified</option>
+              {attribute.options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          ))}
           <div className="register-actions">
             {!nameDone ? null : (
               <Button
@@ -502,18 +538,17 @@ export function RegisterFlow({
                 <dd>{dob}</dd>
               </>
             ) : null}
-            {isBattingStyle(batting) ? (
-              <>
-                <dt>Batting style</dt>
-                <dd>{battingStyleLabel(batting)}</dd>
-              </>
-            ) : null}
-            {isBowlingStyle(bowling) ? (
-              <>
-                <dt>Bowling style</dt>
-                <dd>{bowlingStyleLabel(bowling)}</dd>
-              </>
-            ) : null}
+            {attributes.map((attribute) => {
+              const chosen = attribute.options.find(
+                (option) => option.key === (attrs[attribute.key] ?? ""),
+              );
+              return chosen === undefined ? null : (
+                <Fragment key={attribute.key}>
+                  <dt>{attribute.label}</dt>
+                  <dd>{chosen.label}</dd>
+                </Fragment>
+              );
+            })}
           </dl>
           <div className="register-photo">
             <SelfPhotoUploader slug={slug} name={name} />
@@ -550,9 +585,14 @@ export function RegisterFlow({
             <p className="register-consent-line">
               <strong>Everything else here is published</strong> once the organizer publishes this
               season: your name, your registration number, your playing role, your age if you gave a
-              date of birth, your batting and bowling styles if you gave them, your photo if you add
-              one, and later which team signs you. Anyone with the link can read it — no account, no
-              sign-in.
+              date of birth
+              {attributes.length === 0
+                ? ""
+                : `, your ${attributes
+                    .map((attribute) => attribute.label.toLowerCase())
+                    .join(" and ")} if you gave ${attributes.length === 1 ? "it" : "them"}`}
+              , your photo if you add one, and later which team signs you. Anyone with the link can
+              read it — no account, no sign-in.
             </p>
             <p className="register-consent-line">
               It appears in two places: this season&apos;s public player list, and a page of your

@@ -3,6 +3,7 @@ import { Badge, ButtonLink, PlayerImage, IconArrowLeft } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Fragment } from "react";
 
 import { env } from "../../../../../env";
 import { publicPlayer } from "../../../../../server/competition/public";
@@ -154,6 +155,14 @@ export default async function PlayerProfilePage({
                   <dd>{bowling}</dd>
                 </>
               ) : null}
+              {/* Whatever else this season's sport asks about, already labelled
+                  by its pack — see `describeAttributes`. Empty for cricket. */}
+              {player.attributes.map((attribute) => (
+                <Fragment key={attribute.key}>
+                  <dt>{attribute.label}</dt>
+                  <dd>{attribute.value}</dd>
+                </Fragment>
+              ))}
               <dt>Status</dt>
               <dd>{status}</dd>
             </dl>

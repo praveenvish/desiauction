@@ -203,7 +203,27 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
         }
         setConnection("reconnecting");
         attempt += 1;
-        const backoff = Math.min(5_000, 250 * 2 ** attempt);
+        /*
+         * BACKOFF WITH JITTER, BECAUSE EVERY CLIENT LOSES THE SOCKET AT ONCE.
+         *
+         * The thing that closes these sockets is almost never one client's
+         * network: it is the engine restarting — a deploy, a crash, an OOM.
+         * When that happens every screen in the room disconnects in the same
+         * millisecond and, on a pure exponential schedule, reconnects in the
+         * same millisecond too, for as long as the engine takes to come back.
+         * A projector, a conductor's laptop, eight owners' phones and a hall of
+         * spectators then arrive as one synchronized wave against a process
+         * that is still replaying its event log — and the per-room and per-IP
+         * caps refuse the overflow, which turns one restart into a room that
+         * cannot get back in.
+         *
+         * Full jitter (`random() * ceiling`, AWS's term) spreads the same
+         * clients across the whole window instead of stacking them on its edge.
+         * It costs one multiplication and it is the difference between a herd
+         * and a queue. The floor keeps a fast reconnect fast.
+         */
+        const ceiling = Math.min(5_000, 250 * 2 ** attempt);
+        const backoff = Math.max(100, Math.round(Math.random() * ceiling));
         timer = setTimeout(connect, backoff);
       };
       socket.onerror = () => {

@@ -161,7 +161,12 @@ export function LoginPanel({
     intentRef.current = "request";
     // Keyed on `state` ALONE on purpose: `step` and `next` are read here but
     // must not retrigger it — re-running on a step change would re-push the URL
-    // that the step change had just written.
+    // that the step change had just written. That is a real exclusion rather
+    // than an oversight, so it is stated to the rule as well as to the reader:
+    // both values are read only inside the `state.step === "code"` branch, on
+    // the render that `state` itself changed, so neither can be stale when it
+    // matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   // A rejected submit used to leave `document.activeElement` on <body>: the

@@ -484,7 +484,9 @@ function RosterDetail({
     team.squadMax !== undefined && team.squadMax !== null
       ? Math.max(0, team.squadMax - team.squadFilled)
       : null;
-  const roster = team.roster ?? [];
+  // `?? []` mints a new array whenever a team carries no roster, so the tally
+  // below recomputed on every render of a squad page that had nothing to tally.
+  const roster = useMemo(() => team.roster ?? [], [team.roster]);
 
   // The per-role tally chips, in the design's fixed order.
   const tally = useMemo(() => {

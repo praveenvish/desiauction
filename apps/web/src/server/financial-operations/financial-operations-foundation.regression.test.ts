@@ -891,39 +891,61 @@ describe("M-IP6-1 · FiscalPeriod + the daily reconciliation trigger", () => {
 });
 
 describe("M-IP6-1 · The Runner — schedules, retries, leases, dead letters", () => {
-  it("derives idempotent schedule jobs; a re-fired slot enqueues nothing new", async () => {
-    const nowMs = Date.now();
-    await ensureSchedules(deps, nowMs);
-    // Force the slot due (robust across repeated suite runs against one DB).
-    const due = nextDailyDueMs(nowMs) + 1;
-    await deps.store.transact(async (tx) => {
-      await tx.putSchedule({ slot: "daily-ops", nextDueMs: due - 1, lastFiredMs: null });
-    });
-    const first = await runSchedulesOnce(deps, due);
-    expect(first.fired).toContain("daily-ops");
-    const mine = (await deps.store.loadJobs(org.id)).filter((job) => job.kind === "ops.attest-day");
-    expect(mine).toHaveLength(1);
+  /*
+   * THE ONE TEST WHOSE COST IS THE DATABASE'S SIZE, NOT THE CODE'S.
+   *
+   * `runSchedulesOnce` fires the daily-ops slot for EVERY finance-declared org,
+   * and this test forces that slot twice. On CI's fresh database that is one
+   * org and a few milliseconds. On a long-lived local one it is every org every
+   * suite run has ever created: measured at 12.8 seconds against 74 finops
+   * profiles among 2,209 organizations, against vitest's 5-second default.
+   *
+   * So a developer's machine failed this permanently after a few dozen runs,
+   * with a timeout that reads exactly like a hang in the scheduler — and a
+   * suite that is red for a reason nobody can act on is a suite people stop
+   * reading. The generous timeout says which kind of test this is. It is NOT a
+   * licence for the fan-out to get slower: that it grows per org at all is
+   * recorded as a scale watch in KNOWN_LIMITATIONS.
+   */
+  it(
+    "derives idempotent schedule jobs; a re-fired slot enqueues nothing new",
+    { timeout: 60_000 },
+    async () => {
+      const nowMs = Date.now();
+      await ensureSchedules(deps, nowMs);
+      // Force the slot due (robust across repeated suite runs against one DB).
+      const due = nextDailyDueMs(nowMs) + 1;
+      await deps.store.transact(async (tx) => {
+        await tx.putSchedule({ slot: "daily-ops", nextDueMs: due - 1, lastFiredMs: null });
+      });
+      const first = await runSchedulesOnce(deps, due);
+      expect(first.fired).toContain("daily-ops");
+      const mine = (await deps.store.loadJobs(org.id)).filter(
+        (job) => job.kind === "ops.attest-day",
+      );
+      expect(mine).toHaveLength(1);
 
-    const again = await runSchedulesOnce(deps, due);
-    expect(again.fired).toEqual([]); // the slot advanced past `due`
-    // Force-fire the slot once more at the SAME occasion: same derived key, no new job.
-    await deps.store.transact(async (tx) => {
-      await tx.putSchedule({ slot: "daily-ops", nextDueMs: due - 1, lastFiredMs: null });
-    });
-    await runSchedulesOnce(deps, due);
-    expect(
-      (await deps.store.loadJobs(org.id)).filter((job) => job.kind === "ops.attest-day"),
-    ).toHaveLength(1);
+      const again = await runSchedulesOnce(deps, due);
+      expect(again.fired).toEqual([]); // the slot advanced past `due`
+      // Force-fire the slot once more at the SAME occasion: same derived key, no new job.
+      await deps.store.transact(async (tx) => {
+        await tx.putSchedule({ slot: "daily-ops", nextDueMs: due - 1, lastFiredMs: null });
+      });
+      await runSchedulesOnce(deps, due);
+      expect(
+        (await deps.store.loadJobs(org.id)).filter((job) => job.kind === "ops.attest-day"),
+      ).toHaveLength(1);
 
-    // Test hygiene on the SHARED dev DB: this test's forced slot-fire enqueued
-    // one attest-day job for EVERY org (residue of many suite runs included).
-    // Purge that queue so the drills below drain THEIR job deterministically
-    // and no cross-org daily-ops runs fire side effects mid-suite. (CI runs on
-    // a fresh DB; this line is for the long-lived local one.)
-    await db
-      .delete(finopsJobs)
-      .where(and(eq(finopsJobs.kind, "ops.attest-day"), eq(finopsJobs.state, "queued")));
-  });
+      // Test hygiene on the SHARED dev DB: this test's forced slot-fire enqueued
+      // one attest-day job for EVERY org (residue of many suite runs included).
+      // Purge that queue so the drills below drain THEIR job deterministically
+      // and no cross-org daily-ops runs fire side effects mid-suite. (CI runs on
+      // a fresh DB; this line is for the long-lived local one.)
+      await db
+        .delete(finopsJobs)
+        .where(and(eq(finopsJobs.kind, "ops.attest-day"), eq(finopsJobs.state, "queued")));
+    },
+  );
 
   it("RETRY → DEAD LETTER: deterministic backoff, then a red check on the day", async () => {
     const nowMs = Date.now();
