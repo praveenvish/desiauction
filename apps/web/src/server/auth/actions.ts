@@ -20,6 +20,7 @@ import { db, dbHandle } from "../db";
 import { createPlayerSmsSender } from "../competition/registration-notify";
 import { maySend } from "../messaging/consent";
 import { SMS_TEMPLATES, renderTemplate } from "../messaging/templates";
+import { openChallenge, sealChallenge } from "./challenge-cookie";
 import { requestOtp, verifyOtp } from "./otp";
 import {
   confirmEmailVerification,
@@ -88,8 +89,15 @@ const CHALLENGE_COOKIE = "da_pk_challenge";
  */
 const secureCookie = env.NODE_ENV === "production" && !env.ALLOW_INSECURE_LOCAL_PRODUCTION;
 
+/**
+ * The key the challenge cookie is sealed with. Derived, domain-separated, from a
+ * secret production already requires to be strong (preflight refuses the dev
+ * default), so sealing adds no new variable an operator can forget to set.
+ */
+const CHALLENGE_KEY = `passkey-challenge-key:${env.ENGINE_SECRET}`;
+
 async function setChallenge(challenge: string): Promise<void> {
-  (await cookies()).set(CHALLENGE_COOKIE, challenge, {
+  (await cookies()).set(CHALLENGE_COOKIE, sealChallenge(CHALLENGE_KEY, challenge), {
     httpOnly: true,
     secure: secureCookie,
     sameSite: "lax",
@@ -102,7 +110,7 @@ async function takeChallenge(): Promise<string | null> {
   const store = await cookies();
   const value = store.get(CHALLENGE_COOKIE)?.value ?? null;
   store.delete(CHALLENGE_COOKIE);
-  return value;
+  return value === null ? null : openChallenge(CHALLENGE_KEY, value);
 }
 
 async function requestIp(): Promise<string | null> {
