@@ -56,6 +56,7 @@ import {
   getSessionByToken,
   listSessions,
   revokeOtherSessions,
+  signedInRecently,
   revokeSession,
   revokeSessionByToken,
   type SessionSummary,
@@ -461,11 +462,16 @@ export async function verifyEmailLoginAction(
   redirect(target);
 }
 
+/** Step-up refusal (sessions.ts STEP_UP_WINDOW_MS): one sentence for every credential change. */
+const SIGN_IN_AGAIN =
+  "For your security, sign in again before making this change — it has been a while since you last did.";
+
 // --- Passkeys (M-IP2-2) -----------------------------------------------------
 
 export async function startPasskeyEnrollmentAction(): Promise<PublicKeyCredentialCreationOptionsJSON | null> {
   const session = await currentSession();
-  if (session === null) {
+  // Step-up: a passkey outlives "sign out other devices" (sessions.ts).
+  if (session === null || !signedInRecently(session)) {
     return null;
   }
   const options = await startEnrollment(db, session.personId);
@@ -481,6 +487,9 @@ export async function finishPasskeyEnrollmentAction(
   const challenge = await takeChallenge();
   if (session === null) {
     return { ok: false, error: SESSION_LAPSED };
+  }
+  if (!signedInRecently(session)) {
+    return { ok: false, error: SIGN_IN_AGAIN };
   }
   if (challenge === null) {
     return {
@@ -827,6 +836,9 @@ export async function requestPhoneChangeAction(
   if (session === null) {
     redirect("/login?next=/account");
   }
+  if (!signedInRecently(session)) {
+    return { step: previous.step, error: SIGN_IN_AGAIN };
+  }
   const phone = formString(formData, "phone");
   let result: Awaited<ReturnType<typeof requestPhoneChange>>;
   try {
@@ -1011,6 +1023,9 @@ export async function requestEmailVerificationAction(
   if (session === null) {
     redirect("/login?next=/account");
   }
+  if (!signedInRecently(session)) {
+    return { step: previous.step, error: SIGN_IN_AGAIN };
+  }
   const raw = formString(formData, "email");
   const result = await requestEmailVerification(db, { personId: session.personId, email: raw });
   if (!result.ok) {
@@ -1062,6 +1077,10 @@ export async function confirmEmailVerificationAction(
     return { step: "code", email: previous.email ?? "", error: message[result.reason] };
   }
   await logSecurityEvent(session.personId, "profile.email.verified");
+  // Same rule as a phone change: a new way into the account is the moment to
+  // close every other door. A session that planted this address from a stolen
+  // cookie cannot outlive it, and the person here keeps theirs.
+  await revokeOtherSessions(db, session.personId, session.sessionId);
   revalidatePath("/account");
   return { step: "idle", done: true, email: result.email };
 }

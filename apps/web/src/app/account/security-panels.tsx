@@ -65,7 +65,9 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
     try {
       const options = await startPasskeyEnrollmentAction();
       if (options === null) {
-        setEnrollError("Your session has expired. Sign in again to add a passkey.");
+        setEnrollError(
+          "For your security, sign in again to add a passkey — it has been a while since you last did.",
+        );
         return;
       }
       const response = await startRegistration({ optionsJSON: options });
