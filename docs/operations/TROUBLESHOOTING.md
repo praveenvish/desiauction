@@ -25,6 +25,8 @@ docker compose ps  # infra containers
 | Engine 401s on every command | `ENGINE_SECRET` mismatch between web and engine | Both read the same `.env.local`; restart both after changing it |
 | Auction pages empty after reseeding | Demo org was rebuilt with new ids while a page kept old state | Hard-refresh; sessions survive reseeds but old object ids do not |
 | `drizzle` says nothing to migrate after adding a migration | Journal `when` timestamps are hand-spaced future dates | Bump the new entry's `when` beyond the last one (see packages/db/migrations/meta/_journal.json) |
+| e2e `financial-issuance` (or another finance spec) times out on **"not certified yet"** while the runner is plainly alive | Each runner tick walks EVERY organization (IP-6 ADR-3, O(orgs) by design), and a long-lived local database accumulates thousands of residue orgs from test runs. On one such database (~2,400 orgs) ticks took 7–150 s, so a new org waited past the spec's 90 s for its first certification. Other containers loading the same Docker VM make it much worse | Check `apps/web/e2e/.finops-runner.log` for `tookMs`. Stop foreign load on the Docker VM. Recreating the local database clears the residue, but it is shared by every worktree on the machine, so only do that deliberately. Not a production concern at beta scale: there, the org count is the customer count |
+| `update or delete on table "people" violates foreign key constraint "…_people_fk"` in a test teardown | Since migration 0069, attribution columns (`created_by`, `granted_by`, …) are keys to `people`: a teardown must delete what a person created before the person | Use `purgeOrg()` (`src/server/test-support/purge-org.ts`) before deleting people. It covers every org-scoped table with attribution |
 
 ## Resets
 

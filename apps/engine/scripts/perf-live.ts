@@ -154,6 +154,11 @@ async function main(): Promise<void> {
     engine,
     engineSecret: SECRET,
     nodeEnv: "test",
+    // Every simulated spectator connects from 127.0.0.1, so the per-address
+    // cap (50 by default, a real DoS bound for a real room of many addresses)
+    // refused the 51st and hung the 200-spectator fan-out. The harness
+    // measures fan-out, not the cap, which has its own tests.
+    maxSocketsPerIp: 10_000,
   });
   hubRef = hub;
   await server.listen({ host: "127.0.0.1", port: 0 });

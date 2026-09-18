@@ -4,6 +4,9 @@ Single source of truth for go-live. Items marked ☐F need founder-held
 accounts/credentials; ☐E are engineering actions executable once the ☐F
 above them exist; ☑ are done and verified in-repo.
 
+This is the ledger. The ORDER to do it in, with a proof for each step, is
+[GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md).
+
 ## 1 · Tenant isolation (PRP-1 §1)
 
 - ☑ `withTenantDb` boundary (packages/db) — drizzle-typed, transaction-local GUCs
@@ -111,7 +114,7 @@ above them exist; ☑ are done and verified in-repo.
   on behalf of others is what drives compulsory GST registration for an operator
   and the RBI payment-aggregator question, and neither waits for a turnover
   threshold.
-- ☐F SMS provider account (go-live-critical: login is OTP-first; only DevInboxSender exists) → ☐E implement the `OtpSender` port adapter + SMS-pumping circuit-breaker (RC-4 condition 2)
+- ☐F SMS provider account + DLT registration (go-live-critical: login is OTP-first, and production refuses `OTP_PROVIDER=dev`). ☑ The adapters exist: `Msg91OtpSender` and a WhatsApp sender behind the `OtpSender` port, each with the SMS-pumping circuit breaker (RC-4 condition 2), plus per-shape DLT template variables. This line said "only DevInboxSender exists" long after that stopped being true (corrected 2026-09-18). What remains is the account, the templates and the env — [GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md) §C.
 - ☑ Email provider (2026-08-30). Two systems on two domains on purpose: Zoho
   mailboxes on the root, Resend sending on `mail.desiauction.in`, so a bounce
   storm from registration mail cannot degrade the reputation `privacy@` and

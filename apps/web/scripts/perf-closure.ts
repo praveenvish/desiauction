@@ -191,7 +191,10 @@ async function main(): Promise<void> {
     if (!bid.ok) throw new Error(`bid: ${bid.code}`);
     if (!(await transitionLot(db, auction, lot.id, owner, "sell")).ok) throw new Error("sell");
   }
-  if (!(await transitionAuction(db, auction, owner, "complete")).ok) throw new Error("complete");
+  // Squads are deliberately tiny in this fixture: override DA-06's soft
+  // minimum, as a conductor would in the room.
+  const completed = await transitionAuction(db, auction, owner, "complete", undefined, true);
+  if (!completed.ok) throw new Error(`complete: ${completed.reason}`);
 
   const deps = settlementDeps(db);
   const actor: SettlementActor = {

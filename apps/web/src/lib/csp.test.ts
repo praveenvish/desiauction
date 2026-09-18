@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { buildContentSecurityPolicy, mintNonce, originOf, redactReportedUrl } from "./csp";
@@ -40,12 +42,20 @@ describe("the script policy", () => {
     ]);
   });
 
-  it("keeps the four directives the enforced header already carries", () => {
+  it("keeps the static header's directives that work in Report-Only", () => {
     const policy = buildContentSecurityPolicy(base);
-    expect(directive(policy, "frame-ancestors")).toEqual(["'none'"]);
     expect(directive(policy, "object-src")).toEqual(["'none'"]);
     expect(directive(policy, "base-uri")).toEqual(["'self'"]);
     expect(directive(policy, "form-action")).toEqual(["'self'"]);
+  });
+
+  it("leaves frame-ancestors to the static header, where it is always enforced", () => {
+    // Browsers ignore frame-ancestors in a Report-Only policy (WebKit warns on
+    // every page), so here it would guard nothing in the default mode.
+    expect(directive(buildContentSecurityPolicy(base), "frame-ancestors")).toEqual([]);
+    const config = readFileSync(new URL("../../next.config.mjs", import.meta.url), "utf8");
+    expect(config).toContain(`"frame-ancestors 'none'"`);
+    expect(config).toContain(`key: "X-Frame-Options", value: "DENY"`);
   });
 
   it("relaxes only what the dev server needs, only in development", () => {

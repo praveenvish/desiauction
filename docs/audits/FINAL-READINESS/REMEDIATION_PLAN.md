@@ -1,5 +1,7 @@
 # Final Readiness — Remediation Plan
 
+> **Status: complete (2026-09-18).** Phases 0–12 are done and committed; the outcome, commit by commit, is [REPORT §0](REPORT.md#0--remediation-outcome-added-after-the-audit). Two plan items changed on contact with the evidence, and both are recorded there: `prototypes/va1` was kept, because its precondition "nothing references it" was false; and the demo-booking throttle was dropped as unnecessary once booking ids became signed handles that cannot be enumerated. One Phase 8 item is left open and recorded as such in REPORT §17: the three consecutive clean Firefox + WebKit runs required to return them to the nightly (one clean run exists; the check was stopped). The rest of what is left is founder- and counsel-owned, sequenced in [GO_LIVE_RUNBOOK](../../operations/GO_LIVE_RUNBOOK.md).
+
 Companion to [REPORT.md](REPORT.md). Every finding from that audit is listed here, small ones included. Each has an owner, an approach, a verification step and a phase. Founder decisions taken on 2026-09-18:
 
 | Decision | Choice |

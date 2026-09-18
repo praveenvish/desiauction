@@ -219,7 +219,14 @@ async function main(): Promise<void> {
     const sold = await transitionLot(db, auction, lot.id, owner, "sell");
     if (!sold.ok) throw new Error(`sell: ${sold.reason}`);
   }
-  const completed = await transitionAuction(db, auction, owner, "complete");
+  const completed = await transitionAuction(
+    db,
+    auction,
+    owner,
+    "complete",
+    undefined,
+    /* squads are deliberately tiny in this fixture: override DA-06, as a conductor would */ true,
+  );
   if (!completed.ok) throw new Error(`complete: ${completed.reason}`);
 
   const razorpay = createRazorpayAdapter({
@@ -228,7 +235,14 @@ async function main(): Promise<void> {
     webhookSecret: WEBHOOK_SECRET,
     transport,
   });
-  const deps = settlementDeps(db, { gateways: { "gateway:razorpay": razorpay } });
+  const deps = settlementDeps(db, {
+    gateways: { "gateway:razorpay": razorpay },
+    // Gateway payments refuse without the organizer's Route linked account
+    // (no_settlement_account). The harness never had one, so every gateway
+    // payment below was refused and the webhook row reported n=0 as if it
+    // had been measured. The transport is a stub; the account id is a fixture.
+    settlementAccount: () => Promise.resolve("acc_perf_linked"),
+  });
   const actor: SettlementActor = {
     personId: owner,
     orgId,
@@ -295,7 +309,10 @@ async function main(): Promise<void> {
       method: "gateway:razorpay",
       amount: 100_000,
     });
-    if (ack.ok) gatewayIds.push(pid);
+    // Loud, not skipped: a refused payment here means the row below would
+    // time nothing, which is worse than no row.
+    if (!ack.ok) throw new Error(`gateway payment refused: ${JSON.stringify(ack)}`);
+    gatewayIds.push(pid);
   }
   const webhook: number[] = [];
   for (const pid of gatewayIds) {

@@ -105,7 +105,8 @@ target and start again from step 2.
 | Date | Source size | Target | Restore time (steps 2–6) | Result | By |
 |------|-------------|--------|--------------------------|--------|----|
 | 2026-09-05 | 25 MB / 4,968 rows / 60 tables | local scratch DB, same cluster | 1.8 s | PASS — counts identical, and a full auction night ran on the restored copy through all four roles to two issued receipts | PA-1R Phase 8.4 |
-| _pending — repeat against managed Postgres before launch_ | | | | | |
+| 2026-09-18 | 108 MB / ~131,000 rows / 68 tables | local scratch DB, same cluster | 6.0 s (dump 0.9 s · restore 2.4 s · roles 0.2 s · night 1.9 s) | PASS — every row count identical; a whole auction night (51 steps) ran on the restored copy under the four roles to two numbered receipts, no owner connection on the write path | Final readiness audit, Phase 11 |
+| _pending — repeat against the production stanza before launch ([GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md) §B)_ | | | | | |
 
 **Read that 1.8 s correctly.** It is not a production RTO and must not be quoted
 as one: the database is 25 MB and the cluster is on the same machine. What the

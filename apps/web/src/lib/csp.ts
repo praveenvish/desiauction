@@ -22,7 +22,8 @@
  *   connect-src  'self' + the engine's WebSocket origin + the bucket endpoint —
  *                the live room's socket, and presigned photo uploads, which go
  *                from the browser straight to storage.
- *   everything else 'self' or 'none'.
+ *   everything else 'self' or 'none' — except frame-ancestors, which stays in
+ *                the static header (see the note in the directive list).
  */
 
 export interface CspInputs {
@@ -100,7 +101,13 @@ export function buildContentSecurityPolicy(input: CspInputs): string {
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", ["'self'"]],
-    ["frame-ancestors", ["'none'"]],
+    // NOT frame-ancestors. Browsers ignore it in a Report-Only policy (the spec
+    // says so, and WebKit logs a warning on every page that sends one), so in
+    // the default mode it protected nothing. It is enforced where it works: the
+    // static header in next.config.mjs, which reaches every response, including
+    // those middleware never sees, with X-Frame-Options beside it. Once
+    // CSP_ENFORCE is on, a second copy here would only intersect with the same
+    // 'none'.
     ["report-uri", [input.reportUri]],
   ];
   return directives.map(([name, values]) => `${name} ${values.join(" ")}`).join("; ");
