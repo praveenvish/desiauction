@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 
 import { env } from "../env";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
+import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
 import { adminNavVisible } from "../server/admin/actions";
@@ -148,6 +149,8 @@ export default async function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
         />
+        {/* Every shell, every route: a click is answered before the network is. */}
+        <NavigationProgress />
         <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
           <ProductShell
             session={
