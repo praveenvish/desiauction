@@ -10,6 +10,7 @@ import {
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { normalizeEmail } from "./email-change";
+import { DEFAULT_GLOBAL_PER_HOUR } from "./otp";
 
 /**
  * SIGNING IN WITH A MAILBOX (Phase 1).
@@ -88,7 +89,7 @@ export type EmailLoginRequest =
        */
       isNew?: boolean;
     }
-  | { ok: false; reason: "invalid-email" | "hourly-limit" };
+  | { ok: false; reason: "invalid-email" | "hourly-limit" | "busy" };
 
 /**
  * Mint a code for an address — to sign in, or to sign up.
@@ -106,7 +107,7 @@ export type EmailLoginRequest =
  */
 export async function requestEmailLogin(
   db: Db,
-  input: { email: string; requestIp?: string | null },
+  input: { email: string; requestIp?: string | null; globalPerHour?: number },
 ): Promise<EmailLoginRequest> {
   const email = normalizeEmail(input.email);
   if (email === null) {
@@ -149,6 +150,16 @@ export async function requestEmailLogin(
     if (ip.count >= MAX_PER_HOUR_PER_IP) {
       return { ok: false, reason: "hourly-limit" };
     }
+  }
+
+  // PLATFORM-WIDE CEILING, before the lookup like every other throttle here, so
+  // it answers identically for real and unknown addresses. See otp.ts.
+  const [platform] = (await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(emailVerifications)
+    .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
+  if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
+    return { ok: false, reason: "busy" };
   }
 
   /*

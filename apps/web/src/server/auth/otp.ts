@@ -12,6 +12,15 @@ const RESEND_COOLDOWN_MS = 30 * 1000;
 const MAX_PER_HOUR = 5;
 const MAX_PER_HOUR_PER_IP = 20;
 const MAX_ATTEMPTS = 5;
+/**
+ * PLATFORM-WIDE SEND CEILING. The caps above stop one handset and one source;
+ * this stops the platform being used as an SMS cannon from rotating addresses
+ * (pumping burns money and DLT sender reputation). Sized well above a busy
+ * auction night; `OTP_GLOBAL_HOURLY_CAP` overrides it. Hitting it refuses with
+ * `busy` and logs loudly — during an attack, legitimate sign-ins wait too,
+ * which is the trade-off every ceiling makes.
+ */
+export const DEFAULT_GLOBAL_PER_HOUR = 2_000;
 
 export function hashCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
@@ -26,7 +35,7 @@ export function hashCode(code: string): string {
 export type OtpPurpose = "login" | "phone_change";
 
 export type RequestOtpResult =
-  { ok: true } | { ok: false; reason: "invalid-phone" | "cooldown" | "hourly-limit" };
+  { ok: true } | { ok: false; reason: "invalid-phone" | "cooldown" | "hourly-limit" | "busy" };
 
 /**
  * Uniform behaviour for every plausible phone (no-enumeration, IP-2 §6):
@@ -41,6 +50,7 @@ export async function requestOtp(
   rawPhone: string,
   requestIp: string | null = null,
   purpose: OtpPurpose = "login",
+  globalPerHour: number = DEFAULT_GLOBAL_PER_HOUR,
 ): Promise<RequestOtpResult> {
   const normalized = normalizePhone(rawPhone);
   if (!normalized.ok) {
@@ -85,6 +95,14 @@ export async function requestOtp(
     if (ipCount >= MAX_PER_HOUR_PER_IP) {
       return { ok: false, reason: "hourly-limit" };
     }
+  }
+
+  const [{ count: platformCount }] = (await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(otpCodes)
+    .where(gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)))) as [{ count: number }];
+  if (platformCount >= globalPerHour) {
+    return { ok: false, reason: "busy" };
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");

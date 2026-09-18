@@ -505,6 +505,13 @@
       "when": 1789920000000,
       "tag": "0072_competition_platform_hold",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1790006400000,
+      "tag": "0073_send_ceiling_indexes",
+      "breakpoints": true
     }
   ]
 }

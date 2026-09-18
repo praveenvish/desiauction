@@ -191,7 +191,14 @@ export async function requestOtpAction(
   const phone = formString(formData, "phone");
   let result: Awaited<ReturnType<typeof requestOtp>>;
   try {
-    result = await requestOtp(db, sender, phone, await requestIp());
+    result = await requestOtp(
+      db,
+      sender,
+      phone,
+      await requestIp(),
+      "login",
+      env.OTP_GLOBAL_HOURLY_CAP,
+    );
   } catch (error) {
     // PX-3: provider failure (or open breaker) is an honest, retryable state —
     // never a crash screen on the front door.
@@ -226,6 +233,14 @@ export async function requestOtpAction(
         phone: normalized.ok ? normalized.phone : phone,
         ...carriedNext,
         error: "Code already sent — wait 30 seconds before requesting again.",
+      };
+    }
+    if (result.reason === "busy") {
+      return {
+        step: "phone",
+        phone,
+        ...carriedNext,
+        error: "We're sending a lot of codes right now. Try again in a few minutes.",
       };
     }
     if (result.reason === "hourly-limit") {
@@ -345,11 +360,16 @@ export async function requestEmailLoginAction(
   // `exactOptionalPropertyTypes` is on: spreading a state whose `error` is
   // `string | undefined` is not the same as omitting the key, so every return
   // below sets `error` explicitly rather than carrying an absent one through.
-  const result = await requestEmailLogin(db, { email, requestIp: await requestIp() });
+  const result = await requestEmailLogin(db, {
+    email,
+    requestIp: await requestIp(),
+    globalPerHour: env.OTP_GLOBAL_HOURLY_CAP,
+  });
   if (!result.ok) {
     const message: Record<typeof result.reason, string> = {
       "invalid-email": "Enter the email address on your account.",
       "hourly-limit": "Too many codes for that address. Try again in an hour.",
+      busy: "We're sending a lot of codes right now. Try again in a few minutes.",
     };
     return { ...base, error: message[result.reason] };
   }
@@ -814,6 +834,7 @@ export async function requestPhoneChangeAction(
       personId: session.personId,
       newPhone: phone,
       requestIp: await requestIp(),
+      globalPerHour: env.OTP_GLOBAL_HOURLY_CAP,
     });
   } catch (error) {
     // Same contract as the front door: a melted provider is a retryable state,
@@ -833,6 +854,7 @@ export async function requestPhoneChangeAction(
       "same-number": "That is already the number on this account.",
       cooldown: "Code already sent — wait 30 seconds before requesting another.",
       "hourly-limit": "Too many codes for that number. Try again in an hour.",
+      busy: "We're sending a lot of codes right now. Try again in a few minutes.",
     };
     return { step: previous.step, error: message[result.reason] };
   }

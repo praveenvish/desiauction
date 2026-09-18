@@ -30,7 +30,8 @@ const PHONE_A = `+9196${RUN}0`;
 const PHONE_B = `+9197${RUN}1`;
 const PHONE_C = `+9198${RUN}2`;
 const PHONE_D = `+9199${RUN}3`;
-const TEST_PHONES = [PHONE_A, PHONE_B, PHONE_C, PHONE_D];
+const PHONE_E = `+9196${RUN}4`;
+const TEST_PHONES = [PHONE_A, PHONE_B, PHONE_C, PHONE_D, PHONE_E];
 
 async function loginFresh(phone: string): Promise<string> {
   await requestOtp(db, sender, phone);
@@ -177,6 +178,18 @@ describe("SECURITY REGRESSION — identity contract", () => {
     expect(evaluated.length).toBeLessThanOrEqual(1);
     const [after] = await db.select().from(otpCodes).where(eq(otpCodes.id, row.id)).limit(1);
     expect(after?.attempts).toBe(5);
+  });
+
+  it("the platform-wide ceiling refuses a send once the last hour's codes reach it", async () => {
+    // Earlier tests in this file minted codes within the hour, so a ceiling of
+    // one is already reached: the send is refused as `busy` and nothing is minted.
+    const before = await db.select().from(otpCodes).where(eq(otpCodes.phone, PHONE_E));
+    expect(await requestOtp(db, sender, PHONE_E, null, "login", 1)).toEqual({
+      ok: false,
+      reason: "busy",
+    });
+    const after = await db.select().from(otpCodes).where(eq(otpCodes.phone, PHONE_E));
+    expect(after.length).toBe(before.length);
   });
 
   it("session rotation: every login mints a distinct token; both are independently revocable", async () => {

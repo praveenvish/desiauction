@@ -49,6 +49,12 @@ const envSchema = z.object({
    * fallback"). `msg91` stays as the SMS fallback and is not deprecated.
    */
   OTP_PROVIDER: z.enum(["dev", "msg91", "whatsapp"]).default("dev"),
+  /**
+   * Platform-wide ceiling on sign-in codes minted per hour, per channel (SMS and
+   * email counted separately). Stops the platform being used to pump SMS from
+   * rotating addresses; see DEFAULT_GLOBAL_PER_HOUR in server/auth/otp.ts.
+   */
+  OTP_GLOBAL_HOURLY_CAP: z.coerce.number().int().positive().default(2_000),
   /** Meta phone number ID from the WhatsApp Business Account — not the number. */
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
   /** Permanent system-user token. Rotate via SECRET_ROTATION.md. */
