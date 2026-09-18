@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3000",
+    "dev": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --turbopack --port 3000",
+    "dev:webpack": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3000",
+    "preview": "NEXT_DIST_DIR=.next-preview node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next build && ALLOW_INSECURE_LOCAL_PRODUCTION=1 NEXT_DIST_DIR=.next-preview node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next start --port 3100",
     "build": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next build",
     "start": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next start",
     "lint": "eslint src --max-warnings 0",
@@ -26,6 +28,7 @@
     "perf:competition": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-competition.ts",
     "perf:collections": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-collections.ts",
     "perf:closure": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-closure.ts",
+    "perf:routes": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-routes.ts",
     "perf:finops": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/perf-finops.ts",
     "pass:grant": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/grant-pass.ts",
     "posture:verify": "vitest run --config vitest.posture.config.ts",

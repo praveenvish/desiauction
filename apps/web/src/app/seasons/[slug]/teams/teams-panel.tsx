@@ -25,7 +25,8 @@ import {
   setTeamCoachAction,
   updateTeamAction,
 } from "../../../../server/competition/actions";
-import type { TeamCard, TeamsWorkspaceView } from "../../../../server/competition/actions";
+import type { TeamsWorkspaceView } from "../../../../server/competition/actions";
+import type { TeamCard } from "../../../../server/competition/team-workspace";
 import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
 import { TeamLogoUploader } from "./team-logo-uploader";
 

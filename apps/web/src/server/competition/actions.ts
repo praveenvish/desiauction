@@ -106,7 +106,6 @@ import {
 import { notifyDecision } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, type TeamsWorkspace } from "./team-workspace";
-export type { TeamCard, TeamRosterRow } from "./team-workspace";
 import {
   addPlayerByPhone,
   exportRegistrationsCsv,
