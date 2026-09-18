@@ -30,6 +30,7 @@ import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 // The live client (M-IP4-2, rewired M-IP4-3). This component DECIDES NOTHING:
 // it renders the broadcast AuctionSnapshot (shared socket hook), sends
@@ -65,10 +66,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
    */
   const [pending, setPending] = useState<string | null>(null);
   const intents = useIntentIds();
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   /**
    * THE ROUND TRIP CAN FAIL, AND IT USED TO FAIL SILENTLY FOREVER.

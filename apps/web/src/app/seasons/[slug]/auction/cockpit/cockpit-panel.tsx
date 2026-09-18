@@ -30,6 +30,7 @@ import { AuctionProgress, useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 // THE AUCTION COCKPIT (M-IP4-3). The organizer's control room: open, pause,
 // resume, open ANY queued lot (order control = skip/bring-forward, doc 41),
@@ -96,10 +97,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const [inviteTeam, setInviteTeam] = useState("");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   /*
    * STABLE ACROSS RENDERS, BECAUSE A WINDOW LISTENER DEPENDS ON IT.

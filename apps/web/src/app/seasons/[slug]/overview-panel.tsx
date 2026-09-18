@@ -232,10 +232,12 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   // DA-16: every action dropped focus to <body>. The control that started the
   // work takes it back when the work is done — and it can only take it back
   // once the button is no longer `disabled` by its own loading state, which is
-  // why this is an effect and not a call at the end of the handler.
+  // why this is an effect and not a call at the end of the handler. Which
+  // control to refocus is a ref, not state: it is a note from the handler to
+  // the effect, and rendering again just to clear it did nothing for anyone.
   const advanceRef = useRef<HTMLButtonElement>(null);
   const publishRef = useRef<HTMLButtonElement>(null);
-  const [pendingFocus, setPendingFocus] = useState<"advance" | "publish" | null>(null);
+  const pendingFocusRef = useRef<"advance" | "publish" | null>(null);
 
   const status = view.competition.status;
   const step = NEXT_STEP[status] ?? null;
@@ -251,12 +253,13 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   const canPublish = view.publishBlockers.length === 0;
 
   useEffect(() => {
+    const pendingFocus = pendingFocusRef.current;
     if (pendingFocus === null || busy) {
       return;
     }
     (pendingFocus === "advance" ? advanceRef.current : publishRef.current)?.focus();
-    setPendingFocus(null);
-  }, [pendingFocus, busy, status, view.competition.visibility]);
+    pendingFocusRef.current = null;
+  }, [busy, status, view.competition.visibility]);
   const previewable = view.competition.visibility === "public" || status === "registration_open";
 
   const advance = async () => {
@@ -273,12 +276,12 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
       setBlocked(false);
       toast({ title: ADVANCE_ANNOUNCEMENT[step.to] ?? "Season updated.", tone: "success" });
       router.refresh();
-      setPendingFocus("advance");
+      pendingFocusRef.current = "advance";
     } else if (result.needsDetails === true) {
       // Naming three fields the product gave no way to set was the whole of
       // DA-11. The refusal now carries its own repair.
       setBlocked(true);
-      setPendingFocus("advance");
+      pendingFocusRef.current = "advance";
     } else {
       toast({ title: result.error ?? "Could not advance.", tone: "danger" });
     }
@@ -311,7 +314,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
         tone: "success",
       });
       router.refresh();
-      setPendingFocus("publish");
+      pendingFocusRef.current = "publish";
     } else {
       toast({ title: result.error ?? "Could not update.", tone: "danger" });
     }

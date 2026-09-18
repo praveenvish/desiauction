@@ -75,6 +75,28 @@ function writeUrl(mode: "push" | "replace", step: Step, phone: string, next?: st
   }
 }
 
+/** Routes one submission to the server action its intent names. */
+async function submit(
+  intent: Intent,
+  previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  if (intent === "resend") {
+    // Re-request for the same phone; on cooldown stay on the code step
+    // with the server's message instead of bouncing back to phone entry.
+    const result = await requestOtpAction({ ...previous, step: "phone" }, formData);
+    return result.step === "phone" && result.error !== undefined
+      ? { ...previous, error: result.error }
+      : result;
+  }
+  if (intent === "request") {
+    // "Use a different number" is a client-side step override — the server
+    // state may still say "code"; the submitted intent is authoritative.
+    return requestOtpAction({ ...previous, step: "phone" }, formData);
+  }
+  return verifyOtpAction(previous, formData);
+}
+
 export function LoginPanel({
   next,
   initialStep,
@@ -82,10 +104,16 @@ export function LoginPanel({
   honoredNext,
   returning,
 }: LoginPanelProps) {
-  const intentRef = useRef<Intent>("request");
   const [offline, setOffline] = useState(false);
   const [sentAt, setSentAt] = useState<number | null>(null);
-  const [, setTick] = useState(0);
+  /*
+   * The countdown's clock, held in state and advanced by the interval below.
+   * It used to be a dummy counter whose only job was to force a re-render so
+   * `Date.now()` could be read DURING render — an impure render that a server
+   * pass and a client pass would each answer differently. Now render only
+   * reads state, and the one place time is sampled is the interval.
+   */
+  const [now, setNow] = useState<number | null>(null);
   // Mirrors the URL. Seeded from the server's reading of it so the first client
   // render is byte-identical to the server's (no hydration mismatch).
   const [step, setStep] = useState<Step>(initialStep);
@@ -100,20 +128,31 @@ export function LoginPanel({
       const intent =
         (formData.get("intent") as Intent | null) ??
         (formData.get("code") === null ? "request" : "verify");
-      if (intent === "resend") {
-        // Re-request for the same phone; on cooldown stay on the code step
-        // with the server's message instead of bouncing back to phone entry.
-        const result = await requestOtpAction({ ...previous, step: "phone" }, formData);
-        return result.step === "phone" && result.error !== undefined
-          ? { ...previous, error: result.error }
-          : result;
+      const result = await submit(intent, previous, formData);
+      // What the answer means for the page is decided HERE, once per
+      // submission, where the intent is known. It used to be an effect keyed on
+      // `state` that reconstructed the intent from two refs and compared against
+      // the step it had itself just changed.
+      if (result.step === "code") {
+        setPhone(result.phone);
+        if (result.error === undefined && intent !== "verify") {
+          // A code went out (first send, resend, or a send to a corrected
+          // number), so the resend countdown starts again from now.
+          const sent = Date.now();
+          setSentAt(sent);
+          setNow(sent);
+        }
+        if (intent === "request") {
+          // A step forward, so it earns a history entry; resend and a failed
+          // verify leave the page where it already is.
+          setStep("code");
+          writeUrl("push", "code", result.phone, next);
+        }
+        if (result.error !== undefined) {
+          track("auth.otp_failed");
+        }
       }
-      if (intent === "request") {
-        // "Use a different number" is a client-side step override — the server
-        // state may still say "code"; the submitted intent is authoritative.
-        return requestOtpAction({ ...previous, step: "phone" }, formData);
-      }
-      return verifyOtpAction(previous, formData);
+      return result;
     },
     {
       step: initialStep,
@@ -138,37 +177,6 @@ export function LoginPanel({
     };
   }, []);
 
-  const prevStepRef = useRef<AuthFormState["step"]>(initialStep);
-  useEffect(() => {
-    const arrivedAtCode =
-      state.step === "code" &&
-      state.error === undefined &&
-      (prevStepRef.current === "phone" || intentRef.current === "resend");
-    if (arrivedAtCode) {
-      setSentAt(Date.now());
-    }
-    if (state.step === "code") {
-      setPhone(state.phone);
-      if (step !== "code") {
-        setStep("code");
-        writeUrl("push", "code", state.phone, next);
-      }
-    }
-    if (state.step === "code" && state.error !== undefined) {
-      track("auth.otp_failed");
-    }
-    prevStepRef.current = state.step;
-    intentRef.current = "request";
-    // Keyed on `state` ALONE on purpose: `step` and `next` are read here but
-    // must not retrigger it — re-running on a step change would re-push the URL
-    // that the step change had just written. That is a real exclusion rather
-    // than an oversight, so it is stated to the rule as well as to the reader:
-    // both values are read only inside the `state.step === "code"` branch, on
-    // the render that `state` itself changed, so neither can be stale when it
-    // matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
   // A rejected submit used to leave `document.activeElement` on <body>: the
   // caret gone, the keyboard dismissed on mobile, and nothing to correct
   // without hunting for the field again. Focus goes back to the input that was
@@ -188,7 +196,9 @@ export function LoginPanel({
   }, []);
 
   const secondsLeft =
-    sentAt === null ? 0 : Math.max(0, RESEND_COOLDOWN_S - Math.floor((Date.now() - sentAt) / 1000));
+    sentAt === null || now === null
+      ? 0
+      : Math.max(0, RESEND_COOLDOWN_S - Math.floor((now - sentAt) / 1000));
 
   // Tick the countdown once a second while it's running.
   useEffect(() => {
@@ -196,7 +206,7 @@ export function LoginPanel({
       return;
     }
     const timer = window.setInterval(() => {
-      setTick((value) => value + 1);
+      setNow(Date.now());
     }, 1000);
     return () => {
       window.clearInterval(timer);
@@ -261,7 +271,6 @@ export function LoginPanel({
               : step === "phone"
                 ? "request"
                 : "verify";
-          intentRef.current = intent;
           track(
             intent === "resend"
               ? "auth.otp_resent"
@@ -362,10 +371,6 @@ export function LoginPanel({
               data-testid="change-number"
               onClick={() => {
                 setStep("phone");
-                // The next code request is a fresh arrival at the code step, so
-                // its countdown starts again — without this the server state
-                // still said "code" and the resend button unlocked instantly.
-                prevStepRef.current = "phone";
                 // A correction, not a step forward: it replaces the code step
                 // in history rather than stacking a third entry on it.
                 writeUrl("replace", "phone", phone, next);

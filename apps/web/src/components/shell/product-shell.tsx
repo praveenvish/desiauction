@@ -25,7 +25,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { LEGAL_IDENTITY, legalIdentityPublished } from "../../content/company";
@@ -107,6 +107,22 @@ export interface ProductShellProps {
   children: ReactNode;
 }
 
+function subscribeToStorage(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+/** The device's inbox watermark for this person; undefined when storage is unreadable. */
+function readInboxSeen(personId: string): string | null | undefined {
+  try {
+    return window.localStorage.getItem(inboxSeenKey(personId));
+  } catch {
+    return undefined;
+  }
+}
+
 /** Bell with unread dot: newest event vs. the device's last inbox visit. */
 function BellLink({
   latestEventAt,
@@ -119,23 +135,24 @@ function BellLink({
       this device, which on a shared handset is the wrong person. */
   personId: string;
 }) {
-  const [unread, setUnread] = useState(false);
-  useEffect(() => {
-    if (latestEventAt === null) {
-      setUnread(false);
-      return;
-    }
+  // The watermark is read from storage on every render (useSyncExternalStore
+  // re-reads its snapshot each time), so leaving /inbox — which has just moved
+  // it — shows the new answer at once. Another tab reading the inbox clears
+  // this tab's dot through `storage`. Undefined means "not known yet": the
+  // server render and the hydrating one show no dot rather than guess.
+  const seen = useSyncExternalStore(
+    subscribeToStorage,
+    () => readInboxSeen(personId),
+    () => undefined,
+  );
+  const unread =
+    latestEventAt !== null &&
     // Standing ON the notifications page, the answer is already "you are
-    // reading them" — the page advances the watermark for the next render,
-    // but this effect ran first and kept the dot lit over the very list it
-    // was pointing at.
-    if (pathname.startsWith("/inbox")) {
-      setUnread(false);
-      return;
-    }
-    const seen = window.localStorage.getItem(inboxSeenKey(personId));
-    setUnread(seen === null || latestEventAt > seen);
-  }, [latestEventAt, pathname, personId]);
+    // reading them" — the page advances the watermark as it renders, so the dot
+    // must not stay lit over the very list it was pointing at.
+    !pathname.startsWith("/inbox") &&
+    seen !== undefined &&
+    (seen === null || latestEventAt > seen);
   return (
     <Link
       className="shell-icon-button shell-bell"
@@ -262,7 +279,11 @@ export function ProductShell({
 }: ProductShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // The drawer remembers WHERE it was opened, so it is open only on that page:
+  // navigating anywhere closes it in the same render, with no effect needed to
+  // notice the route changed.
+  const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null);
+  const drawerOpen = drawerOpenOn === pathname;
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
   /**
    * The action a page PUBLISHES, which is now an override rather than the only
@@ -298,11 +319,6 @@ export function ProductShell({
       window.removeEventListener("keydown", onKey);
     };
   }, [kind, session]);
-
-  // Close transient chrome on navigation.
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [pathname]);
 
   // Stable identities, so a page's effect fires once. `retract` clears only
   // what the retracting instance itself published, which keeps a Suspense
@@ -1009,7 +1025,7 @@ export function ProductShell({
                 className="shell-icon-button shell-mobile-only"
                 aria-label="Menu"
                 onClick={() => {
-                  setDrawerOpen(true);
+                  setDrawerOpenOn(pathname);
                 }}
               >
                 <IconMenu />
@@ -1034,7 +1050,7 @@ export function ProductShell({
           <Drawer
             open
             onClose={() => {
-              setDrawerOpen(false);
+              setDrawerOpenOn(null);
             }}
             title="Menu"
           >

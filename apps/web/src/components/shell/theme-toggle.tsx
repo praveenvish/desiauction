@@ -1,7 +1,7 @@
 "use client";
 
 import { IconMoon, IconSun } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 /**
  * Console theme switch (doc 18 C-4). The root carries `data-theme`; Daylight is
@@ -28,15 +28,24 @@ function readTheme(): ConsoleTheme {
     : "daylight";
 }
 
-export function ThemeToggle() {
-  // Server renders the default; the effect reconciles with the real attribute.
-  const [theme, setTheme] = useState<ConsoleTheme>("daylight");
-  const [ready, setReady] = useState(false);
+/**
+ * The attribute IS the store: the bootstrap script, this button and any other
+ * tab-level switch all write `data-theme` on the root, so the toggle subscribes
+ * to that attribute rather than keeping a copy of it in state.
+ */
+function subscribeTheme(onChange: () => void): () => void {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => {
+    observer.disconnect();
+  };
+}
 
-  useEffect(() => {
-    setTheme(readTheme());
-    setReady(true);
-  }, []);
+export function ThemeToggle() {
+  // The server cannot know the stored theme, so it (and the hydrating render)
+  // sees null and draws the default icon; the client snapshot takes over after.
+  const current = useSyncExternalStore(subscribeTheme, readTheme, () => null);
+  const theme: ConsoleTheme = current ?? "daylight";
 
   const next: ConsoleTheme = theme === "daylight" ? "floodlight" : "daylight";
 
@@ -54,10 +63,9 @@ export function ThemeToggle() {
         } catch {
           // Private mode / storage disabled: the switch still works for this view.
         }
-        setTheme(next);
       }}
     >
-      {ready && theme === "floodlight" ? <IconSun size={18} /> : <IconMoon size={18} />}
+      {current === "floodlight" ? <IconSun size={18} /> : <IconMoon size={18} />}
     </button>
   );
 }

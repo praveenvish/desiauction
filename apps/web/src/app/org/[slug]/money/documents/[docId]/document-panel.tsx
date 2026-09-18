@@ -12,7 +12,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   retryDeliveryAction,
@@ -24,6 +24,7 @@ import { DOC_KIND_LABEL } from "../../../../../../server/financial-operations/re
 import { DELIVERY_LANE_LABEL } from "../../../../../../server/financial-operations/deliveries";
 import "../../../../../seasons/[slug]/money/money.css";
 import "../../finance.css";
+import { useHydrated } from "../../../../../../lib/use-hydrated";
 
 /**
  * PX-8 §4 — Operations detail: one document, end to end.
@@ -77,10 +78,7 @@ export function DocumentPanel({ slug, workspace }: { slug: string; workspace: Do
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   const { detail, viewer } = workspace;
   const { snapshot, settlement, deliveries, timeline } = detail;

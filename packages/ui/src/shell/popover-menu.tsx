@@ -62,12 +62,6 @@ export function PopoverMenu({
     };
   }, [open]);
 
-  useEffect(() => {
-    if (open) {
-      focusItem(0);
-    }
-  }, [open]);
-
   const focusItem = (index: number) => {
     const nodes = listRef.current?.querySelectorAll<HTMLElement>("[role='menuitem']");
     if (nodes === undefined || nodes.length === 0) {
@@ -83,6 +77,14 @@ export function PopoverMenu({
     );
     return nodes.findIndex((node) => node === document.activeElement);
   };
+
+  // After the helpers it calls, so the effect never reaches a binding that is
+  // declared further down the component.
+  useEffect(() => {
+    if (open) {
+      focusItem(0);
+    }
+  }, [open]);
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     if (event.key === "Escape") {

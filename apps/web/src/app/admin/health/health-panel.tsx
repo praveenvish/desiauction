@@ -15,6 +15,10 @@ import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
 export function HealthPanel({ health }: { health: PlatformHealth }) {
   const { runner, runnerVerdict, orgs, followers } = health;
   const schedules = runner.schedules;
+  // A SERVER component: it renders once per request and never hydrates, so
+  // reading the clock here cannot disagree with a client pass. The rule cannot
+  // tell a server component from a client one.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   return (
     <>

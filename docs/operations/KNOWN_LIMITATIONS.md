@@ -85,11 +85,3 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
   authenticator that has no cross-engine equivalent.
 - **Real provider latencies** (SMS delivery time, S3 upload/download, live
   webhook round-trip): measured only against the live accounts.
-- **The React Compiler's lint rules are not on.** `eslint-plugin-react-hooks` v7
-  ships the compiler's own analyses (`immutability`, `refs`,
-  `set-state-in-effect`, `purity`) in its recommended preset. The two contracts
-  whose violations are bugs by definition — `rules-of-hooks` and
-  `exhaustive-deps` — ARE enforced, repo-wide, and were clean after four real
-  fixes. The compiler rules flag another ~20 sites, several of them deliberate
-  (the ref-based 10 Hz auction clock exists precisely to avoid re-rendering a
-  room). Adopting them is a design conversation, not a switch.

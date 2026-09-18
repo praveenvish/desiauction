@@ -1,7 +1,9 @@
 "use client";
 
 import { Button, IconCheck } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+
+import { usePageAddress } from "../../../../../lib/use-hydrated";
 
 /**
  * Share control for a public player page. The OG route calls this page "the
@@ -15,12 +17,8 @@ import { useEffect, useState } from "react";
  * sheet. No new dependencies.
  */
 export function SharePlayer({ playerName }: { playerName: string }) {
-  const [url, setUrl] = useState("");
+  const url = usePageAddress();
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    setUrl(window.location.href.split("?")[0] ?? window.location.href);
-  }, []);
 
   async function copy() {
     try {

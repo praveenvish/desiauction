@@ -61,6 +61,7 @@ import type {
   RegistrationStats,
   TimelineEntry,
 } from "../../../../server/competition/registrations";
+import { useHydrated } from "../../../../lib/use-hydrated";
 
 type Row = RegistrationPage["rows"][number];
 
@@ -298,10 +299,7 @@ export function RegistrationDashboardPanel({
   const [search, setSearch] = useState(filters.search);
   // Interactivity marker: this effect runs only after client hydration, so the
   // attribute is a deterministic "the panel's handlers are live now" signal.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   const rows = page.rows;
   const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
@@ -726,8 +724,11 @@ export function RegistrationDashboardPanel({
    * A destructive write has no business on an unmodified letter key listening
    * at the window. Movement and selection stay; the writes are buttons.
    */
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
+  // The listener reads `rows`, `cursor` and `toggle` directly and is
+  // re-registered when any of them changes — one addEventListener per cursor
+  // move, which costs nothing. It used to copy `rows` into a ref DURING render
+  // so the effect could skip that dependency; writing a ref while rendering is
+  // what the compiler rules forbid, and the saving was never worth it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -740,13 +741,12 @@ export function RegistrationDashboardPanel({
       if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
-      const current = rowsRef.current;
       if (event.key === "j") {
-        setCursor((c) => Math.min(c + 1, current.length - 1));
+        setCursor((c) => Math.min(c + 1, rows.length - 1));
       } else if (event.key === "k") {
         setCursor((c) => Math.max(c - 1, 0));
       } else if (event.key === "x") {
-        const row = current[cursor];
+        const row = rows[cursor];
         if (row) {
           toggle(row);
         }
@@ -756,7 +756,7 @@ export function RegistrationDashboardPanel({
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [cursor, toggle]);
+  }, [rows, cursor, toggle]);
 
   // Keep the keyboard cursor in view (P2) — a cursor you cannot see is a cursor
   // that selects rows you did not mean.

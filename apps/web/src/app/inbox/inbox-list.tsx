@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { inboxSeenKey, labelForEvent } from "../../lib/inbox-events";
+import { useHydrated } from "../../lib/use-hydrated";
 
 export interface InboxEvent {
   action: string;
@@ -65,7 +66,7 @@ function formatWhen(iso: string, now: number | null): string {
  */
 export function InboxList({ personId, events }: { personId: string; events: InboxEvent[] }) {
   const [seenBefore, setSeenBefore] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
   // Rendered on the client only: a server-rendered "3 hours ago" is stale by
   // the time it reaches the browser and mismatches on hydration.
   const [now, setNow] = useState<number | null>(null);
@@ -77,7 +78,6 @@ export function InboxList({ personId, events }: { personId: string; events: Inbo
     const key = inboxSeenKey(personId);
     captured.current ??= { seen: window.localStorage.getItem(key) };
     setSeenBefore(captured.current.seen);
-    setHydrated(true);
     setNow(Date.now());
     const latest = events[0]?.at;
     if (latest !== undefined) {

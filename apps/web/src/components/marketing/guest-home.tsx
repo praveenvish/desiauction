@@ -41,10 +41,6 @@ const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
 export function AuctionLab({ sports }: { sports: SportOption[] }) {
   const [selected, setSelected] = useState("football");
   const [bid, setBid] = useState(0);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    setReady(true);
-  }, []);
   const sport = sports.find((item) => item.key === selected) ?? sports[0];
   const sold = bid === 3;
   const amount = 20000 + bid * 5000;
@@ -77,7 +73,6 @@ export function AuctionLab({ sports }: { sports: SportOption[] }) {
                 setSelected(item.key);
                 setBid(0);
               }}
-              disabled={!ready}
             >
               <SportGlyph sport={item.key} />
               <span>{item.label}</span>
@@ -165,7 +160,6 @@ export function AuctionLab({ sports }: { sports: SportOption[] }) {
               <button
                 type="button"
                 className={styles.bidButton}
-                disabled={!ready}
                 onClick={() => {
                   setBid((current) => (current >= 3 ? 0 : current + 1));
                 }}

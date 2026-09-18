@@ -134,8 +134,8 @@ function firstInvalidIn(node: Control): Element | null {
 }
 
 interface ControlWiring<E extends Control> {
-  /** Ref for the DOM node; merges whatever ref the caller forwarded. */
-  ref: (node: E | null) => void;
+  /** Callback ref for the DOM node; merges whatever ref the caller forwarded. */
+  attach: (node: E | null) => void;
   /** The caller's error if there is one, else the browser's own complaint. */
   shownError: string | undefined;
   onInvalid: InvalidHandler<E>;
@@ -177,6 +177,21 @@ interface ControlWiring<E extends Control> {
  *     fail at once the FIRST in document order wins — after it takes focus,
  *     its later siblings no longer see <body> and stand down.
  */
+/**
+ * Hand the DOM node to whatever ref the caller forwarded — a callback or an
+ * object. Written once, outside the hook, because assigning `.current` on a
+ * ref the component RECEIVED is the documented way to merge refs, and the
+ * React Compiler's lint reads that assignment inside a hook as mutating an
+ * argument. Here it is plainly what it is.
+ */
+function assignForwardedRef<E>(forwarded: ForwardedRef<E>, node: E | null): void {
+  if (typeof forwarded === "function") {
+    forwarded(node);
+  } else if (forwarded !== null) {
+    forwarded.current = node;
+  }
+}
+
 function useControl<E extends Control>(
   error: string | undefined,
   forwarded: ForwardedRef<E>,
@@ -190,11 +205,7 @@ function useControl<E extends Control>(
   const ref = useCallback(
     (node: E | null) => {
       nodeRef.current = node;
-      if (typeof forwarded === "function") {
-        forwarded(node);
-      } else if (forwarded !== null) {
-        forwarded.current = node;
-      }
+      assignForwardedRef(forwarded, node);
     },
     [forwarded],
   );
@@ -272,7 +283,7 @@ function useControl<E extends Control>(
     [callerOnInput],
   );
 
-  return { ref, shownError, onInvalid, onInput };
+  return { attach: ref, shownError, onInvalid, onInput };
 }
 
 export interface FieldProps
@@ -283,32 +294,39 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
   { label, help, error, required, className, onInvalid, onInput, ...rest },
   ref,
 ) {
-  const wiring = useControl<HTMLInputElement>(error, ref, onInvalid, onInput);
-  const ids = useChromeIds(help, wiring.shownError);
+  // Destructured, so the ref callback travels apart from the render values:
+  // read through one object, the compiler treats every field as a ref read.
+  const {
+    attach,
+    shownError,
+    onInvalid: handleInvalid,
+    onInput: handleInput,
+  } = useControl<HTMLInputElement>(error, ref, onInvalid, onInput);
+  const ids = useChromeIds(help, shownError);
   return (
     <Chrome
       ids={ids}
       label={label}
       {...(help !== undefined ? { help } : {})}
-      {...(wiring.shownError !== undefined ? { error: wiring.shownError } : {})}
+      {...(shownError !== undefined ? { error: shownError } : {})}
       {...(required !== undefined ? { required } : {})}
     >
       <input
-        ref={wiring.ref}
+        ref={attach}
         id={ids.controlId}
         className={[
           styles["control"],
-          wiring.shownError !== undefined ? styles["invalid"] : undefined,
+          shownError !== undefined ? styles["invalid"] : undefined,
           className,
         ]
           .filter(Boolean)
           .join(" ")}
         required={required}
-        aria-invalid={wiring.shownError !== undefined || undefined}
+        aria-invalid={shownError !== undefined || undefined}
         aria-describedby={ids.describedBy}
         aria-required={required === true || undefined}
-        onInvalid={wiring.onInvalid}
-        onInput={wiring.onInput}
+        onInvalid={handleInvalid}
+        onInput={handleInput}
         {...rest}
       />
     </Chrome>
@@ -323,33 +341,40 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   { label, help, error, required, className, children, onInvalid, onInput, ...rest },
   ref,
 ) {
-  const wiring = useControl<HTMLSelectElement>(error, ref, onInvalid, onInput);
-  const ids = useChromeIds(help, wiring.shownError);
+  // Destructured, so the ref callback travels apart from the render values:
+  // read through one object, the compiler treats every field as a ref read.
+  const {
+    attach,
+    shownError,
+    onInvalid: handleInvalid,
+    onInput: handleInput,
+  } = useControl<HTMLSelectElement>(error, ref, onInvalid, onInput);
+  const ids = useChromeIds(help, shownError);
   return (
     <Chrome
       ids={ids}
       label={label}
       {...(help !== undefined ? { help } : {})}
-      {...(wiring.shownError !== undefined ? { error: wiring.shownError } : {})}
+      {...(shownError !== undefined ? { error: shownError } : {})}
       {...(required !== undefined ? { required } : {})}
     >
       <div className={styles["selectWrap"]}>
         <select
-          ref={wiring.ref}
+          ref={attach}
           id={ids.controlId}
           className={[
             styles["control"],
-            wiring.shownError !== undefined ? styles["invalid"] : undefined,
+            shownError !== undefined ? styles["invalid"] : undefined,
             className,
           ]
             .filter(Boolean)
             .join(" ")}
           required={required}
-          aria-invalid={wiring.shownError !== undefined || undefined}
+          aria-invalid={shownError !== undefined || undefined}
           aria-describedby={ids.describedBy}
           aria-required={required === true || undefined}
-          onInvalid={wiring.onInvalid}
-          onInput={wiring.onInput}
+          onInvalid={handleInvalid}
+          onInput={handleInput}
           {...rest}
         >
           {children}

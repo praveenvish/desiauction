@@ -2,9 +2,10 @@
 
 import { isMinor, type AttributeOption } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select } from "@desiauction/ui";
-import { Fragment, useEffect, useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 
 import { formatPhone } from "../../../../lib/format-phone";
+import { useHydrated } from "../../../../lib/use-hydrated";
 import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
@@ -65,7 +66,13 @@ interface Draft {
  * both answers on the step that shows them nothing missing.
  */
 function readDraft(slug: string): Draft | null {
-  const saved = window.localStorage.getItem(draftKey(slug));
+  let saved: string | null;
+  try {
+    saved = window.localStorage.getItem(draftKey(slug));
+  } catch {
+    // Storage blocked (private mode, site data disabled): there is no draft.
+    return null;
+  }
   if (saved === null || saved === "") {
     return null;
   }
@@ -194,7 +201,15 @@ export function RegisterFlow({
   // Draft recovery: restore EVERY saved answer and resume at review after a
   // refresh or a browser restart. The review below now shows all four, so
   // landing there is a chance to check them, not a way to hide what was lost.
-  useEffect(() => {
+  //
+  // Read once per season, in the first render after hydration (the server has
+  // no localStorage, so an earlier read would mismatch the markup it sent).
+  // Adjusting state during that render replaces an effect that committed the
+  // empty form first and then re-rendered it filled.
+  const hydrated = useHydrated();
+  const [draftReadFor, setDraftReadFor] = useState<string | null>(null);
+  if (hydrated && draftReadFor !== slug) {
+    setDraftReadFor(slug);
     const saved = readDraft(slug);
     if (saved !== null) {
       setRole(saved.role);
@@ -205,7 +220,7 @@ export function RegisterFlow({
         setRestored(true);
       }
     }
-  }, [slug, initialName]);
+  }
 
   const saveDraft = (next: Partial<Draft>) => {
     const current = readDraft(slug) ?? { role, dob, attributes: attrs };

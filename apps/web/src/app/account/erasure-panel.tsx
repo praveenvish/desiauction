@@ -2,7 +2,7 @@
 
 import { Badge, Button, Dialog, Field, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 
 import {
   requestErasureAction,
@@ -25,18 +25,20 @@ export function ErasurePanel({ request }: { request: MyErasureRequest | null }) 
   const [open, setOpen] = useState(false);
   const [understood, setUnderstood] = useState(false);
   const [withdrawing, startWithdraw] = useTransition();
+  // The follow-up (close, confirm, refresh) runs in the action itself, once per
+  // submission, rather than in an effect watching `state` for a change.
   const [state, formAction, pending] = useActionState<ErasureFormState, FormData>(
-    requestErasureAction,
+    async (previous, form) => {
+      const next = await requestErasureAction(previous, form);
+      if (next.filed === true) {
+        setOpen(false);
+        toast({ title: "Request sent. We reply within seven days.", tone: "success" });
+        router.refresh();
+      }
+      return next;
+    },
     {},
   );
-
-  useEffect(() => {
-    if (state.filed === true) {
-      setOpen(false);
-      toast({ title: "Request sent. We reply within seven days.", tone: "success" });
-      router.refresh();
-    }
-  }, [state, toast, router]);
 
   if (request !== null && request.status === "requested") {
     return (

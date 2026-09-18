@@ -1,9 +1,9 @@
 "use client";
 
 import { useToast } from "@desiauction/ui";
-import { useEffect, useState } from "react";
 
 import type { AuctionStatus } from "@desiauction/core";
+import { useOrigin } from "../../../../../lib/use-hydrated";
 
 /**
  * What you are actually forwarding. "Watch … live" went out on completed,
@@ -44,11 +44,8 @@ export function ShareAuction({
   testId?: string;
 }) {
   const toast = useToast();
-  const [url, setUrl] = useState("");
-
-  useEffect(() => {
-    setUrl(`${window.location.origin}/seasons/${slug}/auction/spectate`);
-  }, [slug]);
+  const origin = useOrigin();
+  const url = origin === "" ? "" : `${origin}/seasons/${slug}/auction/spectate`;
 
   const message = `${SHARE_VERB[auctionStatus]} ${auctionName} on DesiAuction`;
 

@@ -3,7 +3,7 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { Badge, Button, Card, Select, useToast, Field, ButtonLink } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   auctionLifecycleAction,
@@ -23,6 +23,7 @@ import {
 import { formatTime } from "../../../../lib/format-date";
 import { AbortDialog } from "./abort-dialog";
 import { ConnectionCheck, RulesCard } from "./live-experience";
+import { useHydrated } from "../../../../lib/use-hydrated";
 
 // The auction desk: readiness gates, creation, lifecycle, paddles, the lot
 // queue and the replay proof. The operational dashboard above it is rendered by
@@ -79,7 +80,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
   });
   const [paddleTeam, setPaddleTeam] = useState("");
   const [report, setReport] = useState<ReplayVerifyReport | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
   // The config locks at creation, so a refusal has to say which field is wrong
   // rather than quietly substituting a value the organizer never chose.
   const [fieldErrors, setFieldErrors] = useState<AuctionSetupFieldErrors>({});
@@ -88,13 +89,20 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
   // WR-1: optimistic, then reconciled — a fully server-controlled checkbox
   // snaps back before the refresh lands, which reads as a switch that ignores
   // the click (and is exactly what a browser automation sees).
-  const [ownerPlansOn, setOwnerPlansOn] = useState(dashboard.ownerPlans?.enabled ?? true);
-  useEffect(() => {
-    setOwnerPlansOn(dashboard.ownerPlans?.enabled ?? true);
-  }, [dashboard.ownerPlans?.enabled]);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  // The server's answer is remembered beside the optimistic one, so a new
+  // answer (the refresh after a save) replaces the guess in the same render.
+  const serverOwnerPlansOn = dashboard.ownerPlans?.enabled ?? true;
+  const [ownerPlans, setOwnerPlans] = useState({
+    server: serverOwnerPlansOn,
+    on: serverOwnerPlansOn,
+  });
+  if (ownerPlans.server !== serverOwnerPlansOn) {
+    setOwnerPlans({ server: serverOwnerPlansOn, on: serverOwnerPlansOn });
+  }
+  const ownerPlansOn = ownerPlans.on;
+  const setOwnerPlansOn = (on: boolean) => {
+    setOwnerPlans((current) => ({ ...current, on }));
+  };
 
   const { ready, view, viewer } = dashboard;
 

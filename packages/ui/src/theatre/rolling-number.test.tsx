@@ -39,4 +39,29 @@ describe("RollingNumber", () => {
     const rolled = Array.from(container.querySelectorAll('[data-testid="rolling-digit"]'));
     expect(rolled.every((node) => /^[0-9]$/.test(node.textContent))).toBe(true);
   });
+
+  it("keeps rolling through an unrelated re-render instead of remounting the digits", () => {
+    // A live room re-renders for reasons of its own (the clock, a new bidder
+    // count) while a roll is still sliding. The previous value used to be a
+    // ref already overwritten by then, so every rolling digit was re-keyed as
+    // "still" and remounted, cutting the animation off part-way.
+    const { container, rerender } = render(<RollingNumber value="₹95,000" />);
+    rerender(<RollingNumber value="₹97,500" />);
+    const before = Array.from(container.querySelectorAll('[data-testid="rolling-digit"]'));
+    rerender(<RollingNumber value="₹97,500" className="pulse" />);
+    const after = Array.from(container.querySelectorAll('[data-testid="rolling-digit"]'));
+    expect(after).toHaveLength(2);
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
+  });
+
+  it("rolls from the value it last showed, not from the one before that", () => {
+    const { container, rerender } = render(<RollingNumber value="₹95,000" />);
+    rerender(<RollingNumber value="₹97,500" />);
+    rerender(<RollingNumber value="₹98,500" />);
+    const rolled = container.querySelectorAll('[data-testid="rolling-digit"]');
+    expect(rolled).toHaveLength(1);
+    expect(rolled[0]?.textContent).toBe("8");
+    expect(rolled[0]?.getAttribute("data-prev")).toBe("7");
+  });
 });

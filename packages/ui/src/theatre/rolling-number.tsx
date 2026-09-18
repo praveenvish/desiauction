@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type HTMLAttributes } from "react";
+import { useState, type HTMLAttributes } from "react";
 
 import styles from "./rolling-number.module.css";
 
@@ -36,11 +36,16 @@ const DIGIT = /^[0-9]$/;
  * figure jumps to its new value.
  */
 export function RollingNumber({ value, className, ...rest }: RollingNumberProps) {
-  const prevRef = useRef(value);
-  const prev = prevRef.current;
-  useEffect(() => {
-    prevRef.current = value;
-  }, [value]);
+  // The value this figure rolled FROM, held until the next change. It used to
+  // be a ref overwritten after every commit, so the first unrelated re-render
+  // after a change saw prev === value, re-keyed every rolling digit as "still"
+  // and remounted it — cutting the roll off mid-slide. State adjusted during
+  // render (React's pattern for "previous prop") keeps it for the whole roll.
+  const [pair, setPair] = useState({ value, prev: value });
+  if (pair.value !== value) {
+    setPair({ value, prev: pair.value });
+  }
+  const prev = pair.value === value ? pair.prev : pair.value;
 
   const aligned = prev.padStart(value.length, " ").slice(-value.length);
   return (

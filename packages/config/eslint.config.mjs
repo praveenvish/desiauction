@@ -80,22 +80,52 @@ export default tseslint.config(
    * Scoped to the files that actually render, so nothing in core, db, the
    * engine or the runner pays for rules that cannot apply to them.
    *
-   * NAMED RULES, NOT `reactHooks.configs.recommended`. That preset changed
-   * shape in v7: it now carries the React Compiler's own analyses
-   * (`immutability`, `refs`, `set-state-in-effect`, `purity`…), which are a
-   * different and far more opinionated proposition than the two contracts
-   * above — they flag working, deliberate code, including this repo's own
-   * ref-based 10Hz auction clock, which exists precisely to avoid re-rendering
-   * a room. Adopting them is a project with a design conversation in it, not a
-   * gate to switch on during an audit; it is recorded as a follow-up. These two
-   * are the ones whose violations are bugs by definition.
+   * THE WHOLE v7 PRESET, INCLUDING THE COMPILER'S ANALYSES (FR-19).
+   *
+   * v7's `recommended` also carries the React Compiler's own checks
+   * (`purity`, `immutability`, `refs`, `set-state-in-effect`…). They were first
+   * held back as "too opinionated for this code"; the audit then ran them and
+   * every finding was worth fixing. Among the 58: a RollingNumber that cut its
+   * own roll short on any unrelated re-render (a ref read during render), an
+   * announcer that painted each auction moment twice before speaking it, and
+   * sixteen panels that rendered twice to flip a `hydrated` boolean. Nothing is
+   * turned down and nothing is suppressed at config level; the two reads of
+   * the clock that ARE deliberately impure (a health check's wall-clock age,
+   * a replay's elapsed time) carry scoped disables with their reasons.
+   *
+   * Every rule is an error, including the three the preset only warns on:
+   * lint here fails on errors, and a warning nobody is made to read is a rule
+   * that is not on.
    */
   {
     files: ["**/*.tsx", "**/*.jsx"],
     plugins: { "react-hooks": reactHooks, "jsx-a11y": jsxA11y },
     rules: {
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "error",
+      ...Object.fromEntries(
+        Object.keys(reactHooks.configs["recommended-latest"].rules).map((rule) => [rule, "error"]),
+      ),
+      /*
+       * The app router does not run the `react` in node_modules: Next 15 ships
+       * its own vendored React build and resolves every page against that. Its
+       * stable channel has no `useEffectEvent` (only the experimental channel's
+       * `experimental_useEffectEvent`), while @types/react 19.2 declares it —
+       * so an import typechecks, passes unit tests under jsdom's real React,
+       * and throws "is not a function" on the live page. It did, on /org and
+       * the registrations desk, and only the browser suite saw it.
+       */
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react",
+              importNames: ["useEffectEvent"],
+              message:
+                "Next's vendored React has no useEffectEvent; it crashes at runtime. Use effect dependencies or useSyncExternalStore.",
+            },
+          ],
+        },
+      ],
       ...jsxA11y.flatConfigs.recommended.rules,
 
       /*

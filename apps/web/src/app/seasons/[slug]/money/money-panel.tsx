@@ -38,6 +38,7 @@ import type { CaseView, ObligationView, PaymentView } from "../../../../server/s
 import { formatDateTime } from "../../../../lib/format-date";
 import { CASE_STATE, PAYMENT_STATE } from "./money-words";
 import "./money.css";
+import { useHydrated } from "../../../../lib/use-hydrated";
 
 /**
  * PX-7 E1 — the Settlement console.
@@ -159,10 +160,7 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
   };
   const outcomeRef = useRef<HTMLParagraphElement | null>(null);
   // A click before hydration is a no-op; the surface says when it is live.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   /**
    * One command runner: every action reports, then re-reads the server truth.

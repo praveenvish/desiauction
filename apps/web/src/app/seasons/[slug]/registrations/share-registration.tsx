@@ -1,7 +1,9 @@
 "use client";
 
 import { Button, useToast, IconCheck } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+
+import { useOrigin } from "../../../../lib/use-hydrated";
 
 /**
  * Recruit-players share control (parity §E). The absolute URL is resolved on the
@@ -11,12 +13,9 @@ import { useEffect, useState } from "react";
  */
 export function ShareRegistration({ slug, open }: { slug: string; open: boolean }) {
   const toast = useToast();
-  const [url, setUrl] = useState("");
+  const origin = useOrigin();
+  const url = origin === "" ? "" : `${origin}/seasons/${slug}/register`;
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    setUrl(`${window.location.origin}/seasons/${slug}/register`);
-  }, [slug]);
 
   async function copy() {
     try {

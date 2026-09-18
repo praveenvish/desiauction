@@ -3,7 +3,7 @@
 import { GROUND_SURFACES } from "@desiauction/core";
 import { Badge, Button, Card, Field, Select, useToast, VisuallyHidden } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   createGroundAction,
@@ -11,6 +11,7 @@ import {
   setGroundStatusAction,
   type VenuesView,
 } from "../../../../server/competition/fixture-actions";
+import { useHydrated } from "../../../../lib/use-hydrated";
 
 // Venue → Ground management (M-IP3-3). Server actions do all the deciding;
 // this panel renders lists and submits intents.
@@ -37,10 +38,7 @@ export function VenuesPanel({
   const [floodlights, setFloodlights] = useState(false);
   const [indoor, setIndoor] = useState(false);
   // Hydration marker (M-IP3-2 pattern): handlers are live once this flips.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   const addVenue = async () => {
     setBusy(true);

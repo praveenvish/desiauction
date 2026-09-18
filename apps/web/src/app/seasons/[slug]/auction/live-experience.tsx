@@ -2,7 +2,7 @@
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type PlanState } from "@desiauction/core";
 import { Badge, ButtonLink, Card, IconTrophy } from "@desiauction/ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { AuctionRules, ResolvedLot } from "../../../../server/auction/live-summary";
 import { fitBadge } from "./plan/plan-model";
@@ -41,114 +41,144 @@ const OUTCOME_KIND: Record<string, FeedEvent["kind"]> = {
   reopened: "reopened",
 };
 
+/** Everything the feed has folded in so far. */
+export interface FeedState extends LiveFeed {
+  /** The snapshot last folded — the render-time guard against folding twice. */
+  folded: AuctionSnapshot | null;
+  /** Outcome seqs already applied: a reconnect replays the same outcome. */
+  seenSeqs: ReadonlySet<number>;
+  lastStatus: string | null;
+  recoveries: number;
+}
+
+/**
+ * One snapshot folded into the feed. Pure: the previous feed in, the next out.
+ *
+ * Outcomes are keyed by atSeq, so a reconnect replaying the same outcome is a
+ * no-op; status changes and recoveries are compared against what the feed
+ * last saw rather than against the previous render.
+ */
+export function foldSnapshot(feed: FeedState, snapshot: AuctionSnapshot): FeedState {
+  let { resolved, events, seenSeqs } = feed;
+  const outcome = snapshot.lastOutcome;
+  if (outcome !== null && !feed.seenSeqs.has(outcome.atSeq)) {
+    seenSeqs = new Set(feed.seenSeqs).add(outcome.atSeq);
+    const kind = OUTCOME_KIND[outcome.kind.toLowerCase()] ?? "sold";
+    if (kind === "sold" || kind === "unsold" || kind === "withdrawn") {
+      const rest = resolved.filter((entry) => entry.lotId !== outcome.lotId);
+      resolved = [
+        ...rest,
+        {
+          lotId: outcome.lotId,
+          // The snapshot outcome is spectator-safe and carries no
+          // registration id; the next server read fills it in.
+          registrationId: null,
+          // Nor does it carry the squad marks, for the same reason — so a
+          // captain sold seconds ago wears the badge from the next server
+          // read rather than from this optimistic row. False is the honest
+          // value here: absent, not "not a captain".
+          isCaptain: false,
+          isViceCaptain: false,
+          lotNumber: outcome.lotNumber,
+          seq: Number.MAX_SAFE_INTEGER - outcome.atSeq,
+          playerName: outcome.playerName,
+          role: "",
+          status: kind,
+          soldPrice: outcome.amount,
+          teamId: null,
+          teamName: outcome.teamName,
+        },
+      ];
+    }
+    events = [
+      {
+        key: `outcome-${String(outcome.atSeq)}`,
+        kind,
+        label:
+          kind === "sold"
+            ? `${outcome.playerName ?? outcome.lotNumber} — SOLD to ${outcome.teamName ?? "?"}`
+            : kind === "unsold"
+              ? `${outcome.playerName ?? outcome.lotNumber} — passes for now`
+              : kind === "held"
+                ? `${outcome.playerName ?? outcome.lotNumber} — frozen by the auctioneer`
+                : kind === "reopened"
+                  ? `${outcome.playerName ?? outcome.lotNumber} — reopened (undo)`
+                  : `${outcome.playerName ?? outcome.lotNumber} — withdrawn`,
+        detail: outcome.amount !== null ? formatPaiseINR(paise(outcome.amount)) : null,
+      },
+      ...events,
+    ];
+  }
+  const previousStatus = feed.lastStatus;
+  if (previousStatus !== null && previousStatus !== snapshot.auctionStatus) {
+    const transitions: Record<string, FeedEvent["kind"] | undefined> = {
+      paused: "paused",
+      live: previousStatus === "paused" ? "resumed" : undefined,
+      completed: "completed",
+    };
+    const kind = transitions[snapshot.auctionStatus];
+    if (kind !== undefined) {
+      events = [
+        {
+          key: `status-${String(snapshot.version)}`,
+          kind,
+          label:
+            kind === "paused"
+              ? "Auction paused"
+              : kind === "resumed"
+                ? "Auction resumed"
+                : "Auction completed",
+          detail: null,
+        },
+        ...events,
+      ];
+    }
+  }
+  let recoveries = feed.recoveries;
+  if (snapshot.recoveries > recoveries) {
+    recoveries = snapshot.recoveries;
+    events = [
+      {
+        key: `recovered-${String(snapshot.recoveries)}-${String(snapshot.version)}`,
+        kind: "recovered",
+        label: "State recovered — every bid verified",
+        detail: null,
+      },
+      ...events,
+    ];
+  }
+  return {
+    resolved,
+    events,
+    seenSeqs,
+    lastStatus: snapshot.auctionStatus,
+    recoveries,
+    folded: snapshot,
+  };
+}
+
 /**
  * Accumulates the live feed from snapshot deltas on top of the server-rendered
  * history: lot outcomes (keyed by atSeq — idempotent under reconnect replays)
  * and major auction transitions (pause/resume/recovery/completion).
+ *
+ * The fold runs DURING render when a new snapshot arrives, so the timeline and
+ * the board it sits beside change in the same commit. It was an effect before,
+ * which painted every new snapshot once with a stale timeline and then again.
  */
 export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | null): LiveFeed {
-  const [resolved, setResolved] = useState<ResolvedLot[]>(initial);
-  const [events, setEvents] = useState<FeedEvent[]>([]);
-  const seenSeqRef = useRef<Set<number>>(new Set());
-  const prevStatusRef = useRef<string | null>(null);
-  const prevRecoveriesRef = useRef(0);
-
-  useEffect(() => {
-    if (snapshot === null) {
-      return;
-    }
-    const outcome = snapshot.lastOutcome;
-    if (outcome !== null && !seenSeqRef.current.has(outcome.atSeq)) {
-      seenSeqRef.current.add(outcome.atSeq);
-      const kind = OUTCOME_KIND[outcome.kind.toLowerCase()] ?? "sold";
-      if (kind === "sold" || kind === "unsold" || kind === "withdrawn") {
-        setResolved((prior) => {
-          const rest = prior.filter((entry) => entry.lotId !== outcome.lotId);
-          return [
-            ...rest,
-            {
-              lotId: outcome.lotId,
-              // The snapshot outcome is spectator-safe and carries no
-              // registration id; the next server read fills it in.
-              registrationId: null,
-              // Nor does it carry the squad marks, for the same reason — so a
-              // captain sold seconds ago wears the badge from the next server
-              // read rather than from this optimistic row. False is the honest
-              // value here: absent, not "not a captain".
-              isCaptain: false,
-              isViceCaptain: false,
-              lotNumber: outcome.lotNumber,
-              seq: Number.MAX_SAFE_INTEGER - outcome.atSeq,
-              playerName: outcome.playerName,
-              role: "",
-              status: kind,
-              soldPrice: outcome.amount,
-              teamId: null,
-              teamName: outcome.teamName,
-            },
-          ];
-        });
-      }
-      setEvents((prior) => [
-        {
-          key: `outcome-${String(outcome.atSeq)}`,
-          kind,
-          label:
-            kind === "sold"
-              ? `${outcome.playerName ?? outcome.lotNumber} — SOLD to ${outcome.teamName ?? "?"}`
-              : kind === "unsold"
-                ? `${outcome.playerName ?? outcome.lotNumber} — passes for now`
-                : kind === "held"
-                  ? `${outcome.playerName ?? outcome.lotNumber} — frozen by the auctioneer`
-                  : kind === "reopened"
-                    ? `${outcome.playerName ?? outcome.lotNumber} — reopened (undo)`
-                    : `${outcome.playerName ?? outcome.lotNumber} — withdrawn`,
-          detail: outcome.amount !== null ? formatPaiseINR(paise(outcome.amount)) : null,
-        },
-        ...prior,
-      ]);
-    }
-    const previousStatus = prevStatusRef.current;
-    if (previousStatus !== null && previousStatus !== snapshot.auctionStatus) {
-      const transitions: Record<string, FeedEvent["kind"] | undefined> = {
-        paused: "paused",
-        live: previousStatus === "paused" ? "resumed" : undefined,
-        completed: "completed",
-      };
-      const kind = transitions[snapshot.auctionStatus];
-      if (kind !== undefined) {
-        setEvents((prior) => [
-          {
-            key: `status-${String(snapshot.version)}`,
-            kind,
-            label:
-              kind === "paused"
-                ? "Auction paused"
-                : kind === "resumed"
-                  ? "Auction resumed"
-                  : "Auction completed",
-            detail: null,
-          },
-          ...prior,
-        ]);
-      }
-    }
-    prevStatusRef.current = snapshot.auctionStatus;
-    if (snapshot.recoveries > prevRecoveriesRef.current) {
-      prevRecoveriesRef.current = snapshot.recoveries;
-      setEvents((prior) => [
-        {
-          key: `recovered-${String(snapshot.recoveries)}-${String(snapshot.version)}`,
-          kind: "recovered",
-          label: "State recovered — every bid verified",
-          detail: null,
-        },
-        ...prior,
-      ]);
-    }
-  }, [snapshot]);
-
-  return { resolved, events };
+  const [feed, setFeed] = useState<FeedState>(() => ({
+    resolved: initial,
+    events: [],
+    folded: null,
+    seenSeqs: new Set(),
+    lastStatus: null,
+    recoveries: 0,
+  }));
+  if (snapshot !== null && snapshot !== feed.folded) {
+    setFeed(foldSnapshot(feed, snapshot));
+  }
+  return { resolved: feed.resolved, events: feed.events };
 }
 
 const FEED_TONE: Record<FeedEvent["kind"], "success" | "neutral" | "warning" | "info" | "danger"> =
