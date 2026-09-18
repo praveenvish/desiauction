@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { isCapabilitySet } from "@desiauction/core";
+import { isOrgCapabilitySet } from "@desiauction/core";
 import {
   auditLog,
   grants,
@@ -29,7 +29,8 @@ export async function createInvite(
   createdBy: string,
   capabilitySet: string,
 ): Promise<{ token: string; expiresAt: Date; reference: string }> {
-  if (!isCapabilitySet(capabilitySet)) {
+  // An invite joins the ORG, so it may carry only an org set.
+  if (!isOrgCapabilitySet(capabilitySet)) {
     throw new Error("unknown capability set");
   }
   const token = randomBytes(24).toString("base64url");

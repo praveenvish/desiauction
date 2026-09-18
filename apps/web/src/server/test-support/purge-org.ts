@@ -44,7 +44,7 @@ import {
   venues,
   type Db,
 } from "@desiauction/db";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 /**
  * DELETE EVERYTHING ONE TEST ORG OWNS, IN AN ORDER A FOREIGN KEY WILL ACCEPT.
@@ -119,6 +119,22 @@ export async function purgeOrg(db: Db, orgId: string): Promise<void> {
   await db.delete(registrations).where(eq(registrations.orgId, orgId));
   await db.delete(teams).where(eq(teams.orgId, orgId));
   await db.delete(franchises).where(eq(franchises.orgId, orgId));
+  // Season-scoped grants (0076, the auctioneer) reach the org only through
+  // their competition — scope_id is the season, not the org.
+  await db
+    .delete(grants)
+    .where(
+      and(
+        eq(grants.scopeType, "tournament"),
+        inArray(
+          grants.scopeId,
+          db
+            .select({ id: competitions.id })
+            .from(competitions)
+            .where(eq(competitions.orgId, orgId)),
+        ),
+      ),
+    );
   await db.delete(competitions).where(eq(competitions.orgId, orgId));
   await db.delete(grounds).where(eq(grounds.orgId, orgId));
   await db.delete(venues).where(eq(venues.orgId, orgId));

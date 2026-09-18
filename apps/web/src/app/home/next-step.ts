@@ -54,6 +54,12 @@ export interface NextStepInput {
   latestEntry: { competitionName: string; status: string } | null;
   /** Holds no role anywhere: not a member, not an owner, not a player. */
   brandNew: boolean;
+  /** A season whose auction this person was appointed to run (auction:conductor). */
+  conducting?: {
+    competitionSlug: string;
+    competitionName: string;
+    auctionStatus: string | null;
+  } | null;
 }
 
 const LIVE = new Set(["live", "paused"]);
@@ -77,6 +83,17 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
       why: "Bidding is open. Your plan and purse are waiting for you in the room.",
       cta: { label: "Enter auction room", href: `/seasons/${team.competitionSlug}/auction/live` },
       then: "your squad and receipts appear here when the hammer falls",
+      tone: "live",
+    };
+  }
+  const night = input.conducting ?? null;
+  if (night !== null && night.auctionStatus !== null && LIVE.has(night.auctionStatus)) {
+    return {
+      key: "auctioneer-live",
+      eyebrow: `Live now · ${night.competitionName}`,
+      title: "You're running the auction — the room is waiting",
+      why: "Open the cockpit to put the next lot on the block.",
+      cta: { label: "Open the cockpit", href: `/seasons/${night.competitionSlug}/auction/cockpit` },
       tone: "live",
     };
   }
@@ -104,6 +121,19 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
           ? `${String(input.attention.length - 1)} more thing${input.attention.length === 2 ? " is" : "s are"} waiting below — this one is first.`
           : "Nothing else is waiting on you.",
       cta: { label: attentionVerb(first.href), href: first.href },
+      tone: "action",
+    };
+  }
+  if (night !== null && (night.auctionStatus === null || UPCOMING.has(night.auctionStatus))) {
+    return {
+      key: "auctioneer-prepare",
+      eyebrow: `Auction night · ${night.competitionName}`,
+      title: "You're the auctioneer for this season",
+      why:
+        night.auctionStatus === null
+          ? "The organizer hasn't set the auction up yet. You'll run it from the cockpit when they do."
+          : "Walk through the cockpit before the night — the lot order, the owners, the big screen.",
+      cta: { label: "Open the auction", href: `/seasons/${night.competitionSlug}/auction` },
       tone: "action",
     };
   }

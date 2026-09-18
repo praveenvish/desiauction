@@ -218,6 +218,21 @@ async function resetDemoOrg(): Promise<void> {
   await db.delete(teams).where(eq(teams.orgId, orgId));
   await db.delete(competitions).where(eq(competitions.orgId, orgId));
   await db.delete(invites).where(eq(invites.orgId, orgId));
+  // Season-scoped grants (0076, the auctioneer) are keyed on the season.
+  await db
+    .delete(grants)
+    .where(
+      and(
+        eq(grants.scopeType, "tournament"),
+        inArray(
+          grants.scopeId,
+          db
+            .select({ id: competitions.id })
+            .from(competitions)
+            .where(eq(competitions.orgId, orgId)),
+        ),
+      ),
+    );
   await db.delete(grants).where(and(eq(grants.scopeType, "org"), eq(grants.scopeId, orgId)));
   await db.delete(orgMembers).where(eq(orgMembers.orgId, orgId));
   await db.delete(auditLog).where(eq(auditLog.scopeId, orgId));
@@ -327,6 +342,16 @@ async function main(): Promise<void> {
     startsOn: "2026-08-01",
     endsOn: "2026-10-31",
     createdBy: founder,
+  });
+  // Bidder C runs the Premier League's auction night without owning the club
+  // (0076): the appointed-auctioneer role, signable-into from a fresh setup.
+  await db.insert(grants).values({
+    id: newId(),
+    personId: ids["bidderC"] as string,
+    scopeType: "tournament",
+    scopeId: leagueId,
+    capabilitySet: "auction:conductor",
+    grantedBy: founder,
   });
   const leagueTeams = ["Demo Tigers", "Demo Falcons", "Demo Panthers", "Demo Wolves"].map(
     (name) => ({ id: newId(), orgId, competitionId: leagueId, name, createdBy: founder }),
@@ -722,7 +747,7 @@ DEMO DATA READY (repeatable — rerun any time)
     organizer: "org:staff",
     bidderA: "viewer · owner of Cup Kings (demo-cup-settled)",
     bidderB: "viewer · owner of Cup Chargers (demo-cup-settled)",
-    bidderC: "viewer (claims a paddle via owner invite)",
+    bidderC: "viewer · auctioneer for demo-premier-league",
     viewer: "viewer",
   };
   for (const user of USERS) {

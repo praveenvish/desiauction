@@ -82,6 +82,20 @@ describe("the one next step /home leads with", () => {
     expect(step?.secondary?.href).toBe("/c");
   });
 
+  it("an appointed auctioneer is sent to the cockpit when the night is live, and to prepare before it", () => {
+    const live = chooseNextStep({
+      ...EMPTY,
+      conducting: { competitionSlug: "pl", competitionName: "PL", auctionStatus: "live" },
+    });
+    expect(live?.key).toBe("auctioneer-live");
+    expect(live?.cta.href).toBe("/seasons/pl/auction/cockpit");
+    const before = chooseNextStep({
+      ...EMPTY,
+      conducting: { competitionSlug: "pl", competitionName: "PL", auctionStatus: "scheduled" },
+    });
+    expect(before?.key).toBe("auctioneer-prepare");
+  });
+
   it("someone with nothing waiting gets no banner rather than a filler one", () => {
     expect(chooseNextStep(EMPTY)).toBeNull();
   });

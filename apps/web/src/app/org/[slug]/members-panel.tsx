@@ -1,6 +1,6 @@
 "use client";
 
-import { CAPABILITY_SETS } from "@desiauction/core";
+import { ORG_CAPABILITY_SETS } from "@desiauction/core";
 import {
   Button,
   ButtonLink,
@@ -384,7 +384,7 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
             setInviteSet(event.target.value);
           }}
         >
-          {CAPABILITY_SETS.filter((set) => set !== "org:owner").map((set) => (
+          {ORG_CAPABILITY_SETS.filter((set) => set !== "org:owner").map((set) => (
             <option key={set} value={set}>
               {INVITE_ROLE_LABEL[set] ?? set}
             </option>

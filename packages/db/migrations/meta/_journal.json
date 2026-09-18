@@ -526,6 +526,13 @@
       "when": 1790179200000,
       "tag": "0075_registration_entered_name",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1790265600000,
+      "tag": "0076_season_scoped_grants",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,7 @@ import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { ForbiddenError, can, requireCapability } from "./authz";
 import { acceptInvite, createInvite, previewInvite, revokeInvite } from "./invites";
+import { createCompetition } from "../competition/competitions";
 import { createOrg, issueGrant, membersOf, resolveTenant, revokeGrants } from "./orgs";
 import { purgeOrg } from "../test-support/purge-org";
 
@@ -236,6 +237,10 @@ describe("AUTHZ REGRESSION — tenancy + capability contract", () => {
     await handle.sql.unsafe(`drop role if exists ${role}`);
     await handle.sql.unsafe(`create role ${role} login password 'probe' nosuperuser nobypassrls`);
     await handle.sql.unsafe(`grant select, insert on grants to ${role}`);
+    // 0076: the grants policy now names competitions (a season-scoped grant is
+    // admitted only for a season of the ACTIVE org), so evaluating it needs
+    // SELECT there — which every production role that touches grants holds.
+    await handle.sql.unsafe(`grant select on competitions to ${role}`);
     const url = new URL(env.DATABASE_URL);
     const probeHandle = createDb(
       `postgres://${role}:probe@${url.hostname}:${url.port}${url.pathname}`,
@@ -265,6 +270,37 @@ describe("AUTHZ REGRESSION — tenancy + capability contract", () => {
         .where(eq(grantsTable.id, legitId))
         .limit(1);
       expect(written?.scopeId).toBe(orgX.id);
+
+      // 0076: a SEASON-scoped grant is admitted for a season of the active org
+      // and refused for another org's season — the auctioneer cannot be
+      // appointed (or self-appointed) across clubs.
+      const seasonX = await createCompetition(db, orgX.id, owner, {
+        sport: "cricket",
+        name: `Probe X ${RUN}`,
+        location: "Mumbai",
+        startsOn: "2026-08-01",
+        endsOn: "2026-09-01",
+      });
+      const seasonY = await createCompetition(db, orgY.id, outsider, {
+        sport: "cricket",
+        name: `Probe Y ${RUN}`,
+        location: "Mumbai",
+        startsOn: "2026-08-01",
+        endsOn: "2026-09-01",
+      });
+      const crossSeason = probe.begin(async (tx) => {
+        await tx`select set_config('app.person_id', ${owner}, true)`;
+        await tx`select set_config('app.org_id', ${orgX.id}, true)`;
+        await tx`insert into grants(id, person_id, scope_type, scope_id, capability_set, granted_by)
+                 values (${newId()}, ${owner}, 'tournament', ${seasonY.id}, 'auction:conductor', ${owner})`;
+      });
+      await expect(crossSeason).rejects.toThrow(/row-level security/);
+      await probe.begin(async (tx) => {
+        await tx`select set_config('app.person_id', ${owner}, true)`;
+        await tx`select set_config('app.org_id', ${orgX.id}, true)`;
+        await tx`insert into grants(id, person_id, scope_type, scope_id, capability_set, granted_by)
+                 values (${newId()}, ${owner}, 'tournament', ${seasonX.id}, 'auction:conductor', ${owner})`;
+      });
     } finally {
       await probe.end();
       await handle.sql.unsafe(`drop owned by ${role}`);

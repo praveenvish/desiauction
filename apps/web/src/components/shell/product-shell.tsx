@@ -6,6 +6,7 @@ import {
   Drawer,
   IconBell,
   IconArrowRight,
+  IconBolt,
   IconGavel,
   IconGlobe,
   IconList,
@@ -180,12 +181,13 @@ function BellLink({
   );
 }
 
-const ROLE_ICONS: Record<"team" | "plan" | "room" | "sports" | "find", ReactNode> = {
+const ROLE_ICONS: Record<"team" | "plan" | "room" | "sports" | "find" | "cockpit", ReactNode> = {
   team: <IconUsers />,
   plan: <IconList />,
   room: <IconGavel />,
   sports: <IconStar />,
   find: <IconGlobe />,
+  cockpit: <IconBolt />,
 };
 
 const RAIL_ICONS: Record<string, ReactNode> = {

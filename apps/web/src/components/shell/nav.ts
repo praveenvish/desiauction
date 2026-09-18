@@ -720,13 +720,15 @@ export interface ShellRoles {
   plays: boolean;
   /** Plays and does NOTHING else — no club membership, no team. */
   onlyPlays: boolean;
+  /** A season whose auction this person was appointed to run, if any. */
+  conducting?: { name: string; seasonSlug: string; live: boolean } | null;
 }
 
 export interface RoleNavItem {
   key: string;
   label: string;
   href: string;
-  icon: "team" | "plan" | "room" | "sports" | "find";
+  icon: "team" | "plan" | "room" | "sports" | "find" | "cockpit";
   live?: boolean;
   active?: boolean;
 }
@@ -766,6 +768,23 @@ export function roleNavGroups(roles: ShellRoles | null, pathname: string): RoleN
           href: `${base}/auction/live`,
           icon: "room",
           live: roles.team.live,
+        },
+      ],
+    });
+  }
+  if (roles.conducting !== undefined && roles.conducting !== null) {
+    const base = `/seasons/${roles.conducting.seasonSlug}/auction`;
+    groups.push({
+      key: "auction",
+      label: "Auction night",
+      items: [
+        { key: "season-auction", label: roles.conducting.name, href: base, icon: "room" },
+        {
+          key: "cockpit",
+          label: "Cockpit",
+          href: `${base}/cockpit`,
+          icon: "cockpit",
+          live: roles.conducting.live,
         },
       ],
     });

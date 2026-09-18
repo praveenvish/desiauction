@@ -7,7 +7,7 @@ import {
   registrations,
   teams,
 } from "@desiauction/db";
-import { and, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../admin/capabilities";
@@ -61,9 +61,35 @@ export interface PersonRoles {
   plays: boolean;
   /** Any platform grant at all (admin, support, moderation, …). */
   operates: boolean;
+  /** Seasons whose auction this person was appointed to run (auction:conductor). */
+  conducts: ConductedSeason[];
+}
+
+export interface ConductedSeason {
+  competitionSlug: string;
+  competitionName: string;
+  /** The season's auction, if one has been created (null before that). */
+  auctionStatus: string | null;
 }
 
 const MANAGING_SETS = new Set(["org:owner", "org:staff"]);
+
+async function conductedSeasons(competitionIds: string[]): Promise<ConductedSeason[]> {
+  if (competitionIds.length === 0) return [];
+  const rows = await systemDb
+    .select({
+      competitionSlug: competitions.slug,
+      competitionName: competitions.name,
+      auctionStatus: auctions.status,
+    })
+    .from(competitions)
+    .leftJoin(
+      auctions,
+      and(eq(auctions.competitionId, competitions.id), ne(auctions.status, "abandoned")),
+    )
+    .where(inArray(competitions.id, competitionIds));
+  return rows;
+}
 
 async function ownedTeams(personId: string): Promise<OwnedTeam[]> {
   const columns = {
@@ -161,13 +187,24 @@ export const rolesOf = cache(async (personId: string): Promise<PersonRoles> => {
     if (level === undefined) memberOf.push({ orgId: org.id, slug: org.slug, name: org.name });
     else organizes.push({ orgId: org.id, slug: org.slug, name: org.name, level });
   }
+  // Appointed auctioneer (0076): a season-scoped conduct grant.
+  const conducts = await conductedSeasons(
+    grants
+      .filter(
+        (grant) =>
+          grant.revokedAt === null &&
+          grant.scopeType === "tournament" &&
+          grant.capabilitySet === "auction:conductor",
+      )
+      .map((grant) => grant.scopeId),
+  );
   const operates = grants.some(
     (grant) =>
       grant.revokedAt === null &&
       grant.scopeType === PLATFORM_SCOPE_TYPE &&
       grant.scopeId === PLATFORM_SCOPE_ID,
   );
-  return { organizes, memberOf, owns, plays, operates };
+  return { organizes, memberOf, owns, plays, operates, conducts };
 });
 
 const AUCTION_OVER = new Set(["completed", "reconciled"]);

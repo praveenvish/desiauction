@@ -1,4 +1,5 @@
 import {
+  competitions,
   auctions,
   auditLog,
   consentRecords,
@@ -254,6 +255,25 @@ export async function executeErasure(input: {
             eq(grants.personId, personId),
             eq(grants.scopeType, "org"),
             eq(grants.scopeId, orgId),
+            isNull(grants.revokedAt),
+          ),
+        );
+      // Season-scoped grants in this club (0076 — an appointed auctioneer)
+      // end with the membership too; their scope is the season, not the org.
+      await tx
+        .update(grants)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(grants.personId, personId),
+            eq(grants.scopeType, "tournament"),
+            inArray(
+              grants.scopeId,
+              tx
+                .select({ id: competitions.id })
+                .from(competitions)
+                .where(eq(competitions.orgId, orgId)),
+            ),
             isNull(grants.revokedAt),
           ),
         );

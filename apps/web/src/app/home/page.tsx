@@ -654,7 +654,11 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
    */
   const manages = roles.organizes.length > 0;
   const brandNew =
-    !manages && roles.memberOf.length === 0 && roles.owns.length === 0 && !roles.plays;
+    !manages &&
+    roles.memberOf.length === 0 &&
+    roles.owns.length === 0 &&
+    roles.conducts.length === 0 &&
+    !roles.plays;
   const team = currentTeam(roles);
   // PI-1: nudge only someone the platform can see IS a player (a registration
   // or a profile row); a pure organizer's home never asks for a bowling style.
@@ -839,6 +843,10 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
             ? null
             : { competitionName: latest.competitionName, status: latest.status },
         brandNew,
+        conducting:
+          roles.conducts.find(
+            (row) => row.auctionStatus !== "completed" && row.auctionStatus !== "reconciled",
+          ) ?? null,
       });
 
   /* ---- which panels have earned their space ------------------------------

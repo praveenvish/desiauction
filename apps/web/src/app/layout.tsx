@@ -142,7 +142,22 @@ export default async function RootLayout({
             roles.plays &&
             roles.organizes.length === 0 &&
             roles.memberOf.length === 0 &&
-            roles.owns.length === 0,
+            roles.owns.length === 0 &&
+            roles.conducts.length === 0,
+          conducting: (() => {
+            // The night to lead with: one still to run, else the newest.
+            const season =
+              roles.conducts.find(
+                (row) => row.auctionStatus !== "completed" && row.auctionStatus !== "reconciled",
+              ) ?? roles.conducts[0];
+            return season === undefined
+              ? null
+              : {
+                  name: season.competitionName,
+                  seasonSlug: season.competitionSlug,
+                  live: season.auctionStatus === "live" || season.auctionStatus === "paused",
+                };
+          })(),
         };
 
   const orgSlugById = new Map(orgs.map((org) => [org.id, org.slug]));
