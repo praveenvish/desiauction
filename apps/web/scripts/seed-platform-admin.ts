@@ -32,7 +32,9 @@ import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capa
  * the power to look at them. `platform:demo` answers the people who asked to be
  * SHOWN the product: names and mobile numbers belonging to strangers with no
  * account here, plus the power to publish, in the company's name, the hours
- * somebody will pick up the phone. None of the three is a superset of another.
+ * somebody will pick up the phone. `platform:privacy` decides account-erasure
+ * requests and runs the erasure, which cannot be undone. None of the four is a
+ * superset of another.
  *
  * All are platform-scoped, and RLS makes all equally uninsertable by the
  * application role: this script is the only route.
@@ -40,8 +42,9 @@ import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capa
  *   pnpm --filter @desiauction/web seed:admin -- <phone>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:billing <phone>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:demo <phone>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:privacy <phone>
  */
-const SETS = ["platform:admin", "platform:billing", "platform:demo"] as const;
+const SETS = ["platform:admin", "platform:billing", "platform:demo", "platform:privacy"] as const;
 const setFlagAt = process.argv.indexOf("--set");
 const requestedSet = setFlagAt === -1 ? "platform:admin" : process.argv[setFlagAt + 1];
 if (!(SETS as readonly string[]).includes(requestedSet ?? "")) {

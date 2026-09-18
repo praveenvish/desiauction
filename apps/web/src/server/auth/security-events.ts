@@ -65,7 +65,12 @@ export type SecurityAction =
   // climax. Written at COMPLETION, not at the hammer: an unsold lot is requeued
   // by default, so "unsold" mid-night is a verdict the auction has not reached.
   | "auction.sold"
-  | "auction.unsold";
+  | "auction.unsold"
+  // The person asked for their account to be erased, or took the request back.
+  // On their own ledger because it is the one request that ends the account;
+  // the DECISION is on the request itself, which /account reads.
+  | "privacy.erasure.requested"
+  | "privacy.erasure.withdrawn";
 
 export async function logSecurityEvent(
   personId: string,

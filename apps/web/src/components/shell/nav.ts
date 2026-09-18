@@ -253,6 +253,9 @@ export const ADMIN_TABS: CompetitionTab[] = [
   // tab is present for everyone, the page 404s without the grant. Which tabs
   // you can SEE must not be a map of which grants you hold.
   { key: "demos", label: "Demos", href: "/admin/demos" },
+  // Erasure sits behind `platform:privacy`, on the same rule as the two above.
+  { key: "erasure", label: "Erasure", href: "/admin/erasure" },
+  { key: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
 ];
 
 export function activeAdminTab(pathname: string): string {
@@ -276,6 +279,12 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/demos")) {
     return "demos";
+  }
+  if (pathname.startsWith("/admin/erasure")) {
+    return "erasure";
+  }
+  if (pathname.startsWith("/admin/newsletter")) {
+    return "newsletter";
   }
   return "overview";
 }
@@ -387,6 +396,8 @@ const SECTION_LABELS: [RegExp, string][] = [
   // Longest-first: availability must not be labelled "Demos".
   [/^\/admin\/demos\/availability$/, "Demo availability"],
   [/^\/admin\/demos$/, "Demos"],
+  [/^\/admin\/erasure$/, "Erasure requests"],
+  [/^\/admin\/newsletter$/, "Newsletter"],
   // Longest-first: the case review must not be labelled "Money".
   [/\/money\/case\/[^/]+$/, "Case review"],
   // PX-8 finance (org-scoped) — also longest-first.

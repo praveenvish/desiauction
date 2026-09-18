@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@desiauction/ui";
+import Link from "next/link";
 import { useActionState } from "react";
 
 import { subscribeNewsletterAction } from "../../server/marketing/actions";
@@ -56,12 +57,16 @@ export function NewsletterForm() {
           </p>
         ) : null}
       </form>
-      {/* Both halves are true of what the action actually does: it writes one
-          row to `newsletter_subscribers` and nothing else. The usual
-          "unsubscribe any time" is NOT here — there is no unsubscribe link and
-          no sender yet, and a footer is a poor place to make a promise the
-          product cannot keep. It goes in the day the mechanism does. */}
-      <p className={styles["fine"]}>Product updates only. Your address goes nowhere else.</p>
+      {/* Every clause is true of what the product does: one row in
+          `newsletter_subscribers`, deleted after twenty-four months by the
+          retention sweep, and removable from /newsletter/unsubscribe. The
+          "unsubscribe" line waited until that page existed, as it should. */}
+      <p className={styles["fine"]}>
+        Product updates only. Your address goes nowhere else.{" "}
+        <Link href="/newsletter/unsubscribe" className={styles["fineLink"]}>
+          Unsubscribe
+        </Link>
+      </p>
     </>
   );
 }

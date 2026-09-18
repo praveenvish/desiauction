@@ -108,6 +108,33 @@ export async function platformDemoGate(): Promise<AdminIdentity | null> {
   };
 }
 
+/**
+ * THE FOURTH DOOR — the privacy desk, which can erase a person.
+ *
+ * Its own grant for the reason every door here has its own: seeing the whole
+ * platform, answering a pass and answering a demo request are all different
+ * from ending somebody's account in every club at once, and none of them should
+ * carry that power by accident. Returns null the same way as the others.
+ */
+export async function platformPrivacyGate(): Promise<AdminIdentity | null> {
+  const session = await currentSession();
+  if (session === null) {
+    return null;
+  }
+  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, async (db) =>
+    hasPlatformCapability(await grantsFor(db, session.personId), "platform.privacy"),
+  );
+  if (!allowed) {
+    return null;
+  }
+  return {
+    personId: session.personId,
+    name: session.name,
+    phone: session.phone,
+    email: session.email,
+  };
+}
+
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */
 export async function isPlatformAdmin(): Promise<boolean> {
   return (await platformAdminGate()) !== null;

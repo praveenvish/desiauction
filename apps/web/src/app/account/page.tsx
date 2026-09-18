@@ -20,6 +20,8 @@ import { NotificationSwitches } from "./notification-switches";
 import { PersonProfilePanel } from "./person-profile-panel";
 import { SportProfiles } from "./sport-profiles";
 import { EmailVerify } from "./email-verify";
+import { ErasurePanel } from "./erasure-panel";
+import { myErasureRequest } from "../../server/privacy/actions";
 import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
 import { SignOutButton } from "./sign-out-button";
@@ -36,6 +38,7 @@ export default async function AccountPage() {
   const security = await accountSecurity();
   const settings = await notificationSettings();
   const email = await accountEmail();
+  const erasure = await myErasureRequest();
   const cricketProfile = await playerProfileFor(session.personId);
   /*
    * One form per enabled sport, built from its pack. The specs are flattened to
@@ -179,14 +182,15 @@ export default async function AccountPage() {
                 destroying the record, so the tournament&rsquo;s history stays intact for everyone
                 else in it.
               </p>
+              <ErasurePanel request={erasure} />
               <p className="account-prose">
-                <strong>To ask:</strong> email{" "}
+                You can also email{" "}
                 <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
                   privacy@desiauction.in
                 </a>{" "}
-                from the number on this account, or from an address we can verify against it. We
-                reply within seven days. You can also{" "}
-                <Link href="/support">raise it through support</Link> if you would rather not email.
+                from the number on this account, or{" "}
+                <Link href="/support">raise it through support</Link>. We reply within seven days
+                either way.
               </p>
               <p className="account-prose account-links">
                 <Link href="/legal/data-retention">Data Retention policy</Link>

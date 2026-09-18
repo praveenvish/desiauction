@@ -405,6 +405,8 @@ const ACTIVITY_PHRASE: Record<string, string> = {
   "grant.issued": "Paddle granted",
   "grant.revoked": "Paddle revoked",
   "org.created": "Organization created",
+  // Written by the privacy desk when a member or player asked to be erased.
+  "person.erased": "A member's account was erased",
   "payment.captured": "Payment received",
   "payment.failed": "Payment failed",
   "registration.submitted": "New registration",

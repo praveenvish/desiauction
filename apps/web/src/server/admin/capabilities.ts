@@ -56,9 +56,11 @@ import type { GrantLike } from "@desiauction/core";
  * uninsertable by the application role whatever its set. It is seeded
  * out-of-band or it does not exist.
  */
-export type PlatformCapability = "platform.admin" | "platform.pass" | "platform.demo";
+export type PlatformCapability =
+  "platform.admin" | "platform.pass" | "platform.demo" | "platform.privacy";
 
-export type PlatformCapabilitySet = "platform:admin" | "platform:billing" | "platform:demo";
+export type PlatformCapabilitySet =
+  "platform:admin" | "platform:billing" | "platform:demo" | "platform:privacy";
 
 const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   "platform:admin": ["platform.admin"],
@@ -84,12 +86,25 @@ const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
    * or it does not exist.
    */
   "platform:demo": ["platform.demo"],
+  /**
+   * THE FOURTH SET: the privacy desk, which can ERASE a person.
+   *
+   * Every other platform power is about reading the platform or answering a
+   * customer. This one ends somebody's account, anonymizes them across every
+   * club they were ever in and cannot be undone, which is precisely why it is
+   * nobody's side effect: not administration's (seeing everyone is not a licence
+   * to delete anyone), not billing's, not the demo desk's. An operator who needs
+   * it is handed it deliberately, seeded out-of-band like the other three, and
+   * inherits both structural locks unchanged.
+   */
+  "platform:privacy": ["platform.privacy"],
 };
 
 export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
   "platform:admin",
   "platform:billing",
   "platform:demo",
+  "platform:privacy",
 ];
 
 /** The singleton scope. `scope_id` is char(26); this is the nil ULID. */

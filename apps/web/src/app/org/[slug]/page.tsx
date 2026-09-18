@@ -68,6 +68,8 @@ const ACTIVITY_PHRASE: Record<string, string> = {
   "grant.revoked": "Access revoked",
   "org.members.invite": "Member invited",
   "org.members.removed": "Member removed",
+  // The privacy desk erased somebody at their request (server/privacy/erasure.ts).
+  "person.erased": "A member's account was erased",
   "team.created": "Team added",
   "payment.captured": "Payment received",
   "settlement.CaseClosed": "Settlement closed",

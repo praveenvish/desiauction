@@ -51,7 +51,50 @@ export const people = pgTable("people", {
   email: text("email"),
   emailVerifiedAt: ts("email_verified_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
+  /**
+   * WHEN THIS PERSON WAS ERASED (0066); null for everyone else.
+   *
+   * The row outlives the person because shared records — a registration, a
+   * paddle, a sale — point at it and 0040 refuses to let them dangle. Erasure
+   * therefore empties the row rather than deleting it, and this is the marker
+   * that says so. Two CHECKs hold it honest: a row with no phone and no email is
+   * legal only when erased, and an erased row may hold neither.
+   */
+  erasedAt: ts("erased_at"),
 });
+
+/**
+ * A PERSON ASKING TO BE ERASED (0066).
+ *
+ * Platform-to-person data, like `consent_records`: no org, no RLS; the person
+ * reads and files their own, the privacy desk (`platform:privacy`) decides.
+ * One open request per person is a partial unique index, and the CHECKs in the
+ * migration tie `decided_at`/`decided_by` to the status so a request is either
+ * open or decided, never half of each.
+ */
+export const erasureRequests = pgTable(
+  "erasure_requests",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    status: text("status", { enum: ["requested", "completed", "declined", "withdrawn"] })
+      .notNull()
+      .default("requested"),
+    reason: text("reason"),
+    requestedAt: ts("requested_at").notNull().defaultNow(),
+    decidedBy: char("decided_by", { length: 26 }),
+    decidedAt: ts("decided_at"),
+    decisionNote: text("decision_note"),
+  },
+  (table) => [
+    uniqueIndex("erasure_requests_open_uq")
+      .on(table.personId)
+      .where(sql`${table.status} = 'requested'`),
+    index("erasure_requests_queue_idx").on(table.status, table.requestedAt),
+  ],
+);
 
 /**
  * THE PERSON'S DURABLE CRICKET IDENTITY (PI-1).
@@ -1855,11 +1898,20 @@ export const finopsSchedules = pgTable("finops_schedules", {
 
 // Home page "Stay updated" capture. Platform-level, ZERO tenant data (same
 // posture as finops_schedules above) — no org_id, no RLS.
-export const newsletterSubscribers = pgTable("newsletter_subscribers", {
-  id: id(),
-  email: text("email").notNull().unique(),
-  createdAt: ts("created_at").notNull().defaultNow(),
-});
+export const newsletterSubscribers = pgTable(
+  "newsletter_subscribers",
+  {
+    id: id(),
+    email: text("email").notNull().unique(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    /** Throttling only (0067); nulled by the retention sweep after ninety days. */
+    requestIp: text("request_ip"),
+  },
+  (table) => [
+    index("newsletter_subscribers_ip_idx").on(table.requestIp, table.createdAt),
+    index("newsletter_subscribers_created_idx").on(table.createdAt),
+  ],
+);
 
 /**
  * SOMEBODY WANTS TO BE SHOWN (migration 0031).

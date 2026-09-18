@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import { demoBookings, demoRequests, newId } from "@desiauction/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -67,6 +67,41 @@ export function tokenForRequest(requestId: string): string {
     .update(`demo-booking:${requestId}`)
     .digest("base64url")
     .slice(0, 32);
+}
+
+/**
+ * THE HANDLE A REQUESTER BOOKS WITH — the request id, signed.
+ *
+ * The pick page and `bookSlotAction` used to take a bare request id. Booking
+ * against one hands back the booking's own management token, which can cancel
+ * or move the booking and opens a page with the requester's details, so the
+ * bare id was a credential in all but name, and it travelled in a query string,
+ * which is exactly what access logs record. Now only the handle the requester's
+ * own form response carries is accepted: the id plus an HMAC under the same
+ * secret the booking links use, in a separate namespace so neither can stand in
+ * for the other.
+ */
+export function pickHandleFor(requestId: string): string {
+  const signature = createHmac("sha256", env.DEMO_TOKEN_SECRET)
+    .update(`demo-pick:${requestId}`)
+    .digest("base64url")
+    .slice(0, 22);
+  return `${requestId}.${signature}`;
+}
+
+/** The request a handle names, or null for anything that is not one we issued. */
+export function requestIdFromHandle(handle: unknown): string | null {
+  if (typeof handle !== "string") {
+    return null;
+  }
+  const dot = handle.indexOf(".");
+  const requestId = dot === 26 ? handle.slice(0, 26) : "";
+  if (requestId === "") {
+    return null;
+  }
+  const expected = Buffer.from(pickHandleFor(requestId));
+  const given = Buffer.from(handle);
+  return expected.length === given.length && timingSafeEqual(expected, given) ? requestId : null;
 }
 
 function isUniqueViolation(error: unknown): boolean {

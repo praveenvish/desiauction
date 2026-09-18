@@ -34,6 +34,21 @@ const BETA_DRAFT: LegalVersion = {
   note: "Initial beta draft. Structure is final; wording is under legal review and may change before general availability.",
 };
 
+/**
+ * The second beta draft of the privacy and retention documents (2026-09-18).
+ *
+ * Both changed in substance, so both say so rather than keep the July date:
+ * they now describe the product-news sign-up (which collected addresses no
+ * policy mentioned), the in-product account-deletion request, and exactly what
+ * survives an erasure. A changed promise under an unchanged version is how a
+ * reader is told nothing moved when it did.
+ */
+const BETA_DRAFT_2: LegalVersion = {
+  version: "0.2 (beta draft)",
+  date: "18 Sep 2026",
+  note: "Adds the product-news sign-up and its retention, account deletion from the Account page, and what is kept after deletion. Still under legal review.",
+};
+
 const DRAFT_NOTICE: Block = {
   kind: "callout",
   tone: "warning",
@@ -137,8 +152,8 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     slug: "privacy",
     title: "Privacy Policy",
     summary: "What we store, why, and your control over it.",
-    effective: "16 Jul 2026",
-    versions: [BETA_DRAFT],
+    effective: "18 Sep 2026",
+    versions: [BETA_DRAFT_2, BETA_DRAFT],
     blocks: [
       DRAFT_NOTICE,
       { kind: "heading", level: 2, text: "What we store" },
@@ -204,6 +219,13 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       {
         kind: "paragraph",
         text: "We use it to arrange and hold that one conversation, and for nothing else. It is not added to any mailing list, it is not used to advertise to you, and it is not shared or sold. If you book a time, we send you a confirmation and up to two reminders about that booking; you can cancel it at any point from the link in those messages, and cancelling stops the reminders.",
+      },
+      // The footer's product-news sign-up collected addresses that no policy
+      // mentioned. Stated here with the same honesty as the demo form above.
+      { kind: "heading", level: 2, text: "If you sign up for product news" },
+      {
+        kind: "paragraph",
+        text: "The sign-up in our site footer keeps your email address, the time you signed up, and the network address you signed up from. We use the address only to tell you about DesiAuction itself. It is not shared or sold. The network address is used only to stop the form being abused, and is deleted after ninety days. Your email address is deleted twenty-four months after you signed up, or at once if you unsubscribe at /newsletter/unsubscribe.",
       },
       { kind: "heading", level: 2, text: "Retention and deletion" },
       {
@@ -369,8 +391,8 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     slug: "data-retention",
     title: "Data Retention",
     summary: "How long we keep things, and what happens on deletion.",
-    effective: "16 Jul 2026",
-    versions: [BETA_DRAFT],
+    effective: "18 Sep 2026",
+    versions: [BETA_DRAFT_2, BETA_DRAFT],
     blocks: [
       DRAFT_NOTICE,
       { kind: "heading", level: 2, text: "Immutable records" },
@@ -383,10 +405,19 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
         kind: "paragraph",
         text: "If you asked for a demonstration without opening an account, we keep that request for twenty-four months and then delete it. The network address it was sent from is kept for ninety days — it exists only to stop the form being abused — and is deleted after that whether or not the request itself is still held. Ask us sooner and we will delete it sooner; there is no record here we are required to keep.",
       },
+      { kind: "heading", level: 2, text: "Product-news sign-ups" },
+      {
+        kind: "paragraph",
+        text: "An email address given in our site footer is kept for twenty-four months and then deleted automatically. The network address it came from is kept for ninety days, only to stop the form being abused. You can remove your address sooner at /newsletter/unsubscribe.",
+      },
       { kind: "heading", level: 2, text: "Account deletion" },
       {
         kind: "paragraph",
-        text: "You may request deletion of your account. Where your data appears only in your own profile, we delete it. Where it appears in a shared, immutable record — an auction you bid in, a receipt issued to you — we anonymize your personal identifiers rather than destroy the record, so the tournament's history stays intact for everyone else in it.",
+        text: "You may request deletion of your account from your Account page, or by writing to us. Where your data appears only in your own profile, we delete it. Where it appears in a shared, immutable record — an auction you bid in, a receipt issued to you — we anonymize your personal identifiers rather than destroy the record, so the tournament's history stays intact for everyone else in it.",
+      },
+      {
+        kind: "paragraph",
+        text: "Two records are kept after deletion, linked only to an anonymous identifier: the record of what you consented to and when, with your withdrawal added, because it is our evidence of having asked; and your account's security history, which cannot be edited by anyone once written. Neither holds your number or email address. The security history does keep the names you gave your devices when you added passkeys (such as \u201cmy iPhone\u201d), as they were written at the time.",
       },
       { kind: "heading", level: 2, text: "How to ask" },
       {

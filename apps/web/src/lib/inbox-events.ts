@@ -8,7 +8,19 @@
  * inbox's client component, so the security panel could not reach it. It lives
  * here now and both read it.
  */
-const LABELS: Record<string, string> = {
+import type { SecurityAction } from "../server/auth/security-events";
+
+/**
+ * EVERY EVENT THE LEDGER CAN WRITE HAS PROSE — checked by the compiler.
+ *
+ * This was a plain `Record<string, string>`, so an event could be added to the
+ * `SecurityAction` union, written on every account, and render as a raw key in
+ * monospace with nothing failing. Five had: a sign-out, a refused passkey, a
+ * changed phone number, a verified email and an updated player profile all read
+ * as database identifiers on /inbox and /account. `satisfies` below makes a
+ * missing label a type error at the point the event is invented.
+ */
+const PERSON_EVENT_LABELS = {
   "auth.login.otp": "Signed in with a one-time code",
   "auth.login.email": "Signed in with a code sent to your email",
   // The FIRST line of an email-anchored account's ledger. Deliberately not
@@ -30,10 +42,6 @@ const LABELS: Record<string, string> = {
   "auth.passkey.renamed": "Passkey renamed",
   "auth.passkey.removed": "Passkey removed",
   "auth.session.revoked": "A device was signed out",
-  // The first finance event a PAYER ever receives. Until the in-app adapter
-  // actually wrote a person-scoped row, a receipt was visible to the club's
-  // finance desk and to nobody else — the inbox had no finance writer at all.
-  "finance.document.issued": "A receipt was issued to your team",
   // The sentence a player waits all night for. The team and the price live in
   // the row's meta; the label stays short because the inbox is a list.
   "auction.sold": "You were sold at auction",
@@ -44,6 +52,25 @@ const LABELS: Record<string, string> = {
   "profile.name.updated": "Name updated",
   // The first name is not an update — see `profile.name.set`.
   "profile.name.set": "Name added to your profile",
+  "auth.logout": "Signed out",
+  "auth.passkey.failed": "A passkey sign-in was refused",
+  "auth.phone.changed": "Your mobile number was changed",
+  "profile.email.verified": "Email address verified",
+  "profile.player.updated": "Player profile updated",
+  "privacy.erasure.requested": "You asked for your account to be deleted",
+  "privacy.erasure.withdrawn": "You withdrew your account deletion request",
+} satisfies Record<SecurityAction, string>;
+
+/**
+ * Written by other domains onto the same person-scoped ledger (finance), so they
+ * are not in the auth union above but still deserve a sentence.
+ */
+const LABELS: Record<string, string> = {
+  ...PERSON_EVENT_LABELS,
+  // The first finance event a PAYER ever receives. Until the in-app adapter
+  // actually wrote a person-scoped row, a receipt was visible to the club's
+  // finance desk and to nobody else — the inbox had no finance writer at all.
+  "finance.document.issued": "A receipt was issued to your team",
 };
 
 /**

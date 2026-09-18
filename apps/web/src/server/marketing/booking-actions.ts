@@ -7,7 +7,13 @@ import { demoBookings, demoRequests } from "@desiauction/db";
 import { eq, sql } from "drizzle-orm";
 
 import { db } from "../db";
-import { bookSlot, bookingByToken, cancelBooking, rescheduleBooking } from "./demo-booking";
+import {
+  bookSlot,
+  bookingByToken,
+  cancelBooking,
+  requestIdFromHandle,
+  rescheduleBooking,
+} from "./demo-booking";
 import { sendBookingCancellation, sendBookingConfirmation } from "./demo-booking-mail";
 import { logger } from "../logger";
 
@@ -64,9 +70,17 @@ export async function bookSlotAction(
   _previous: SlotActionState,
   formData: FormData,
 ): Promise<SlotActionState> {
-  const requestId = formData.get("requestId");
+  // Only a handle this server signed names a request (see `pickHandleFor`); a
+  // bare id, or anything else, is the same "we couldn't find it" as a stale one.
+  const requestId = requestIdFromHandle(formData.get("requestHandle"));
   const slotStart = formData.get("slotStart");
-  if (typeof requestId !== "string" || typeof slotStart !== "string") {
+  if (requestId === null) {
+    return {
+      status: "error",
+      message: "We couldn't find that request. Start again from the demo page.",
+    };
+  }
+  if (typeof slotStart !== "string") {
     return { status: "error", message: "Pick a time to continue." };
   }
 
