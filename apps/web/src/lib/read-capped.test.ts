@@ -21,6 +21,26 @@ describe("readCapped", () => {
     expect(await readCapped(chunked(["ab", "cd"]), 10)).toBe("abcd");
   });
 
+  it("keeps the exact bytes when a multi-byte character is split across chunks", async () => {
+    // A webhook signature is computed over the bytes sent; decoding chunk by
+    // chunk would turn a split "₹" into two replacement characters.
+    const bytes = new TextEncoder().encode('{"amount":"₹500"}');
+    const cut = bytes.indexOf(0xe2) + 1; // inside the three-byte "₹"
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, cut));
+        controller.enqueue(bytes.slice(cut));
+        controller.close();
+      },
+    });
+    const request = new Request("http://x/", {
+      method: "POST",
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+    expect(await readCapped(request, 1024)).toBe('{"amount":"₹500"}');
+  });
+
   it("refuses a chunked body that grows past the cap, with no length declared", async () => {
     expect(await readCapped(chunked(["x".repeat(8), "y".repeat(8)]), 10)).toBeNull();
   });
