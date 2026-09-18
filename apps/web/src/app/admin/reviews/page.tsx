@@ -33,7 +33,9 @@ export default async function AdminReviewsPage() {
           <header className="dash-head">
             <p className="competitions-hint">
               Ask the people who ran a tournament how it went, then publish the reviews worth
-              standing behind. A published review is only ever quoted if its author said we may.
+              standing behind. A published review is only ever quoted if its author said we may —
+              and a published platform review that may be quoted appears on the home page, newest
+              first, exactly as written.
             </p>
           </header>
           <ReviewDeskPanel desk={desk} />

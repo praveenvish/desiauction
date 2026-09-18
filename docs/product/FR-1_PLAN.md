@@ -1,6 +1,6 @@
 # FR-1 — Problem reports and reviews
 
-**Status:** Phases 1–4 BUILT (2026-09-17/18, on `feature/fr1-feedback`); Phase 5 planned. **Author:** engineering. **Planned:** 2026-09-17.
+**Status:** ALL PHASES (1–5) BUILT (2026-09-17/18, on `feature/fr1-feedback`). **Author:** engineering. **Planned:** 2026-09-17.
 **Founder decisions:** taken 2026-09-17 — "go with your recommendations" (§8).
 
 ---
@@ -308,3 +308,42 @@ signed and unsigned bylines, pending one absent) → reader report → club repl
 desk shows the report and its reason, sorted first → "Keep it up" clears it.
 Found and fixed in the browser: the summary's rounded stars read "4.7, 5 out of
 5" to a screen reader; now decorative beside the exact number.
+
+## 14. Phase 5 — what shipped
+
+**Shipped.** `server/reviews/voices.ts` — the ONE door through which the landing
+page may quote anybody: a PLATFORM review, PUBLISHED by an operator, whose
+author ticked "may quote" and signed it, with words in it. Newest-published
+first, never sorted by rating. Long quotes are cut at a word boundary and end
+in "…". `<LandingVoices/>` renders it under "In their own words", after the
+live-tournaments strip, with a footnote saying how the quotes got there. It is
+guarded exactly like `<LiveTournaments/>` (rethrow Next signals, log, render
+nothing) — `GET /` still renders with Postgres stopped — and renders nothing
+until there is a quote. The desk says so: a quotable platform review's badge
+reads "may quote — publishing shows it on the home page", then "on the home
+page"; publish and hide both revalidate `/`.
+
+**The no-fabrication rule, amended in one place.** `content.test.ts` still
+bans testimonials in the static landing copy, unchanged. A new test pins the
+amendment: `marketing.ts` carries no quote/testimonial keys, the landing's
+quote section reads from `server/reviews/voices` and not from content, and the
+page renders it. `voices.regression.test.ts` proves the filter against
+Postgres (pending, hidden, unpermitted, wordless and season reviews never
+appear; hiding removes; order is by publication, not rating).
+
+**Found by looking:** a single quote stretched into a full-width banner
+(`auto-fit` collapses empty tracks; now `auto-fill`), and the first heading —
+"From people who ran their auction on it" — was not true of a team owner's
+quote. It is "In their own words".
+
+**Merge note (adds to §12):** the parallel branch's landing restructure
+(`ui/premium-landing`) should keep `<LandingVoices />` wherever the proof
+section lands; and if it restores the old trust copy ("no customers to name
+yet", "no quotes from organizers"), that copy must yield once a voice exists —
+the two cannot be on the page together.
+
+**Verification.** 5 unit + 5 DB regression tests for the quotes, the landing
+guard tested for both failure and emptiness, the amended content test; 289
+tests across touched suites; every gate green; production build; the section
+seen at 1440 and 320 px (no horizontal scroll) with a seeded quote, then the
+seed removed.

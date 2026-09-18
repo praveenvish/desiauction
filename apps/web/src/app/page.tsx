@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { env } from "../env";
 import { LANDING, PRICING, TRUST_MARKS } from "../content/marketing";
 import { HeroStage, type StagePlayer } from "../components/marketing/hero-stage";
+import { LandingVoices } from "../components/marketing/landing-voices";
 import { LiveTournaments } from "../components/marketing/live-tournaments";
 import {
   IconArrowRight,
@@ -185,6 +186,10 @@ export default function LandingPage() {
             explaining. Renders nothing when the directory is empty or the
             database is unreachable, which restores exactly today's layout. */}
         <LiveTournaments />
+
+        {/* FR-1 Phase 5: real, permitted quotes — absent until there is one,
+            and absent when the database is (same guard as the strip above). */}
+        <LandingVoices />
 
         {/* --- 2 · The night in three beats -------------------------------- */}
         <section className="mk-band" id="how" aria-labelledby="how-heading">

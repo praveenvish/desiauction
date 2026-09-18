@@ -233,6 +233,10 @@
     "apps/web/src/server/reviews/season-actions.ts": {
       "class": "debt",
       "reason": "FR-1 Phase 4. Same shape as competition/fixture-actions: resolveCompetition runs on the system pool (membership proven) before the tenant boundary opens for the competition.manage check. The review reads are on no-RLS tables. PA-1R Phase 3.4."
+    },
+    "apps/web/src/server/reviews/voices.ts": {
+      "class": "by-design",
+      "reason": "FR-1 Phase 5. The landing page's quotes: published, author-permitted PLATFORM reviews, read by an unauthenticated visitor. reviews carries no RLS and a platform review belongs to no org, so there is no tenant to scope to."
     }
   }
 }

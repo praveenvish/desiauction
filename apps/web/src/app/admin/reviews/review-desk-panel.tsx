@@ -208,7 +208,9 @@ function ReviewRow({ review }: { review: DeskReview }) {
           <Badge tone={review.mayQuote ? "success" : "neutral"}>
             {review.seasonName === null
               ? review.mayQuote
-                ? "may quote"
+                ? review.status === "published"
+                  ? "on the home page"
+                  : "may quote — publishing shows it on the home page"
                 : "not for quoting"
               : review.mayQuote
                 ? "signed"

@@ -44,6 +44,9 @@ export async function moderateReviewAction(
   const result = await moderate(reviewId, status, operator.personId);
   if (result.ok) {
     revalidatePath("/admin/reviews");
+    // A platform review may be quoted on the landing page; publish or hide,
+    // the home page must not keep serving yesterday's answer.
+    revalidatePath("/");
   }
   return result;
 }
