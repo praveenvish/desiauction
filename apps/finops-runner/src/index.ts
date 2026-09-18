@@ -50,6 +50,8 @@ if (env.SENTRY_DSN !== undefined) {
      * disagree about what is sensitive.
      */
     beforeSend: (event) => scrub(event) as typeof event,
+    // Transactions never pass through beforeSend; their spans carry URLs.
+    beforeSendTransaction: (event) => scrub(event) as typeof event,
   });
 }
 
