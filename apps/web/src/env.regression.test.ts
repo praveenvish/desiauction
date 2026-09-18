@@ -83,8 +83,7 @@ describe("web env — development stays effortless", () => {
 
 describe("web env — production refuses every dev-only default", () => {
   it("refuses a production boot whose email would fall back to the dev inbox", () => {
-    const { EMAIL_API_KEY: _drop, ...noKey } = PROD_OK;
-    expect(() => parseEnv(raw(noKey))).toThrow(/EMAIL/);
+    expect(() => parseEnv(raw({ ...PROD_OK, EMAIL_API_KEY: undefined }))).toThrow(/EMAIL/);
     expect(() => parseEnv(raw({ ...PROD_OK, EMAIL_PROVIDER: "dev" }))).toThrow(/EMAIL/);
   });
 

@@ -313,7 +313,7 @@ describe("EMAIL SIGN-UP — the account the mailbox creates", () => {
     const staleCode = login.ok ? (login.code ?? "") : "";
 
     const change = await requestEmailVerification(db, { personId, email: newEmail });
-    const changeCode = change.ok ? (change.code ?? "") : "";
+    const changeCode = change.ok ? change.code : "";
     expect(await confirmEmailVerification(db, { personId, code: changeCode })).toEqual({
       ok: true,
       email: newEmail,
