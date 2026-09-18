@@ -16,6 +16,7 @@ import {
   finopsPeriods,
   finopsProfiles,
   finopsSeries,
+  fixtureLineups,
   fixtureResults,
   fixtures,
   franchises,
@@ -111,6 +112,7 @@ export async function purgeOrg(db: Db, orgId: string): Promise<void> {
   // misses is no longer silent residue, it is a teardown that cannot delete
   // its people. (fixture_results was missed, and 185 orphaned results were
   // what the local database had to show for it.)
+  await db.delete(fixtureLineups).where(eq(fixtureLineups.orgId, orgId));
   await db.delete(fixtureResults).where(eq(fixtureResults.orgId, orgId));
   await db.delete(fixtures).where(eq(fixtures.orgId, orgId));
   await db.delete(passUpgradeRequests).where(eq(passUpgradeRequests.orgId, orgId));

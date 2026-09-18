@@ -146,12 +146,14 @@ export default async function RootLayout({
         };
 
   const orgSlugById = new Map(orgs.map((org) => [org.id, org.slug]));
+  const managedOrgIds = new Set((roles?.organizes ?? []).map((club) => club.orgId));
   const competitions = (competitionsView_?.competitions ?? []).map((competition) => ({
     slug: competition.slug,
     name: competition.name,
     orgName: competition.orgName,
     orgSlug: orgSlugById.get(competition.orgId) ?? "",
     canSettle: settlementOrgs.has(competition.orgId),
+    canManage: managedOrgIds.has(competition.orgId),
   }));
   return (
     // `suppressHydrationWarning`: the bootstrap below rewrites `data-theme`

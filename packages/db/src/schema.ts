@@ -1058,6 +1058,34 @@ export const fixtureParticipants = pgTable(
   ],
 );
 
+/**
+ * WHO PLAYED (0074, launch polish Phase 3). One row per player who took the
+ * field for their team in a fixture. A team with a lineup recorded and a
+ * registration NOT in it means "in the squad, didn't play"; a team with no
+ * lineup recorded means "not recorded" — the career never guesses between them.
+ * Keyed by registration (the per-season snapshot), not person: the career joins
+ * through registrations.person_id, exactly as every other career fact does.
+ */
+export const fixtureLineups = pgTable(
+  "fixture_lineups",
+  {
+    fixtureId: char("fixture_id", { length: 26 }).notNull(),
+    registrationId: char("registration_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    recordedBy: char("recorded_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.fixtureId, table.registrationId] }),
+    index("fixture_lineups_registration_idx").on(table.registrationId),
+    index("fixture_lineups_competition_idx").on(table.competitionId),
+  ],
+);
+
 export const fixtures = pgTable(
   "fixtures",
   {

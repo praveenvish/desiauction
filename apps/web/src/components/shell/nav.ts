@@ -320,7 +320,17 @@ export function activeAdminTab(pathname: string): string {
  * tab is not disabled for anyone else — it is ABSENT, matching the surface
  * itself, which 404s rather than admit the books exist.
  */
-export function competitionTabs(slug: string, canSettle = false): CompetitionTab[] {
+export function competitionTabs(
+  slug: string,
+  canSettle = false,
+  /**
+   * Manages the season's club (org:owner / org:staff). Registrations and
+   * Lineups are rosters: a plain member or a team owner used to be offered
+   * Registrations and shown a one-line refusal behind it. Defaults to true so
+   * callers that predate the flag keep their tabs.
+   */
+  canManage = true,
+): CompetitionTab[] {
   const base = `/seasons/${slug}`;
   // These tabs ARE the season workspace's navigation, so they carry the
   // navigation test hooks. They used to hang off buttons on the overview, which
@@ -328,13 +338,21 @@ export function competitionTabs(slug: string, canSettle = false): CompetitionTab
   return [
     { key: "overview", label: "Overview", href: base },
     { key: "teams", label: "Teams", href: `${base}/teams`, testId: "open-teams" },
-    {
-      key: "registrations",
-      label: "Registrations",
-      href: `${base}/registrations`,
-      testId: "open-dashboard",
-    },
+    ...(canManage
+      ? [
+          {
+            key: "registrations",
+            label: "Registrations",
+            href: `${base}/registrations`,
+            testId: "open-dashboard",
+          },
+        ]
+      : []),
     { key: "fixtures", label: "Fixtures", href: `${base}/fixtures`, testId: "open-fixtures" },
+    // Who played each match — what a player's career counts as a match played.
+    ...(canManage
+      ? [{ key: "lineups", label: "Lineups", href: `${base}/lineups`, testId: "open-lineups" }]
+      : []),
     // The table sits beside the fixtures it is derived from. It reads for
     // everyone who can see the season, not just officers — a league table only
     // officers can open is not a league table.
@@ -394,6 +412,9 @@ export function activeCompetitionTab(pathname: string, slug: string): string {
   if (pathname.startsWith(`${base}/fixtures`)) {
     return "fixtures";
   }
+  if (pathname.startsWith(`${base}/lineups`)) {
+    return "lineups";
+  }
   if (pathname.startsWith(`${base}/standings`)) {
     return "standings";
   }
@@ -450,6 +471,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/fixtures\/calendar$/, "Calendar"],
   [/\/fixtures\/match-day$/, "Match day"],
   [/\/fixtures$/, "Fixtures"],
+  [/\/lineups$/, "Lineups"],
   [/\/reviews$/, "Reviews"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
@@ -515,6 +537,7 @@ const SURFACE_SUBTITLES: [string, string][] = [
   ["/money", "Receipts issued to your teams, across every season."],
   ["/inbox", "Approvals, auction results, receipts and account activity."],
   ["/account", "Your sign-in, profile and security."],
+  ["/me", "Every tournament, match and sport you've played — in one place."],
   ["/me/cricket", "Every season you've played, in one place."],
 ];
 
@@ -654,6 +677,10 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
  * pack for should not be given a confident title.
  */
 export function careerTitle(pathname: string): string | null {
+  // The all-sports hub (launch polish, Phase 3).
+  if (pathname === "/me") {
+    return "My sports";
+  }
   const match = /^\/me\/([^/?#]+)/.exec(pathname);
   if (match === null) {
     return null;

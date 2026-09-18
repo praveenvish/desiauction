@@ -94,6 +94,8 @@ export interface ShellCompetition {
   orgSlug: string;
   /** PX-7: holder of `settlement.view` on this competition's org — gates Money. */
   canSettle: boolean;
+  /** Manages this competition's club (org:owner/staff) — gates the roster tabs. */
+  canManage?: boolean;
 }
 
 export interface ProductShellProps {
@@ -406,7 +408,11 @@ export function ProductShell({
       groups.push({
         label: `In ${currentCompetition.name}`,
         items: [
-          ...competitionTabs(currentCompetition.slug, currentCompetition.canSettle).map((tab) => ({
+          ...competitionTabs(
+            currentCompetition.slug,
+            currentCompetition.canSettle,
+            currentCompetition.canManage ?? true,
+          ).map((tab) => ({
             key: `section-${tab.key}`,
             label: tab.label,
             hint: currentCompetition.name,
@@ -829,10 +835,12 @@ export function ProductShell({
         <SubNavTabs
           label="Season sections"
           linkComponent={Link}
-          tabs={competitionTabs(slug, competition.canSettle).map((tab) => ({
-            ...tab,
-            active: tab.key === activeTab,
-          }))}
+          tabs={competitionTabs(slug, competition.canSettle, competition.canManage ?? true).map(
+            (tab) => ({
+              ...tab,
+              active: tab.key === activeTab,
+            }),
+          )}
         />
       );
     }

@@ -92,6 +92,9 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capabilities.js";
 import { auctionReady } from "../src/server/auction/auction-ready.js";
 import { FINOPS_STORAGE_DIR } from "../src/server/financial-operations/deps.js";
+import { createFixture } from "../src/server/competition/fixture-aggregate.js";
+import { saveLineup } from "../src/server/competition/lineups.js";
+import { recordFixtureResult } from "../src/server/competition/results.js";
 import { settlementDeps } from "../src/server/settlement/deps.js";
 import {
   attestManualCapture,
@@ -465,6 +468,57 @@ async function main(): Promise<void> {
     true,
   );
   if (!completed.ok) throw new Error(`complete: ${completed.reason}`);
+
+  // --- Two played matches with lineups (launch polish, Phase 3) ---------------
+  // So a player's profile has matches to show from a fresh setup. Fixtures are
+  // created by the real aggregate and results/lineups recorded by the real
+  // writers; the ONE shortcut is the status jump to `completed`, because the
+  // lifecycle's guards (ground, kickoff window) are fixture-desk concerns this
+  // exemplar does not need to stage.
+  const [kings, chargers] = cupTeams;
+  if (kings !== undefined && chargers !== undefined) {
+    const squadRows = await db
+      .select({ id: registrations.id, teamId: registrations.teamId })
+      .from(registrations)
+      .where(and(eq(registrations.competitionId, cupId), eq(registrations.status, "approved")));
+    for (const [round, [home, away, outcome]] of (
+      [
+        [kings, chargers, "home_win"],
+        [chargers, kings, "away_win"],
+      ] as const
+    ).entries()) {
+      const made = await createFixture(db, cup, founder, {
+        homeTeamId: home.id,
+        awayTeamId: away.id,
+        kickoffAt: `2026-02-${String(7 + round * 7).padStart(2, "0")}T09:30`,
+        round: round + 1,
+      });
+      if (!made.ok) throw new Error(`createFixture: ${made.reason}`);
+      await db.update(fixtures).set({ status: "completed" }).where(eq(fixtures.id, made.fixtureId));
+      const recorded = await recordFixtureResult(db, {
+        orgId,
+        fixtureId: made.fixtureId,
+        actorId: founder,
+        result: {
+          outcome,
+          homeScore: { runs: 142, wickets: 6, balls: 120 },
+          awayScore: { runs: outcome === "home_win" ? 128 : 146, wickets: 8, balls: 120 },
+        },
+      });
+      if (!recorded.ok) throw new Error(`recordFixtureResult: ${recorded.reason}`);
+      for (const team of [home, away]) {
+        const saved = await saveLineup(db, {
+          competitionId: cupId,
+          orgId,
+          fixtureId: made.fixtureId,
+          teamId: team.id,
+          registrationIds: squadRows.filter((row) => row.teamId === team.id).map((row) => row.id),
+          actorId: founder,
+        });
+        if (!saved.ok) throw new Error(`saveLineup: ${saved.reason}`);
+      }
+    }
+  }
 
   // --- Settlement: case → obligations → manual payments → journal -------------
   const sDeps = settlementDeps(db, { gateways: {} });
