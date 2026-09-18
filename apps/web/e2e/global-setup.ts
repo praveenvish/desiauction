@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { openSync, writeFileSync } from "node:fs";
+import { openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createDb, finopsJobs } from "@desiauction/db";
@@ -249,13 +250,61 @@ async function purgeStaleJobs(): Promise<void> {
 }
 
 /** Where the teardown looks for the runner it has to stop. */
-export const RUNNER_PID_FILE = fileURLToPath(new URL("./.finops-runner.pid", import.meta.url));
+/**
+ * ONE PID FILE PER PLAYWRIGHT PROCESS, named for that process.
+ *
+ * This was a single shared `.finops-runner.pid`, and that made killing a run
+ * dangerous for the NEXT one: a SIGTERM'd Playwright still runs its global
+ * teardown, which read the shared file after the new run's setup had overwritten
+ * it — and stopped the NEW run's runner. Every finance spec in the new run then
+ * failed on "not certified yet", looking exactly like a settlement regression.
+ * Keyed by `process.pid` (setup and teardown run in the same main process), a
+ * teardown can only ever find the runner its own setup started.
+ */
+const E2E_DIR = fileURLToPath(new URL(".", import.meta.url));
+export const RUNNER_PID_FILE = join(E2E_DIR, `.finops-runner.${String(process.pid)}.pid`);
+
+/** Is a process id still alive? Signal 0 checks without sending anything. */
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Stop runners left behind by Playwright processes that died WITHOUT a teardown
+ * (a crash, kill -9). Their pid files name a parent that no longer exists; the
+ * runner inside is an orphan holding a database connection and ticking against
+ * the same tables this run is about to use.
+ */
+function reapOrphanedRunners(): void {
+  for (const name of readdirSync(E2E_DIR)) {
+    const match = /^\.finops-runner\.(\d+)\.pid$/.exec(name);
+    if (match?.[1] === undefined || Number(match[1]) === process.pid || alive(Number(match[1]))) {
+      continue;
+    }
+    const file = join(E2E_DIR, name);
+    const runner = Number.parseInt(readFileSync(file, "utf8").trim(), 10);
+    if (Number.isFinite(runner)) {
+      try {
+        process.kill(-runner, "SIGTERM");
+      } catch {
+        // Already gone.
+      }
+    }
+    rmSync(file, { force: true });
+  }
+}
 
 export default async function globalSetup(): Promise<void> {
   const base = "http://localhost:3050";
   // Before the runner, not after: it claims in `not_before_ms` order, so a
   // runner started first spends its opening ticks on the litter this removes.
   await purgeStaleJobs();
+  reapOrphanedRunners();
   startFinopsRunner();
   await warmRoutes(base);
   await warmSignIn(base);
