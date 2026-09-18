@@ -29,7 +29,7 @@ import { redirect } from "next/navigation";
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
 import { membersOf, resolveTenant, type OrgSummary } from "../orgs/orgs";
-import { can, grantsFor } from "../orgs/authz";
+import { can } from "../orgs/authz";
 import { canFinops, finopsActor, issueFinopsGrant, revokeFinopsGrant } from "./authz";
 import { derivedId } from "../derived-id";
 import { webFinopsDeps } from "./deps";
@@ -47,6 +47,7 @@ import {
   type ReconciliationView,
   type RegisterRow,
 } from "./views";
+import { grantsOfPerson } from "../request-cache";
 
 /**
  * PX-8 Financial Operations Workspace — the internal RPC surface (PX-1 F1/F2).
@@ -315,9 +316,7 @@ export async function finopsOrgIds(): Promise<string[]> {
   if (session === null) {
     return [];
   }
-  const held = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    grantsFor(db, session.personId),
-  );
+  const held = await grantsOfPerson(session.personId);
   return [
     ...new Set(
       held

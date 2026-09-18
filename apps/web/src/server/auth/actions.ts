@@ -62,6 +62,7 @@ import {
   type SessionSummary,
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
+import { cache } from "react";
 
 const CHALLENGE_COOKIE = "da_pk_challenge";
 
@@ -726,12 +727,23 @@ export async function logoutToAction(next: string): Promise<void> {
   redirect(safe);
 }
 
-export async function currentSession() {
+/**
+ * The session, read ONCE per request. The root layout, every gate it fans out
+ * to, and the page itself each ask; uncached, that was six or more session
+ * lookups (each able to write a slide) before a page rendered anything.
+ * Internal because this module is `"use server"`: `cache()` returns a plain
+ * function, and every export here must be async.
+ */
+const currentSessionOnce = cache(async () => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (token === undefined) {
     return null;
   }
   return getSessionByToken(db, token);
+});
+
+export async function currentSession() {
+  return currentSessionOnce();
 }
 
 // --- Profile (PX-3) -----------------------------------------------------------

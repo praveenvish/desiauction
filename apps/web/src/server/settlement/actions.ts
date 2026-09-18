@@ -17,7 +17,7 @@ import { currentSession } from "../auth/actions";
 import { type CompetitionSummary } from "../competition/competitions";
 import { resolveMemberCompetition } from "../competition/resolve";
 import { dbHandle } from "../db";
-import { can, grantsFor } from "../orgs/authz";
+import { can } from "../orgs/authz";
 import { membersOf, resolveTenant, type OrgSummary } from "../orgs/orgs";
 import { parseRupees, RUPEE_PARSE_MESSAGES } from "./amount";
 import {
@@ -55,6 +55,7 @@ import {
   type Ack,
 } from "./writer";
 import { logger } from "../logger";
+import { grantsOfPerson } from "../request-cache";
 
 /**
  * PX-7 Settlement Experience — the internal RPC surface (PX-1 E1/E2).
@@ -240,9 +241,7 @@ const settlementOrgIdsOnce = cache(async (): Promise<string[]> => {
   if (session === null) {
     return [];
   }
-  const held = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    grantsFor(db, session.personId),
-  );
+  const held = await grantsOfPerson(session.personId);
   const orgIds = held
     .filter(
       (grant) =>

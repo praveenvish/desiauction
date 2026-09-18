@@ -128,6 +128,7 @@ import {
   type TimelineEntry,
 } from "./registrations";
 import { seasonHoldOf, type SeasonHold } from "../moderation/season-hold";
+import { orgsOfPerson } from "../request-cache";
 
 // Org-scoped internal RPC (C-14, IP-3_DESIGN D1). Every action resolves the
 // session, then the tenant, then the capability, then acts — no other path.
@@ -188,7 +189,7 @@ export interface CompetitionsView {
 const competitionsViewOnce = cache(async (): Promise<CompetitionsView> => {
   const session = await requireSession();
   const [orgs, competitions] = await Promise.all([
-    withTenantDb(dbHandle, { personId: session.personId }, (db) => orgsFor(db, session.personId)),
+    orgsOfPerson(session.personId),
     // Cross-org union scoped by the membership join (see `resolve.ts`).
     memberCompetitions(session.personId),
   ]);

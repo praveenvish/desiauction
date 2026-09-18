@@ -207,20 +207,26 @@ function OrgLadder({ rungs, current }: { rungs: OrgRung[]; current: number }) {
 export default async function OrgHomePage({ params }: { params: Promise<{ slug: string }> }) {
   // The sports currently switched on — the picker renders only when there is
   // more than one (SP-1 Phase 1).
-  const sportOptions = await enabledSports();
   const { slug } = await params;
-  const view = await orgView(slug);
+  // ONE batch, not three steps in series. The gate still decides the answer
+  // before anything renders — `notFound()` below — but the panel reads no longer
+  // wait for it: each re-checks membership itself and returns null for a
+  // stranger, so running them alongside the gate reveals nothing and saves two
+  // round-trip depths on every visit.
+  const [sportOptions, view, authority, finance, catalogue, overview, messaging] =
+    await Promise.all([
+      enabledSports(),
+      orgView(slug),
+      moneyAuthority(slug),
+      financeAuthority(slug),
+      orgCatalogue(slug),
+      orgOverview(slug),
+      orgMessagingSettingsView(slug),
+    ]);
   if (view === null) {
     // Non-members and unknown slugs are indistinguishable (M-IP2-3 tenancy).
     notFound();
   }
-  const [authority, finance, catalogue, overview, messaging] = await Promise.all([
-    moneyAuthority(slug),
-    financeAuthority(slug),
-    orgCatalogue(slug),
-    orgOverview(slug),
-    orgMessagingSettingsView(slug),
-  ]);
 
   // Counts fold from the reads already in hand — no extra query.
   const editions = [
