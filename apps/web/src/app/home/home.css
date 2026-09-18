@@ -1491,3 +1491,84 @@
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
+
+/* ==========================================================================
+   QUIET PREMIUM (launch polish, Phase 4) — the organizer dashboard, flat.
+   Overrides kept together here rather than edited into the rules above, so the
+   earlier reasoning in those rules stays readable next to what replaced it.
+   ========================================================================== */
+
+/* Icon chips: a tinted disc with a coloured glyph, not a gradient tile with a
+   white glyph and a drop shadow — six of those in a list read as buttons. */
+.home-ic {
+  box-shadow: none;
+  color: var(--text-accent);
+  background: var(--accent-subtle);
+}
+.home-ic--accent,
+.home-ic--gold,
+.home-ic--violet {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+.home-ic--green {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+.home-ic--info,
+.home-ic--teal {
+  background: var(--info-subtle);
+  color: var(--info-strong);
+}
+.home-ic--warn {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+}
+
+/* The lifecycle is a strip between hairlines, not a floating box. */
+.home-flow,
+.home-flow--map {
+  padding: var(--space-2) 0;
+  border: 0;
+  border-block: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* "Needs attention" says so in its heading and count; a tinted, bordered box
+   around it was a second panel competing with the next-step banner. */
+.home-panel--alert {
+  border-color: var(--border-subtle);
+  background: transparent;
+}
+
+.home-main {
+  gap: var(--space-10);
+}
+
+.home-col {
+  gap: var(--space-8);
+}
+
+/* Empty states are one quiet line, left-aligned with the section — an empty
+   panel used to take half a screen to say "nothing yet". */
+.home-blank {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
+  text-align: left;
+}
+
+.home-blank-ic {
+  width: 28px;
+  height: 28px;
+  border: 0;
+}
+
+.home-blank-ic svg {
+  width: 15px;
+  height: 15px;
+}
