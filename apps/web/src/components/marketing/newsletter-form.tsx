@@ -19,7 +19,6 @@ export function NewsletterForm() {
   }
   return (
     <>
-      <p className={styles["hint"]}>Release notes and what we ship next, a few times a season.</p>
       <form action={formAction} className={styles["form"]}>
         <label className={styles["label"]} htmlFor="newsletter-email">
           Email address
@@ -33,7 +32,8 @@ export function NewsletterForm() {
             name="email"
             type="email"
             required
-            placeholder="Enter your email"
+            placeholder="Your email address"
+            autoComplete="email"
             className={styles["input"]}
             // Named, not merely printed: without the description the error is
             // rendered text a screen-reader user never hears, and `aria-invalid`

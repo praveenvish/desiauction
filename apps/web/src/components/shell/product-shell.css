@@ -95,9 +95,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 36px;
-  padding: var(--space-1) var(--space-4);
-  border-radius: var(--radius-full);
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 7px;
   background: var(--accent);
   color: var(--text-on-accent);
   text-decoration: none;
@@ -119,24 +119,6 @@
 .shell-header-cta:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-}
-
-/* At rest the door glows softly, like it's plugged in. Scoped to :not(:hover)
-   so the hover shadow (a transition) isn't overridden by the animation. */
-@media (prefers-reduced-motion: no-preference) {
-  .shell-header-cta:not(:hover) {
-    animation: shell-cta-glow 3.5s ease-in-out infinite alternate;
-  }
-}
-
-@keyframes shell-cta-glow {
-  from {
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 16%, transparent);
-  }
-
-  to {
-    box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 36%, transparent);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -264,4 +246,34 @@
 .shell-railuser-text span {
   font-size: var(--text-xs-size);
   color: color-mix(in srgb, var(--identity-glyph) 55%, transparent);
+}
+
+/* Public identity: the vector carries the monogram, the text remains readable. */
+.public-brand-name {
+  display: block;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+.public-brand-name > span {
+  color: var(--text-accent);
+}
+.public-brand-name > small {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-text);
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.13em;
+  color: var(--text-secondary);
+}
+@media (max-width: 359px) {
+  .public-brand-name > small {
+    font-size: 7px;
+    letter-spacing: 0.1em;
+  }
+  .shell-header-link {
+    padding-inline: 6px;
+    font-size: 12px;
+  }
 }

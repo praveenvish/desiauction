@@ -5,6 +5,7 @@ import {
   Breadcrumb,
   Drawer,
   IconBell,
+  IconArrowRight,
   IconChevronDown,
   IconHelp,
   IconHome,
@@ -207,8 +208,8 @@ function publicNav(pathname: string): PublicShellLink[] {
     link.href === pathname ? { ...link, active: true } : link;
   return [
     { label: "Features", href: "/features" },
-    { label: "Pricing", href: "/pricing" },
     { label: "Browse tournaments", href: "/c" },
+    { label: "Pricing", href: "/pricing" },
     {
       label: "Resources",
       href: "/help",
@@ -223,9 +224,9 @@ function publicNav(pathname: string): PublicShellLink[] {
         { label: "Rules & guidelines", href: "/rules-guidelines" },
         { label: "Support", href: "/support" },
         { label: "Legal", href: "/legal" },
+        { label: "About us", href: "/about" },
       ].map(mark),
     },
-    { label: "About", href: "/about" },
   ].map(mark);
 }
 
@@ -611,10 +612,23 @@ export function ProductShell({
     const atLoginGate = pathname === "/login";
     return (
       <PublicShell
-        wordmark="DesiAuction"
+        wordmark={
+          <span className="public-brand-name">
+            Desi<span>Auction</span>
+            <small aria-hidden="true">THE GAME STARTS HERE</small>
+          </span>
+        }
         wordmarkHref="/"
-        glyph={<BrandMark size={30} />}
+        glyph={<BrandMark size={42} />}
         nav={publicNav(pathname)}
+        {...(!atGate
+          ? {
+              mobileAction:
+                session !== null
+                  ? { label: "Open console", href: "/home" }
+                  : { label: "Create your tournament", href: "/login" },
+            }
+          : {})}
         headerAction={
           session !== null ? (
             <Link className="shell-header-cta" href="/home">
@@ -626,7 +640,7 @@ export function ProductShell({
                 Sign in
               </Link>
               <Link className="shell-header-cta shell-desktop-only" href="/login">
-                Start your auction
+                Start free <IconArrowRight width={16} height={16} />
               </Link>
             </>
           )
@@ -653,7 +667,7 @@ export function ProductShell({
             label: "Product",
             links: [
               { label: "Features", href: "/features" },
-              { label: "How it works", href: "/#how" },
+              { label: "Try the auction demo", href: "/#playground" },
               { label: "Pricing", href: "/pricing" },
               { label: "Security", href: "/security" },
               { label: "Release notes", href: "/releases" },
@@ -666,7 +680,7 @@ export function ProductShell({
               // Labelled for what the link DOES, not where it lands: creating a
               // tournament begins at the phone gate, and "Create tournament"
               // pointing at /login read as a broken link to anyone who noticed.
-              { label: "Start your auction", href: "/login" },
+              { label: "Create a tournament", href: "/login" },
               { label: "Rules & guidelines", href: "/rules-guidelines" },
               { label: "Book a demo", href: "/schedule-demo" },
             ],
@@ -690,7 +704,14 @@ export function ProductShell({
             ],
           },
         ]}
-        footerTagline="Live player auctions for Indian tournaments — server-verified bidding, settled to the rupee."
+        footerHeading={
+          <>
+            Every sport.
+            <br />
+            <span>One community.</span>
+          </>
+        }
+        footerTagline="Bring your players together. Build your teams. Make your next tournament one to remember."
         footerNewsletter={<NewsletterForm />}
         // The copyright belongs to the entity, not the product name: the
         // company signing this footer is Eventztree, and it is named here for
@@ -840,7 +861,12 @@ export function ProductShell({
             },
           ]}
           linkComponent={Link}
-          wordmark="DesiAuction"
+          wordmark={
+            <span className="public-brand-name">
+              Desi<span>Auction</span>
+              <small aria-hidden="true">THE GAME STARTS HERE</small>
+            </span>
+          }
           wordmarkHref="/home"
           glyph={<BrandMark size={32} />}
           tagline="Bid · Build · Win"

@@ -91,7 +91,7 @@
    between a form a visitor fills in and one they scroll past. */
 .fine {
   margin: var(--space-2) 0 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs-size);
   line-height: 1.5;
 }

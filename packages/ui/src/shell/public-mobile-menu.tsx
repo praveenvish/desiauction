@@ -3,12 +3,13 @@
 import { useState, type ElementType } from "react";
 
 import { Drawer } from "./drawer";
-import { IconMenu } from "./icons";
+import { IconMenu, IconArrowRight } from "./icons";
 import type { PublicShellLink } from "./public-shell-types";
 import styles from "./public-shell.module.css";
 
 export interface PublicMobileMenuProps {
   nav: PublicShellLink[];
+  action?: PublicShellLink;
   linkComponent?: ElementType;
 }
 
@@ -21,7 +22,11 @@ export interface PublicMobileMenuProps {
  * children under the group label. Nav-only by design: the header's own action
  * (Sign in / Open console) stays visible beside the trigger at every width.
  */
-export function PublicMobileMenu({ nav, linkComponent: Link = "a" }: PublicMobileMenuProps) {
+export function PublicMobileMenu({
+  nav,
+  action,
+  linkComponent: Link = "a",
+}: PublicMobileMenuProps) {
   const [open, setOpen] = useState(false);
   const close = () => {
     setOpen(false);
@@ -47,7 +52,8 @@ export function PublicMobileMenu({ nav, linkComponent: Link = "a" }: PublicMobil
           a closed panel. Nothing is lost by mounting late: the drawer has no
           state to keep between openings. */}
       {open ? (
-        <Drawer open onClose={close} title="Menu">
+        <Drawer open onClose={close} title="Explore" className={styles["mobile-panel"] ?? ""}>
+          <p className={styles["drawer-intro"]}>Your sport. Your people. Your moment.</p>
           <nav aria-label="Site" className={styles["drawer-nav"] ?? ""}>
             {nav.map((link) =>
               link.children !== undefined && link.children.length > 0 ? (
@@ -62,6 +68,7 @@ export function PublicMobileMenu({ nav, linkComponent: Link = "a" }: PublicMobil
                       onClick={close}
                     >
                       {child.label}
+                      <IconArrowRight />
                     </Link>
                   ))}
                 </div>
@@ -74,10 +81,17 @@ export function PublicMobileMenu({ nav, linkComponent: Link = "a" }: PublicMobil
                   onClick={close}
                 >
                   {link.label}
+                  <IconArrowRight />
                 </Link>
               ),
             )}
           </nav>
+          {action !== undefined ? (
+            <Link href={action.href} className={styles["mobile-action"]} onClick={close}>
+              {action.label}
+              <IconArrowRight width={18} height={18} />
+            </Link>
+          ) : null}
         </Drawer>
       ) : null}
     </>

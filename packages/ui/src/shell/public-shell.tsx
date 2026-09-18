@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { BrandGlyph, IconChevronDown } from "./icons";
+import { BrandGlyph, IconChevronDown, IconBell } from "./icons";
 import { PopoverMenu } from "./popover-menu";
 import { PublicMobileMenu } from "./public-mobile-menu";
 import styles from "./public-shell.module.css";
@@ -32,9 +32,11 @@ export function PublicShell({
   glyph = <BrandGlyph />,
   nav = [],
   headerAction,
+  mobileAction,
   footerLinks = [],
   footerGroups = [],
   footerTagline,
+  footerHeading,
   footerSocial,
   footerNewsletter,
   footerNote,
@@ -95,7 +97,13 @@ export function PublicShell({
           ) : null}
           <div className={styles["header-action"]}>
             {headerAction}
-            {nav.length > 0 ? <PublicMobileMenu nav={nav} linkComponent={Link} /> : null}
+            {nav.length > 0 ? (
+              <PublicMobileMenu
+                nav={nav}
+                linkComponent={Link}
+                {...(mobileAction !== undefined ? { action: mobileAction } : {})}
+              />
+            ) : null}
           </div>
         </div>
       </header>
@@ -117,18 +125,15 @@ export function PublicShell({
           {footerCompact ? null : footerGroups.length > 0 ? (
             <div className={styles["footer-grid"]}>
               <div className={styles["footer-brand"]}>
-                <span className={styles["wordmark"]}>
+                <Link href={wordmarkHref} className={styles["wordmark"]}>
                   <WordmarkGlyph glyph={glyph} />
                   {wordmark}
-                </span>
+                </Link>
+                {footerHeading !== undefined ? (
+                  <h2 className={styles["footer-heading"]}>{footerHeading}</h2>
+                ) : null}
                 {footerTagline !== undefined ? (
                   <p className={styles["footer-tagline"]}>{footerTagline}</p>
-                ) : null}
-                {footerNewsletter !== undefined ? (
-                  <div className={styles["footer-newsletter"]}>
-                    <h2 className={styles["footer-group-label"]}>Stay updated</h2>
-                    {footerNewsletter}
-                  </div>
                 ) : null}
                 {footerSocial !== undefined ? (
                   <div className={styles["footer-social"]} aria-hidden="true">
@@ -161,6 +166,20 @@ export function PublicShell({
                 </Link>
               ))}
             </nav>
+          ) : null}
+          {!footerCompact && footerNewsletter !== undefined ? (
+            <div className={styles["footer-newsletter"]}>
+              <div className={styles["newsletter-heading"]}>
+                <span className={styles["newsletter-symbol"]} aria-hidden="true">
+                  <IconBell width={24} height={24} />
+                </span>
+                <div>
+                  <h2>Stay in the game.</h2>
+                  <p>Product news. New features. A few updates a season.</p>
+                </div>
+              </div>
+              <div className={styles["newsletter-content"]}>{footerNewsletter}</div>
+            </div>
           ) : null}
           {footerNote !== undefined || footerBottomLinks.length > 0 ? (
             <div className={styles["footer-bottom"]}>
