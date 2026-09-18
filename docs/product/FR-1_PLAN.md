@@ -1,6 +1,6 @@
 # FR-1 — Problem reports and reviews
 
-**Status:** Phases 1–2 BUILT (2026-09-17, on `feature/fr1-feedback`); Phases 3–5 planned. **Author:** engineering. **Planned:** 2026-09-17.
+**Status:** Phases 1–3 BUILT (2026-09-17/18, on `feature/fr1-feedback`); Phases 4–5 planned. **Author:** engineering. **Planned:** 2026-09-17.
 **Founder decisions:** taken 2026-09-17 — "go with your recommendations" (§8).
 
 ---
@@ -198,3 +198,59 @@ proof extended to `reviewDesk`; 255 tests across the touched suites green; lint,
 typecheck, depcruise, format, production build green; browser-verified ask →
 link → write → edit → publish → link closed, the /account switch, and the form
 at 320px. Not yet run: Playwright e2e for either phase.
+
+## 11. Phase 3 — what shipped, and where the plan was wrong
+
+**Shipped.** `server/reviews/review-sweep.ts`, run by the existing
+`POST /api/jobs/feedback` after the retention purge. It asks for a PLATFORM
+review 2 hours to 14 days after:
+
+- **an auction closed** — timed by the `AuctionClosed` event in the auction's
+  ledger. Asks the club's organizers and every paddle holder, each with their
+  own opening line ("You've run a tournament" / "You bid for a team").
+- **a season finished** — derived: every fixture completed or cancelled, at
+  least one played, timed by the latest fixture. Asks the organizers.
+
+One platform ask per person, ever; the sweep never re-issues (only the desk
+does). No email → not asked. Known minor → never asked. "Feedback requests"
+off → the ask is recorded so no later sweep reconsiders them, but never mailed.
+At most 200 asks per run. The desk's ask list now says why each person was
+asked.
+
+**Where the plan was wrong:**
+
+1. *"Auction reaches completed → +2h" had no clock.* `auctions` has no
+   completion time; the ledger's `AuctionClosed` event does. 96 local auctions
+   are "completed" with no close event (seeded) — they are never asked about.
+2. *"Organizers" is not org membership.* Team owners are viewer-level members,
+   so organizers are active `org:owner` / `org:staff` grants.
+3. *Without an upper bound the first run would mail everybody* who ever closed
+   an auction (461 locally). The 14-day lookback is the guard.
+4. *"Players and owners (tournament)" moved to Phase 4* — this phase only has
+   the platform subject; tournament asks arrive with tournament reviews.
+5. *The club's messaging switch is not consulted.* It governs SMS on behalf of
+   a club; this is a platform email, gated by the person's own switch.
+
+**Operator setup:** schedule `POST /api/jobs/feedback` every 15–60 minutes
+(it already needed scheduling for Phase 1's purge).
+
+**Verification.** 13 DB regression tests (isolated by running the sweep with a
+January-2020 clock over January-2020 fixtures, so the cross-tenant read cannot
+touch real rows); a read-only dry run of the candidate query against the real
+local database: 74 ms, 1 candidate.
+
+## 12. Merge note — account erasure (0066, on `ui/premium-foundation`)
+
+A parallel branch adds account erasure (`0066_account_erasure`, deliberately
+numbered after this branch's 0064/0065). Erasure KEEPS the `people` row and
+scrubs it, so this branch's `ON DELETE CASCADE` / `SET NULL` never fire for an
+erased person. Whichever branch merges second must extend the erasure to:
+
+- delete the person's `review_requests` (their `reviews` cascade with them);
+- null `problem_reports.reply_email` where `person_id` is theirs (the report
+  itself stays — it is about the platform — but its way to reach them goes).
+
+Also: that branch's 0069 adds FKs on attribution columns; on the shared local
+database, `consent.regression` and `admin-foundation.regression` fail from THIS
+branch because the database is ahead of it. Not a defect here; re-run after the
+branches meet.

@@ -16,9 +16,32 @@ import { REVIEW_LINK_TTL_MS, type ValidReview } from "./reviews";
 
 const SUPPORT_EMAIL = "support@desiauction.in";
 
+/**
+ * Who the ask is addressed to, so the first line is true. An owner bid in an
+ * auction; they did not "run a tournament", and a mail that says they did reads
+ * as a mail sent to the wrong person.
+ */
+export type AskAudience = "organizer" | "owner" | "general";
+
+const OPENING: Record<AskAudience, readonly string[]> = {
+  organizer: [
+    "You've run a tournament on DesiAuction, and we'd like to know how it went — what",
+    "worked, and what got in your way. It takes two minutes:",
+  ],
+  owner: [
+    "You bid for a team in an auction on DesiAuction, and we'd like to know how it went",
+    "from your side of the room — what worked, and what got in your way. Two minutes:",
+  ],
+  general: [
+    "You've used DesiAuction, and we'd like to know how it went — what worked, and what",
+    "got in your way. It takes two minutes:",
+  ],
+};
+
 export function reviewAskMail(
   name: string | null,
   link: string,
+  audience: AskAudience = "general",
 ): { subject: string; text: string } {
   const days = Math.round(REVIEW_LINK_TTL_MS / 86_400_000);
   return {
@@ -26,8 +49,7 @@ export function reviewAskMail(
     text: [
       name === null ? "Hi," : `Hi ${name},`,
       "",
-      "You've run a tournament on DesiAuction, and we'd like to know how it went — what",
-      "worked, and what got in your way. It takes two minutes:",
+      ...OPENING[audience],
       "",
       `  ${link}`,
       "",

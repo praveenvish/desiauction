@@ -234,6 +234,13 @@ function ReviewRow({ review }: { review: DeskReview }) {
   );
 }
 
+const SOURCE_WORDS: Record<string, string> = {
+  manual_admin: "asked from this desk",
+  manual_org: "asked by their club",
+  auction_completed: "after their auction",
+  season_completed: "after their season",
+};
+
 function AsksCard({ asks }: { asks: readonly DeskAsk[] }) {
   const now = Date.now();
   return (
@@ -258,7 +265,9 @@ function AsksCard({ asks }: { asks: readonly DeskAsk[] }) {
               </span>
               <span className="review-asks-state">
                 <Badge tone={state.tone}>{state.words}</Badge>
-                <span className="competitions-hint">asked {day(ask.createdAt)}</span>
+                <span className="competitions-hint">
+                  {SOURCE_WORDS[ask.source] ?? ask.source} · {day(ask.createdAt)}
+                </span>
               </span>
             </li>
           );

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
 import { withRequestId } from "../../../../server/logger";
+import { sweepReviewAsks } from "../../../../server/reviews/review-sweep";
 import { purgeExpiredProblemReports } from "../../../../server/support/report-retention";
 
 /**
@@ -11,9 +12,9 @@ import { purgeExpiredProblemReports } from "../../../../server/support/report-re
  * `demo-reminders`, and for the same reasons: the web tier holds no scheduler,
  * and the certified finops runner is no home for this.
  *
- * Phase 1 runs the problem-report retention purge. A retention promise with no
- * scheduled enforcement is a paragraph; screenshots of people's screens are the
- * last thing that should outlive theirs.
+ * Two jobs: the problem-report retention purge (Phase 1 — a retention promise
+ * with no scheduled enforcement is a paragraph), and the review-ask sweep
+ * (Phase 3 — see `server/reviews/review-sweep.ts` for who is asked and when).
  *
  * Fail-closed (no secret → 404) and idempotent (a purge that finds nothing does
  * nothing), so calling it every ten minutes is fine.
@@ -37,8 +38,11 @@ async function handle(request: Request): Promise<NextResponse> {
   if (!secretMatches(request.headers.get("x-feedback-job-secret"), expected)) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
+  // In sequence, not in parallel: the purge is cheap and the sweep sends mail,
+  // and a failure in one should be attributable from the response alone.
   const purged = await purgeExpiredProblemReports();
-  return NextResponse.json({ purged });
+  const reviewAsks = await sweepReviewAsks();
+  return NextResponse.json({ purged, reviewAsks });
 }
 
 export function POST(request: Request): Promise<NextResponse> {

@@ -155,6 +155,10 @@ export interface IssuedAsk {
  * The insert races safely: two operators pressing at once both reach
  * ON CONFLICT, and both get the one row. A re-issue pushes the expiry out so
  * the link in the new mail works for the full thirty days.
+ *
+ * `reissue: false` is the automatic sweep's mode: somebody already asked is
+ * left alone entirely — no new expiry, and `created: false` tells the caller
+ * not to mail them again. Only a person pressing Ask on the desk re-issues.
  */
 export async function askForPlatformReview(
   db: Db,
@@ -163,28 +167,46 @@ export async function askForPlatformReview(
     source: "manual_admin" | "manual_org" | "auction_completed" | "season_completed";
     requestedBy: string | null;
     now?: Date;
+    reissue?: boolean;
   },
 ): Promise<IssuedAsk> {
   const now = input.now ?? new Date();
   const id = newId();
   const expiresAt = new Date(now.getTime() + REVIEW_LINK_TTL_MS);
-  const [row] = await db
-    .insert(reviewRequests)
-    .values({
-      id,
-      personId: input.personId,
-      subjectType: "platform",
-      source: input.source,
-      requestedBy: input.requestedBy,
-      tokenHash: hashReviewToken(tokenForReviewRequest(id)),
-      expiresAt,
-    })
-    .onConflictDoUpdate({
-      target: [reviewRequests.personId, reviewRequests.subjectType],
-      set: { expiresAt },
-    })
-    .returning({ id: reviewRequests.id });
-  const requestId = row?.id ?? id;
+  const insert = db.insert(reviewRequests).values({
+    id,
+    personId: input.personId,
+    subjectType: "platform",
+    source: input.source,
+    requestedBy: input.requestedBy,
+    tokenHash: hashReviewToken(tokenForReviewRequest(id)),
+    expiresAt,
+  });
+  const target = [reviewRequests.personId, reviewRequests.subjectType];
+  let requestId: string;
+  if (input.reissue === false) {
+    const [row] = await insert.onConflictDoNothing({ target }).returning({ id: reviewRequests.id });
+    if (row === undefined) {
+      const [existing] = await db
+        .select({ id: reviewRequests.id })
+        .from(reviewRequests)
+        .where(
+          and(
+            eq(reviewRequests.personId, input.personId),
+            eq(reviewRequests.subjectType, "platform"),
+          ),
+        )
+        .limit(1);
+      requestId = existing?.id ?? id;
+    } else {
+      requestId = row.id;
+    }
+  } else {
+    const [row] = await insert
+      .onConflictDoUpdate({ target, set: { expiresAt } })
+      .returning({ id: reviewRequests.id });
+    requestId = row?.id ?? id;
+  }
   const [existing] = await db
     .select({ id: reviews.id })
     .from(reviews)
