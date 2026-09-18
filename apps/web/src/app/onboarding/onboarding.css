@@ -210,3 +210,33 @@
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
+
+/* Who is signed in sits under the one action, as a footnote: above the
+   question it was the first thing read and wrapped mid-sentence on a phone. */
+.onboarding-form .onboarding-hint {
+  margin-top: var(--space-1);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.onboarding-contact {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.onboarding-form .onboarding-signout {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.onboarding-sub {
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 900px) {
+  .onboarding-grid {
+    max-width: 960px;
+    gap: var(--space-16);
+  }
+}

@@ -148,13 +148,17 @@ export default async function AccountPage() {
             </section>
             {/* Beside the identity it belongs to, and above Security: this is a
               contact route the product will actually use, not a credential. */}
-            <section id="email" className="account-section" aria-label="Email">
-              <Card>
-                <EmailVerify current={email.email} verified={email.verified} />
-              </Card>
+            <section id="email" className="account-section" aria-labelledby="account-email-title">
+              <h2 id="account-email-title">Email</h2>
+              <EmailVerify current={email.email} verified={email.verified} />
             </section>
             {security !== null ? (
-              <section id="security" className="account-section" aria-label="Sign-in and security">
+              <section
+                id="security"
+                className="account-section"
+                aria-labelledby="account-security-title"
+              >
+                <h2 id="account-security-title">Sign-in &amp; security</h2>
                 <SecurityPanels security={security} />
               </section>
             ) : null}
@@ -173,34 +177,36 @@ export default async function AccountPage() {
             beside them: knowing what we send is not the same as being able to
             stop it, and a person deserves both.
           */}
-            <Card className="account-card" id="notifications" data-testid="notifications-panel">
-              <h2>Notifications</h2>
-              <p className="account-prose">
-                We use your mobile number for two things, and nothing else. We never sell it, and we
-                never use it for marketing.
-              </p>
-              <dl className="account-facts">
-                <dt>Sign-in codes</dt>
-                <dd>
-                  By SMS, only when you ask for one. These cannot be turned off — they are how you
-                  get into your account.
-                </dd>
-                <dt>Everything else</dt>
-                <dd>
-                  Stays in <Link href="/inbox">your notifications</Link> here in the app.
-                </dd>
-              </dl>
-              <h3 className="account-subhead">What we may text you</h3>
-              <p className="account-prose">
-                Switch any of these off and we stop sending it. Sign-in codes are not on the list
-                because turning them off would lock you out of your own account.
-              </p>
-              {settings === null ? null : <NotificationSwitches settings={settings} />}
-              <p className="account-prose">
-                You can also reply <strong>STOP</strong> to any message to stop all of them at once,
-                and <strong>START</strong> to turn them back on.
-              </p>
-            </Card>
+            <section id="notifications" className="account-section" aria-label="Notifications">
+              <Card className="account-card" data-testid="notifications-panel">
+                <h2>Notifications</h2>
+                <p className="account-prose">
+                  We use your mobile number for two things, and nothing else. We never sell it, and
+                  we never use it for marketing.
+                </p>
+                <dl className="account-facts">
+                  <dt>Sign-in codes</dt>
+                  <dd>
+                    By SMS, only when you ask for one. These cannot be turned off — they are how you
+                    get into your account.
+                  </dd>
+                  <dt>Everything else</dt>
+                  <dd>
+                    Stays in <Link href="/inbox">your notifications</Link> here in the app.
+                  </dd>
+                </dl>
+                <h3 className="account-subhead">What we may text you</h3>
+                <p className="account-prose">
+                  Switch any of these off and we stop sending it. Sign-in codes are not on the list
+                  because turning them off would lock you out of your own account.
+                </p>
+                {settings === null ? null : <NotificationSwitches settings={settings} />}
+                <p className="account-prose">
+                  You can also reply <strong>STOP</strong> to any message to stop all of them at
+                  once, and <strong>START</strong> to turn them back on.
+                </p>
+              </Card>
+            </section>
 
             {/*
             YOUR DATA — the deletion path the product did not have.
@@ -212,31 +218,33 @@ export default async function AccountPage() {
             page nobody opens. A manual, staffed process is defensible at beta
             scale. An undiscoverable one is not. This is the discoverable one.
           */}
-            <Card className="account-card" id="data" data-testid="your-data-panel">
-              <h2>Your data</h2>
-              <p className="account-prose">
-                You can ask us to delete your account. Where your data appears only in your own
-                profile, we delete it. Where it appears in a shared, permanent record — an auction
-                you bid in, a receipt issued to you — we anonymize your name and number instead of
-                destroying the record, so the tournament&rsquo;s history stays intact for everyone
-                else in it.
-              </p>
-              <ErasurePanel request={erasure} />
-              <p className="account-prose">
-                You can also email{" "}
-                <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
-                  privacy@desiauction.in
-                </a>{" "}
-                from the number on this account, or{" "}
-                <Link href="/support">raise it through support</Link>. We reply within seven days
-                either way.
-              </p>
-              <p className="account-prose account-links">
-                <Link href="/legal/data-retention">Data Retention policy</Link>
-                {" · "}
-                <Link href="/legal/privacy">Privacy Policy</Link>
-              </p>
-            </Card>
+            <section id="data" className="account-section" aria-label="Your data">
+              <Card className="account-card" data-testid="your-data-panel">
+                <h2>Your data</h2>
+                <p className="account-prose">
+                  You can ask us to delete your account. Where your data appears only in your own
+                  profile, we delete it. Where it appears in a shared, permanent record — an auction
+                  you bid in, a receipt issued to you — we anonymize your name and number instead of
+                  destroying the record, so the tournament&rsquo;s history stays intact for everyone
+                  else in it.
+                </p>
+                <ErasurePanel request={erasure} />
+                <p className="account-prose">
+                  You can also email{" "}
+                  <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
+                    privacy@desiauction.in
+                  </a>{" "}
+                  from the number on this account, or{" "}
+                  <Link href="/support">raise it through support</Link>. We reply within seven days
+                  either way.
+                </p>
+                <p className="account-prose account-links">
+                  <Link href="/legal/data-retention">Data Retention policy</Link>
+                  {" · "}
+                  <Link href="/legal/privacy">Privacy Policy</Link>
+                </p>
+              </Card>
+            </section>
           </div>
         </main>
       </ToastProvider>

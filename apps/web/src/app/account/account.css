@@ -419,3 +419,223 @@
   gap: var(--space-2);
   justify-content: flex-end;
 }
+
+/* ==========================================================================
+   ONE SETTINGS GRAMMAR (launch polish, Phase 4). The founder's read of this
+   page was "bad UI", and the screenshot agreed: three heading sizes, a boxed
+   section beside an unboxed one, a hairline under some sections and not
+   others, 20px gold checkboxes and a checklist parked under the form. Every
+   section now has the same shape — a hairline, a heading, its content — and
+   sub-panels inside one (passkeys, sessions, activity) are spaced, not ruled.
+   ========================================================================== */
+.account-stack {
+  gap: 0;
+}
+
+.account-stack > .account-section {
+  padding-block: var(--space-8);
+}
+
+.account-stack > .account-section:first-of-type {
+  padding-top: var(--space-2);
+}
+
+.account-stack > .account-section + .account-section {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Cards inside a section are the section's content, not boxes: the console
+   card rule gives each one padding and a hairline after any sibling, and the
+   :not()s here only lift this rule over that one. */
+.account .account-stack .account-section > :not(h2):not(.account-intro) {
+  padding: 0;
+  border-top: 0;
+}
+
+.account .account-section > * + * {
+  margin-top: var(--space-6);
+}
+
+.account .account-section > h2 + * {
+  margin-top: var(--space-4);
+}
+
+.account-stack h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.005em;
+  color: var(--text-heading);
+}
+
+.account-h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.account-stack .dash-hint,
+.account-stack .account-card > p:first-of-type {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-md-line);
+}
+
+/* The identity header: avatar, name as the heading, contact under it. */
+.profile-head {
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.account-stack .profile-name {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.profile-phone {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm-size);
+}
+
+.profile-phone > [data-testid="account-phone"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The checklist is a meter and two quiet columns, above the form. */
+.profile-completion {
+  border-top: 0;
+  padding: 0;
+  margin-bottom: var(--space-6);
+}
+
+.profile-completion-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.profile-completion-label {
+  flex: none;
+}
+
+.profile-meter {
+  position: relative;
+  flex: 1;
+  max-width: 240px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.profile-meter > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.profile-completion ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-6);
+  margin-top: var(--space-4);
+}
+
+.profile-completion li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  line-height: var(--text-sm-line);
+}
+
+.profile-completion li > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.profile-completion li[data-done="true"] {
+  color: var(--text-primary);
+}
+
+.profile-completion li[data-done="true"] > svg {
+  color: var(--success-base);
+}
+
+@media (max-width: 599px) {
+  .profile-completion ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.profile-form {
+  max-width: 480px;
+}
+
+/* Notifications: facts as a two-column list at body size, and switches at
+   the size of every other checkbox in the product. */
+.account .account-facts {
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.account .account-facts dd {
+  margin: 0;
+  font-variant-numeric: normal;
+}
+
+.account-stack .notify-switch {
+  padding-inline: 0;
+}
+
+.account-stack .notify-switch:hover {
+  background: transparent;
+}
+
+.account-stack .notify-switch input {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+}
+
+.account-stack .notify-switch-label {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.account-subhead {
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.email-verify {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.email-verify .profile-form {
+  width: 100%;
+}
+
+@media (max-width: 599px) {
+  .account .account-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .account .account-facts dd {
+    margin-bottom: var(--space-2);
+  }
+}
