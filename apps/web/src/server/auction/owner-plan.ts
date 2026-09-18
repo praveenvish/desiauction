@@ -27,6 +27,7 @@ import {
 import { and, asc, eq } from "drizzle-orm";
 
 import type { AuctionRules } from "./live-summary";
+import { shownName } from "../competition/shown-name";
 
 /**
  * THE OWNER'S PLAN, STORED (WR-1).
@@ -68,7 +69,7 @@ export async function planLots(db: Db, auctionId: string): Promise<PlanLotRow[]>
       basePrice: lots.basePrice,
       soldPrice: lots.soldPrice,
       soldToTeamId: paddles.teamId,
-      playerName: people.name,
+      playerName: shownName,
       role: registrations.role,
       number: registrations.registrationNumber,
     })

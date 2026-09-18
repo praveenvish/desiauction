@@ -29,6 +29,7 @@ import {
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
+import { shownName, shownPhotoKey } from "./shown-name";
 
 // Registration reads + creation (IP-3 §4, doc 42). TRIAGE TRANSITIONS live only
 // in registration-aggregate.ts; this module owns ENTRY into the competition —
@@ -394,6 +395,10 @@ export async function addPlayerByPhone(
       role: player.role,
       status: "submitted",
       registrationNumber: registrationNumber(id),
+      // An account that already had its own name: the season shows the name
+      // the organizer typed instead (0075, shown-name.ts), so adding a phone
+      // number is never a way to learn who it belongs to.
+      ...(found !== undefined && found.name !== null ? { enteredName: player.name } : {}),
       ...(player.basePriceBand !== null ? { basePriceBand: player.basePriceBand } : {}),
       ...validProfile(player.profile),
     }),
@@ -439,6 +444,12 @@ export interface RegistrationRow {
   number: string;
   personId: string;
   name: string | null;
+  /**
+   * The organizer added this player by phone to an account that already had
+   * its own name (0075): `name` is what they typed, and nothing read from the
+   * account (photo, profile gender) may be shown or evaluated for this row.
+   */
+  typedName: boolean;
   /**
    * NULLABLE SINCE 0062 for the rows that predate the rule, never for a new
    * one: `submitRegistration` refuses an account with no number, because SMS
@@ -719,7 +730,7 @@ export interface RegistrationPage {
 const SORTS: Record<RegistrationSort, SQL[]> = {
   recent: [desc(registrations.createdAt), asc(registrations.id)],
   oldest: [asc(registrations.createdAt), asc(registrations.id)],
-  name: [asc(people.name), asc(registrations.id)],
+  name: [asc(shownName), asc(registrations.id)],
   number: [asc(registrations.registrationNumber), asc(registrations.id)],
   status: [asc(registrations.status), asc(registrations.registrationNumber)],
 };
@@ -748,7 +759,7 @@ export async function queryRegistrations(
   if (term !== undefined && term !== "") {
     const like = `%${term}%`;
     const clause = or(
-      ilike(people.name, like),
+      ilike(shownName, like),
       ilike(people.phone, like),
       ilike(registrations.registrationNumber, like),
       ilike(teams.name, like),
@@ -776,7 +787,8 @@ export async function queryRegistrations(
       id: registrations.id,
       number: registrations.registrationNumber,
       personId: registrations.personId,
-      name: people.name,
+      name: shownName,
+      typedName: sql<boolean>`${registrations.enteredName} is not null`,
       phone: people.phone,
       role: registrations.role,
       status: registrations.status,
@@ -797,7 +809,7 @@ export async function queryRegistrations(
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,
       rejectionNote: registrations.rejectionNote,
-      photoKey: people.photoUrl,
+      photoKey: shownPhotoKey,
       photoConsentAt: people.photoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
       battingStyle: registrations.battingStyle,
@@ -851,9 +863,11 @@ export async function photoTargetsOf(db: Db, competitionId: string): Promise<Pho
     .select({
       registrationId: registrations.id,
       number: registrations.registrationNumber,
-      name: people.name,
+      name: shownName,
       phone: people.phone,
-      photoUrl: people.photoUrl,
+      // A typed-name row (0075) never reports the account's photo — "already
+      // has a photo" would itself say something about who the number is.
+      photoUrl: shownPhotoKey,
       photoConsentAt: people.photoConsentAt,
     })
     .from(registrations)
@@ -1025,10 +1039,12 @@ export async function orphanPreSigned(db: Db, competitionId: string): Promise<Or
 /** Name keys that appear on >1 registration in this competition (dup/conflict flag). */
 export async function duplicateNameKeys(db: Db, competitionId: string): Promise<Set<string>> {
   const rows = await db
-    .select({ key: sql<string>`lower(btrim(regexp_replace(${people.name}, '\\s+', ' ', 'g')))` })
+    // The SHOWN name (0075): comparing account names would let a duplicate flag
+    // reveal what a typed-name row's account is really called.
+    .select({ key: sql<string>`lower(btrim(regexp_replace(${shownName}, '\\s+', ' ', 'g')))` })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
-    .where(and(eq(registrations.competitionId, competitionId), sql`${people.name} is not null`))
+    .where(and(eq(registrations.competitionId, competitionId), sql`${shownName} is not null`))
     .groupBy(sql`1`)
     .having(sql`count(*) > 1`);
   return new Set(rows.map((r) => r.key));

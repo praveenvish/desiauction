@@ -9,6 +9,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { shownName } from "./shown-name";
 
 /**
  * WHO PLAYED EACH MATCH (launch polish, Phase 3) — the domain half.
@@ -107,7 +108,7 @@ export async function lineupSides(
       .select({
         registrationId: registrations.id,
         teamId: registrations.teamId,
-        name: people.name,
+        name: shownName,
         role: registrations.role,
         isCaptain: registrations.isCaptain,
       })
@@ -120,7 +121,7 @@ export async function lineupSides(
           inArray(registrations.teamId, [fixture.home.id, fixture.away.id]),
         ),
       )
-      .orderBy(asc(people.name)),
+      .orderBy(asc(shownName)),
     db
       .select({ registrationId: fixtureLineups.registrationId, teamId: fixtureLineups.teamId })
       .from(fixtureLineups)

@@ -764,6 +764,13 @@ export const registrations = pgTable(
      * declares — cricket and football both say true, pickleball has no
      * meaningful role at all.
      */
+    /**
+     * The name the ORGANIZER typed when adding this player by phone to an
+     * account that already existed (0075). Shown instead of the account's own
+     * name wherever the season shows this registration, so importing a list of
+     * phone numbers cannot turn into a lookup of who they belong to.
+     */
+    enteredName: text("entered_name"),
     role: text("role"),
     status: text("status", {
       enum: ["draft", "submitted", "approved", "rejected", "waitlisted", "withdrawn"],
