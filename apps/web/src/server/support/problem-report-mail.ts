@@ -75,12 +75,10 @@ export function reporterAcknowledgement(report: ValidProblemReport): {
       "Thanks for telling us. Your report has reached the team, with the page you were on",
       report.screenshot === null ? "so we can look at it." : "and the screenshot you sent.",
       "",
-      "What you told us:",
-      ...report.description
-        .split(/\r?\n/)
-        .slice(0, 12)
-        .map((line) => `  ${line}`),
-      "",
+      // The description is NOT repeated here. This mail goes to an address the
+      // form was given, and repeating what was typed turned the form into a
+      // way to send any text, from us, to anyone ("your account is suspended,
+      // verify at…"). The team has the words; the reporter wrote them.
       "We read every report. If we need more detail, or once it's fixed, we'll write back",
       "to this address.",
       "",
@@ -92,10 +90,19 @@ export function reporterAcknowledgement(report: ValidProblemReport): {
   };
 }
 
+/**
+ * Send the team's copy, and a receipt to `receiptTo` when there is one.
+ *
+ * The receipt address is decided by the CALLER from the session, never taken
+ * from the form: a guest's `replyEmail` is a string anybody can type, and a
+ * receipt sent to it is a mail from DesiAuction to a stranger. It stays on the
+ * report for the team to reply to by hand.
+ */
 export async function sendProblemReportMail(
   report: ValidProblemReport,
   reportId: string,
   reporterLabel: string,
+  receiptTo: string | null,
 ): Promise<{ reporter: MailOutcome | "no-address"; support: MailOutcome }> {
   const mailer = transactionalMailer();
 
@@ -114,9 +121,9 @@ export async function sendProblemReportMail(
   });
 
   const reporter: MailOutcome | "no-address" =
-    report.replyEmail === null
+    receiptTo === null
       ? "no-address"
-      : await mailer.send({ to: report.replyEmail, ...reporterAcknowledgement(report) });
+      : await mailer.send({ to: receiptTo, ...reporterAcknowledgement(report) });
 
   return { reporter, support };
 }
