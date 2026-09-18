@@ -136,8 +136,18 @@ export default async function RootLayout({
       <body>
         {/* Replay the remembered console theme before first paint (no flash).
             The one inline script the app writes itself, so it carries the
-            request's nonce like every script Next emits (middleware.ts). */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+            request's nonce like every script Next emits (middleware.ts).
+            `suppressHydrationWarning`: browsers HIDE a nonce once the
+            element is parsed (the attribute reads back as ""), so exfiltrating
+            it through the DOM is impossible — and React, comparing the server's
+            nonce with that empty attribute, reports a mismatch that is the
+            security feature working. It suppresses this element's own
+            attributes only. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+        />
         <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
           <ProductShell
             session={
