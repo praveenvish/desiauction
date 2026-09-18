@@ -189,6 +189,42 @@
     "apps/web/src/server/competition/sports.ts": {
       "class": "by-design",
       "reason": "SP-1 Phase 1. The `sports` catalogue is global reference data \u2014 the same rows for every organization, no org_id column, no RLS policy \u2014 so there is no tenant to scope to and withTenantDb would set a GUC nothing reads. Reads only; the table is written by migrations."
+    },
+    "apps/web/src/server/support/actions.ts": {
+      "class": "by-design",
+      "reason": "FR-1. Public 'report a problem' form: a guest may file one, and problem_reports carries no org_id and no RLS (0064). Identity comes from the session, never the form."
+    },
+    "apps/web/src/server/support/report-desk.ts": {
+      "class": "by-design",
+      "reason": "FR-1. The report desk's one write (status + operator stamp) on problem_reports \u2014 no org_id, no RLS. Called only behind platform:support."
+    },
+    "apps/web/src/server/support/report-retention.ts": {
+      "class": "by-design",
+      "reason": "FR-1. Scheduled retention purge over problem_reports / problem_report_screenshots \u2014 no org_id, no RLS; behind FEEDBACK_JOB_SECRET."
+    },
+    "apps/web/src/server/admin/report-views.ts": {
+      "class": "by-design",
+      "reason": "FR-1. Platform report desk projection (read-only) over problem_reports \u2014 no org_id, cross-tenant by definition, gated by platform:support."
+    },
+    "apps/web/src/server/admin/review-views.ts": {
+      "class": "by-design",
+      "reason": "FR-1. Platform review desk projection (read-only) over review_requests/reviews \u2014 gated by platform:support; platform reviews belong to no org."
+    },
+    "apps/web/src/app/review/[token]/page.tsx": {
+      "class": "by-design",
+      "reason": "FR-1. Pre-tenant token path, the same class as /demo/[token]: the link token is the whole principal, and review_requests/reviews carry no RLS."
+    },
+    "apps/web/src/server/reviews/actions.ts": {
+      "class": "by-design",
+      "reason": "FR-1. The public review form behind a link token \u2014 pre-tenant; review tables carry no RLS. The person is whoever the token's request names."
+    },
+    "apps/web/src/server/reviews/desk.ts": {
+      "class": "by-design",
+      "reason": "FR-1. Platform review desk writes (no-RLS review tables) plus ONE system-pool person lookup whose date-of-birth fallback reads tenant registrations \u2014 deliberately, so a platform operator's minor check cannot be blinded by RLS. Gated by platform:support."
+    },
+    "apps/web/src/server/reviews/review-sweep.ts": {
+      "class": "by-design",
+      "reason": "FR-1. System sweep, the same class as settlement/coordination-sweep: a read-only candidate query across every org (closed auctions, finished seasons, organizer grants, paddles) on the system pool, then writes only to the no-RLS review tables. Behind FEEDBACK_JOB_SECRET."
     }
   }
 }
