@@ -59,14 +59,30 @@ const redactPaths = [
   'req.headers["x-callback-secret"]',
 ];
 
-const base = pino({
-  level: env.LOG_LEVEL,
-  base: { app: "web", env: env.NODE_ENV, version: env.APP_VERSION },
-  redact: { paths: redactPaths, censor: "[redacted]" },
-  ...(env.NODE_ENV === "development"
-    ? { transport: { target: "pino-pretty", options: { colorize: true } } }
-    : {}),
-});
+/*
+ * ONE LOGGER PER PROCESS, not one per module evaluation.
+ *
+ * In `next dev` this module is evaluated again for every separately compiled
+ * route and on every hot reload, and in development each evaluation's
+ * `pino-pretty` transport starts its own worker thread piped into stdout.
+ * Measured on 2026-09-18: 11-13 transports per server lifetime
+ * ("MaxListenersExceededWarning … listeners added to [Socket]"), next-server at
+ * 4.5 GB, and Next restarting itself on its memory threshold every few pages —
+ * localhost refusing connections, then every route compiling cold again. The
+ * same globalThis guard db.ts uses for its pools keeps it to one.
+ */
+const globalStore = globalThis as { __daLogger?: Logger };
+const base: Logger =
+  globalStore.__daLogger ??
+  pino({
+    level: env.LOG_LEVEL,
+    base: { app: "web", env: env.NODE_ENV, version: env.APP_VERSION },
+    redact: { paths: redactPaths, censor: "[redacted]" },
+    ...(env.NODE_ENV === "development"
+      ? { transport: { target: "pino-pretty", options: { colorize: true } } }
+      : {}),
+  });
+globalStore.__daLogger = base;
 
 /**
  * The request id, carried without threading it through every signature.
