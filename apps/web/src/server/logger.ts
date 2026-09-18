@@ -107,3 +107,42 @@ export function logger(): Logger {
   const id = requestId();
   return id === undefined ? base : base.child({ requestId: id });
 }
+
+/**
+ * The logger for a SERVER ACTION or page, carrying the request id middleware.ts
+ * stamps on every page and action request.
+ *
+ * Server actions have no request object and run outside `withRequestId`, so
+ * `logger()` above could never attach an id to them — only the five API routes
+ * had one. The id is in the request headers instead; this reads it. Outside a
+ * request (a script, a test) there are no headers to read, and it degrades to
+ * the plain logger rather than throwing.
+ */
+export async function requestLogger(): Promise<Logger> {
+  const ambient = requestId();
+  if (ambient !== undefined) {
+    return base.child({ requestId: ambient });
+  }
+  try {
+    const { headers } = await import("next/headers");
+    const id = (await headers()).get("x-request-id");
+    return id === null ? base : base.child({ requestId: id });
+  } catch {
+    return base;
+  }
+}
+
+/**
+ * One line for every authorization refusal, in one shape, whichever gate
+ * refused. Before this only the settlement and finance gates logged anything,
+ * so a burst of refused org and season actions — a broken link, a stale role,
+ * somebody probing — left no trace. Names the person, the scope and the
+ * capability; never the payload of what was attempted.
+ */
+export async function logAuthzRefused(detail: {
+  personId: string;
+  scope: string;
+  capability: string;
+}): Promise<void> {
+  (await requestLogger()).warn(detail, "authz.refused");
+}

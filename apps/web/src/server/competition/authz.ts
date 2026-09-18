@@ -1,6 +1,7 @@
 import { hasCapability, type Capability } from "@desiauction/core";
 import type { Db } from "@desiauction/db";
 
+import { logAuthzRefused } from "../logger";
 import { ForbiddenError, grantsFor } from "../orgs/authz";
 
 // IP-3 scope hierarchy (IP-3_DESIGN D4), realized by COMPOSING the frozen pure
@@ -41,6 +42,14 @@ export async function requireCompetitionCapability(
   capability: Capability,
 ): Promise<void> {
   if (!(await canCompetition(db, personId, scope, capability))) {
+    await logAuthzRefused({
+      personId,
+      scope:
+        scope.competitionId === undefined
+          ? `org:${scope.orgId}`
+          : `org:${scope.orgId}/competition:${scope.competitionId}`,
+      capability,
+    });
     throw new ForbiddenError();
   }
 }

@@ -6,15 +6,14 @@
 // bootstrap: `frame-ancestors` (clickjacking, alongside X-Frame-Options),
 // `base-uri` (blocks <base> injection that could rewrite relative URLs),
 // `object-src 'none'` (no plugins), and `form-action 'self'` (a form cannot be
-// pointed at an external origin — defence-in-depth for the login flow). A
-// nonce-based `script-src`/`style-src` requires middleware and is recorded as a
-// tracked follow-up (docs/operations/PRODUCTION_CHECKLIST.md), not shipped here
-// where it would need `'unsafe-inline'` and defeat its own purpose.
-// No `default-src`/`script-src`/`connect-src` here ON PURPOSE: those need a
-// nonce to coexist with the app-router hydration bootstrap, the engine
-// WebSocket, and Sentry, and adding them without one would either break the app
-// or require `'unsafe-inline'` (worthless). These four restrict framing, <base>,
-// plugins and form targets only — pure gain, no breakage.
+// pointed at an external origin — defence-in-depth for the login flow).
+//
+// THE SCRIPT POLICY IS NOT HERE, AND THAT IS NOT AN OMISSION. `script-src`,
+// `connect-src` and the rest need a PER-REQUEST nonce to coexist with the app
+// router's inline bootstrap, and a static header cannot carry one. They are sent
+// by src/middleware.ts, built by src/lib/csp.ts: Report-Only by default, enforced
+// when CSP_ENFORCE is set. These four stay here because they need no nonce and
+// must hold on every response, including the ones middleware never sees.
 const CSP = [
   "base-uri 'self'",
   "object-src 'none'",

@@ -2,6 +2,8 @@ import { hasCapability, type Capability, type GrantLike, type Scope } from "@des
 import { grants, type Db } from "@desiauction/db";
 import { eq } from "drizzle-orm";
 
+import { logAuthzRefused } from "../logger";
+
 // The permission evaluation engine (IP-2_DESIGN D6). Business code asks
 // "does this identity hold this capability?" — never "is this an admin?".
 // Evaluation is core's pure hasCapability; this module only fetches grants.
@@ -34,6 +36,7 @@ export async function requireCapability(
 ): Promise<void> {
   const held = await grantsFor(db, personId);
   if (!hasCapability(held, scope, capability)) {
+    await logAuthzRefused({ personId, scope: `${scope.scopeType}:${scope.scopeId}`, capability });
     throw new ForbiddenError();
   }
 }

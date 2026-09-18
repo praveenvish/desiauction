@@ -186,9 +186,12 @@ Covers the PX-2…PX-10 web product this checklist predated. Full findings in
   (`base-uri`/`object-src`/`frame-ancestors`/`form-action`), `Referrer-Policy`,
   `Permissions-Policy` (apps/web/next.config.mjs). Verified emitted on the prod
   build.
-- ☐E CSP `script-src`/`style-src` with per-request nonces (needs middleware) —
-  the four nonce-free directives ship now; the nonce rollout is the remaining
-  CSP work.
+- ☑ CSP `script-src` with per-request nonces (2026-09-18): `src/middleware.ts`
+  sends the full policy from `src/lib/csp.ts` as **Report-Only**, violations POST
+  to `/api/csp-report`, and `e2e/content-security-policy.spec.ts` fails on any
+  violation across public, console, admin and live-room surfaces.
+  ☐E **Enforce it:** after one production deploy with no `csp.violation` lines in
+  the logs, set `CSP_ENFORCE=1`. Unsetting it backs out without a deploy.
 - ☑ Web readiness probe `/readyz` (DB `select 1` → 200/503), distinct from the
   liveness `/healthz`. Mirrors the engine's DB-checking health.
 - ☐E Wire the orchestrator: liveness → `/healthz`, readiness → `/readyz` (web)

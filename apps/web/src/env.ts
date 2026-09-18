@@ -247,6 +247,19 @@ const envSchema = z.object({
     .optional()
     .transform((value) => value !== undefined),
   /**
+   * ENFORCE THE SCRIPT POLICY, rather than only report it (middleware.ts).
+   *
+   * Unset, the nonce policy ships as `Content-Security-Policy-Report-Only`:
+   * browsers log what it would block and POST it to /api/csp-report, and block
+   * nothing. Set it once a deploy has run clean — the e2e suite asserts zero
+   * violations on every surface — and the same policy becomes enforced. It is a
+   * switch rather than a code change so that turning it off is just as quick.
+   */
+  CSP_ENFORCE: z
+    .enum(["1", "true"])
+    .optional()
+    .transform((value) => value !== undefined),
+  /**
    * DEPLOY-TIME KILL SWITCH for "My plan" (WR-1), the owner's private auction
    * plan. Unset = on. Set to `1` to make the plan page 404, the live card
    * vanish and every plan write refuse, everywhere, without a migration or a

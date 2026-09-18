@@ -6,6 +6,7 @@ import "@desiauction/ui/styles/motion.css";
 import "./base.css";
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -84,6 +85,10 @@ export default async function RootLayout({
   // notFound, the dynamic-rendering bailout) through untouched, so this can
   // never silently freeze a dynamic render into a static, permanently
   // signed-out shell.
+  // Minted per request by middleware.ts; absent only when middleware did not
+  // run (a prefetch), in which case the inline script below renders without it
+  // exactly as it did before there was a policy.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   let session: Awaited<ReturnType<typeof currentSession>> = null;
   try {
     session = await currentSession();
@@ -128,8 +133,10 @@ export default async function RootLayout({
     // before React hydrates, which is a deliberate server/client difference.
     <html lang="en" data-theme="daylight" suppressHydrationWarning>
       <body>
-        {/* Replay the remembered console theme before first paint (no flash). */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        {/* Replay the remembered console theme before first paint (no flash).
+            The one inline script the app writes itself, so it carries the
+            request's nonce like every script Next emits (middleware.ts). */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <ProductShell
           session={
             session !== null
