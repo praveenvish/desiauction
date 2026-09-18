@@ -49,6 +49,12 @@ const envSchema = z
     /** Max concurrent spectate sockets from one client address (DoS ceiling). */
     WS_MAX_SOCKETS_PER_IP: z.coerce.number().int().positive().default(50),
     /**
+     * Proxy hops in front of the engine (Caddy in production = 1). Without it
+     * the per-client socket cap keys on the proxy's address — one cap for the
+     * whole platform. Same meaning as the web tier's variable.
+     */
+    TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).max(10).default(0),
+    /**
      * Per-actor command rate limit (token bucket).
      *
      * Sized to stop SUSTAINED abuse — one participant making the event log grow

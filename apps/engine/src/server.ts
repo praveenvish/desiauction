@@ -12,6 +12,7 @@ import {
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { WebSocketServer, type WebSocket } from "ws";
 
+import { clientAddress } from "./client-address.js";
 import { ENGINE_ACTOR, type AuctionEngine } from "./engine-core.js";
 
 // The engine transport (M-IP4-2). HTTP carries COMMANDS (from the web tier,
@@ -30,6 +31,8 @@ export interface ServerDeps {
   allowedOrigins?: string[];
   maxSocketsPerRoom?: number;
   maxSocketsPerIp?: number;
+  /** Proxy hops in front (Caddy = 1); the per-client cap keys on the address they forwarded. */
+  trustedProxies?: number;
 }
 
 /**
@@ -462,7 +465,11 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
         socket.destroy();
         return;
       }
-      const remoteAddress = request.socket.remoteAddress ?? "";
+      const remoteAddress = clientAddress(
+        request.headers,
+        request.socket.remoteAddress,
+        deps.trustedProxies ?? 0,
+      );
       if (remoteAddress !== "" && hub.socketsFrom(remoteAddress) >= maxPerIp) {
         deps.logger.warn({ remoteAddress }, "client at socket capacity — refusing socket");
         socket.destroy();

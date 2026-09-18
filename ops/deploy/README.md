@@ -26,7 +26,9 @@ It also means every deploy passes the same quality gates as `main`.
 Copy from the production template and split by service:
 
 - `web.env` — the full web environment (see `preflight:production`)
-- `engine.env` — `DATABASE_URL` (engine role), `ENGINE_SECRET`, `ENGINE_ALLOWED_ORIGINS`
+- `engine.env` — `DATABASE_URL` (engine role), `ENGINE_SECRET`, `ENGINE_ALLOWED_ORIGINS`,
+  `TRUSTED_PROXY_COUNT=1` (Caddy is in front; without it the per-client socket cap keys on
+  Caddy's address and becomes ONE cap of 50 sockets for every live room together)
 - `runner.env` — `DATABASE_URL` (runner role), `FINOPS_*`
 - `db.env` — `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - `minio.env` — `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` (read by both `minio`
