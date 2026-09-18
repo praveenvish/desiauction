@@ -84,7 +84,9 @@ export const erasureRequests = pgTable(
       .default("requested"),
     reason: text("reason"),
     requestedAt: ts("requested_at").notNull().defaultNow(),
-    decidedBy: char("decided_by", { length: 26 }),
+    decidedBy: char("decided_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     decidedAt: ts("decided_at"),
     decisionNote: text("decision_note"),
   },
@@ -221,7 +223,9 @@ export const organizations = pgTable("organizations", {
   // The club's own words for the Org Detail "About" banner — nullable, edited
   // in place by an owner. Never fabricated; empty until someone writes it.
   description: text("description"),
-  createdBy: char("created_by", { length: 26 }).notNull(),
+  createdBy: char("created_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
@@ -388,7 +392,9 @@ export const orgMessagingSettings = pgTable(
     channel: text("channel", { enum: ["sms", "email", "in-app"] }).notNull(),
     enabled: boolean("enabled").notNull(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
-    updatedBy: char("updated_by", { length: 26 }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
   },
   (table) => [uniqueIndex("org_messaging_settings_uq").on(table.orgId, table.topic, table.channel)],
 );
@@ -474,7 +480,9 @@ export const grants = pgTable(
     scopeType: text("scope_type", { enum: ["org", "tournament", "team", "platform"] }).notNull(),
     scopeId: char("scope_id", { length: 26 }).notNull(),
     capabilitySet: text("capability_set").notNull(),
-    grantedBy: char("granted_by", { length: 26 }).notNull(),
+    grantedBy: char("granted_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
     revokedAt: ts("revoked_at"),
   },
@@ -489,9 +497,13 @@ export const invites = pgTable("invites", {
   orgId: char("org_id", { length: 26 }).notNull(),
   capabilitySet: text("capability_set").notNull(),
   tokenHash: text("token_hash").notNull().unique(),
-  createdBy: char("created_by", { length: 26 }).notNull(),
+  createdBy: char("created_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
   expiresAt: ts("expires_at").notNull(),
-  acceptedBy: char("accepted_by", { length: 26 }),
+  acceptedBy: char("accepted_by", { length: 26 }).references(() => people.id, {
+    onDelete: "restrict",
+  }),
   acceptedAt: ts("accepted_at"),
   revokedAt: ts("revoked_at"),
 });
@@ -508,7 +520,13 @@ export const auditLog = pgTable(
     meta: jsonb("meta"),
     at: ts("at").notNull().defaultNow(),
   },
-  (table) => [index("audit_scope_idx").on(table.scopeType, table.scopeId, table.at)],
+  (table) => [
+    index("audit_scope_idx").on(table.scopeType, table.scopeId, table.at),
+    // 0044 and 0068: "what did this person do" and "what happened in this
+    // scope" without naming the scope type — neither can seek the index above.
+    index("audit_log_actor_at_idx").on(table.actor, table.at),
+    index("audit_log_scope_id_at_idx").on(table.scopeId, table.at),
+  ],
 );
 
 // --- Competition domain (IP-3 §4). Every row is org-scoped (C-13, invariant 1);
@@ -551,7 +569,9 @@ export const tournaments = pgTable(
       .references(() => sports.key),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [index("tournaments_org_idx").on(table.orgId)],
@@ -580,11 +600,15 @@ export const passUpgradeRequests = pgTable("pass_upgrade_requests", {
   requestedTier: text("requested_tier", { enum: ["free", "pro", "association"] }).notNull(),
   /** Why they need it, in their words: the most useful field for whoever answers. */
   note: text("note"),
-  requestedBy: char("requested_by", { length: 26 }).notNull(),
+  requestedBy: char("requested_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
   createdAt: ts("created_at").notNull().defaultNow(),
   /** Null resolution = still open. A partial unique index allows exactly one. */
   resolvedAt: ts("resolved_at"),
-  resolvedBy: char("resolved_by", { length: 26 }),
+  resolvedBy: char("resolved_by", { length: 26 }).references(() => people.id, {
+    onDelete: "restrict",
+  }),
   outcome: text("outcome", { enum: ["granted", "declined"] }),
 });
 
@@ -642,7 +666,9 @@ export const competitions = pgTable(
     location: text("location"),
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -663,7 +689,9 @@ export const franchises = pgTable(
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     name: text("name").notNull(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [index("franchises_org_idx").on(table.orgId)],
@@ -688,7 +716,9 @@ export const teams = pgTable(
     logoUrl: text("logo_url"),
     // Non-bidding team staff (organizer metadata; not an authenticated role).
     coachName: text("coach_name"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   // Team name is unique within a competition (doc 43).
@@ -777,7 +807,9 @@ export const registrations = pgTable(
     note: text("note"),
     rejectionReason: text("rejection_reason"),
     rejectionNote: text("rejection_note"),
-    reviewedBy: char("reviewed_by", { length: 26 }),
+    reviewedBy: char("reviewed_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     reviewedAt: ts("reviewed_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
@@ -849,8 +881,12 @@ export const orgImportMappings = pgTable(
     dateOrder: text("date_order", { enum: ["dmy", "mdy"] })
       .notNull()
       .default("dmy"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
-    updatedBy: char("updated_by", { length: 26 }),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -874,7 +910,9 @@ export const venues = pgTable(
     name: text("name").notNull(),
     address: text("address"),
     city: text("city"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   // One venue name per org — venue information exists exactly once.
@@ -902,7 +940,9 @@ export const grounds = pgTable(
     status: text("status", { enum: ["active", "unavailable"] })
       .notNull()
       .default("active"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -964,7 +1004,9 @@ export const fixtureResults = pgTable(
     /** "DLS", "super over", "conceded" — how, when not simply the higher score. */
     method: text("method"),
     note: text("note"),
-    recordedBy: char("recorded_by", { length: 26 }).notNull(),
+    recordedBy: char("recorded_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     recordedAt: ts("recorded_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -1035,7 +1077,9 @@ export const fixtures = pgTable(
     startedAt: ts("started_at"),
     completedAt: ts("completed_at"),
     cancelledAt: ts("cancelled_at"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -1070,7 +1114,9 @@ export const auctions = pgTable(
       .default("scheduled"),
     // AuctionConfig (doc 41), locked at creation; changes are audited overrides.
     config: jsonb("config").notNull(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -1251,9 +1297,13 @@ export const auctionOwnerInvites = pgTable(
     auctionId: char("auction_id", { length: 26 }).notNull(),
     teamId: char("team_id", { length: 26 }).notNull(),
     tokenHash: text("token_hash").notNull().unique(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     expiresAt: ts("expires_at").notNull(),
-    acceptedBy: char("accepted_by", { length: 26 }),
+    acceptedBy: char("accepted_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     acceptedAt: ts("accepted_at"),
     revokedAt: ts("revoked_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
@@ -1271,7 +1321,9 @@ export const paddleGrants = pgTable(
     personId: char("person_id", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
-    grantedBy: char("granted_by", { length: 26 }).notNull(),
+    grantedBy: char("granted_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
     revokedAt: ts("revoked_at"),
   },
@@ -1335,8 +1387,12 @@ export const auctionTeamTargets = pgTable(
     priority: smallint("priority").notNull().default(3),
     /** The player to turn to if this one is lost. Chains by following pointers. */
     fallbackRegistrationId: char("fallback_registration_id", { length: 26 }),
-    createdBy: char("created_by", { length: 26 }).notNull(),
-    updatedBy: char("updated_by", { length: 26 }),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -1426,7 +1482,9 @@ export const featureSettings = pgTable(
     scopeId: char("scope_id", { length: 26 }).notNull(),
     feature: text("feature").notNull(),
     enabled: boolean("enabled").notNull(),
-    updatedBy: char("updated_by", { length: 26 }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (table) => [
@@ -1990,7 +2048,9 @@ export const demoRequests = pgTable(
     createdAt: ts("created_at").notNull().defaultNow(),
     /** Null contact = still open. Outcome and contact move together (CHECK). */
     contactedAt: ts("contacted_at"),
-    contactedBy: char("contacted_by", { length: 26 }),
+    contactedBy: char("contacted_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     outcome: text("outcome", {
       enum: ["scheduled", "showed", "no_show", "signed_up", "not_a_fit", "no_response"],
     }),
@@ -2021,7 +2081,9 @@ export const demoAvailability = pgTable(
     effectiveFrom: date("effective_from"),
     effectiveTo: date("effective_to"),
     createdAt: ts("created_at").notNull().defaultNow(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
   },
   (table) => [index("demo_availability_weekday_idx").on(table.weekday)],
 );
@@ -2032,7 +2094,9 @@ export const demoBlackouts = pgTable("demo_blackouts", {
   blackoutOn: date("blackout_on").notNull().unique(),
   reason: text("reason"),
   createdAt: ts("created_at").notNull().defaultNow(),
-  createdBy: char("created_by", { length: 26 }).notNull(),
+  createdBy: char("created_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
 });
 
 /**

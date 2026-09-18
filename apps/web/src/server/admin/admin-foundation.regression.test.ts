@@ -63,6 +63,7 @@ import {
   userDirectory,
 } from "./views";
 import { passQueue } from "./passes";
+import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -114,6 +115,12 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  // The org this suite creates used to be left behind, pointing at an owner
+  // the next line deletes. Since 0069 keys `organizations.created_by` to
+  // people, that order is refused, so the org and everything under it go first.
+  if (orgId !== "") {
+    await purgeOrg(db, orgId);
+  }
   await db.delete(grantsTable).where(inArray(grantsTable.personId, [adminId, ownerId]));
   // createOrg() also writes an org_members row, which references `people`
   // under RESTRICT (0040): the person cannot go while the membership stands.

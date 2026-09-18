@@ -27,3 +27,22 @@ timestamp, and the other's entry is skipped. Before adding one, read
 `select id, created_at from drizzle.__drizzle_migrations order by created_at desc limit 5`
 and number yours after anything a sibling branch has already applied. 0066 is
 numbered past `fr1-feedback`'s 0064/0065 for this reason.
+
+## Keys to `people`
+
+Every column that names a person is a foreign key to `people`. `person_id`
+columns have been keyed since 0040, whose ON DELETE split (CASCADE for a person's
+own profile rows, RESTRICT for shared records) is the erasure policy enforced
+by the database. The attribution columns (`created_by`, `granted_by`,
+`reviewed_by`, …) followed in 0069, all `ON DELETE RESTRICT`. People are never
+deleted in production: erasure anonymizes the row. A test teardown therefore
+has to delete what a person created before it deletes the person.
+
+0069's keys are `NOT VALID`. They check every new write and every delete of a
+person, but they never proved the rows that were already there, because
+long-lived development databases carry teardown residue. On a database that
+started from these migrations, promote them once
+(`ALTER TABLE … VALIDATE CONSTRAINT …_people_fk`, a light lock). The columns
+that are deliberately NOT keyed, because they may name the system actor
+`00000000000000000000000000`, are listed in the migration's header: the
+append-only logs, the settlement writer and IP-6.

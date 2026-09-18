@@ -1,5 +1,12 @@
-import { createDb, demoAvailability, demoBlackouts, demoRequests, newId } from "@desiauction/db";
-import { like } from "drizzle-orm";
+import {
+  createDb,
+  demoAvailability,
+  demoBlackouts,
+  demoRequests,
+  newId,
+  people,
+} from "@desiauction/db";
+import { eq, like } from "drizzle-orm";
 
 /**
  * PUBLISHING AVAILABILITY FOR A TEST, DIRECTLY.
@@ -22,6 +29,18 @@ const DATABASE_URL =
 export const E2E_MARK = "E2E-DEMO1";
 
 /**
+ * The operator the fixture availability is published BY.
+ *
+ * `created_by` is a key to `people` (migration 0069), so the stamp is a real
+ * person rather than an id nobody holds — a fixture that could not name its
+ * author would be refused, exactly as a real row would. The id keeps the stamp
+ * cleanup searches for; the address is reserved (`.invalid`) so nothing is
+ * ever sent to it.
+ */
+const PUBLISHER_ID = `${E2E_MARK}${"0".repeat(26 - E2E_MARK.length)}`.slice(0, 26);
+const PUBLISHER_EMAIL = "e2e-demo-publisher@example.invalid";
+
+/**
  * Offer every weekday evening, so a booking test never has to care which day it
  * runs on. Real availability is a founder's decision; this is a fixture.
  */
@@ -31,6 +50,10 @@ export async function publishTestAvailability(): Promise<void> {
     await handle.db
       .delete(demoAvailability)
       .where(like(demoAvailability.createdBy, `${E2E_MARK}%`));
+    await handle.db
+      .insert(people)
+      .values({ id: PUBLISHER_ID, email: PUBLISHER_EMAIL, name: "E2E demo publisher" })
+      .onConflictDoNothing();
     for (let weekday = 0; weekday <= 6; weekday += 1) {
       await handle.db.insert(demoAvailability).values({
         id: newId(),
@@ -40,7 +63,7 @@ export async function publishTestAvailability(): Promise<void> {
         startMinute: 10 * 60,
         endMinute: 22 * 60,
         slotMinutes: 30,
-        createdBy: `${E2E_MARK}${"0".repeat(26 - E2E_MARK.length)}`.slice(0, 26),
+        createdBy: PUBLISHER_ID,
       });
     }
   } finally {
@@ -57,6 +80,8 @@ export async function clearTestDemoData(): Promise<void> {
       .delete(demoAvailability)
       .where(like(demoAvailability.createdBy, `${E2E_MARK}%`));
     await handle.db.delete(demoBlackouts).where(like(demoBlackouts.createdBy, `${E2E_MARK}%`));
+    // Last, once nothing it published remains to name it.
+    await handle.db.delete(people).where(eq(people.id, PUBLISHER_ID));
   } finally {
     await handle.sql.end({ timeout: 5 });
   }

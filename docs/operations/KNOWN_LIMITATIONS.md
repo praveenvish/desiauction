@@ -40,9 +40,6 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
 
 ## Scale watch (measure before acting — not blockers at beta scale)
 
-- `audit_log` has no index on `actor` or `scope_id` alone; the platform-admin
-  audit explorer and org directory filter by these. Sub-10 ms at beta volumes;
-  add targeted indexes before large-tenant GA, after measuring on staging.
 - Web DB pool `max: 10`; the admin health page fans out one snapshot set per
   finance-declared org in parallel. Fine at beta scale; size against the staging
   perf run.
