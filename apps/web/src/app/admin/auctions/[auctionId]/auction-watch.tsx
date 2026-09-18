@@ -9,7 +9,7 @@ import { roleLabeller } from "../../../../lib/role-label";
 import { adminAuctionWatch, type AuctionWatch } from "../../../../server/admin/live-watch";
 import { AuctionOverviewPanel } from "../../../seasons/[slug]/auction/auction-overview-panel";
 import { LiveFreshness } from "../../live-freshness";
-import { ageLabel, istClock, istTime, usePolled } from "../../use-polled";
+import { ageLabel, istClock, istTime, istWhen, usePolled } from "../../use-polled";
 
 const REFRESH_MS = 5_000;
 
@@ -112,8 +112,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             pulse.openedAtMs === null
               ? "Not yet"
               : pulse.closedAtMs !== null
-                ? `${istClock(pulse.openedAtMs)}–${istTime(pulse.closedAtMs)}`
-                : istTime(pulse.openedAtMs)
+                ? `${istClock(pulse.openedAtMs)}–${istWhen(pulse.closedAtMs, data.generatedAtMs)}`
+                : istWhen(pulse.openedAtMs, data.generatedAtMs)
           }
         />
         <Vital label="Duration" value={durationMs === null ? "—" : ageLabel(durationMs)} />

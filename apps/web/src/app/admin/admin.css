@@ -566,7 +566,7 @@ td .admin-id {
    two on a phone, never a horizontal scroll. */
 .admin-live-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: var(--space-3);
   margin: 0;
 }
@@ -629,6 +629,23 @@ td .admin-id {
 }
 
 .admin-badge-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A folded tail — the "Never closed" backlog beyond its first ten. */
+.admin-more {
+  margin-top: var(--space-3);
+}
+
+.admin-more > summary {
+  cursor: pointer;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  margin-bottom: var(--space-2);
+}
+
+.admin-more > summary:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }

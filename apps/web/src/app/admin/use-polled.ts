@@ -142,6 +142,22 @@ export function istTime(ms: number): string {
   return `${istClock(ms)} IST`;
 }
 
+const IST_DAY = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  day: "numeric",
+  month: "short",
+});
+
+/**
+ * The time, with the day when it is not the same day as `relativeToMs` — "18:53
+ * IST" for tonight, "13 Sep, 18:53 IST" for an auction opened five days ago, so
+ * an old instant never passes for a recent one.
+ */
+export function istWhen(ms: number, relativeToMs: number): string {
+  const sameDay = IST_DAY.format(new Date(ms)) === IST_DAY.format(new Date(relativeToMs));
+  return sameDay ? istTime(ms) : `${IST_DAY.format(new Date(ms))}, ${istTime(ms)}`;
+}
+
 /** The same wall-clock time without the zone — for the first half of a range. */
 export function istClock(ms: number): string {
   return IST_TIME.format(new Date(ms));

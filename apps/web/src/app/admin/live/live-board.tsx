@@ -9,9 +9,11 @@ import type { EngineRoom, LiveBoardView } from "../../../server/admin/live-watch
 import { adminLiveBoard } from "../../../server/admin/live-watch";
 import type { LiveAuctionRow, RoomState } from "../../../server/admin/live-views";
 import { LiveFreshness } from "../live-freshness";
-import { ageLabel, istTime, usePolled } from "../use-polled";
+import { ageLabel, istWhen, usePolled } from "../use-polled";
 
 const REFRESH_MS = 10_000;
+/** "Never closed" is a backlog, not a feed: the longest-silent tail folds away. */
+const STALE_SHOWN = 10;
 
 const STATE_BADGE: Record<
   RoomState,
@@ -94,23 +96,20 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
             without anyone closing it. Only the organizer can close it, from their cockpit.
           </p>
           <ul className="admin-live-list is-compact">
-            {data.stale.map((row) => (
-              <li key={row.auctionId} className="admin-live-row">
-                <span className="admin-live-name">
-                  <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
-                  <span className="admin-meta">
-                    {row.orgName} ·{" "}
-                    {row.lastEventAtMs === null
-                      ? "never opened"
-                      : `silent ${ageLabel(data.generatedAtMs - row.lastEventAtMs)}`}
-                  </span>
-                </span>
-                <span className="admin-meta">
-                  {row.lots.sold} of {row.lots.total} sold
-                </span>
-              </li>
+            {data.stale.slice(0, STALE_SHOWN).map((row) => (
+              <StaleRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
             ))}
           </ul>
+          {data.stale.length > STALE_SHOWN ? (
+            <details className="admin-more">
+              <summary>Show all {String(data.stale.length)}</summary>
+              <ul className="admin-live-list is-compact">
+                {data.stale.slice(STALE_SHOWN).map((row) => (
+                  <StaleRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
+                ))}
+              </ul>
+            </details>
+          ) : null}
         </Card>
       ) : null}
 
@@ -126,7 +125,7 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
                   <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
                   <span className="admin-meta">
                     {row.orgName} · {row.status === "abandoned" ? "abandoned" : "closed"}{" "}
-                    {istTime(row.endedAtMs)}
+                    {istWhen(row.endedAtMs, data.generatedAtMs)}
                   </span>
                 </span>
                 <span className="admin-meta">
@@ -138,6 +137,25 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         )}
       </Card>
     </>
+  );
+}
+
+function StaleRow({ row, nowMs }: { row: LiveAuctionRow; nowMs: number }) {
+  return (
+    <li className="admin-live-row">
+      <span className="admin-live-name">
+        <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
+        <span className="admin-meta">
+          {row.orgName} ·{" "}
+          {row.lastEventAtMs === null
+            ? "never opened"
+            : `silent ${ageLabel(nowMs - row.lastEventAtMs)}`}
+        </span>
+      </span>
+      <span className="admin-meta">
+        {row.lots.sold} of {row.lots.total} sold
+      </span>
+    </li>
   );
 }
 
@@ -184,7 +202,8 @@ function engineTrouble(room: EngineRoom | undefined): string | null {
 
 function engineLine(room: EngineRoom | undefined): string {
   if (room === undefined || room.state === "not_checked") {
-    return "Engine not checked";
+    // Each refresh asks the engine about the busiest rooms only.
+    return "Not checked (busiest 20 only)";
   }
   if (room.state === "unreachable") {
     return "Engine not answering";
@@ -216,7 +235,7 @@ function RoomRow({
           <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
           <span className="admin-meta">
             {row.orgName} · {row.sport}
-            {row.openedAtMs === null ? "" : ` · opened ${istTime(row.openedAtMs)}`}
+            {row.openedAtMs === null ? "" : ` · opened ${istWhen(row.openedAtMs, nowMs)}`}
           </span>
         </span>
         <Badge tone={badge.tone}>{badge.label}</Badge>
