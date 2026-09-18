@@ -305,6 +305,20 @@ check(
   "set SENTRY_DSN so errors are captured (a missing DSN is a silent no-op in every app)",
 );
 
+// --- Email sign-in -----------------------------------------------------------
+// The door that works without DLT. With EMAIL_PROVIDER=auto and no mailer the
+// web tier used to fall back to the dev inbox silently; env.ts now refuses to
+// boot, and this says so before the deploy rather than at it.
+check(
+  "EMAIL_MAILER",
+  env.EMAIL_PROVIDER !== "dev" &&
+    Boolean(env.EMAIL_API_ENDPOINT) &&
+    Boolean(env.EMAIL_API_KEY) &&
+    Boolean(env.EMAIL_FROM),
+  "email sign-in codes and receipts need a real mailer",
+  "set EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM (and leave EMAIL_PROVIDER unset or http)",
+);
+
 // --- Per-IP throttles (audit PA-1 §25) ---------------------------------------
 // `clientIp` now refuses to read `x-real-ip` unless a trusted proxy is declared,
 // because at 0 there is nothing in front to overwrite it and the header is

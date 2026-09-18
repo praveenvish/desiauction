@@ -366,6 +366,21 @@ const productionSchema = envSchema
       "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=msg91 with credentials",
     path: ["OTP_PROVIDER"],
   })
+  .refine(
+    (v) =>
+      !serving(v) ||
+      (v.EMAIL_PROVIDER !== "dev" &&
+        v.EMAIL_API_ENDPOINT !== undefined &&
+        v.EMAIL_API_KEY !== undefined &&
+        v.EMAIL_FROM !== undefined),
+    {
+      // `auto` without credentials silently falls back to the dev inbox: email
+      // sign-in codes land in plain text in otp_inbox and nobody receives them.
+      message:
+        "email needs EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM in production (and EMAIL_PROVIDER not dev) — otherwise sign-in codes go to a database table instead of a mailbox",
+      path: ["EMAIL_PROVIDER"],
+    },
+  )
   .refine((v) => !serving(v) || v.MEDIA_STORAGE === "bucket", {
     message:
       "MEDIA_STORAGE=local writes uploads to the app host and a built server does not serve them — set MEDIA_STORAGE=bucket",

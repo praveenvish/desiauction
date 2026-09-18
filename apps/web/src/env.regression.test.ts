@@ -34,6 +34,11 @@ const PROD_OK: Raw = {
   OTP_PROVIDER: "msg91",
   MSG91_AUTH_KEY: "key",
   MSG91_TEMPLATE_ID: "template",
+  // Email sign-in is the door that works without DLT; production refuses to
+  // boot without a real mailer (codes would otherwise land in otp_inbox).
+  EMAIL_API_ENDPOINT: "https://api.mail.example/send",
+  EMAIL_API_KEY: "key",
+  EMAIL_FROM: "no-reply@mail.desiauction.in",
   // Absent until now, which meant this "fully configured production
   // environment" silently carried `ws://localhost:4000/ws` — a plaintext socket
   // a page served over https refuses to open. Only preflight ever looked.
@@ -77,6 +82,12 @@ describe("web env — development stays effortless", () => {
 });
 
 describe("web env — production refuses every dev-only default", () => {
+  it("refuses a production boot whose email would fall back to the dev inbox", () => {
+    const { EMAIL_API_KEY: _drop, ...noKey } = PROD_OK;
+    expect(() => parseEnv(raw(noKey))).toThrow(/EMAIL/);
+    expect(() => parseEnv(raw({ ...PROD_OK, EMAIL_PROVIDER: "dev" }))).toThrow(/EMAIL/);
+  });
+
   it("accepts a fully configured production environment", () => {
     expect(() => parseEnv(raw(PROD_OK))).not.toThrow();
   });

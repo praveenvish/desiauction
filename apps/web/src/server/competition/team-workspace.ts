@@ -219,8 +219,16 @@ export async function teamsWorkspace(
     // loop used to drop those rows, and the card then read "No owner yet",
     // which is the one sentence that makes an organizer mint a second link on
     // auction night. The cockpit has always shown the phone; this now agrees.
+    //
+    // But the fallback is a CONTACT: `personLabel` becomes the phone or email
+    // when no name is set, and this card renders for every member — rival
+    // owners included. Contacts leave only with `options.roster`, the same gate
+    // the squad's phones already use; everyone else learns the team HAS an
+    // owner, which is the fact that stops a second link being minted.
     for (const owner of [...invited, ...paddleHolders]) {
-      const label = personLabel(owner);
+      const label = options.roster
+        ? personLabel(owner)
+        : owner.name?.trim() || "Owner (name not set)";
       ownerByTeam.set(owner.teamId, label);
     }
   }

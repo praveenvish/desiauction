@@ -53,7 +53,11 @@ export function middleware(request: NextRequest): NextResponse {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set(header, policy);
-  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  // A client-supplied id is honoured for correlation, but bounded and plain:
+  // it is copied into every log line of this request.
+  const offered = request.headers.get("x-request-id");
+  const requestId =
+    offered !== null && /^[A-Za-z0-9._-]{1,64}$/.test(offered) ? offered : crypto.randomUUID();
   requestHeaders.set("x-request-id", requestId);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
