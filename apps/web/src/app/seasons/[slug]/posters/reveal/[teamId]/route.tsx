@@ -1,17 +1,17 @@
 import { buildTeamPoster } from "@desiauction/core";
 
 import { teamPosterSource } from "../../../../../../server/competition/posters";
-import { renderTeamPoster } from "../../poster-card";
+import { renderRevealPoster } from "../../poster-card";
 import { posterResponse } from "../../poster-response";
 
 /**
- * The squad sheet — one image covering fifteen faces, and the more forwarded of
- * the two, because an owner posts it the same night.
+ * "Meet the squad" — the same roster as the sheet next door, announced rather
+ * than accounted for.
  *
- * Same console gate as the player poster next door, and for a stronger reason:
- * this one carries fifteen civilians' faces and what each of them was bought
- * for. See `server/competition/posters.ts` for the gate, the consent rule, the
- * age rule and the audit row.
+ * It reads the SAME source, under the same gate, and differs in one deliberate
+ * way: `forcePrices: false`. A reveal is the poster an owner sends to a fan
+ * group, and a fan group has no business with anybody's fee — so the money is
+ * off by construction here rather than by a query parameter somebody could flip.
  */
 
 export const runtime = "nodejs";
@@ -24,15 +24,16 @@ export async function GET(
   const { slug, teamId } = await params;
   return posterResponse({
     request,
-    kind: "team",
+    kind: "reveal",
     source: (query) =>
       teamPosterSource(slug, teamId, {
         theme: query.theme,
         size: query.size,
-        prices: query.prices,
-        kind: "team",
+        prices: false,
+        kind: "reveal",
       }),
     build: buildTeamPoster,
-    draw: renderTeamPoster,
+    draw: renderRevealPoster,
+    forcePrices: false,
   });
 }

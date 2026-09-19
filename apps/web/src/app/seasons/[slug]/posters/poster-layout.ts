@@ -62,20 +62,25 @@ export interface PosterMetrics {
   readonly teamNameMin: number;
   readonly squadLabelSize: number;
 
-  // Squad table.
-  readonly squadArea: number;
-  readonly rowMin: number;
-  readonly rowMax: number;
+  // The sheets (squad, reveal, top buys, season): one gap between every band,
+  // and the title block's type.
+  readonly gap: number;
+  readonly kickerSize: number;
+  readonly titleMax: number;
+  readonly titleMin: number;
+  readonly subSize: number;
 
   // Spent / remaining.
   readonly statSize: number;
   readonly statLabelSize: number;
   readonly statHeight: number;
 
-  // Brand footer — drawn for the free tier only, so every budget above has to
-  // survive its absence. `space-between` on the frame is what absorbs it.
+  // Brand footer — on EVERY poster (the founder's call, 2026-09-20): the
+  // DesiAuction lockup on one side, the sponsor line or the domain on the other.
+  readonly footerHeight: number;
   readonly footerMark: number;
   readonly footerNameSize: number;
+  readonly footerTagSize: number;
   readonly footerUrlSize: number;
 }
 
@@ -111,15 +116,69 @@ const SQUARE: PosterMetrics = {
   teamNameMax: 60,
   teamNameMin: 34,
   squadLabelSize: 26,
-  squadArea: 552,
-  rowMin: 30,
-  rowMax: 52,
-  statSize: 44,
-  statLabelSize: 22,
-  statHeight: 92,
+  gap: 22,
+  kickerSize: 22,
+  titleMax: 60,
+  titleMin: 34,
+  subSize: 22,
+  statSize: 38,
+  statLabelSize: 18,
+  statHeight: 78,
+  footerHeight: 60,
+  footerMark: 46,
+  footerNameSize: 26,
+  footerTagSize: 12,
+  footerUrlSize: 20,
+};
+
+/**
+ * 4:5 — the tallest shape a feed shows uncropped. Between the two, and written
+ * out rather than interpolated for the same reason the story is: its extra 270
+ * pixels go to the photo and the grid, not to the margins.
+ */
+const PORTRAIT: PosterMetrics = {
+  ...POSTER_SIZES.portrait,
+  pad: 56,
+  radius: 30,
+  chipRadius: 16,
+  headerTile: 76,
+  competitionMax: 30,
+  competitionMin: 18,
+  chipSize: 32,
+  chipHeight: 64,
+  photoWidth: 480,
+  photoHeight: 590,
+  photoMonogramSize: 190,
+  nameMax: 84,
+  nameMin: 44,
+  roleSize: 34,
+  stampSize: 60,
+  stampHeight: 104,
+  stampTracking: 5,
+  stampPadX: 34,
+  priceMax: 70,
+  priceMin: 38,
+  crest: 70,
+  crestMonogramSize: 30,
+  outcomeSize: 32,
+  heroCrest: 116,
+  heroCrestMonogramSize: 48,
+  teamNameMax: 70,
+  teamNameMin: 38,
+  squadLabelSize: 28,
+  gap: 26,
+  kickerSize: 24,
+  titleMax: 72,
+  titleMin: 38,
+  subSize: 24,
+  statSize: 42,
+  statLabelSize: 20,
+  statHeight: 86,
+  footerHeight: 66,
   footerMark: 50,
   footerNameSize: 28,
-  footerUrlSize: 23,
+  footerTagSize: 13,
+  footerUrlSize: 22,
 };
 
 const STORY: PosterMetrics = {
@@ -137,7 +196,7 @@ const STORY: PosterMetrics = {
   // season's own name below the size anybody can read.
   chipSize: 34,
   chipHeight: 70,
-  // The story's extra height is spent here and on `squadArea` — roughly twice
+  // The story's extra height is spent here and on the grids — roughly twice
   // the photo and a full squad at readable size, which is what the taller
   // canvas is actually for.
   photoWidth: 728,
@@ -160,18 +219,26 @@ const STORY: PosterMetrics = {
   teamNameMax: 86,
   teamNameMin: 44,
   squadLabelSize: 32,
-  squadArea: 1152,
-  rowMin: 40,
-  rowMax: 76,
-  statSize: 62,
-  statLabelSize: 30,
-  statHeight: 120,
-  footerMark: 66,
+  gap: 34,
+  kickerSize: 30,
+  titleMax: 96,
+  titleMin: 44,
+  subSize: 30,
+  statSize: 52,
+  statLabelSize: 24,
+  statHeight: 104,
+  footerHeight: 84,
+  footerMark: 64,
   footerNameSize: 36,
+  footerTagSize: 16,
   footerUrlSize: 28,
 };
 
-const METRICS: Record<PosterSize, PosterMetrics> = { square: SQUARE, story: STORY };
+const METRICS: Record<PosterSize, PosterMetrics> = {
+  square: SQUARE,
+  portrait: PORTRAIT,
+  story: STORY,
+};
 
 export function metricsFor(size: PosterSize): PosterMetrics {
   return METRICS[size];
@@ -287,43 +354,342 @@ export function fitPrice(price: string, stamp: string, metrics: PosterMetrics): 
   return fitHeadline(price, room, metrics.priceMax, metrics.priceMin);
 }
 
-export interface SquadFit {
-  readonly rowHeight: number;
-  readonly fontSize: number;
-  /** How many squad rows are drawn. */
-  readonly shown: number;
-  /** How many did not fit — zero unless the squad is larger than the frame. */
-  readonly overflow: number;
+// --- The sheets: squad, reveal, top buys, season ---------------------------
+
+function clampTo(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+/** The header row is as tall as the taller of its two slots. */
+export function headerHeight(metrics: PosterMetrics): number {
+  return Math.max(metrics.headerTile, metrics.chipHeight);
 }
 
 /**
- * How the squad table spends its band of pixels.
+ * The height left for a sheet's ONE flexible band (the grid, the ranked list)
+ * once the header, the footer, every fixed band and the gaps between all of
+ * them have been paid for.
  *
- * Rows breathe when there are eight of them and tighten when there are fifteen,
- * because one fixed row height would either waste half the poster on a short
- * squad or clip a full one. The floor matters more than the ceiling: below
- * `rowMin` the names stop being readable at the size these actually get viewed,
- * so past that point the table stops shrinking.
- *
- * That is where the last row earns its place. `buildTeamPoster` deliberately
- * does not truncate — a pure model that silently dropped players would produce
- * a squad poster quietly missing somebody's name, the one failure nobody would
- * catch by looking at it. So when a squad genuinely cannot fit, the renderer
- * gives up a row to SAY so rather than ending the list early and looking
- * complete.
+ * Computed, not left to flexbox, because the grid inside that band is sized
+ * from it: a grid fitted to a guess is a grid Satori clips at the bottom.
  */
-export function fitSquadRows(count: number, metrics: PosterMetrics): SquadFit {
-  const { squadArea, rowMin, rowMax } = metrics;
-  if (count <= 0) {
-    return { rowHeight: rowMax, fontSize: rowFontSize(rowMax), shown: 0, overflow: 0 };
-  }
-  const rowHeight = Math.max(rowMin, Math.min(rowMax, Math.floor(squadArea / count)));
-  const capacity = Math.max(1, Math.floor(squadArea / rowHeight));
-  const shown = count <= capacity ? count : Math.max(0, capacity - 1);
-  return { rowHeight, fontSize: rowFontSize(rowHeight), shown, overflow: count - shown };
+export function sheetBody(metrics: PosterMetrics, bands: readonly number[]): number {
+  const sections = 2 + bands.length + 1;
+  const fixed = bands.reduce((total, band) => total + band, 0);
+  return (
+    metrics.height -
+    2 * metrics.pad -
+    headerHeight(metrics) -
+    metrics.footerHeight -
+    fixed -
+    metrics.gap * (sections - 1)
+  );
 }
 
-/** Type inside a row, clamped: too small to read is as bad as clipped. */
-function rowFontSize(rowHeight: number): number {
-  return Math.max(20, Math.min(38, Math.round(rowHeight * 0.5)));
+export interface TileFitOptions {
+  readonly gap: number;
+  /** Photo height over photo width: 1 for a disc, 1.15 for a portrait card. */
+  readonly aspect: number;
+  /** The label band under a photo, for a cell this wide. */
+  readonly label: (cellWidth: number) => number;
+  /** A four-man squad does not get four billboard-sized faces. */
+  readonly maxCell: number;
+  /** Below this a face is a smudge; the grid overflows instead of shrinking. */
+  readonly minPhoto: number;
+  readonly maxCols?: number;
+}
+
+export interface TileFit {
+  readonly cols: number;
+  readonly rows: number;
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+  readonly photoWidth: number;
+  readonly photoHeight: number;
+  readonly labelHeight: number;
+  readonly gap: number;
+  /** Tiles drawn with a face. */
+  readonly shown: number;
+  /** Players that did not fit — drawn as ONE "+N" tile, never silently dropped. */
+  readonly overflow: number;
+  readonly gridWidth: number;
+  readonly gridHeight: number;
+}
+
+function tryCols(
+  count: number,
+  cols: number,
+  width: number,
+  height: number,
+  options: TileFitOptions,
+): TileFit | null {
+  const rows = Math.ceil(count / cols);
+  const cellWidth = Math.min(
+    options.maxCell,
+    Math.floor((width - (cols - 1) * options.gap) / cols),
+  );
+  if (cellWidth <= 0) {
+    return null;
+  }
+  const cellRoom = Math.floor((height - (rows - 1) * options.gap) / rows);
+  const labelHeight = options.label(cellWidth);
+  const photoHeight = Math.min(Math.round(cellWidth * options.aspect), cellRoom - labelHeight);
+  const photoWidth = Math.min(cellWidth, Math.floor(photoHeight / options.aspect));
+  if (photoWidth < options.minPhoto) {
+    return null;
+  }
+  const cellHeight = photoHeight + labelHeight;
+  return {
+    cols,
+    rows,
+    cellWidth,
+    cellHeight,
+    photoWidth,
+    photoHeight,
+    labelHeight,
+    gap: options.gap,
+    shown: count,
+    overflow: 0,
+    gridWidth: cols * cellWidth + (cols - 1) * options.gap,
+    gridHeight: rows * cellHeight + (rows - 1) * options.gap,
+  };
+}
+
+const EMPTY_FIT: TileFit = {
+  cols: 0,
+  rows: 0,
+  cellWidth: 0,
+  cellHeight: 0,
+  photoWidth: 0,
+  photoHeight: 0,
+  labelHeight: 0,
+  gap: 0,
+  shown: 0,
+  overflow: 0,
+  gridWidth: 0,
+  gridHeight: 0,
+};
+
+/**
+ * HOW A SQUAD OF FACES SPENDS ITS BAND.
+ *
+ * Every column count is tried and the one that gives each face the most area
+ * wins — four players get four big portraits in a row, twenty-five get a 7×4
+ * contact sheet. When even the densest grid would push faces below `minPhoto`,
+ * the grid keeps its floor and gives its last cell to a "+N more" tile rather
+ * than ending early and looking complete: a squad poster quietly missing a
+ * player is the one failure nobody would catch by looking at it.
+ */
+export function fitTiles(
+  count: number,
+  width: number,
+  height: number,
+  options: TileFitOptions,
+): TileFit {
+  if (count <= 0 || width <= 0 || height <= 0) {
+    return EMPTY_FIT;
+  }
+  const maxCols = Math.min(count, options.maxCols ?? 12);
+  let best: TileFit | null = null;
+  for (let cols = 1; cols <= maxCols; cols += 1) {
+    const fit = tryCols(count, cols, width, height, options);
+    if (
+      fit !== null &&
+      (best === null || fit.photoWidth * fit.photoHeight > best.photoWidth * best.photoHeight)
+    ) {
+      best = fit;
+    }
+  }
+  if (best !== null) {
+    return best;
+  }
+  // Nothing fits everybody: find the grid that holds the most faces at the floor.
+  let capacity = 0;
+  let capacityCols = 1;
+  for (let cols = 1; cols <= (options.maxCols ?? 12); cols += 1) {
+    const cellWidth = Math.floor((width - (cols - 1) * options.gap) / cols);
+    if (cellWidth < options.minPhoto) {
+      break;
+    }
+    const cellHeight = Math.ceil(options.minPhoto * options.aspect) + options.label(cellWidth);
+    const rows = Math.floor((height + options.gap) / (cellHeight + options.gap));
+    if (rows * cols > capacity) {
+      capacity = rows * cols;
+      capacityCols = cols;
+    }
+  }
+  const fit = capacity < 2 ? null : tryCols(capacity, capacityCols, width, height, options);
+  if (fit === null) {
+    return { ...EMPTY_FIT, overflow: count };
+  }
+  const shown = capacity - 1;
+  return { ...fit, shown, overflow: count - shown };
+}
+
+/** Type inside a squad face tile, and the label band it needs. */
+export interface FaceType {
+  readonly nameSize: number;
+  readonly roleSize: number;
+  readonly priceSize: number;
+  readonly labelHeight: number;
+}
+
+export function faceType(cellWidth: number, prices: boolean): FaceType {
+  const nameSize = clampTo(cellWidth * 0.125, 16, 34);
+  const roleSize = clampTo(nameSize * 0.68, 12, 22);
+  const priceSize = clampTo(nameSize * 0.92, 14, 30);
+  const labelHeight = Math.round(
+    10 + nameSize * 1.2 + 4 + roleSize * 1.3 + (prices ? 4 + priceSize * 1.25 : 0) + 6,
+  );
+  return { nameSize, roleSize, priceSize, labelHeight };
+}
+
+export interface NameFit {
+  readonly text: string;
+  readonly size: number;
+}
+
+/**
+ * A name in a tile: shrink first, then shorten ("Prakash B."), then — as the
+ * renderer's last resort — an ellipsis. Shrinking beats shortening while it
+ * stays readable, because a surname is how half a village tells two Rameshes
+ * apart.
+ */
+export function fitName(
+  full: string,
+  short: string,
+  width: number,
+  max: number,
+  min: number,
+): NameFit {
+  const size = fitHeadline(full, width, max, min);
+  const fits = estimateTextWidth(full, size) <= width;
+  if (fits && size >= max * 0.78) {
+    return { text: full, size };
+  }
+  const shortSize = fitHeadline(short, width, max, min);
+  // Shrinking beats shortening only while it stays close to the tile's own type
+  // size: "Vikram Singh Rathore" at half the size of the name beside it looks
+  // like a mistake, and "Vikram S." does not.
+  return !fits || shortSize > size ? { text: short, size: shortSize } : { text: full, size };
+}
+
+export interface RankFit {
+  readonly rowHeight: number;
+  readonly gap: number;
+  readonly photo: number;
+  readonly rankSize: number;
+  readonly nameSize: number;
+  readonly metaSize: number;
+  readonly priceMax: number;
+  readonly priceMin: number;
+  readonly listHeight: number;
+}
+
+/**
+ * The ranked list on "Top N buys". Rows grow to fill the band for a top three
+ * and tighten for a top ten, with a ceiling so three rows on a story do not
+ * become three billboards.
+ */
+export function fitRankRows(count: number, height: number, metrics: PosterMetrics): RankFit {
+  const n = Math.max(1, count);
+  const gap = Math.round(metrics.gap * 0.55);
+  const maxRow = Math.round(metrics.width * 0.24);
+  const rowHeight = Math.min(maxRow, Math.floor((height - gap * (n - 1)) / n));
+  const photo = rowHeight - 2 * Math.round(rowHeight * 0.1);
+  const nameSize = clampTo(rowHeight * 0.24, 20, 56);
+  return {
+    rowHeight,
+    gap,
+    photo,
+    rankSize: clampTo(rowHeight * 0.4, 26, 104),
+    nameSize,
+    metaSize: clampTo(nameSize * 0.62, 14, 30),
+    priceMax: clampTo(rowHeight * 0.3, 22, 66),
+    priceMin: clampTo(rowHeight * 0.18, 18, 34),
+    listHeight: n * rowHeight + (n - 1) * gap,
+  };
+}
+
+export interface SeasonFit {
+  readonly panelCols: number;
+  readonly panelRows: number;
+  readonly panelWidth: number;
+  readonly panelHeight: number;
+  readonly panelHeader: number;
+  readonly inset: number;
+  readonly nameSize: number;
+  readonly faces: TileFit;
+}
+
+/** A face on the season sheet is a coin; it earns a first name only above 72px. */
+function seasonLabel(cellWidth: number): number {
+  return cellWidth >= 72 ? Math.round(clampTo(cellWidth * 0.19, 13, 20) * 1.3) + 6 : 0;
+}
+
+export function seasonFaceNameSize(cellWidth: number): number {
+  return clampTo(cellWidth * 0.19, 13, 20);
+}
+
+/**
+ * EVERY SQUAD ON ONE SHEET.
+ *
+ * Panel columns are tried like face columns are: the arrangement that gives
+ * the largest squad the biggest faces wins, and a squad that cannot fit at the
+ * floor overflows into a "+N" coin inside its own panel.
+ */
+export function fitSeasonGrid(
+  teams: number,
+  largest: number,
+  width: number,
+  height: number,
+  gap: number,
+): SeasonFit | null {
+  if (teams <= 0) {
+    return null;
+  }
+  let best: SeasonFit | null = null;
+  let bestScore = -1;
+  for (let panelCols = 1; panelCols <= Math.min(teams, 4); panelCols += 1) {
+    const panelRows = Math.ceil(teams / panelCols);
+    const panelWidth = Math.floor((width - (panelCols - 1) * gap) / panelCols);
+    const panelHeight = Math.floor((height - (panelRows - 1) * gap) / panelRows);
+    const panelHeader = clampTo(panelWidth * 0.1, 44, 64);
+    const inset = Math.round(panelHeader * 0.32);
+    const faces = fitTiles(
+      Math.max(1, largest),
+      panelWidth - 2 * inset,
+      panelHeight - panelHeader - 2 * inset,
+      {
+        gap: Math.max(6, Math.round(inset * 0.6)),
+        aspect: 1,
+        label: seasonLabel,
+        maxCell: 140,
+        minPhoto: 34,
+      },
+    );
+    /*
+     * Everyone visible beats bigger faces with somebody in a "+N" — and a grid
+     * that FILLS its panel beats a marginally bigger one that leaves a third of
+     * every panel empty, which is what "biggest face wins" produced: six tall
+     * skinny panels with two columns of coins down the middle.
+     */
+    const room = panelHeight - panelHeader - 2 * inset;
+    const fill = room <= 0 ? 0 : Math.min(1, faces.gridHeight / room);
+    const score = faces.photoWidth * (0.55 + 0.45 * fill) * (faces.overflow > 0 ? 0.3 : 1);
+    if (score > bestScore) {
+      bestScore = score;
+      best = {
+        panelCols,
+        panelRows,
+        panelWidth,
+        panelHeight,
+        panelHeader,
+        inset,
+        nameSize: clampTo(panelHeader * 0.42, 18, 28),
+        faces,
+      };
+    }
+  }
+  return best;
 }

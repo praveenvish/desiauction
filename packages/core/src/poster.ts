@@ -19,11 +19,20 @@ import { formatPaiseINR, paise } from "./money";
 import { roleLabel } from "./player-profile";
 
 /**
- * Themes are a PALETTE PLUS AN EMPHASIS, not four separate layouts. One
- * renderer reading a theme keeps every poster on the same grid, which is what
- * stops a theme picker from becoming four designs that drift apart.
+ * A theme is a DESIGN: a layout family plus a palette.
+ *
+ * Three families, because the founder asked for variety that reads as three
+ * different posters rather than one poster in four colours:
+ *
+ * - `floodlight` / `gold` / `arena` / `ink` — the CLASSIC family: the product's
+ *   own card, a wash of light over a dark (or, for `ink`, paper) ground.
+ * - `matchday` — the team's own colour IS the poster. Loud, made for the group.
+ * - `minimal` — light editorial: paper, one hairline of team colour, air.
+ *
+ * Every family draws every poster kind, and the team colour drives the accents
+ * in all of them, so the choice is mood, never "which one works for squads".
  */
-export const POSTER_THEMES = ["floodlight", "gold", "arena", "ink"] as const;
+export const POSTER_THEMES = ["floodlight", "matchday", "minimal", "gold", "arena", "ink"] as const;
 export type PosterTheme = (typeof POSTER_THEMES)[number];
 
 export function isPosterTheme(value: string): value is PosterTheme {
@@ -31,19 +40,76 @@ export function isPosterTheme(value: string): value is PosterTheme {
 }
 
 /**
- * Square for a feed, portrait for a Status/Story. Both 1080-wide because that
- * is what every Indian phone uploads without re-compressing to mush — and
- * neither is the 1200x630 the link-preview cards use, which is the wrong shape
- * for the two places these are actually posted.
+ * Square for a feed, 4:5 portrait for an Instagram/Facebook post (the tallest
+ * shape a feed shows uncropped), and 9:16 for a Status/Story. All 1080 wide
+ * because that is what every Indian phone uploads without re-compressing to
+ * mush — and none is the 1200x630 the link-preview cards use, which is the wrong
+ * shape for the places these are actually posted.
  */
 export const POSTER_SIZES = {
   square: { width: 1080, height: 1080 },
+  portrait: { width: 1080, height: 1350 },
   story: { width: 1080, height: 1920 },
 } as const;
 export type PosterSize = keyof typeof POSTER_SIZES;
 
 export function isPosterSize(value: string): value is PosterSize {
-  return value === "square" || value === "story";
+  return value === "square" || value === "portrait" || value === "story";
+}
+
+/**
+ * WHAT A POSTER IS OF.
+ *
+ * `player` and `team` are the two the studio always had. `reveal` is the same
+ * squad announced rather than accounted for ("Meet the squad" — faces, no
+ * money). `top` and `season` read the whole auction, which is why they are
+ * organizer-only upstream: a rival owner may not publish another team's prices.
+ */
+export const POSTER_KINDS = ["player", "team", "reveal", "top", "season"] as const;
+export type PosterKind = (typeof POSTER_KINDS)[number];
+
+export function isPosterKind(value: string): value is PosterKind {
+  return (POSTER_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * The shapes each kind is drawn in. Every squad in the season on a 1080 square
+ * is a contact sheet of thumbnails nobody can read, so `season` is tall-only.
+ */
+export const POSTER_KIND_SIZES: Record<PosterKind, readonly PosterSize[]> = {
+  player: ["square", "portrait", "story"],
+  team: ["square", "portrait", "story"],
+  reveal: ["square", "portrait", "story"],
+  top: ["square", "portrait", "story"],
+  season: ["portrait", "story"],
+};
+
+/** Top-N is a choice from three, not a free number: 7 rows has no layout. */
+export const TOP_BUY_COUNTS = [3, 5, 10] as const;
+export type TopBuyCount = (typeof TOP_BUY_COUNTS)[number];
+
+export function isTopBuyCount(value: number): value is TopBuyCount {
+  return (TOP_BUY_COUNTS as readonly number[]).includes(value);
+}
+
+/**
+ * A team colour as the renderer may use it: `#RRGGBB`, uppercase, or null.
+ *
+ * The column is free text an organizer typed into a colour picker, and it ends
+ * up inside a CSS string at raster time. Anything that is not a plain hex —
+ * `red`, `url(...)`, a stray semicolon — is refused rather than interpolated.
+ */
+export function normalizeHexColor(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const trimmed = value.trim();
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(trimmed);
+  if (short !== null) {
+    const [, r = "", g = "", b = ""] = short;
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+  return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed.toUpperCase() : null;
 }
 
 /** How the sale reads. `sold` is the only one that carries a price. */
@@ -66,6 +132,8 @@ export interface PlayerPosterInput {
   pricePaise: number | null;
   teamName: string | null;
   teamCrestUrl: string | null;
+  /** The buying team's colour, normalized upstream by `normalizeHexColor`. */
+  teamColor?: string | null;
   competitionName: string;
   competitionLogoUrl: string | null;
 }
@@ -84,6 +152,7 @@ export interface PlayerPoster {
   outcomeLine: string | null;
   teamName: string | null;
   teamCrestUrl: string | null;
+  teamColor: string | null;
   competitionName: string;
   competitionLogoUrl: string | null;
 }
@@ -100,6 +169,18 @@ const STAMP: Record<PosterOutcome, string> = {
 function clamp(value: string, max: number): string {
   const trimmed = value.trim();
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1).trimEnd()}…`;
+}
+
+/**
+ * What a crest tile says when the club has no logo.
+ *
+ * A short name IS the mark — "JW", "MI", "RCB" — so it is printed as itself.
+ * Taking initials from it produced "J" for a franchise that had already told us
+ * what to call it in two letters.
+ */
+export function crestMark(shortName: string | null | undefined, name: string): string {
+  const short = shortName?.trim() ?? "";
+  return short !== "" && short.length <= 4 ? short.toUpperCase() : monogramOf(short || name);
 }
 
 export function monogramOf(name: string): string {
@@ -156,22 +237,58 @@ export function buildPlayerPoster(input: PlayerPosterInput): PlayerPoster {
     outcomeLine,
     teamName: input.teamName === null ? null : clamp(input.teamName, 24),
     teamCrestUrl: input.teamCrestUrl,
+    teamColor: normalizeHexColor(input.teamColor),
     competitionName: clamp(input.competitionName, 34),
     competitionLogoUrl: input.competitionLogoUrl,
   };
 }
 
+/** A shorter handle for a small tile: "Prakash Bishnoi" → "Prakash B." */
+export function shortNameOf(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part !== "");
+  if (parts.length <= 1) {
+    return clamp(parts[0] ?? name, 14);
+  }
+  const last = parts[parts.length - 1] ?? "";
+  return `${clamp(parts[0] ?? "", 12)} ${last.slice(0, 1).toUpperCase()}.`;
+}
+
+/** The smallest handle: the first name alone, for a face the size of a coin. */
+export function firstNameOf(name: string): string {
+  return clamp(name.trim().split(/\s+/)[0] ?? name, 10);
+}
+
+// --- Squad ------------------------------------------------------------------
+
+/**
+ * How a player joined the squad without (or besides) the hammer. A player can
+ * be an icon AND the captain — the marks are a set, not a single label.
+ */
+export type PosterMark = "icon" | "captain" | "retained";
+
 export interface TeamPosterMember {
   name: string;
   role: string;
-  /** Integer paise, or null for a pre-signed icon/retained player. */
+  /** Integer paise, or null for a pre-signed icon/retained/captain player. */
   pricePaise: number | null;
-  marker: "icon" | "retained" | "captain" | null;
+  marks: readonly PosterMark[];
+  /**
+   * Consent- AND age-gated upstream (a poster is public the moment it is
+   * forwarded). Null means the initials tile, never a broken image.
+   */
+  photoUrl: string | null;
 }
 
 export interface TeamPosterInput {
   teamName: string;
+  teamShortName?: string | null;
   teamCrestUrl: string | null;
+  /** Free text from the team form; normalized here, never trusted. */
+  teamColor?: string | null;
+  coachName?: string | null;
   competitionName: string;
   competitionLogoUrl: string | null;
   members: readonly TeamPosterMember[];
@@ -183,14 +300,28 @@ export interface TeamPosterInput {
 
 export interface TeamPosterRow {
   name: string;
+  /** For a tile too narrow for the full name. */
+  shortName: string;
+  firstName: string;
+  monogram: string;
   roleLine: string;
   priceLabel: string | null;
+  /** The ONE label a table row has room for — "ICON", "RET" or "C". */
   markerLabel: string | null;
+  /** Every mark, for a face tile: "C" and "ICON" can both apply. */
+  badges: readonly string[];
+  isCaptain: boolean;
+  photoUrl: string | null;
 }
 
 export interface TeamPoster {
   teamName: string;
+  teamMonogram: string;
   teamCrestUrl: string | null;
+  teamColor: string | null;
+  coachName: string | null;
+  /** The first captain's name, for the "Captain · X" line. */
+  captainName: string | null;
   competitionName: string;
   competitionLogoUrl: string | null;
   rows: readonly TeamPosterRow[];
@@ -199,11 +330,44 @@ export interface TeamPoster {
   remainingLabel: string;
 }
 
-const MARKER: Record<NonNullable<TeamPosterMember["marker"]>, string> = {
+const BADGE: Record<PosterMark, string> = {
+  captain: "C",
   icon: "ICON",
   retained: "RET",
-  captain: "C",
 };
+
+/** Marks in the order they are read: the captain's armband before the rest. */
+const MARK_ORDER: readonly PosterMark[] = ["captain", "icon", "retained"];
+
+/** Where a member sits on the sheet: the captain leads, then the pre-signed. */
+function rankOf(member: TeamPosterMember): number {
+  if (member.marks.includes("captain")) {
+    return 0;
+  }
+  if (member.marks.includes("icon")) {
+    return 1;
+  }
+  return member.marks.includes("retained") ? 2 : 3;
+}
+
+function rowOf(member: TeamPosterMember): TeamPosterRow {
+  const marks = MARK_ORDER.filter((mark) => member.marks.includes(mark));
+  // A table row has room for one word; ICON is the one people look for, and
+  // "C" beside a price is the captain the room bought.
+  const primary = marks.includes("icon") ? "icon" : (marks[0] ?? null);
+  return {
+    name: clamp(member.name, 20),
+    shortName: shortNameOf(member.name),
+    firstName: firstNameOf(member.name),
+    monogram: monogramOf(member.name),
+    roleLine: roleLabel(member.role),
+    priceLabel: member.pricePaise === null ? null : formatPaiseINR(paise(member.pricePaise)),
+    markerLabel: primary === null ? null : BADGE[primary],
+    badges: marks.map((mark) => BADGE[mark]),
+    isCaptain: marks.includes("captain"),
+    photoUrl: member.photoUrl,
+  };
+}
 
 /**
  * The squad poster — the one an OWNER posts, and the more valuable of the two:
@@ -214,22 +378,199 @@ const MARKER: Record<NonNullable<TeamPosterMember["marker"]>, string> = {
  * question and belongs to the renderer, which knows the size it is drawing;
  * silently dropping players in a pure model would mean a squad poster that
  * quietly omits somebody's name.
+ *
+ * The ORDER is decided here: captain first, then icons, then retained, then the
+ * room's purchases in the order they arrived (the source sends them priciest
+ * first). A stable sort, so equal ranks keep the source's order.
  */
 export function buildTeamPoster(input: TeamPosterInput): TeamPoster {
   const remaining = Math.max(0, input.pursePaise - input.spentPaise);
+  const ordered = input.members
+    .map((member, index) => ({ member, index }))
+    .sort((a, b) => rankOf(a.member) - rankOf(b.member) || a.index - b.index)
+    .map(({ member }) => member);
+  const captain = ordered.find((member) => member.marks.includes("captain"));
+  const coach = input.coachName?.trim() ?? "";
   return {
     teamName: clamp(input.teamName, 24),
+    teamMonogram: crestMark(input.teamShortName, input.teamName),
     teamCrestUrl: input.teamCrestUrl,
+    teamColor: normalizeHexColor(input.teamColor),
+    coachName: coach === "" ? null : clamp(coach, 24),
+    captainName: captain === undefined ? null : clamp(captain.name, 24),
     competitionName: clamp(input.competitionName, 34),
     competitionLogoUrl: input.competitionLogoUrl,
-    rows: input.members.map((member) => ({
-      name: clamp(member.name, 20),
-      roleLine: roleLabel(member.role),
-      priceLabel: member.pricePaise === null ? null : formatPaiseINR(paise(member.pricePaise)),
-      markerLabel: member.marker === null ? null : MARKER[member.marker],
-    })),
+    rows: ordered.map(rowOf),
     squadLabel: `${String(input.members.length)} player${input.members.length === 1 ? "" : "s"}`,
     spentLabel: formatPaiseINR(paise(input.spentPaise)),
     remainingLabel: formatPaiseINR(paise(remaining)),
+  };
+}
+
+// --- Top buys ---------------------------------------------------------------
+
+export interface TopBuyInput {
+  playerName: string;
+  role: string;
+  photoUrl: string | null;
+  /** Integer paise. Only SOLD lots are buys; the source never sends others. */
+  pricePaise: number;
+  teamName: string;
+  teamColor?: string | null;
+  teamCrestUrl: string | null;
+}
+
+export interface TopBuysPosterInput {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  buys: readonly TopBuyInput[];
+  count: TopBuyCount;
+}
+
+export interface TopBuyRow {
+  rank: number;
+  /** "01" — a two-digit rank reads as a chart position, "1" as a list item. */
+  rankLabel: string;
+  name: string;
+  shortName: string;
+  monogram: string;
+  roleLine: string;
+  priceLabel: string;
+  teamName: string;
+  teamMonogram: string;
+  teamColor: string | null;
+  teamCrestUrl: string | null;
+  photoUrl: string | null;
+}
+
+export interface TopBuysPoster {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  /** "TOP 5 BUYS" — or fewer, honestly, when fewer were sold. */
+  title: string;
+  chip: string;
+  rows: readonly TopBuyRow[];
+}
+
+/**
+ * The night's biggest signings, ranked.
+ *
+ * The title counts what is ON the poster, not what was asked for: a season
+ * that sold three players asked for a "Top 5" gets "TOP 3 BUYS", because a
+ * headline promising five above three rows is the kind of small lie that makes
+ * everything under it look made up. Ties keep the source's order (it sorts by
+ * price, then by sale), so the same night always ranks the same way.
+ */
+export function buildTopBuysPoster(input: TopBuysPosterInput): TopBuysPoster {
+  const ranked = input.buys
+    .map((buy, index) => ({ buy, index }))
+    .sort((a, b) => b.buy.pricePaise - a.buy.pricePaise || a.index - b.index)
+    .slice(0, input.count)
+    .map(({ buy }, index): TopBuyRow => ({
+      rank: index + 1,
+      rankLabel: String(index + 1).padStart(2, "0"),
+      name: clamp(buy.playerName, 22),
+      shortName: shortNameOf(buy.playerName),
+      monogram: monogramOf(buy.playerName),
+      roleLine: roleLabel(buy.role),
+      priceLabel: formatPaiseINR(paise(buy.pricePaise)),
+      teamName: clamp(buy.teamName, 22),
+      teamMonogram: monogramOf(buy.teamName),
+      teamColor: normalizeHexColor(buy.teamColor),
+      teamCrestUrl: buy.teamCrestUrl,
+      photoUrl: buy.photoUrl,
+    }));
+  const shown = ranked.length;
+  return {
+    competitionName: clamp(input.competitionName, 34),
+    competitionLogoUrl: input.competitionLogoUrl,
+    title: shown === 1 ? "TOP BUY" : `TOP ${String(shown)} BUYS`,
+    chip: `Top ${String(shown)}`,
+    rows: ranked,
+  };
+}
+
+// --- Season: every squad ----------------------------------------------------
+
+export interface SeasonSquadInput {
+  teamName: string;
+  teamShortName?: string | null;
+  teamColor?: string | null;
+  teamCrestUrl: string | null;
+  members: readonly TeamPosterMember[];
+  spentPaise: number;
+}
+
+export interface SeasonPosterInput {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  squads: readonly SeasonSquadInput[];
+}
+
+export interface SeasonSquad {
+  teamName: string;
+  teamMonogram: string;
+  teamColor: string | null;
+  teamCrestUrl: string | null;
+  countLabel: string;
+  spentLabel: string;
+  rows: readonly TeamPosterRow[];
+}
+
+export interface SeasonPoster {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  chip: string;
+  /** "48 players · 6 teams" — the line that holds with prices hidden. */
+  countLine: string;
+  /** Total committed at the hammer across every squad. */
+  spentLabel: string;
+  squads: readonly SeasonSquad[];
+  /** The largest squad — what the grid has to be sized for. */
+  largestSquad: number;
+}
+
+/**
+ * Every squad on one poster — the "results" sheet a club pins after the night.
+ *
+ * Squads keep the source's order (alphabetical, like every other team list), and
+ * each squad is ordered exactly as its own squad poster orders it, through the
+ * same `buildTeamPoster` rules, so the two posters never disagree about who
+ * leads a team.
+ */
+export function buildSeasonPoster(input: SeasonPosterInput): SeasonPoster {
+  const squads = input.squads.map((squad): SeasonSquad => {
+    const team = buildTeamPoster({
+      teamName: squad.teamName,
+      teamShortName: squad.teamShortName ?? null,
+      teamCrestUrl: squad.teamCrestUrl,
+      teamColor: squad.teamColor ?? null,
+      competitionName: input.competitionName,
+      competitionLogoUrl: input.competitionLogoUrl,
+      members: squad.members,
+      spentPaise: squad.spentPaise,
+      pursePaise: squad.spentPaise,
+    });
+    return {
+      teamName: clamp(squad.teamName, 20),
+      teamMonogram: team.teamMonogram,
+      teamColor: team.teamColor,
+      teamCrestUrl: squad.teamCrestUrl,
+      countLabel: team.squadLabel,
+      spentLabel: team.spentLabel,
+      rows: team.rows,
+    };
+  });
+  const players = input.squads.reduce((total, squad) => total + squad.members.length, 0);
+  const spent = input.squads.reduce((total, squad) => total + squad.spentPaise, 0);
+  const teamsLabel = `${String(squads.length)} team${squads.length === 1 ? "" : "s"}`;
+  return {
+    competitionName: clamp(input.competitionName, 34),
+    competitionLogoUrl: input.competitionLogoUrl,
+    chip: teamsLabel,
+    countLine: `${String(players)} player${players === 1 ? "" : "s"} · ${teamsLabel}`,
+    spentLabel: formatPaiseINR(paise(spent)),
+    squads,
+    largestSquad: squads.reduce((max, squad) => Math.max(max, squad.rows.length), 0),
   };
 }
