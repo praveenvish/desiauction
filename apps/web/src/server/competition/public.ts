@@ -78,6 +78,12 @@ export interface PublicCompetitionView {
   listed: boolean;
   /** Ready-to-render competition crest URL, or null for the monogram fallback. */
   logoUrl: string | null;
+  /**
+   * The season's cover photo (0082), behind the public hero. Only ever read
+   * here, after the visibility gate above: an unpublished season's picture is
+   * as absent as the rest of it.
+   */
+  coverUrl: string | null;
   /** PX-6: the live door on the public page (null until an auction exists). */
   auctionStatus: string | null;
   teams: TeamSummary[];
@@ -114,6 +120,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       endsOn: competitions.endsOn,
       orgName: organizations.name,
       logoKey: competitions.logoUrl,
+      coverKey: competitions.coverUrl,
       sport: competitions.sport,
     })
     .from(competitions)
@@ -154,6 +161,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     // this view cannot exist for an unpublished competition.
     listed: true,
     logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
+    coverUrl: row.coverKey === null ? null : storage.readUrl(row.coverKey),
     auctionStatus: auctionRows[0]?.status ?? null,
     teams,
     fixtures: fixtures.rows.map(toPublicFixture),
