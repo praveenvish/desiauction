@@ -320,7 +320,17 @@ export function activeAdminTab(pathname: string): string {
  * tab is not disabled for anyone else — it is ABSENT, matching the surface
  * itself, which 404s rather than admit the books exist.
  */
-export function competitionTabs(slug: string, canSettle = false): CompetitionTab[] {
+export function competitionTabs(
+  slug: string,
+  canSettle = false,
+  /**
+   * Manages the season's club (org:owner / org:staff). Registrations and
+   * Lineups are rosters: a plain member or a team owner used to be offered
+   * Registrations and shown a one-line refusal behind it. Defaults to true so
+   * callers that predate the flag keep their tabs.
+   */
+  canManage = true,
+): CompetitionTab[] {
   const base = `/seasons/${slug}`;
   // These tabs ARE the season workspace's navigation, so they carry the
   // navigation test hooks. They used to hang off buttons on the overview, which
@@ -328,13 +338,21 @@ export function competitionTabs(slug: string, canSettle = false): CompetitionTab
   return [
     { key: "overview", label: "Overview", href: base },
     { key: "teams", label: "Teams", href: `${base}/teams`, testId: "open-teams" },
-    {
-      key: "registrations",
-      label: "Registrations",
-      href: `${base}/registrations`,
-      testId: "open-dashboard",
-    },
+    ...(canManage
+      ? [
+          {
+            key: "registrations",
+            label: "Registrations",
+            href: `${base}/registrations`,
+            testId: "open-dashboard",
+          },
+        ]
+      : []),
     { key: "fixtures", label: "Fixtures", href: `${base}/fixtures`, testId: "open-fixtures" },
+    // Who played each match — what a player's career counts as a match played.
+    ...(canManage
+      ? [{ key: "lineups", label: "Lineups", href: `${base}/lineups`, testId: "open-lineups" }]
+      : []),
     // The table sits beside the fixtures it is derived from. It reads for
     // everyone who can see the season, not just officers — a league table only
     // officers can open is not a league table.
@@ -394,6 +412,9 @@ export function activeCompetitionTab(pathname: string, slug: string): string {
   if (pathname.startsWith(`${base}/fixtures`)) {
     return "fixtures";
   }
+  if (pathname.startsWith(`${base}/lineups`)) {
+    return "lineups";
+  }
   if (pathname.startsWith(`${base}/standings`)) {
     return "standings";
   }
@@ -450,6 +471,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/fixtures\/calendar$/, "Calendar"],
   [/\/fixtures\/match-day$/, "Match day"],
   [/\/fixtures$/, "Fixtures"],
+  [/\/lineups$/, "Lineups"],
   [/\/reviews$/, "Reviews"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
@@ -515,6 +537,7 @@ const SURFACE_SUBTITLES: [string, string][] = [
   ["/money", "Receipts issued to your teams, across every season."],
   ["/inbox", "Approvals, auction results, receipts and account activity."],
   ["/account", "Your sign-in, profile and security."],
+  ["/me", "Every tournament, match and sport you've played — in one place."],
   ["/me/cricket", "Every season you've played, in one place."],
 ];
 
@@ -654,6 +677,10 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
  * pack for should not be given a confident title.
  */
 export function careerTitle(pathname: string): string | null {
+  // The all-sports hub (launch polish, Phase 3).
+  if (pathname === "/me") {
+    return "My sports";
+  }
   const match = /^\/me\/([^/?#]+)/.exec(pathname);
   if (match === null) {
     return null;
@@ -676,4 +703,112 @@ export function liveExit(pathname: string, hasSession: boolean): { href: string;
     return { href: `/c/${match.slug}`, label: "Leave auction" };
   }
   return { href: `/seasons/${match.slug}/auction`, label: "Leave auction" };
+}
+
+/**
+ * WHAT THE RAIL OFFERS, BY ROLE (launch polish, Phase 2).
+ *
+ * The facts come from `server/roles/roles.ts`; this only decides what to show.
+ * Offering is not allowing — every surface still gates itself — but a rail that
+ * offers a player "Tournaments" and "Organizations" (both empty for them) and
+ * nothing about the season they are actually in reads as "not for you".
+ */
+export interface ShellRoles {
+  /** The team this person owns and should see first, if any. */
+  team: { name: string; seasonSlug: string; live: boolean } | null;
+  /** Plays anywhere: a registration or a player profile. */
+  plays: boolean;
+  /** Plays and does NOTHING else — no club membership, no team. */
+  onlyPlays: boolean;
+  /** A season whose auction this person was appointed to run, if any. */
+  conducting?: { name: string; seasonSlug: string; live: boolean } | null;
+}
+
+export interface RoleNavItem {
+  key: string;
+  label: string;
+  href: string;
+  icon: "team" | "plan" | "room" | "sports" | "find" | "cockpit";
+  live?: boolean;
+  active?: boolean;
+}
+
+export interface RoleNavGroup {
+  key: string;
+  label: string;
+  items: RoleNavItem[];
+}
+
+/**
+ * The primary rail for this person. Someone who only plays has no use for the
+ * organizer's index pages; everyone else — including a brand-new account, who
+ * may be an organizer about to start — keeps the four.
+ */
+export function railFor(roles: ShellRoles | null): RailTarget[] {
+  if (roles?.onlyPlays === true) {
+    return RAIL.filter((item) => item.key === "home" || item.key === "help");
+  }
+  return RAIL;
+}
+
+export function roleNavGroups(roles: ShellRoles | null, pathname: string): RoleNavGroup[] {
+  if (roles === null) return [];
+  const groups: RoleNavGroup[] = [];
+  if (roles.team !== null) {
+    const base = `/seasons/${roles.team.seasonSlug}`;
+    groups.push({
+      key: "team",
+      label: "My team",
+      items: [
+        { key: "team", label: roles.team.name, href: `${base}/teams`, icon: "team" },
+        { key: "plan", label: "My plan", href: `${base}/auction/plan`, icon: "plan" },
+        {
+          key: "room",
+          label: "Auction room",
+          href: `${base}/auction/live`,
+          icon: "room",
+          live: roles.team.live,
+        },
+      ],
+    });
+  }
+  if (roles.conducting !== undefined && roles.conducting !== null) {
+    const base = `/seasons/${roles.conducting.seasonSlug}/auction`;
+    groups.push({
+      key: "auction",
+      label: "Auction night",
+      items: [
+        { key: "season-auction", label: roles.conducting.name, href: base, icon: "room" },
+        {
+          key: "cockpit",
+          label: "Cockpit",
+          href: `${base}/cockpit`,
+          icon: "cockpit",
+          live: roles.conducting.live,
+        },
+      ],
+    });
+  }
+  if (roles.plays) {
+    groups.push({
+      key: "play",
+      label: "Play",
+      items: [
+        { key: "sports", label: "My sports", href: "/me", icon: "sports" },
+        { key: "find", label: "Find tournaments", href: "/c", icon: "find" },
+      ],
+    });
+  }
+  // Active state by exact section: the team items are all under /seasons/{slug},
+  // so a prefix match would light all three at once.
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({
+      ...item,
+      active:
+        item.key === "sports"
+          ? pathname === "/me" || pathname.startsWith("/me/")
+          : pathname === item.href || pathname.startsWith(`${item.href}/`),
+    })),
+  }));
 }

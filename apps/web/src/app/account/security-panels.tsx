@@ -170,7 +170,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
   return (
     <>
       <Card className="account-card" data-testid="passkeys-panel">
-        <h2>Passkeys</h2>
+        <h3 className="account-h3">Passkeys</h3>
         {security.passkeys.length === 0 ? (
           <EmptyState
             title="No passkeys yet"
@@ -227,14 +227,19 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
             }}
             {...(enrollError !== null ? { error: enrollError } : {})}
           />
-          <Button onClick={() => void enroll()} loading={busy} data-testid="enroll-passkey">
+          <Button
+            variant="secondary"
+            onClick={() => void enroll()}
+            loading={busy}
+            data-testid="enroll-passkey"
+          >
             Add passkey
           </Button>
         </div>
       </Card>
 
       <Card className="account-card" data-testid="sessions-panel">
-        <h2>Active sessions</h2>
+        <h3 className="account-h3">Active sessions</h3>
         <p className="security-intro">
           {security.sessions.length === 1
             ? "This is the only device signed into your account."
@@ -265,7 +270,8 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
               <span className="security-actions">
                 {!session.current ? (
                   <Button
-                    variant="danger"
+                    variant="secondary"
+                    size="sm"
                     onClick={() => {
                       setDialogError(null);
                       setPending({ kind: "revoke-session", session });
@@ -297,7 +303,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
           ) : null}
           {others.length > 0 ? (
             <Button
-              variant="danger"
+              variant="secondary"
               data-testid="revoke-other-sessions"
               onClick={() => {
                 setDialogError(null);
@@ -311,7 +317,12 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
       </Card>
 
       <Card className="account-card" data-testid="events-panel">
-        <h2>Security activity</h2>
+        <h3 className="account-h3">Security activity</h3>
+        {security.events.length === 0 ? (
+          <p className="security-note">
+            Nothing yet. Sign-ins, new passkeys and changes to your number or email appear here.
+          </p>
+        ) : null}
         <ul className="security-list events">
           {security.events.slice(0, eventsShown).map((event, index) => (
             <li key={`${event.action}-${event.at.toISOString()}-${String(index)}`}>

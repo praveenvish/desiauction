@@ -85,6 +85,9 @@ export async function requestPhoneChange(
     input.requestIp ?? null,
     "phone_change",
     input.globalPerHour,
+    // Bound to the asking account: the code proves THIS account's change and
+    // nobody else's (security review, launch Phase 5).
+    input.personId,
   );
   return sent.ok ? { ok: true } : { ok: false, reason: sent.reason };
 }
@@ -145,7 +148,7 @@ export async function confirmPhoneChange(
    * rebuilt one function later. Burning the code first means the answer costs a
    * message to a handset the asker must be holding.
    */
-  const consumed = await consumeCode(db, phone, input.code, "phone_change");
+  const consumed = await consumeCode(db, phone, input.code, "phone_change", input.personId);
   if (!consumed.ok) {
     return consumed.reason === "invalid" && consumed.attemptsLeft !== undefined
       ? { ok: false, reason: "invalid", attemptsLeft: consumed.attemptsLeft }

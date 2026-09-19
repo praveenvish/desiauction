@@ -48,7 +48,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
             </p>
           )}
           <div className="table-scroll">
-            <table className="reg-table" data-testid="admin-template-table">
+            <table className="reg-table msg-template-table" data-testid="admin-template-table">
               <thead>
                 <tr>
                   <th scope="col">Message</th>
@@ -102,7 +102,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
             />
           ) : (
             <div className="table-scroll">
-              <table className="reg-table" data-testid="admin-delivery-table">
+              <table className="reg-table msg-delivery-table" data-testid="admin-delivery-table">
                 <thead>
                   <tr>
                     <th scope="col">Message</th>
@@ -180,7 +180,10 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
             />
           ) : (
             <div className="table-scroll">
-              <table className="reg-table" data-testid="admin-suppression-table">
+              <table
+                className="reg-table msg-suppression-table"
+                data-testid="admin-suppression-table"
+              >
                 <thead>
                   <tr>
                     <th scope="col">Contact</th>

@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
-import { hashCode } from "./otp";
+import { phoneCodeDigest } from "./otp";
 import { DevInboxSender } from "./otp-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 
@@ -31,7 +31,8 @@ const OLD = `+9198${RUN}1`;
 const NEW = `+9198${RUN}2`;
 const OTHERS = `+9198${RUN}3`;
 const SPARE = `+9198${RUN}4`;
-const PHONES = [OLD, NEW, OTHERS, SPARE];
+const STOLEN = `+9198${RUN}5`;
+const PHONES = [OLD, NEW, OTHERS, SPARE, STOLEN];
 
 let personId = "";
 let otherId = "";
@@ -56,7 +57,13 @@ async function latestCode(phone: string): Promise<string> {
     .orderBy(desc(otpInbox.createdAt))
     .limit(1);
   const code = message?.code ?? "";
-  if (hashCode(code) !== row.codeHash) {
+  // A sign-in code is keyed to the phone; a change code also to the account
+  // that asked for it (code-digest.ts) — either is the same message.
+  const digests = [
+    phoneCodeDigest("login", phone, code),
+    ...[personId, otherId].map((id) => phoneCodeDigest("phone_change", phone, code, id)),
+  ];
+  if (!digests.includes(row.codeHash)) {
     throw new Error("dev inbox and otp_codes disagree about the code");
   }
   return code;
@@ -145,6 +152,31 @@ describe("confirming the change", () => {
       .where(and(eq(otpCodes.phone, OTHERS), isNull(otpCodes.consumedAt)))
       .limit(1);
     expect(pending, "the refused attempt consumed its code").toBeUndefined();
+  });
+
+  it("refuses a code that a DIFFERENT account asked for (security review, launch Phase 5)", async () => {
+    // The takeover shape: an attacker asks, from their OWN account, to move to a
+    // number they hold, then presents that code on a victim's stolen session.
+    // The lookup matched by phone alone, so it worked. The code is now bound to
+    // the account that asked.
+    await requestPhoneChange(db, sender, { personId: otherId, newPhone: STOLEN });
+    const [message] = await db
+      .select({ code: otpInbox.code })
+      .from(otpInbox)
+      .where(eq(otpInbox.phone, STOLEN))
+      .orderBy(desc(otpInbox.createdAt))
+      .limit(1);
+    const result = await confirmPhoneChange(db, {
+      personId,
+      newPhone: STOLEN,
+      code: message?.code ?? "",
+    });
+    expect(result.ok).toBe(false);
+    const [mine] = await db
+      .select({ phone: people.phone })
+      .from(people)
+      .where(eq(people.id, personId));
+    expect(mine?.phone, "the victim's number did not move").toBe(OLD);
   });
 
   it("moves the number, and the OLD one stops signing in to the account", async () => {

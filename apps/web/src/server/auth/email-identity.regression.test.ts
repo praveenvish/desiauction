@@ -45,7 +45,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registrationNumber } from "@desiauction/core";
 
 import { env } from "../../env";
-import { hashCode, requestOtp, verifyOtp } from "./otp";
+import { phoneCodeDigest, requestOtp, verifyOtp } from "./otp";
 import { DevInboxSender } from "./otp-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import {
@@ -81,7 +81,8 @@ let org = { id: "", name: "", slug: "" };
 let season = "";
 const seeded: string[] = [];
 
-async function latestCode(phone: string): Promise<string> {
+/** `boundTo`: the account that asked, for a phone-CHANGE code (code-digest.ts). */
+async function latestCode(phone: string, boundTo?: string): Promise<string> {
   const [row] = await db
     .select({ codeHash: otpCodes.codeHash })
     .from(otpCodes)
@@ -98,7 +99,11 @@ async function latestCode(phone: string): Promise<string> {
     .orderBy(desc(otpInbox.createdAt))
     .limit(1);
   const code = message?.code ?? "";
-  if (hashCode(code) !== row.codeHash) {
+  const expected =
+    boundTo === undefined
+      ? phoneCodeDigest("login", phone, code)
+      : phoneCodeDigest("phone_change", phone, code, boundTo);
+  if (expected !== row.codeHash) {
     throw new Error("dev inbox and otp_codes disagree about the code");
   }
   return code;
@@ -268,7 +273,7 @@ describe("THE PLAYER RULE — a season reaches players by SMS or not at all", ()
     const confirmed = await confirmPhoneChange(db, {
       personId: emailOnlyId,
       newPhone: TO_ATTACH,
-      code: await latestCode(TO_ATTACH),
+      code: await latestCode(TO_ATTACH, emailOnlyId),
     });
     // No OLD number to announce to — this was an attach, not a move.
     expect(confirmed).toEqual({ ok: true, previousPhone: null, newPhone: TO_ATTACH });
@@ -294,7 +299,7 @@ describe("NO MERGE — a credential in use is refused, never folded", () => {
     const confirmed = await confirmPhoneChange(db, {
       personId: claimant,
       newPhone: SOMEBODY_ELSES,
-      code: await latestCode(SOMEBODY_ELSES),
+      code: await latestCode(SOMEBODY_ELSES, claimant),
     });
     expect(confirmed).toEqual({ ok: false, reason: "taken" });
 

@@ -15,6 +15,7 @@ import { storage } from "../media";
 import { systemDb } from "../db";
 import { teamsOf, type TeamSummary } from "./competitions";
 import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 // PX-5 public reads (PX-1 02 §I thin-wiring class): anonymous, system-pool
 // composites over EXISTING queries. Public exposure is governed by the
@@ -305,14 +306,14 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
   const rows = await systemDb
     .select({
       number: registrations.registrationNumber,
-      name: people.name,
+      name: shownName,
       role: registrations.role,
       dateOfBirth: registrations.dateOfBirth,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
-      photoKey: people.photoUrl,
-      photoConsentAt: people.photoConsentAt,
+      photoKey: shownPhotoKey,
+      photoConsentAt: shownPhotoConsentAt,
       teamId: registrations.teamId,
       teamName: teams.name,
       isIcon: registrations.isIcon,
@@ -392,14 +393,14 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
     .select({
       personId: registrations.personId,
       number: registrations.registrationNumber,
-      name: people.name,
+      name: shownName,
       role: registrations.role,
       dateOfBirth: registrations.dateOfBirth,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
-      photoKey: people.photoUrl,
-      photoConsentAt: people.photoConsentAt,
+      photoKey: shownPhotoKey,
+      photoConsentAt: shownPhotoConsentAt,
       teamId: registrations.teamId,
       teamName: teams.name,
       isIcon: registrations.isIcon,

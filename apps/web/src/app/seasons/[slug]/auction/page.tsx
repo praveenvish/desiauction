@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 
 import { PageTitle } from "../../../../components/shell/page-title";
 import { auctionDashboard } from "../../../../server/auction/actions";
+import { auctioneerPanelView } from "../../../../server/auction/auctioneer-actions";
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
 import { AuctionOverviewPanel } from "./auction-overview-panel";
 import { AuctionPanel } from "./auction-panel";
+import { AuctioneerPanel } from "./auctioneer-panel";
 import { BroadcastLinks } from "./broadcast-links";
 import "../../seasons.css";
 // The hub renders <BroadcastLinks>, and every rule that dresses it —
@@ -49,7 +51,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   // See /seasons: `auction/spectate` next door is public, so no gate layout.
   await requireOnboarded();
-  const dashboard = await auctionDashboard(slug);
+  const [dashboard, auctioneers] = await Promise.all([
+    auctionDashboard(slug),
+    auctioneerPanelView(slug),
+  ]);
   if (dashboard === null) {
     notFound();
   }
@@ -104,7 +109,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     them either. */}
                 {status !== null && dashboard.viewer.planAvailable ? (
                   <ButtonLink
-                    href={`/seasons//auction/plan`}
+                    href={`/seasons/${slug}/auction/plan`}
                     variant="secondary"
                     size="touch"
                     data-testid="open-plan"
@@ -150,6 +155,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               it is where they collect the two URLs they will open elsewhere. */}
           {dashboard.viewer.canConduct ? <BroadcastLinks slug={slug} /> : null}
           <AuctionPanel slug={slug} dashboard={dashboard} />
+          {auctioneers !== null ? <AuctioneerPanel slug={slug} view={auctioneers} /> : null}
         </div>
       </main>
     </ToastProvider>

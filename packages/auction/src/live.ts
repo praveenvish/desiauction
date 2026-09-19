@@ -8,7 +8,7 @@ import {
   type SnapshotRefs,
 } from "@desiauction/core";
 import { bids, lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import {
   diffProjection,
@@ -22,6 +22,20 @@ import {
 // (core's pure reducer), assemble static reference data, build the immutable
 // AuctionSnapshot. Deterministic end to end — no clock is read anywhere here.
 
+/**
+ * The name a lot is announced under: what the organizer typed for this entry
+ * (0075), else the account's own name — the web tier's `shownName`, which this
+ * package cannot import. Reading `people.name` here put the ACCOUNT's real name
+ * on the block, the overlay and the anonymous spectate page for an entry added
+ * under a typed name, reopening the phone → name lookup 0075 closed (security
+ * review, launch Phase 5). Deterministic, so the snapshot hash still agrees
+ * across engines — but a running auction's snapshot changes, so deploy this
+ * between auctions.
+ */
+export const lotPlayerName = sql<
+  string | null
+>`coalesce(${registrations.enteredName}, ${people.name})`;
+
 export async function snapshotRefs(db: Db, auction: AuctionRecord): Promise<SnapshotRefs> {
   const [lotRows, paddleRows] = await Promise.all([
     db
@@ -29,7 +43,7 @@ export async function snapshotRefs(db: Db, auction: AuctionRecord): Promise<Snap
         id: lots.id,
         lotNumber: lots.lotNumber,
         seq: lots.seq,
-        playerName: people.name,
+        playerName: lotPlayerName,
         role: registrations.role,
         basePrice: lots.basePrice,
       })

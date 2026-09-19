@@ -35,6 +35,7 @@ import { dbHandle, systemDb } from "../db";
 import { storage } from "../media";
 import { canCompetition } from "./authz";
 import { competitionForRegistration, resolveCompetition } from "./competitions";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
  * THE POSTER'S SERVER SIDE — the gate, the join, and the evidence.
@@ -424,9 +425,9 @@ async function playerPosterFrom(
     async (db) => {
       const [row] = await db
         .select({
-          playerName: people.name,
-          photoKey: people.photoUrl,
-          photoConsentAt: people.photoConsentAt,
+          playerName: shownName,
+          photoKey: shownPhotoKey,
+          photoConsentAt: shownPhotoConsentAt,
           role: registrations.role,
           number: registrations.registrationNumber,
           status: registrations.status,
@@ -657,7 +658,7 @@ async function teamPosterFrom(
       const preSigned = await db
         .select({
           registrationId: registrations.id,
-          name: people.name,
+          name: shownName,
           role: registrations.role,
           isIcon: registrations.isIcon,
           // No captain flag here on purpose: a marker slot holds one label, and
@@ -674,12 +675,12 @@ async function teamPosterFrom(
             or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
           ),
         )
-        .orderBy(asc(people.name));
+        .orderBy(asc(shownName));
 
       const bought = await db
         .select({
           registrationId: registrations.id,
-          name: people.name,
+          name: shownName,
           role: registrations.role,
           price: lots.soldPrice,
           isCaptain: registrations.isCaptain,
@@ -937,7 +938,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
           : db
               .select({
                 registrationId: registrations.id,
-                name: people.name,
+                name: shownName,
                 number: registrations.registrationNumber,
                 soldPrice: lots.soldPrice,
                 teamName: teams.name,

@@ -1,0 +1,346 @@
+/* My sports (launch polish, Phase 3): flat — one panel, the rest on the page. */
+.me {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.me-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.me-avatar {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--identity-field-deep);
+  color: var(--identity-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.me-who {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.me-name {
+  margin: 0;
+  font-size: var(--text-2xl-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.me-meta {
+  margin: 2px 0 0;
+  font-size: var(--text-base-size);
+  color: var(--text-secondary);
+}
+
+.me-complete {
+  flex: none;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.me-figures {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  border-block: 1px solid var(--border-subtle);
+}
+
+.me-figure {
+  padding: var(--space-4) var(--space-5) var(--space-4) 0;
+}
+
+.me-figure + .me-figure {
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+.me-figure dt {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.me-figure dd {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+/* The one contained surface on this page. */
+.me-next {
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.me-next h2 {
+  margin: var(--space-1) 0;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.me-next p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.me-next .me-next-eyebrow {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.me-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.me-filter a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.me-filter a[aria-current="page"] {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--text-heading);
+}
+
+.me-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: var(--space-10);
+  align-items: start;
+}
+
+@media (max-width: 899px) {
+  .me-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.me-main,
+.me-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.me-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.me-head h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.me-head span {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.me-rows,
+.me-sports {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.me-rows li,
+.me-sports li {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.me-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: center;
+  min-height: 56px;
+  padding: var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.me-row:hover {
+  background: var(--surface-sunken);
+}
+
+.me-year,
+.me-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.me-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.me-row-main strong,
+.me-table strong {
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.me-row-main span,
+.me-table td span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.me-verdict {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.me-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.me-table th {
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.me-table td {
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.me-table td strong,
+.me-table td span {
+  display: block;
+}
+
+.me-result {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.me-result--won {
+  color: var(--success-strong);
+}
+
+.me-result--lost,
+.me-result--tied,
+.me-result--no_result {
+  color: var(--text-secondary);
+}
+
+.me-result--live {
+  color: var(--live);
+}
+
+.me-played {
+  font-size: var(--text-sm-size);
+  white-space: nowrap;
+}
+
+.me-played--played {
+  font-weight: var(--font-weight-semibold);
+  color: var(--success-strong);
+}
+
+.me-played--bench,
+.me-played--unknown {
+  color: var(--text-secondary);
+}
+
+.me-sports li {
+  padding: var(--space-3) 0;
+}
+
+.me-sport-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.me-sport-line a {
+  flex: 1 1 auto;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.me-sport-line span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.me-bar {
+  display: flex;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.me-bar i {
+  background: var(--accent);
+}
+
+.me-privacy,
+.me-empty {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.me-privacy strong {
+  color: var(--text-heading);
+}

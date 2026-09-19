@@ -43,7 +43,7 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
                 here while planning is on; /auction/plan 404s for everyone else. */}
             {view.planAvailable ? (
               <ButtonLink
-                href={`/seasons//auction/plan`}
+                href={`/seasons/${slug}/auction/plan`}
                 variant="secondary"
                 data-testid="open-plan"
               >

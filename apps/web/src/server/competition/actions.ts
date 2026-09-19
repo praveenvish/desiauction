@@ -1404,18 +1404,21 @@ export async function registrationDashboard(
     // PI-1: the organizer-channel category advisory, computed by THE evaluator
     // (never by a second SQL copy of its rules) over just this page's people.
     const categoryFlags: Record<string, "category_mismatch"> = {};
-    if (competition.entryCategory !== "open" && page.rows.length > 0) {
+    // Rows the organizer typed a name for are skipped: their profile gender
+    // belongs to an account the club only knows by a phone number (0075).
+    const evaluable = page.rows.filter((row) => !row.typedName);
+    if (competition.entryCategory !== "open" && evaluable.length > 0) {
       const genders = await db
         .select({ personId: playerProfiles.personId, gender: playerProfiles.gender })
         .from(playerProfiles)
         .where(
           inArray(
             playerProfiles.personId,
-            page.rows.map((row) => row.personId),
+            evaluable.map((row) => row.personId),
           ),
         );
       const genderOf = new Map(genders.map((entry) => [entry.personId, entry.gender]));
-      for (const row of page.rows) {
+      for (const row of evaluable) {
         const verdict = evaluateRegistration({
           competitionStatus: competition.status,
           entryCategory: competition.entryCategory,
@@ -1752,7 +1755,9 @@ export interface AddPlayerInput {
 }
 
 export type AddPlayerActionResult =
-  | { ok: true; registrationId: string; number: string; personExisted: boolean }
+  // No "personExisted": whether a phone already has an account is not the
+  // club's to learn (0075 — the same leak the typed name closes).
+  | { ok: true; registrationId: string; number: string }
   | { ok: false; error: string; fieldErrors?: Partial<Record<PlayerField, string>> };
 
 /**
@@ -1810,7 +1815,6 @@ export async function addPlayerAction(
     ok: true,
     registrationId: result.registrationId,
     number: result.number,
-    personExisted: result.personExisted,
   };
 }
 

@@ -332,6 +332,9 @@ describe("PX-9 · RLS: the platform grant is unforgeable from the application ro
     await handle.sql.unsafe(`drop role if exists ${role}`);
     await handle.sql.unsafe(`create role ${role} login password 'probe' nosuperuser nobypassrls`);
     await handle.sql.unsafe(`grant select, insert, update, delete on grants to ${role}`);
+    // 0076: the grants policy names competitions (season-scoped grants), so
+    // evaluating it needs SELECT there — as every production role has.
+    await handle.sql.unsafe(`grant select on competitions to ${role}`);
 
     const url = new URL(env.DATABASE_URL);
     const probeHandle = createDb(
@@ -390,6 +393,7 @@ describe("PX-9 · RLS: the platform grant is unforgeable from the application ro
     } finally {
       await probeHandle.sql.end({ timeout: 5 });
       await handle.sql.unsafe(`revoke all on grants from ${role}`);
+      await handle.sql.unsafe(`revoke all on competitions from ${role}`);
       await handle.sql.unsafe(`drop role if exists ${role}`);
     }
   }, 60_000);

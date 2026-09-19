@@ -1,0 +1,13 @@
+-- THE NAME THE ORGANIZER TYPED (launch polish, security phase 0 → Phase 3).
+--
+-- addPlayerByPhone and the CSV import reuse any account that already holds the
+-- phone, and never overwrite its name — correctly: it is not the club's to
+-- correct. But the registrations screen then showed that ACCOUNT's real name
+-- and consented photo, and the gender check read its profile. Anyone who could
+-- create a club could import a list of numbers and read back who they belong to.
+--
+-- The organizer's own words are now kept on the registration and shown in
+-- their place; the account's photo stays with the account. Null for every
+-- registration a player made themselves, and for an organizer-added one that
+-- created the account (whose name IS the typed name).
+ALTER TABLE "registrations" ADD COLUMN "entered_name" text;

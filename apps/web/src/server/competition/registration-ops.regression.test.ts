@@ -821,6 +821,49 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(foreign).toEqual([]);
   });
 
+  it("adding a phone that already has an account shows the club's typed name — never the account's", async () => {
+    // 0075: this was a lookup. Any club could import a list of numbers and read
+    // back the real names, consented photos and gender of every account holder.
+    const personId = newId();
+    const phone = `+9196${RUN}7`;
+    await db.insert(people).values({
+      id: personId,
+      phone,
+      name: "Real Account Name",
+      photoUrl: `people/${personId}/photo.jpg`,
+      photoConsentAt: new Date(),
+    });
+    seededPersonIds.push(personId);
+    const added = await addPlayerByPhone(db, compId, org.id, owner, {
+      name: "Typed By Club",
+      phone,
+      role: "batter",
+      basePriceBand: null,
+    });
+    if (!added.ok) {
+      throw new Error("expected ok");
+    }
+    const page = await queryRegistrations(db, compId, {
+      search: "Typed By Club",
+      page: 1,
+      pageSize: 25,
+    });
+    const row = page.rows.find((r) => r.id === added.registrationId);
+    expect(row?.name).toBe("Typed By Club");
+    expect(row?.typedName).toBe(true);
+    expect(row?.photoUrl).toBeNull();
+    // And searching by the account's real name finds nothing to confirm it.
+    const probe = await queryRegistrations(db, compId, {
+      search: "Real Account Name",
+      page: 1,
+      pageSize: 25,
+    });
+    expect(probe.rows.map((r) => r.id)).not.toContain(added.registrationId);
+    // The account's own name is untouched — it is not the club's to correct.
+    const [account] = await db.select().from(people).where(eq(people.id, personId));
+    expect(account?.name).toBe("Real Account Name");
+  });
+
   it("manual re-add of the same phone reuses the person and refuses the duplicate", async () => {
     const result = await addPlayerByPhone(db, compId, org.id, owner, {
       name: "Manual Player Again",

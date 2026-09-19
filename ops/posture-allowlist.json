@@ -172,7 +172,7 @@
     },
     "apps/web/src/server/support/report-retention.ts": {
       "class": "by-design",
-      "reason": "FR-1. Scheduled retention purge over problem_reports / problem_report_screenshots \u2014 no org_id, no RLS; behind FEEDBACK_JOB_SECRET."
+      "reason": "FR-1. Scheduled retention purge over problem_reports / problem_report_screenshots \u2014 no org_id, no RLS; behind FEEDBACK_JOB_SECRET. Launch Phase 5 adds the age purge of otp_codes / email_verifications rows and review_reports.reporter_ip (global, no org_id, no RLS) in the same job."
     },
     "apps/web/src/server/admin/report-views.ts": {
       "class": "by-design",
@@ -221,6 +221,10 @@
     "apps/web/src/server/admin/live-watch.ts": {
       "class": "by-design",
       "reason": "Platform administration live board and auction watch \u2014 cross-tenant by definition, read-only, gated by platform:admin; same shape as admin/actions.ts."
+    },
+    "apps/web/src/server/roles/roles.ts": {
+      "class": "by-design",
+      "reason": "Which roles a person holds spans every club they touch (organizer here, team owner there, player elsewhere), so it cannot be scoped to one org. Every system-pool query is self-scoped to the session's personId (owner invites accepted_by, paddle grants person_id, registrations/player_profiles person_id), the career.ts posture. It decides what the shell OFFERS, never what a surface ALLOWS."
     }
   }
 }

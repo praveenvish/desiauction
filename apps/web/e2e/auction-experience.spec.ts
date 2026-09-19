@@ -268,6 +268,9 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(organizer.getByTestId("owner-plans-switch")).toBeChecked();
   await organizer.getByTestId("owner-plans-switch").uncheck();
   await expect(organizer.getByTestId("owner-plans-switch")).not.toBeChecked({ timeout: 20_000 });
+  // The box flips at once and saves behind it (disabled while saving). Reload
+  // only once the save is done — a reload abandons an action still in flight.
+  await expect(organizer.getByTestId("owner-plans-switch")).toBeEnabled({ timeout: 20_000 });
   await organizer.reload();
   await expect(organizer.getByTestId("owner-plans-switch")).not.toBeChecked({ timeout: 30_000 });
   await ownerA.page.goto(planUrl);
@@ -282,6 +285,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(ownerA.page.getByTestId("my-plan-headroom")).toHaveCount(0);
   await organizer.getByTestId("owner-plans-switch").check();
   await expect(organizer.getByTestId("owner-plans-switch")).toBeChecked({ timeout: 20_000 });
+  await expect(organizer.getByTestId("owner-plans-switch")).toBeEnabled({ timeout: 20_000 });
   await ownerA.page.goto(planUrl);
   await expect(ownerA.page.locator('[data-testid^="plan-target-"]')).toHaveCount(2, {
     timeout: 30_000,

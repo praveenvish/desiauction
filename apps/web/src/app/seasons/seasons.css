@@ -2700,7 +2700,9 @@ p + .date-row {
     min-width: 0;
   }
 
-  .reg-table .reg-actions > :is(a, button, [role="button"]) {
+  /* Not the primary: this paints the background white, and on the ink primary
+     (Phase 4) that left a white label on white — a blank Approve button. */
+  .reg-table .reg-actions > :is(a, button, [role="button"]):not([class*="primary"]) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3214,4 +3216,120 @@ p + .date-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/*
+ * THE LEAGUE TABLE STAYS A TABLE on a phone. The registrations table's
+ * row-as-card treatment made each team a jumble of POSITION 1 PLAYED 2 WON 2
+ * pairs — a league table is read ACROSS, and comparing two teams' points is
+ * the whole point of it. Nine narrow numeric columns fit in ~520px, so it
+ * scrolls sideways inside its own container with the team pinned.
+ */
+@media (max-width: 1100px) {
+  .table-scroll:has(> .standings-table) {
+    overflow-x: auto;
+  }
+
+  .reg-table.standings-table {
+    display: table;
+    min-width: 520px;
+  }
+
+  .reg-table.standings-table thead {
+    display: table-header-group;
+  }
+
+  .reg-table.standings-table tbody {
+    display: table-row-group;
+  }
+
+  .reg-table.standings-table tr,
+  .reg-table.standings-table tbody tr {
+    display: table-row;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+  }
+
+  .reg-table.standings-table th,
+  .reg-table.standings-table td {
+    display: table-cell;
+    padding: var(--space-2) var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .reg-table.standings-table td::before {
+    content: none;
+  }
+
+  .reg-table.standings-table td[data-label="Team"],
+  .reg-table.standings-table th:nth-child(2) {
+    position: sticky;
+    left: 0;
+    min-width: 150px;
+    background: var(--surface-raised);
+  }
+
+  .reg-table.standings-table td[data-label="Team"] > * {
+    display: block;
+  }
+}
+
+/* Results worklist: number, match and score, then the one action — a row
+   each, ruled. It borrowed the auction cockpit's list class, whose styles
+   live in the auction route's sheet, so on this page it rendered as a
+   bulleted run-on ("Cup Kings v Cup Chargers142 – 128"). */
+.results-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+.results-list > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "num match action"
+    "num score action"
+    "form form form";
+  align-items: center;
+  gap: 2px var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.results-list > li > :first-child {
+  grid-area: num;
+  align-self: start;
+}
+
+.results-list > li > .registration-name {
+  grid-area: match;
+}
+
+.results-list > li > .competitions-hint {
+  grid-area: score;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.results-list > li > button {
+  grid-area: action;
+}
+
+.results-list > li > .authority-form {
+  grid-area: form;
+  margin-top: var(--space-3);
+}
+
+/* In a column (phones), the retro block's 420px flex-basis became a 420px
+   HEIGHT — the ~200px blank band under a finished season's figures. Here at
+   the end because `.season-retro` itself is declared after the phone query. */
+@media (max-width: 520px) {
+  .season-retro {
+    flex-basis: auto;
+  }
 }

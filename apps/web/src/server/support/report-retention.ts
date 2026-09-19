@@ -1,4 +1,10 @@
-import { problemReportScreenshots, problemReports } from "@desiauction/db";
+import {
+  emailVerifications,
+  otpCodes,
+  problemReportScreenshots,
+  problemReports,
+  reviewReports,
+} from "@desiauction/db";
 import { and, isNotNull, lt } from "drizzle-orm";
 
 import { db } from "../db";
@@ -61,5 +67,46 @@ export async function purgeExpiredProblemReports(
     reportsDeleted: reports.length,
     screenshotsDeleted: screenshots.length,
     addressesCleared: cleared.length,
+  };
+}
+
+/**
+ * SHORT-LIVED SECURITY RECORDS (security review, launch Phase 5).
+ *
+ * Three stores kept a network address or a code row forever although their
+ * only use ends within the hour: the per-IP and per-phone send caps look back
+ * sixty minutes, a code lives fifteen, and a review report's address exists
+ * only to refuse a flood. Account erasure cleared them per person; nothing
+ * cleared them by age. A day of slack keeps a lockout investigation possible.
+ */
+export const SECURITY_RECORD_RETENTION_MS = DAY_MS;
+
+export interface SecurityPurgeResult {
+  readonly phoneCodesDeleted: number;
+  readonly emailCodesDeleted: number;
+  readonly reviewAddressesCleared: number;
+}
+
+export async function purgeSpentSecurityRecords(
+  now: Date = new Date(),
+): Promise<SecurityPurgeResult> {
+  const before = new Date(now.getTime() - SECURITY_RECORD_RETENTION_MS);
+  const phoneCodes = await db
+    .delete(otpCodes)
+    .where(lt(otpCodes.createdAt, before))
+    .returning({ id: otpCodes.id });
+  const emailCodes = await db
+    .delete(emailVerifications)
+    .where(lt(emailVerifications.createdAt, before))
+    .returning({ id: emailVerifications.id });
+  const reviewAddresses = await db
+    .update(reviewReports)
+    .set({ reporterIp: null })
+    .where(and(isNotNull(reviewReports.reporterIp), lt(reviewReports.createdAt, before)))
+    .returning({ id: reviewReports.id });
+  return {
+    phoneCodesDeleted: phoneCodes.length,
+    emailCodesDeleted: emailCodes.length,
+    reviewAddressesCleared: reviewAddresses.length,
   };
 }

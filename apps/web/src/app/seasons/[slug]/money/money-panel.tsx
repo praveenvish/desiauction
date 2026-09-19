@@ -1540,7 +1540,8 @@ function Overrides({
         <div className="money-row-actions" style={{ justifyContent: "flex-start" }}>
           {canReopen ? (
             <Button
-              variant="danger"
+              // The trigger opens the reason form; red is for the confirm there.
+              variant="secondary"
               disabled={busy}
               onClick={() => {
                 setOpen("reopen");
@@ -1553,7 +1554,7 @@ function Overrides({
           ) : null}
           {canVoid ? (
             <Button
-              variant="danger"
+              variant="secondary"
               disabled={busy}
               onClick={() => {
                 setOpen("void");

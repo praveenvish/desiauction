@@ -48,8 +48,7 @@ export function EmailVerify({ current, verified }: { current: string | null; ver
   const onCodeStep = requested.step === "code" && confirmed.done !== true;
 
   return (
-    <div className="phone-change" data-testid="email-verify">
-      <h3 className="account-subhead">Email address</h3>
+    <div className="email-verify" data-testid="email-verify">
       {current !== null && verified ? (
         <p className="notify-switch-detail">
           <span data-testid="account-email">{current}</span> <Badge tone="success">Confirmed</Badge>

@@ -17,8 +17,22 @@ export type { Clock } from "./clock";
 export { normalizePhone } from "./phone";
 export { scrub, scrubText, REDACTED } from "./scrub";
 export type { NormalizedPhone, PhoneResult } from "./phone";
-export { capabilitiesOf, hasCapability, isCapabilitySet, CAPABILITY_SETS } from "./capabilities";
-export type { Capability, CapabilitySet, GrantLike, Scope, ScopeType } from "./capabilities";
+export {
+  capabilitiesOf,
+  hasCapability,
+  isCapabilitySet,
+  isOrgCapabilitySet,
+  CAPABILITY_SETS,
+  ORG_CAPABILITY_SETS,
+} from "./capabilities";
+export type {
+  Capability,
+  CapabilitySet,
+  GrantLike,
+  OrgCapabilitySet,
+  Scope,
+  ScopeType,
+} from "./capabilities";
 export {
   competitionTransition,
   registrationTransition,

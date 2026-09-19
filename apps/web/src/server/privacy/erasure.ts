@@ -1,4 +1,5 @@
 import {
+  competitions,
   auctions,
   auditLog,
   consentRecords,
@@ -244,6 +245,14 @@ export async function executeErasure(input: {
           bowlingStyle: null,
           attributes: {},
           note: null,
+          // The name an organizer typed (0075). `shownName` prefers it over the
+          // anonymized account name, so leaving it would keep the person's name
+          // on the showcase, posters, lineups and share cards after erasure.
+          enteredName: null,
+          // ...and the photo the club attached to that entry (0077): a face.
+          enteredPhotoKey: null,
+          enteredPhotoConsentAt: null,
+          enteredPhotoConsentVia: null,
         })
         .where(and(eq(registrations.personId, personId), eq(registrations.orgId, orgId)));
       await tx
@@ -254,6 +263,25 @@ export async function executeErasure(input: {
             eq(grants.personId, personId),
             eq(grants.scopeType, "org"),
             eq(grants.scopeId, orgId),
+            isNull(grants.revokedAt),
+          ),
+        );
+      // Season-scoped grants in this club (0076 — an appointed auctioneer)
+      // end with the membership too; their scope is the season, not the org.
+      await tx
+        .update(grants)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(grants.personId, personId),
+            eq(grants.scopeType, "tournament"),
+            inArray(
+              grants.scopeId,
+              tx
+                .select({ id: competitions.id })
+                .from(competitions)
+                .where(eq(competitions.orgId, orgId)),
+            ),
             isNull(grants.revokedAt),
           ),
         );

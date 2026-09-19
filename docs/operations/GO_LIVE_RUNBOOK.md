@@ -147,6 +147,11 @@ sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
    **Proof:** `curl -fsS https://$ENGINE_DOMAIN/healthz`,
    `curl -fsS https://$PUBLIC_DOMAIN/readyz`, and the runner logging its
    machines as `started`.
+5. **E** — Schedule the daily feedback job: `POST /api/jobs/feedback` with the
+   `x-feedback-job-secret` header (`FEEDBACK_JOB_SECRET`). Besides review asks
+   and report retention, it is what ages out spent sign-in codes and stored
+   request addresses after a day.
+   **Proof:** one run returns `security` counts in its JSON body.
 
 ## E · Errors reach somebody
 
@@ -259,6 +264,15 @@ It is the whole product in one evening:
 
 **Proof:** every step done by a real person on a real device, and no new
 Sentry issue. The next morning, a backup of that night is listed off-host.
+
+## After launch
+
+- **Day 31 or later** — remove the legacy session-cookie fallback. Production
+  sessions are issued as `__Host-da_session`; `presentedToken` in
+  `apps/web/src/server/auth/actions.ts` still accepts the old `da_session` so
+  the rename signed nobody out. The cookie itself expires 30 days after it
+  was issued (it is not re-set when a session slides), so after that no
+  browser still holds the old name.
 
 ---
 

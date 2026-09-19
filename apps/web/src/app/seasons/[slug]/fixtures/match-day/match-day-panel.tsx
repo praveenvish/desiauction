@@ -15,13 +15,18 @@ import {
 // legal next lifecycle step per fixture. No live match management — the machine
 // edges (start, complete, cancel) only.
 
+// The console's one colour grammar: grey not started, blue set and open,
+// red live, green done. "Published" was green and "completed" grey — the
+// schedule read as finished before a ball was bowled, and finished as idle.
+// A cancelled match is closed, not an alarm. (Same table in the fixtures
+// panel, the calendar and match day — change the three together.)
 const FIXTURE_TONE = {
   draft: "neutral",
   scheduled: "info",
-  published: "success",
-  in_progress: "warning",
-  completed: "neutral",
-  cancelled: "danger",
+  published: "info",
+  in_progress: "live",
+  completed: "success",
+  cancelled: "neutral",
 } as const;
 
 const NEXT_ACTION: Partial<Record<string, { action: FixtureLifecycleAction; label: string }>> = {

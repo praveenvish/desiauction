@@ -1026,7 +1026,7 @@ export function RegistrationDashboardPanel({
               </option>
             ))}
           </Select>
-          <Button type="submit" data-testid="search-submit">
+          <Button type="submit" variant="secondary" data-testid="search-submit">
             Search
           </Button>
         </form>
@@ -2421,6 +2421,8 @@ function RegRow({
           <>
             <Button
               size="sm"
+              // One primary per screen: a row action is secondary (Phase 4).
+              variant="secondary"
               onClick={onApprove}
               loading={busy}
               data-focus-key={`approve-${row.id}`}

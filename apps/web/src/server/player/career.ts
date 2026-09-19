@@ -1,13 +1,17 @@
 import {
   auctions,
   competitions,
+  fixtureLineups,
+  fixtureResults,
+  fixtures,
   lots,
   organizations,
   registrations,
   teams,
   tournaments,
 } from "@desiauction/db";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, ne, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { systemDb } from "../db";
 
@@ -34,6 +38,8 @@ export interface CareerSeason {
   registrationId: string;
   competitionName: string;
   competitionSlug: string;
+  /** The season's sport pack key — the hub groups and filters by it. */
+  sport: string;
   /** The durable tournament name this season is an edition of, if any. */
   tournamentName: string | null;
   orgName: string;
@@ -69,6 +75,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
       registrationId: registrations.id,
       competitionName: competitions.name,
       competitionSlug: competitions.slug,
+      sport: competitions.sport,
       startsOn: competitions.startsOn,
       tournamentName: tournaments.name,
       orgName: organizations.name,
@@ -115,6 +122,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
     registrationId: row.registrationId,
     competitionName: row.competitionName,
     competitionSlug: row.competitionSlug,
+    sport: row.sport,
     tournamentName: row.tournamentName,
     orgName: row.orgName,
     startsOn: row.startsOn,
@@ -189,4 +197,120 @@ export async function personSeasonsInOrg(
     )
     .orderBy(asc(competitions.startsOn))
     .limit(20);
+}
+
+/**
+ * EVERY MATCH THIS PERSON'S TEAMS PLAYED, and whether they were on the field
+ * (launch polish, Phase 3) — the half of "my profile" that results alone could
+ * never answer, because results are recorded per team.
+ *
+ * `played` is three-valued on purpose, from the lineup record (0074):
+ *   · "played"  — a lineup row for this registration;
+ *   · "bench"   — the team's lineup was recorded and this person is not in it;
+ *   · "unknown" — nobody recorded the team's lineup, so the page must not guess.
+ *
+ * Same posture as `playerCareer`: person-scoped from the session, system pool,
+ * a projection over the fixture and result writers. Only matches that happened
+ * (in progress or completed) — a scheduled fixture is not part of a career.
+ */
+export interface CareerMatch {
+  fixtureId: string;
+  kickoffAt: string | null;
+  sport: string;
+  competitionName: string;
+  teamName: string;
+  opponentName: string;
+  /** From this person's side: won, lost, tied, or no result; null while in progress. */
+  result: "won" | "lost" | "tied" | "no_result" | null;
+  played: "played" | "bench" | "unknown";
+}
+
+export const MATCHES_LIMIT = 100;
+
+export async function playerMatches(personId: string): Promise<CareerMatch[]> {
+  const home = alias(teams, "home_team");
+  const away = alias(teams, "away_team");
+  const rows = await systemDb
+    .select({
+      fixtureId: fixtures.id,
+      kickoffAt: fixtures.kickoffAt,
+      sport: competitions.sport,
+      competitionName: competitions.name,
+      registrationId: registrations.id,
+      teamId: registrations.teamId,
+      homeTeamId: fixtures.homeTeamId,
+      homeName: home.name,
+      awayName: away.name,
+      outcome: fixtureResults.outcome,
+      lineupRegistration: fixtureLineups.registrationId,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .innerJoin(
+      fixtures,
+      and(
+        eq(fixtures.competitionId, registrations.competitionId),
+        or(
+          eq(fixtures.homeTeamId, registrations.teamId),
+          eq(fixtures.awayTeamId, registrations.teamId),
+        ),
+      ),
+    )
+    .innerJoin(home, eq(home.id, fixtures.homeTeamId))
+    .innerJoin(away, eq(away.id, fixtures.awayTeamId))
+    .leftJoin(fixtureResults, eq(fixtureResults.fixtureId, fixtures.id))
+    .leftJoin(
+      fixtureLineups,
+      and(
+        eq(fixtureLineups.fixtureId, fixtures.id),
+        eq(fixtureLineups.registrationId, registrations.id),
+      ),
+    )
+    .where(
+      and(
+        eq(registrations.personId, personId),
+        isNotNull(registrations.teamId),
+        inArray(fixtures.status, ["in_progress", "completed"]),
+      ),
+    )
+    .orderBy(desc(fixtures.kickoffAt), desc(fixtures.seq))
+    .limit(MATCHES_LIMIT);
+  if (rows.length === 0) {
+    return [];
+  }
+  // Which (fixture, team) pairs have ANY lineup — the difference between
+  // "didn't play" and "nobody wrote it down".
+  const recorded = await systemDb
+    .selectDistinct({ fixtureId: fixtureLineups.fixtureId, teamId: fixtureLineups.teamId })
+    .from(fixtureLineups)
+    .where(inArray(fixtureLineups.fixtureId, [...new Set(rows.map((row) => row.fixtureId))]));
+  const recordedPairs = new Set(recorded.map((row) => `${row.fixtureId}:${row.teamId}`));
+  return rows.map((row) => {
+    const isHome = row.homeTeamId === row.teamId;
+    const result: CareerMatch["result"] =
+      row.outcome === null
+        ? null
+        : row.outcome === "tie"
+          ? "tied"
+          : row.outcome === "no_result" || row.outcome === "abandoned"
+            ? "no_result"
+            : (row.outcome === "home_win") === isHome
+              ? "won"
+              : "lost";
+    return {
+      fixtureId: row.fixtureId,
+      kickoffAt: row.kickoffAt,
+      sport: row.sport,
+      competitionName: row.competitionName,
+      teamName: isHome ? row.homeName : row.awayName,
+      opponentName: isHome ? row.awayName : row.homeName,
+      result,
+      played:
+        row.lineupRegistration !== null
+          ? "played"
+          : recordedPairs.has(`${row.fixtureId}:${row.teamId ?? ""}`)
+            ? "bench"
+            : "unknown",
+    };
+  });
 }

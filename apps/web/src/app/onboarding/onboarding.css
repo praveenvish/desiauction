@@ -94,7 +94,12 @@
 
 @media (min-width: 900px) {
   .onboarding-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 480px);
+    /* One composed block, centred: on a wide screen the stretchy first column
+       pushed the card against the right edge and left the headline floating
+       in the middle of nowhere (founder review, 2026-09-19). */
+    max-width: 1040px;
+    margin-inline: auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
     gap: clamp(var(--space-10), 6vw, var(--space-24));
     justify-items: stretch;
     /* Bias the composition above the optical centre. A card centred in a tall
@@ -115,7 +120,7 @@
     flex-direction: column;
     gap: var(--space-5);
     max-width: 26rem;
-    justify-self: end;
+    justify-self: start;
   }
 }
 
@@ -204,4 +209,34 @@
   margin: 0;
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
+}
+
+/* Who is signed in sits under the one action, as a footnote: above the
+   question it was the first thing read and wrapped mid-sentence on a phone. */
+.onboarding-form .onboarding-hint {
+  margin-top: var(--space-1);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.onboarding-contact {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.onboarding-form .onboarding-signout {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.onboarding-sub {
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 900px) {
+  .onboarding-grid {
+    max-width: 960px;
+    gap: var(--space-16);
+  }
 }

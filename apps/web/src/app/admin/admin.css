@@ -649,3 +649,118 @@ td .admin-id {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+   MESSAGING ON A PHONE. Each table gets the layout its rows are read in,
+   instead of every cell stacked under a label: a template is its key and
+   its state, then the variable to set; a delivery row is one message and
+   three figures side by side; a suppression is who, since when, and why.
+   ========================================================================== */
+@media (max-width: 1100px) {
+  [data-surface="console"] .msg-template-table tbody tr,
+  [data-surface="console"] .msg-suppression-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--space-4);
+    align-items: start;
+  }
+
+  [data-surface="console"] .msg-template-table tbody tr > td,
+  [data-surface="console"] .msg-delivery-table tbody tr > td,
+  [data-surface="console"] .msg-suppression-table tbody tr > td {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Template: key + description | status / variable across. */
+  [data-surface="console"] .msg-template-table td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  [data-surface="console"] .msg-template-table td:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  [data-surface="console"] .msg-template-table td:nth-child(3) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  [data-surface="console"] .msg-template-table td:nth-child(1) > span {
+    display: block;
+  }
+
+  [data-surface="console"] .msg-template-table td:nth-child(3) code {
+    overflow-wrap: anywhere;
+  }
+
+  /* Delivery: the message, then Sent · Failed · Suppressed in a row. */
+  [data-surface="console"] .msg-delivery-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--space-4);
+  }
+
+  [data-surface="console"] .msg-delivery-table td:nth-child(1) {
+    grid-column: 1 / -1;
+    padding-bottom: var(--space-2);
+  }
+
+  [data-surface="console"] .msg-delivery-table td.admin-num {
+    text-align: start;
+  }
+
+  /* Suppression: contact | since / reason · topic. */
+  [data-surface="console"] .msg-suppression-table td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  [data-surface="console"] .msg-suppression-table td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1;
+    color: var(--text-secondary);
+    font-size: var(--text-sm-size);
+  }
+
+  [data-surface="console"] .msg-suppression-table td:nth-child(2),
+  [data-surface="console"] .msg-suppression-table td:nth-child(3) {
+    grid-row: 2;
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-start;
+    align-items: baseline;
+    font-size: var(--text-sm-size);
+  }
+
+  [data-surface="console"] .msg-suppression-table td:nth-child(2) {
+    grid-column: 1;
+  }
+
+  [data-surface="console"] .msg-suppression-table td:nth-child(3) {
+    grid-column: 2;
+  }
+
+  /* Labels that the layout already says. */
+  [data-surface="console"] .msg-template-table td:nth-child(1)::before,
+  [data-surface="console"] .msg-template-table td:nth-child(2)::before,
+  [data-surface="console"] .msg-delivery-table td:nth-child(1)::before,
+  [data-surface="console"] .msg-suppression-table td:nth-child(1)::before,
+  [data-surface="console"] .msg-suppression-table td:nth-child(4)::before {
+    content: none;
+  }
+
+  [data-surface="console"] .msg-template-table td:nth-child(3)::before,
+  [data-surface="console"] .msg-delivery-table td.admin-num::before {
+    display: block;
+    max-width: none;
+    padding: 0 0 2px;
+  }
+
+  [data-surface="console"] .msg-suppression-table td:nth-child(2)::before,
+  [data-surface="console"] .msg-suppression-table td:nth-child(3)::before {
+    padding: 0;
+  }
+}

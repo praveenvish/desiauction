@@ -264,6 +264,11 @@ export async function commitRegistrationImport(
       .from(people)
       .where(inArray(people.phone, phones));
     const personByPhone = new Map(existing.map((p) => [p.phone, p.id]));
+    // Phones whose account already carries its own name (0075): the season
+    // shows the name this FILE gives, never the account's — see shown-name.ts.
+    const namedAccounts = new Set(
+      existing.filter((p) => p.name !== null && p.phone !== null).map((p) => p.phone),
+    );
 
     // The first name the file gives each phone — the same row `find` returned,
     // without scanning the file once per phone.
@@ -428,6 +433,7 @@ export async function commitRegistrationImport(
           role: row.role,
           status: "submitted",
           registrationNumber: registrationNumber(id),
+          ...(namedAccounts.has(row.phone) && row.name !== "" ? { enteredName: row.name } : {}),
           ...(row.basePriceBand !== null ? { basePriceBand: row.basePriceBand } : {}),
           // DA-28: whatever the file supplied, so an imported player is not
           // permanently thinner than one who self-registered.

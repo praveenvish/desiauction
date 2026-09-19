@@ -40,7 +40,9 @@ export default async function OnboardingPage({
     redirect(destination);
   }
   return (
-    <main className="onboarding">
+    // The first signed-in screen: it takes the console's quiet primitives
+    // (an ink primary, not the marketing gold) — see data-surface in AppShell.
+    <main className="onboarding" data-surface="console">
       <Link className="onboarding-mark" href="/">
         <span className="onboarding-mark-glyph" aria-hidden="true">
           <BrandGlyph size={22} />

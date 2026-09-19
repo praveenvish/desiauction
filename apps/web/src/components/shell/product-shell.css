@@ -277,3 +277,16 @@
     font-size: 12px;
   }
 }
+
+/* Daylight console (launch polish, Phase 4): the rail's user chip is an
+   initials disc on the warm rail, not a gold coin. */
+[data-theme="daylight"] .shell-railuser-avatar {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+/* The contact line was 55% of the heading ink — 3.86:1 on the warm rail,
+   under AA for 12px text. The rail's secondary ink passes. */
+[data-theme="daylight"] .shell-railuser-text span {
+  color: var(--text-secondary);
+}

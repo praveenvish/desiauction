@@ -201,7 +201,8 @@ export function ReconciliationPanel({
               Run ingest now
             </Button>
             <Button
-              variant="danger"
+              // Opens the confirmation below; the red belongs on the confirm.
+              variant="secondary"
               disabled={busy}
               onClick={() => {
                 setRewinding(true);

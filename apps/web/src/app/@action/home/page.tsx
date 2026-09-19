@@ -1,5 +1,7 @@
 import { FormDialog } from "../../../components/form-dialog";
+import { currentSession } from "../../../server/auth/actions";
 import { competitionsView } from "../../../server/competition/actions";
+import { rolesOf } from "../../../server/roles/roles";
 import { CreateTournamentForm } from "../../tournaments/create-tournament-form";
 
 /**
@@ -15,8 +17,16 @@ import { CreateTournamentForm } from "../../tournaments/create-tournament-form";
  * trip on every render.
  */
 export default async function HomeAction() {
-  const { orgs } = await competitionsView();
-  if (orgs.length === 0) {
+  const session = await currentSession();
+  if (session === null) {
+    return null;
+  }
+  // Offered to people who MANAGE a club, in the clubs they manage. A team owner
+  // or a plain member used to see it too — belonging is not permission.
+  const [{ orgs }, roles] = await Promise.all([competitionsView(), rolesOf(session.personId)]);
+  const managed = new Set(roles.organizes.map((club) => club.orgId));
+  const creatable = orgs.filter((org) => managed.has(org.id));
+  if (creatable.length === 0) {
     return null;
   }
   return (
@@ -29,7 +39,7 @@ export default async function HomeAction() {
       size="touch"
       triggerTestId="home-new-tournament"
     >
-      <CreateTournamentForm orgs={orgs} />
+      <CreateTournamentForm orgs={creatable} />
     </FormDialog>
   );
 }
