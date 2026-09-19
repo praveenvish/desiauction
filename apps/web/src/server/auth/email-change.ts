@@ -4,6 +4,7 @@ import { emailVerifications, newId, people, type Db } from "@desiauction/db";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { boundSubject, codeDigest } from "./code-digest";
+import { DEFAULT_GLOBAL_PER_HOUR } from "./otp";
 
 /**
  * ADDING AN ADDRESS THE PLATFORM MAY ACTUALLY SEND TO.
@@ -29,6 +30,13 @@ import { boundSubject, codeDigest } from "./code-digest";
 
 const CODE_TTL_MS = 15 * 60 * 1000;
 const MAX_PER_HOUR = 5;
+/**
+ * Per source address, and the platform ceiling shared with sign-in mail
+ * (security review, launch Phase 5). The per-person cap alone let one host
+ * spray verification mail by rotating throwaway accounts — mail the platform
+ * pays for and sends under its own domain's reputation.
+ */
+const MAX_PER_HOUR_PER_IP = 20;
 const MAX_ATTEMPTS = 5;
 
 /**
@@ -58,7 +66,7 @@ export function normalizeEmail(raw: string): string | null {
 
 export type EmailVerificationRequest =
   | { ok: true; email: string; code: string }
-  | { ok: false; reason: "invalid-email" | "same-email" | "hourly-limit" };
+  | { ok: false; reason: "invalid-email" | "same-email" | "hourly-limit" | "busy" };
 
 /**
  * Mint a code for an address. Returns it so the CALLER sends it — this module
@@ -73,7 +81,7 @@ export type EmailVerificationRequest =
  */
 export async function requestEmailVerification(
   db: Db,
-  input: { personId: string; email: string },
+  input: { personId: string; email: string; requestIp?: string | null; globalPerHour?: number },
 ): Promise<EmailVerificationRequest> {
   const email = normalizeEmail(input.email);
   if (email === null) {
@@ -102,6 +110,33 @@ export async function requestEmailVerification(
     // the address is exactly what that looks like.
     return { ok: false, reason: "hourly-limit" };
   }
+  const since = new Date(Date.now() - 60 * 60 * 1000);
+  const requestIp =
+    input.requestIp !== undefined && input.requestIp !== null && input.requestIp !== ""
+      ? input.requestIp
+      : null;
+  if (requestIp !== null) {
+    const [ip] = (await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emailVerifications)
+      .where(
+        and(
+          eq(emailVerifications.requestIp, requestIp),
+          eq(emailVerifications.purpose, "email_change"),
+          gt(emailVerifications.createdAt, since),
+        ),
+      )) as [{ count: number }];
+    if (ip.count >= MAX_PER_HOUR_PER_IP) {
+      return { ok: false, reason: "hourly-limit" };
+    }
+  }
+  const [platform] = (await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(emailVerifications)
+    .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
+  if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
+    return { ok: false, reason: "busy" };
+  }
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await db.insert(emailVerifications).values({
     id: newId(),
@@ -113,6 +148,7 @@ export async function requestEmailVerification(
     // to the default cannot silently widen what they prove.
     purpose: "email_change",
     expiresAt: new Date(Date.now() + CODE_TTL_MS),
+    ...(requestIp === null ? {} : { requestIp }),
   });
   return { ok: true, email, code };
 }

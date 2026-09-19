@@ -153,3 +153,36 @@ describe("verification", () => {
     expect(await verifiedEmailOf(db, personId)).toBe(OTHERS);
   });
 });
+
+describe("limits (security review, launch Phase 5)", () => {
+  it("caps one source address across accounts, not only one account", async () => {
+    // Rotating throwaway accounts beat the per-person cap; the address did not.
+    const ip = `203.0.113.${RUN.slice(-2)}`;
+    await db.insert(emailVerifications).values(
+      Array.from({ length: 20 }, (_, index) => ({
+        id: newId(),
+        personId,
+        email: `spray-${String(index)}-${RUN}@example.com`,
+        codeHash: "x",
+        purpose: "email_change" as const,
+        expiresAt: new Date(Date.now() + 60_000),
+        requestIp: ip,
+      })),
+    );
+    const refused = await requestEmailVerification(db, {
+      personId: otherId,
+      email: `fresh-${RUN}@example.com`,
+      requestIp: ip,
+    });
+    expect(refused).toEqual({ ok: false, reason: "hourly-limit" });
+  });
+
+  it("stops at the platform ceiling it shares with sign-in mail", async () => {
+    const refused = await requestEmailVerification(db, {
+      personId: otherId,
+      email: `ceiling-${RUN}@example.com`,
+      globalPerHour: 1,
+    });
+    expect(refused).toEqual({ ok: false, reason: "busy" });
+  });
+});

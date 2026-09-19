@@ -53,6 +53,8 @@ import {
 import {
   RETURNING_COOKIE,
   SESSION_COOKIE,
+  challengeCookieName,
+  sessionCookieName,
   createSession,
   getSessionByToken,
   listSessions,
@@ -64,8 +66,6 @@ import {
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
 import { cache } from "react";
-
-const CHALLENGE_COOKIE = "da_pk_challenge";
 
 /**
  * SECURE, EXCEPT ON THE REHEARSAL SERVER — which is not a server that serves people.
@@ -92,6 +92,42 @@ const CHALLENGE_COOKIE = "da_pk_challenge";
  */
 const secureCookie = env.NODE_ENV === "production" && !env.ALLOW_INSECURE_LOCAL_PRODUCTION;
 
+/** `__Host-` names in production (sessions.ts); the plain names where cookies can't be Secure. */
+const SESSION_NAME = sessionCookieName(secureCookie);
+const CHALLENGE_COOKIE = challengeCookieName(secureCookie);
+
+/**
+ * The token this browser presents: the current name first, then the name
+ * sessions were issued under before the `__Host-` rename — so the rename signs
+ * nobody out. Identical names where cookies are not Secure.
+ */
+function presentedToken(store: Awaited<ReturnType<typeof cookies>>): string | undefined {
+  return store.get(SESSION_NAME)?.value ?? store.get(SESSION_COOKIE)?.value;
+}
+
+/**
+ * Expire a cookie with the attributes it was SET with. A plain `delete()`
+ * emits no `Secure`, and a browser ignores any `__Host-` header without it —
+ * so sign-out would have left the session cookie standing.
+ */
+function expireCookie(store: Awaited<ReturnType<typeof cookies>>, name: string): void {
+  store.set(name, "", {
+    httpOnly: true,
+    secure: secureCookie,
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
+}
+
+/** Forget the session under both names. */
+function clearSessionCookies(store: Awaited<ReturnType<typeof cookies>>): void {
+  expireCookie(store, SESSION_NAME);
+  if (SESSION_NAME !== SESSION_COOKIE) {
+    expireCookie(store, SESSION_COOKIE);
+  }
+}
+
 /**
  * The key the challenge cookie is sealed with. Derived, domain-separated, from a
  * secret production already requires to be strong (preflight refuses the dev
@@ -112,7 +148,7 @@ async function setChallenge(challenge: string): Promise<void> {
 async function takeChallenge(): Promise<string | null> {
   const store = await cookies();
   const value = store.get(CHALLENGE_COOKIE)?.value ?? null;
-  store.delete(CHALLENGE_COOKIE);
+  expireCookie(store, CHALLENGE_COOKIE);
   return value === null ? null : openChallenge(CHALLENGE_KEY, value);
 }
 
@@ -137,12 +173,14 @@ async function issueSessionCookie(personId: string): Promise<void> {
    * Revoked BEFORE the new cookie is set, so a failure here cannot leave the
    * browser holding a session that was meant to be replaced.
    */
-  const replaced = store.get(SESSION_COOKIE)?.value;
+  const replaced = presentedToken(store);
   if (replaced !== undefined && replaced !== "") {
     await revokeSessionByToken(db, replaced);
   }
   const session = await createSession(db, personId, agent);
-  store.set(SESSION_COOKIE, session.token, {
+  // A sign-in moves this browser onto the current name for good.
+  clearSessionCookies(store);
+  store.set(SESSION_NAME, session.token, {
     httpOnly: true,
     secure: secureCookie,
     sameSite: "lax",
@@ -695,7 +733,7 @@ export async function revokeOtherSessionsAction(): Promise<ActionResult & { revo
 
 export async function logoutAction(): Promise<void> {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+  const token = presentedToken(store);
   if (token !== undefined) {
     const session = await getSessionByToken(db, token);
     if (session !== null) {
@@ -705,7 +743,7 @@ export async function logoutAction(): Promise<void> {
       await logSecurityEvent(session.personId, "auth.logout");
     }
   }
-  store.delete(SESSION_COOKIE);
+  clearSessionCookies(store);
   redirect("/login");
 }
 
@@ -724,7 +762,7 @@ export async function logoutAction(): Promise<void> {
 export async function logoutToAction(next: string): Promise<void> {
   const safe = safeNext(next);
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+  const token = presentedToken(store);
   if (token !== undefined) {
     const session = await getSessionByToken(db, token);
     if (session !== null) {
@@ -732,7 +770,7 @@ export async function logoutToAction(next: string): Promise<void> {
       await logSecurityEvent(session.personId, "auth.logout");
     }
   }
-  store.delete(SESSION_COOKIE);
+  clearSessionCookies(store);
   redirect(safe);
 }
 
@@ -744,7 +782,7 @@ export async function logoutToAction(next: string): Promise<void> {
  * function, and every export here must be async.
  */
 const currentSessionOnce = cache(async () => {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const token = presentedToken(await cookies());
   if (token === undefined) {
     return null;
   }
@@ -1058,13 +1096,19 @@ export async function requestEmailVerificationAction(
     return { step: previous.step, error: SIGN_IN_AGAIN };
   }
   const raw = formString(formData, "email");
-  const result = await requestEmailVerification(db, { personId: session.personId, email: raw });
+  const result = await requestEmailVerification(db, {
+    personId: session.personId,
+    email: raw,
+    requestIp: await requestIp(),
+    globalPerHour: env.OTP_GLOBAL_HOURLY_CAP,
+  });
   if (!result.ok) {
     const message: Record<typeof result.reason, string> = {
       "invalid-email":
         raw.trim() === "" ? "Enter an email address." : "That doesn't look like an email address.",
       "same-email": "That address is already confirmed on this account.",
       "hourly-limit": "Too many confirmation emails. Try again in an hour.",
+      busy: "We're sending a lot of email right now. Try again in a few minutes.",
     };
     return { step: previous.step, error: message[result.reason] };
   }

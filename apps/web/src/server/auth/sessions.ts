@@ -6,7 +6,31 @@ import { and, desc, eq, gt, isNull, ne } from "drizzle-orm";
 // DB-backed revocable sessions (IP-2_DESIGN D2). The cookie carries the raw
 // token; only its SHA-256 is stored. Token rotates at every login (fixation).
 
+/**
+ * The session cookie's name as it was — and still is, wherever cookies cannot
+ * be Secure (local http, the WebKit rehearsal harness; see `secureCookie` in
+ * actions.ts). Also the name read as a FALLBACK in production until every
+ * cookie issued under it has expired: the cookie lives 30 days from issue (it
+ * is not re-set when a session slides), so the fallback can go in a release
+ * after that — GO_LIVE_RUNBOOK "After launch".
+ */
 export const SESSION_COOKIE = "da_session";
+
+/**
+ * `__Host-` (security review, launch Phase 5): the browser then refuses the
+ * cookie unless it is Secure, host-only (no Domain) and Path=/ — so a sibling
+ * subdomain, or a man in the middle on plain http, cannot plant or overwrite a
+ * session (session fixation) under this name. Browsers reject the prefix on a
+ * non-Secure cookie outright, hence the plain name wherever `secure` is false.
+ */
+export function sessionCookieName(secure: boolean): string {
+  return secure ? `__Host-${SESSION_COOKIE}` : SESSION_COOKIE;
+}
+
+/** The passkey ceremony's sealed challenge, under the same rule. */
+export function challengeCookieName(secure: boolean): string {
+  return secure ? "__Host-da_pk_challenge" : "da_pk_challenge";
+}
 
 /**
  * "This device has signed in before" — nothing else. No id, no phone, no
@@ -16,6 +40,9 @@ export const SESSION_COOKIE = "da_session";
  * /login, to decide which door leads. It lives beside SESSION_COOKIE rather
  * than in actions.ts, which is a "use server" module and may export nothing but
  * async server actions.
+ *
+ * Deliberately NOT `__Host-`: it grants nothing, and a planted value can only
+ * change which sign-in door /login shows first.
  */
 export const RETURNING_COOKIE = "da_returning";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
