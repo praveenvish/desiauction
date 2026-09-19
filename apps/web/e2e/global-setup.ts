@@ -67,8 +67,30 @@ const ROUTES = [
   "/",
 ];
 
+/**
+ * WARM WHAT THE RUN WILL VISIT (`E2E_WARM_ROUTES`, comma-separated).
+ *
+ * The full list is sized for the full suite. CI's small dev-server steps — one
+ * photo test, four design-system specs — warmed all of it anyway, and a dev
+ * server holding ~35 compiled routes crossed Next's memory threshold about a
+ * minute in: it restarted under the first test, which lost its server
+ * mid-click (the photo journey "flaked" at a different step each run, and its
+ * retry on the restarted server passed). A narrow run names its own pages.
+ * Unset keeps the full list, so a whole-suite run is unchanged.
+ */
+function routesToWarm(): string[] {
+  const narrowed = process.env["E2E_WARM_ROUTES"];
+  if (narrowed === undefined || narrowed.trim() === "") {
+    return [...ROUTES];
+  }
+  return narrowed
+    .split(",")
+    .map((route) => route.trim())
+    .filter((route) => route.startsWith("/"));
+}
+
 async function warmRoutes(base: string): Promise<void> {
-  const queue = [...ROUTES];
+  const queue = routesToWarm();
   const worker = async (): Promise<void> => {
     for (;;) {
       const route = queue.shift();

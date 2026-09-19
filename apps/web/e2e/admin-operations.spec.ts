@@ -3,7 +3,7 @@ import { competitions, createDb, grants, newId, organizations, people } from "@d
 import { expect, test, type Page } from "@playwright/test";
 import { eq, inArray } from "drizzle-orm";
 
-import { latestOtp, resetOtpBudget } from "./otp";
+import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
 
 // ADMIN OPERATIONS — the live board, the auction watch and the moderation desk,
 // through the browser.
@@ -34,16 +34,19 @@ let orgId = "";
 let seasonSlug = "";
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
-  await resetOtpBudget(phone);
-  await page.goto("/login");
-  await page.getByLabel("Mobile number").fill(phone);
-  await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
-    timeout: 30_000,
+  // Serialized per phone across workers: see withSignInLock in otp.ts.
+  await withSignInLock(phone, async () => {
+    await resetOtpBudget(phone);
+    await page.goto("/login");
+    await page.getByLabel("Mobile number").fill(phone);
+    await page.getByRole("button", { name: "Send code" }).click();
+    await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+      timeout: 30_000,
+    });
+    await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page).not.toHaveURL(/\/login/);
   });
-  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
-  await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(page).not.toHaveURL(/\/login/);
 }
 
 async function axeClean(page: Page, surface: string): Promise<void> {

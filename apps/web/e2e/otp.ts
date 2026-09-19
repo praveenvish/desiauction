@@ -1,3 +1,7 @@
+import { mkdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { createDb, otpCodes, otpInbox } from "@desiauction/db";
 import { desc, eq } from "drizzle-orm";
 
@@ -90,5 +94,51 @@ export async function resetOtpBudget(phone: string): Promise<void> {
     await handle.db.delete(otpCodes).where(eq(otpCodes.phone, e164));
   } finally {
     await handle.sql.end();
+  }
+}
+
+/**
+ * ONE SIGN-IN PER FIXED IDENTITY AT A TIME, ACROSS WORKERS.
+ *
+ * Five specs sign in as the same demo founder, and CI runs them on parallel
+ * workers. Each starts with `resetOtpBudget`, which DELETES the phone's pending
+ * codes — so worker B's reset could wipe the code worker A had just been sent,
+ * A's verify found nothing, and A sat on /login until its retry (the "auction
+ * watch" flake on #13–#15). Even without the reset, a second request between
+ * A's send and A's verify makes A's code stale: the server checks the newest.
+ *
+ * A directory is the lock because `mkdir` is atomic across processes. A lock
+ * left by a killed worker is taken over once it is older than any sign-in.
+ */
+const LOCK_STALE_MS = 90_000;
+const LOCK_WAIT_MS = 180_000;
+
+export async function withSignInLock<T>(phone: string, fn: () => Promise<T>): Promise<T> {
+  const e164 = phone.startsWith("+") ? phone : `+91${phone}`;
+  const lock = join(tmpdir(), `desiauction-e2e-signin-${e164}`);
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      mkdirSync(lock);
+      break;
+    } catch {
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
+          rmSync(lock, { recursive: true, force: true });
+          continue;
+        }
+      } catch {
+        continue; // Released between the two calls — try again at once.
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`waited ${String(LOCK_WAIT_MS)}ms for another worker's sign-in as ${e164}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    rmSync(lock, { recursive: true, force: true });
   }
 }

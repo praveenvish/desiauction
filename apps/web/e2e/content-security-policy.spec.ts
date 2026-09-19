@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { latestOtp, resetOtpBudget } from "./otp";
+import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
 
 // THE SCRIPT POLICY, PROVEN AGAINST THE REAL PAGES.
 //
@@ -56,16 +56,19 @@ function watchViolations(page: Page): string[] {
 }
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
-  await resetOtpBudget(phone);
-  await page.goto("/login");
-  await page.getByLabel("Mobile number").fill(phone);
-  await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
-    timeout: 30_000,
+  // Serialized per phone across workers: see withSignInLock in otp.ts.
+  await withSignInLock(phone, async () => {
+    await resetOtpBudget(phone);
+    await page.goto("/login");
+    await page.getByLabel("Mobile number").fill(phone);
+    await page.getByRole("button", { name: "Send code" }).click();
+    await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+      timeout: 30_000,
+    });
+    await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page).not.toHaveURL(/\/login/);
   });
-  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
-  await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(page).not.toHaveURL(/\/login/);
 }
 
 test("every page carries a nonce policy, and every script it runs carries the nonce", async ({
