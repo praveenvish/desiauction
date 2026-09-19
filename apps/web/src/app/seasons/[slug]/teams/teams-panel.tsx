@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 
+import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { formatPhone } from "../../../../lib/format-phone";
 import {
@@ -503,76 +504,8 @@ function RosterDetail({
     );
   }, [roster, view.roles]);
 
-  return (
-    <>
-      <Link href={`/seasons/${slug}/teams`} className="teams-back">
-        <IconArrowLeft size={16} className="icon-lead" /> All teams
-      </Link>
-
-      <header className="team-detail-head">
-        {team.logoUrl !== null ? (
-          <img className="teams-crest lg" src={team.logoUrl} alt="" width={52} height={52} />
-        ) : (
-          <span className="team-card-mono lg" style={paintOnFill(team.color)} aria-hidden>
-            {monogram(team)}
-          </span>
-        )}
-        <div className="team-detail-id">
-          {/* Selecting a team is a URL state of the Teams surface, so the
-              shell's title follows it rather than the page growing a second. */}
-          <PageTitle title={team.name} />
-          <p className="team-detail-sub">
-            {team.shortName !== null ? `${team.shortName} · ` : ""}
-            {team.ownerName !== null ? `Owner · ${team.ownerName} · ` : "No owner yet · "}
-            {team.coachName !== null ? `Coach · ${team.coachName} · ` : ""}
-            {slotsOpen !== null && team.squadMax !== undefined && team.squadMax !== null
-              ? `${String(team.squadFilled)}/${String(team.squadMax)} squad · ${String(slotsOpen)} slot${slotsOpen === 1 ? "" : "s"} open`
-              : `${String(team.squadFilled)} player${team.squadFilled === 1 ? "" : "s"}`}
-          </p>
-        </div>
-        <div className="team-detail-actions">
-          {view.viewer.canSeeRoster ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              data-testid="export-squad"
-              onClick={() => {
-                setExportOpen(true);
-              }}
-            >
-              Export squad
-            </Button>
-          ) : null}
-        </div>
-      </header>
-
-      {team.spent !== undefined ? (
-        <div className="team-detail-tiles">
-          <div className="season-tile">
-            <span className="season-tile-value">{exactINR(team.spent)}</span>
-            <span className="season-tile-label">Purse spent</span>
-          </div>
-          <div className="season-tile">
-            <span className="season-tile-value season-tile-accent">
-              {remaining !== null && (team.purseTotal ?? 0) > 0 ? exactINR(remaining) : "—"}
-            </span>
-            <span className="season-tile-label">Remaining</span>
-          </div>
-          <div className="season-tile">
-            <span className="season-tile-value">
-              {team.usedPct !== undefined && team.usedPct !== null
-                ? `${String(team.usedPct)}%`
-                : "—"}
-            </span>
-            <span className="season-tile-label">Purse used</span>
-          </div>
-          <div className="season-tile">
-            <span className="season-tile-value team-tile-name">{team.topBuyName ?? "—"}</span>
-            <span className="season-tile-label">Top buy</span>
-          </div>
-        </div>
-      ) : null}
-
+  const squadSection = (
+    <div className="team-squad-tab">
       {canManage && view.viewer.canSeeRoster ? (
         <SquadPreSign
           slug={slug}
@@ -693,36 +626,123 @@ function RosterDetail({
           />
         </Card>
       )}
+    </div>
+  );
 
-      {canManage ? (
-        <Card>
-          <h2 className="team-settings-title">Team settings</h2>
-          <div className="teams-manage">
-            <TeamLogoUploader
-              slug={slug}
-              teamId={team.id}
-              teamName={team.name}
-              {...(team.logoUrl !== null ? { currentUrl: team.logoUrl } : {})}
-            />
-            <div className="teams-settings-forms">
-              <TeamIdentityEditor
-                slug={slug}
-                team={team}
-                locked={view.rulesSource?.locked ?? false}
-              />
-              <CoachEditor slug={slug} teamId={team.id} initial={team.coachName ?? ""} />
-              <OwnerInvite
-                slug={slug}
-                teamId={team.id}
-                ownerName={team.ownerName}
-                canConduct={view.viewer.canConduct}
-                auctionExists={view.rulesSource !== null}
-                auctionFinished={view.rulesSource?.finished ?? false}
-              />
-            </div>
+  return (
+    <>
+      <Link href={`/seasons/${slug}/teams`} className="teams-back">
+        <IconArrowLeft size={16} className="icon-lead" /> All teams
+      </Link>
+
+      <header className="team-detail-head">
+        {team.logoUrl !== null ? (
+          <img className="teams-crest lg" src={team.logoUrl} alt="" width={52} height={52} />
+        ) : (
+          <span className="team-card-mono lg" style={paintOnFill(team.color)} aria-hidden>
+            {monogram(team)}
+          </span>
+        )}
+        <div className="team-detail-id">
+          {/* Selecting a team is a URL state of the Teams surface, so the
+              shell's title follows it rather than the page growing a second. */}
+          <PageTitle title={team.name} />
+          <p className="team-detail-sub">
+            {team.shortName !== null ? `${team.shortName} · ` : ""}
+            {team.ownerName !== null ? `Owner · ${team.ownerName} · ` : "No owner yet · "}
+            {team.coachName !== null ? `Coach · ${team.coachName} · ` : ""}
+            {slotsOpen !== null && team.squadMax !== undefined && team.squadMax !== null
+              ? `${String(team.squadFilled)}/${String(team.squadMax)} squad · ${String(slotsOpen)} slot${slotsOpen === 1 ? "" : "s"} open`
+              : `${String(team.squadFilled)} player${team.squadFilled === 1 ? "" : "s"}`}
+          </p>
+        </div>
+        <div className="team-detail-actions">
+          {view.viewer.canSeeRoster ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="export-squad"
+              onClick={() => {
+                setExportOpen(true);
+              }}
+            >
+              Export squad
+            </Button>
+          ) : null}
+        </div>
+      </header>
+
+      {team.spent !== undefined ? (
+        <div className="team-detail-tiles">
+          <div className="season-tile">
+            <span className="season-tile-value">{exactINR(team.spent)}</span>
+            <span className="season-tile-label">Purse spent</span>
           </div>
-        </Card>
+          <div className="season-tile">
+            <span className="season-tile-value season-tile-accent">
+              {remaining !== null && (team.purseTotal ?? 0) > 0 ? exactINR(remaining) : "—"}
+            </span>
+            <span className="season-tile-label">Remaining</span>
+          </div>
+          <div className="season-tile">
+            <span className="season-tile-value">
+              {team.usedPct !== undefined && team.usedPct !== null
+                ? `${String(team.usedPct)}%`
+                : "—"}
+            </span>
+            <span className="season-tile-label">Purse used</span>
+          </div>
+          <div className="season-tile">
+            <span className="season-tile-value team-tile-name">{team.topBuyName ?? "—"}</span>
+            <span className="season-tile-label">Top buy</span>
+          </div>
+        </div>
       ) : null}
+
+      {/* Two tabs rather than one long page: the squad is what an organizer
+          comes here for; crest, name, coach and owner are set once. */}
+      {canManage ? (
+        <HashTabs
+          label="Team sections"
+          tabs={[
+            { id: "squad", label: "Squad", badge: roster.length, content: squadSection },
+            {
+              id: "settings",
+              label: "Team settings",
+              content: (
+                <div className="team-settings-tab">
+                  <div className="teams-manage">
+                    <TeamLogoUploader
+                      slug={slug}
+                      teamId={team.id}
+                      teamName={team.name}
+                      {...(team.logoUrl !== null ? { currentUrl: team.logoUrl } : {})}
+                    />
+                    <div className="teams-settings-forms">
+                      <TeamIdentityEditor
+                        slug={slug}
+                        team={team}
+                        locked={view.rulesSource?.locked ?? false}
+                      />
+                      <CoachEditor slug={slug} teamId={team.id} initial={team.coachName ?? ""} />
+                      <OwnerInvite
+                        slug={slug}
+                        teamId={team.id}
+                        ownerName={team.ownerName}
+                        canConduct={view.viewer.canConduct}
+                        auctionExists={view.rulesSource !== null}
+                        auctionFinished={view.rulesSource?.finished ?? false}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ),
+            },
+          ]}
+        />
+      ) : (
+        squadSection
+      )}
 
       <ExportDialog
         slug={slug}

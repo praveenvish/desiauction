@@ -3433,3 +3433,16 @@ p + .date-row {
 .squad-sheets-actions {
   margin-top: var(--space-4);
 }
+
+/* Team detail tabs (Squad · Team settings): the tab rule is the section's top
+   edge, so the first block inside a tab drops its own. */
+.team-squad-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.team-squad-tab > .pd-presign:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
