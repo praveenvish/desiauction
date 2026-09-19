@@ -1,10 +1,12 @@
-import { ButtonLink, ToastProvider } from "@desiauction/ui";
+import { ToastProvider } from "@desiauction/ui";
 import { SportTermsProvider } from "../../../../components/sport-terms";
 import { notFound } from "next/navigation";
 
 import { fixtureDashboard } from "../../../../server/competition/fixture-actions";
 import { FixturesPanel } from "./fixtures-panel";
 import "../../seasons.css";
+import "../_tabs/tabs.css";
+import "./fixtures.css";
 
 export const metadata = { title: "Fixtures · DesiAuction" };
 
@@ -28,40 +30,10 @@ export default async function FixturesPage({
   if (dashboard === null) {
     notFound();
   }
-  // How many rounds this schedule spans — the design's "N fixtures across M
-  // rounds". Counted over the SCHEDULE (fixtureStats), not over the 25 rows of
-  // the current page, which reported a 30-round season as 4 rounds.
-  const rounds = dashboard.stats.rounds;
   return (
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <header className="dash-head">
-            <div className="competition-title-row title-row-actions">
-              <span className="date-row">
-                <ButtonLink
-                  href={`/seasons/${slug}/fixtures/calendar`}
-                  variant="secondary"
-                  data-testid="open-calendar"
-                >
-                  Calendar
-                </ButtonLink>
-                <ButtonLink
-                  href={`/seasons/${slug}/fixtures/match-day`}
-                  variant="secondary"
-                  data-testid="open-match-day"
-                >
-                  Match day
-                </ButtonLink>
-              </span>
-            </div>
-            {dashboard.stats.total > 0 ? (
-              <p className="competitions-hint">
-                {dashboard.stats.total} fixture{dashboard.stats.total === 1 ? "" : "s"}
-                {rounds > 0 ? ` across ${String(rounds)} round${rounds === 1 ? "" : "s"}` : ""}
-              </p>
-            ) : null}
-          </header>
           <SportTermsProvider terms={dashboard.terms}>
             <FixturesPanel
               scoreFields={dashboard.scoreFields}
@@ -70,6 +42,7 @@ export default async function FixturesPage({
               orgSlug={dashboard.orgSlug}
               isPublic={dashboard.competition.visibility === "public"}
               stats={dashboard.stats}
+              next={dashboard.next}
               page={dashboard.page}
               teams={dashboard.teams}
               grounds={dashboard.grounds}

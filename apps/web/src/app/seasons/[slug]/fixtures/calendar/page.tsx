@@ -1,47 +1,94 @@
 import { addDays } from "@desiauction/core";
-import { Badge, ButtonLink, Card, IconArrowRight, IconArrowLeft } from "@desiauction/ui";
+import {
+  ButtonLink,
+  IconArrowLeft,
+  IconArrowRight,
+  IconCalendar,
+  IconClock,
+  IconList,
+  IconMatch,
+  SectionCard,
+  TeamChip,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { formatKickoff, formatWallDate } from "../../../../../lib/format-date";
+import { formatWallDate, formatWallTime } from "../../../../../lib/format-date";
 import { calendarView } from "../../../../../server/competition/fixture-actions";
 import type { FixtureSnapshot } from "../../../../../server/competition/fixtures";
+import { FixtureStatusPill } from "../../_tabs/fixture-status";
 import "../../../seasons.css";
+import "../../_tabs/tabs.css";
+import "../fixtures.css";
 
 export const metadata = { title: "Fixture calendar · DesiAuction" };
 
 // Server-driven calendar (M-IP3-3): day view, week view, competition timeline
 // and upcoming fixtures. Navigation is plain links — no client scheduling logic.
 
-// The console's one colour grammar: grey not started, blue set and open,
-// red live, green done. "Published" was green and "completed" grey — the
-// schedule read as finished before a ball was bowled, and finished as idle.
-// A cancelled match is closed, not an alarm. (Same table in the fixtures
-// panel, the calendar and match day — change the three together.)
-const FIXTURE_TONE = {
-  draft: "neutral",
-  scheduled: "info",
-  published: "info",
-  in_progress: "live",
-  completed: "success",
-  cancelled: "neutral",
-} as const;
+const VIEW_TITLE = { day: "Day", week: "Week", timeline: "Season timeline" } as const;
 
-function FixtureLine({ fixture }: { fixture: FixtureSnapshot }) {
+/** One match on a day: when, who, where, and where it stands. */
+function FixtureLine({ fixture, withDate }: { fixture: FixtureSnapshot; withDate: boolean }) {
   return (
-    <li className="calendar-fixture" data-testid={`cal-${fixture.number}`}>
-      <span className="reg-number">{fixture.number}</span>
-      <span className="registration-name">
-        {fixture.homeTeamName} vs {fixture.awayTeamName}
+    <li className="cal-line" data-testid={`cal-${fixture.number}`}>
+      <span className="cal-line-time">
+        {fixture.kickoffAt !== null ? (
+          <>
+            {withDate ? (
+              <span className="st-sub">{formatWallDate(fixture.kickoffAt.slice(0, 10))}</span>
+            ) : null}
+            <strong>{formatWallTime(fixture.kickoffAt)}</strong>
+          </>
+        ) : (
+          <span className="st-muted">unscheduled</span>
+        )}
       </span>
-      <span className="registration-phone">
-        {fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "unscheduled"}
-        {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
-        {fixture.venueName !== null ? ` (${fixture.venueName})` : ""}
+      <span className="cal-line-main">
+        <span className="fx-teams">
+          {fixture.homeTeamId === null ? (
+            <TeamChip color={null}>{fixture.squadCount} squads</TeamChip>
+          ) : (
+            <>
+              <TeamChip color={fixture.homeTeamColor}>{fixture.homeTeamName}</TeamChip>
+              <span className="fx-vs">vs</span>
+              <TeamChip color={fixture.awayTeamColor}>{fixture.awayTeamName}</TeamChip>
+            </>
+          )}
+        </span>
+        <span className="cal-line-where">
+          <span className="st-mono">{fixture.number}</span>
+          {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
+          {fixture.venueName !== null ? ` (${fixture.venueName})` : ""}
+        </span>
       </span>
-      <Badge tone={FIXTURE_TONE[fixture.status]}>{fixture.status.replace(/_/g, " ")}</Badge>
+      <FixtureStatusPill status={fixture.status} />
     </li>
   );
+}
+
+function Lines({
+  fixtures,
+  empty,
+  withDate = false,
+}: {
+  fixtures: readonly FixtureSnapshot[];
+  empty: string;
+  withDate?: boolean;
+}) {
+  return fixtures.length === 0 ? (
+    <p className="cal-none">{empty}</p>
+  ) : (
+    <ul className="cal-lines">
+      {fixtures.map((fixture) => (
+        <FixtureLine key={fixture.id} fixture={fixture} withDate={withDate} />
+      ))}
+    </ul>
+  );
+}
+
+function count(n: number): string {
+  return `${String(n)} match${n === 1 ? "" : "es"}`;
 }
 
 export default async function CalendarPage({
@@ -70,92 +117,104 @@ export default async function CalendarPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <header className="dash-head">
-          <div className="competition-title-row title-row-actions">
-            <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary">
-              Fixtures
-            </ButtonLink>
-          </div>
-        </header>
-
-        <Card>
-          <nav className="calendar-nav" aria-label="Calendar view">
-            <span className="calendar-views">
+        <div className="st-head">
+          <div className="cal-left">
+            <nav className="cal-views" aria-label="Calendar view">
               {(["day", "week", "timeline"] as const).map((name) => (
                 <Link
                   key={name}
                   href={href({ view: name })}
-                  className={view.view === name ? "calendar-tab active" : "calendar-tab"}
+                  className="cal-view"
                   data-testid={`view-${name}`}
                   aria-current={view.view === name ? "page" : undefined}
                 >
                   {name}
                 </Link>
               ))}
-            </span>
+            </nav>
             {view.view !== "timeline" ? (
-              <span className="calendar-pager">
-                <Link href={href({ date: addDays(view.date, -step) })} className="calendar-tab">
-                  <IconArrowLeft size={16} className="icon-lead" />{" "}
-                  <span className="calendar-pager-word">previous</span>
+              <span className="cal-pager">
+                <Link
+                  href={href({ date: addDays(view.date, -step) })}
+                  className="cal-step"
+                  aria-label={view.view === "week" ? "Previous week" : "Previous day"}
+                >
+                  <IconArrowLeft size={16} aria-hidden />
                 </Link>
-                <strong data-testid="calendar-date">{formatWallDate(view.date)}</strong>
+                <strong data-testid="calendar-date">
+                  {view.view === "week" ? "Week of " : ""}
+                  {formatWallDate(view.date)}
+                </strong>
                 <Link
                   href={href({ date: addDays(view.date, step) })}
-                  className="calendar-tab"
+                  className="cal-step"
                   data-testid="calendar-next"
+                  aria-label={view.view === "week" ? "Next week" : "Next day"}
                 >
-                  <span className="calendar-pager-word">next</span>
-                  <IconArrowRight size={16} className="icon-trail" />
+                  <IconArrowRight size={16} aria-hidden />
                 </Link>
               </span>
             ) : null}
-          </nav>
-        </Card>
+          </div>
+          <div className="st-actions">
+            <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary" size="sm">
+              <IconList size={16} aria-hidden />
+              Fixture list
+            </ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/fixtures/match-day`} variant="secondary" size="sm">
+              <IconMatch size={16} aria-hidden />
+              Match day
+            </ButtonLink>
+          </div>
+        </div>
 
         {view.view === "timeline" ? (
-          <Card data-testid="timeline-view">
-            <h2>Season timeline</h2>
-            {view.timeline.length === 0 ? (
-              <p className="competitions-hint">No scheduled fixtures yet.</p>
-            ) : (
-              <ul className="calendar-day-list">
-                {view.timeline.map((fixture) => (
-                  <FixtureLine key={fixture.id} fixture={fixture} />
-                ))}
-              </ul>
-            )}
-          </Card>
+          <SectionCard
+            icon={<IconCalendar />}
+            title={VIEW_TITLE.timeline}
+            description={
+              view.timeline.length === 0
+                ? "No scheduled fixtures yet."
+                : `${count(view.timeline.length)}, in kickoff order`
+            }
+            flush={view.timeline.length > 0}
+            data-testid="timeline-view"
+          >
+            {view.timeline.length > 0 ? (
+              <Lines fixtures={view.timeline} empty="" withDate />
+            ) : undefined}
+          </SectionCard>
         ) : (
           view.days.map((day) => (
-            <Card key={day.date} data-testid={`day-${day.date}`}>
-              {/* A calendar that never names a weekday is not a calendar. */}
-              <h2>{formatWallDate(day.date)}</h2>
-              {day.fixtures.length === 0 ? (
-                <p className="competitions-hint">No fixtures.</p>
-              ) : (
-                <ul className="calendar-day-list">
-                  {day.fixtures.map((fixture) => (
-                    <FixtureLine key={fixture.id} fixture={fixture} />
-                  ))}
-                </ul>
-              )}
-            </Card>
+            /* A calendar that never names a weekday is not a calendar. */
+            <SectionCard
+              key={day.date}
+              icon={<IconCalendar />}
+              tone={day.fixtures.length > 0 ? "gold" : "neutral"}
+              title={formatWallDate(day.date)}
+              description={day.fixtures.length === 0 ? "No fixtures" : count(day.fixtures.length)}
+              flush={day.fixtures.length > 0}
+              data-testid={`day-${day.date}`}
+            >
+              {day.fixtures.length > 0 ? <Lines fixtures={day.fixtures} empty="" /> : undefined}
+            </SectionCard>
           ))
         )}
 
-        <Card data-testid="upcoming-panel">
-          <h2>Upcoming fixtures</h2>
-          {view.upcoming.length === 0 ? (
-            <p className="competitions-hint">Nothing upcoming.</p>
-          ) : (
-            <ul className="calendar-day-list">
-              {view.upcoming.map((fixture) => (
-                <FixtureLine key={fixture.id} fixture={fixture} />
-              ))}
-            </ul>
-          )}
-        </Card>
+        <SectionCard
+          icon={<IconClock />}
+          tone="blue"
+          title="Upcoming fixtures"
+          description={
+            view.upcoming.length === 0 ? "Nothing upcoming." : "The next matches to be played"
+          }
+          flush={view.upcoming.length > 0}
+          data-testid="upcoming-panel"
+        >
+          {view.upcoming.length > 0 ? (
+            <Lines fixtures={view.upcoming} empty="" withDate />
+          ) : undefined}
+        </SectionCard>
       </div>
     </main>
   );

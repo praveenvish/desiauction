@@ -1,0 +1,674 @@
+/* ==========================================================================
+   THE SEASON'S OTHER TABS — Fixtures, Table, Lineups, Reviews, Money,
+   Readiness, Posters. The console kit draws the cards; this file holds what
+   those tabs share inside them: the action row above the cards, flush tables
+   that turn into stacked rows on a phone, team tiles, filter chips, hairline
+   lists. Same measures as the overview and the auction dashboard. Tokens only.
+   ========================================================================== */
+
+.st-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- The row above the cards: what this is, and the page's actions ---- */
+
+.st-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.st-head-lede {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.st-head-lede strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.st-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.st-actions a,
+.st-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---- Small words inside cards ---- */
+
+.st-meta {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.st-note {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.st-note strong {
+  color: var(--text-heading);
+}
+
+.st-pad {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.st-foot-note {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.st-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.st-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.st-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.st-link svg {
+  transition: transform var(--duration-fast) ease;
+}
+
+.st-link:hover svg {
+  transform: translateX(2px);
+}
+
+/* Cards side by side share a height. */
+.st-grid > * {
+  align-items: stretch;
+}
+
+/* ---- Empty state inside a card ---- */
+
+.st-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+}
+
+.st-empty-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.st-empty h3 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+}
+
+.st-empty p {
+  max-width: 52ch;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.st-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* ---- Team tile: the crest, or the team's initials on its own colour ---- */
+
+.st-crest {
+  --team: var(--text-muted);
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  /* The TeamChip formula: a wash of the team's colour with its initials in a
+     deepened version of it — legible whatever colour a club picked. */
+  background: color-mix(in srgb, var(--team) 16%, var(--surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--team) 30%, transparent);
+  color: color-mix(in srgb, var(--team) 55%, var(--text-heading));
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.st-crest[data-size="lg"] {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm-size);
+}
+
+.st-crest[data-size="xl"] {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-md-size);
+}
+
+.st-crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.st-crest[data-logo="true"] {
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+
+.st-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.st-team-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.st-team-name {
+  overflow: hidden;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.st-sub {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Filter row inside a flush card ---- */
+
+.st-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.st-search {
+  box-sizing: border-box;
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 44px;
+  padding: 0 var(--space-1) 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+}
+
+.st-search:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.st-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  outline: none;
+}
+
+.st-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.st-search button {
+  flex: none;
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.st-search button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.st-select {
+  box-sizing: border-box;
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 var(--space-8) 0 var(--space-3);
+  background-color: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+}
+
+.st-select[data-active="true"] {
+  border-color: var(--accent);
+  background-color: var(--accent-subtle);
+  color: var(--text-heading);
+}
+
+.st-select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Status chips: a count per state, each one a filter. */
+.st-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  list-style: none;
+}
+
+.st-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
+}
+
+.st-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-heading);
+}
+
+.st-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text-heading);
+}
+
+.st-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.st-chip-count {
+  min-width: 1.5em;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.st-chip[aria-pressed="true"] .st-chip-count {
+  background: var(--surface-raised);
+}
+
+/* ---- Flush tables ---- */
+
+.st-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.st-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.st-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.st-table thead th {
+  padding: var(--space-2) var(--space-3);
+  border-block: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-align: start;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.st-table tbody td,
+.st-table tbody th,
+.st-table tfoot td,
+.st-table tfoot th {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+  color: var(--text-primary);
+  text-align: start;
+  font-weight: var(--font-weight-regular);
+}
+
+.st-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.st-table tfoot > tr > * {
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 0;
+  background: var(--surface-sunken);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.st-table tr > :first-child {
+  padding-inline-start: var(--space-5);
+}
+
+.st-table tr > :last-child {
+  padding-inline-end: var(--space-5);
+}
+
+.st-table tbody tr:not([data-group]):hover > * {
+  background: color-mix(in srgb, var(--surface-sunken) 55%, transparent);
+}
+
+.st-table .st-num,
+.st-table th.st-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.st-strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.st-muted {
+  color: var(--text-muted);
+}
+
+.st-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-variant-ligatures: none;
+  color: var(--text-secondary);
+}
+
+/* A group header inside a table body — "Round 2 · Sat, 3 Aug". */
+.st-table tr[data-group] > th {
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.st-group-when {
+  margin-inline-start: var(--space-2);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.st-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.st-row-actions > * {
+  flex: none;
+}
+
+/* The ⋯ trigger for a row's rarer actions. */
+.st-kebab {
+  flex: none;
+  color: var(--text-muted);
+  padding: var(--space-2);
+}
+
+.st-kebab:hover {
+  color: var(--text-primary);
+}
+
+/* ---- Hairline list rows inside a card ---- */
+
+.st-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.st-rows > li {
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.st-rows > li:first-child {
+  padding-top: 0;
+}
+
+.st-rows > li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* ---- Pager ---- */
+
+.st-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* ---- Phone ---- */
+
+@media (max-width: 719px) {
+  .st-head {
+    align-items: stretch;
+  }
+
+  .st-actions {
+    width: 100%;
+  }
+
+  .st-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .st-toolbar,
+  .st-chips {
+    padding-inline: var(--space-4);
+  }
+
+  .st-select {
+    flex: 1 1 140px;
+    width: 100%;
+  }
+
+  .st-pad {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  .st-foot-note,
+  .st-pager {
+    padding-inline: var(--space-4);
+  }
+
+  .st-table tr > :first-child {
+    padding-inline-start: var(--space-4);
+  }
+
+  .st-table tr > :last-child {
+    padding-inline-end: var(--space-4);
+  }
+
+  /* A table marked data-stack becomes one card per row: the heading row goes
+     to screen readers only and each cell names itself from data-label. */
+  .st-table[data-stack] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .st-table[data-stack],
+  .st-table[data-stack] tbody,
+  .st-table[data-stack] tfoot {
+    display: block;
+  }
+
+  .st-table[data-stack] tbody tr:not([data-group]),
+  .st-table[data-stack] tfoot tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .st-table[data-stack] tbody tr[data-group] {
+    display: block;
+  }
+
+  .st-table[data-stack] tbody tr[data-group] > th {
+    display: block;
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .st-table[data-stack] tbody tr:not([data-group]) > *,
+  .st-table[data-stack] tfoot tr > * {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: start;
+  }
+
+  .st-table[data-stack] [data-span="full"] {
+    grid-column: 1 / -1;
+  }
+
+  .st-table[data-stack] [data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: var(--text-xs-size);
+    font-weight: var(--font-weight-regular);
+    color: var(--text-muted);
+  }
+
+  .st-table[data-stack] .st-row-actions {
+    justify-content: flex-start;
+  }
+}

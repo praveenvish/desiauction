@@ -1,6 +1,15 @@
 "use client";
 
-import { Badge, Button, Card, Field, Select, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Field,
+  IconTrophy,
+  Pill,
+  SectionCard,
+  Select,
+  TeamChip,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -32,6 +41,9 @@ export interface ResultFixture {
   readonly homeTeamId: string | null;
   readonly homeTeamName: string | null;
   readonly awayTeamName: string | null;
+  /** Colours for the team chips; absent where the caller has none. */
+  readonly homeTeamColor?: string | null;
+  readonly awayTeamColor?: string | null;
   readonly status: string;
   /** Lobby only: how many squads dropped in, and how many have been placed. */
   readonly squadCount: number;
@@ -248,24 +260,25 @@ export function ResultsCard({
   };
 
   return (
-    <Card data-testid="results-card">
-      <div className="competition-title-row">
-        <h2>Results</h2>
-        <Badge
-          tone={outstanding.length === 0 ? "success" : "warning"}
-          data-testid="results-outstanding"
-        >
+    <SectionCard
+      icon={<IconTrophy />}
+      tone="green"
+      title="Results"
+      description={
+        played.some(isLobbyFixture)
+          ? "A lobby is scored by where each squad finished — 1 is the win, and squads may share a place. The table is derived from these, so a correction here moves it immediately."
+          : "Overs are written the way a scorer writes them — 18.3 is eighteen overs and three balls. The table is derived from these, so a correction here moves it immediately."
+      }
+      action={
+        <Pill tone={outstanding.length === 0 ? "green" : "amber"} dot testId="results-outstanding">
           {outstanding.length === 0
             ? "All played matches scored"
             : `${String(outstanding.length)} still to score`}
-        </Badge>
-      </div>
-      <p className="competitions-hint">
-        {played.some(isLobbyFixture)
-          ? "A lobby is scored by where each squad finished — 1 is the win, and squads may share a place. The table is derived from these, so a correction here moves it immediately."
-          : "Overs are written the way a scorer writes them — 18.3 is eighteen overs and three balls. The table is derived from these, so a correction here moves it immediately."}
-      </p>
-      <ul className="cockpit-queue results-list" data-testid="results-list">
+        </Pill>
+      }
+      data-testid="results-card"
+    >
+      <ul className="st-rows fx-results" data-testid="results-list">
         {/* Outstanding first: this list is a worklist, and the matches that
             still need something are the reason anybody opened it. */}
         {[...outstanding, ...played.filter((f) => isScored(f, results))].map((fixture) => {
@@ -273,40 +286,61 @@ export function ResultsCard({
           const lobby = isLobbyFixture(fixture);
           const scored = isScored(fixture, results);
           return (
-            <li key={fixture.id} data-testid={`result-${fixture.number}`}>
-              <Badge tone={scored ? "neutral" : "warning"}>{fixture.number}</Badge>
-              <span className="registration-name">
-                {lobby
-                  ? `${String(fixture.squadCount)} squads`
-                  : `${fixture.homeTeamName ?? "TBA"} v ${fixture.awayTeamName ?? "TBA"}`}
-              </span>
-              <span className="competitions-hint">
-                {lobby
-                  ? scored
-                    ? "every squad placed"
-                    : `${String(fixture.placedCount)} of ${String(fixture.squadCount)} placed`
-                  : recorded === undefined
-                    ? "no result recorded"
-                    : `${summarise(recorded.score?.home)} – ${summarise(recorded.score?.away)} · ${recorded.outcome.replace("_", " ")}`}
-              </span>
-              {canManage ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    open(fixture);
-                  }}
-                  data-testid={`record-${fixture.number}`}
-                >
-                  {scored ? "Amend" : "Record"}
-                </Button>
-              ) : null}
+            <li key={fixture.id} data-testid={`result-${fixture.number}`} data-scored={scored}>
+              <div className="fx-result-row">
+                <span className="st-mono">{fixture.number}</span>
+                <span className="fx-teams">
+                  {lobby ? (
+                    <TeamChip color={null}>{fixture.squadCount} squads</TeamChip>
+                  ) : (
+                    <>
+                      <TeamChip color={fixture.homeTeamColor ?? null}>
+                        {fixture.homeTeamName ?? "TBA"}
+                      </TeamChip>
+                      <span className="fx-vs">v</span>
+                      <TeamChip color={fixture.awayTeamColor ?? null}>
+                        {fixture.awayTeamName ?? "TBA"}
+                      </TeamChip>
+                    </>
+                  )}
+                </span>
+                <span className="fx-result-score">
+                  {lobby ? (
+                    scored ? (
+                      "every squad placed"
+                    ) : (
+                      <Pill tone="amber">{`${String(fixture.placedCount)} of ${String(fixture.squadCount)} placed`}</Pill>
+                    )
+                  ) : recorded === undefined ? (
+                    <Pill tone="amber">no result recorded</Pill>
+                  ) : (
+                    <>
+                      <strong>
+                        {summarise(recorded.score?.home)} – {summarise(recorded.score?.away)}
+                      </strong>{" "}
+                      · {recorded.outcome.replace("_", " ")}
+                    </>
+                  )}
+                </span>
+                {canManage ? (
+                  <Button
+                    size="sm"
+                    variant={scored ? "ghost" : "secondary"}
+                    onClick={() => {
+                      open(fixture);
+                    }}
+                    data-testid={`record-${fixture.number}`}
+                  >
+                    {scored ? "Amend" : "Record"}
+                  </Button>
+                ) : null}
+              </div>
               {canManage && openId === fixture.id && lobby ? (
-                <div className="authority-form" data-testid="lobby-form">
+                <div className="fx-result-form" data-testid="lobby-form">
                   {squads === null ? (
-                    <p className="competitions-hint">Loading the squads…</p>
+                    <p className="st-note">Loading the squads…</p>
                   ) : squads.length === 0 ? (
-                    <p className="competitions-hint">This lobby has no squads in it.</p>
+                    <p className="st-note">This lobby has no squads in it.</p>
                   ) : (
                     <>
                       {/* One block per squad, in finishing order. Placement is a
@@ -315,7 +349,7 @@ export function ResultsCard({
                       {squads.map((squad) => (
                         <div
                           key={squad.teamId}
-                          className="date-row"
+                          className="fx-squad-row"
                           data-testid={`squad-row-${squad.teamId}`}
                         >
                           <Field
@@ -362,7 +396,7 @@ export function ResultsCard({
                 </div>
               ) : null}
               {canManage && openId === fixture.id && !lobby ? (
-                <div className="authority-form" data-testid="result-form">
+                <div className="fx-result-form" data-testid="result-form">
                   <Select
                     label="How it ended"
                     value={form.outcome}
@@ -404,6 +438,6 @@ export function ResultsCard({
           );
         })}
       </ul>
-    </Card>
+    </SectionCard>
   );
 }

@@ -1,5 +1,12 @@
 import { addDays } from "@desiauction/core";
-import { ButtonLink, Card, ToastProvider, IconArrowRight, IconArrowLeft } from "@desiauction/ui";
+import {
+  ButtonLink,
+  IconArrowLeft,
+  IconArrowRight,
+  IconCalendar,
+  IconList,
+  ToastProvider,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,6 +14,8 @@ import { formatWallDate } from "../../../../../lib/format-date";
 import { matchDayView } from "../../../../../server/competition/fixture-actions";
 import { MatchDayPanel } from "./match-day-panel";
 import "../../../seasons.css";
+import "../../_tabs/tabs.css";
+import "../fixtures.css";
 
 export const metadata = { title: "Match day · DesiAuction" };
 
@@ -30,28 +39,35 @@ export default async function MatchDayPage({
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <header className="dash-head">
-            <div className="competition-title-row title-row-actions">
-              <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary">
-                Fixtures
+          <div className="st-head">
+            <span className="cal-pager">
+              <Link
+                href={dayHref(addDays(view.date, -1))}
+                className="cal-step"
+                aria-label="Previous day"
+              >
+                <IconArrowLeft size={16} aria-hidden />
+              </Link>
+              <strong data-testid="match-day-date">{formatWallDate(view.date)}</strong>
+              <Link
+                href={dayHref(addDays(view.date, 1))}
+                className="cal-step"
+                aria-label="Next day"
+              >
+                <IconArrowRight size={16} aria-hidden />
+              </Link>
+            </span>
+            <div className="st-actions">
+              <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary" size="sm">
+                <IconList size={16} aria-hidden />
+                Fixture list
+              </ButtonLink>
+              <ButtonLink href={`/seasons/${slug}/fixtures/calendar`} variant="secondary" size="sm">
+                <IconCalendar size={16} aria-hidden />
+                Calendar
               </ButtonLink>
             </div>
-          </header>
-
-          <Card>
-            <nav className="calendar-nav" aria-label="Match day">
-              <span className="date-row">
-                <Link href={dayHref(addDays(view.date, -1))} className="calendar-tab">
-                  <IconArrowLeft size={16} className="icon-lead" /> previous day
-                </Link>
-                <strong data-testid="match-day-date">{formatWallDate(view.date)}</strong>
-                <Link href={dayHref(addDays(view.date, 1))} className="calendar-tab">
-                  next day
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              </span>
-            </nav>
-          </Card>
+          </div>
 
           <MatchDayPanel
             slug={slug}
