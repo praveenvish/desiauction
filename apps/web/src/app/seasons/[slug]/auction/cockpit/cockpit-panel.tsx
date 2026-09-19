@@ -13,7 +13,11 @@ import {
 import { formatDateTime } from "../../../../../lib/format-date";
 import { personContact } from "../../../../../lib/person-label";
 import { GavelButton, type GavelHandle } from "./gavel-button";
-import type { CockpitView, OwnerAcceptance } from "../../../../../server/auction/conduct-actions";
+import type { CockpitView } from "../../../../../server/auction/conduct-actions";
+// Straight from its own module: a "use server" file may export only async
+// functions, and Turbopack compiled its `export type` re-export into a real
+// export that does not exist — the cockpit 500'd on every load.
+import type { OwnerAcceptance } from "../../../../../server/auction/owner-acceptances";
 import {
   grantPaddleAction,
   inviteOwnerAction,

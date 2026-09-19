@@ -65,7 +65,6 @@ function signCrests<T extends { logoKey: string | null }>(
 }
 
 import type { OwnerAcceptance } from "./owner-acceptances";
-export type { OwnerAcceptance };
 
 export interface CockpitView {
   competition: { name: string; slug: string };
