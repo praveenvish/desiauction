@@ -47,6 +47,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { requestOtp, verifyOtp } from "../auth/otp";
+import { smsSeasonName } from "../messaging/templates";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { advanceCompetition, createCompetition, resolveCompetition } from "./competitions";
@@ -198,7 +199,9 @@ describe("THE LONG SEASON NAME that silently swallowed every notice", () => {
       .where(and(eq(otpInbox.phone, PLAYER), like(otpInbox.code, "DesiAuction:%")))
       .limit(1);
     expect(message?.body).toContain("You are approved for");
-    expect(message?.body).toContain(LONGEST_NAME);
+    // Shortened to one DLT variable (30 characters, templates.ts) — never
+    // refused: a long season name must not cost the player their notice.
+    expect(message?.body).toContain(`approved for ${smsSeasonName(LONGEST_NAME)}. You are`);
   });
 
   it("sends a link that fits the slot with the season left out of it", async () => {
@@ -227,9 +230,10 @@ describe("THE LONG SEASON NAME that silently swallowed every notice", () => {
 describe("AN UNRENDERABLE MESSAGE IS COUNTED, NOT SWALLOWED", () => {
   it("reports every untold person as FAILED rather than answering zero", async () => {
     /*
-     * Forced through the competition NAME, the other capped slot, because the
-     * link can no longer overrun. The point is not which slot broke — it is
-     * that a message we could not compose must never read as "nothing to send".
+     * Forced through an EMPTY season name: a long one is now shortened rather
+     * than refused, so blank is the only name that cannot be composed. The
+     * point is not which slot broke — it is that a message we could not
+     * compose must never read as "nothing to send".
      *
      * FAILED and not SUPPRESSED, deliberately: suppressed means "we decided not
      * to text this person" and is a settled state nobody chases. This is ours
@@ -241,7 +245,7 @@ describe("AN UNRENDERABLE MESSAGE IS COUNTED, NOT SWALLOWED", () => {
       db,
       {
         orgId: org.id,
-        competitionName: "x".repeat(200),
+        competitionName: "   ",
         registrationIds: [registrationId],
         event: "approve",
         actorId: organizerId,

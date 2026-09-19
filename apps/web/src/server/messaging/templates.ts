@@ -87,103 +87,92 @@ export interface MessageTemplate {
 const SLOT = /\{([a-z0-9_]+)\}/g;
 
 /**
+ * WHAT DLT ALLOWS A VARIABLE TO HOLD (v2, launch go-live pack).
+ *
+ * The operator portals cap every `{#var#}` at 30 characters, and since TRAI's
+ * 2024 URL rule a link must be a WHITELISTED domain in the fixed text — not a
+ * variable. v1 declared a 60-character season slot, a 50-character reason and
+ * the link as a slot: registrable as written by none of the portals. v2 holds
+ * every variable to 30 (season names are shortened by `smsSeasonName`, reasons
+ * were rewritten to fit), and carries the link as fixed text on the production
+ * domain — which must be whitelisted under the entity before these send.
+ *
+ * The same text is the registration sheet: docs/messaging/DLT_REGISTRATION.md
+ * is generated from this file (`pnpm --filter @desiauction/web dlt:sheet`).
+ */
+export const DLT_VAR_MAX = 30;
+
+/** Fixed text, not a slot: a URL must be on a whitelisted domain (TRAI, 2024). */
+export const SMS_LINK = "https://desiauction.in/home";
+export const SMS_SUPPORT_LINK = "https://desiauction.in/support";
+
+/**
  * The five decision notices, all transactional: each is the direct consequence
  * of an action the recipient took. None may be sent for marketing.
  *
- * WHAT THE SLOT BUDGETS ACTUALLY BUY, measured rather than asserted.
+ * WHAT THE BUDGET BUYS (v2), measured rather than asserted.
  *
  * An SMS is 160 GSM-7 characters before it splits into 153-character parts,
- * each billed, and a split transactional message is also more likely to be
- * scrubbed. This comment used to say the budgets were "deliberately tight" and
- * the numbers did not support it: `link` was capped at 60 when the longest link
- * this product can build is 27, and at their declared maxima FIVE of six
- * templates ran past 160 — `registration.rejected` reached 246.
- *
- * The caps now describe what can actually arrive:
- *
- *   competition — `NAME_MAX_LENGTH`, the longest season name `validateName`
- *                 accepts. Tied to it by test.
- *   link        — `${PUBLIC_BASE_URL}/home`, which carries no variable part
- *                 since the season came out of it. 40 covers a base URL of 35
- *                 characters; production uses 27.
- *   reason      — the longest sentence in `REASON_TO_PLAYER`. Tied by test.
- *
- * And the residue is a decision rather than an accident. With a season named
- * the way seasons are actually named, every template is ONE segment. With the
- * longest name the product accepts, four become two. Cutting that would mean
- * cutting the sentences that say what a status MEANS — a player told only
- * "you are on the waitlist", without "the organizer moves waitlisted players up
- * if a place opens", reasonably reads it as a rejection. A second segment on a
- * minority of seasons is the cheaper mistake. `templates.test.ts` holds every
- * one of these numbers so the next edit has to justify itself.
+ * each billed, and a split message is likelier to be scrubbed. v1 capped a
+ * season at 60 characters, and at its maxima four of six templates ran to two
+ * segments. v2 fills every variable to DLT's 30 and every template is still
+ * ONE segment at worst — `templates.test.ts` holds each number, so the next
+ * sentence added has to justify itself there.
  */
 export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
   "registration.approved": {
     key: "registration.approved",
-    version: "1",
+    version: "2",
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: You are approved for {competition}. You are in the player pool for auction day. {link}",
-    slots: [
-      { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 40 },
-    ],
+    body: `DesiAuction: You are approved for {competition}. You are in the player pool for auction day. ${SMS_LINK}`,
+    slots: [{ name: "competition", maxLength: DLT_VAR_MAX }],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_APPROVED",
   },
   "registration.waitlisted": {
     key: "registration.waitlisted",
-    version: "1",
+    version: "2",
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: You are on the waitlist for {competition}. The organizer moves waitlisted players up if a place opens. {link}",
-    slots: [
-      { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 40 },
-    ],
+    body: `DesiAuction: You are on the waitlist for {competition}. The organizer moves players up if a place opens. ${SMS_LINK}`,
+    slots: [{ name: "competition", maxLength: DLT_VAR_MAX }],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_WAITLISTED",
   },
   "registration.rejected": {
     key: "registration.rejected",
-    version: "1",
+    version: "2",
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
     // The reason is a slot, not five separate templates: DLT matches the fixed
     // text, and the reasons are a closed set we control (REASON_TO_PLAYER).
-    body: "DesiAuction: Your registration for {competition} was not approved - {reason}. {link}",
+    body: `DesiAuction: Your registration for {competition} was not approved: {reason}. ${SMS_LINK}`,
     slots: [
-      { name: "competition", maxLength: 60 },
-      { name: "reason", maxLength: 50 },
-      { name: "link", maxLength: 40 },
+      { name: "competition", maxLength: DLT_VAR_MAX },
+      { name: "reason", maxLength: DLT_VAR_MAX },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_REJECTED",
   },
   "registration.withdrawn": {
     key: "registration.withdrawn",
-    version: "1",
+    version: "2",
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: Your registration for {competition} has been withdrawn. You can register again while intake is open. {link}",
-    slots: [
-      { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 40 },
-    ],
+    body: `DesiAuction: Your registration for {competition} was withdrawn. You can register again while it is open. ${SMS_LINK}`,
+    slots: [{ name: "competition", maxLength: DLT_VAR_MAX }],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_WITHDRAWN",
   },
   "registration.restored": {
     key: "registration.restored",
-    version: "1",
+    version: "2",
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: Your registration for {competition} is back under review. {link}",
-    slots: [
-      { name: "competition", maxLength: 60 },
-      { name: "link", maxLength: 40 },
-    ],
+    body: `DesiAuction: Your registration for {competition} is back under review. ${SMS_LINK}`,
+    slots: [{ name: "competition", maxLength: DLT_VAR_MAX }],
     providerTemplateEnv: "MSG91_TEMPLATE_REGISTRATION_RESTORED",
   },
   /*
@@ -197,21 +186,43 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
    * itself instead of completing in silence.
    *
    * The new number is NOT named in full. Somebody who has taken an account
-   * should not be handed a working contact for its owner, and "the last four
-   * digits changed to" is enough for the owner to recognise their own handset
-   * or fail to.
+   * should not be handed a working contact for its owner, and "ending 4321" is
+   * enough for the owner to recognise their own handset or fail to.
+   *
+   * v1 said "reply to this message". An alphanumeric DLT header cannot receive
+   * a reply — the one person who most needed a way out was pointed at a dead
+   * end. v2 points at support.
    */
   "security.phone_changed": {
     key: "security.phone_changed",
-    version: "1",
+    version: "2",
     channel: "sms",
     locale: "en-IN",
     category: "transactional",
-    body: "DesiAuction: The mobile number on your account was changed to one ending {last4}. If this was not you, reply to this message or contact your organizer now.",
+    body: `DesiAuction: Your account's mobile number was changed to one ending {last4}. Not you? Get help now at ${SMS_SUPPORT_LINK}`,
     slots: [{ name: "last4", maxLength: 4 }],
     providerTemplateEnv: "MSG91_TEMPLATE_SECURITY_PHONE_CHANGED",
   },
 };
+
+/**
+ * A season name as it fits one DLT variable: whole words up to the cap. No
+ * ellipsis — "..." against the template's own full stop printed "Cricket...."
+ * mid-sentence, and a real ellipsis is not GSM-7 (it would halve the segment).
+ * "Malad Gymkhana Cricket" still tells the player which season this is; an
+ * undeliverable notice would tell them nothing.
+ */
+export function smsSeasonName(name: string): string {
+  const trimmed = name.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= DLT_VAR_MAX) {
+    return trimmed;
+  }
+  const cut = trimmed.slice(0, DLT_VAR_MAX + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > DLT_VAR_MAX / 2 ? cut.slice(0, lastSpace) : trimmed.slice(0, DLT_VAR_MAX))
+    .trim()
+    .replace(/[\s,;:.-]+$/, "");
+}
 
 export type RenderResult =
   | { readonly ok: true; readonly body: string; readonly slots: Record<string, string> }

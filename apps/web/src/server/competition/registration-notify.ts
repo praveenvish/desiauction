@@ -6,6 +6,7 @@ import { env } from "../../env";
 import { maySend } from "../messaging/consent";
 import {
   SMS_TEMPLATES,
+  smsSeasonName,
   renderTemplate,
   type MessageTemplate,
   type TemplateKey,
@@ -230,12 +231,15 @@ export function createPlayerSmsSender(db: Db): PlayerSmsSender {
 // --- The copy ---------------------------------------------------------------
 
 /** What a rejection reason means to the person it happened to. */
+// Each fits one DLT variable (30 characters, templates.ts) — they are the only
+// values that ever fill the rejection notice's {reason}, and the player's
+// registration page shows the same words.
 export const REASON_TO_PLAYER: Record<RejectionReason, string> = {
-  duplicate: "you were already registered for this season",
-  ineligible: "you did not meet this season's eligibility rules",
+  duplicate: "you were already registered",
+  ineligible: "eligibility rules were not met",
   withdrew: "you asked to withdraw",
-  capacity: "the season filled up",
-  other: "the organizer did not give a specific reason",
+  capacity: "the season is full",
+  other: "no reason was given",
 };
 
 export type NotifiableEvent = "approve" | "reject" | "waitlist" | "withdraw" | "restore";
@@ -260,14 +264,16 @@ const TEMPLATE_FOR_EVENT: Readonly<Record<NotifiableEvent, TemplateKey>> = {
 function messageFor(
   event: NotifiableEvent,
   competitionName: string,
-  link: string,
   reason: RejectionReason | undefined,
 ): TemplatedSms | null {
   const template = SMS_TEMPLATES[TEMPLATE_FOR_EVENT[event]];
+  // Shortened to one DLT variable rather than refused: a long season name
+  // must never cost the player their notice.
+  const competition = smsSeasonName(competitionName);
   const slots: Record<string, string> =
     event === "reject"
-      ? { competition: competitionName, reason: REASON_TO_PLAYER[reason ?? "other"], link }
-      : { competition: competitionName, link };
+      ? { competition, reason: REASON_TO_PLAYER[reason ?? "other"] }
+      : { competition };
   const rendered = renderTemplate(template, slots);
   if (!rendered.ok) {
     return null;
@@ -323,8 +329,8 @@ export async function notifyDecision(
    * bare login wall, and it is answered by the SMS itself rather than by the
    * page it points at.
    */
-  const link = `${env.PUBLIC_BASE_URL}/home`;
-  const body = messageFor(input.event, input.competitionName, link, input.reason);
+  // v2: the link is fixed text in every template (templates.ts SMS_LINK).
+  const body = messageFor(input.event, input.competitionName, input.reason);
   if (body === null) {
     /*
      * UNRENDERABLE IS A FAILURE, NOT A NO-OP.
@@ -348,7 +354,7 @@ export async function notifyDecision(
       new Error(`registration notice for "${input.event}" could not be rendered`),
       {
         tags: { area: "messaging", template: TEMPLATE_FOR_EVENT[input.event] },
-        extra: { linkLength: link.length, competitionNameLength: input.competitionName.length },
+        extra: { competitionNameLength: input.competitionName.length },
       },
     );
     return { sent: 0, failed: input.registrationIds.length, suppressed: 0 };
