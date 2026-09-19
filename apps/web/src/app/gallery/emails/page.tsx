@@ -9,6 +9,7 @@ import {
   appointmentMail,
   ownerSummaryMail,
   soldMail,
+  squadSheetMail,
   unsoldMail,
 } from "../../../server/messaging/player-mail";
 import { reviewAskMail, seasonAskMail } from "../../../server/reviews/review-mail";
@@ -94,6 +95,23 @@ export default function EmailGalleryPage() {
         teamName: "Cup Kings",
         roles: ["captain"],
         bought: true,
+      }),
+    },
+    {
+      name: "Meet your squad — every squad member, after the auction",
+      mail: squadSheetMail({
+        name: "Arjun",
+        season: "Malad Premier League 2026",
+        orgName: "Malad Cricket Club",
+        teamName: "Cup Kings",
+        squad: [
+          { name: "Vikram Patel", note: "Captain" },
+          { name: "Rahul Desai", note: "Icon" },
+          { name: "Arjun Sharma (you)", note: "Player" },
+          { name: "Karan Mehta", note: "Player" },
+        ],
+        coach: "Suresh Iyer",
+        firstMatch: "vs Tigers · Sun, 4 Oct 2026, 7:30 am · Malad Ground",
       }),
     },
     {

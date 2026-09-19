@@ -97,6 +97,8 @@ export class SmsSendError extends Error {
   constructor(
     message: string,
     readonly breakerOpen: boolean,
+    /** No retry can deliver it — the shape has no registered template id. */
+    readonly permanent = false,
   ) {
     super(message);
     this.name = "SmsSendError";
@@ -147,6 +149,7 @@ export class Msg91FlowSmsSender implements PlayerSmsSender {
       throw new SmsSendError(
         `no DLT template registered for ${message.template.key} (set ${message.template.providerTemplateEnv})`,
         false,
+        true,
       );
     }
     const base = this.config.apiBase ?? MSG91_API_BASE;
@@ -183,6 +186,12 @@ export class Msg91FlowSmsSender implements PlayerSmsSender {
   }
 }
 
+/** The MSG91 template id configured for a template's env var, if any. */
+export function templateIdFromEnv(variable: string): string | undefined {
+  const value: unknown = (env as Readonly<Record<string, unknown>>)[variable];
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
 /**
  * One construction point. The real provider is selected only when the platform
  * is already sending real SMS (OTP_PROVIDER=msg91) AND a transactional flow id
@@ -205,17 +214,17 @@ export function createPlayerSmsSender(db: Db): PlayerSmsSender {
    * the variable, rather than sending against the wrong registration.
    */
   // Read through `env`, never `process.env` — the validated surface is the only
-  // one allowed outside env.ts (IP-0_DESIGN §11), and it is also what makes a
-  // typo in a variable name a compile error instead of an undelivered message.
-  const ids: Readonly<Record<string, string | undefined>> = {
-    MSG91_TEMPLATE_REGISTRATION_APPROVED: env.MSG91_TEMPLATE_REGISTRATION_APPROVED,
-    MSG91_TEMPLATE_REGISTRATION_WAITLISTED: env.MSG91_TEMPLATE_REGISTRATION_WAITLISTED,
-    MSG91_TEMPLATE_REGISTRATION_REJECTED: env.MSG91_TEMPLATE_REGISTRATION_REJECTED,
-    MSG91_TEMPLATE_REGISTRATION_WITHDRAWN: env.MSG91_TEMPLATE_REGISTRATION_WITHDRAWN,
-    MSG91_TEMPLATE_REGISTRATION_RESTORED: env.MSG91_TEMPLATE_REGISTRATION_RESTORED,
-  };
+  // one allowed outside env.ts (IP-0_DESIGN §11). A variable a template names
+  // but env.ts does not declare fails templates.test ("names an env var that
+  // env.ts actually declares"), not an undelivered message.
+  //
+  // Every template's id, read by the variable it names — NOT a hand-kept list.
+  // The list was five registration shapes long, so the phone-change security
+  // alert (sent through this same sender) had no id in production however it
+  // was configured, and failed as "no DLT template registered". A template now
+  // cannot be added without its id being looked up.
   const registered = (template: MessageTemplate): string | undefined =>
-    ids[template.providerTemplateEnv];
+    templateIdFromEnv(template.providerTemplateEnv);
   const anyRegistered = Object.values(SMS_TEMPLATES).some(
     (template) => (registered(template) ?? "") !== "",
   );

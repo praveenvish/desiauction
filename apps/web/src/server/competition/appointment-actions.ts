@@ -8,10 +8,12 @@ import { dbHandle } from "../db";
 import { canCompetition } from "./authz";
 import { announceAppointments, appointmentsView, rolesLabel } from "./appointments";
 import { resolveMemberCompetition } from "./resolve";
+import { sendSquadSheets, squadSheetsView, type SquadSheetsView } from "./squad-sheets";
 
 /**
- * Who may announce appointments: whoever may set them — `team.manage`, the
- * same capability the captain / icon / retained toggles require.
+ * Who may announce appointments and send squad sheets: whoever may set the
+ * squads — `team.manage`, the capability the captain / icon / retained toggles
+ * and team assignment require.
  */
 async function gate(slug: string) {
   const session = await currentSession();
@@ -67,4 +69,35 @@ export async function announceAppointmentsAction(
   );
   revalidatePath(`/seasons/${slug}/teams`);
   return { ok: true, told };
+}
+
+// --- Squad sheets ("Meet your squad") -----------------------------------------
+
+export type SquadSheetsPanelView = SquadSheetsView;
+
+export async function squadSheetsPanelView(slug: string): Promise<SquadSheetsPanelView | null> {
+  const gated = await gate(slug);
+  if (gated === null) return null;
+  const { personId, competition } = gated;
+  return withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
+    squadSheetsView(db, competition.id),
+  );
+}
+
+export async function sendSquadSheetsAction(
+  slug: string,
+): Promise<{ ok: true; sent: number } | { ok: false; error: string }> {
+  const gated = await gate(slug);
+  if (gated === null) {
+    return { ok: false, error: "You can't send squad sheets for this season." };
+  }
+  const { personId, competition } = gated;
+  const result = await withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
+    sendSquadSheets(db, { competitionId: competition.id, actorId: personId }),
+  );
+  if (!result.ok) {
+    return { ok: false, error: result.reason };
+  }
+  revalidatePath(`/seasons/${slug}/teams`);
+  return { ok: true, sent: result.sent };
 }

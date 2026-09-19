@@ -233,6 +233,10 @@
     "apps/web/src/server/competition/appointments.ts": {
       "class": "by-design",
       "reason": "Reads message_outbox dedupe keys (platform queue, no RLS) to tell which appointments were already announced; every season read stays inside the caller's withTenantDb. Behind team.manage (appointment-actions.ts)."
+    },
+    "apps/web/src/server/competition/squad-sheets.ts": {
+      "class": "by-design",
+      "reason": "Reads message_outbox dedupe keys (platform queue, no RLS) to tell which squad members already have their sheet for their current team; every season read stays inside the caller's withTenantDb. Behind team.manage (appointment-actions.ts)."
     }
   }
 }

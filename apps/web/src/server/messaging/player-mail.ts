@@ -158,6 +158,30 @@ export function rolesTitle(roles: readonly AppointedRole[]): string {
   return `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1] ?? ""}`;
 }
 
+/**
+ * The roles as they fit ONE DLT variable (30 characters, templates.ts). The
+ * full words first ("captain and icon player"); past the cap, the short words
+ * ("vice-captain, icon and retained"); past that, the first role alone —
+ * never a truncated phrase.
+ */
+export function smsRolePhrase(roles: readonly AppointedRole[], max = 30): string {
+  const ordered = ROLE_ORDER.filter((role) => roles.includes(role));
+  const full = rolesTitle(ordered);
+  if (full.length <= max) return full;
+  const SHORT: Record<AppointedRole, string> = {
+    captain: "captain",
+    vice_captain: "vice-captain",
+    icon: "icon",
+    retained: "retained",
+  };
+  const words = ordered.map((role) => SHORT[role]);
+  const short =
+    words.length <= 1
+      ? (words[0] ?? "")
+      : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1] ?? ""}`;
+  return short.length <= max ? short : ROLE_WORDS[ordered[0] ?? "captain"].title;
+}
+
 export interface AppointmentFacts {
   readonly name: string;
   readonly season: string;
@@ -192,6 +216,52 @@ export function appointmentMail(facts: AppointmentFacts): ComposedMail {
       ],
       action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
       footnote: `You received this because ${facts.orgName} named you in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+    }),
+  };
+}
+
+// --- The squad sheet -----------------------------------------------------------
+
+export interface SquadSheetFacts {
+  readonly name: string;
+  readonly season: string;
+  readonly orgName: string;
+  readonly teamName: string;
+  /** The whole squad, the reader marked "(you)", roles as the note. */
+  readonly squad: readonly SquadLine[];
+  readonly coach: string | null;
+  /** "vs Tigers · Sun, 4 Oct 2026, 7:30 am · Malad Ground", or null. */
+  readonly firstMatch: string | null;
+}
+
+/**
+ * "Meet your squad" — the whole team, the captain and coach named, the first
+ * match. Sent when the organizer presses Send, after the auction: the one mail
+ * every squad member gets, including the captain and icons, who never had a
+ * sale to be told about.
+ */
+export function squadSheetMail(facts: SquadSheetFacts): ComposedMail {
+  const count = facts.squad.length;
+  return {
+    subject: `Meet your ${facts.teamName} squad`,
+    ...renderEmail({
+      preheader: `${String(count)} players${facts.coach === null ? "" : `, coached by ${facts.coach}`} — the ${facts.teamName} squad for ${facts.season}.`,
+      heading: `Meet your ${facts.teamName} squad`,
+      paragraphs: [
+        `Hi ${facts.name},`,
+        `${facts.orgName} has set the ${facts.teamName} squad for ${facts.season}. Here is who you'll be playing with.`,
+      ],
+      details: [
+        ...facts.squad.map((line) => [line.name, line.note] as const),
+        ...(facts.coach === null ? [] : [["Coach", facts.coach] as const]),
+      ],
+      after: [
+        facts.firstMatch === null
+          ? `${facts.orgName} will share the fixtures soon.`
+          : `Your first match: ${facts.firstMatch}.`,
+      ],
+      action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
+      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
     }),
   };
 }

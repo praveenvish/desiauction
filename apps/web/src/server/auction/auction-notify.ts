@@ -12,8 +12,8 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { logSecurityEvent } from "../auth/security-events";
 import { dbHandle } from "../db";
-import { enqueueMail, kickDrain } from "../messaging/outbox";
-import { auctionOutcomeMails } from "./outcome-mail";
+import { enqueueMail, enqueueSms, kickDrain } from "../messaging/outbox";
+import { auctionOutcomeMessages } from "./outcome-mail";
 
 /**
  * TELLING THE PLAYER WHAT HAPPENED TO THEM.
@@ -116,24 +116,27 @@ export async function announceAuctionOutcomes(input: {
 }): Promise<number> {
   let sent = 0;
   try {
-    const [outcomes, mails] = await withTenantDb(
+    const [outcomes, messages] = await withTenantDb(
       dbHandle,
       { personId: input.personId, orgId: input.orgId },
       (db) =>
         Promise.all([
           outcomesOf(db, input.auctionId, input.competition),
-          auctionOutcomeMails(db, {
+          auctionOutcomeMessages(db, {
             auctionId: input.auctionId,
             competitionId: input.competition.id,
-          }).catch(() => []),
+          }).catch(() => ({ mails: [], texts: [] })),
         ]),
     );
     // The personal emails (sold, unsold, each owner's squad) are QUEUED, not
     // sent: ninety provider calls must not hold the conductor's screen, and the
     // queue's dedupe key makes a retried completion a no-op. Delivered after
     // the response; the scheduled drain catches anything a restart dropped.
+    // A sale also goes out as one line of SMS — most players have no verified
+    // email. Held till 8 am if the night ran late (outbox.ts).
     try {
-      await enqueueMail(mails);
+      await enqueueMail(messages.mails);
+      await enqueueSms(messages.texts);
       kickDrain();
     } catch {
       // The inbox rows below still carry every outcome.

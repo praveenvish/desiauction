@@ -96,10 +96,12 @@ Login is OTP-first. Until this section is done, nobody but the operator can
 sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
 
 1. **F** — MSG91 account plus **DLT registration**: the principal entity, the
-   sender header, and one content template per message shape. The OTP
-   template needs a code slot. Registration decision notices are separate
-   templates (the regime registers one template per message shape), and the
-   old number's phone-change notice is one more.
+   sender header, and one content template per message shape — every template
+   in [DLT_REGISTRATION](../messaging/DLT_REGISTRATION.md), generated from the
+   code. The OTP template needs a code slot. Registration decision notices are
+   separate templates (the regime registers one template per message shape),
+   the old number's phone-change notice is one more, and so are the two auction
+   texts (a sale, a named role).
 2. **E** — Set in `web.env`:
    ```sh
    OTP_PROVIDER=msg91
@@ -111,12 +113,17 @@ sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
    MSG91_TEMPLATE_REGISTRATION_WITHDRAWN=…
    MSG91_TEMPLATE_REGISTRATION_RESTORED=…
    MSG91_TEMPLATE_SECURITY_PHONE_CHANGED=…          # the old number is told
+   MSG91_TEMPLATE_AUCTION_SOLD=…                    # "Cup Kings bought you for Rs 75,000"
+   MSG91_TEMPLATE_TEAM_APPOINTED=…                  # "You are named captain of Cup Kings"
    SMS_INBOUND_SECRET=…                             # ≥16 chars; STOP replies land here
    ```
    A missing decision template makes that one notice refuse with the variable
-   named; it does not send against another shape's registration. The
-   circuit breaker (3 consecutive provider failures, 60 s cool-down) is on by
-   default.
+   named; it does not send against another shape's registration. The two
+   auction texts are the same: without their ids the sale and the appointment
+   still reach the player by inbox and email, and the queued text fails once
+   with the variable named (`message_outbox.last_error`). Texts due between
+   10 pm and 8 am IST wait for 8 am. The circuit breaker (3 consecutive
+   provider failures, 60 s cool-down) is on by default.
 3. **E** — Configure the provider's inbound (STOP) webhook with the same
    `SMS_INBOUND_SECRET`. While the secret is unset, that route answers 404.
    **Proof:** sign in on a phone that has never used the product, from a

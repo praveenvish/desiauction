@@ -17,8 +17,10 @@ import {
  * override somebody who turned it off for themselves. `maySend` reads the
  * person's answer first and returns before it reaches these rows.
  *
- * SMS only, because SMS is the only channel a club's messages go out on. Email
- * has no address to send to yet, and the in-app ledger is the person's own.
+ * Texts and emails both: since the personal messages (auction results,
+ * appointments, squad sheets) a club reaches its players by email as well, and
+ * a switch that stopped only the text would promise more than it does. The
+ * in-app ledger is the person's own and is not the club's to switch off.
  */
 export function MessagingSwitches({
   slug,

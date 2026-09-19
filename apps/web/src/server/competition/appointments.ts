@@ -15,8 +15,9 @@ import { and, asc, eq, isNotNull, like, or, sql } from "drizzle-orm";
 
 import { logSecurityEvent } from "../auth/security-events";
 import { db as appDb } from "../db";
-import { enqueueMail, kickDrain, type QueuedMail } from "../messaging/outbox";
-import { appointmentMail, type AppointedRole } from "../messaging/player-mail";
+import { enqueueMail, enqueueSms, kickDrain, type QueuedMail } from "../messaging/outbox";
+import { appointmentMail, smsRolePhrase, type AppointedRole } from "../messaging/player-mail";
+import { smsFit, smsSeasonName } from "../messaging/templates";
 import { shownName } from "./shown-name";
 
 /**
@@ -205,6 +206,22 @@ export async function announceAppointments(
   }));
   const fresh = new Set(await enqueueMail(mails));
   const told = pending.filter((item) => fresh.has(dedupeKey(item)));
+  // And one line of SMS each — most players have no verified email. Keyed apart
+  // (`sms:`) so it never reads as a told role in `toldRoles`.
+  await enqueueSms(
+    told.map((item) => ({
+      personId: item.personId,
+      orgId: context.orgId,
+      kind: "team.appointed",
+      dedupeKey: `sms:${dedupeKey(item)}`,
+      templateKey: "team.appointed" as const,
+      slots: {
+        role: smsRolePhrase(item.roles),
+        team: smsFit(item.teamName),
+        competition: smsSeasonName(context.season),
+      },
+    })),
+  );
   for (const item of told) {
     try {
       await logSecurityEvent(item.personId, "team.appointed", {

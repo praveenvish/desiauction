@@ -101,6 +101,10 @@ const envSchema = z.object({
    * though nothing refuses to start without it.
    */
   MSG91_TEMPLATE_SECURITY_PHONE_CHANGED: z.string().min(1).optional(),
+  // Personal moments (Phase 2): the sale and a named role. Unset = the queued
+  // text fails with the variable named; the inbox and email still carry it.
+  MSG91_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
+  MSG91_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
   /**
    * Shared secret on the inbound-SMS webhook, which is where a STOP lands.
    *
