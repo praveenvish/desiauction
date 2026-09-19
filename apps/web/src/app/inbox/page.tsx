@@ -93,13 +93,13 @@ export default async function InboxPage() {
             <IconCog size={16} aria-hidden /> Notification settings
           </Link>
         }
-        flush
+        flush={events.length > 0}
       >
         {events.length === 0 ? (
           <EmptyState
             headingLevel={3}
             title="Nothing yet"
-            description="Registration decisions and account activity land here."
+            description="New notices appear here the moment they happen."
           />
         ) : (
           <InboxList
