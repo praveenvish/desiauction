@@ -317,7 +317,7 @@
   border-top-color: transparent;
   background: linear-gradient(90deg, transparent, var(--accent), transparent) top / 40% 2px
     no-repeat;
-  animation: pd-busy 900ms linear infinite;
+  animation: pd-busy var(--duration-shimmer) linear infinite;
 }
 
 @keyframes pd-busy {

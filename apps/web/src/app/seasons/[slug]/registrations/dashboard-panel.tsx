@@ -228,7 +228,9 @@ export function RegistrationDashboardPanel({
       url.searchParams.set("player", id);
     }
     url.searchParams.delete("review");
-    window.history.replaceState(window.history.state, "", url.toString());
+    // `null`, as Next documents: it then syncs its router to this URL, so a later
+    // `router.refresh()` keeps the parameter instead of restoring its own.
+    window.history.replaceState(null, "", url.toString());
   }, []);
 
   const openSheet = useCallback(
