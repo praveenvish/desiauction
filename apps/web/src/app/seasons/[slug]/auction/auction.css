@@ -2897,3 +2897,11 @@
 .replay-subject > p {
   margin: 0;
 }
+
+/* The cockpit's right-hand tabs (Purses · Owners · Screens). */
+.cockpit-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
