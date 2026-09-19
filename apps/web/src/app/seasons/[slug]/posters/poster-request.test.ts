@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_POSTER_SIZE,
   DEFAULT_POSTER_THEME,
+  DEFAULT_TOP_COUNT,
+  SPONSOR_MAX,
+  cleanSponsor,
   parsePosterQuery,
   posterHeaders,
   posterRefusal,
@@ -59,6 +62,54 @@ describe("parsePosterQuery", () => {
   });
 });
 
+describe("the kind's own parameters", () => {
+  it("takes 3, 5 or 10 for the top list and nothing else", () => {
+    for (const n of [3, 5, 10]) {
+      expect(query(`n=${String(n)}`).count).toBe(n);
+    }
+    for (const search of ["n=7", "n=0", "n=-5", "n=1e3", "n=", "n=five", "n[]=3"]) {
+      expect(query(search).count).toBe(DEFAULT_TOP_COUNT);
+    }
+  });
+
+  /*
+   * Absent means SHOWN. A missing parameter must never publish less than the
+   * studio previewed — the preview and the file are the same route, and the
+   * difference between them would be somebody's fee quietly appearing.
+   */
+  it("shows prices unless asked, in exactly those words, not to", () => {
+    expect(query("").prices).toBe(true);
+    expect(query("prices=1").prices).toBe(true);
+    expect(query("prices=false").prices).toBe(true);
+    expect(query("prices=0").prices).toBe(false);
+  });
+
+  it("narrows the size to what the KIND can draw", () => {
+    // The season sheet has no square: 12 squads of thumbnails is not a poster.
+    expect(parsePosterQuery(new URLSearchParams("size=square"), "season").size).toBe("portrait");
+    expect(parsePosterQuery(new URLSearchParams("size=story"), "season").size).toBe("story");
+    expect(parsePosterQuery(new URLSearchParams("size=square"), "player").size).toBe("square");
+  });
+
+  it("scrubs a sponsor credit down to one clamped line", () => {
+    expect(cleanSponsor("  Sharma   Motors  ")).toBe("Sharma Motors");
+    expect(cleanSponsor("Line one\nLine two")).toBe("Line one Line two");
+    expect(cleanSponsor("\u0000\u001b[31m")).toBe("[31m");
+    expect(cleanSponsor("   ")).toBeNull();
+    expect(cleanSponsor(null)).toBeNull();
+    const long = cleanSponsor("S".repeat(200));
+    expect(long).toHaveLength(SPONSOR_MAX);
+    expect(long?.endsWith("…")).toBe(true);
+    expect(query("sponsor=Sharma%20Motors").sponsor).toBe("Sharma Motors");
+  });
+
+  it("treats motion as opt-in, like download", () => {
+    expect(query("").motion).toBe(false);
+    expect(query("motion=1").motion).toBe(true);
+    expect(query("motion=true").motion).toBe(false);
+  });
+});
+
 describe("posterHeaders", () => {
   /*
    * The load-bearing one. A poster is a photograph of a named civilian behind an
@@ -85,6 +136,22 @@ describe("posterHeaders", () => {
 
   it("declares the PNG the rasterizer actually returns", () => {
     expect(posterHeaders("x.png", false)["content-type"]).toBe("image/png");
+  });
+
+  /*
+   * The animator cannot read a price off a picture, and a header carrying a ₹
+   * is a header some proxy will mangle — so the facts travel as ASCII JSON.
+   */
+  it("carries the motion facts as ASCII JSON, only when there is a sprite", () => {
+    expect(posterHeaders("x.png", false)["x-poster-motion"]).toBeUndefined();
+    const header = posterHeaders("x.png", false, {
+      layers: ["base", "hero", "stamp", "price"],
+      height: 1350,
+      pricePaise: 7_500_000,
+    })["x-poster-motion"];
+    expect(JSON.parse(header ?? "{}")).toMatchObject({ pricePaise: 7_500_000, height: 1350 });
+    // eslint-disable-next-line no-control-regex -- asserting there are none.
+    expect(/[^\x00-\x7f]/.test(header ?? "")).toBe(false);
   });
 });
 
