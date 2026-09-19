@@ -10,7 +10,7 @@ import {
   teams,
   tournaments,
 } from "@desiauction/db";
-import { and, asc, desc, eq, inArray, isNotNull, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
@@ -49,6 +49,8 @@ export interface CareerSeason {
   role: string | null;
   status: string;
   teamName: string | null;
+  /** The team's own colour, for its chip — null when the club set none. */
+  teamColor: string | null;
   isCaptain: boolean;
   isViceCaptain: boolean;
   jerseyNumber: string | null;
@@ -88,6 +90,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
       isViceCaptain: registrations.isViceCaptain,
       jerseyNumber: registrations.jerseyNumber,
       teamName: teams.name,
+      teamColor: teams.primaryColor,
       teamFranchiseId: teams.franchiseId,
       lotStatus: lots.status,
       soldPrice: lots.soldPrice,
@@ -130,6 +133,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
     role: row.role,
     status: row.status,
     teamName: row.teamName,
+    teamColor: row.teamColor,
     isCaptain: row.isCaptain,
     isViceCaptain: row.isViceCaptain,
     jerseyNumber: row.jerseyNumber,
@@ -313,6 +317,86 @@ export async function playerMatches(personId: string): Promise<CareerMatch[]> {
           : recordedPairs.has(`${row.fixtureId}:${row.teamId ?? ""}`)
             ? "bench"
             : "unknown",
+    };
+  });
+}
+
+/**
+ * WHAT IS NEXT ON THE CALENDAR — the published fixtures of the teams this
+ * person is in, from now on. Same person-scoped system-pool class as
+ * `playerMatches`; only PUBLISHED fixtures, because a draft or a merely
+ * scheduled one is the organizer's working copy and not yet a promise.
+ * `kickoffAt` is local wall-clock text, so "from now on" compares it as text
+ * against today's date — lexicographic order IS chronological order there.
+ */
+export interface UpcomingMatch {
+  fixtureId: string;
+  kickoffAt: string | null;
+  sport: string;
+  competitionName: string;
+  competitionSlug: string;
+  teamName: string;
+  teamColor: string | null;
+  opponentName: string;
+}
+
+export const UPCOMING_LIMIT = 5;
+
+export async function playerUpcomingMatches(
+  personId: string,
+  today: string,
+): Promise<UpcomingMatch[]> {
+  const home = alias(teams, "home_team");
+  const away = alias(teams, "away_team");
+  const rows = await systemDb
+    .select({
+      fixtureId: fixtures.id,
+      kickoffAt: fixtures.kickoffAt,
+      sport: competitions.sport,
+      competitionName: competitions.name,
+      competitionSlug: competitions.slug,
+      teamId: registrations.teamId,
+      homeTeamId: fixtures.homeTeamId,
+      homeName: home.name,
+      homeColor: home.primaryColor,
+      awayName: away.name,
+      awayColor: away.primaryColor,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .innerJoin(
+      fixtures,
+      and(
+        eq(fixtures.competitionId, registrations.competitionId),
+        or(
+          eq(fixtures.homeTeamId, registrations.teamId),
+          eq(fixtures.awayTeamId, registrations.teamId),
+        ),
+      ),
+    )
+    .innerJoin(home, eq(home.id, fixtures.homeTeamId))
+    .innerJoin(away, eq(away.id, fixtures.awayTeamId))
+    .where(
+      and(
+        eq(registrations.personId, personId),
+        isNotNull(registrations.teamId),
+        eq(fixtures.status, "published"),
+        or(isNull(fixtures.kickoffAt), gte(fixtures.kickoffAt, today)),
+      ),
+    )
+    .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
+    .limit(UPCOMING_LIMIT);
+  return rows.map((row) => {
+    const isHome = row.homeTeamId === row.teamId;
+    return {
+      fixtureId: row.fixtureId,
+      kickoffAt: row.kickoffAt,
+      sport: row.sport,
+      competitionName: row.competitionName,
+      competitionSlug: row.competitionSlug,
+      teamName: isHome ? row.homeName : row.awayName,
+      teamColor: isHome ? row.homeColor : row.awayColor,
+      opponentName: isHome ? row.awayName : row.homeName,
     };
   });
 }

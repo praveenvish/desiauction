@@ -1,10 +1,24 @@
 import { formatPaiseINR, paise, roleLabelIn, sportPack } from "@desiauction/core";
-import { Badge, Card, EmptyState, PageIntro, PlayerImage, Stat, StatRow } from "@desiauction/ui";
+import {
+  EmptyState,
+  HeroBanner,
+  IconArrowRight,
+  IconGavel,
+  IconPin,
+  IconRupee,
+  IconTrophy,
+  IconUsers,
+  PlayerImage,
+  SectionCard,
+  StatCard,
+  StatGrid,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { currentSession } from "../../../server/auth/actions";
-import { playerCareer, type CareerSeason } from "../../../server/player/career";
+import { HeroChip, HeroStatus } from "../../../components/season-hero/season-hero";
+import { playerCareer } from "../../../server/player/career";
 import {
   ownPhotoUrl,
   playerProfileFor,
@@ -12,7 +26,8 @@ import {
   sportProfileFor,
 } from "../../../server/player/profile";
 import { formatDate } from "../../../lib/format-date";
-import "./me-cricket.css";
+import { RegistrationCard } from "../registration-card";
+import "../me.css";
 
 /**
  * ONE SPORT'S CAREER (SP-1 Phase 3).
@@ -36,35 +51,7 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
  * opens with content.
  */
 
-const REG_TONE: Record<string, "success" | "info" | "warning" | "neutral"> = {
-  approved: "success",
-  submitted: "info",
-  waitlisted: "warning",
-  rejected: "neutral",
-  withdrawn: "neutral",
-};
-
-function auctionBadge(
-  season: CareerSeason,
-): { tone: "success" | "info" | "neutral"; text: string } | null {
-  const outcome = season.auction;
-  if (outcome === null) {
-    return null;
-  }
-  if (outcome.kind === "sold") {
-    return { tone: "success", text: `Sold · ${formatPaiseINR(paise(outcome.soldPrice))}` };
-  }
-  if (outcome.kind === "icon") {
-    return { tone: "info", text: "Icon player" };
-  }
-  if (outcome.kind === "retained") {
-    return { tone: "info", text: "Retained" };
-  }
-  if (outcome.kind === "captain") {
-    return { tone: "info", text: "Captain · picked before the auction" };
-  }
-  return { tone: "neutral", text: "Unsold" };
-}
+const money = (value: number): string => formatPaiseINR(paise(value));
 
 export default async function MySportPage({ params }: { params: Promise<{ sport: string }> }) {
   const pack = sportPack((await params).sport);
@@ -84,112 +71,117 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
     ownPhotoUrl(session.personId),
   ]);
 
-  return (
-    <main className="me-cricket">
-      <PageIntro />
-      <div className="me-cricket-stack">
-        <Card className="me-cricket-head" data-testid="career-header">
-          <PlayerImage
-            name={session.name ?? "Player"}
-            seed={session.personId}
-            src={photoUrl}
-            size="md"
-            shape="round"
-            decorative
-          />
-          <div className="me-cricket-id">
-            <h2>{session.name ?? "—"}</h2>
-            <p className="me-cricket-sub">
-              {[
-                sportProfile.defaultRole !== null
-                  ? roleLabelIn(pack, sportProfile.defaultRole)
-                  : null,
-                profile.location,
-              ]
-                .filter((part): part is string => part !== null)
-                .join(" · ") || "Add your role and city on the Account page."}
-            </p>
-          </div>
-          {completeness.done < completeness.total ? (
-            <Link href="/account" className="me-cricket-complete">
-              Profile {completeness.done}/{completeness.total} — finish it
-            </Link>
-          ) : null}
-        </Card>
+  const role =
+    sportProfile.defaultRole !== null ? roleLabelIn(pack, sportProfile.defaultRole) : null;
 
-        {career.seasons.length === 0 ? (
+  return (
+    <main className="me">
+      <HeroBanner
+        testId="career-header"
+        crest={
+          <span className="me-crest-photo">
+            <PlayerImage
+              name={session.name ?? "Player"}
+              seed={session.personId}
+              src={photoUrl}
+              size="lg"
+              fluid
+              decorative
+            />
+          </span>
+        }
+        eyebrow={<HeroStatus>{pack.label}</HeroStatus>}
+        title={session.name ?? "—"}
+        meta={
+          role === null && profile.location === null
+            ? [<>Add your role and city on the Account page.</>]
+            : [
+                ...(role !== null ? [<HeroChip key="role">{role}</HeroChip>] : []),
+                ...(profile.location !== null
+                  ? [
+                      <>
+                        <IconPin />
+                        {profile.location}
+                      </>,
+                    ]
+                  : []),
+              ]
+        }
+        actions={
+          <Link
+            href={completeness.done < completeness.total ? "/account" : "/me"}
+            className="sh-ghost"
+          >
+            {completeness.done < completeness.total
+              ? `Profile ${String(completeness.done)}/${String(completeness.total)} — finish it`
+              : "All my sports"}
+            <IconArrowRight size={14} />
+          </Link>
+        }
+        sideAlign="start"
+      />
+
+      {career.seasons.length === 0 ? (
+        <SectionCard icon={<IconTrophy />} title="Seasons">
           <EmptyState
+            headingLevel={3}
             title="No seasons yet"
             description="When you register for a tournament, it shows up here — and after auction night, so does your result."
             action={<Link href="/c">Find a tournament</Link>}
           />
-        ) : (
-          <>
-            <StatRow label="Career totals">
-              <Stat label="Seasons" value={String(career.totals.seasons)} />
-              <Stat label="Teams" value={String(career.totals.teams)} />
-              <Stat label="Times sold" value={String(career.totals.soldCount)} />
-              <Stat
-                label="Highest price"
-                value={
-                  career.totals.highestPrice !== null
-                    ? formatPaiseINR(paise(career.totals.highestPrice))
-                    : "—"
-                }
-              />
-            </StatRow>
+        </SectionCard>
+      ) : (
+        <>
+          <StatGrid testId="career-totals">
+            <StatCard
+              icon={<IconTrophy />}
+              tone="gold"
+              value={String(career.totals.seasons)}
+              label={career.totals.seasons === 1 ? "Season" : "Seasons"}
+            />
+            <StatCard
+              icon={<IconUsers />}
+              tone="blue"
+              value={String(career.totals.teams)}
+              label={career.totals.teams === 1 ? "Team" : "Teams"}
+            />
+            <StatCard
+              icon={<IconGavel />}
+              tone="purple"
+              value={String(career.totals.soldCount)}
+              label="Times sold"
+            />
+            <StatCard
+              icon={<IconRupee />}
+              tone="green"
+              value={career.totals.highestPrice !== null ? money(career.totals.highestPrice) : "—"}
+              label="Highest price"
+            />
+          </StatGrid>
 
-            <Card data-testid="career-seasons">
-              <h2 className="me-cricket-h2">Seasons</h2>
-              <ul className="me-cricket-seasons">
-                {career.seasons.map((season) => {
-                  const outcome = auctionBadge(season);
-                  return (
-                    <li key={season.registrationId}>
-                      <Link
-                        href={`/seasons/${season.competitionSlug}/register`}
-                        className="me-cricket-season"
-                      >
-                        <span className="me-cricket-season-text">
-                          <strong>
-                            {season.tournamentName !== null
-                              ? `${season.tournamentName} · ${season.competitionName}`
-                              : season.competitionName}
-                          </strong>
-                          <span>
-                            {[
-                              season.orgName,
-                              season.startsOn !== null ? formatDate(season.startsOn) : null,
-                              roleLabelIn(pack, season.role),
-                              season.teamName,
-                              season.isCaptain
-                                ? "Captain"
-                                : season.isViceCaptain
-                                  ? "Vice-captain"
-                                  : null,
-                            ]
-                              .filter((part): part is string => part !== null)
-                              .join(" · ")}
-                          </span>
-                        </span>
-                        <span className="me-cricket-season-badges">
-                          {outcome !== null ? (
-                            <Badge tone={outcome.tone}>{outcome.text}</Badge>
-                          ) : (
-                            <Badge tone={REG_TONE[season.status] ?? "neutral"}>
-                              {season.status}
-                            </Badge>
-                          )}
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
-          </>
-        )}
-      </div>
+          <SectionCard
+            icon={<IconTrophy />}
+            title="Seasons"
+            description={`${String(career.seasons.length)} in ${pack.label.toLowerCase()}, oldest first`}
+            data-testid="career-seasons"
+          >
+            <ul className="me-regs">
+              {career.seasons.map((season) => (
+                <li key={season.registrationId}>
+                  <RegistrationCard
+                    season={season}
+                    eyebrow={season.startsOn !== null ? formatDate(season.startsOn) : pack.label}
+                    subline={[season.orgName, roleLabelIn(pack, season.role)]
+                      .filter((part) => part !== "")
+                      .join(" · ")}
+                    money={money}
+                  />
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        </>
+      )}
     </main>
   );
 }
