@@ -38,13 +38,15 @@ const TITLE_OF: Record<string, string> = {
   abandoned: "Auction abandoned",
 };
 
+// Labels are the status words themselves (capitalized in CSS): the pill is
+// also the page's one machine-readable status, `auction-status`.
 const PILL_OF: Record<string, { label: string; className: string }> = {
-  scheduled: { label: "Scheduled", className: "auc-title-pill is-scheduled" },
-  live: { label: "Live", className: "auc-title-pill is-live" },
-  paused: { label: "Paused", className: "auc-title-pill is-paused" },
-  completed: { label: "Completed", className: "auc-title-pill is-done" },
-  reconciled: { label: "Settled", className: "auc-title-pill is-done" },
-  abandoned: { label: "Abandoned", className: "auc-title-pill is-abandoned" },
+  scheduled: { label: "scheduled", className: "auc-title-pill is-scheduled" },
+  live: { label: "live", className: "auc-title-pill is-live" },
+  paused: { label: "paused", className: "auc-title-pill is-paused" },
+  completed: { label: "completed", className: "auc-title-pill is-done" },
+  reconciled: { label: "settled", className: "auc-title-pill is-done" },
+  abandoned: { label: "abandoned", className: "auc-title-pill is-abandoned" },
 };
 
 export default async function AuctionPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -75,14 +77,14 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           {/* Before an auction exists every control here is absent, and the
               empty header drew a stray rule and a blank band at the top. */}
           {status !== null ? (
-            <header className="dash-head">
-              <div className="competition-title-row title-row-actions">
+            <header className="auc-head">
+              {pill !== null ? (
+                <span className={pill.className} data-testid="auction-status">
+                  {pill.label}
+                </span>
+              ) : null}
+              <div className="auc-head-actions">
                 <span className="date-row">
-                  {pill !== null ? (
-                    <span className={pill.className} data-testid="auction-header-status">
-                      {pill.label}
-                    </span>
-                  ) : null}
                   {inProgress ? (
                     <ButtonLink
                       href={`/seasons/${slug}/auction/live`}
@@ -150,25 +152,40 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               </div>
             </header>
           ) : null}
-          {/* Progress, burndown and the block mean nothing before the room
-              opens — the setup steps say what is left instead. */}
-          {dashboard.overview !== null && status !== "scheduled" ? (
-            <AuctionOverviewPanel overview={dashboard.overview} />
-          ) : null}
-          {/* The board and the overlay were unreachable from anywhere in the
-              product. The dashboard is where an organizer sets the night up, so
-              it is where they collect the two URLs they will open elsewhere. */}
-          {/* Only once there is a room: before the auction exists both screens
-              show nothing, and the section sat above the setup it waits on. */}
-          {/* During setup the links live in the "Go live" step. */}
-          {dashboard.viewer.canConduct &&
-          status !== null &&
-          status !== "scheduled" &&
-          status !== "abandoned" ? (
-            <BroadcastLinks slug={slug} />
-          ) : null}
-          <AuctionPanel slug={slug} dashboard={dashboard} />
-          {auctioneers !== null ? <AuctioneerPanel slug={slug} view={auctioneers} /> : null}
+          <AuctionPanel
+            slug={slug}
+            dashboard={dashboard}
+            overviewSlot={
+              dashboard.overview !== null && status !== "scheduled" ? (
+                // Keyed: an element handed across to a client component is
+                // checked as a list child when it renders there.
+                <div key="overview" className="auc-section-stack">
+                  <AuctionOverviewPanel
+                    overview={dashboard.overview}
+                    {...(status === "completed" || status === "reconciled"
+                      ? { idleHint: "The hammer is down on every player — the squads are final." }
+                      : {})}
+                  />
+                </div>
+              ) : null
+            }
+            // The board and the overlay were unreachable from anywhere in the
+            // product; this is where an organizer collects the two URLs they
+            // will open elsewhere. During setup they sit in the "Go live" step.
+            broadcastSlot={
+              dashboard.viewer.canConduct &&
+              status !== null &&
+              status !== "scheduled" &&
+              status !== "abandoned" ? (
+                <BroadcastLinks key="broadcast" slug={slug} />
+              ) : null
+            }
+            auctioneersSlot={
+              auctioneers !== null ? (
+                <AuctioneerPanel key="auctioneers" slug={slug} view={auctioneers} />
+              ) : null
+            }
+          />
         </div>
       </main>
     </ToastProvider>

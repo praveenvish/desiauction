@@ -27,6 +27,29 @@
   white-space: nowrap;
 }
 
+.badge {
+  display: inline-block;
+  margin-inline-start: var(--space-2);
+  min-width: 1.5em;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.badge[data-attention="true"] {
+  background: var(--accent-subtle);
+  color: var(--text-heading);
+}
+
+.tab[aria-selected="true"] .badge {
+  color: var(--text-heading);
+}
+
 .tab:hover {
   color: var(--text-primary);
 }

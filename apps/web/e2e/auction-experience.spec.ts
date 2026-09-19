@@ -261,7 +261,8 @@ test("the full night: lobby → owners → bidding with notifications → public
 
   // The organizer switches owner plans OFF: the page is gone (404, not 403 —
   // existence privacy) and the door vanishes; ON brings both back untouched.
-  await organizer.goto(`/seasons/${slug}/auction`);
+  // The switch lives on the Room tab; the hash opens it (and survives reload).
+  await organizer.goto(`/seasons/${slug}/auction#room`);
   await expect(organizer.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });

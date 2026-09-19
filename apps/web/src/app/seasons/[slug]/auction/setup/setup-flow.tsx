@@ -1,16 +1,11 @@
 "use client";
 
-import { Badge, Button, ButtonLink, IconCheck, useToast } from "@desiauction/ui";
+import { Badge, Button, ButtonLink, IconArrowRight, IconCheck, useToast } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import {
-  MIN_CLAIMED_TEAMS,
-  setupSteps,
-  type SetupStep,
-  type StepId,
-} from "../../../../../lib/auction-setup-steps";
+import { MIN_CLAIMED_TEAMS, setupSteps, type StepId } from "../../../../../lib/auction-setup-steps";
 import {
   auctionLifecycleAction,
   queueAllLotsAction,
@@ -42,7 +37,7 @@ export function AuctionSetupFlow({
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
-  const [opened, setOpened] = useState<ReadonlySet<StepId>>(new Set());
+  const [picked, setPicked] = useState<StepId | null>(null);
   const [acceptShortOpen, setAcceptShortOpen] = useState(false);
 
   const { ready, view, viewer, overview, feasibility } = dashboard;
@@ -58,13 +53,6 @@ export function AuctionSetupFlow({
     claimedTeams: claimedTeamIds.size,
     counts: counts === null ? null : { queued: counts.queued, prepared: counts.prepared },
   });
-  const stepOf = (id: StepId): SetupStep => {
-    const found = steps.find((step) => step.id === id);
-    if (found === undefined) {
-      throw new Error(`unknown step ${id}`);
-    }
-    return found;
-  };
   const doneCount = steps.filter((step) => step.state === "done").length;
 
   const run = async (
@@ -77,6 +65,7 @@ export function AuctionSetupFlow({
     setBusy(null);
     if (result.ok) {
       toast({ title: done, tone: "success" });
+      setPicked(null);
       router.refresh();
     } else {
       toast({ title: result.error ?? "Refused.", tone: "danger" });
@@ -148,7 +137,9 @@ export function AuctionSetupFlow({
       </div>
     ),
     rules: exists ? (
-      <p className="as-hint">Locked at creation — they are listed under Room details below.</p>
+      <p className="as-hint">
+        Locked when the auction was created — the full list is on the <strong>Room</strong> tab.
+      </p>
     ) : viewer.canManage ? (
       <RulesStep slug={slug} dashboard={dashboard} />
     ) : (
@@ -256,6 +247,31 @@ export function AuctionSetupFlow({
     ),
   };
 
+  // One step on screen at a time: the list on the left says where the night
+  // stands, the panel on the right is the only thing asking for work. Until
+  // the organizer picks a step themselves, the panel follows the first step
+  // still to do — and a successful action hands it back to that rule, so the
+  // page moves on by itself as the night comes together.
+  const firstOpen = steps.find((step) => step.state === "current")?.id ?? "live";
+  const selected = picked ?? firstOpen;
+  const selectedIndex = steps.findIndex((step) => step.id === selected);
+  const nextStep = steps[selectedIndex + 1];
+
+  // On a phone the step list is a strip that scrolls sideways; keep the open
+  // step's chip in view. Scrolls the strip only — never the page.
+  const stripRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const strip = stripRef.current;
+    const chip = strip?.querySelector<HTMLElement>('[data-selected="true"]');
+    if (strip === null || chip === null || chip === undefined) {
+      return;
+    }
+    if (strip.scrollWidth <= strip.clientWidth) {
+      return;
+    }
+    strip.scrollTo({ left: Math.max(0, chip.offsetLeft - strip.offsetLeft - 16) });
+  }, [selected]);
+
   return (
     <section className="as-flow" aria-labelledby="as-flow-title" data-testid="setup-flow">
       <header className="as-flow-head">
@@ -272,53 +288,78 @@ export function AuctionSetupFlow({
           </span>
         </span>
       </header>
-      <ol className="as-steps">
-        {steps.map((step, index) => {
-          const open = step.state !== "done" || opened.has(step.id);
-          return (
+      <div className="as-board">
+        <ol className="as-steps" aria-label="Setup steps" ref={stripRef}>
+          {steps.map((step, index) => (
             <li
               key={step.id}
               className="as-step"
               data-state={step.state}
+              data-selected={step.id === selected ? "true" : undefined}
               data-testid={`setup-step-${step.id}`}
             >
               <button
                 type="button"
                 className="as-step-head"
-                aria-expanded={open}
+                aria-current={step.id === selected ? "step" : undefined}
                 aria-controls={`as-body-${step.id}`}
                 onClick={() => {
-                  setOpened((current) => {
-                    const next = new Set(current);
-                    if (next.has(step.id)) {
-                      next.delete(step.id);
-                    } else {
-                      next.add(step.id);
-                    }
-                    return next;
-                  });
+                  setPicked(step.id);
                 }}
+                data-testid={`setup-step-open-${step.id}`}
               >
                 <span className="as-step-mark" aria-hidden>
                   {step.state === "done" ? <IconCheck size={14} /> : index + 1}
                 </span>
                 <span className="as-step-text">
                   <span className="as-step-title">{step.title}</span>
-                  <span className="as-step-summary">{stepOf(step.id).summary}</span>
+                  <span className="as-step-summary">{step.summary}</span>
                 </span>
-                <span className="as-step-state">
-                  {step.state === "done" ? "Done" : step.state === "current" ? "Next" : "Later"}
+                <span className="as-step-state" data-state={step.state}>
+                  {step.state === "done" ? "Done" : step.state === "current" ? "To do" : "Later"}
                 </span>
               </button>
-              {/* `hidden`, not unmounted: a finished step's facts stay in the
-                  page for anyone (or any test) who reads them. */}
-              <div className="as-step-body" id={`as-body-${step.id}`} hidden={!open}>
-                {bodies[step.id]}
-              </div>
             </li>
-          );
-        })}
-      </ol>
+          ))}
+        </ol>
+        <div className="as-panel">
+          {/* `hidden`, not unmounted: every step's facts and controls stay in
+              the page for anyone (or any test) who reads them. */}
+          {steps.map((step, index) => (
+            <div
+              key={step.id}
+              className="as-step-body"
+              id={`as-body-${step.id}`}
+              hidden={step.id !== selected}
+              data-testid={`setup-body-${step.id}`}
+            >
+              <div className="as-panel-head">
+                <span className="as-panel-eyebrow">
+                  Step {index + 1} of {steps.length}
+                </span>
+                <h3 className="as-panel-title">{step.title}</h3>
+                <p className="as-panel-summary">{step.summary}</p>
+              </div>
+              {bodies[step.id]}
+              {nextStep !== undefined && step.id === selected ? (
+                <div className="as-panel-foot">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setPicked(nextStep.id);
+                    }}
+                    data-testid="setup-next-step"
+                  >
+                    Next: {nextStep.title}
+                    <IconArrowRight size={16} className="icon-trail" />
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

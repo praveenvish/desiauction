@@ -1,9 +1,17 @@
 "use client";
 
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast, ButtonLink } from "@desiauction/ui";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  PlayerImage,
+  Select,
+  useToast,
+  type TabItem,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   auctionLifecycleAction,
@@ -15,24 +23,30 @@ import {
   type AuctionDashboard,
   type ReplayVerifyReport,
 } from "../../../../server/auction/actions";
+import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { formatTime } from "../../../../lib/format-date";
+import { compactINR } from "../../../../lib/inr";
 import { AbortDialog } from "./abort-dialog";
 import { AuctionSetupFlow } from "./setup/setup-flow";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 import { useHydrated } from "../../../../lib/use-hydrated";
+import "./hub.css";
 
-// The auction desk: readiness gates, creation, lifecycle, paddles, the lot
-// queue and the replay proof. The operational dashboard above it is rendered by
-// AuctionOverviewPanel; the live bidding surfaces are /live and /cockpit.
-
-const AUCTION_TONE = {
-  scheduled: "info",
-  live: "success",
-  paused: "warning",
-  completed: "neutral",
-  reconciled: "neutral",
-  abandoned: "danger",
-} as const;
+/*
+ * THE AUCTION DESK, ONE SECTION AT A TIME.
+ *
+ * This page used to be every panel of the night stacked in one column — the
+ * progress, the screens, the rules, the connection, the gates, the lifecycle,
+ * the paddles, the lot table and a forty-row event log — 4,700px on a laptop
+ * and 6,500px on a phone, with the one control that mattered somewhere in the
+ * middle. Now a ruled figure strip says where the night stands, and tabs hold
+ * the rest: the setup steps (or, once the room is open, the overview and its
+ * controls), the players, the paddles, the room's screens and settings, and
+ * the log. The tab lives in the URL hash, so a reload keeps its place.
+ *
+ * Server-rendered pieces (the overview, the broadcast links, the auctioneer
+ * panel) arrive as slots from page.tsx.
+ */
 
 const LOT_TONE = {
   prepared: "neutral",
@@ -58,14 +72,66 @@ const AUCTION_NEXT: Partial<Record<string, { command: string; label: string }[]>
   ],
 };
 
-export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: AuctionDashboard }) {
+type LotFilter = "all" | "waiting" | "sold" | "unsold";
+
+const LOT_FILTERS: { id: LotFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "waiting", label: "Still to come" },
+  { id: "sold", label: "Sold" },
+  { id: "unsold", label: "Unsold" },
+];
+
+function lotMatches(filter: LotFilter, status: string): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "waiting":
+      return (
+        status === "prepared" ||
+        status === "queued" ||
+        status === "on_block" ||
+        status === "closing_soon" ||
+        status === "frozen"
+      );
+    case "sold":
+      return status === "sold";
+    case "unsold":
+      return status === "unsold" || status === "withdrawn";
+  }
+}
+
+/** "LotClosingSoon" → "Lot closing soon": the log reads as sentences. */
+function eventLabel(type: string): string {
+  const words = type.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+const LOG_PREVIEW = 12;
+
+export function AuctionPanel({
+  slug,
+  dashboard,
+  overviewSlot,
+  broadcastSlot,
+  auctioneersSlot,
+}: {
+  slug: string;
+  dashboard: AuctionDashboard;
+  /** The operational read (progress, block, burndown) — live and after. */
+  overviewSlot?: ReactNode;
+  /** The board and overlay addresses, for anyone who can conduct. */
+  broadcastSlot?: ReactNode;
+  /** Who else may run this room. */
+  auctioneersSlot?: ReactNode;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [paddleTeam, setPaddleTeam] = useState("");
   const [report, setReport] = useState<ReplayVerifyReport | null>(null);
+  const [lotFilter, setLotFilter] = useState<LotFilter>("all");
+  const [logOpen, setLogOpen] = useState(false);
   const hydrated = useHydrated();
-  const [acceptShortOpen, setAcceptShortOpen] = useState(false);
   // WR-1: optimistic, then reconciled — a fully server-controlled checkbox
   // snaps back before the refresh lands, which reads as a switch that ignores
   // the click (and is exactly what a browser automation sees).
@@ -158,403 +224,509 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
     }
   };
 
+  const status = view?.auction.status ?? null;
+  const terminal = status === "completed" || status === "reconciled" || status === "abandoned";
+  const teamOfPaddle = new Map(
+    (view?.paddles ?? []).map((row) => [row.paddleNumber, row.teamName]),
+  );
+  const counts = dashboard.overview?.counts ?? null;
+
+  /* ---- Figures: where the night stands, before any tab is opened. ---------- */
+  // Four figures, the four a phone can hold two-by-two. Before and during
+  // the night "still to come" is the number that matters; after it, the money.
+  const figures =
+    view !== null && counts !== null ? (
+      <div className="stat-row auc-figures" data-testid="auction-figures">
+        <div className="stat-tile">
+          <span className="stat-value">{view.lots.length}</span>
+          <span className="stat-label">Players in the auction</span>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-value">
+            {claimedTeams}/{ready.teams.length}
+          </span>
+          <span className="stat-label">{terminal ? "Teams that bid" : "Teams ready to bid"}</span>
+        </div>
+        {terminal ? null : (
+          <div className="stat-tile">
+            <span className="stat-value">{counts.queued + counts.prepared + counts.onBlock}</span>
+            <span className="stat-label">Still to come</span>
+          </div>
+        )}
+        <div className="stat-tile">
+          <span className="stat-value">{counts.sold}</span>
+          <span className="stat-label">
+            Sold{counts.unsold > 0 ? ` · ${String(counts.unsold)} unsold` : ""}
+          </span>
+        </div>
+        {terminal && dashboard.overview !== null ? (
+          <div className="stat-tile">
+            <span className="stat-value">{compactINR(dashboard.overview.moneyMoved)}</span>
+            <span className="stat-label">Spent</span>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+
+  /* ---- Overview (once the room has opened): the read + its controls. ------- */
+  const lifecycleButtons =
+    view !== null && viewer.canConduct && !setupMode
+      ? (AUCTION_NEXT[view.auction.status] ?? []).map((step) =>
+          // DO NOT OFFER WHAT THIS SCREEN CANNOT DO. Closing a short auction
+          // needs a REASON on the record (DA-06), and the place that asks for
+          // one is the cockpit's two-act dialog — so here it is a link there,
+          // never a button whose only outcome is a refusal.
+          step.command === "complete" && !liveFeasibility.ok ? (
+            <ButtonLink
+              key={step.command}
+              href={`/seasons/${slug}/auction/cockpit`}
+              variant="secondary"
+              size="touch"
+              data-testid="auction-complete-on-cockpit"
+            >
+              Close short — on the cockpit
+            </ButtonLink>
+          ) : (
+            <Button
+              key={step.command}
+              size="touch"
+              variant={step.command === "complete" ? "secondary" : "primary"}
+              onClick={() =>
+                void act(
+                  () =>
+                    auctionLifecycleAction(slug, step.command, undefined, {
+                      acceptShortSquads: false,
+                    }),
+                  step.label,
+                )
+              }
+              loading={busy}
+              disabled={step.command === "open" && goLiveBlockers.length > 0}
+              data-testid={`auction-${step.command}`}
+            >
+              {step.label}
+            </Button>
+          ),
+        )
+      : [];
+
+  const overviewTab = (
+    <div className="auc-section-stack">
+      {lifecycleButtons.length > 0 ? (
+        <section className="auc-section" aria-labelledby="auc-controls-title">
+          <div className="auc-section-head">
+            <h2 id="auc-controls-title">Run the room</h2>
+            <p className="auc-section-hint">
+              Bidding itself happens in the cockpit. These pause or close the whole auction.
+            </p>
+          </div>
+          <div className="date-row">{lifecycleButtons}</div>
+        </section>
+      ) : null}
+      {/* The shortfall follows the auction to its close — stated every time
+          the page is opened, not discovered at 11pm behind a refusal. */}
+      {view !== null && !liveFeasibility.ok && !terminal ? (
+        <p className="auction-feasibility is-short" data-testid="feasibility-banner">
+          {liveFeasibility.headline} Closing this auction will need the conductor&apos;s override on
+          the cockpit (Close auction → “Close short — on the record”).
+        </p>
+      ) : null}
+      {overviewSlot}
+    </div>
+  );
+
+  /* ---- Players: the lot list, with faces. --------------------------------- */
+  const visibleLots = (view?.lots ?? []).filter((lot) => lotMatches(lotFilter, lot.status));
+  const playersTab =
+    view === null ? null : (
+      <section className="auc-section" data-testid="lot-queue" aria-labelledby="auc-lots-title">
+        <div className="auc-section-head auc-section-head-row">
+          <div>
+            <h2 id="auc-lots-title">Players under the hammer</h2>
+            <p className="auc-section-hint">
+              {view.lots.length} players, in registration-number order. Queued players come up one
+              by one.
+            </p>
+          </div>
+          {viewer.canConduct && !setupMode && (counts?.prepared ?? 0) > 0 ? (
+            <Button
+              variant="secondary"
+              size="touch"
+              onClick={() => void act(() => queueAllLotsAction(slug), "Lots queued")}
+              loading={busy}
+              data-testid="queue-all"
+            >
+              Queue {counts?.prepared ?? 0} waiting
+            </Button>
+          ) : null}
+        </div>
+        <div className="auc-filter" role="group" aria-label="Show players">
+          {LOT_FILTERS.map((option) => {
+            const n = view.lots.filter((lot) => lotMatches(option.id, lot.status)).length;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                className="auc-filter-chip"
+                aria-pressed={lotFilter === option.id}
+                onClick={() => {
+                  setLotFilter(option.id);
+                }}
+              >
+                {option.label}
+                <span className="auc-filter-count">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+        <ul className="auc-lots" data-testid="lots-table">
+          {visibleLots.map((lot) => {
+            const soldTo =
+              lot.soldToPaddle === null
+                ? null
+                : (teamOfPaddle.get(lot.soldToPaddle) ?? lot.soldToPaddle);
+            return (
+              <li
+                key={lot.id}
+                className="auc-lot"
+                data-status={lot.status}
+                data-testid={`lot-${lot.lotNumber}`}
+              >
+                <span className="auc-lot-number">{lot.lotNumber}</span>
+                <PlayerImage
+                  name={lot.playerName ?? "Unnamed"}
+                  seed={lot.id}
+                  size="sm"
+                  shape="round"
+                />
+                <span className="auc-lot-who">
+                  <span className="auc-lot-name">{lot.playerName ?? "Unnamed"}</span>
+                  <span className="auc-lot-meta">
+                    {lot.role.replace(/_/g, " ")} · base {formatPaiseINR(paise(lot.basePrice))}
+                  </span>
+                </span>
+                <span className="auc-lot-status">
+                  <Badge tone={LOT_TONE[lot.status]}>{lot.status.replace(/_/g, " ")}</Badge>
+                </span>
+                <span className="auc-lot-result">
+                  {lot.soldPrice !== null ? (
+                    <>
+                      <strong>{formatPaiseINR(paise(lot.soldPrice))}</strong>
+                      {soldTo !== null ? <span> → {soldTo}</span> : null}
+                    </>
+                  ) : lot.bidCount > 0 ? (
+                    `${String(lot.bidCount)} bid${lot.bidCount === 1 ? "" : "s"}`
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+          {visibleLots.length === 0 ? (
+            <li className="auc-empty">
+              {view.lots.length === 0 ? "No players in this auction." : "No players here yet."}
+            </li>
+          ) : null}
+        </ul>
+      </section>
+    );
+
+  /* ---- Paddles: who holds each team's paddle. ----------------------------- */
+  const paddlesTab =
+    view === null ? null : (
+      <section className="auc-section" data-testid="paddles-panel" aria-labelledby="auc-pad-title">
+        <div className="auc-section-head">
+          <h2 id="auc-pad-title">Paddles</h2>
+          {/* THE PADDLE TRAP, stated before auction night instead of
+              discovered in the hall: "Issue paddle" hands the paddle to
+              WHOEVER CLICKS IT, and one browser can hold one paddle. */}
+          <p className="auc-section-hint">
+            {setupMode ? (
+              <>
+                Owners get their paddle through the <strong>Team owners</strong> setup step. Issuing
+                one here gives it to <strong>you</strong> — only useful for a test run on your own
+                devices.
+              </>
+            ) : (
+              <>
+                One paddle per team, held by the team&apos;s owner on their own device. Issuing here
+                gives the paddle to <strong>you</strong>. Release hands one back.
+              </>
+            )}
+          </p>
+        </div>
+        {view.paddles.length === 0 ? (
+          <p className="auc-empty">No paddles yet.</p>
+        ) : (
+          <ul className="auc-pad-list">
+            {view.paddles.map((paddle) => {
+              // The overview lists ACTIVE paddles only (released ones are
+              // filtered at the read), which is how a released paddle is told
+              // apart from a live one here.
+              const active =
+                dashboard.overview === null ||
+                dashboard.overview.paddles.some((row) => row.paddleNumber === paddle.paddleNumber);
+              return (
+                <li
+                  key={paddle.id}
+                  className="auc-pad-row"
+                  data-active={active ? "true" : "false"}
+                  data-testid={`paddle-${paddle.paddleNumber}`}
+                >
+                  <span className="auc-pad-number">{paddle.paddleNumber}</span>
+                  <span className="auc-pad-team">
+                    <span className="auc-lot-name">{paddle.teamName}</span>
+                    <span className="auc-lot-meta">
+                      {active ? (paddle.holderName ?? "Not claimed") : "Released"}
+                    </span>
+                  </span>
+                  <span className="auc-pad-figures">
+                    {paddle.committed !== undefined ? (
+                      <span>
+                        <strong>{formatPaiseINR(paise(paddle.committed))}</strong> spent
+                      </span>
+                    ) : null}
+                    <span>
+                      <strong>{paddle.squadSize}</strong> signed
+                    </span>
+                  </span>
+                  {viewer.canConduct && active ? (
+                    <Button
+                      variant="ghost"
+                      size="touch"
+                      onClick={() =>
+                        void act(() => releasePaddleAction(slug, paddle.teamId), "Paddle released")
+                      }
+                      loading={busy}
+                      data-testid={`release-paddle-${paddle.paddleNumber}`}
+                    >
+                      Release
+                    </Button>
+                  ) : (
+                    <span />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {/* Issuing a paddle hands its purse to whoever clicks — the season
+            manager's act, never the appointed auctioneer's. */}
+        {viewer.canManage && !terminal ? (
+          <div className="auc-inline-form">
+            <Select
+              label="Issue a paddle to yourself for"
+              name="paddleTeam"
+              value={paddleTeam}
+              onChange={(event) => {
+                setPaddleTeam(event.target.value);
+              }}
+            >
+              <option value="">Choose a team…</option>
+              {ready.teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </Select>
+            <Button
+              size="touch"
+              variant="secondary"
+              onClick={() => void act(() => issuePaddleAction(slug, paddleTeam), "Paddle issued")}
+              loading={busy}
+              disabled={paddleTeam === ""}
+              data-testid="issue-paddle"
+            >
+              Issue paddle
+            </Button>
+          </div>
+        ) : null}
+      </section>
+    );
+
+  /* ---- Room: screens, rules, settings, staff. ------------------------------ */
+  const showOwnerPlans = view !== null && viewer.canManage && dashboard.ownerPlans !== undefined;
+  const showAbort = view !== null && viewer.canManage && !terminal;
+  // Two columns on a wide screen: what you open elsewhere on the left, what
+  // is set for this room on the right.
+  const roomTab = (
+    <div className="auc-room">
+      <div className="auc-section-stack">
+        {broadcastSlot}
+        {dashboard.wsUrl !== null && !setupMode ? (
+          <ConnectionCheck wsUrl={dashboard.wsUrl} />
+        ) : null}
+        {dashboard.rules !== null ? <RulesCard rules={dashboard.rules} /> : null}
+      </div>
+      <div className="auc-section-stack">
+        {showOwnerPlans && dashboard.ownerPlans !== undefined ? (
+          <section className="auc-section" aria-labelledby="auc-settings-title">
+            <div className="auc-section-head">
+              <h2 id="auc-settings-title">Settings</h2>
+            </div>
+            {/* WR-1: the organizer's switch for owner plans. Outside the locked
+              config on purpose — a switch flipped mid-season is not a rule of
+              the night. Layers above (platform, club, deploy) can only be read
+              here, so the row says when one of them has decided. */}
+            <label className="plan-switch" htmlFor="owner-plans-switch">
+              <input
+                id="owner-plans-switch"
+                type="checkbox"
+                checked={ownerPlansOn}
+                disabled={
+                  busy ||
+                  (dashboard.ownerPlans.deniedBy !== null &&
+                    dashboard.ownerPlans.deniedBy !== "auction")
+                }
+                data-testid="owner-plans-switch"
+                onChange={(event) => {
+                  const next = event.target.checked;
+                  setOwnerPlansOn(next);
+                  void (async () => {
+                    setBusy(true);
+                    const result = await setAuctionFeatureAction(slug, next);
+                    setBusy(false);
+                    if (result.ok) {
+                      toast({
+                        title: next ? "Owner plans on" : "Owner plans off",
+                        tone: "success",
+                      });
+                      router.refresh();
+                    } else {
+                      setOwnerPlansOn(!next);
+                      toast({ title: result.error ?? "Refused.", tone: "danger" });
+                    }
+                  })();
+                }}
+              />
+              <span className="plan-switch-text">
+                <span className="plan-switch-label">Owner plans</span>
+                <span className="plan-switch-detail">
+                  {dashboard.ownerPlans.deniedBy !== null &&
+                  dashboard.ownerPlans.deniedBy !== "auction"
+                    ? "Switched off above this auction — the platform or your club decides this one."
+                    : "Owners keep a private wish list with the most they'd pay, and see it against the live bidding. Never visible to you or rival owners."}
+                </span>
+              </span>
+            </label>
+          </section>
+        ) : null}
+        {auctioneersSlot}
+        {showAbort ? (
+          <section className="auc-section auc-danger" aria-labelledby="auc-danger-title">
+            <div className="auc-section-head">
+              <h2 id="auc-danger-title">Abort this auction</h2>
+              <p className="auc-section-hint">
+                Ends it for good — there is no way back, and the reason goes on the record.
+              </p>
+            </div>
+            {/* Behind a confirmation: `abandoned` is terminal and there is no
+              command back. */}
+            <div className="date-row">
+              <AbortDialog
+                busy={busy}
+                onAbort={(reason) => {
+                  void act(() => auctionLifecycleAction(slug, "abort", reason), "Auction aborted");
+                }}
+              />
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  /* ---- Log: the immutable record, newest first. --------------------------- */
+  const logEvents = view === null ? [] : logOpen ? view.events : view.events.slice(0, LOG_PREVIEW);
+  const logTab =
+    view === null ? null : (
+      <section className="auc-section" data-testid="replay-panel" aria-labelledby="auc-log-title">
+        <div className="auc-section-head auc-section-head-row">
+          <div>
+            <h2 id="auc-log-title">Event log</h2>
+            <p className="auc-section-hint">
+              {view.eventCount} events, written once and never edited. Replaying them rebuilds the
+              auction from scratch.
+            </p>
+          </div>
+          {viewer.canConduct ? (
+            <Button
+              variant="secondary"
+              size="touch"
+              onClick={() => void verify()}
+              loading={busy}
+              data-testid="verify-replay"
+            >
+              Replay &amp; verify
+            </Button>
+          ) : null}
+        </div>
+        {report !== null ? (
+          <p data-testid="replay-report" className="auc-report" data-ok={report.ok}>
+            {report.ok
+              ? report.divergences === 0
+                ? `Replayed ${String(report.eventCount)} events — everything matches.`
+                : `Replayed ${String(report.eventCount)} events — repaired ${String(report.divergences)} difference(s) from the log.`
+              : `Replay failed closed: ${report.reason ?? ""}`}
+          </p>
+        ) : null}
+        <ol className="auc-ev-list">
+          {logEvents.map((event) => (
+            <li key={event.seq}>
+              <span className="auc-ev-seq">#{event.seq}</span>
+              <span className="auc-ev-type">{eventLabel(event.type)}</span>
+              <span className="auc-ev-at">{formatTime(event.atMs)}</span>
+            </li>
+          ))}
+        </ol>
+        {view.events.length > LOG_PREVIEW ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setLogOpen((open) => !open);
+            }}
+            data-testid="log-toggle"
+          >
+            {logOpen ? "Show fewer" : `Show all ${String(view.events.length)} events`}
+          </Button>
+        ) : null}
+      </section>
+    );
+
+  const tabs: TabItem[] = [];
+  if (setupMode) {
+    tabs.push({
+      id: "setup",
+      label: "Setup",
+      content: <AuctionSetupFlow slug={slug} dashboard={dashboard} />,
+    });
+  } else {
+    tabs.push({ id: "overview", label: "Overview", content: overviewTab });
+  }
+  if (playersTab !== null && view !== null) {
+    tabs.push({ id: "players", label: "Players", badge: view.lots.length, content: playersTab });
+  }
+  if (paddlesTab !== null && view !== null) {
+    tabs.push({
+      id: "paddles",
+      label: "Paddles",
+      badge: `${String(claimedTeams)}/${String(ready.teams.length)}`,
+      content: paddlesTab,
+    });
+  }
+  tabs.push({ id: "room", label: "Room", content: roomTab });
+  if (logTab !== null && view !== null) {
+    tabs.push({ id: "log", label: "Log", badge: view.eventCount, content: logTab });
+  }
+
   return (
     <div
-      className="competitions-stack"
+      className="auc-hub"
       data-testid="auction-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
-      {setupMode ? <AuctionSetupFlow slug={slug} dashboard={dashboard} /> : null}
-      {setupMode && view !== null ? <h2 className="as-details-title">Room details</h2> : null}
-      {dashboard.rules !== null ? <RulesCard rules={dashboard.rules} /> : null}
-      {dashboard.wsUrl !== null && !setupMode ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
-
-      {view !== null ? (
-        <>
-          <Card data-testid="auction-lifecycle">
-            <div className="competition-head">
-              <h2>{view.auction.name}</h2>
-              <Badge tone={AUCTION_TONE[view.auction.status]} data-testid="auction-status">
-                {view.auction.status}
-              </Badge>
-            </div>
-            <p className="competitions-hint">
-              {/* DA-30: purse is money sight. Absent from the payload, not
-                  dimmed in the markup, for anyone without it. */}
-              {view.auction.config.pursePerTeam !== undefined
-                ? `Purse ${formatPaiseINR(paise(view.auction.config.pursePerTeam))} · `
-                : ""}
-              squad {view.auction.config.squadMin}–{view.auction.config.squadMax} · timer{" "}
-              {view.auction.config.timer.initialSeconds}s +{" "}
-              {view.auction.config.timer.extensionSeconds}s anti-snipe · config locked at creation
-            </p>
-            {/* WR-1: the organizer's switch for owner plans. Outside the locked
-                config on purpose — a switch flipped mid-season is not a rule of
-                the night. Layers above (platform, club, deploy) can only be
-                read here, so the row says when one of them has decided. */}
-            {viewer.canManage && dashboard.ownerPlans !== undefined ? (
-              <label className="plan-switch" htmlFor="owner-plans-switch">
-                <input
-                  id="owner-plans-switch"
-                  type="checkbox"
-                  checked={ownerPlansOn}
-                  disabled={
-                    busy ||
-                    (dashboard.ownerPlans.deniedBy !== null &&
-                      dashboard.ownerPlans.deniedBy !== "auction")
-                  }
-                  data-testid="owner-plans-switch"
-                  onChange={(event) => {
-                    const next = event.target.checked;
-                    setOwnerPlansOn(next);
-                    void (async () => {
-                      setBusy(true);
-                      const result = await setAuctionFeatureAction(slug, next);
-                      setBusy(false);
-                      if (result.ok) {
-                        toast({
-                          title: next ? "Owner plans on" : "Owner plans off",
-                          tone: "success",
-                        });
-                        router.refresh();
-                      } else {
-                        setOwnerPlansOn(!next);
-                        toast({ title: result.error ?? "Refused.", tone: "danger" });
-                      }
-                    })();
-                  }}
-                />
-                <span className="plan-switch-text">
-                  <span className="plan-switch-label">Owner plans</span>
-                  <span className="plan-switch-detail">
-                    {dashboard.ownerPlans.deniedBy !== null &&
-                    dashboard.ownerPlans.deniedBy !== "auction"
-                      ? "Switched off above this auction — the platform or your club decides this one."
-                      : "Team owners keep a private list of who they want and the most they'd pay, and see it against the live bidding. Off hides it for every team in this auction. It is never visible to you or to rival owners."}
-                  </span>
-                </span>
-              </label>
-            ) : null}
-            {/* The shortfall follows the auction all the way to its close —
-                stated here every time the page is opened, not discovered at
-                11pm behind a refusal. */}
-            {!liveFeasibility.ok ? (
-              <p className="auction-feasibility is-short" data-testid="feasibility-banner">
-                {liveFeasibility.headline} Closing this auction will need the conductor&apos;s
-                override on the cockpit (Close auction → “Close short — on the record”).
-              </p>
-            ) : null}
-            {viewer.canConduct ? (
-              <div className="date-row">
-                {(setupMode ? [] : (AUCTION_NEXT[view.auction.status] ?? [])).map((step) =>
-                  // DO NOT OFFER WHAT THIS SCREEN CANNOT DO.
-                  //
-                  // Closing an auction whose squads are short needs a REASON on
-                  // the record (DA-06), and the place that asks for one is the
-                  // cockpit's two-act dialog. This panel has no such dialog, and
-                  // its Close passed no override at all — so for a short auction
-                  // the button could only ever produce a refusal. The refusal
-                  // was at least well-written (it names the cockpit and the
-                  // exact control), but a button whose only outcome is an error
-                  // is a worse thing to put in front of a conductor at 11pm than
-                  // a link to where the work happens.
-                  step.command === "complete" && !liveFeasibility.ok ? (
-                    <ButtonLink
-                      key={step.command}
-                      href={`/seasons/${slug}/auction/cockpit`}
-                      variant="secondary"
-                      size="touch"
-                      data-testid="auction-complete-on-cockpit"
-                    >
-                      Close short — on the cockpit
-                    </ButtonLink>
-                  ) : (
-                    <Button
-                      key={step.command}
-                      size="touch"
-                      onClick={() =>
-                        void act(
-                          () =>
-                            auctionLifecycleAction(slug, step.command, undefined, {
-                              acceptShortSquads: acceptShortOpen,
-                            }),
-                          step.label,
-                        )
-                      }
-                      loading={busy}
-                      // Only `open` carries the go-live guard; pause, resume and
-                      // the rest must never be gated on paddle counts.
-                      disabled={step.command === "open" && goLiveBlockers.length > 0}
-                      data-testid={`auction-${step.command}`}
-                    >
-                      {step.label}
-                    </Button>
-                  ),
-                )}
-                {viewer.canManage &&
-                view.auction.status !== "completed" &&
-                view.auction.status !== "reconciled" &&
-                view.auction.status !== "abandoned" ? (
-                  /* Behind a confirmation now. This is the catastrophic exit —
-                     `abandoned` is terminal and there is no command back — and
-                     it used to be a single tap beside Pause, with the reason
-                     hardcoded to "conductor abort" so the log never said why. */
-                  <AbortDialog
-                    busy={busy}
-                    onAbort={(reason) => {
-                      void act(
-                        () => auctionLifecycleAction(slug, "abort", reason),
-                        "Auction aborted",
-                      );
-                    }}
-                  />
-                ) : null}
-              </div>
-            ) : null}
-            {/* A disabled control must always say why, or it is just a dead
-                button. This is the one place a first-time organizer stalls, so
-                it names the blocker AND who can clear it — several of these are
-                not things the organizer can do from this screen at all. */}
-            {viewer.canConduct &&
-            !setupMode &&
-            view.auction.status === "scheduled" &&
-            goLiveBlockers.length > 0 ? (
-              <p className="competitions-hint" data-testid="auction-open-blockers">
-                Not ready to open: {goLiveBlockers.join("; ")}.
-              </p>
-            ) : null}
-            {viewer.canConduct &&
-            !setupMode &&
-            view.auction.status === "scheduled" &&
-            !liveFeasibility.ok ? (
-              <label className="auction-ack">
-                <input
-                  type="checkbox"
-                  checked={acceptShortOpen}
-                  data-testid="accept-short-open"
-                  onChange={(event) => {
-                    setAcceptShortOpen(event.target.checked);
-                  }}
-                />
-                <span>
-                  Open anyway — {liveFeasibility.shortfall} squad place
-                  {liveFeasibility.shortfall === 1 ? "" : "s"} cannot be filled from this pool.
-                </span>
-              </label>
-            ) : null}
-          </Card>
-
-          <Card data-testid="paddles-panel">
-            <h2>Paddles</h2>
-            {/* THE PADDLE TRAP, stated before auction night instead of
-                discovered in the hall: "Issue paddle" hands the paddle to
-                WHOEVER CLICKS IT, one browser can hold one paddle, and opening
-                needs two teams able to bid. An organizer who clicks twice ends
-                up holding both paddles and cannot run the room. */}
-            <p className="competitions-hint">
-              {setupMode ? (
-                <>
-                  Owners get their paddle through the <strong>Team owners</strong> step above.
-                  Issuing one here gives it to <strong>you</strong> — the person clicking — which is
-                  only useful for a test run on your own devices.
-                </>
-              ) : (
-                <>
-                  One paddle per team. Issuing gives the paddle to <strong>you</strong> — the person
-                  clicking — so bidding needs each team&apos;s owner on their own device. Owners are
-                  invited from the{" "}
-                  <a href={`/seasons/${slug}/auction/cockpit`} className="auction-inline-link">
-                    cockpit
-                  </a>
-                  , and they claim their own paddle. Release hands one back.
-                </>
-              )}
-            </p>
-            {view.paddles.length === 0 ? (
-              <p className="competitions-hint">No paddles issued yet.</p>
-            ) : (
-              <ul className="conflict-list">
-                {view.paddles.map((paddle) => {
-                  // The overview lists ACTIVE paddles only (released ones are
-                  // filtered at the read), which is how a released paddle is
-                  // told apart from a live one here.
-                  const active =
-                    dashboard.overview === null ||
-                    dashboard.overview.paddles.some(
-                      (row) => row.paddleNumber === paddle.paddleNumber,
-                    );
-                  return (
-                    <li key={paddle.id} data-testid={`paddle-${paddle.paddleNumber}`}>
-                      <Badge tone={active ? "info" : "neutral"}>{paddle.paddleNumber}</Badge>
-                      <span className="registration-name">{paddle.teamName}</span>
-                      <span className="registration-phone">
-                        {active ? (paddle.holderName ?? "—") : "released"}
-                        {paddle.committed !== undefined
-                          ? ` · committed ${formatPaiseINR(paise(paddle.committed))}`
-                          : ""}{" "}
-                        · squad {paddle.squadSize}
-                      </span>
-                      {viewer.canConduct && active ? (
-                        <Button
-                          variant="ghost"
-                          size="touch"
-                          onClick={() =>
-                            void act(
-                              () => releasePaddleAction(slug, paddle.teamId),
-                              "Paddle released",
-                            )
-                          }
-                          loading={busy}
-                          data-testid={`release-paddle-${paddle.paddleNumber}`}
-                        >
-                          Release
-                        </Button>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {/* Issuing a paddle hands its purse to whoever clicks — the
-                season manager's act, never the appointed auctioneer's. */}
-            {viewer.canManage ? (
-              <div className="date-row">
-                <Select
-                  label="Team"
-                  name="paddleTeam"
-                  value={paddleTeam}
-                  onChange={(event) => {
-                    setPaddleTeam(event.target.value);
-                  }}
-                >
-                  <option value="">Choose…</option>
-                  {ready.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </Select>
-                <Button
-                  size="touch"
-                  onClick={() =>
-                    void act(() => issuePaddleAction(slug, paddleTeam), "Paddle issued")
-                  }
-                  loading={busy}
-                  disabled={paddleTeam === ""}
-                  data-testid="issue-paddle"
-                >
-                  Issue paddle
-                </Button>
-              </div>
-            ) : null}
-          </Card>
-
-          <Card data-testid="lot-queue">
-            <div className="competition-head">
-              <h2>Lot queue</h2>
-              <span className="competitions-hint">
-                {view.lots.length} lots · registration-number order
-              </span>
-            </div>
-            {viewer.canConduct && !setupMode ? (
-              <div className="date-row">
-                <Button
-                  variant="secondary"
-                  size="touch"
-                  onClick={() => void act(() => queueAllLotsAction(slug), "Lots queued")}
-                  loading={busy}
-                  data-testid="queue-all"
-                >
-                  Queue all prepared
-                </Button>
-              </div>
-            ) : null}
-            <div className="table-scroll">
-              <table className="reg-table" data-testid="lots-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Player</th>
-                    <th>Role</th>
-                    <th>Base</th>
-                    <th>Status</th>
-                    <th>Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.lots.map((lot) => (
-                    /* `.reg-table` drops its `thead` below 1100px and brings the
-                       headings back through `data-label` (seasons.css). */
-                    <tr key={lot.id} data-testid={`lot-${lot.lotNumber}`}>
-                      <td data-label="#" className="reg-number">
-                        {lot.lotNumber}
-                      </td>
-                      <td data-label="Player">{lot.playerName ?? "Unnamed"}</td>
-                      <td data-label="Role">{lot.role.replace(/_/g, " ")}</td>
-                      <td data-label="Base">{formatPaiseINR(paise(lot.basePrice))}</td>
-                      <td data-label="Status">
-                        <Badge tone={LOT_TONE[lot.status]}>{lot.status.replace(/_/g, " ")}</Badge>
-                      </td>
-                      <td data-label="Result">
-                        {lot.soldPrice !== null
-                          ? `${formatPaiseINR(paise(lot.soldPrice))} → ${lot.soldToPaddle ?? ""}`
-                          : lot.bidCount > 0
-                            ? `${String(lot.bidCount)} bid(s)`
-                            : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                  {view.lots.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="dash-hint">
-                        No lots.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          <Card data-testid="replay-panel">
-            <div className="competition-head">
-              <h2>Event log &amp; replay</h2>
-              <span className="competitions-hint">
-                {view.eventCount} immutable events · single-writer order
-              </span>
-            </div>
-            {viewer.canConduct ? (
-              <Button
-                variant="secondary"
-                size="touch"
-                onClick={() => void verify()}
-                loading={busy}
-                data-testid="verify-replay"
-              >
-                Replay events &amp; verify state
-              </Button>
-            ) : null}
-            {report !== null ? (
-              <p data-testid="replay-report" className="competitions-hint">
-                {report.ok
-                  ? report.divergences === 0
-                    ? `Replayed ${String(report.eventCount)} events — projection matches persisted state exactly.`
-                    : `Replayed ${String(report.eventCount)} events — healed ${String(report.divergences)} divergence(s) from the log.`
-                  : `Replay failed closed: ${report.reason ?? ""}`}
-              </p>
-            ) : null}
-            <ol className="timeline event-log">
-              {view.events.map((event) => (
-                <li key={event.seq}>
-                  <Badge tone="neutral">#{event.seq}</Badge>
-                  <span className="registration-name">{event.type}</span>
-                  <span className="timeline-at">{formatTime(event.atMs)}</span>
-                </li>
-              ))}
-            </ol>
-          </Card>
-        </>
-      ) : null}
+      {figures}
+      <HashTabs tabs={tabs} label="Auction sections" defaultId={setupMode ? "setup" : "overview"} />
     </div>
   );
 }

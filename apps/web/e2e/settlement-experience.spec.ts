@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { completeAuction } from "./complete-auction";
 import { latestOtp } from "./otp";
+import { issuePaddleTo, showAuctionTab } from "./auction-tabs";
 
 // PX-7 FOUNDER DEMONSTRATION: complete an auction → open the Settlement
 // Workspace → review the case → verify → record a manual payment → waive one
@@ -160,12 +161,11 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // Opening needs ≥2 paddles and ≥1 queued lot; completing needs zero
   // unresolved lots. Nothing is sold: the dues are declared, not bid.
   for (const team of ["Kings", "Chargers"]) {
-    await page.getByLabel("Team", { exact: true }).selectOption({ label: team });
-    await page.getByTestId("issue-paddle").click();
-    await expect(page.getByTestId("paddles-panel")).toContainText(team, { timeout: 20_000 });
+    await issuePaddleTo(page, team);
   }
+  await showAuctionTab(page, "Setup");
   await page.getByTestId("queue-all").click();
-  await expect(page.getByTestId("lots-table")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("lot-L001")).toContainText("queued", { timeout: 20_000 });
   await page.getByTestId("accept-short-open").check();
   await page.getByTestId("auction-open").click();
   await expect(page.getByTestId("auction-status")).toHaveText("live", { timeout: 20_000 });
