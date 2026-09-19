@@ -47,15 +47,14 @@ export function ShareRegistration({ slug, open }: { slug: string; open: boolean 
   // is a fact the recruiting control has to know.
   if (!open) {
     return (
-      <div className="share-reg" data-testid="share-registration">
-        <p className="share-reg-label" data-testid="share-closed">
-          Registration is closed — the link no longer takes new players
-        </p>
-        <p className="dash-hint">
-          Anyone opening it now is told intake has closed. Reopen registration on the season
-          Overview to start recruiting again; you can still add players yourself or import a CSV.
-        </p>
-      </div>
+      // One line, not a panel: a closed link is a fact to know, not a task.
+      <p className="share-reg-closed" data-testid="share-registration">
+        <span className="share-reg-dot" aria-hidden />
+        <span data-testid="share-closed">
+          <strong>Registration is closed</strong> — the link no longer takes new players. Reopen it
+          from the season Overview; you can still add or import players here.
+        </span>
+      </p>
     );
   }
 

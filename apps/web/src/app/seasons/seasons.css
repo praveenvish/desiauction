@@ -1205,6 +1205,30 @@ p + .date-row {
   background: var(--surface-sunken);
 }
 
+.share-reg-closed {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.share-reg-closed strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.share-reg-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+  transform: translateY(-1px);
+}
+
 .share-reg-label {
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);

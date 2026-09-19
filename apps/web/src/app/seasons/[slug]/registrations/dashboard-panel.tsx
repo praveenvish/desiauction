@@ -649,33 +649,40 @@ export function RegistrationDashboardPanel({
           }}
           hint={feeHint(stats)}
         />
-        <StatTile
-          label="Waitlisted"
-          value={stats.waitlisted}
-          testId="stat-waitlisted"
-          active={filters.status === "waitlisted"}
-          onSelect={() => {
-            changeFilter({ status: "waitlisted" });
-          }}
-        />
-        <StatTile
-          label="Declined"
-          value={stats.rejected}
-          testId="stat-rejected"
-          active={filters.status === "rejected"}
-          onSelect={() => {
-            changeFilter({ status: "rejected" });
-          }}
-        />
-        <StatTile
-          label="Withdrawn"
-          value={stats.withdrawn}
-          testId="stat-withdrawn"
-          active={filters.status === "withdrawn"}
-          onSelect={() => {
-            changeFilter({ status: "withdrawn" });
-          }}
-        />
+        {/* Zero-count outcomes stay off the strip unless they are the open filter. */}
+        {stats.waitlisted > 0 || filters.status === "waitlisted" ? (
+          <StatTile
+            label="Waitlisted"
+            value={stats.waitlisted}
+            testId="stat-waitlisted"
+            active={filters.status === "waitlisted"}
+            onSelect={() => {
+              changeFilter({ status: "waitlisted" });
+            }}
+          />
+        ) : null}
+        {stats.rejected > 0 || filters.status === "rejected" ? (
+          <StatTile
+            label="Declined"
+            value={stats.rejected}
+            testId="stat-rejected"
+            active={filters.status === "rejected"}
+            onSelect={() => {
+              changeFilter({ status: "rejected" });
+            }}
+          />
+        ) : null}
+        {stats.withdrawn > 0 || filters.status === "withdrawn" ? (
+          <StatTile
+            label="Withdrawn"
+            value={stats.withdrawn}
+            testId="stat-withdrawn"
+            active={filters.status === "withdrawn"}
+            onSelect={() => {
+              changeFilter({ status: "withdrawn" });
+            }}
+          />
+        ) : null}
       </div>
 
       {/* DA-35: the orphan. A pre-signed player with no team is in NO auction
@@ -1357,10 +1364,9 @@ function NextStep({
       </ButtonLink>
     );
   } else {
-    eyebrow = "All set";
-    title = "Every registration is decided";
-    why = "New registrations will appear here for review.";
-    action = null;
+    // Nothing to do is not a step. The banner stays away rather than filling
+    // the top of the desk with "all set".
+    return null;
   }
   return (
     <section className="pd-next" aria-label="Next step" data-testid="next-step">
