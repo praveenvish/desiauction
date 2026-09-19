@@ -13,7 +13,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   cancelDeliveryAction,
@@ -30,6 +30,7 @@ import {
 import type { DeliveryView } from "../../../../../server/financial-operations/views";
 import "../../../../seasons/[slug]/money/money.css";
 import "../finance.css";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 /**
  * PX-8 §2 — the Delivery workspace.
@@ -88,10 +89,7 @@ export function DeliveriesPanel({
 }) {
   const pathname = usePathname();
   const params = useSearchParams();
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   const [dialog, setDialog] = useState<{ kind: "cancel" | "confirm"; row: DeliveryView } | null>(
     null,

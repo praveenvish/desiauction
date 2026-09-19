@@ -234,3 +234,26 @@
   background: var(--accent-pressed);
   color: var(--text-inverse);
 }
+
+/* --- theatre demo ---------------------------------------------------------- */
+.demo-money {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--display-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--money-value);
+}
+
+.demo-stage {
+  position: relative;
+  isolation: isolate;
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+}
+
+.demo-stage > * {
+  position: relative;
+  z-index: 1;
+}

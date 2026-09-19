@@ -59,14 +59,30 @@ const redactPaths = [
   'req.headers["x-callback-secret"]',
 ];
 
-const base = pino({
-  level: env.LOG_LEVEL,
-  base: { app: "web", env: env.NODE_ENV, version: env.APP_VERSION },
-  redact: { paths: redactPaths, censor: "[redacted]" },
-  ...(env.NODE_ENV === "development"
-    ? { transport: { target: "pino-pretty", options: { colorize: true } } }
-    : {}),
-});
+/*
+ * ONE LOGGER PER PROCESS, not one per module evaluation.
+ *
+ * In `next dev` this module is evaluated again for every separately compiled
+ * route and on every hot reload, and in development each evaluation's
+ * `pino-pretty` transport starts its own worker thread piped into stdout.
+ * Measured on 2026-09-18: 11-13 transports per server lifetime
+ * ("MaxListenersExceededWarning … listeners added to [Socket]"), next-server at
+ * 4.5 GB, and Next restarting itself on its memory threshold every few pages —
+ * localhost refusing connections, then every route compiling cold again. The
+ * same globalThis guard db.ts uses for its pools keeps it to one.
+ */
+const globalStore = globalThis as { __daLogger?: Logger };
+const base: Logger =
+  globalStore.__daLogger ??
+  pino({
+    level: env.LOG_LEVEL,
+    base: { app: "web", env: env.NODE_ENV, version: env.APP_VERSION },
+    redact: { paths: redactPaths, censor: "[redacted]" },
+    ...(env.NODE_ENV === "development"
+      ? { transport: { target: "pino-pretty", options: { colorize: true } } }
+      : {}),
+  });
+globalStore.__daLogger = base;
 
 /**
  * The request id, carried without threading it through every signature.
@@ -106,4 +122,43 @@ export function requestId(): string | undefined {
 export function logger(): Logger {
   const id = requestId();
   return id === undefined ? base : base.child({ requestId: id });
+}
+
+/**
+ * The logger for a SERVER ACTION or page, carrying the request id middleware.ts
+ * stamps on every page and action request.
+ *
+ * Server actions have no request object and run outside `withRequestId`, so
+ * `logger()` above could never attach an id to them — only the five API routes
+ * had one. The id is in the request headers instead; this reads it. Outside a
+ * request (a script, a test) there are no headers to read, and it degrades to
+ * the plain logger rather than throwing.
+ */
+export async function requestLogger(): Promise<Logger> {
+  const ambient = requestId();
+  if (ambient !== undefined) {
+    return base.child({ requestId: ambient });
+  }
+  try {
+    const { headers } = await import("next/headers");
+    const id = (await headers()).get("x-request-id");
+    return id === null ? base : base.child({ requestId: id });
+  } catch {
+    return base;
+  }
+}
+
+/**
+ * One line for every authorization refusal, in one shape, whichever gate
+ * refused. Before this only the settlement and finance gates logged anything,
+ * so a burst of refused org and season actions — a broken link, a stale role,
+ * somebody probing — left no trace. Names the person, the scope and the
+ * capability; never the payload of what was attempted.
+ */
+export async function logAuthzRefused(detail: {
+  personId: string;
+  scope: string;
+  capability: string;
+}): Promise<void> {
+  (await requestLogger()).warn(detail, "authz.refused");
 }

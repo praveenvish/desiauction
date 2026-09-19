@@ -71,7 +71,24 @@ export type AdminSurface =
   /** The demo desk (DEMO-1), behind `platform:demo`. Opening it reads the name
    *  and mobile number of somebody who is not a customer, which is precisely
    *  the kind of read this log exists for. */
-  | "demos";
+  | "demos"
+  /** The privacy desk, behind `platform:privacy`: names, numbers and the power to
+   *  erase them. Every opening is recorded. */
+  | "erasure"
+  /** The product-news list: a count, and an export of every address on it. */
+  | "newsletter"
+  | "newsletter-export"
+  /** The problem-report desk (FR-1), behind `platform:support`. Opening it
+   *  reads people's reply addresses and pictures of their screens. */
+  | "reports"
+  /** The review desk (FR-1 Phase 2), also behind `platform:support`. */
+  | "reviews"
+  /** Every auction running right now, across every club. */
+  | "live"
+  /** One auction, watched: lots, bids and every team's purse. */
+  | "auction"
+  /** The moderation desk (0072), behind `platform:moderation`. */
+  | "moderation";
 
 /**
  * Record that an administrator opened a surface.

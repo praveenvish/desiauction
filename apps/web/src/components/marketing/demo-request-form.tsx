@@ -41,9 +41,12 @@ export function DemoRequestForm({ source }: { source: string }) {
           tournament we&apos;ve already finished, so you see the squads, the bidding and the money
           afterwards rather than an empty screen.
         </p>
-        {state.requestId !== undefined ? (
+        {state.pickHandle !== undefined ? (
           <p className={styles["doneBody"]}>
-            <Link href={`/schedule-demo/pick?r=${state.requestId}`} className={styles["pickLink"]}>
+            <Link
+              href={`/schedule-demo/pick?r=${encodeURIComponent(state.pickHandle)}`}
+              className={styles["pickLink"]}
+            >
               <IconCalendar width={16} height={16} aria-hidden />
               Or pick a time yourself
             </Link>

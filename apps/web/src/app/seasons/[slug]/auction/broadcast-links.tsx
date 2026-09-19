@@ -1,7 +1,9 @@
 "use client";
 
 import { Card, Field, useToast } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+
+import { useOrigin } from "../../../../lib/use-hydrated";
 
 /**
  * THE WAY IN TO THE BROADCAST SURFACES (DA-20).
@@ -21,12 +23,8 @@ import { useEffect, useState } from "react";
  */
 export function BroadcastLinks({ slug }: { slug: string }) {
   const toast = useToast();
-  const [origin, setOrigin] = useState("");
+  const origin = useOrigin();
   const [sponsor, setSponsor] = useState("");
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
 
   const boardUrl = `${origin}/seasons/${slug}/auction/board`;
   const trimmedSponsor = sponsor.trim();

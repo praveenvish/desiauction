@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { Button, ButtonLink, Card } from "@desiauction/ui";
 import { redirect } from "next/navigation";
@@ -179,9 +180,9 @@ function ValidOwnerInvite({ preview, token }: { preview: OwnerJoinPreview; token
         {/* A real decline would set `declined_at`, which is a migration and out
             of scope here. So this is an exit, honestly labelled. */}
         <p className="join-decline">
-          <a href="/home" data-testid="owner-join-decline">
+          <Link href="/home" data-testid="owner-join-decline">
             This isn&apos;t for me
-          </a>{" "}
+          </Link>{" "}
           — leaving does nothing to the link. Tell the organizer: an owner link cannot be withdrawn
           once sent.
         </p>

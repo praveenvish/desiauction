@@ -26,7 +26,9 @@ const FOUNDATION_ICONS = [IconShieldCheck, IconLedger, IconRefresh] as const;
  * Product vignettes: each feature group is SHOWN as the surface it describes,
  * built from the same tokens the product renders with. Decorative (aria-hidden)
  * — the adjacent checklist is the accessible content — and truthful: every
- * frame depicts a surface the certified platform actually has.
+ * frame depicts a surface the certified platform actually has. The desk is a
+ * football season's, with football's own role names: the product runs twelve
+ * sports, and a cricket-only sample on the page that says so contradicted it.
  */
 const VIGNETTES: Record<string, ReactNode> = {
   Registration: (
@@ -35,24 +37,24 @@ const VIGNETTES: Record<string, ReactNode> = {
         <i />
         <i />
         <i />
-        <span>Registration desk</span>
+        <span>Registration desk · Football</span>
       </div>
       <div className="mk-vignette-body">
         <div className="mk-vrow">
           <span>
-            <strong>K. Patel</strong> · All-rounder
+            <strong>K. Patel</strong> · Midfielder
           </span>
           <span className="mk-vpill mk-vpill--ok">Approved</span>
         </div>
         <div className="mk-vrow">
           <span>
-            <strong>S. Nair</strong> · Bowler
+            <strong>S. Nair</strong> · Goalkeeper
           </span>
           <span className="mk-vpill mk-vpill--wait">Waitlist</span>
         </div>
         <div className="mk-vrow">
           <span>
-            <strong>R. Iyer</strong> · Wicket-keeper
+            <strong>R. Iyer</strong> · Forward
           </span>
           <span className="mk-vpill mk-vpill--ok">Approved</span>
         </div>

@@ -37,7 +37,11 @@ export type ProductEventName =
   | "demo.slot_picked"
   | "demo.confirmed"
   | "demo.cancelled"
-  | "demo.rescheduled";
+  | "demo.rescheduled"
+  // FR-1. Whether people find the door, and whether the screenshot survives to
+  // the send. No payload says who, and none carries what they wrote.
+  | "support.report_opened"
+  | "support.report_sent";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

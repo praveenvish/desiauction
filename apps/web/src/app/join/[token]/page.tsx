@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ButtonLink, Card } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
@@ -132,9 +133,9 @@ function ValidInvite({ preview, token }: { preview: InvitePreview; token: string
             which is a migration and out of scope for this work — so this is an
             exit, not a state change, and it does not claim to kill the link. */}
         <p className="join-decline">
-          <a href="/home" data-testid="join-decline">
+          <Link href="/home" data-testid="join-decline">
             This isn&apos;t for me
-          </a>{" "}
+          </Link>{" "}
           — leaving does nothing to the link; ask the organizer to revoke it.
         </p>
       </Card>

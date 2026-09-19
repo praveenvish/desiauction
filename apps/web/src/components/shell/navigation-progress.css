@@ -1,0 +1,47 @@
+/*
+ * The navigation bar: a hairline of accent along the top edge of the viewport.
+ *
+ * Transform-only, so it never moves layout and never repaints text (axe reads
+ * mid-animation frames; see axe-scans-aria-hidden-contrast). The creep is one
+ * long transition toward 85% with a front-loaded curve: it jumps to about a
+ * third almost at once — the "we heard you" — then slows, so a slow network
+ * never makes it look finished.
+ */
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 10000;
+  height: 3px;
+  pointer-events: none;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+}
+
+.nav-progress[data-phase="loading"] {
+  opacity: 1;
+  transform: scaleX(0.85);
+  /* motion-ok: an ambient creep, not an interaction — 10s is the point. */
+  transition: transform 10s cubic-bezier(0.08, 0.82, 0.17, 1);
+}
+
+.nav-progress[data-phase="done"] {
+  opacity: 0;
+  transform: scaleX(1);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    opacity var(--duration-slow) var(--ease-out) var(--duration-fast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still there — the feedback is the point — but it does not travel. */
+  .nav-progress[data-phase="loading"] {
+    transform: scaleX(0.6);
+    transition: none;
+  }
+  .nav-progress[data-phase="done"] {
+    transition: none;
+  }
+}

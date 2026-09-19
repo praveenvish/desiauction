@@ -384,8 +384,20 @@ export async function advanceCompetition(
  * season is, where it is, and whether you can still enter.
  */
 export interface PublishBlocker {
-  code: "dates" | "location" | "intake";
+  /**
+   * `platform_hold` (0072) is not the organizer's to clear: DesiAuction took
+   * the page down, and the message says why and who to write to.
+   */
+  code: "dates" | "location" | "intake" | "platform_hold";
   message: string;
+}
+
+/** The blocker a platform hold raises — first, because nothing else matters until it lifts. */
+export function holdBlocker(reason: string): PublishBlocker {
+  return {
+    code: "platform_hold",
+    message: `DesiAuction took this page down: “${reason}” Write to support@desiauction.in to have it reviewed.`,
+  };
 }
 
 export function publishBlockers(competition: {

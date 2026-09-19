@@ -1,0 +1,54 @@
+/*
+ * Depth wrapper. The angle arrives as custom properties written by the Tilt
+ * component; this file decides how they feel. Rest → hover uses the base
+ * duration so the settle is soft; while the pointer is moving the transition
+ * is instant so the face follows the hand without lag.
+ */
+.tilt {
+  position: relative;
+  transform: perspective(var(--depth-perspective)) rotateX(var(--tilt-x, 0deg))
+    rotateY(var(--tilt-y, 0deg)) translateY(var(--tilt-lift, 0px));
+  transform-style: preserve-3d;
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.tilt[data-active="true"] {
+  transition-duration: var(--duration-instant);
+}
+
+.lift[data-active="true"] {
+  --tilt-lift: var(--depth-lift);
+}
+
+/* The sheen: a soft highlight under the pointer, using the theme's own sheen
+   token so it reads as light on the surface rather than a white smear. */
+.glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--glare-x, 50%) var(--glare-y, 50%),
+    color-mix(in srgb, var(--accent-sheen) 14%, transparent),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.tilt[data-active="true"] .glare {
+  opacity: 1;
+}
+
+/* The JS gate never engages on a coarse pointer or under reduced motion; this
+   is the same decision made in CSS so the two can never disagree. */
+@media (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .tilt {
+    transform: none;
+    transition: none;
+  }
+
+  .glare {
+    display: none;
+  }
+}

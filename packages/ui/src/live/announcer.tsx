@@ -44,7 +44,11 @@ export function AnnouncerProvider({ children }: { children: ReactNode }) {
   const draining = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const drain = useCallback(() => {
+  // A NAMED function expression, because the queue re-schedules itself: the
+  // name `drainQueue` is bound inside the function, so the timeout below refers
+  // to a finished function rather than to the `drain` constant that is still
+  // being initialised when this closure is created.
+  const drain = useCallback(function drainQueue() {
     const next = queue.current.shift();
     if (next === undefined) {
       draining.current = false;
@@ -55,7 +59,7 @@ export function AnnouncerProvider({ children }: { children: ReactNode }) {
     setPoliteText("");
     timer.current = setTimeout(() => {
       setPoliteText(next);
-      timer.current = setTimeout(drain, POLITE_GAP_MS);
+      timer.current = setTimeout(drainQueue, POLITE_GAP_MS);
     }, POLITE_GAP_MS);
   }, []);
 

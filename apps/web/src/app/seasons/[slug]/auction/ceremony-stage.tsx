@@ -8,7 +8,8 @@ import {
   type CeremonyState,
   type LotOutcomeKind,
 } from "@desiauction/core";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { GoldDrift, SoldStamp, type StampSize } from "@desiauction/ui";
+import { useEffect, useMemo, useState } from "react";
 
 import type { LotMedia } from "../../../../server/auction/live-summary";
 
@@ -71,14 +72,14 @@ export function outcomeMeta(outcome: NonNullable<AuctionSnapshot["lastOutcome"]>
   }
 }
 
-// The SOLD celebration is 30 fixed confetti pieces — a fixed count, no
-// randomness, so every connected surface (cockpit, stage, spectate, live)
-// renders the identical burst for the same moment, exactly as the ceremony
-// phases already do (each keyed on `ceremony.key`). The whole layer is
-// decorative (aria-hidden) and collapses to nothing under prefers-reduced-
-// motion; the static gold border on `.ceremony-sold` remains the non-motion
-// marker, so nothing about the announced outcome depends on animation.
-const CONFETTI = Array.from({ length: 30 }, (_, i) => i);
+// THE SOLD CEREMONY (doc 11, C-5) — four beats in 1800ms, timed in
+// auction.css around the shared theatre primitives: the freeze (a gold flash
+// behind the name), the stamp (the gavel strikes, gold SOLD lands with a
+// spring), the facts (the price and the buyer roll in), the settle (gold
+// recedes to a thin frame). Every layer is deterministic and keyed on
+// `ceremony.key`, so the cockpit, the big screen and a phone in the hall play
+// the identical moment. Decoration is aria-hidden and gone under reduced
+// motion; the static gold frame is the non-motion marker.
 
 /** How long a blank stage stays hopeful before it admits it cannot get through. */
 const PATIENCE_MS = 8_000;
@@ -98,6 +99,8 @@ export function CeremonyStage({
    * keeps rendering exactly the stage it always has.
    */
   lotMedia = {},
+  /** `stage` when the ceremony fills a projector; `lg` in a page. */
+  stampSize = "lg",
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
@@ -105,6 +108,7 @@ export function CeremonyStage({
   ceremony: CeremonyState;
   remainingMs: number | null;
   lotMedia?: Readonly<Record<string, LotMedia>>;
+  stampSize?: StampSize;
 }) {
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // "Waiting for the first snapshot…" told a guest, in the product's own
@@ -186,14 +190,21 @@ export function CeremonyStage({
       {ceremony.phase === "sold" ? (
         <div className="ceremony-celebration" aria-hidden="true">
           <span className="ceremony-glow" />
-          {CONFETTI.map((i) => (
-            <i key={i} className="ceremony-confetti" style={{ "--i": i } as CSSProperties} />
-          ))}
+          <GoldDrift className="ceremony-drift" />
         </div>
       ) : null}
-      <p className="ceremony-title" data-testid="ceremony-title">
-        {PHASE_TITLE[ceremony.phase]}
-      </p>
+      {/* The two verdicts are STAMPED, not titled: the word arrives as an
+          object with weight (SOLD struck by the gavel in gold; UNSOLD in
+          neutral ink, brisk, C-23). Every other phase keeps its title line. */}
+      {ceremony.phase === "sold" || ceremony.phase === "unsold" ? (
+        <p className="ceremony-title ceremony-title--stamp" data-testid="ceremony-title">
+          <SoldStamp tone={ceremony.phase} size={stampSize} />
+        </p>
+      ) : (
+        <p className="ceremony-title" data-testid="ceremony-title">
+          {PHASE_TITLE[ceremony.phase]}
+        </p>
+      )}
       {finished ? (
         <div className="ceremony-lot ceremony-waiting" data-testid="ceremony-finished">
           <p className="ceremony-waiting-title" data-testid="ceremony-progress">
@@ -202,7 +213,10 @@ export function CeremonyStage({
           <p className="ceremony-waiting-hint">Every lot is settled. Final squads below.</p>
         </div>
       ) : lot !== null ? (
-        <div className="ceremony-lot">
+        /* `ceremony-reveal`: a new lot enters line by line — name, then meta,
+           then money, then the clock — 60ms apart. The section is keyed on the
+           moment, so the reveal plays once per lot and never on a bid. */
+        <div className={`ceremony-lot${ceremony.phase === "opening" ? " ceremony-reveal" : ""}`}>
           <h2 className="ceremony-player" data-testid="ceremony-player">
             {lot.playerName ?? "Unnamed"}
           </h2>
@@ -263,7 +277,14 @@ export function CeremonyStage({
             <p className="ceremony-bid" data-testid="ceremony-bid">
               {formatPaiseINR(paise(outcome.amount))}
               {outcome.kind === "sold" ? (
-                <span className="ceremony-leader" data-testid="ceremony-leader">
+                /* Beat three's second fact. "Sold to" is its own small line so
+                   the franchise name below it can be set at display size — the
+                   hall reads WHO before it reads how much. */
+                <span
+                  className="ceremony-leader ceremony-leader--sold"
+                  data-testid="ceremony-leader"
+                >
+                  <span className="ceremony-leader-kicker">Sold to</span>
                   {[outcome.teamName, outcome.paddleNumber]
                     .filter((part): part is string => part !== null && part !== "")
                     .join(" · ")}
@@ -282,7 +303,10 @@ export function CeremonyStage({
                 </span>{" "}
               </>
             )}
-            {outcomeMeta(outcome)}
+            {/* The buyer is already named in display type above on a sale;
+                repeating "to Strikers" here said it twice. The queue position
+                is the fact that line has left to give. */}
+            {outcome.kind === "sold" ? outcome.lotNumber : outcomeMeta(outcome)}
           </p>
         </div>
       ) : (

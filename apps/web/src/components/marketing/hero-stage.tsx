@@ -1,21 +1,26 @@
 "use client";
 
+import { GoldDrift, RollingNumber, SoldStamp, Tilt } from "@desiauction/ui";
 import { useEffect, useRef, useState } from "react";
 
 /**
- * The hero's scripted auction replay (2026-07-24 council rebuild). Engineering
- * Council ruling: the landing demonstrates the product with a SCRIPTED timeline
- * through stage markup — a static asset with zero server dependency — never a
- * live room. The loop: bids climb in Indian-grouped rupees while the calling
- * team flips, the SOLD stamp slams (transform-only — axe scans visual contrast
- * regardless of aria-hidden, so no opacity keyframes on text, ever), then the
- * next fictional player takes the block.
+ * The hero's scripted auction replay (2026-07-24 council rebuild; PREMIUM-1
+ * theatre). Engineering Council ruling: the landing demonstrates the product
+ * with a SCRIPTED timeline through stage markup — a static asset with zero
+ * server dependency — never a live room.
+ *
+ * What the visitor now sees is the DUEL, not a number: three fictional
+ * franchises call the lot in turn, the price rolls up digit by digit, the
+ * paddle that called it lights, and at the top of the ladder the gavel strikes
+ * and gold SOLD lands on the card — the same `SoldStamp`, `RollingNumber` and
+ * `GoldDrift` the real auction room uses, so the demo IS the product's
+ * choreography and cannot drift from it.
  *
  * The server render IS the final SOLD frame of the first player, so no-JS and
  * prefers-reduced-motion both show a truthful, complete scene. The whole block
  * is decorative (aria-hidden); the visible "simulated demo" label lives in the
- * page, outside this block. The old pointer parallax is deliberately gone —
- * the council's motion rule is one signature gesture, and it's the stamp.
+ * page, outside this block. Text never animates opacity (axe samples every
+ * frame); the digits roll by transform and the stamp scales.
  */
 
 export interface StagePlayer {
@@ -29,7 +34,7 @@ export interface StagePlayer {
 }
 
 const BID_STEP_MS = 950;
-const SOLD_HOLD_MS = 2600;
+const SOLD_HOLD_MS = 3200;
 const BID_STEPS = 5;
 
 function rupees(value: number): string {
@@ -123,17 +128,31 @@ export function HeroStage({
   const player = script[playerIndex] ?? first;
   const bids = ladder(player);
   const amount = rupees(bids[Math.min(bidIndex, bids.length - 1)] ?? player.final);
-  // While bidding, the calling team rotates; the winner calls the final bid.
-  const callingTeam =
-    phase === "sold"
-      ? player.team
-      : (teams[(playerIndex + bidIndex) % teams.length] ?? player.team);
-  const teamSlot = ["a", "b", "c"][teams.indexOf(callingTeam) % 3] ?? "a";
+
+  /**
+   * Who called each rung. The winner always calls the last one; the rungs
+   * before it rotate through the other franchises, so every paddle gets a
+   * turn and the final call visibly changes hands.
+   */
+  const callerAt = (step: number): string | null => {
+    if (step === 0) return null;
+    if (step === BID_STEPS) return player.team;
+    const rivals = teams.filter((team) => team !== player.team);
+    return rivals[(playerIndex + step) % Math.max(1, rivals.length)] ?? player.team;
+  };
+  const callingTeam = callerAt(bidIndex);
+  const lastCallOf = (team: string): number | null => {
+    for (let step = bidIndex; step >= 1; step -= 1) {
+      if (callerAt(step) === team) return bids[step] ?? null;
+    }
+    return null;
+  };
 
   return (
     <div className="mk-hero-visual" aria-hidden="true">
-      <div className="mk-stage-wrap">
+      <Tilt className="mk-stage-wrap" glare max={4}>
         <div className="mk-stage" data-phase={phase}>
+          {phase === "sold" ? <GoldDrift count={14} className="mk-stage-drift" /> : null}
           <div className="mk-stage-top">
             <span className="mk-stage-live">
               <i />
@@ -155,23 +174,35 @@ export function HeroStage({
               <span className="mk-stage-bid-label">
                 {phase === "sold" ? "Winning bid" : "Current bid"}
               </span>
-              <span className="mk-stage-amount">{amount}</span>
+              <RollingNumber className="mk-stage-amount" value={amount} />
             </span>
-            <span className="mk-stage-sold">SOLD</span>
+            {phase === "sold" ? <SoldStamp className="mk-stage-stamp" /> : null}
           </div>
-          <div className="mk-stage-spark">
-            {Array.from({ length: BID_STEPS + 2 }).map((_, bar) => (
-              <i key={bar} data-lit={bar <= bidIndex + 1} />
-            ))}
-          </div>
-          <div className="mk-stage-teams">
-            <span className={`mk-stage-team mk-stage-team-${teamSlot}`}>
-              <i />
-              {phase === "sold" ? `to ${player.team}` : `${callingTeam} calling`}
-            </span>
-          </div>
+          <ul className="mk-stage-paddles">
+            {teams.map((team, index) => {
+              const call = lastCallOf(team);
+              const won = phase === "sold" && team === player.team;
+              const leading = !won && phase === "bidding" && callingTeam === team;
+              const slot = ["a", "b", "c"][index % 3] ?? "a";
+              return (
+                <li
+                  key={team}
+                  className={`mk-stage-paddle mk-stage-team-${slot}`}
+                  data-leading={leading ? "true" : "false"}
+                  data-won={won ? "true" : "false"}
+                >
+                  <i />
+                  <span className="mk-stage-paddle-name">{team}</span>
+                  <span className="mk-stage-paddle-call">{call === null ? "—" : rupees(call)}</span>
+                  <span className="mk-stage-paddle-tag">
+                    {won ? "Sold" : leading ? "Leading" : call === null ? "Watching" : "Outbid"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-      </div>
+      </Tilt>
     </div>
   );
 }

@@ -1,0 +1,146 @@
+/*
+ * THE CEREMONY'S CLOCK, in tokens (doc 11 — total 1800 ms):
+ *   0–150      freeze     (the stage's job; see the consumer)
+ *   150–600    the stamp  hammer strike (slow rung) then the spring landing
+ *   600–1400   the facts  (the consumer's RollingNumber and leader line)
+ *   1400–1800  the settle (gold recedes to a thin frame — consumer)
+ *
+ * Everything here is transform or shadow. The word is never faded.
+ */
+.stamp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.28em 0.7em;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.14em;
+  line-height: 1;
+  white-space: nowrap;
+  transform-origin: 50% 60%;
+  /* Ink on gold: the pinned AA pair (doc 08). */
+  background: var(--ceremony-gold);
+  color: var(--text-on-accent);
+  box-shadow:
+    0 8px 28px color-mix(in srgb, var(--ceremony-gold) 45%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent-sheen, #fff) 35%, transparent);
+  animation: stamp-land var(--duration-emphatic) cubic-bezier(0.2, 1.4, 0.35, 1) both;
+  animation-delay: var(--duration-slow);
+}
+
+.stamp[data-tone="unsold"] {
+  background: var(--surface-overlay);
+  color: var(--text-heading);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+  animation: stamp-settle var(--duration-slow) var(--ease-out) both;
+  animation-delay: 0ms;
+}
+
+.md {
+  font-size: var(--text-xl-size);
+}
+
+.lg {
+  font-size: var(--text-3xl-size);
+}
+
+.stage {
+  font-size: clamp(var(--text-3xl-size), min(6vw, 7vh), var(--display-lg-size));
+  padding: 0.22em 0.6em;
+}
+
+.word {
+  display: inline-block;
+}
+
+/* The flash behind the word: shadow only, so the lettering never flickers. */
+.stamp[data-tone="sold"]::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: stamp-flash var(--duration-dramatic) var(--ease-out) both;
+  animation-delay: var(--duration-slow);
+}
+
+.hammer {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+  overflow: visible;
+}
+
+.hammer-swing {
+  transform-box: fill-box;
+  transform-origin: 20% 90%;
+  animation: hammer-strike var(--duration-slow) var(--ease-in) both;
+}
+
+.hammer-block {
+  opacity: 0.55;
+}
+
+@keyframes hammer-strike {
+  0% {
+    transform: rotate(-42deg);
+  }
+
+  70% {
+    transform: rotate(4deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes stamp-land {
+  0% {
+    transform: rotate(-8deg) scale(1.18);
+  }
+
+  60% {
+    transform: rotate(-5deg) scale(0.98);
+  }
+
+  100% {
+    transform: rotate(-6deg) scale(1);
+  }
+}
+
+@keyframes stamp-settle {
+  from {
+    transform: translateY(0.2em);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes stamp-flash {
+  0% {
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--ceremony-glow, var(--ceremony-gold)) 60%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 1.4em transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp,
+  .stamp[data-tone="unsold"],
+  .stamp[data-tone="sold"]::after,
+  .hammer-swing {
+    animation: none;
+  }
+
+  .stamp[data-tone="sold"] {
+    transform: rotate(-6deg);
+  }
+}

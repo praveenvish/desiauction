@@ -2,13 +2,17 @@ import "@desiauction/ui/styles/fonts.css";
 import "@desiauction/ui/styles/primitives.css";
 import "@desiauction/ui/styles/floodlight.css";
 import "@desiauction/ui/styles/daylight.css";
+import "@desiauction/ui/styles/motion.css";
 import "./base.css";
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { env } from "../env";
+import { ReportProblemProvider } from "../components/report-problem/report-problem";
+import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
 import { adminNavVisible } from "../server/admin/actions";
@@ -83,6 +87,10 @@ export default async function RootLayout({
   // notFound, the dynamic-rendering bailout) through untouched, so this can
   // never silently freeze a dynamic render into a static, permanently
   // signed-out shell.
+  // Minted per request by middleware.ts; absent only when middleware did not
+  // run (a prefetch), in which case the inline script below renders without it
+  // exactly as it did before there was a policy.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   let session: Awaited<ReturnType<typeof currentSession>> = null;
   try {
     session = await currentSession();
@@ -127,37 +135,53 @@ export default async function RootLayout({
     // before React hydrates, which is a deliberate server/client difference.
     <html lang="en" data-theme="daylight" suppressHydrationWarning>
       <body>
-        {/* Replay the remembered console theme before first paint (no flash). */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
-        <ProductShell
-          session={
-            session !== null
-              ? {
-                  name: session.name,
-                  phone: session.phone,
-                  email: session.email,
-                  personId: session.personId,
-                }
-              : null
-          }
-          orgs={orgs.map((org) => ({
-            slug: org.slug,
-            name: org.name,
-            canFinance: financeOrgs.has(org.id),
-            // Settlement and Finance are separate capability partitions, and
-            // the money tab strip spans both. Without this the strip was built
-            // from membership alone, so someone with neither key saw four tabs
-            // that all 404 for them.
-            canSettle: settlementOrgs.has(org.id),
-          }))}
-          competitions={competitions}
-          serverAction={action}
-          isAdmin={isAdmin}
-          latestEventAt={latestEventAt}
-          logout={logoutAction}
-        >
-          {children}
-        </ProductShell>
+        {/* Replay the remembered console theme before first paint (no flash).
+            The one inline script the app writes itself, so it carries the
+            request's nonce like every script Next emits (middleware.ts).
+            `suppressHydrationWarning`: browsers HIDE a nonce once the
+            element is parsed (the attribute reads back as ""), so exfiltrating
+            it through the DOM is impossible — and React, comparing the server's
+            nonce with that empty attribute, reports a mismatch that is the
+            security feature working. It suppresses this element's own
+            attributes only. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+        />
+        {/* Every shell, every route: a click is answered before the network is. */}
+        <NavigationProgress />
+        <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
+          <ProductShell
+            session={
+              session !== null
+                ? {
+                    name: session.name,
+                    phone: session.phone,
+                    email: session.email,
+                    personId: session.personId,
+                  }
+                : null
+            }
+            orgs={orgs.map((org) => ({
+              slug: org.slug,
+              name: org.name,
+              canFinance: financeOrgs.has(org.id),
+              // Settlement and Finance are separate capability partitions, and
+              // the money tab strip spans both. Without this the strip was built
+              // from membership alone, so someone with neither key saw four tabs
+              // that all 404 for them.
+              canSettle: settlementOrgs.has(org.id),
+            }))}
+            competitions={competitions}
+            serverAction={action}
+            isAdmin={isAdmin}
+            latestEventAt={latestEventAt}
+            logout={logoutAction}
+          >
+            {children}
+          </ProductShell>
+        </ReportProblemProvider>
       </body>
     </html>
   );

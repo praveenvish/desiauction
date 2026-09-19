@@ -11,6 +11,7 @@ export interface DrawerProps {
   title: string;
   side?: "start" | "end";
   children: ReactNode;
+  className?: string;
 }
 
 /**
@@ -18,7 +19,7 @@ export interface DrawerProps {
  * focus trap, Escape, top layer). Used by the shell for mobile navigation
  * overflow; generic for future side panels.
  */
-export function Drawer({ open, onClose, title, side = "end", children }: DrawerProps) {
+export function Drawer({ open, onClose, title, side = "end", children, className }: DrawerProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -35,9 +36,12 @@ export function Drawer({ open, onClose, title, side = "end", children }: DrawerP
   }, [open]);
 
   return (
+    // Same as `Dialog`: a modal <dialog> already closes on Escape, natively,
+    // through the `onClose` below. See the long note there.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <dialog
       ref={ref}
-      className={[styles["drawer"], styles[side]].join(" ")}
+      className={[styles["drawer"], styles[side], className].filter(Boolean).join(" ")}
       aria-labelledby={titleId}
       onClose={onClose}
       onClick={(event) => {

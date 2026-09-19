@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Badge,
   Button,
@@ -64,7 +65,9 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
     try {
       const options = await startPasskeyEnrollmentAction();
       if (options === null) {
-        setEnrollError("Your session has expired. Sign in again to add a passkey.");
+        setEnrollError(
+          "For your security, sign in again to add a passkey — it has been a while since you last did.",
+        );
         return;
       }
       const response = await startRegistration({ optionsJSON: options });
@@ -338,7 +341,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
             <p className="security-note" data-testid="events-truncated">
               Showing the {String(security.events.length)} most recent of{" "}
               {String(security.eventsTotal)} events. Need the full history?{" "}
-              <a href="/support">Ask support</a>.
+              <Link href="/support">Ask support</Link>.
             </p>
           ) : null}
         </div>

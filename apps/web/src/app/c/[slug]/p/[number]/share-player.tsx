@@ -1,7 +1,9 @@
 "use client";
 
-import { Button } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { Button, IconCheck } from "@desiauction/ui";
+import { useState } from "react";
+
+import { usePageAddress } from "../../../../../lib/use-hydrated";
 
 /**
  * Share control for a public player page. The OG route calls this page "the
@@ -15,12 +17,8 @@ import { useEffect, useState } from "react";
  * sheet. No new dependencies.
  */
 export function SharePlayer({ playerName }: { playerName: string }) {
-  const [url, setUrl] = useState("");
+  const url = usePageAddress();
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    setUrl(window.location.href.split("?")[0] ?? window.location.href);
-  }, []);
 
   async function copy() {
     try {
@@ -65,7 +63,14 @@ export function SharePlayer({ playerName }: { playerName: string }) {
           aria-label={`Public page for ${playerName}`}
         />
         <Button size="sm" variant="secondary" onClick={() => void copy()} disabled={url === ""}>
-          {copied ? "Copied ✓" : "Copy"}
+          {copied ? (
+            <>
+              Copied
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Copy"
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void share()} disabled={url === ""}>
           Share

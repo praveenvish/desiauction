@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { engineDiagnosticsAction } from "../../../../../server/auction/conduct-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 // RECOVERY DASHBOARD + ENGINE DIAGNOSTICS (M-IP4-3). Everything read-only,
 // polled from the engine's diagnostics feed through the conduct-gated proxy.
@@ -24,21 +25,22 @@ export function EnginePanel({ slug }: { slug: string }) {
   const [refreshMs, setRefreshMs] = useState<number | null>(null);
   const [unreachable, setUnreachable] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
-  const refresh = useCallback(async () => {
+  // A promise chain rather than an async function: every state write sits in
+  // the callback that runs when the answer arrives, which is what it always
+  // did — this shape just makes that visible to the compiler's effect rule.
+  const refresh = useCallback((): Promise<void> => {
     const started = performance.now();
-    const result = await engineDiagnosticsAction(slug);
-    setRefreshMs(performance.now() - started);
-    if (result.ok) {
-      setDiagnostics(result.diagnostics);
-      setUnreachable(false);
-    } else {
-      setUnreachable(true);
-    }
+    return engineDiagnosticsAction(slug).then((result) => {
+      setRefreshMs(performance.now() - started);
+      if (result.ok) {
+        setDiagnostics(result.diagnostics);
+        setUnreachable(false);
+      } else {
+        setUnreachable(true);
+      }
+    });
   }, [slug]);
 
   useEffect(() => {

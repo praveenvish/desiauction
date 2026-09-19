@@ -215,6 +215,28 @@ jobs:
         run: >-
           pnpm --filter @desiauction/web exec playwright test
           e2e/gallery.spec.ts e2e/identity.spec.ts e2e/motion.spec.ts e2e/primitives.spec.ts
+
+      # THE TWENTY-NINTH SKIP, AND THE ONE THAT IS NOT DECORATIVE.
+      #
+      # The step above recovered the four design-system specs the precompiled
+      # run skips. It left one more behind: the player-photo journey, which
+      # skips itself under PLAYWRIGHT_PRECOMPILED because `MEDIA_STORAGE=local`
+      # writes into `public/`, which a built server has already baked. So the
+      # ONLY end-to-end exercise of media upload — the route that mints a key,
+      # the ownership check on it, the byte-sniffing content check, and the
+      # attach that writes the row — ran in no job at all.
+      #
+      # That is not a theoretical gap: `api/media/upload/route.ts` carries a
+      # comment about a 403 that killed every self-registered player photo under
+      # the default storage mode, found by a person because "the e2e suite covers
+      # the ORGANIZER's photo import, whose actor is a member, so nothing went
+      # red". Selected by title so the rest of the file is not run twice.
+      - name: Player photo journey (dev server — local media is written after a build)
+        env:
+          PLAYWRIGHT_PRECOMPILED: ""
+        run: >-
+          pnpm --filter @desiauction/web exec playwright test e2e/registration-ops.spec.ts
+          -g "imports their photo by filename"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

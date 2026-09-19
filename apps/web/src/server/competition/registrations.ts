@@ -1,5 +1,7 @@
 import {
+  DEFAULT_SPORT_KEY,
   deriveAge,
+  describeAttributes,
   isBattingStyle,
   isBowlingStyle,
   isRoleIn,
@@ -11,6 +13,7 @@ import {
   type FeeStatus,
   type PhotoTarget,
   sportPackFor,
+  splitAttributeWrite,
   type RegistrationStatus,
 } from "@desiauction/core";
 import {
@@ -50,19 +53,50 @@ export type SubmitResult =
  * Each field is validated here; invalid values are dropped, never persisted. */
 export interface PlayerProfileInput {
   dateOfBirth?: string;
+  /**
+   * Cricket's two styles, by their own names. Kept for the callers that supply
+   * them directly — the organizer's add-player dialog and the CSV import, both
+   * of which map named spreadsheet columns onto named fields.
+   */
   battingStyle?: string;
   bowlingStyle?: string;
+  /**
+   * EVERY SPORT'S OPTIONAL DETAIL, keyed by its pack's attribute keys.
+   *
+   * The public registration form posts this, and it is the half that was
+   * missing: `registrations.attributes` is documented in the schema as where
+   * "every sport added from football on" writes, and nothing in the product
+   * ever wrote to it. Values are validated against the season's pack before a
+   * single one is stored, and route themselves — cricket's two into their own
+   * columns, everybody else's into the json.
+   */
+  attributes?: Record<string, string>;
 }
 
-function validProfile(profile: PlayerProfileInput | undefined): Partial<{
+type ProfileColumns = Partial<{
   dateOfBirth: string;
   battingStyle: string;
   bowlingStyle: string;
-}> {
+  attributes: Record<string, string>;
+}>;
+
+/** `batting_style` → `battingStyle`: the pack names columns, drizzle names keys. */
+function camel(column: string): string {
+  return column.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
+/**
+ * `sport` is optional so the two callers that never had it — the add-player
+ * dialog and the import — keep working exactly as they did. When it is given,
+ * the pack decides which attributes exist, which values are legal, and where
+ * each one is stored, and anything it does not recognise is dropped rather than
+ * persisted. That is the same posture the two named fields below already had.
+ */
+function validProfile(profile: PlayerProfileInput | undefined, sport?: string): ProfileColumns {
   if (profile === undefined) {
     return {};
   }
-  const out: { dateOfBirth?: string; battingStyle?: string; bowlingStyle?: string } = {};
+  const out: ProfileColumns = {};
   if (profile.dateOfBirth !== undefined && deriveAge(profile.dateOfBirth, new Date()) !== null) {
     out.dateOfBirth = profile.dateOfBirth;
   }
@@ -71,6 +105,15 @@ function validProfile(profile: PlayerProfileInput | undefined): Partial<{
   }
   if (profile.bowlingStyle !== undefined && isBowlingStyle(profile.bowlingStyle)) {
     out.bowlingStyle = profile.bowlingStyle;
+  }
+  if (profile.attributes !== undefined && sport !== undefined) {
+    const write = splitAttributeWrite(sportPackFor(sport), profile.attributes);
+    for (const [column, value] of Object.entries(write.columns)) {
+      (out as Record<string, unknown>)[camel(column)] = value;
+    }
+    if (Object.keys(write.json).length > 0) {
+      out.attributes = write.json;
+    }
   }
   return out;
 }
@@ -108,6 +151,8 @@ export async function reinstateWithdrawn(
     // than optional (exactOptionalPropertyTypes).
     basePriceBand: string | null | undefined;
     profile: PlayerProfileInput | undefined;
+    /** The season's sport, so a REJOIN routes attributes as a first entry does. */
+    sport?: string;
   },
 ): Promise<{ id: string; number: string } | null> {
   const [existing] = await db
@@ -136,7 +181,7 @@ export async function reinstateWithdrawn(
       fresh.basePriceBand !== ""
         ? { basePriceBand: fresh.basePriceBand }
         : {}),
-      ...validProfile(fresh.profile),
+      ...validProfile(fresh.profile, fresh.sport),
       // Back in triage, unreviewed: stale rejection provenance and a stale
       // reviewer would both describe a decision about a different application.
       rejectionReason: null,
@@ -228,7 +273,7 @@ export async function submitRegistration(
       status: "submitted",
       registrationNumber: registrationNumber(id),
       ...(basePriceBand !== undefined && basePriceBand !== "" ? { basePriceBand } : {}),
-      ...validProfile(profile),
+      ...validProfile(profile, competition.sport),
     }),
   );
   // Insert first, ask questions second: the ordinary case stays one statement,
@@ -241,6 +286,7 @@ export async function submitRegistration(
       role,
       basePriceBand,
       profile,
+      sport: competition.sport,
     });
     if (reinstated === null) {
       return { ok: false, reason: "duplicate" };
@@ -461,6 +507,15 @@ export interface RegistrationRow {
   age: number | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
+  /**
+   * The season's OTHER optional detail, in the sport's own words.
+   *
+   * Already labelled by the pack, so the panel renders a list rather than
+   * deciding what a football season calls anything. Empty for cricket, whose
+   * two attributes are the named columns above, and empty for a sport whose
+   * pack declares none.
+   */
+  attributes: { key: string; label: string; value: string }[];
 }
 
 /** Legacy triage list for the M-IP3-1 competition page (latest first, unpaged). */
@@ -747,6 +802,7 @@ export async function queryRegistrations(
       dateOfBirth: registrations.dateOfBirth,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
+      attributes: registrations.attributes,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -757,14 +813,29 @@ export async function queryRegistrations(
     .offset((page - 1) * pageSize);
 
   const dupKeys = await duplicateNameKeys(db, competitionId);
+  // One row, once per page, to label the season's own attributes. Cheaper and
+  // clearer than joining `competitions` onto every registration for a value
+  // that is the same for all of them.
+  const [season] = await db
+    .select({ sport: competitions.sport })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  const sport = season?.sport ?? DEFAULT_SPORT_KEY;
   const now = new Date();
-  const rows: RegistrationRow[] = raw.map(({ photoKey, photoConsentAt, dateOfBirth, ...r }) => ({
-    ...r,
-    duplicateName: dupKeys.has(nameKey(r.name)),
-    // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
-    photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
-    age: deriveAge(dateOfBirth, now),
-  }));
+  const rows: RegistrationRow[] = raw.map(
+    ({ photoKey, photoConsentAt, dateOfBirth, attributes, ...r }) => ({
+      ...r,
+      duplicateName: dupKeys.has(nameKey(r.name)),
+      // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
+      photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
+      age: deriveAge(dateOfBirth, now),
+      // Labelled HERE, by the season's pack, so no client has to know what a
+      // football attribute key means. Values the pack cannot explain are
+      // dropped rather than printed raw — see `describeAttributes`.
+      attributes: describeAttributes(sport, (attributes ?? {}) as Record<string, unknown>),
+    }),
+  );
   return { rows, total, page, pageSize };
 }
 

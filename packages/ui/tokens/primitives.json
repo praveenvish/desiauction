@@ -85,6 +85,19 @@
     "20": { "$value": "80px", "$type": "dimension" },
     "24": { "$value": "96px", "$type": "dimension" }
   },
+  "depth": {
+    "lift-sm": { "$value": "-2px", "$type": "dimension" },
+    "lift": { "$value": "-4px", "$type": "dimension" },
+    "lift-lg": { "$value": "-6px", "$type": "dimension" },
+    "tilt": { "$value": "6deg", "$type": "dimension" },
+    "perspective": { "$value": "900px", "$type": "dimension" }
+  },
+  "rhythm": {
+    "tight": { "$value": "12px", "$type": "dimension" },
+    "block": { "$value": "20px", "$type": "dimension" },
+    "section": { "$value": "32px", "$type": "dimension" },
+    "band": { "$value": "clamp(40px, 5vw, 80px)", "$type": "dimension" }
+  },
   "radius": {
     "sm": { "$value": "4px", "$type": "dimension" },
     "md": { "$value": "8px", "$type": "dimension" },

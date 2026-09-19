@@ -17,6 +17,15 @@
   --space-20: 80px;
   --space-24: 96px;
   --space-05: 2px;
+  --depth-lift-sm: -2px;
+  --depth-lift: -4px;
+  --depth-lift-lg: -6px;
+  --depth-tilt: 6deg;
+  --depth-perspective: 900px;
+  --rhythm-tight: 12px;
+  --rhythm-block: 20px;
+  --rhythm-section: 32px;
+  --rhythm-band: clamp(40px, 5vw, 80px);
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;

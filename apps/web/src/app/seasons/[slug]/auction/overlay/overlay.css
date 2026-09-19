@@ -403,9 +403,9 @@ body:has(.obs-overlay) {
   font-variant-numeric: tabular-nums;
 }
 
-/* The reused confetti cascades the full frame on a sale. */
+/* The reused drift climbs the full frame on a sale. */
 .obs-celebration {
-  --fall: 100vh;
+  --drift-height: 100vh;
 }
 
 /* Below this the lower third cannot hold two columns without truncating the

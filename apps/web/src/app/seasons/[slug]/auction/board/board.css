@@ -671,3 +671,41 @@
     justify-self: start;
   }
 }
+
+/* --- the sound switch: floated, quiet until pointed at --------------------- */
+.board {
+  position: relative;
+}
+
+.board-sound {
+  position: absolute;
+  top: clamp(12px, 2vw, 24px);
+  right: clamp(12px, 2vw, 24px);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.55;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.board-sound:hover,
+.board-sound:focus-visible,
+.board-sound[aria-pressed="true"] {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--text-heading);
+}
+
+.board-sound:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

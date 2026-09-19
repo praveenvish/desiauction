@@ -70,4 +70,47 @@ describe("HttpMailer", () => {
       }).send("someone@example.com", "1", "login"),
     ).rejects.toThrow();
   });
+
+  /*
+   * THE REASON TRAVELS WITH THE FAILURE. "couldn't send" with nothing behind it
+   * hid a corporate TLS proxy for an afternoon (2026-09-18): the dev server had
+   * lost NODE_EXTRA_CA_CERTS, every send died on the certificate chain, and
+   * neither the page nor the log said so.
+   */
+  it("names the network cause when the provider cannot be reached", async () => {
+    const tls = Object.assign(new TypeError("fetch failed"), {
+      cause: { code: "SELF_SIGNED_CERT_IN_CHAIN" },
+    });
+    const transport = vi.fn<MailTransport>().mockRejectedValue(tls);
+    await expect(
+      new HttpMailer({
+        endpoint: "https://mail.test/send",
+        apiKey: "k",
+        from: "f",
+        transport,
+      }).send("someone@example.com", "1", "login"),
+    ).rejects.toThrow("mail provider unreachable (SELF_SIGNED_CERT_IN_CHAIN)");
+  });
+
+  it("carries the provider's own words on a rejection, bounded", async () => {
+    const transport = vi
+      .fn<MailTransport>()
+      .mockResolvedValue({ status: 403, body: `domain not verified ${"x".repeat(500)}` });
+    const failure = new HttpMailer({
+      endpoint: "https://mail.test/send",
+      apiKey: "k",
+      from: "f",
+      transport,
+    })
+      .send("someone@example.com", "1", "login")
+      .then(
+        () => "sent",
+        (error: unknown) => (error as Error).message,
+      );
+    const message: string = await failure;
+    expect(message).toContain("403: domain not verified");
+    expect(message.length).toBeLessThan(260);
+    // The request carried the API key; the failure must not.
+    expect(message).not.toContain("Bearer");
+  });
 });

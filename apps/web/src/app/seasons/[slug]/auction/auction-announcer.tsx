@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type CeremonyState } from "@desiauction/core";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 // THE ANNOUNCER — the auction night as spoken word.
 //
@@ -64,6 +64,77 @@ function ceremonyLine(ceremony: CeremonyState, snapshot: AuctionSnapshot): strin
   }
 }
 
+interface Announcement {
+  key: string;
+  text: string;
+}
+
+interface SpokenMoment {
+  /** The ceremony key last considered — spoken or deliberately silent. */
+  key: string | null;
+  moment: Announcement | null;
+}
+
+/** Where one lot's clock is on the 30s → 10s → time ladder, and what it last said. */
+export interface ClockLadder {
+  lotId: string | null;
+  /** The lowest threshold already announced for this lot (Infinity: none yet). */
+  at: number;
+  call: Announcement | null;
+}
+
+export const CLOCK_LADDER_START: ClockLadder = { lotId: null, at: Infinity, call: null };
+
+/**
+ * The clock region's next state, or `prev` itself when nothing changes — the
+ * identity is what lets the component adjust state during render without
+ * looping.
+ *
+ * When one tick crosses two thresholds at once (a late join, a paused tab
+ * catching up) it announces the more urgent one: "30 seconds left" said with
+ * five seconds on the clock is wrong, not merely late.
+ */
+export function advanceClockLadder(
+  prev: ClockLadder,
+  lotId: string | null,
+  remainingMs: number | null,
+): ClockLadder {
+  const at = prev.lotId === lotId ? prev.at : Infinity;
+  const unchanged = (): ClockLadder =>
+    prev.lotId === lotId && prev.at === at ? prev : { ...prev, lotId, at };
+  if (lotId === null || remainingMs === null) {
+    /*
+     * A resolved lot has no clock. Leaving the last call — "10 seconds left." —
+     * standing in the live region under a card that had already said SOLD made
+     * the running commentary contradict the result beside it, and a screen
+     * reader kept stale urgency on the page.
+     */
+    return prev.call === null && prev.lotId === lotId && prev.at === at
+      ? prev
+      : { lotId, at, call: null };
+  }
+  const seconds = Math.ceil(remainingMs / 1000);
+  if (seconds <= 0) {
+    return at > 0
+      ? { lotId, at: 0, call: { key: `${lotId}-0`, text: "Time. The lot is with the auctioneer." } }
+      : unchanged();
+  }
+  let crossed: number | null = null;
+  for (const threshold of THRESHOLDS) {
+    if (seconds <= threshold && at > threshold) {
+      crossed = crossed === null ? threshold : Math.min(crossed, threshold);
+    }
+  }
+  if (crossed === null) {
+    return unchanged();
+  }
+  return {
+    lotId,
+    at: crossed,
+    call: { key: `${lotId}-${String(crossed)}`, text: `${String(crossed)} seconds left.` },
+  };
+}
+
 export function AuctionAnnouncer({
   snapshot,
   ceremony,
@@ -76,57 +147,30 @@ export function AuctionAnnouncer({
   // Each announcement is a NEW node (keyed), so an identical sentence twice
   // over — the same player undone and re-sold at the same price — is still two
   // announcements rather than one silent DOM no-op.
-  const [moment, setMoment] = useState<{ key: string; text: string } | null>(null);
-  const spokenKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (snapshot === null || ceremony.key === spokenKeyRef.current) {
-      return;
-    }
+  //
+  // Both regions are "previous prop" state, adjusted DURING render: a change
+  // is spoken in the same commit that shows it. They used to be effects that
+  // set state after the commit, which painted every moment twice — once
+  // silent, once announced — and needed refs to remember what was spoken.
+  const [spoken, setSpoken] = useState<SpokenMoment>({ key: null, moment: null });
+  if (snapshot !== null && ceremony.key !== spoken.key) {
     const text = ceremonyLine(ceremony, snapshot);
-    spokenKeyRef.current = ceremony.key;
-    if (text !== null) {
-      setMoment({ key: ceremony.key, text });
-    }
-  }, [ceremony, snapshot]);
+    setSpoken({
+      key: ceremony.key,
+      moment: text === null ? spoken.moment : { key: ceremony.key, text },
+    });
+  }
+  const moment = spoken.moment;
 
   // The clock, at thresholds. The lot id resets the ladder so every lot gets
   // its own thirty-second and ten-second call.
-  const [clock, setClock] = useState<{ key: string; text: string } | null>(null);
   const lotId = snapshot?.currentLot?.lotId ?? null;
-  const crossedRef = useRef<{ lotId: string | null; at: number }>({ lotId: null, at: Infinity });
-  useEffect(() => {
-    if (crossedRef.current.lotId !== lotId) {
-      crossedRef.current = { lotId, at: Infinity };
-    }
-    if (lotId === null || remainingMs === null) {
-      /*
-       * A resolved lot has no clock. Returning without clearing left the last
-       * call — "10 seconds left." — standing in the live region under a card
-       * that had already said SOLD, so the running commentary contradicted the
-       * result beside it and a screen reader kept stale urgency on the page.
-       */
-      setClock(null);
-      return;
-    }
-    const seconds = Math.ceil(remainingMs / 1000);
-    if (seconds <= 0) {
-      if (crossedRef.current.at > 0) {
-        crossedRef.current = { lotId, at: 0 };
-        setClock({ key: `${lotId}-0`, text: "Time. The lot is with the auctioneer." });
-      }
-      return;
-    }
-    for (const threshold of THRESHOLDS) {
-      if (seconds <= threshold && crossedRef.current.at > threshold) {
-        crossedRef.current = { lotId, at: threshold };
-        setClock({
-          key: `${lotId}-${String(threshold)}`,
-          text: `${String(threshold)} seconds left.`,
-        });
-        return;
-      }
-    }
-  }, [lotId, remainingMs]);
+  const [ladder, setLadder] = useState<ClockLadder>(CLOCK_LADDER_START);
+  const nextLadder = advanceClockLadder(ladder, lotId, remainingMs);
+  if (nextLadder !== ladder) {
+    setLadder(nextLadder);
+  }
+  const clock = nextLadder.call;
 
   return (
     <>

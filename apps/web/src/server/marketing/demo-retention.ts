@@ -2,6 +2,7 @@ import { demoRequests } from "@desiauction/db";
 import { and, isNotNull, lt } from "drizzle-orm";
 
 import { db } from "../db";
+import { purgeExpiredNewsletter, type NewsletterPurge } from "./newsletter";
 
 /**
  * THE PROMISE IN THE POLICY, IN CODE.
@@ -55,4 +56,16 @@ export async function purgeExpiredDemoData(now: Date = new Date()): Promise<Purg
     .returning({ id: demoRequests.id });
 
   return { requestsDeleted: deleted.length, addressesCleared: cleared.length };
+}
+
+/**
+ * The newsletter list's retention, on the same door and the same schedule.
+ *
+ * `/legal/data-retention` states twenty-four months for an address and ninety
+ * days for the network address it arrived from; this is those two sentences
+ * enforced. Kept beside the demo purge because both are the platform's own
+ * marketing contacts, not any club's data.
+ */
+export function purgeExpiredNewsletterData(now: Date = new Date()): Promise<NewsletterPurge> {
+  return purgeExpiredNewsletter(db, now);
 }

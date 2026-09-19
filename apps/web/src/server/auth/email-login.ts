@@ -10,6 +10,7 @@ import {
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { normalizeEmail } from "./email-change";
+import { DEFAULT_GLOBAL_PER_HOUR } from "./otp";
 
 /**
  * SIGNING IN WITH A MAILBOX (Phase 1).
@@ -88,7 +89,7 @@ export type EmailLoginRequest =
        */
       isNew?: boolean;
     }
-  | { ok: false; reason: "invalid-email" | "hourly-limit" };
+  | { ok: false; reason: "invalid-email" | "hourly-limit" | "busy" };
 
 /**
  * Mint a code for an address — to sign in, or to sign up.
@@ -106,7 +107,7 @@ export type EmailLoginRequest =
  */
 export async function requestEmailLogin(
   db: Db,
-  input: { email: string; requestIp?: string | null },
+  input: { email: string; requestIp?: string | null; globalPerHour?: number },
 ): Promise<EmailLoginRequest> {
   const email = normalizeEmail(input.email);
   if (email === null) {
@@ -149,6 +150,16 @@ export async function requestEmailLogin(
     if (ip.count >= MAX_PER_HOUR_PER_IP) {
       return { ok: false, reason: "hourly-limit" };
     }
+  }
+
+  // PLATFORM-WIDE CEILING, before the lookup like every other throttle here, so
+  // it answers identically for real and unknown addresses. See otp.ts.
+  const [platform] = (await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(emailVerifications)
+    .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
+  if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
+    return { ok: false, reason: "busy" };
   }
 
   /*
@@ -234,23 +245,33 @@ export async function verifyEmailLogin(
   if (candidate.attempts >= MAX_ATTEMPTS) {
     return { ok: false, reason: "locked" };
   }
+  /*
+   * RESERVE AN ATTEMPT BEFORE COMPARING, right guess or wrong. The bump is
+   * conditional on the row still being under the cap and unconsumed, so a
+   * parallel burst gets at most the remaining budget of reservations and the
+   * rest are refused without their guess ever being compared. Guarding only the
+   * WRONG branch let the right guess in a burst of thousands pass the snapshot
+   * read above and consume the code past the cap.
+   */
+  const [reserved] = await db
+    .update(emailVerifications)
+    .set({ attempts: sql`${emailVerifications.attempts} + 1` })
+    .where(
+      and(
+        eq(emailVerifications.id, candidate.id),
+        lt(emailVerifications.attempts, MAX_ATTEMPTS),
+        isNull(emailVerifications.consumedAt),
+      ),
+    )
+    .returning({ attempts: emailVerifications.attempts });
+  if (reserved === undefined) {
+    return { ok: false, reason: "locked" };
+  }
   if (candidate.codeHash !== hashCode(input.code)) {
-    /*
-     * The bump is CONDITIONAL on the row still being under the cap, so two
-     * racing guesses cannot both read four attempts and both write five. The
-     * update returns nothing when another request already took the last one.
-     */
-    const [bumped] = await db
-      .update(emailVerifications)
-      .set({ attempts: sql`${emailVerifications.attempts} + 1` })
-      .where(
-        and(eq(emailVerifications.id, candidate.id), lt(emailVerifications.attempts, MAX_ATTEMPTS)),
-      )
-      .returning({ attempts: emailVerifications.attempts });
-    if (bumped === undefined || bumped.attempts >= MAX_ATTEMPTS) {
+    if (reserved.attempts >= MAX_ATTEMPTS) {
       return { ok: false, reason: "locked" };
     }
-    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - bumped.attempts };
+    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - reserved.attempts };
   }
   /*
    * Consumed conditionally too: a correct code presented twice concurrently
@@ -265,6 +286,17 @@ export async function verifyEmailLogin(
     return { ok: false, reason: "invalid" };
   }
   if (consumed.personId !== null) {
+    // The person was bound when the code was MINTED, minutes ago. If the
+    // address has since left that account (an email change), the old mailbox
+    // must not still open it — re-read, never trust mint time.
+    const [holder] = await db
+      .select({ email: people.email })
+      .from(people)
+      .where(eq(people.id, consumed.personId))
+      .limit(1);
+    if (holder === undefined || holder.email === null || normalizeEmail(holder.email) !== email) {
+      return { ok: false, reason: "invalid" };
+    }
     return { ok: true, personId: consumed.personId, created: false };
   }
 

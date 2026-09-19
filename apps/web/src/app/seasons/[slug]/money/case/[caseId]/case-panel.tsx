@@ -11,12 +11,13 @@ import {
   VisuallyHidden,
   type BadgeTone,
 } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { formatDateTime } from "../../../../../../lib/format-date";
 import { replayEvidence, type ReviewView } from "../../../../../../server/settlement/actions";
 import { CASE_STATE, PAYMENT_STATE } from "../../money-words";
 import "../../money.css";
+import { useHydrated } from "../../../../../../lib/use-hydrated";
 
 /**
  * PX-7 E2 — Case review: the audit view.
@@ -115,10 +116,7 @@ export function CasePanel({
   const { case: settlementCase, ceremony, readiness } = review;
   // The repo idiom: a tab click before hydration is a no-op, so the surface
   // announces when it is actually interactive (M-IP4-1 panels do the same).
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   return (
     <div data-testid="case-panel" data-hydrated={hydrated ? "true" : "false"}>

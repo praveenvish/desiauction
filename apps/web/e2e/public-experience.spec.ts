@@ -60,10 +60,13 @@ test("founder demo: landing → discover → help → legal → register → sig
   // --- Anonymous visitor opens the landing page -----------------------------
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "SOLD, without the shouting", level: 1 }),
+    page.getByRole("heading", { name: /Great teams\s*start here\./, level: 1 }),
   ).toBeVisible();
-  // The council rebuild's honesty label: the simulated stage says it is one.
-  await expect(page.getByText("Simulated demo", { exact: false })).toBeVisible();
+  // The guest demo must be clearly distinguished from a real auction.
+  await expect(page.getByText("INTERACTIVE DEMO", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Fictional players & teams. No real bids or payments."),
+  ).toBeVisible();
   await axeClean(page, "/");
 
   // --- Reads the product overview -------------------------------------------

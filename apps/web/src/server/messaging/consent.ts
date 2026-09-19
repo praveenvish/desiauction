@@ -271,6 +271,11 @@ export const NOTIFICATION_TOPICS = [
     label: "Receipts and money",
     detail: "When a club issues you a receipt or records a payment.",
   },
+  {
+    topic: "feedback",
+    label: "Feedback requests",
+    detail: "When we ask how a season or DesiAuction worked for you.",
+  },
 ] as const;
 
 /** Every topic's current answer for one person, defaulted where unset. */

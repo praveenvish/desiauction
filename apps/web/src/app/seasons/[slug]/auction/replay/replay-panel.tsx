@@ -10,10 +10,11 @@ import {
   type CurrentLotBids,
 } from "@desiauction/core";
 import { Badge, Card } from "@desiauction/ui";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { ReplayViewerData } from "../../../../../server/auction/conduct-actions";
 import { formatTime } from "../../../../../lib/format-date";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 // THE REPLAY VIEWER (M-IP4-3). The founder scrubs through the immutable event
 // log; every frame is core's pure fold of events[0..n] — the EXACT reducer the
@@ -49,13 +50,14 @@ function bidsFromEvents(
 
 export function ReplayPanel({ data }: { data: ReplayViewerData }) {
   const [step, setStep] = useState(data.events.length);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   const frame = useMemo(() => {
     const slice = data.events.slice(0, step);
+    // Measuring the fold IS the point of this viewer, and the figure is only
+    // rendered once hydrated (see HYDRATION below), so the server and client
+    // never have to agree on it.
+    // eslint-disable-next-line react-hooks/purity
     const started = performance.now();
     const replay = replayAuction(slice);
     if (!replay.ok) {
@@ -70,6 +72,7 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
       ok: true as const,
       snapshot,
       serialized: serializeSnapshot(snapshot),
+      // eslint-disable-next-line react-hooks/purity -- see `started` above.
       foldMs: performance.now() - started,
     };
   }, [data, step]);

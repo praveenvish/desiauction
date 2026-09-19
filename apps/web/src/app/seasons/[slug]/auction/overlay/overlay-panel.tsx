@@ -4,8 +4,7 @@ import { useMemo } from "react";
 
 import { roleLabeller } from "../../../../../lib/role-label";
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { PlayerImage } from "@desiauction/ui";
-import type { CSSProperties } from "react";
+import { GoldDrift, PlayerImage } from "@desiauction/ui";
 
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
@@ -20,8 +19,6 @@ import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-s
 // feed with the same burst as the cockpit and the stage. Fully decorative and
 // collapses under prefers-reduced-motion; nothing about the announced outcome
 // depends on motion.
-
-const CONFETTI = Array.from({ length: 30 }, (_, i) => i);
 
 function money(amount: number): string {
   return formatPaiseINR(paise(amount));
@@ -104,13 +101,7 @@ export function OverlayPanel({
       {ceremony.phase === "sold" ? (
         <div className="ceremony-celebration obs-celebration" aria-hidden="true">
           <span className="ceremony-glow" />
-          {CONFETTI.map((index) => (
-            <i
-              key={index}
-              className="ceremony-confetti"
-              style={{ "--i": index } as CSSProperties}
-            />
-          ))}
+          <GoldDrift className="ceremony-drift obs-drift" count={32} />
         </div>
       ) : null}
 

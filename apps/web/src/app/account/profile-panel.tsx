@@ -1,7 +1,16 @@
 "use client";
 
 import { PROFILE_ITEMS, type ProfileCompleteness, type ProfileItem } from "@desiauction/core";
-import { Badge, Button, Card, Field, PlayerImage, useToast } from "@desiauction/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  PlayerImage,
+  useToast,
+  IconCheckCircle,
+  IconCircle,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, type ReactNode } from "react";
 
@@ -132,7 +141,12 @@ export function ProfilePanel({
             const { label, hint } = ITEM_LABELS[item];
             return (
               <li key={item} data-done={itemDone}>
-                {itemDone ? "✓" : "○"} {label}{" "}
+                {itemDone ? (
+                  <IconCheckCircle size={16} className="icon-lead" />
+                ) : (
+                  <IconCircle size={16} className="icon-lead" />
+                )}
+                {label}{" "}
                 {!itemDone && hint !== undefined ? (
                   <span className="profile-hint">{hint}</span>
                 ) : null}

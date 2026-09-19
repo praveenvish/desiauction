@@ -4,7 +4,10 @@ import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
 import { sweepDemoReminders } from "../../../../server/marketing/demo-reminders";
-import { purgeExpiredDemoData } from "../../../../server/marketing/demo-retention";
+import {
+  purgeExpiredDemoData,
+  purgeExpiredNewsletterData,
+} from "../../../../server/marketing/demo-retention";
 import { withRequestId } from "../../../../server/logger";
 
 /**
@@ -49,8 +52,13 @@ async function handle(request: Request): Promise<NextResponse> {
   // demo requests are deleted at twenty-four months and their network addresses
   // at ninety days, and a promise with no scheduled enforcement is a paragraph.
   // Both are idempotent, so a caller running this every ten minutes is fine.
-  const [reminders, purged] = await Promise.all([sweepDemoReminders(), purgeExpiredDemoData()]);
-  return NextResponse.json({ reminders, purged });
+  // The newsletter list's retention rides here too — see `purgeExpiredNewsletterData`.
+  const [reminders, purged, newsletter] = await Promise.all([
+    sweepDemoReminders(),
+    purgeExpiredDemoData(),
+    purgeExpiredNewsletterData(),
+  ]);
+  return NextResponse.json({ reminders, purged, newsletter });
 }
 
 /**

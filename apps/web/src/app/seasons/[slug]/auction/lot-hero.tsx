@@ -2,7 +2,7 @@
 
 import { roleLabeller } from "../../../../lib/role-label";
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { PlayerImage } from "@desiauction/ui";
+import { PlayerImage, RollingNumber } from "@desiauction/ui";
 import { useMemo, useSyncExternalStore } from "react";
 
 import type { AuctionClock } from "./use-auction-socket";
@@ -19,8 +19,10 @@ import type { AuctionSnapshot } from "@desiauction/core";
 /** Circumference of the r=54 ring below; the dash offset animates against it. */
 const RING_LENGTH = 2 * Math.PI * 54;
 
-/** The countdown turns from gold to danger inside the last 15 seconds. */
-const HOT_SECONDS = 15;
+/** Under ten seconds the ring turns to warning and breathes (doc 11). */
+const WARNING_SECONDS = 10;
+/** Under five it turns to danger and the breath quickens. */
+const CRITICAL_SECONDS = 5;
 
 /** Stable no-op store: `useSyncExternalStore` must not be called conditionally. */
 const noopSubscribe = () => () => undefined;
@@ -49,12 +51,25 @@ export function CountdownRing({
   );
   const ms = clock === undefined ? remainingMs : smooth;
   const seconds = ms === null ? null : Math.max(0, Math.ceil(ms / 1000));
-  const hot = seconds !== null && seconds <= HOT_SECONDS;
+  const tier =
+    seconds === null
+      ? "calm"
+      : seconds <= CRITICAL_SECONDS
+        ? "critical"
+        : seconds <= WARNING_SECONDS
+          ? "warning"
+          : "calm";
+  const hot = tier !== "calm";
   // Guard the divisor: a lot whose duration is unknown draws a full ring
   // rather than dividing by zero and vanishing.
   const fraction = totalMs <= 0 || ms === null ? 1 : Math.min(1, ms / totalMs);
   return (
-    <div className="lot-ring" data-hot={hot ? "true" : "false"} data-testid="countdown-ring">
+    <div
+      className="lot-ring"
+      data-hot={hot ? "true" : "false"}
+      data-tier={tier}
+      data-testid="countdown-ring"
+    >
       <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden>
         <circle cx="66" cy="66" r="54" className="lot-ring-track" />
         <circle
@@ -133,7 +148,16 @@ export function LotHero({
   const photo = media?.photoUrl ?? null;
   const number = media?.number ?? null;
   return (
-    <section className="lot-hero" data-testid={testId} data-frozen={frozen ? "true" : undefined}>
+    // Keyed on the lot: a new player remounts the hero and the reveal stagger
+    // (auction.css) plays once for them. A bid on the same lot keeps the key.
+    <section
+      key={lot.lotId}
+      className="lot-hero"
+      data-testid={testId}
+      data-frozen={frozen ? "true" : undefined}
+    >
+      {/* The bid's one-off sweep on the frame; remounts per bid id. */}
+      {bid === null ? null : <span key={bid.bidId} className="lot-hero-pulse" aria-hidden />}
       <div className="lot-hero-top">
         {/* The face and the name travel together in their own row so the
             countdown keeps the far edge of the hero, where it has always been —
@@ -190,29 +214,35 @@ export function LotHero({
               actually waiting on — clearly marked as not-yet-bid. */}
           <p
             /*
-             * REMOUNT ON EVERY NEW AMOUNT so the arrival animation replays.
-             * This is the number the room is watching and it used to change
-             * with no event at all — one figure silently became another, which
-             * on a screen across a hall is a change you can miss entirely.
+             * THE DIGITS ROLL. This is the number the room is watching and it
+             * used to change with no event at all — one figure silently became
+             * another, which on a screen across a hall is a change you can miss
+             * entirely. `RollingNumber` keeps the element mounted across bids
+             * and rolls exactly the digits that changed; its text content is
+             * always the formatted figure and nothing else.
              *
-             * Safe to remount: the announcements live in `auction-announcer`,
-             * which owns the only aria-live regions on this surface, so nothing
-             * here is re-read by a screen reader.
+             * The announcements live in `auction-announcer`, which owns the
+             * only aria-live regions on this surface, so nothing here is
+             * re-read by a screen reader.
              */
-            key={bid === null ? "ask" : String(bid.amount)}
             className={bid === null ? "lot-hero-bid lot-hero-bid--none" : "lot-hero-bid"}
             data-testid="leading-bid"
           >
-            {bid === null
-              ? formatPaiseINR(paise(lot.basePrice))
-              : formatPaiseINR(paise(bid.amount))}
+            <RollingNumber
+              value={
+                bid === null
+                  ? formatPaiseINR(paise(lot.basePrice))
+                  : formatPaiseINR(paise(bid.amount))
+              }
+            />
           </p>
           {bid === null ? (
             <p className="lot-hero-lead lot-hero-lead--none" data-testid="leading-team">
               Opening ask · awaiting the first paddle…
             </p>
           ) : (
-            <p className="lot-hero-lead" data-testid="leading-team">
+            /* Keyed on the team so a change of leader replays the chip's arrival. */
+            <p key={bid.teamName} className="lot-hero-lead" data-testid="leading-team">
               <span
                 className="lot-hero-dot"
                 style={leadColor === null ? undefined : { background: leadColor }}

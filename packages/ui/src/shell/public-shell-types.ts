@@ -33,19 +33,17 @@ export interface PublicShellProps {
   nav?: PublicShellLink[];
   /** Right-side header slot: Sign in / user chip. */
   headerAction?: ReactNode;
+  /** Primary destination inside the small-screen navigation. */
+  mobileAction?: PublicShellLink;
   footerLinks?: PublicShellLink[];
   /** Columned footer (preferred). When present, `footerLinks` is ignored. */
   footerGroups?: PublicShellFooterGroup[];
   /** Short brand line rendered beside the footer wordmark. */
   footerTagline?: ReactNode;
+  footerHeading?: ReactNode;
   /** Decorative row rendered under the footer tagline (e.g. social glyphs). */
   footerSocial?: ReactNode;
-  /**
-   * Subscribe slot, rendered under the brand line rather than as a column of
-   * its own. A sixth column squeezed the four link columns and left the form
-   * stranded across the page from the sentence that motivates it; beneath the
-   * tagline it reads as part of the brand's pitch, which is what it is.
-   */
+  /** Subscription form, displayed in its own band below the link groups. */
   footerNewsletter?: ReactNode;
   footerNote?: ReactNode;
   /**

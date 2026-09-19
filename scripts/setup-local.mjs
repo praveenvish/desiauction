@@ -2,7 +2,7 @@
 // → environment → migrations → RLS roles → demo seed → validation. Idempotent:
 // safe to re-run any time; never overwrites an existing .env.local.
 import { execSync, spawnSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,6 +62,18 @@ ENGINE_SECRET=dev-engine-secret
 }
 
 // 3 · Infrastructure ----------------------------------------------------------
+// docker compose substitutes ${DB_PORT} from the shell or a `.env` file, never
+// from `.env.local`, so a `.env.local` that moved the database (DB_PORT=5436)
+// used to be ignored here: compose recreated the container on 5433 while every
+// app connected to 5436, and the database looked dead. Hand it across.
+if (process.env.DB_PORT === undefined) {
+  const port = /^DB_PORT=(\d+)\s*$/m.exec(readFileSync(envPath, "utf8"))?.[1];
+  if (port !== undefined) {
+    process.env.DB_PORT = port;
+    console.log(`✓ DB_PORT=${port} from .env.local`);
+  }
+}
+
 step("3/7 infrastructure (docker compose)");
 const compose = capture("docker compose up -d");
 if (compose.code !== 0) {

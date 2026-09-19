@@ -1,0 +1,38 @@
+diff --git a/dist/esm/server/body-streams.js b/dist/esm/server/body-streams.js
+index 8c1b494987ae8bf65159cb4a5fef36ca952a27d7..812940b535b1d5b955e45406980aab9bf54e1a72 100644
+--- a/dist/esm/server/body-streams.js
++++ b/dist/esm/server/body-streams.js
+@@ -44,6 +44,14 @@ export function getCloneableBody(readable, sizeLimit) {
+                     throw res.error;
+                 }
+                 replaceRequestBody(readable, buffered);
++                // desiauction patch: replaceRequestBody copies the PassThrough's
++                // `_events` over the request's, dropping every listener already on
++                // it — including the router's `req.on('error', noop)`. A client
++                // that disconnects after sending its body (a server action whose
++                // redirect it stops reading, a closed tab) then destroys the request
++                // with "aborted"/ECONNRESET and nothing handles it: an
++                // uncaughtException per abort, captured by Sentry as fatal.
++                readable.on('error', ()=>{});
+                 buffered = readable;
+             }
+         },
+diff --git a/dist/server/body-streams.js b/dist/server/body-streams.js
+index 6b1b578b5372fbd70f089ccf79eab7b100f09c40..af2a79747c34d6fb6b6ee84fb214e8a8adfc1021 100644
+--- a/dist/server/body-streams.js
++++ b/dist/server/body-streams.js
+@@ -71,6 +71,14 @@ function getCloneableBody(readable, sizeLimit) {
+                     throw res.error;
+                 }
+                 replaceRequestBody(readable, buffered);
++                // desiauction patch: replaceRequestBody copies the PassThrough's
++                // `_events` over the request's, dropping every listener already on
++                // it — including the router's `req.on('error', noop)`. A client
++                // that disconnects after sending its body (a server action whose
++                // redirect it stops reading, a closed tab) then destroys the request
++                // with "aborted"/ECONNRESET and nothing handles it: an
++                // uncaughtException per abort, captured by Sentry as fatal.
++                readable.on('error', ()=>{});
+                 buffered = readable;
+             }
+         },

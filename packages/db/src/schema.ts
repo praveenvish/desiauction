@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -51,7 +52,52 @@ export const people = pgTable("people", {
   email: text("email"),
   emailVerifiedAt: ts("email_verified_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
+  /**
+   * WHEN THIS PERSON WAS ERASED (0066); null for everyone else.
+   *
+   * The row outlives the person because shared records — a registration, a
+   * paddle, a sale — point at it and 0040 refuses to let them dangle. Erasure
+   * therefore empties the row rather than deleting it, and this is the marker
+   * that says so. Two CHECKs hold it honest: a row with no phone and no email is
+   * legal only when erased, and an erased row may hold neither.
+   */
+  erasedAt: ts("erased_at"),
 });
+
+/**
+ * A PERSON ASKING TO BE ERASED (0066).
+ *
+ * Platform-to-person data, like `consent_records`: no org, no RLS; the person
+ * reads and files their own, the privacy desk (`platform:privacy`) decides.
+ * One open request per person is a partial unique index, and the CHECKs in the
+ * migration tie `decided_at`/`decided_by` to the status so a request is either
+ * open or decided, never half of each.
+ */
+export const erasureRequests = pgTable(
+  "erasure_requests",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    status: text("status", { enum: ["requested", "completed", "declined", "withdrawn"] })
+      .notNull()
+      .default("requested"),
+    reason: text("reason"),
+    requestedAt: ts("requested_at").notNull().defaultNow(),
+    decidedBy: char("decided_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    decidedAt: ts("decided_at"),
+    decisionNote: text("decision_note"),
+  },
+  (table) => [
+    uniqueIndex("erasure_requests_open_uq")
+      .on(table.personId)
+      .where(sql`${table.status} = 'requested'`),
+    index("erasure_requests_queue_idx").on(table.status, table.requestedAt),
+  ],
+);
 
 /**
  * THE PERSON'S DURABLE CRICKET IDENTITY (PI-1).
@@ -168,6 +214,8 @@ export const emailVerifications = pgTable(
   (table) => [
     index("email_verifications_person_idx").on(table.personId, table.createdAt),
     index("email_verifications_ip_idx").on(table.requestIp, table.createdAt),
+    // The platform-wide send ceiling counts the last hour across every address.
+    index("email_verifications_created_idx").on(table.createdAt),
   ],
 );
 
@@ -178,7 +226,9 @@ export const organizations = pgTable("organizations", {
   // The club's own words for the Org Detail "About" banner — nullable, edited
   // in place by an owner. Never fabricated; empty until someone writes it.
   description: text("description"),
-  createdBy: char("created_by", { length: 26 }).notNull(),
+  createdBy: char("created_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
 
@@ -244,6 +294,8 @@ export const otpCodes = pgTable(
   (table) => [
     index("otp_codes_phone_idx").on(table.phone, table.createdAt),
     index("otp_codes_ip_idx").on(table.requestIp, table.createdAt),
+    // The platform-wide send ceiling counts the last hour across every phone.
+    index("otp_codes_created_idx").on(table.createdAt),
   ],
 );
 
@@ -345,7 +397,9 @@ export const orgMessagingSettings = pgTable(
     channel: text("channel", { enum: ["sms", "email", "in-app"] }).notNull(),
     enabled: boolean("enabled").notNull(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
-    updatedBy: char("updated_by", { length: 26 }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
   },
   (table) => [uniqueIndex("org_messaging_settings_uq").on(table.orgId, table.topic, table.channel)],
 );
@@ -431,7 +485,9 @@ export const grants = pgTable(
     scopeType: text("scope_type", { enum: ["org", "tournament", "team", "platform"] }).notNull(),
     scopeId: char("scope_id", { length: 26 }).notNull(),
     capabilitySet: text("capability_set").notNull(),
-    grantedBy: char("granted_by", { length: 26 }).notNull(),
+    grantedBy: char("granted_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
     revokedAt: ts("revoked_at"),
   },
@@ -446,9 +502,13 @@ export const invites = pgTable("invites", {
   orgId: char("org_id", { length: 26 }).notNull(),
   capabilitySet: text("capability_set").notNull(),
   tokenHash: text("token_hash").notNull().unique(),
-  createdBy: char("created_by", { length: 26 }).notNull(),
+  createdBy: char("created_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
   expiresAt: ts("expires_at").notNull(),
-  acceptedBy: char("accepted_by", { length: 26 }),
+  acceptedBy: char("accepted_by", { length: 26 }).references(() => people.id, {
+    onDelete: "restrict",
+  }),
   acceptedAt: ts("accepted_at"),
   revokedAt: ts("revoked_at"),
 });
@@ -465,7 +525,13 @@ export const auditLog = pgTable(
     meta: jsonb("meta"),
     at: ts("at").notNull().defaultNow(),
   },
-  (table) => [index("audit_scope_idx").on(table.scopeType, table.scopeId, table.at)],
+  (table) => [
+    index("audit_scope_idx").on(table.scopeType, table.scopeId, table.at),
+    // 0044 and 0068: "what did this person do" and "what happened in this
+    // scope" without naming the scope type — neither can seek the index above.
+    index("audit_log_actor_at_idx").on(table.actor, table.at),
+    index("audit_log_scope_id_at_idx").on(table.scopeId, table.at),
+  ],
 );
 
 // --- Competition domain (IP-3 §4). Every row is org-scoped (C-13, invariant 1);
@@ -508,7 +574,9 @@ export const tournaments = pgTable(
       .references(() => sports.key),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [index("tournaments_org_idx").on(table.orgId)],
@@ -537,11 +605,15 @@ export const passUpgradeRequests = pgTable("pass_upgrade_requests", {
   requestedTier: text("requested_tier", { enum: ["free", "pro", "association"] }).notNull(),
   /** Why they need it, in their words: the most useful field for whoever answers. */
   note: text("note"),
-  requestedBy: char("requested_by", { length: 26 }).notNull(),
+  requestedBy: char("requested_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
   createdAt: ts("created_at").notNull().defaultNow(),
   /** Null resolution = still open. A partial unique index allows exactly one. */
   resolvedAt: ts("resolved_at"),
-  resolvedBy: char("resolved_by", { length: 26 }),
+  resolvedBy: char("resolved_by", { length: 26 }).references(() => people.id, {
+    onDelete: "restrict",
+  }),
   outcome: text("outcome", { enum: ["granted", "declined"] }),
 });
 
@@ -599,8 +671,22 @@ export const competitions = pgTable(
     location: text("location"),
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
+    /**
+     * THE PLATFORM HOLD (0072). Set by the moderation desk when a public season
+     * page is taken down; cleared when the hold is lifted. While it is set the
+     * season cannot be public — a CHECK, not a convention — so no publishing
+     * path, present or future, can put it back on the open web. The organizer
+     * sees the reason; lifting the hold does not republish.
+     */
+    platformHoldAt: ts("platform_hold_at"),
+    platformHoldReason: text("platform_hold_reason"),
+    platformHoldBy: char("platform_hold_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("competitions_org_idx").on(table.orgId),
@@ -620,7 +706,9 @@ export const franchises = pgTable(
     id: id(),
     orgId: char("org_id", { length: 26 }).notNull(),
     name: text("name").notNull(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [index("franchises_org_idx").on(table.orgId)],
@@ -645,7 +733,9 @@ export const teams = pgTable(
     logoUrl: text("logo_url"),
     // Non-bidding team staff (organizer metadata; not an authenticated role).
     coachName: text("coach_name"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   // Team name is unique within a competition (doc 43).
@@ -734,7 +824,9 @@ export const registrations = pgTable(
     note: text("note"),
     rejectionReason: text("rejection_reason"),
     rejectionNote: text("rejection_note"),
-    reviewedBy: char("reviewed_by", { length: 26 }),
+    reviewedBy: char("reviewed_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     reviewedAt: ts("reviewed_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
@@ -806,8 +898,12 @@ export const orgImportMappings = pgTable(
     dateOrder: text("date_order", { enum: ["dmy", "mdy"] })
       .notNull()
       .default("dmy"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
-    updatedBy: char("updated_by", { length: 26 }),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -831,7 +927,9 @@ export const venues = pgTable(
     name: text("name").notNull(),
     address: text("address"),
     city: text("city"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   // One venue name per org — venue information exists exactly once.
@@ -859,7 +957,9 @@ export const grounds = pgTable(
     status: text("status", { enum: ["active", "unavailable"] })
       .notNull()
       .default("active"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -921,7 +1021,9 @@ export const fixtureResults = pgTable(
     /** "DLS", "super over", "conceded" — how, when not simply the higher score. */
     method: text("method"),
     note: text("note"),
-    recordedBy: char("recorded_by", { length: 26 }).notNull(),
+    recordedBy: char("recorded_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     recordedAt: ts("recorded_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -992,7 +1094,9 @@ export const fixtures = pgTable(
     startedAt: ts("started_at"),
     completedAt: ts("completed_at"),
     cancelledAt: ts("cancelled_at"),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -1027,7 +1131,9 @@ export const auctions = pgTable(
       .default("scheduled"),
     // AuctionConfig (doc 41), locked at creation; changes are audited overrides.
     config: jsonb("config").notNull(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -1208,9 +1314,13 @@ export const auctionOwnerInvites = pgTable(
     auctionId: char("auction_id", { length: 26 }).notNull(),
     teamId: char("team_id", { length: 26 }).notNull(),
     tokenHash: text("token_hash").notNull().unique(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     expiresAt: ts("expires_at").notNull(),
-    acceptedBy: char("accepted_by", { length: 26 }),
+    acceptedBy: char("accepted_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     acceptedAt: ts("accepted_at"),
     revokedAt: ts("revoked_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
@@ -1228,7 +1338,9 @@ export const paddleGrants = pgTable(
     personId: char("person_id", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
-    grantedBy: char("granted_by", { length: 26 }).notNull(),
+    grantedBy: char("granted_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
     revokedAt: ts("revoked_at"),
   },
@@ -1292,8 +1404,12 @@ export const auctionTeamTargets = pgTable(
     priority: smallint("priority").notNull().default(3),
     /** The player to turn to if this one is lost. Chains by following pointers. */
     fallbackRegistrationId: char("fallback_registration_id", { length: 26 }),
-    createdBy: char("created_by", { length: 26 }).notNull(),
-    updatedBy: char("updated_by", { length: 26 }),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
@@ -1383,7 +1499,9 @@ export const featureSettings = pgTable(
     scopeId: char("scope_id", { length: 26 }).notNull(),
     feature: text("feature").notNull(),
     enabled: boolean("enabled").notNull(),
-    updatedBy: char("updated_by", { length: 26 }),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (table) => [
@@ -1855,11 +1973,20 @@ export const finopsSchedules = pgTable("finops_schedules", {
 
 // Home page "Stay updated" capture. Platform-level, ZERO tenant data (same
 // posture as finops_schedules above) — no org_id, no RLS.
-export const newsletterSubscribers = pgTable("newsletter_subscribers", {
-  id: id(),
-  email: text("email").notNull().unique(),
-  createdAt: ts("created_at").notNull().defaultNow(),
-});
+export const newsletterSubscribers = pgTable(
+  "newsletter_subscribers",
+  {
+    id: id(),
+    email: text("email").notNull().unique(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    /** Throttling only (0067); nulled by the retention sweep after ninety days. */
+    requestIp: text("request_ip"),
+  },
+  (table) => [
+    index("newsletter_subscribers_ip_idx").on(table.requestIp, table.createdAt),
+    index("newsletter_subscribers_created_idx").on(table.createdAt),
+  ],
+);
 
 /**
  * SOMEBODY WANTS TO BE SHOWN (migration 0031).
@@ -1938,7 +2065,9 @@ export const demoRequests = pgTable(
     createdAt: ts("created_at").notNull().defaultNow(),
     /** Null contact = still open. Outcome and contact move together (CHECK). */
     contactedAt: ts("contacted_at"),
-    contactedBy: char("contacted_by", { length: 26 }),
+    contactedBy: char("contacted_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
     outcome: text("outcome", {
       enum: ["scheduled", "showed", "no_show", "signed_up", "not_a_fit", "no_response"],
     }),
@@ -1969,7 +2098,9 @@ export const demoAvailability = pgTable(
     effectiveFrom: date("effective_from"),
     effectiveTo: date("effective_to"),
     createdAt: ts("created_at").notNull().defaultNow(),
-    createdBy: char("created_by", { length: 26 }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
   },
   (table) => [index("demo_availability_weekday_idx").on(table.weekday)],
 );
@@ -1980,7 +2111,9 @@ export const demoBlackouts = pgTable("demo_blackouts", {
   blackoutOn: date("blackout_on").notNull().unique(),
   reason: text("reason"),
   createdAt: ts("created_at").notNull().defaultNow(),
-  createdBy: char("created_by", { length: 26 }).notNull(),
+  createdBy: char("created_by", { length: 26 })
+    .notNull()
+    .references(() => people.id, { onDelete: "restrict" }),
 });
 
 /**
@@ -2013,4 +2146,199 @@ export const demoBookings = pgTable(
     index("demo_bookings_slot_idx").on(table.slotStart),
     index("demo_bookings_request_idx").on(table.demoRequestId),
   ],
+);
+
+/** Raw bytes. Postgres `bytea`, surfaced to the app as a Node `Buffer`. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+/**
+ * SOMEBODY TELLING US SOMETHING IS BROKEN (FR-1, migration 0064).
+ *
+ * No RLS and no org, like `demo_requests`: a guest can file one, and a signed-in
+ * report is about the platform rather than a tenant. Readers are operators
+ * holding `platform:support`. The page URL arrives already stripped of its
+ * query string and token segments, and `context` is a closed, size-capped set
+ * of keys — both enforced in `apps/web/src/server/support/problem-reports.ts`.
+ */
+export const problemReports = pgTable(
+  "problem_reports",
+  {
+    id: id(),
+    /** Null for a guest, and nulled if the person is ever deleted. */
+    personId: char("person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    replyEmail: text("reply_email"),
+    category: text("category", { enum: ["bug", "confusing", "idea", "other"] }).notNull(),
+    description: text("description").notNull(),
+    pageUrl: text("page_url").notNull(),
+    context: jsonb("context").$type<Record<string, string>>().notNull().default({}),
+    /** Throttling only; cleared by the retention sweep. */
+    requestIp: text("request_ip"),
+    status: text("status", { enum: ["new", "triaged", "fixed", "wont_fix", "duplicate"] })
+      .notNull()
+      .default("new"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    /** Null exactly while `status` is new (CHECK). */
+    triagedAt: ts("triaged_at"),
+    triagedBy: char("triaged_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    index("problem_reports_created_idx").on(table.createdAt),
+    index("problem_reports_person_idx").on(table.personId, table.createdAt),
+    index("problem_reports_ip_idx").on(table.requestIp, table.createdAt),
+  ],
+);
+
+/**
+ * The picture that came with a report (0064) — in the database, not the media
+ * store, because the media store serves every key from a public base URL.
+ * At most a megabyte, one per report, cascades with it, purged after 90 days.
+ */
+export const problemReportScreenshots = pgTable("problem_report_screenshots", {
+  reportId: char("report_id", { length: 26 })
+    .primaryKey()
+    .references(() => problemReports.id, { onDelete: "cascade" }),
+  contentType: text("content_type", {
+    enum: ["image/jpeg", "image/png", "image/webp"],
+  }).notNull(),
+  bytes: bytea("bytes").notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+/**
+ * ASKING SOMEBODY HOW IT WENT (FR-1 Phase 2, migration 0065).
+ *
+ * One ask per person per subject (unique index) — asking again re-sends the
+ * same link. The link token is an HMAC of this row's id under
+ * REVIEW_TOKEN_SECRET; only its SHA-256 is stored. No RLS: the principal on the
+ * review page is the token, and a platform review belongs to no organization.
+ */
+export const reviewRequests = pgTable(
+  "review_requests",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    /** 0070: a request is about the platform or about one competition. */
+    subjectType: text("subject_type", { enum: ["platform", "competition"] })
+      .notNull()
+      .default("platform"),
+    /** Set exactly when the subject is a competition (CHECK in 0070). */
+    competitionId: char("competition_id", { length: 26 }).references(() => competitions.id, {
+      onDelete: "cascade",
+    }),
+    orgId: char("org_id", { length: 26 }),
+    /** The part the person had in the season; signs an unnamed public review. */
+    role: text("role", { enum: ["player", "owner"] }),
+    source: text("source", {
+      enum: ["manual_admin", "manual_org", "auction_completed", "season_completed"],
+    }).notNull(),
+    requestedBy: char("requested_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    tokenHash: text("token_hash").notNull().unique("review_requests_token_hash_uq"),
+    /** The address the ask went to; null when the link was shared by hand. */
+    sentTo: text("sent_to"),
+    sentAt: ts("sent_at"),
+    openedAt: ts("opened_at"),
+    expiresAt: ts("expires_at").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    // One platform ask per person, and one per person per season (0070).
+    uniqueIndex("review_requests_platform_uq")
+      .on(table.personId)
+      .where(sql`${table.subjectType} = 'platform'`),
+    uniqueIndex("review_requests_competition_uq")
+      .on(table.personId, table.competitionId)
+      .where(sql`${table.subjectType} = 'competition'`),
+    index("review_requests_created_idx").on(table.createdAt),
+  ],
+);
+
+/**
+ * A REVIEW (FR-1 Phase 2, migration 0065). Held `pending` until an operator
+ * publishes or hides it. `mayQuote` is the author's permission to show it
+ * publicly, and a quote needs `displayName` (CHECK). Deleting the person
+ * deletes the review — the words are theirs.
+ */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: id(),
+    requestId: char("request_id", { length: 26 })
+      .notNull()
+      .unique("reviews_request_uq")
+      .references(() => reviewRequests.id, { onDelete: "cascade" }),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    subjectType: text("subject_type", { enum: ["platform", "competition"] })
+      .notNull()
+      .default("platform"),
+    competitionId: char("competition_id", { length: 26 }).references(() => competitions.id, {
+      onDelete: "cascade",
+    }),
+    orgId: char("org_id", { length: 26 }),
+    role: text("role", { enum: ["player", "owner"] }),
+    rating: smallint("rating").notNull(),
+    wentWell: text("went_well"),
+    improve: text("improve"),
+    mayQuote: boolean("may_quote").notNull().default(false),
+    displayName: text("display_name"),
+    displayOrg: text("display_org"),
+    status: text("status", { enum: ["pending", "published", "hidden"] })
+      .notNull()
+      .default("pending"),
+    moderatedAt: ts("moderated_at"),
+    moderatedBy: char("moderated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    /** A season's organizer may answer a published review; never edit it (0070). */
+    organizerReply: text("organizer_reply"),
+    organizerReplyAt: ts("organizer_reply_at"),
+    organizerReplyBy: char("organizer_reply_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("reviews_status_created_idx").on(table.status, table.createdAt)],
+);
+
+/**
+ * A reader's report that a public review should come down (FR-1 Phase 4,
+ * migration 0070). Queues for operators; nothing is removed automatically.
+ */
+export const reviewReports = pgTable(
+  "review_reports",
+  {
+    id: id(),
+    reviewId: char("review_id", { length: 26 })
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    reason: text("reason", {
+      enum: ["abusive", "false", "personal_info", "spam", "other"],
+    }).notNull(),
+    note: text("note"),
+    /** Throttling only. */
+    reporterIp: text("reporter_ip"),
+    reporterPersonId: char("reporter_person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    resolvedAt: ts("resolved_at"),
+    resolvedBy: char("resolved_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [index("review_reports_ip_idx").on(table.reporterIp, table.createdAt)],
 );

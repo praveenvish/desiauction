@@ -47,7 +47,10 @@ describe("razorpay webhook ingress", () => {
       fileURLToPath(new URL("../../app/api/webhooks/razorpay/route.ts", import.meta.url)),
       "utf8",
     );
-    expect(source).toContain("request.text()");
+    // Raw text through `readCapped` (the body-size cap, launch polish P0):
+    // bytes collected whole and decoded once — `read-capped.test.ts` proves a
+    // character split across chunks survives intact.
+    expect(source).toContain("readCapped(request");
     expect(source).not.toContain("request.json()");
   });
 });

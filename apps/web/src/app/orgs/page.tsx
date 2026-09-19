@@ -1,4 +1,4 @@
-import { Badge, Card } from "@desiauction/ui";
+import { Badge, Card, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -157,7 +157,7 @@ export default async function OrgsPage({
                   </span>
                 </span>
                 <span className="org-row-go" aria-hidden>
-                  →
+                  <IconArrowRight size={16} aria-hidden />
                 </span>
               </Link>
             ))}

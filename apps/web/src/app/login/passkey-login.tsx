@@ -1,13 +1,13 @@
 "use client";
 
-import { Button } from "@desiauction/ui";
+import { Button, IconLock } from "@desiauction/ui";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { finishPasskeyLoginAction, startPasskeyLoginAction } from "../../server/auth/actions";
 
-export function PasskeyLogin() {
+export function PasskeyLogin({ next }: { next?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,9 +18,9 @@ export function PasskeyLogin() {
     try {
       const options = await startPasskeyLoginAction();
       const response = await startAuthentication({ optionsJSON: options });
-      const result = await finishPasskeyLoginAction(response);
+      const result = await finishPasskeyLoginAction(response, next);
       if (result.ok) {
-        router.push("/home");
+        router.push(result.target);
         return;
       }
       setError("That passkey wasn't recognised.");
@@ -42,6 +42,7 @@ export function PasskeyLogin() {
         loading={busy}
         data-testid="passkey-login"
       >
+        <IconLock size={18} className="icon-lead" />
         Sign in with a passkey
       </Button>
       {error !== null ? <p className="passkey-error">{error}</p> : null}

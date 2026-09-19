@@ -7,7 +7,6 @@
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-1);
 }
 
 .default {
@@ -20,4 +19,72 @@
 
 .none {
   padding: 0;
+}
+
+/* Elevation rungs (doc 10). Raised is the default a Card always had. */
+.flat {
+  box-shadow: none;
+}
+
+.raised {
+  box-shadow: var(--shadow-1);
+}
+
+.floating {
+  box-shadow: var(--shadow-2);
+}
+
+/*
+ * The one interaction language for a card that is a target. Before this the
+ * shared Card had no hover at all and three console pages each drew their
+ * own — a 2px lift here, a background swap there — so the same gesture read
+ * differently on every screen. The lift is small on purpose: a card is a
+ * surface, not a button; it acknowledges the pointer, it does not jump.
+ *
+ * Transform and shadow only, so the lift never triggers layout and the text
+ * inside keeps its computed contrast on every frame.
+ */
+.interactive {
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-instant) var(--ease-out);
+}
+
+.interactive:hover {
+  transform: translateY(var(--depth-lift-sm));
+  box-shadow: var(--shadow-2);
+  border-color: var(--border-strong);
+}
+
+.interactive:active {
+  transform: translateY(0) scale(0.995);
+  box-shadow: var(--shadow-1);
+  transition-duration: var(--duration-instant);
+}
+
+.interactive:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A finger cannot hover; a lift that only ever shows on tap-release is a
+   flicker, not feedback. */
+@media (hover: none) {
+  .interactive:hover {
+    transform: none;
+    box-shadow: var(--shadow-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive {
+    transition: none;
+  }
+
+  .interactive:hover,
+  .interactive:active {
+    transform: none;
+  }
 }

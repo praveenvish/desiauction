@@ -14,6 +14,9 @@ import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 
 import { reinstateWithdrawn } from "./registrations";
 
+/** New people per INSERT statement — well inside Postgres's 65,535 bind limit. */
+const PEOPLE_INSERT_CHUNK = 500;
+
 // CSV import commit (M-IP3-2, doc 42 "Import Assistant stages rows"). Validation
 // happens in core (parseRegistrationCsv) BEFORE this runs — every row that
 // reaches here fully validated, whether the organizer committed a clean file or
@@ -262,15 +265,61 @@ export async function commitRegistrationImport(
       .where(inArray(people.phone, phones));
     const personByPhone = new Map(existing.map((p) => [p.phone, p.id]));
 
+    // The first name the file gives each phone — the same row `find` returned,
+    // without scanning the file once per phone.
+    const nameByPhone = new Map<string, string>();
+    for (const row of rows) {
+      if (!nameByPhone.has(row.phone)) {
+        nameByPhone.set(row.phone, row.name);
+      }
+    }
+
+    /*
+     * NEW PEOPLE IN ONE STATEMENT PER CHUNK, NOT ONE PER PERSON (S-4).
+     *
+     * A first import of a 300-player sheet used to be 300 sequential INSERTs
+     * inside the transaction. It is now one multi-row insert per 500. ON
+     * CONFLICT DO NOTHING plus a re-read also closes a race the loop had: a
+     * person created by a concurrent sign-in between the lookup above and the
+     * insert used to abort the whole import on the unique phone; now that
+     * person is simply found and used.
+     */
+    const fresh = phones
+      .filter((phone) => !personByPhone.has(phone))
+      .map((phone) => ({ id: newId(), phone, name: nameByPhone.get(phone) ?? null }));
+    for (let at = 0; at < fresh.length; at += PEOPLE_INSERT_CHUNK) {
+      const chunk = fresh.slice(at, at + PEOPLE_INSERT_CHUNK);
+      const created = await tx
+        .insert(people)
+        .values(chunk)
+        .onConflictDoNothing()
+        .returning({ id: people.id, phone: people.phone });
+      for (const person of created) {
+        if (person.phone !== null) {
+          personByPhone.set(person.phone, person.id);
+        }
+      }
+    }
+    const raced = fresh.map((person) => person.phone).filter((phone) => !personByPhone.has(phone));
+    if (raced.length > 0) {
+      const late = await tx
+        .select({ id: people.id, phone: people.phone })
+        .from(people)
+        .where(inArray(people.phone, raced));
+      for (const person of late) {
+        if (person.phone !== null) {
+          personByPhone.set(person.phone, person.id);
+        }
+      }
+    }
+
     let named = 0;
-    for (const phone of phones) {
-      const name = rows.find((r) => r.phone === phone)?.name ?? null;
-      if (!personByPhone.has(phone)) {
-        const id = newId();
-        await tx.insert(people).values({ id, phone, name });
-        personByPhone.set(phone, id);
+    for (const found of existing) {
+      const phone = found.phone;
+      if (phone === null) {
         continue;
       }
+      const name = nameByPhone.get(phone) ?? null;
       /*
        * NAME A STUB THE FILE CAN NAME.
        *
@@ -281,8 +330,7 @@ export async function commitRegistrationImport(
        * had just read. An EXISTING name is never overwritten: it is the
        * person's own, not ours to correct from a spreadsheet.
        */
-      const found = existing.find((person) => person.phone === phone);
-      if (found !== undefined && found.name === null && name !== null && name !== "") {
+      if (found.name === null && name !== null && name !== "") {
         const updated = await tx
           .update(people)
           .set({ name })

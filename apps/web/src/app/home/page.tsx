@@ -9,6 +9,8 @@ import {
   Money,
   SectionHeader,
   VisuallyHidden,
+  IconArrowRight,
+  IconCheck,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -403,6 +405,8 @@ const ACTIVITY_PHRASE: Record<string, string> = {
   "grant.issued": "Paddle granted",
   "grant.revoked": "Paddle revoked",
   "org.created": "Organization created",
+  // Written by the privacy desk when a member or player asked to be erased.
+  "person.erased": "A member's account was erased",
   "payment.captured": "Payment received",
   "payment.failed": "Payment failed",
   "registration.submitted": "New registration",
@@ -657,8 +661,6 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
   // IS one: the hero needs what the list row could not say — who is on the
   // block, what the top bid is, and who is holding it.
   const liveRow = dash.auctions.find((auction) => auction.status === "live") ?? null;
-  const liveBoard =
-    liveRow === null ? null : ((await auctionDashboard(liveRow.competitionSlug))?.overview ?? null);
 
   // The hero owns the live auction, so the panel below lists only what the hero
   // is not already showing — the design's "no duplication" rule.
@@ -667,10 +669,16 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
   // The scan used to be a sequential `for` loop doing up to eight composite
   // reads one after another — eight round-trip depths for work that has no
   // ordering between its items. `Promise.all` collapses it to one.
+  // The live hero's read rides in the same batch: it depends on nothing the
+  // scan does, and awaiting it first added one more round trip in series.
   const scanned = view.competitions.slice(0, ATTENTION_SCAN_LIMIT);
-  const attention = (
-    await Promise.all(scanned.map((competition) => attentionFor(competition, dash)))
-  ).filter((row): row is AttentionRow => row !== null);
+  const [liveBoard, scannedRows] = await Promise.all([
+    liveRow === null
+      ? Promise.resolve(null)
+      : auctionDashboard(liveRow.competitionSlug).then((board) => board?.overview ?? null),
+    Promise.all(scanned.map((competition) => attentionFor(competition, dash))),
+  ]);
+  const attention = scannedRows.filter((row): row is AttentionRow => row !== null);
   const unscanned = view.competitions.length - scanned.length;
 
   const greeting = greetingFor(new Date(), name);
@@ -900,7 +908,8 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
               href={`/seasons/${liveRow.competitionSlug}/auction/live`}
               data-testid="home-enter-room"
             >
-              {liveDone ? "Close out the auction →" : "Enter auction room →"}
+              {liveDone ? "Close out the auction" : "Enter auction room"}
+              <IconArrowRight size={16} className="icon-trail" />
             </ButtonLink>
           </section>
         ) : null}
@@ -984,7 +993,7 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                                 <span>{row.detail}</span>
                               </span>
                               <span className="home-go" aria-hidden>
-                                →
+                                <IconArrowRight size={16} aria-hidden />
                               </span>
                             </Link>
                           </li>
@@ -1410,7 +1419,8 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                  * empty cricket career and told them that was their record.
                  */
                 <Link href={`/me/${careerSport}`} data-testid="home-career-link">
-                  My {careerSportLabel} →
+                  My {careerSportLabel}
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               }
             />
@@ -1534,7 +1544,7 @@ function SetupLadder({ rungs, current }: { rungs: SetupRung[]; current: number }
           return (
             <li key={rung.key} className={`home-rung home-rung--${state}`}>
               <span className="home-rung-mark" aria-hidden>
-                {rung.done ? "✓" : index + 1}
+                {rung.done ? <IconCheck size={14} /> : index + 1}
               </span>
               <span className="home-rung-text">
                 <strong>

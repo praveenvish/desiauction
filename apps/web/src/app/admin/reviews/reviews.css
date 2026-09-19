@@ -1,0 +1,129 @@
+/* FR-1 Phase 2 — the review desk. Loaded after admin.css. */
+
+.review-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 32rem;
+  margin-top: var(--space-3);
+}
+
+.review-ask-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-size: var(--text-sm-size);
+}
+
+.review-ask-result p {
+  margin: 0;
+}
+
+.review-ask-link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.review-ask-link code {
+  min-width: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.review-list,
+.review-asks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.review-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.review-row-rating {
+  margin: 0 0 var(--space-1);
+  color: var(--text-accent);
+  font-size: var(--text-base-size);
+  letter-spacing: 0.1em;
+}
+
+.review-row-rating-rest {
+  color: var(--border-strong);
+}
+
+.review-row-label {
+  margin: 0 0 var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.review-row-text {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.review-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.review-asks li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.review-asks-who {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.review-asks-state {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.review-row-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.review-row-reports ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+}

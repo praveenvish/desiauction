@@ -12,6 +12,15 @@ const RESEND_COOLDOWN_MS = 30 * 1000;
 const MAX_PER_HOUR = 5;
 const MAX_PER_HOUR_PER_IP = 20;
 const MAX_ATTEMPTS = 5;
+/**
+ * PLATFORM-WIDE SEND CEILING. The caps above stop one handset and one source;
+ * this stops the platform being used as an SMS cannon from rotating addresses
+ * (pumping burns money and DLT sender reputation). Sized well above a busy
+ * auction night; `OTP_GLOBAL_HOURLY_CAP` overrides it. Hitting it refuses with
+ * `busy` and logs loudly — during an attack, legitimate sign-ins wait too,
+ * which is the trade-off every ceiling makes.
+ */
+export const DEFAULT_GLOBAL_PER_HOUR = 2_000;
 
 export function hashCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
@@ -26,7 +35,7 @@ export function hashCode(code: string): string {
 export type OtpPurpose = "login" | "phone_change";
 
 export type RequestOtpResult =
-  { ok: true } | { ok: false; reason: "invalid-phone" | "cooldown" | "hourly-limit" };
+  { ok: true } | { ok: false; reason: "invalid-phone" | "cooldown" | "hourly-limit" | "busy" };
 
 /**
  * Uniform behaviour for every plausible phone (no-enumeration, IP-2 §6):
@@ -41,6 +50,7 @@ export async function requestOtp(
   rawPhone: string,
   requestIp: string | null = null,
   purpose: OtpPurpose = "login",
+  globalPerHour: number = DEFAULT_GLOBAL_PER_HOUR,
 ): Promise<RequestOtpResult> {
   const normalized = normalizePhone(rawPhone);
   if (!normalized.ok) {
@@ -85,6 +95,14 @@ export async function requestOtp(
     if (ipCount >= MAX_PER_HOUR_PER_IP) {
       return { ok: false, reason: "hourly-limit" };
     }
+  }
+
+  const [{ count: platformCount }] = (await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(otpCodes)
+    .where(gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)))) as [{ count: number }];
+  if (platformCount >= globalPerHour) {
+    return { ok: false, reason: "busy" };
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -150,27 +168,45 @@ export async function consumeCode(
     return { ok: false, reason: "expired" };
   }
 
-  if (candidate.codeHash !== hashCode(code)) {
-    // Atomic increment guarded by the cap: concurrent wrong guesses serialize
-    // on the row lock and only rows still under MAX_ATTEMPTS are bumped, so the
-    // 5-attempt ceiling holds under parallelism (RC-4 Finding 3). A no-op
-    // update (empty return) means the cap was already reached.
-    const [bumped] = await db
-      .update(otpCodes)
-      .set({ attempts: sql`${otpCodes.attempts} + 1` })
-      .where(and(eq(otpCodes.id, candidate.id), lt(otpCodes.attempts, MAX_ATTEMPTS)))
-      .returning({ attempts: otpCodes.attempts });
-    if (bumped === undefined) {
-      // Lost the race to a parallel guess that took the last attempt.
-      return { ok: false, reason: "locked" };
-    }
-    if (bumped.attempts >= MAX_ATTEMPTS) {
-      return { ok: false, reason: "locked", lockedOut: true };
-    }
-    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - bumped.attempts };
+  // RESERVE AN ATTEMPT BEFORE COMPARING — for right and wrong guesses alike.
+  // The guarded increment serializes on the row lock, so a parallel burst gets
+  // at most the remaining budget of reservations; everyone else is refused
+  // without their guess ever being compared. Checking the cap only on the
+  // WRONG branch (as this once did) let a thousand parallel guesses all pass
+  // the snapshot read above, and the right one consume the code past the cap.
+  const [reserved] = await db
+    .update(otpCodes)
+    .set({ attempts: sql`${otpCodes.attempts} + 1` })
+    .where(
+      and(
+        eq(otpCodes.id, candidate.id),
+        lt(otpCodes.attempts, MAX_ATTEMPTS),
+        isNull(otpCodes.consumedAt),
+      ),
+    )
+    .returning({ attempts: otpCodes.attempts });
+  if (reserved === undefined) {
+    // Lost the race: a parallel guess took the last attempt, or consumed it.
+    return { ok: false, reason: "locked" };
   }
 
-  await db.update(otpCodes).set({ consumedAt: new Date() }).where(eq(otpCodes.id, candidate.id));
+  if (candidate.codeHash !== hashCode(code)) {
+    if (reserved.attempts >= MAX_ATTEMPTS) {
+      return { ok: false, reason: "locked", lockedOut: true };
+    }
+    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - reserved.attempts };
+  }
+
+  // Consumed conditionally: the same correct code presented twice at once
+  // signs in once. The loser matches no row.
+  const [consumed] = await db
+    .update(otpCodes)
+    .set({ consumedAt: new Date() })
+    .where(and(eq(otpCodes.id, candidate.id), isNull(otpCodes.consumedAt)))
+    .returning({ id: otpCodes.id });
+  if (consumed === undefined) {
+    return { ok: false, reason: "invalid" };
+  }
   return { ok: true };
 }
 

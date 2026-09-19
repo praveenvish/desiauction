@@ -3,6 +3,8 @@
 import { formatPaiseINR, paise, type AuctionSnapshot } from "@desiauction/core";
 import { Badge } from "@desiauction/ui";
 
+import { SoundToggle } from "../../../../components/shell/sound-toggle";
+
 import type { ConnectionState } from "./use-auction-socket";
 
 // The live status ribbon (M-IP4-3): the persistent operational strip every
@@ -167,6 +169,10 @@ export function StatusRibbon({
           {live ? <span className="ribbon-network-dot" aria-hidden /> : null}
           {connectionLabel(connection, offline)}
         </Badge>
+        {/* Sound is a room feature and this strip is the room's one piece of
+            chrome, so the switch lives here on every live surface. Off by
+            default; the click that turns it on is what unlocks the browser. */}
+        {variant === "shell" ? <SoundToggle className="ribbon-sound shell-icon-button" /> : null}
         {/* The version is the operator's convergence check across surfaces. It
             stays machine-readable everywhere (`data-version`) and stays out of
             a guest's chrome. */}

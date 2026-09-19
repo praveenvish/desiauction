@@ -224,6 +224,109 @@ export function isAttributeValueIn(pack: SportPack, key: string, value: string):
   return attributeOptionKeys(pack, key).includes(value);
 }
 
+/**
+ * ONE SPORT'S OPTIONAL PLAYER DETAIL, AS PLAIN DATA.
+ *
+ * The twin of `roleOptions`, and it exists for the same reason: a pack carries
+ * functions (a score field's `parse`, a tiebreaker's `compute`) and therefore
+ * cannot cross into a client component. `/account`'s sport-profile panel had
+ * already hand-rolled exactly this projection inline; the public registration
+ * form needed it too and reached for cricket's `BATTING_STYLES` instead — so a
+ * footballer registering for a football season was asked for a batting style
+ * and never asked which foot they kick with.
+ *
+ * Storage is carried through because the WRITER needs it and nothing else does:
+ * cricket's two attributes are real columns with ten consumers behind them, and
+ * every sport added since lands in `registrations.attributes`. A form renders
+ * these identically either way.
+ */
+export interface AttributeOption {
+  readonly key: string;
+  readonly label: string;
+  /** "column" values go to their own column; "json" values to `attributes`. */
+  readonly storage: "column" | "json";
+  /** The column's name, when `storage` is "column". */
+  readonly column: string | null;
+  readonly options: readonly { readonly key: string; readonly label: string }[];
+}
+
+export function attributeOptions(sport: string): AttributeOption[] {
+  return sportPackFor(sport).attributes.map((attribute) => ({
+    key: attribute.key,
+    label: attribute.label,
+    storage: attribute.storage.kind,
+    column: attribute.storage.kind === "column" ? attribute.storage.column : null,
+    options: attribute.options.map((option) => ({ key: option.key, label: option.label })),
+  }));
+}
+
+/**
+ * Where a set of answers physically goes — the one place that decision is made.
+ *
+ * REFUSES SILENTLY RATHER THAN THROWING, because every caller is a form and the
+ * alternative to dropping an unrecognised value is failing a registration over
+ * a stale draft in somebody's browser. An answer survives only if the pack
+ * declares its attribute AND lists its value; anything else is a value from
+ * another sport, an edited request, or a `localStorage` draft written before the
+ * organizer changed the season, and none of those should reach a row.
+ *
+ * Column names are returned verbatim (`batting_style`), not camel-cased: core
+ * does not know what an ORM is, and the two consumers that do can map two keys.
+ */
+export interface AttributeWrite {
+  readonly columns: Record<string, string>;
+  readonly json: Record<string, string>;
+}
+
+export function splitAttributeWrite(
+  pack: SportPack,
+  answers: Readonly<Record<string, string>>,
+): AttributeWrite {
+  const columns: Record<string, string> = {};
+  const json: Record<string, string> = {};
+  for (const attribute of pack.attributes) {
+    const value = answers[attribute.key];
+    if (value === undefined || value === "" || !isAttributeValueIn(pack, attribute.key, value)) {
+      continue;
+    }
+    if (attribute.storage.kind === "column") {
+      columns[attribute.storage.column] = value;
+    } else {
+      json[attribute.key] = value;
+    }
+  }
+  return { columns, json };
+}
+
+/**
+ * The stored answers a season's pack can still explain, labelled for display.
+ *
+ * Reading is the other half of collecting, and without it `registrations.
+ * attributes` is a column nothing renders — which is what it was. Values the
+ * pack no longer lists are dropped rather than shown raw: a season whose sport
+ * was changed under it should show nothing, not a football position on a
+ * cricket card.
+ */
+export function describeAttributes(
+  sport: string,
+  stored: Readonly<Record<string, unknown>>,
+): { key: string; label: string; value: string }[] {
+  const pack = sportPackFor(sport);
+  const out: { key: string; label: string; value: string }[] = [];
+  for (const attribute of pack.attributes) {
+    const raw = stored[attribute.key];
+    if (typeof raw !== "string" || raw === "") {
+      continue;
+    }
+    const label = termLabel(attribute.options, raw);
+    if (label === null) {
+      continue;
+    }
+    out.push({ key: attribute.key, label: attribute.label, value: label });
+  }
+  return out;
+}
+
 /** As `parseRoleIn`, for one attribute's options. Null means "could not place". */
 export function parseAttributeIn(pack: SportPack, key: string, value: string): string | null {
   const spec = attributeSpec(pack, key);

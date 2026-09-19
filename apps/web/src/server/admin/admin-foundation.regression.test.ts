@@ -42,6 +42,7 @@ import { webFinopsDeps } from "../financial-operations/deps";
 import { recordAdminAccess } from "./access-log";
 import {
   ADMIN_ACCESS_ACTION,
+  PLATFORM_CAPABILITY_SETS,
   PLATFORM_SCOPE_ID,
   PLATFORM_SCOPE_TYPE,
   hasPlatformCapability,
@@ -63,6 +64,13 @@ import {
   userDirectory,
 } from "./views";
 import { passQueue } from "./passes";
+import { purgeOrg } from "../test-support/purge-org";
+import { reportQueue } from "./report-views";
+import { reviewDesk } from "./review-views";
+import { deskQueue } from "./desk-queue";
+import { auctionExists, auctionHeader, auctionPulse, liveAuctionBoard } from "./live-views";
+import { moderationDesk } from "./moderation-views";
+import { platformSeasonBySlug } from "./season-lookup";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -114,6 +122,12 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  // The org this suite creates used to be left behind, pointing at an owner
+  // the next line deletes. Since 0069 keys `organizations.created_by` to
+  // people, that order is refused, so the org and everything under it go first.
+  if (orgId !== "") {
+    await purgeOrg(db, orgId);
+  }
   await db.delete(grantsTable).where(inArray(grantsTable.personId, [adminId, ownerId]));
   // createOrg() also writes an org_members row, which references `people`
   // under RESTRICT (0040): the person cannot go while the membership stands.
@@ -192,6 +206,35 @@ describe("RH-1g · The platform engine's second set", () => {
         "platform.pass",
       ),
     ).toBe(false);
+  });
+});
+
+describe("Platform desks · every set is exactly one power", () => {
+  it("each of the platform sets confers its own capability and no other — none is a superset", () => {
+    const granted = PLATFORM_CAPABILITY_SETS.map((set) => platformCapabilitiesOf(set));
+    for (const capabilities of granted) {
+      expect(capabilities).toHaveLength(1);
+    }
+    // Six sets, six different powers: nobody acquires one by holding another.
+    expect(new Set(granted.flat()).size).toBe(PLATFORM_CAPABILITY_SETS.length);
+  });
+
+  it("moderation takes pages down, and cannot see the platform; admin cannot take pages down", () => {
+    const grant = (capabilitySet: string) => [
+      {
+        capabilitySet,
+        scopeType: PLATFORM_SCOPE_TYPE,
+        scopeId: PLATFORM_SCOPE_ID,
+        revokedAt: null,
+      },
+    ];
+    const moderation = grant("platform:moderation");
+    expect(hasPlatformCapability(moderation, "platform.moderate")).toBe(true);
+    expect(hasPlatformCapability(moderation, "platform.admin")).toBe(false);
+    const admin = grant("platform:admin");
+    expect(hasPlatformCapability(admin, "platform.moderate")).toBe(false);
+    // No org set reaches it either — an organizer cannot unlist a rival.
+    expect(capabilitiesOf("platform:moderation")).toEqual([]);
   });
 });
 
@@ -432,8 +475,40 @@ describe("PX-9 · The read-only guarantee, proved at runtime", () => {
     // behind its own grant, and the queue that feeds it is a projection like
     // every other one. Driven here so it can never quietly start mutating.
     const passes = await passQueue(ro);
+    // FR-1: the problem-report queue is a projection like the rest; its one
+    // write lives in server/support/report-desk.ts.
+    const reports = await reportQueue(ro);
+    expect(Array.isArray(reports.open)).toBe(true);
+    expect(Array.isArray(reports.closed)).toBe(true);
+    // FR-1 Phase 2: the review desk is a projection too.
+    const desk = await reviewDesk(ro);
+    expect(Array.isArray(desk.pending)).toBe(true);
+    expect(Array.isArray(desk.asks)).toBe(true);
     expect(Array.isArray(passes.open)).toBe(true);
     expect(Array.isArray(passes.recent)).toBe(true);
+
+    // The live board, the auction watch and the moderation desk are
+    // projections too — driven here so none of them can start mutating.
+    const live = await liveAuctionBoard(ro, Date.now());
+    expect(Array.isArray(live.running)).toBe(true);
+    const [anyAuction] = await db.select({ id: auctions.id }).from(auctions).limit(1);
+    if (anyAuction !== undefined) {
+      expect((await auctionHeader(ro, anyAuction.id))?.auctionId).toBe(anyAuction.id);
+      expect((await auctionPulse(ro, anyAuction.id, Date.now())).eventCount).toBeGreaterThanOrEqual(
+        0,
+      );
+      expect(await auctionExists(ro, anyAuction.id)).toBe(true);
+    }
+    expect(await auctionExists(ro, "not-an-auction")).toBe(false);
+    const moderation = await moderationDesk(ro, "");
+    expect(Array.isArray(moderation.published)).toBe(true);
+    expect(Array.isArray(moderation.held)).toBe(true);
+    const desks = await deskQueue(
+      ro,
+      new Set(["platform.pass", "platform.demo", "platform.privacy", "platform.support"] as const),
+    );
+    expect(Array.isArray(desks)).toBe(true);
+    expect(await platformSeasonBySlug(ro, "no-such-season")).toBeNull();
   }, 120_000);
 
   it("the proof harness itself has teeth — a write through it throws", () => {

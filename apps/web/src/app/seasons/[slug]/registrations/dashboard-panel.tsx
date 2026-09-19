@@ -18,6 +18,7 @@ import {
   Tabs,
   useToast,
   VisuallyHidden,
+  IconCheck,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -60,6 +61,7 @@ import type {
   RegistrationStats,
   TimelineEntry,
 } from "../../../../server/competition/registrations";
+import { useHydrated } from "../../../../lib/use-hydrated";
 
 type Row = RegistrationPage["rows"][number];
 
@@ -297,10 +299,7 @@ export function RegistrationDashboardPanel({
   const [search, setSearch] = useState(filters.search);
   // Interactivity marker: this effect runs only after client hydration, so the
   // attribute is a deterministic "the panel's handlers are live now" signal.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   const rows = page.rows;
   const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
@@ -725,8 +724,11 @@ export function RegistrationDashboardPanel({
    * A destructive write has no business on an unmodified letter key listening
    * at the window. Movement and selection stay; the writes are buttons.
    */
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
+  // The listener reads `rows`, `cursor` and `toggle` directly and is
+  // re-registered when any of them changes — one addEventListener per cursor
+  // move, which costs nothing. It used to copy `rows` into a ref DURING render
+  // so the effect could skip that dependency; writing a ref while rendering is
+  // what the compiler rules forbid, and the saving was never worth it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -739,13 +741,12 @@ export function RegistrationDashboardPanel({
       if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
-      const current = rowsRef.current;
       if (event.key === "j") {
-        setCursor((c) => Math.min(c + 1, current.length - 1));
+        setCursor((c) => Math.min(c + 1, rows.length - 1));
       } else if (event.key === "k") {
         setCursor((c) => Math.max(c - 1, 0));
       } else if (event.key === "x") {
-        const row = current[cursor];
+        const row = rows[cursor];
         if (row) {
           toggle(row);
         }
@@ -755,7 +756,7 @@ export function RegistrationDashboardPanel({
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [cursor, toggle]);
+  }, [rows, cursor, toggle]);
 
   // Keep the keyboard cursor in view (P2) — a cursor you cannot see is a cursor
   // that selects rows you did not mean.
@@ -1382,6 +1383,16 @@ export function RegistrationDashboardPanel({
                       <dd>{detail.bowlingStyle.replace(/_/g, " ")}</dd>
                     </div>
                   ) : null}
+                  {/* Whatever else the SEASON'S sport asks about — a preferred
+                      foot, a raiding side. Labelled by the pack on the server,
+                      so this renders any sport without knowing any of them.
+                      Empty for cricket, whose two are the named rows above. */}
+                  {detail.attributes.map((attribute) => (
+                    <div key={attribute.key}>
+                      <dt>{attribute.label}</dt>
+                      <dd>{attribute.value}</dd>
+                    </div>
+                  ))}
                   <div>
                     <dt>Team</dt>
                     <dd>{detail.teamName ?? "—"}</dd>
@@ -2459,7 +2470,14 @@ function RegRow({
           data-focus-key={`icon-${row.id}`}
           data-testid={`icon-toggle-${row.personId}`}
         >
-          {row.isIcon ? "Icon ✓" : "Icon"}
+          {row.isIcon ? (
+            <>
+              Icon
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Icon"
+          )}
         </Button>
         {/* Retention is NOT exclusive with either of its neighbours, and the
             button says so by never being disabled. You retain last season's
@@ -2478,7 +2496,14 @@ function RegRow({
           data-focus-key={`retain-${row.id}`}
           data-testid={`retain-toggle-${row.personId}`}
         >
-          {row.isRetained ? "Retained ✓" : "Retain"}
+          {row.isRetained ? (
+            <>
+              Retained
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Retain"
+          )}
         </Button>
         <Button
           size="sm"
@@ -2494,7 +2519,14 @@ function RegRow({
           data-focus-key={`captain-${row.id}`}
           data-testid={`captain-toggle-${row.personId}`}
         >
-          {row.isCaptain ? "Captain ✓" : "Captain"}
+          {row.isCaptain ? (
+            <>
+              Captain
+              <IconCheck size={14} className="icon-trail" />
+            </>
+          ) : (
+            "Captain"
+          )}
         </Button>
         <Button size="sm" variant="ghost" onClick={onDetails}>
           Details

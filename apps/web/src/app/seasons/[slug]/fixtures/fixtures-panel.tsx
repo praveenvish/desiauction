@@ -14,7 +14,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 
 import {
   createFixtureAction,
@@ -38,6 +38,7 @@ import {
 import { formatDateTime, formatKickoff, formatWallDate } from "../../../../lib/format-date";
 import { ResultsCard } from "./results-card";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
+import { useHydrated } from "../../../../lib/use-hydrated";
 
 type Snapshot = FixtureDashboard["page"]["rows"][number];
 type GeneratePreview = Awaited<ReturnType<typeof previewGenerationAction>>;
@@ -129,10 +130,7 @@ export function FixturesPanel({
   const [preview, setPreview] = useState<FixtureImportPreview | null>(null);
   const csvRef = useRef<HTMLTextAreaElement>(null);
   // Hydration marker (M-IP3-2 pattern): handlers are live once this flips.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   // Generate wizard state. `plan` holds the dry run awaiting confirmation.
   const [plan, setPlan] = useState<Extract<GeneratePreview, { ok: true }> | null>(null);

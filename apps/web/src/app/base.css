@@ -144,3 +144,48 @@ a:not([class]):focus-visible {
   color: var(--danger-base);
   font-size: var(--text-sm-size);
 }
+
+/*
+ * INLINE ICONS. The product used to end links with a typed "→" and mark done
+ * steps with a typed "✓" — font glyphs that sat on a different baseline in
+ * every face and never matched the drawn icons beside them. Those are icons
+ * now (one set, packages/ui/src/icons), and these two classes are how an icon
+ * sits inside a line of text.
+ *
+ * `icon-trail` follows a label ("All teams →") and nudges forward on hover of
+ * the enclosing link, the same beat Button gives its trailing arrow.
+ * `icon-lead` precedes one ("← previous"). Both align to the text's x-height
+ * rather than the baseline, which is what makes a 16px glyph look centred
+ * beside 15px type.
+ */
+.icon-trail,
+.icon-lead {
+  display: inline-block;
+  vertical-align: -0.2em;
+  flex: none;
+}
+
+.icon-trail {
+  margin-left: var(--space-1);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.icon-lead {
+  margin-right: var(--space-1);
+}
+
+a:hover .icon-trail,
+button:hover .icon-trail {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-trail {
+    transition: none;
+  }
+
+  a:hover .icon-trail,
+  button:hover .icon-trail {
+    transform: none;
+  }
+}

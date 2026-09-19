@@ -1,8 +1,8 @@
 "use client";
 
-import { Card, SectionHeader } from "@desiauction/ui";
+import { Card, SectionHeader, IconStar, IconStarOutline } from "@desiauction/ui";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 export interface ShortcutCompetition {
   slug: string;
@@ -13,9 +13,35 @@ export interface ShortcutCompetition {
 const RECENT_KEY = "da:recent-competitions";
 const PIN_KEY = "da:pinned-competitions";
 
-function readList(key: string): string[] {
+/*
+ * The two lists live in localStorage, which is the store; the component
+ * subscribes to it rather than copying it into state on mount. The snapshot is
+ * the raw string (stable between writes, so React can compare it), parsed
+ * once per change. Other tabs announce writes through `storage`; this tab
+ * announces its own through `notify`, because `storage` never fires in the tab
+ * that wrote.
+ */
+const listeners = new Set<() => void>();
+
+function subscribeLists(onChange: () => void): () => void {
+  listeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function readRaw(key: string): string | null {
   try {
-    const raw = window.localStorage.getItem(key);
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function parseList(raw: string | null): string[] {
+  try {
     const parsed: unknown = raw === null ? [] : JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
   } catch {
@@ -23,10 +49,34 @@ function readList(key: string): string[] {
   }
 }
 
+function writeList(key: string, list: string[]): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(list));
+  } catch {
+    // Private mode / storage disabled: shortcuts are a convenience, not state.
+    return;
+  }
+  for (const notify of listeners) {
+    notify();
+  }
+}
+
+function useList(key: string): string[] {
+  const raw = useSyncExternalStore(
+    subscribeLists,
+    () => readRaw(key),
+    () => null,
+  );
+  return useMemo(() => parseList(raw), [raw]);
+}
+
 /** Records a competition visit — called by the shell on navigation. */
 export function recordRecentCompetition(slug: string): void {
-  const next = [slug, ...readList(RECENT_KEY).filter((entry) => entry !== slug)].slice(0, 5);
-  window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  const next = [slug, ...parseList(readRaw(RECENT_KEY)).filter((entry) => entry !== slug)].slice(
+    0,
+    5,
+  );
+  writeList(RECENT_KEY, next);
 }
 
 /**
@@ -35,13 +85,8 @@ export function recordRecentCompetition(slug: string): void {
  * a personal lens over data the session already holds, not new backend truth.
  */
 export function HomeShortcuts({ competitions }: { competitions: ShortcutCompetition[] }) {
-  const [recent, setRecent] = useState<string[]>([]);
-  const [pins, setPins] = useState<string[]>([]);
-
-  useEffect(() => {
-    setRecent(readList(RECENT_KEY));
-    setPins(readList(PIN_KEY));
-  }, []);
+  const recent = useList(RECENT_KEY);
+  const pins = useList(PIN_KEY);
 
   const bySlug = new Map(competitions.map((competition) => [competition.slug, competition]));
   const pinned = pins
@@ -55,8 +100,7 @@ export function HomeShortcuts({ competitions }: { competitions: ShortcutCompetit
 
   const togglePin = (slug: string) => {
     const next = pins.includes(slug) ? pins.filter((entry) => entry !== slug) : [...pins, slug];
-    setPins(next);
-    window.localStorage.setItem(PIN_KEY, JSON.stringify(next));
+    writeList(PIN_KEY, next);
   };
 
   if (pinned.length === 0 && continuing.length === 0) {
@@ -123,7 +167,7 @@ function ShortcutCard({
           onTogglePin(competition.slug);
         }}
       >
-        {pinned ? "★" : "☆"}
+        {pinned ? <IconStar size={18} /> : <IconStarOutline size={18} />}
       </button>
     </Card>
   );

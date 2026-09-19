@@ -1,4 +1,5 @@
 import {
+  attributeOptions,
   entryCategoryLabel,
   isRejectionReason,
   roleLabelIn,
@@ -331,11 +332,16 @@ export default async function RegisterPage({
               key: value.key,
               label: value.label,
             }))}
+            // …and what else is worth asking. `attributeOptions` is the same
+            // plain-data projection `/account`'s sport panel renders, so the two
+            // places a player answers these questions offer the same questions.
+            attributes={attributeOptions(landing.sport)}
             profileDefaults={{
               role: sportProfile?.defaultRole ?? "",
               dob: personProfile.dateOfBirth ?? "",
-              batting: sportProfile?.attributes["batting_style"] ?? "",
-              bowling: sportProfile?.attributes["bowling_style"] ?? "",
+              // Held answers for THIS sport, whatever it is — this used to lift
+              // exactly two cricket keys out and drop everything else.
+              attributes: sportProfile?.attributes ?? {},
             }}
           />
         )}

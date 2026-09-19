@@ -16,6 +16,31 @@ describe("scrub", () => {
     expect(scrubText("using rzp_live_ABCDEF123456")).toContain("[key]");
   });
 
+  it("redacts the SMS provider URL a fetch span records — code and number both", () => {
+    // MSG91 takes the OTP and the mobile in the query string; Sentry's outgoing
+    // fetch spans carry that URL as url.full / url.query.
+    const url =
+      "https://control.msg91.com/api/v5/otp?template_id=abc&mobile=919876543210&otp=482913&otp_expiry=5";
+    const out = scrubText(url);
+    expect(out).not.toContain("482913");
+    expect(out).not.toContain("9876543210");
+    expect(out).toContain("template_id=abc");
+    expect(scrubText("mobile=919876543210&otp=482913")).not.toContain("482913");
+  });
+
+  it("redacts a bare 91-prefixed mobile but not ordinary long numbers", () => {
+    expect(scrubText("to 919876543210 failed")).toContain("[phone]");
+    expect(scrubText("amount 2500000 paise")).toBe("amount 2500000 paise");
+  });
+
+  it("redacts capability-link tokens in paths", () => {
+    for (const path of ["/join/AbC123xyz", "/owner-join/t0k3n", "/demo/h4ndle", "/review/r3v"]) {
+      const out = scrubText(`GET https://desiauction.in${path}?x=1`);
+      expect(out).toContain("[token]");
+      expect(out).not.toContain(path.split("/")[2]);
+    }
+  });
+
   it("redacts sensitive fields by name, at any depth", () => {
     const scrubbed = scrub({
       ok: true,

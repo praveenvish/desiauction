@@ -136,6 +136,80 @@ afterAll(async () => {
   await handle.sql.end();
 });
 
+/**
+ * THE SECOND HALF OF THE SAME DOOR.
+ *
+ * Roles were opened by SP-1; the OPTIONAL detail beside them was not. Every
+ * registration form asked for a batting style and a bowling style whatever the
+ * sport was, and `registrations.attributes` — which the schema and the pack
+ * contract both name as the home of "every sport added from football on" — had
+ * no writer anywhere in the product. So a footballer was asked two cricket
+ * questions and never asked the one their own pack declares.
+ */
+describe("SPORT DETAIL — a season stores the answers its own sport asks for", () => {
+  it("stores a football answer in the attributes column", async () => {
+    const personId = await person("Left Foot Lal", "20");
+    const result = await submitRegistration(db, football, org.id, personId, "defender", undefined, {
+      attributes: { preferred_foot: "left" },
+    });
+    expect(result).toMatchObject({ ok: true });
+    const [row] = await db
+      .select({
+        attributes: registrationsTable.attributes,
+        battingStyle: registrationsTable.battingStyle,
+      })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.personId, personId))
+      .limit(1);
+    expect(row?.attributes).toEqual({ preferred_foot: "left" });
+    // …and nothing leaks into the cricket columns it does not belong in.
+    expect(row?.battingStyle).toBeNull();
+  });
+
+  it("still routes cricket's answers to their own columns", async () => {
+    // The change must be invisible to the one sport that has users: cricket's
+    // pack declares the same two attributes as COLUMN-backed, so they must land
+    // exactly where ten existing consumers already read them.
+    const personId = await person("Right Hand Ravi", "21");
+    const result = await submitRegistration(db, cricket, org.id, personId, "batter", undefined, {
+      attributes: { batting_style: "right_hand", bowling_style: "right_arm_fast" },
+    });
+    expect(result).toMatchObject({ ok: true });
+    const [row] = await db
+      .select({
+        attributes: registrationsTable.attributes,
+        battingStyle: registrationsTable.battingStyle,
+        bowlingStyle: registrationsTable.bowlingStyle,
+      })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.personId, personId))
+      .limit(1);
+    expect(row?.battingStyle).toBe("right_hand");
+    expect(row?.bowlingStyle).toBe("right_arm_fast");
+    expect(row?.attributes).toEqual({});
+  });
+
+  it("refuses to store one sport's answer on another sport's season", async () => {
+    // A stale device-local draft is the realistic source of this, and it must
+    // not reach a row: the season's pack decides, not the request.
+    const personId = await person("Confused Kumar", "22");
+    const result = await submitRegistration(db, football, org.id, personId, "forward", undefined, {
+      attributes: { batting_style: "right_hand", preferred_foot: "right" },
+    });
+    expect(result).toMatchObject({ ok: true });
+    const [row] = await db
+      .select({
+        attributes: registrationsTable.attributes,
+        battingStyle: registrationsTable.battingStyle,
+      })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.personId, personId))
+      .limit(1);
+    expect(row?.attributes).toEqual({ preferred_foot: "right" });
+    expect(row?.battingStyle).toBeNull();
+  });
+});
+
 describe("SPORT DOORS — a player can enter a season that is not cricket", () => {
   it("self-registration takes a football role", async () => {
     // Returned `invalid_role` for every football role there is.

@@ -42,18 +42,25 @@ const RUN = String(Date.now()).slice(-7);
 const PHONE_PLAIN = `+9195${RUN}01`;
 const PHONE_STOPPED = `+9195${RUN}02`;
 const PHONE_TOPIC = `+9195${RUN}03`;
-const PHONES = [PHONE_PLAIN, PHONE_STOPPED, PHONE_TOPIC];
+const PHONE_ACTOR = `+9195${RUN}04`;
+const PHONES = [PHONE_PLAIN, PHONE_STOPPED, PHONE_TOPIC, PHONE_ACTOR];
 
 let plainId = "";
 
 /** The club used by the org-settings block, hoisted so cleanup can find it. */
 const ORG = newId();
+/**
+ * The person who flips the club's switch. A real `people` row: `updated_by` is
+ * keyed to people (migration 0069), so an invented id is refused — as it
+ * should be, since a setting nobody can be named for is not attributable.
+ */
 const ACTOR = newId();
 
 beforeAll(async () => {
   await db.delete(people).where(inArray(people.phone, PHONES));
   plainId = newId();
   await db.insert(people).values({ id: plainId, phone: PHONE_PLAIN, name: "Consent Synthetic" });
+  await db.insert(people).values({ id: ACTOR, phone: PHONE_ACTOR, name: "Consent Organizer" });
 });
 
 afterAll(async () => {

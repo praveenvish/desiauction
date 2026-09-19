@@ -222,7 +222,14 @@ async function main(): Promise<void> {
     const sold = await transitionLot(db, auction, lot.id, owner, "sell");
     if (!sold.ok) throw new Error("sell");
   }
-  const completed = await transitionAuction(db, auction, owner, "complete");
+  const completed = await transitionAuction(
+    db,
+    auction,
+    owner,
+    "complete",
+    undefined,
+    /* squads are deliberately tiny in this fixture: override DA-06, as a conductor would */ true,
+  );
   if (!completed.ok) throw new Error("complete");
 
   const sdeps = settlementDeps(db);

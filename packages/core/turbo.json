@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/db/src/schema.ts",
+        "$TURBO_ROOT$/apps/web/src/**",
+        "$TURBO_ROOT$/packages/auction/src/**",
+        "$TURBO_ROOT$/packages/settlement/src/**",
+        "$TURBO_ROOT$/packages/financial-operations/src/**",
+        "$TURBO_ROOT$/packages/ui/src/**"
+      ]
+    }
+  }
+}

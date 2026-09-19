@@ -10,6 +10,8 @@ import {
   Select,
   useToast,
   VisuallyHidden,
+  IconArrowRight,
+  IconCheck,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
@@ -230,10 +232,12 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   // DA-16: every action dropped focus to <body>. The control that started the
   // work takes it back when the work is done — and it can only take it back
   // once the button is no longer `disabled` by its own loading state, which is
-  // why this is an effect and not a call at the end of the handler.
+  // why this is an effect and not a call at the end of the handler. Which
+  // control to refocus is a ref, not state: it is a note from the handler to
+  // the effect, and rendering again just to clear it did nothing for anyone.
   const advanceRef = useRef<HTMLButtonElement>(null);
   const publishRef = useRef<HTMLButtonElement>(null);
-  const [pendingFocus, setPendingFocus] = useState<"advance" | "publish" | null>(null);
+  const pendingFocusRef = useRef<"advance" | "publish" | null>(null);
 
   const status = view.competition.status;
   const step = NEXT_STEP[status] ?? null;
@@ -249,12 +253,13 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   const canPublish = view.publishBlockers.length === 0;
 
   useEffect(() => {
+    const pendingFocus = pendingFocusRef.current;
     if (pendingFocus === null || busy) {
       return;
     }
     (pendingFocus === "advance" ? advanceRef.current : publishRef.current)?.focus();
-    setPendingFocus(null);
-  }, [pendingFocus, busy, status, view.competition.visibility]);
+    pendingFocusRef.current = null;
+  }, [busy, status, view.competition.visibility]);
   const previewable = view.competition.visibility === "public" || status === "registration_open";
 
   const advance = async () => {
@@ -271,12 +276,12 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
       setBlocked(false);
       toast({ title: ADVANCE_ANNOUNCEMENT[step.to] ?? "Season updated.", tone: "success" });
       router.refresh();
-      setPendingFocus("advance");
+      pendingFocusRef.current = "advance";
     } else if (result.needsDetails === true) {
       // Naming three fields the product gave no way to set was the whole of
       // DA-11. The refusal now carries its own repair.
       setBlocked(true);
-      setPendingFocus("advance");
+      pendingFocusRef.current = "advance";
     } else {
       toast({ title: result.error ?? "Could not advance.", tone: "danger" });
     }
@@ -309,7 +314,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
         tone: "success",
       });
       router.refresh();
-      setPendingFocus("publish");
+      pendingFocusRef.current = "publish";
     } else {
       toast({ title: result.error ?? "Could not update.", tone: "danger" });
     }
@@ -349,7 +354,10 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
             {secondary.label}
           </ButtonLink>
           {view.auctionLive ? (
-            <ButtonLink href={`/seasons/${slug}/auction/live`}>Go to live auction →</ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/auction/live`}>
+              Go to live auction
+              <IconArrowRight size={16} className="icon-trail" />
+            </ButtonLink>
           ) : null}
         </div>
       </header>
@@ -375,7 +383,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
                   {...(state === "now" ? { "aria-current": "step" as const } : {})}
                 >
                   <span className="season-step-mark" aria-hidden>
-                    {state === "done" ? "✓" : String(index + 1)}
+                    {state === "done" ? <IconCheck size={14} /> : String(index + 1)}
                   </span>
                   <span className="season-step-label">{label}</span>
                   {/* The only carrier of state used to be aria-hidden, so a
@@ -472,7 +480,10 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
             data-testid="pending-tile"
           >
             <span className="season-tile-value season-tile-warn">{view.pendingPlayers}</span>
-            <span className="season-tile-label">Awaiting your review →</span>
+            <span className="season-tile-label">
+              Awaiting your review
+              <IconArrowRight size={16} className="icon-trail" />
+            </span>
           </Link>
         ) : null}
         <div className="season-tile">
@@ -507,7 +518,8 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           <div className="season-card-head">
             <h2>{view.lotsSold > 0 && view.viewer.canSeeMoney ? "Top teams by spend" : "Teams"}</h2>
             <Link className="season-inline-link" href={`/seasons/${slug}/teams`}>
-              All teams →
+              All teams
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>
           </div>
           {view.topTeams.length === 0 ? (
@@ -633,14 +645,24 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
       <Card className="season-publish-card" data-testid="visibility-row">
         <div className="season-card-head">
           <h2>Public page</h2>
-          <Badge tone={view.competition.visibility === "public" ? "success" : "neutral"}>
-            {view.competition.visibility === "public" ? "LIVE" : "Not listed"}
-          </Badge>
+          {view.platformHold !== null ? (
+            <Badge tone="danger" data-testid="platform-hold-badge">
+              Taken down
+            </Badge>
+          ) : (
+            <Badge tone={view.competition.visibility === "public" ? "success" : "neutral"}>
+              {view.competition.visibility === "public" ? "LIVE" : "Not listed"}
+            </Badge>
+          )}
         </div>
         <p className="competitions-hint">
-          {view.competition.visibility === "public"
-            ? "This season is listed publicly at /c/" + slug + " — anyone can see it and share it."
-            : "Publishing puts this season on the public directory, where players and spectators can find it."}
+          {view.platformHold !== null
+            ? "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
+            : view.competition.visibility === "public"
+              ? "This season is listed publicly at /c/" +
+                slug +
+                " — anyone can see it and share it."
+              : "Publishing puts this season on the public directory, where players and spectators can find it."}
         </p>
         {view.viewer.canManage && !canPublish && view.competition.visibility !== "public" ? (
           <ul className="season-blockers" data-testid="publish-blockers">
@@ -667,8 +689,9 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           {previewable ? (
             <Link className="season-inline-link" href={`/c/${slug}`} data-testid="open-public-page">
               {view.competition.visibility === "public"
-                ? "View the public page →"
-                : "Preview the public page →"}
+                ? "View the public page"
+                : "Preview the public page"}
+              <IconArrowRight size={16} className="icon-trail" />
             </Link>
           ) : null}
           {view.viewer.canManage ? (
@@ -733,7 +756,8 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           {previewable ? (
             <p>
               <Link className="season-inline-link" href={`/c/${slug}`} target="_blank">
-                Preview it first →
+                Preview it first
+                <IconArrowRight size={16} className="icon-trail" />
               </Link>
             </p>
           ) : null}

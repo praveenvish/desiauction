@@ -234,7 +234,18 @@ test.describe("with times published", () => {
     await fillDemoForm(page, freshPhone());
     await page.getByRole("button", { name: "Book a demo" }).click();
 
-    await page.getByRole("link", { name: "Or pick a time yourself" }).click();
+    const pickLink = page.getByRole("link", { name: "Or pick a time yourself" });
+    // The link carries a SIGNED handle; the bare request id inside it must not
+    // open the picker on its own, or anyone holding the id could book (and so
+    // manage) somebody else's demo.
+    const pickHref = (await pickLink.getAttribute("href")) ?? "";
+    const handle = decodeURIComponent(new URL(pickHref, "http://x").searchParams.get("r") ?? "");
+    const bareId = handle.split(".")[0] ?? "";
+    expect(bareId).toHaveLength(26);
+    const bare = await page.request.get(`/schedule-demo/pick?r=${bareId}`);
+    expect(bare.status()).toBe(404);
+
+    await pickLink.click();
     await expect(page.getByRole("heading", { level: 1, name: "Pick a time" })).toBeVisible();
     // The timezone is stated, never guessed.
     await expect(page.getByText("All times are Indian Standard Time (IST).")).toBeVisible();

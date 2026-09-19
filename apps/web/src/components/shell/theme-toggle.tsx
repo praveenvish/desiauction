@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { IconMoon, IconSun } from "@desiauction/ui";
+import { useSyncExternalStore } from "react";
 
 /**
  * Console theme switch (doc 18 C-4). The root carries `data-theme`; Daylight is
@@ -27,15 +28,24 @@ function readTheme(): ConsoleTheme {
     : "daylight";
 }
 
-export function ThemeToggle() {
-  // Server renders the default; the effect reconciles with the real attribute.
-  const [theme, setTheme] = useState<ConsoleTheme>("daylight");
-  const [ready, setReady] = useState(false);
+/**
+ * The attribute IS the store: the bootstrap script, this button and any other
+ * tab-level switch all write `data-theme` on the root, so the toggle subscribes
+ * to that attribute rather than keeping a copy of it in state.
+ */
+function subscribeTheme(onChange: () => void): () => void {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => {
+    observer.disconnect();
+  };
+}
 
-  useEffect(() => {
-    setTheme(readTheme());
-    setReady(true);
-  }, []);
+export function ThemeToggle() {
+  // The server cannot know the stored theme, so it (and the hydrating render)
+  // sees null and draws the default icon; the client snapshot takes over after.
+  const current = useSyncExternalStore(subscribeTheme, readTheme, () => null);
+  const theme: ConsoleTheme = current ?? "daylight";
 
   const next: ConsoleTheme = theme === "daylight" ? "floodlight" : "daylight";
 
@@ -53,29 +63,9 @@ export function ThemeToggle() {
         } catch {
           // Private mode / storage disabled: the switch still works for this view.
         }
-        setTheme(next);
       }}
     >
-      {ready && theme === "floodlight" ? (
-        <svg viewBox="0 0 24 24" fill="none" width={18} height={18} aria-hidden>
-          <circle cx="12" cy="12" r="4.4" stroke="currentColor" strokeWidth="1.8" />
-          <path
-            d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" fill="none" width={18} height={18} aria-hidden>
-          <path
-            d="M20 14.2A8 8 0 1 1 9.8 4a6.3 6.3 0 0 0 10.2 10.2z"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
+      {current === "floodlight" ? <IconSun size={18} /> : <IconMoon size={18} />}
     </button>
   );
 }

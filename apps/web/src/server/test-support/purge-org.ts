@@ -7,22 +7,32 @@ import {
   auditLog,
   bids,
   competitions,
+  featureSettings,
   finopsDispatches,
   finopsDocuments,
   finopsEvents,
+  finopsExports,
   finopsJobs,
+  finopsPeriods,
+  finopsProfiles,
   finopsSeries,
+  fixtureResults,
   fixtures,
+  franchises,
   grants,
+  grounds,
   invites,
   journalCheckpoints,
   journalLegs,
   journalPostings,
   lots,
+  orgImportMappings,
   orgMembers,
+  orgMessagingSettings,
   organizations,
   paddleGrants,
   paddles,
+  passUpgradeRequests,
   payments,
   registrations,
   settlementCases,
@@ -80,6 +90,9 @@ export async function purgeOrg(db: Db, orgId: string): Promise<void> {
   await db.delete(finopsSeries).where(eq(finopsSeries.orgId, orgId));
   await db.delete(finopsJobs).where(eq(finopsJobs.orgId, orgId));
   await db.delete(finopsEvents).where(eq(finopsEvents.orgId, orgId));
+  await db.delete(finopsExports).where(eq(finopsExports.orgId, orgId));
+  await db.delete(finopsPeriods).where(eq(finopsPeriods.orgId, orgId));
+  await db.delete(finopsProfiles).where(eq(finopsProfiles.orgId, orgId));
 
   // The auction spine — the half every hand-written teardown forgot.
   await db.delete(auctionTeamTargetRevisions).where(eq(auctionTeamTargetRevisions.orgId, orgId));
@@ -92,15 +105,27 @@ export async function purgeOrg(db: Db, orgId: string): Promise<void> {
   await db.delete(paddles).where(eq(paddles.orgId, orgId));
   await db.delete(auctions).where(eq(auctions.orgId, orgId));
 
-  // Competition structure.
+  // Competition structure. Results before the fixtures they record, grounds
+  // before their venues. These rows name who created or recorded them, and
+  // since migration 0069 those names are keys to `people`: a table this list
+  // misses is no longer silent residue, it is a teardown that cannot delete
+  // its people. (fixture_results was missed, and 185 orphaned results were
+  // what the local database had to show for it.)
+  await db.delete(fixtureResults).where(eq(fixtureResults.orgId, orgId));
   await db.delete(fixtures).where(eq(fixtures.orgId, orgId));
+  await db.delete(passUpgradeRequests).where(eq(passUpgradeRequests.orgId, orgId));
   await db.delete(registrations).where(eq(registrations.orgId, orgId));
   await db.delete(teams).where(eq(teams.orgId, orgId));
+  await db.delete(franchises).where(eq(franchises.orgId, orgId));
   await db.delete(competitions).where(eq(competitions.orgId, orgId));
+  await db.delete(grounds).where(eq(grounds.orgId, orgId));
   await db.delete(venues).where(eq(venues.orgId, orgId));
   await db.delete(tournaments).where(eq(tournaments.orgId, orgId));
 
-  // Identity edges into the org, then the org itself.
+  // Org-level settings, then identity edges into the org, then the org itself.
+  await db.delete(featureSettings).where(eq(featureSettings.orgId, orgId));
+  await db.delete(orgImportMappings).where(eq(orgImportMappings.orgId, orgId));
+  await db.delete(orgMessagingSettings).where(eq(orgMessagingSettings.orgId, orgId));
   await db.delete(invites).where(eq(invites.orgId, orgId));
   await db.delete(grants).where(eq(grants.scopeId, orgId));
   await db.delete(orgMembers).where(eq(orgMembers.orgId, orgId));

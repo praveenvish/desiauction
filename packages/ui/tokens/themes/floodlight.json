@@ -83,6 +83,10 @@
     "3": {
       "$value": "0 4px 8px rgb(3 5 9 / 0.48), 0 20px 48px rgb(3 5 9 / 0.52)",
       "$type": "shadow"
+    },
+    "4": {
+      "$value": "0 8px 16px rgb(3 5 9 / 0.50), 0 32px 64px rgb(3 5 9 / 0.58)",
+      "$type": "shadow"
     }
   }
 }

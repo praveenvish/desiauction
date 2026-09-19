@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import { systemDb } from "../db";
 import { resolvePassRequest, type GrantOutcome } from "../competition/pass-grant";
+import { inOrg } from "../tenant";
 import { platformBillingGate } from "./authz";
+import { platformSeasonBySlug } from "./season-lookup";
 
 /**
  * THE ONE THING ADMINISTRATION MAY CHANGE.
@@ -21,9 +23,15 @@ import { platformBillingGate } from "./authz";
  * first. An operator who does both holds both grants, and the audit says which
  * of them answered.
  *
- * Runs on the SYSTEM pool because a platform operator is not a member of the
- * organization whose season this is — the same reason every cross-tenant
- * projection does. The gate that admits them ran under RLS first.
+ * The WRITE runs on the application role inside the season's own tenant
+ * boundary. It used to run on the system pool, on the reasoning that a platform
+ * operator is a member of no club — but the system role is a platform-READ role
+ * with UPDATE on nothing a pass touches (ops/db/create-app-role.sql), so under
+ * the production roles every answer failed with "permission denied for table
+ * pass_upgrade_requests" while every local suite, running as the owner, passed.
+ * The system pool now answers only "which club is this season in?", which a
+ * member of no club cannot ask any other way; the boundary then names that club,
+ * and the gate that admitted the operator ran under RLS first.
  */
 
 export type AnswerPassResult = { ok: true; summary: string } | { ok: false; error: string };
@@ -61,12 +69,18 @@ export async function answerPassRequest(
   if (!isGrantOutcome(outcome)) {
     return { ok: false, error: "Answer the request with a grant or a decline." };
   }
-  const result = await resolvePassRequest(systemDb, {
-    slug,
-    outcome,
-    actorId: operator.personId,
-    ...(note.trim() === "" ? {} : { note: note.trim().slice(0, 500) }),
-  });
+  const season = await platformSeasonBySlug(systemDb, slug);
+  if (season === null) {
+    return { ok: false, error: `No season with slug ${slug}.` };
+  }
+  const result = await inOrg(operator.personId, season.orgId, (db) =>
+    resolvePassRequest(db, {
+      slug,
+      outcome,
+      actorId: operator.personId,
+      ...(note.trim() === "" ? {} : { note: note.trim().slice(0, 500) }),
+    }),
+  );
   if (!result.ok) {
     return { ok: false, error: result.detail };
   }

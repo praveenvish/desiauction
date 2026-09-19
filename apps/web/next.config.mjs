@@ -6,15 +6,14 @@
 // bootstrap: `frame-ancestors` (clickjacking, alongside X-Frame-Options),
 // `base-uri` (blocks <base> injection that could rewrite relative URLs),
 // `object-src 'none'` (no plugins), and `form-action 'self'` (a form cannot be
-// pointed at an external origin — defence-in-depth for the login flow). A
-// nonce-based `script-src`/`style-src` requires middleware and is recorded as a
-// tracked follow-up (docs/operations/PRODUCTION_CHECKLIST.md), not shipped here
-// where it would need `'unsafe-inline'` and defeat its own purpose.
-// No `default-src`/`script-src`/`connect-src` here ON PURPOSE: those need a
-// nonce to coexist with the app-router hydration bootstrap, the engine
-// WebSocket, and Sentry, and adding them without one would either break the app
-// or require `'unsafe-inline'` (worthless). These four restrict framing, <base>,
-// plugins and form targets only — pure gain, no breakage.
+// pointed at an external origin — defence-in-depth for the login flow).
+//
+// THE SCRIPT POLICY IS NOT HERE, AND THAT IS NOT AN OMISSION. `script-src`,
+// `connect-src` and the rest need a PER-REQUEST nonce to coexist with the app
+// router's inline bootstrap, and a static header cannot carry one. They are sent
+// by src/middleware.ts, built by src/lib/csp.ts: Report-Only by default, enforced
+// when CSP_ENFORCE is set. These four stay here because they need no nonce and
+// must hold on every response, including the ones middleware never sees.
 const CSP = [
   "base-uri 'self'",
   "object-src 'none'",
@@ -56,8 +55,38 @@ export default {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],
+  /*
+   * PINO RUNS FROM node_modules, NOT FROM A BUNDLE.
+   *
+   * In development the logger writes through a `pino-pretty` transport, and a
+   * pino transport runs in a worker thread that pino starts from its own file
+   * on disk (thread-stream's `lib/worker.js`). Bundled by webpack, that path
+   * points into `.next/server/vendor-chunks/lib/worker.js`, which does not
+   * exist: every logger start threw "Cannot find module …/worker.js" as an
+   * uncaughtException, the worker died, and dev logs went nowhere. Next 15.5's
+   * built-in external list does not include pino, so it is listed here. In
+   * production there is no transport, and standalone tracing still copies pino
+   * into the server's node_modules.
+   */
+  serverExternalPackages: ["pino", "pino-pretty"],
   headers() {
-    return Promise.resolve([{ source: "/:path*", headers: securityHeaders }]);
+    return Promise.resolve([
+      { source: "/:path*", headers: securityHeaders },
+      // FR-1: a problem-report screenshot is a picture of somebody's screen,
+      // served to one operator. Config headers REPLACE a route handler's own
+      // header of the same name, so the stricter policy the route sets was
+      // being overwritten by the site-wide one above — measured, not assumed.
+      // A later rule wins for the same key, so it is restated here.
+      {
+        source: "/admin/reports/:reportId/screenshot",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'none'; frame-ancestors 'none'; sandbox",
+          },
+        ],
+      },
+    ]);
   },
   redirects() {
     // A competition is now called a season — the thing that runs, under a

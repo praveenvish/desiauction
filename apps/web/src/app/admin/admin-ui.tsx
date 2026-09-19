@@ -1,4 +1,4 @@
-import type { BadgeTone } from "@desiauction/ui";
+import { IconEye, type BadgeTone } from "@desiauction/ui";
 
 /**
  * PX-9 shared admin rendering. Presentation only — no reads, no rules. The
@@ -42,7 +42,9 @@ export function statusTone(status: string): BadgeTone {
 export function ReadOnlyNotice() {
   return (
     <p className="admin-readonly" data-testid="admin-readonly">
-      <span aria-hidden>👁</span>
+      <span aria-hidden>
+        <IconEye size={18} />
+      </span>
       <span>
         Read-only. Administration observes the platform; every operational fix happens in the
         console that owns it, under that console&rsquo;s own permissions — which a platform grant

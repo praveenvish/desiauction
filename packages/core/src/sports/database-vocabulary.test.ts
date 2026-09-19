@@ -47,12 +47,26 @@ function columnEnum(source: string, column: string): string[] | null {
   return [...(found[1] ?? "").matchAll(/["']([^"']+)["']/g)].map((m) => m[1] as string);
 }
 
+/** One table's block — from `pgTable("<name>"` up to the next `pgTable(`. */
+function tableSource(source: string, table: string): string {
+  const found = new RegExp(`pgTable\\(\\s*["']${table}["']`).exec(source);
+  if (found === null) {
+    throw new Error(`schema.ts has no table ${table}`);
+  }
+  const next = source.indexOf("pgTable(", found.index + 1);
+  return source.slice(found.index, next < 0 ? undefined : next);
+}
+
 describe("the database's role vocabulary", () => {
   const source = readFileSync(SCHEMA, "utf8");
+  // `role` is not only a sport's playing role: FR-1's review_requests.role and
+  // reviews.role are the part a person had in a season ("player" | "owner"),
+  // a closed list on purpose. The rule is about the REGISTRATION's role.
+  const registrations = tableSource(source, "registrations");
 
   it("leaves registrations.role OPEN — no column-level list can name two sports", () => {
     expect(
-      columnEnum(source, "role"),
+      columnEnum(registrations, "role"),
       "an enum here would refuse every football role the pack allows",
     ).toBeNull();
   });
@@ -61,7 +75,7 @@ describe("the database's role vocabulary", () => {
     // `required` is a per-sport fact the pack declares. Cricket and football
     // both say true; pickleball has no meaningful playing role at all, and a
     // NOT NULL column would force it to invent one.
-    const declaration = /role: text\("role"\)([^,]*),/.exec(source);
+    const declaration = /role: text\("role"\)([^,]*),/.exec(registrations);
     expect(declaration, "registrations.role is no longer a plain text column").not.toBeNull();
     expect(declaration?.[1] ?? "", "role must not be notNull").not.toContain("notNull");
   });

@@ -7,6 +7,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { SlotPicker } from "../../../components/marketing/slot-picker";
 import { db } from "../../../server/db";
+import { requestIdFromHandle } from "../../../server/marketing/demo-booking";
 import { bookableDays } from "../../../server/marketing/demo-slots";
 import "../../content.css";
 import "../demo.css";
@@ -22,11 +23,12 @@ export const dynamic = "force-dynamic";
 /**
  * PICKING A TIME FOR A REQUEST THAT ALREADY EXISTS.
  *
- * The request id is in the query string, which is the honest reading of what it
- * is: a pointer to a row somebody just created in this same session, not a
- * credential. It confers nothing — every field it could reveal is a field the
- * same person typed a moment ago, and booking against it produces a token that
- * IS a credential and travels in a path segment.
+ * The query string carries a SIGNED handle for the request (`pickHandleFor`),
+ * issued only in the requester's own form response. It used to carry the bare
+ * id, on the reasoning that an id confers nothing — but booking against it
+ * returns the booking's management token, so whoever held the id could book in
+ * the requester's name and then cancel or move it. A handle that does not
+ * verify is a 404, indistinguishable from a request that does not exist.
  *
  * NO `loading.tsx` MAY BE ADDED ABOVE THIS ROUTE. A Suspense boundary over a
  * gated page commits a 200 before the gate runs, which turns `notFound()` and
@@ -39,9 +41,9 @@ export default async function PickTimePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const raw = params["r"];
-  const requestId = typeof raw === "string" ? raw : null;
-  if (requestId === null || requestId.length !== 26) {
+  const handle = params["r"];
+  const requestId = requestIdFromHandle(handle);
+  if (requestId === null || typeof handle !== "string") {
     notFound();
   }
 
@@ -91,7 +93,7 @@ export default async function PickTimePage({
             Half an hour, {request.name.split(" ")[0] ?? "on"} — we&apos;ll call the number you gave
             us and walk through a real auction end to end.
           </p>
-          <SlotPicker days={days} requestId={requestId} submitLabel="Book this time" />
+          <SlotPicker days={days} requestHandle={handle} submitLabel="Book this time" />
         </>
       )}
     </main>

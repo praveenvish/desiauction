@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { decideUndo, replayAuction, type AuctionEventEnvelope } from "./auction";
-import { deriveCeremony } from "./auction-ceremony";
+import { deriveCeremony, type CeremonyState } from "./auction-ceremony";
 import { buildAuctionLedger } from "./auction-ledger";
 import {
   buildAuctionSnapshot,
@@ -321,6 +321,57 @@ describe("FLOODLIGHT ceremony derivation (deterministic, presentation-only)", ()
       phase: "extension",
       key: "extension-lot1-1",
     });
+  });
+
+  it("an extension survives the engine's own closing-soon frame that follows it", () => {
+    seq = 0;
+    const base = [
+      ev("PaddleIssued", { paddleId: "pad1", teamId: "t1", personId: "p1", paddleNumber: "P01" }),
+      ev("PaddleIssued", { paddleId: "pad2", teamId: "t2", personId: "p2", paddleNumber: "P02" }),
+      ev("LotPrepared", { lotId: "lot1" }),
+      ev("LotQueued", { lotId: "lot1" }),
+      ev("AuctionOpened", {}),
+      ev("LotOpened", { lotId: "lot1", endsAtMs: at + 30_000 }),
+      ev("BidAccepted", { lotId: "lot1", bidId: "b1", paddleId: "pad1", amount: 1_000_000 }),
+    ];
+    const before = snapshotAt(base);
+    const extendedEvents = [
+      ...base,
+      ev("BidAccepted", { lotId: "lot1", bidId: "b2", paddleId: "pad2", amount: 1_500_000 }),
+      ev("TimerExtended", { lotId: "lot1", endsAtMs: at + 60_000 }),
+    ];
+    const extended = snapshotAt(extendedEvents);
+    // 250 ms later: the watchdog sees the fresh remainder inside the window.
+    const closingSoon = snapshotAt([...extendedEvents, ev("LotClosingSoon", { lotId: "lot1" })]);
+
+    const shown = deriveCeremony(before, extended);
+    expect(shown).toEqual({ phase: "extension", key: "extension-lot1-1" });
+    // The regression: this used to become { phase: "bid", key: "bid-b2" }.
+    expect(deriveCeremony(extended, closingSoon, shown)).toBe(shown);
+  });
+
+  it("an extension still gives way to the next real moment", () => {
+    seq = 0;
+    const base = [
+      ev("PaddleIssued", { paddleId: "pad1", teamId: "t1", personId: "p1", paddleNumber: "P01" }),
+      ev("PaddleIssued", { paddleId: "pad2", teamId: "t2", personId: "p2", paddleNumber: "P02" }),
+      ev("LotPrepared", { lotId: "lot1" }),
+      ev("LotQueued", { lotId: "lot1" }),
+      ev("AuctionOpened", {}),
+      ev("LotOpened", { lotId: "lot1", endsAtMs: at + 30_000 }),
+      ev("BidAccepted", { lotId: "lot1", bidId: "b1", paddleId: "pad1", amount: 1_000_000 }),
+      ev("BidAccepted", { lotId: "lot1", bidId: "b2", paddleId: "pad2", amount: 1_500_000 }),
+      ev("TimerExtended", { lotId: "lot1", endsAtMs: at + 60_000 }),
+    ];
+    const extended = snapshotAt(base);
+    const shown: CeremonyState = { phase: "extension", key: "extension-lot1-1" };
+    const outbid = snapshotAt([
+      ...base,
+      ev("BidAccepted", { lotId: "lot1", bidId: "b3", paddleId: "pad1", amount: 2_000_000 }),
+    ]);
+    expect(deriveCeremony(extended, outbid, shown)).toEqual({ phase: "bid", key: "bid-b3" });
+    // With nothing on screen (a fresh connection) the steady answer is unchanged.
+    expect(deriveCeremony(extended, extended)).toEqual({ phase: "bid", key: "bid-b2" });
   });
 
   it("pause dominates lot moments; recovery dominates everything", () => {

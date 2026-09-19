@@ -155,27 +155,38 @@ export async function confirmEmailVerification(
   if (candidate.expiresAt.getTime() < Date.now()) {
     return { ok: false, reason: "expired" };
   }
+  // Reserve an attempt BEFORE comparing, right guess or wrong — the same rule
+  // as the sign-in path, for the same reason: guarding only the wrong branch
+  // let the right guess in a parallel burst consume the code past the cap.
+  const [reserved] = await db
+    .update(emailVerifications)
+    .set({ attempts: sql`${emailVerifications.attempts} + 1` })
+    .where(
+      and(
+        eq(emailVerifications.id, candidate.id),
+        lt(emailVerifications.attempts, MAX_ATTEMPTS),
+        isNull(emailVerifications.consumedAt),
+      ),
+    )
+    .returning({ attempts: emailVerifications.attempts });
+  if (reserved === undefined) {
+    return { ok: false, reason: "locked" };
+  }
   if (candidate.codeHash !== hashCode(input.code)) {
-    // Same atomic increment as the sign-in path: concurrent wrong guesses
-    // serialize on the row lock and only rows still under the cap are bumped,
-    // so the ceiling holds under parallelism.
-    const [bumped] = await db
-      .update(emailVerifications)
-      .set({ attempts: sql`${emailVerifications.attempts} + 1` })
-      .where(
-        and(eq(emailVerifications.id, candidate.id), lt(emailVerifications.attempts, MAX_ATTEMPTS)),
-      )
-      .returning({ attempts: emailVerifications.attempts });
-    if (bumped === undefined || bumped.attempts >= MAX_ATTEMPTS) {
+    if (reserved.attempts >= MAX_ATTEMPTS) {
       return { ok: false, reason: "locked" };
     }
-    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - bumped.attempts };
+    return { ok: false, reason: "invalid", attemptsLeft: MAX_ATTEMPTS - reserved.attempts };
   }
 
-  await db
+  const [spent] = await db
     .update(emailVerifications)
     .set({ consumedAt: new Date() })
-    .where(eq(emailVerifications.id, candidate.id));
+    .where(and(eq(emailVerifications.id, candidate.id), isNull(emailVerifications.consumedAt)))
+    .returning({ id: emailVerifications.id });
+  if (spent === undefined) {
+    return { ok: false, reason: "invalid" };
+  }
 
   // Collision answered only now, after the code was spent — see the request
   // step. Merging two accounts is not something this product can do safely.
@@ -192,6 +203,19 @@ export async function confirmEmailVerification(
     .update(people)
     .set({ email: candidate.email, emailVerifiedAt: new Date() })
     .where(eq(people.id, input.personId));
+  // Sign-in codes already mailed to the OLD address die with it: they were
+  // bound to this person at mint time, and the mailbox that no longer belongs
+  // to the account must not open it for the rest of their fifteen minutes.
+  await db
+    .update(emailVerifications)
+    .set({ consumedAt: new Date() })
+    .where(
+      and(
+        eq(emailVerifications.personId, input.personId),
+        eq(emailVerifications.purpose, "login"),
+        isNull(emailVerifications.consumedAt),
+      ),
+    );
   return { ok: true, email: candidate.email };
 }
 

@@ -31,6 +31,7 @@ export default function robots(): MetadataRoute.Robots {
           "/seasons/",
           "/join/",
           "/owner-join/",
+          "/review/",
           "/admin",
           "/search",
           "/dev/",

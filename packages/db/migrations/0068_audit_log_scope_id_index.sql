@@ -1,0 +1,20 @@
+-- audit_log BY SCOPE ALONE (final readiness audit S-2).
+--
+-- The only scope index is (scope_type, scope_id, at), and Postgres 17 has no
+-- skip scan: a predicate on scope_id WITHOUT scope_type cannot seek it and
+-- falls back to a sequential scan of the whole log. That is not a rare admin
+-- query. It is the account page's security feed (security-events.ts: three
+-- reads by person id on every visit), the home dashboard's recent activity
+-- (inArray over the person's scopes), the admin org directory's correlated
+-- "last activity" subquery (once per org row), and the finops store's audit
+-- lookups. Measured before this migration on a 56k-row local log: a seq scan
+-- touching 1,910 buffers to return nothing, cost growing linearly with a table
+-- that only ever grows.
+--
+-- The actor half of S-2 was already closed by 0044 (audit_log_actor_at_idx).
+--
+-- Plain CREATE INDEX, not CONCURRENTLY: migrations run inside a transaction,
+-- and at launch the log is small enough that the brief write lock is nothing.
+-- Deploy outside a live auction window as every migration is (DEPLOYMENT.md,
+-- pre-deploy step 5).
+CREATE INDEX IF NOT EXISTS "audit_log_scope_id_at_idx" ON "audit_log" ("scope_id", "at");

@@ -14,6 +14,7 @@ import {
   useToast,
   VisuallyHidden,
   type BadgeTone,
+  IconCheck,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -37,6 +38,7 @@ import type { CaseView, ObligationView, PaymentView } from "../../../../server/s
 import { formatDateTime } from "../../../../lib/format-date";
 import { CASE_STATE, PAYMENT_STATE } from "./money-words";
 import "./money.css";
+import { useHydrated } from "../../../../lib/use-hydrated";
 
 /**
  * PX-7 E1 — the Settlement console.
@@ -135,7 +137,7 @@ function CaseStepper({ status }: { status: string }) {
             {...(state === "current" ? { "aria-current": "step" as const } : {})}
           >
             <span className="case-step-mark" aria-hidden>
-              {state === "done" ? "✓" : String(index + 1)}
+              {state === "done" ? <IconCheck size={14} /> : String(index + 1)}
             </span>
             {step.label}
             {state === "done" ? <VisuallyHidden> (done)</VisuallyHidden> : null}
@@ -158,10 +160,7 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
   };
   const outcomeRef = useRef<HTMLParagraphElement | null>(null);
   // A click before hydration is a no-op; the surface says when it is live.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   /**
    * One command runner: every action reports, then re-reads the server truth.

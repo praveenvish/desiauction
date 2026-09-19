@@ -5,6 +5,7 @@ import {
   Breadcrumb,
   Drawer,
   IconBell,
+  IconArrowRight,
   IconChevronDown,
   IconHelp,
   IconHome,
@@ -24,7 +25,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { LEGAL_IDENTITY, legalIdentityPublished } from "../../content/company";
@@ -47,6 +48,7 @@ import {
   pageIdentity,
   shellKind,
 } from "./nav";
+import { useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
 import { ShellStatusContext } from "./page-status";
 import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
@@ -106,6 +108,22 @@ export interface ProductShellProps {
   children: ReactNode;
 }
 
+function subscribeToStorage(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+/** The device's inbox watermark for this person; undefined when storage is unreadable. */
+function readInboxSeen(personId: string): string | null | undefined {
+  try {
+    return window.localStorage.getItem(inboxSeenKey(personId));
+  } catch {
+    return undefined;
+  }
+}
+
 /** Bell with unread dot: newest event vs. the device's last inbox visit. */
 function BellLink({
   latestEventAt,
@@ -118,23 +136,24 @@ function BellLink({
       this device, which on a shared handset is the wrong person. */
   personId: string;
 }) {
-  const [unread, setUnread] = useState(false);
-  useEffect(() => {
-    if (latestEventAt === null) {
-      setUnread(false);
-      return;
-    }
+  // The watermark is read from storage on every render (useSyncExternalStore
+  // re-reads its snapshot each time), so leaving /inbox — which has just moved
+  // it — shows the new answer at once. Another tab reading the inbox clears
+  // this tab's dot through `storage`. Undefined means "not known yet": the
+  // server render and the hydrating one show no dot rather than guess.
+  const seen = useSyncExternalStore(
+    subscribeToStorage,
+    () => readInboxSeen(personId),
+    () => undefined,
+  );
+  const unread =
+    latestEventAt !== null &&
     // Standing ON the notifications page, the answer is already "you are
-    // reading them" — the page advances the watermark for the next render,
-    // but this effect ran first and kept the dot lit over the very list it
-    // was pointing at.
-    if (pathname.startsWith("/inbox")) {
-      setUnread(false);
-      return;
-    }
-    const seen = window.localStorage.getItem(inboxSeenKey(personId));
-    setUnread(seen === null || latestEventAt > seen);
-  }, [latestEventAt, pathname, personId]);
+    // reading them" — the page advances the watermark as it renders, so the dot
+    // must not stay lit over the very list it was pointing at.
+    !pathname.startsWith("/inbox") &&
+    seen !== undefined &&
+    (seen === null || latestEventAt > seen);
   return (
     <Link
       className="shell-icon-button shell-bell"
@@ -207,8 +226,8 @@ function publicNav(pathname: string): PublicShellLink[] {
     link.href === pathname ? { ...link, active: true } : link;
   return [
     { label: "Features", href: "/features" },
-    { label: "Pricing", href: "/pricing" },
     { label: "Browse tournaments", href: "/c" },
+    { label: "Pricing", href: "/pricing" },
     {
       label: "Resources",
       href: "/help",
@@ -223,9 +242,9 @@ function publicNav(pathname: string): PublicShellLink[] {
         { label: "Rules & guidelines", href: "/rules-guidelines" },
         { label: "Support", href: "/support" },
         { label: "Legal", href: "/legal" },
+        { label: "About us", href: "/about" },
       ].map(mark),
     },
-    { label: "About", href: "/about" },
   ].map(mark);
 }
 
@@ -261,7 +280,12 @@ export function ProductShell({
 }: ProductShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // The drawer remembers WHERE it was opened, so it is open only on that page:
+  // navigating anywhere closes it in the same render, with no effect needed to
+  // notice the route changed.
+  const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null);
+  const drawerOpen = drawerOpenOn === pathname;
+  const reportProblem = useReportProblem();
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
   /**
    * The action a page PUBLISHES, which is now an override rather than the only
@@ -297,11 +321,6 @@ export function ProductShell({
       window.removeEventListener("keydown", onKey);
     };
   }, [kind, session]);
-
-  // Close transient chrome on navigation.
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [pathname]);
 
   // Stable identities, so a page's effect fires once. `retract` clears only
   // what the retracting instance itself published, which keeps a Suspense
@@ -605,16 +624,32 @@ export function ProductShell({
     // five-column sitemap footer, which at 390px was HALF the page under a
     // single 300px card. Same compact treatment as /login.
     const atGate =
-      pathname === "/login" || pathname.startsWith("/join/") || pathname.startsWith("/owner-join/");
+      pathname === "/login" ||
+      pathname.startsWith("/join/") ||
+      pathname.startsWith("/owner-join/") ||
+      pathname.startsWith("/review/");
     // …but only /login takes the fill treatment (it is a floodlight surface;
     // see the login polish note). The invitation cards stay on daylight.
     const atLoginGate = pathname === "/login";
     return (
       <PublicShell
-        wordmark="DesiAuction"
+        wordmark={
+          <span className="public-brand-name">
+            Desi<span>Auction</span>
+            <small aria-hidden="true">THE GAME STARTS HERE</small>
+          </span>
+        }
         wordmarkHref="/"
-        glyph={<BrandMark size={30} />}
+        glyph={<BrandMark size={42} />}
         nav={publicNav(pathname)}
+        {...(!atGate
+          ? {
+              mobileAction:
+                session !== null
+                  ? { label: "Open console", href: "/home" }
+                  : { label: "Create your tournament", href: "/login" },
+            }
+          : {})}
         headerAction={
           session !== null ? (
             <Link className="shell-header-cta" href="/home">
@@ -626,7 +661,7 @@ export function ProductShell({
                 Sign in
               </Link>
               <Link className="shell-header-cta shell-desktop-only" href="/login">
-                Start your auction
+                Start free <IconArrowRight width={16} height={16} />
               </Link>
             </>
           )
@@ -653,7 +688,7 @@ export function ProductShell({
             label: "Product",
             links: [
               { label: "Features", href: "/features" },
-              { label: "How it works", href: "/#how" },
+              { label: "Try the auction demo", href: "/#playground" },
               { label: "Pricing", href: "/pricing" },
               { label: "Security", href: "/security" },
               { label: "Release notes", href: "/releases" },
@@ -666,7 +701,7 @@ export function ProductShell({
               // Labelled for what the link DOES, not where it lands: creating a
               // tournament begins at the phone gate, and "Create tournament"
               // pointing at /login read as a broken link to anyone who noticed.
-              { label: "Start your auction", href: "/login" },
+              { label: "Create a tournament", href: "/login" },
               { label: "Rules & guidelines", href: "/rules-guidelines" },
               { label: "Book a demo", href: "/schedule-demo" },
             ],
@@ -677,6 +712,9 @@ export function ProductShell({
               { label: "Help centre", href: "/help" },
               { label: "FAQ", href: "/help/faq" },
               { label: "Contact support", href: "/support" },
+              // Opens the report dialog over THIS page (the provider intercepts
+              // the hash), so the screenshot is of what they were looking at.
+              { label: "Report a problem", href: "#report-a-problem" },
               { label: "Search the site", href: "/search" },
             ],
           },
@@ -690,7 +728,14 @@ export function ProductShell({
             ],
           },
         ]}
-        footerTagline="Live player auctions for Indian tournaments — server-verified bidding, settled to the rupee."
+        footerHeading={
+          <>
+            Every sport.
+            <br />
+            <span>One community.</span>
+          </>
+        }
+        footerTagline="Bring your players together. Build your teams. Make your next tournament one to remember."
         footerNewsletter={<NewsletterForm />}
         // The copyright belongs to the entity, not the product name: the
         // company signing this footer is Eventztree, and it is named here for
@@ -840,7 +885,12 @@ export function ProductShell({
             },
           ]}
           linkComponent={Link}
-          wordmark="DesiAuction"
+          wordmark={
+            <span className="public-brand-name">
+              Desi<span>Auction</span>
+              <small aria-hidden="true">THE GAME STARTS HERE</small>
+            </span>
+          }
           wordmarkHref="/home"
           glyph={<BrandMark size={32} />}
           tagline="Bid · Build · Win"
@@ -866,7 +916,7 @@ export function ProductShell({
                     always true — phone or email, one of the two is guaranteed
                     by `people_reachable_check` — and on the shared handsets
                     this product targets it says WHICH account is signed in. */}
-                {session.name !== null ? <span>{personContact(session)}</span> : null}
+                {session.name !== null ? <span data-private>{personContact(session)}</span> : null}
               </span>
             </Link>
           }
@@ -936,7 +986,11 @@ export function ProductShell({
                 <PopoverMenu
                   label="Account menu"
                   trigger={<span className="shell-avatar">{initials}</span>}
-                  header={<span data-testid="shell-session-phone">{personContact(session)}</span>}
+                  header={
+                    <span data-testid="shell-session-phone" data-private>
+                      {personContact(session)}
+                    </span>
+                  }
                   items={[
                     {
                       key: "account",
@@ -951,6 +1005,11 @@ export function ProductShell({
                       onSelect: () => {
                         router.push("/help");
                       },
+                    },
+                    {
+                      key: "report-problem",
+                      label: "Report a problem",
+                      onSelect: reportProblem,
                     },
                     // PX-1 01 §3: "(Admin: + Platform admin.)" — absent, not
                     // disabled, for everyone else. The surface 404s regardless;
@@ -983,7 +1042,7 @@ export function ProductShell({
                 className="shell-icon-button shell-mobile-only"
                 aria-label="Menu"
                 onClick={() => {
-                  setDrawerOpen(true);
+                  setDrawerOpenOn(pathname);
                 }}
               >
                 <IconMenu />
@@ -1008,11 +1067,13 @@ export function ProductShell({
           <Drawer
             open
             onClose={() => {
-              setDrawerOpen(false);
+              setDrawerOpenOn(null);
             }}
             title="Menu"
           >
-            <div className="shell-drawer-session">{personContact(session)}</div>
+            <div className="shell-drawer-session" data-private>
+              {personContact(session)}
+            </div>
             <ul className="shell-drawer-list">
               {orgs.map((org) => (
                 <li key={org.slug}>
@@ -1030,6 +1091,20 @@ export function ProductShell({
                 <Link href="/help" className="shell-drawer-link">
                   Help
                 </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="shell-drawer-link"
+                  onClick={() => {
+                    // Close the drawer first: the screenshot is of the page,
+                    // not of the menu that was covering it.
+                    setDrawerOpenOn(null);
+                    reportProblem();
+                  }}
+                >
+                  Report a problem
+                </button>
               </li>
               {isAdmin ? (
                 <li>

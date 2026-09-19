@@ -131,6 +131,17 @@ const APP_WRITES_UNPROTECTED = [
   "demo_availability",
   "demo_blackouts",
   "demo_bookings",
+  // FR-1 (0064): a guest can file a problem report, so these are no-RLS for
+  // the same reason as the demo tables — and the operator desk and retention
+  // sweep write them on the same pool.
+  "problem_reports",
+  "problem_report_screenshots",
+  // FR-1 Phase 2 (0065): the review page's principal is a link token, not a
+  // tenant, and platform reviews belong to no organization.
+  "review_requests",
+  "reviews",
+  // FR-1 Phase 4 (0070): a reader's report on a public review, no tenant.
+  "review_reports",
 ];
 
 /**
@@ -142,7 +153,15 @@ const APP_WRITES_UNPROTECTED = [
  * account page's profile form and a 500 in production, so it is asserted by
  * name rather than trusted to default privileges.
  */
-const APP_WRITES_PERSON = ["player_profiles"];
+/*
+ * `consent_records` joined 2026-09-18. Self-registration wrote consent through
+ * the SYSTEM pool, which holds no INSERT here, and a catch hid the refusal — so
+ * under this recipe every registration committed with no consent on record,
+ * a minor's guardian consent included. The write now rides the app role inside
+ * the registration's own transaction, and this line is what keeps that grant
+ * from being assumed again.
+ */
+const APP_WRITES_PERSON = ["player_profiles", "consent_records"];
 
 function expectations(allTables: string[]): Expectation[] {
   const out: Expectation[] = [];
@@ -179,7 +198,7 @@ function expectations(allTables: string[]): Expectation[] {
         table,
         verb,
         allowed: true,
-        why: "the public demo form and the operator desk both write on the app pool (no RLS to bypass)",
+        why: "public forms (demo, problem report) and their operator desks write on the app pool (no RLS to bypass)",
       });
     }
   }

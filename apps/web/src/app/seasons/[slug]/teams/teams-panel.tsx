@@ -11,6 +11,8 @@ import {
   paintOnFill,
   useToast,
   initialsFor,
+  IconArrowRight,
+  IconArrowLeft,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,7 +25,8 @@ import {
   setTeamCoachAction,
   updateTeamAction,
 } from "../../../../server/competition/actions";
-import type { TeamCard, TeamsWorkspaceView } from "../../../../server/competition/actions";
+import type { TeamsWorkspaceView } from "../../../../server/competition/actions";
+import type { TeamCard } from "../../../../server/competition/team-workspace";
 import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
 import { TeamLogoUploader } from "./team-logo-uploader";
 
@@ -441,7 +444,8 @@ function TeamGridCard({
           className="team-card-link team-card-cover"
           data-testid={`open-roster-${team.id}`}
         >
-          {view.viewer.canSeeRoster ? "Prepare roster →" : "Open team →"}
+          {view.viewer.canSeeRoster ? "Prepare roster" : "Open team"}
+          <IconArrowRight size={16} className="icon-trail" />
         </Link>
       </div>
     </article>
@@ -481,7 +485,9 @@ function RosterDetail({
     team.squadMax !== undefined && team.squadMax !== null
       ? Math.max(0, team.squadMax - team.squadFilled)
       : null;
-  const roster = team.roster ?? [];
+  // `?? []` mints a new array whenever a team carries no roster, so the tally
+  // below recomputed on every render of a squad page that had nothing to tally.
+  const roster = useMemo(() => team.roster ?? [], [team.roster]);
 
   // The per-role tally chips, in the design's fixed order.
   const tally = useMemo(() => {
@@ -506,7 +512,7 @@ function RosterDetail({
   return (
     <>
       <Link href={`/seasons/${slug}/teams`} className="teams-back">
-        ← All teams
+        <IconArrowLeft size={16} className="icon-lead" /> All teams
       </Link>
 
       <header className="team-detail-head">

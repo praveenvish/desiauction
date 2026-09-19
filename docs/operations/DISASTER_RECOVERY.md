@@ -32,6 +32,16 @@ and re-arms timers — measured 29 ms at 2,500 lots, drilled by the
 `demo:operational-recovery` founder scenario (browsers reconverge on the
 identical snapshot). No operator action beyond the restart.
 
+Measured as a whole process on 2026-09-18 (final readiness audit, Phase 11):
+`kill -9` of a production-built engine, restart, `/healthz` 200 in **1.07–1.68 s**
+across five runs (median ≈ 1.1 s). That covers node start, the database
+connection, re-taking the single-writer lease and rehydrating every live or
+paused auction before the listener opens, and each boot rehydrated **97**
+in-flight auctions (local test residue). A real night has a handful, so this
+is pessimistic. Clients then reconnect on full-jitter backoff from 100 ms. A
+developer laptop is not the production host, so treat these as an order of
+magnitude and not an SLO.
+
 ### finops-runner lost
 Start a new machine. Leases expire, cursors resume, derived job keys absorb
 re-fires; killing the runner at any instant loses nothing (ADR-4). Verified

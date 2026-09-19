@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { IconArrowLeft } from "@desiauction/ui";
 
 import { env } from "../../../env";
 import { FAQS, HELP_ARTICLES, helpArticle, helpCategory } from "../../../content/help";
@@ -44,7 +45,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
       <main className="content-page content-narrow">
         <p className="article-meta no-print">
           <Link href="/help" className="prose-link">
-            <span aria-hidden="true">←</span> All help
+            <IconArrowLeft size={16} className="icon-lead" /> All help
           </Link>
         </p>
         <h1>Frequently asked questions</h1>

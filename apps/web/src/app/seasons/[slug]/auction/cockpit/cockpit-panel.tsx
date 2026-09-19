@@ -3,7 +3,7 @@
 import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
 import { Badge, Button, Card, Select, useToast, Dialog, Field } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   COCKPIT_SHORTCUTS,
@@ -26,9 +26,11 @@ import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
-import { AuctionProgress } from "../live-experience";
+import { AuctionProgress, useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
+import { useCeremonySound } from "../use-ceremony-sound";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 // THE AUCTION COCKPIT (M-IP4-3). The organizer's control room: open, pause,
 // resume, open ANY queued lot (order control = skip/bring-forward, doc 41),
@@ -67,6 +69,24 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const { snapshot, connection, remainingMs, ceremony, stale, offline } = useAuctionSocket(
     view.wsUrl,
   );
+  /*
+   * THE CONDUCTOR'S OWN SCREEN WAS THE STALE ONE.
+   *
+   * `/live` and `/spectate` both fed their pool, purse and squad panels from
+   * `useLiveFeed`, which folds each outcome off the socket into the
+   * server-rendered list. The cockpit passed `view.resolved` straight through —
+   * the value as it was when the page loaded — so every one of those panels
+   * froze at the moment the conductor opened it.
+   *
+   * Observed on a four-lot auction: after two lots had sold the pool read
+   * "Sold 1 · Unsold 1 · Remaining 1". Not merely out of date — three of four
+   * lots, a total that cannot be right, on the one screen whose job is to tell
+   * the person running the room where the night has got to. Spectators had the
+   * correct numbers the whole time.
+   */
+  const feed = useLiveFeed(view.resolved, snapshot);
+  // The conductor hears the room too: opt-in, off by default (doc 11 sound).
+  useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   /**
    * DA: one global `busy` flag disabled 21 buttons at once — including the
    * gavel — for the duration of ANY command. The key names the single control
@@ -77,48 +97,57 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const [inviteTeam, setInviteTeam] = useState("");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
-  const send = async (
-    key: string,
-    type: string,
-    payload: Record<string, unknown>,
-    done?: string,
-  ) => {
-    // The same repair as the live room's `send`: a REJECTED request (offline
-    // handset, server restart, proxy) skipped `setPending(null)` entirely, so
-    // the control it names — including the gavel — stayed disabled for the rest
-    // of the session with nothing said. See live-panel.tsx for the full note.
-    setPending(key);
-    let ack;
-    try {
-      ack = await submitAuctionCommand(slug, commandId(), type, payload);
-    } catch {
-      // See live-panel.tsx: a rejected promise means the answer is missing, not
-      // that the command failed, so the message says only that and sends the
-      // conductor to server truth rather than asserting an outcome.
-      toast({
-        title:
-          "Lost the connection before the auction answered — check the bid feed before acting again.",
-        tone: "danger",
-      });
-      return false;
-    } finally {
-      setPending(null);
-    }
-    if (ack.accepted) {
-      if (done !== undefined) {
-        toast({ title: done, tone: "success" });
+  /*
+   * STABLE ACROSS RENDERS, BECAUSE A WINDOW LISTENER DEPENDS ON IT.
+   *
+   * The keyboard effect below lists `send` among its dependencies and its
+   * comment says it re-subscribes "whenever the room state the guards read
+   * changes". It did not: a function literal is a new value every render, so
+   * both window listeners were torn down and re-registered on EVERY render —
+   * and this panel re-renders once a second from the countdown alone, for the
+   * length of an auction. The comment described the intent; this makes it true.
+   *
+   * The closure is exact: `slug` is a prop, `router` and `toast` are stable by
+   * construction (`useRouter`, and a `useCallback` behind `ToastProvider`), and
+   * `setPending` is a setState. Nothing here can go stale.
+   */
+  const send = useCallback(
+    async (key: string, type: string, payload: Record<string, unknown>, done?: string) => {
+      // The same repair as the live room's `send`: a REJECTED request (offline
+      // handset, server restart, proxy) skipped `setPending(null)` entirely, so
+      // the control it names — including the gavel — stayed disabled for the rest
+      // of the session with nothing said. See live-panel.tsx for the full note.
+      setPending(key);
+      let ack;
+      try {
+        ack = await submitAuctionCommand(slug, commandId(), type, payload);
+      } catch {
+        // See live-panel.tsx: a rejected promise means the answer is missing, not
+        // that the command failed, so the message says only that and sends the
+        // conductor to server truth rather than asserting an outcome.
+        toast({
+          title:
+            "Lost the connection before the auction answered — check the bid feed before acting again.",
+          tone: "danger",
+        });
+        return false;
+      } finally {
+        setPending(null);
       }
-      router.refresh();
-      return true;
-    }
-    toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
-    return false;
-  };
+      if (ack.accepted) {
+        if (done !== undefined) {
+          toast({ title: done, tone: "success" });
+        }
+        router.refresh();
+        return true;
+      }
+      toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
+      return false;
+    },
+    [slug, router, toast],
+  );
 
   /**
    * DA-16: completing an auction is irreversible and was one unguarded click.
@@ -270,7 +299,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
 
   const status = snapshot?.auctionStatus ?? view.view.auction.status;
   const lot = snapshot?.currentLot ?? null;
-  const queue = snapshot?.queue ?? [];
+  // Same reason as `send` above: `?? []` mints a new array whenever the
+  // snapshot carries no queue, which re-ran the keyboard effect every render.
+  const queue = useMemo(() => snapshot?.queue ?? [], [snapshot?.queue]);
   const live = status === "live";
   const finished = status === "completed" || status === "reconciled" || status === "abandoned";
   /**
@@ -687,6 +718,12 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   any bid standing on the lot. It cannot be undone, and it is the only way to close
                   an auction that has a frozen lot on it.
                 </p>
+                {finished ? (
+                  <p className="competitions-hint" data-testid="resolve-blocked">
+                    This auction has ended. These lots stay as they finished — the ledger and the
+                    replay are the record now.
+                  </p>
+                ) : null}
                 <ol className="cockpit-queue">
                   {view.view.lots
                     .filter((entry) => entry.status === "frozen" || entry.status === "unsold")
@@ -708,7 +745,16 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                               )
                             }
                             loading={pending === `requeue-${entry.id}`}
-                            disabled={stale}
+                            /* `finished` for the same reason "Invite owner"
+                               carries it: the control was offered on a
+                               completed auction, directly under a banner
+                               saying nothing here can be opened or undone, and
+                               clicking it did NOTHING AT ALL. The engine
+                               refuses the command — the record is safe — but
+                               the refusal never reached the screen, so the
+                               conductor's only evidence was a button that did
+                               not respond. */
+                            disabled={stale || finished}
                             data-testid={`requeue-${entry.lotNumber}`}
                           >
                             Requeue
@@ -726,7 +772,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                 )
                               }
                               loading={pending === `withdraw-${entry.id}`}
-                              disabled={stale}
+                              disabled={stale || finished}
                               data-testid={`withdraw-frozen-${entry.lotNumber}`}
                             >
                               Withdraw
@@ -950,10 +996,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             snapshot={snapshot}
             teams={view.teams}
             rules={view.rules}
-            squadSizes={squadSizesOf(view.teams, view.preSigned, view.resolved)}
+            squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
           />
 
-          <PoolSummary snapshot={snapshot} resolved={view.resolved} preSigned={view.preSigned} />
+          <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={view.preSigned} />
         </div>
       </div>
 
@@ -961,7 +1007,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         roles={view.roles}
         teams={view.teams}
         preSigned={view.preSigned}
-        resolved={view.resolved}
+        resolved={feed.resolved}
         snapshot={snapshot}
         squadMax={view.rules.squadMax}
       />

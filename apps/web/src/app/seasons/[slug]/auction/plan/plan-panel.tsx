@@ -46,6 +46,7 @@ import {
 } from "./plan-model";
 import { PlanReportCard } from "./plan-report";
 import { PlanWhatIf } from "./plan-what-if";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 /**
  * MY PLAN — the page (WR-1).
@@ -86,7 +87,7 @@ function nameOf(lot: PlanLotRow | undefined, fallback: string): string {
 export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
   const announce = useAnnouncer();
   const [pending, startTransition] = useTransition();
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
   const [targets, setTargets] = useState<TargetRow[]>(view.targets);
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(view.targets.map((row) => [row.id, rupeesFromPaise(row.maxBid)])),
@@ -96,9 +97,6 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
   // Phase 1.5: two tabs, one plan. When this tab comes back into view the page
   // re-reads the server, and the local rows follow the server's — a save made
   // in the other tab shows up here without a reload. Fires only on return to
@@ -117,10 +115,14 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
       window.removeEventListener("focus", onVisible);
     };
   }, [router]);
-  useEffect(() => {
+  // A fresh server read replaces the local copy in the same render, rather
+  // than one commit later from an effect (which flashed the stale list first).
+  const [syncedTargets, setSyncedTargets] = useState(view.targets);
+  if (syncedTargets !== view.targets) {
+    setSyncedTargets(view.targets);
     setTargets(view.targets);
     setDrafts(Object.fromEntries(view.targets.map((row) => [row.id, rupeesFromPaise(row.maxBid)])));
-  }, [view.targets]);
+  }
 
   const lotsByRegistration = useMemo(
     () => new Map(view.lots.map((lot) => [lot.registrationId, lot])),

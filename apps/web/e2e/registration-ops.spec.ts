@@ -9,6 +9,16 @@ import { latestOtp } from "./otp";
 const STAMP = String(Date.now()).slice(-8);
 const PHONE_ORG = `84${STAMP}`;
 
+/*
+ * FIRST-VISIT BUDGET. CI runs the photo journey on `next dev` (local media
+ * cannot be served by a build), where the first visit to a route compiles it.
+ * Two CI failures on 2026-09-18 were exactly that and nothing else: 5s after
+ * "Verify and continue" the URL was still /login, and 5s after "open
+ * dashboard" the Overview was still on screen — the next page mid-compile.
+ * The same budget tournaments-index.spec.ts gives its cold visits.
+ */
+const COLD = { timeout: 30_000 } as const;
+
 async function otpLogin(page: Page, phone: string): Promise<void> {
   if (!page.url().includes("/login")) {
     await page.goto("/login");
@@ -17,11 +27,11 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await page.getByRole("button", { name: "Send code" }).click();
   // Await the send completing (data-step flips only after the action commits)
   // before reading the inbox — the login.spec idiom; a bare read races the mint.
-  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", COLD);
   const code = await latestOtp(phone);
   await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await expect(page).not.toHaveURL(/\/login/, COLD);
   // PX-3: the name gate now guards every console route, not just /home — a
   // fresh account that stops here never reaches the org/tournament screens
   // this helper is used to reach.
@@ -120,7 +130,7 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
 
   // Into the operations dashboard — wait for client hydration before driving it.
   await page.getByTestId("open-dashboard").click();
-  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
   await expect(page.getByTestId("stat-total")).toContainText("0");
 
   // Import 8 players by CSV (set the file input's content directly).
@@ -277,7 +287,7 @@ test("an organizer adds one player by hand, then imports their photo by filename
   await page.getByLabel("Season name").filter({ visible: true }).fill(`Hand Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create season" }).click();
   await page.getByTestId("open-dashboard").click();
-  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
 
   // Add one player through the dialog (no CSV, no self-registration).
   await page.getByTestId("open-add-player").click();
@@ -338,7 +348,7 @@ test("declining for 'other' demands the reason, keeps it from the player, and sh
   await page.getByLabel("Season name").filter({ visible: true }).fill(`Decline Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create season" }).click();
   await page.getByTestId("open-dashboard").click();
-  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
 
   await page.getByTestId("open-add-player").click();
   const addDialog = page.getByRole("dialog");
@@ -462,7 +472,7 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
   await expect(page.getByTestId("competition-status")).toHaveText("registration open");
 
   await page.getByTestId("open-dashboard").click();
-  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
 
   await page.getByTestId("open-import").click();
   await page.getByTestId("import-textarea").evaluate(
@@ -598,7 +608,7 @@ test("a file's own vocabulary is mapped onto the season's", async ({ page }) => 
   await expect(page.getByTestId("competition-status")).toHaveText("setup");
   await page.getByTestId("advance-status").click();
   await page.getByTestId("open-dashboard").click();
-  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true");
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
 
   // Three players, all banded in the club's own words. The season accepts
   // A/B/C, so as written every one of these rows is refused.

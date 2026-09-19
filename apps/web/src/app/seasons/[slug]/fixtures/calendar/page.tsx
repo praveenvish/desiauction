@@ -1,5 +1,5 @@
 import { addDays } from "@desiauction/core";
-import { Badge, ButtonLink, Card } from "@desiauction/ui";
+import { Badge, ButtonLink, Card, IconArrowRight, IconArrowLeft } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -91,7 +91,7 @@ export default async function CalendarPage({
             {view.view !== "timeline" ? (
               <span className="date-row">
                 <Link href={href({ date: addDays(view.date, -step) })} className="calendar-tab">
-                  ← previous
+                  <IconArrowLeft size={16} className="icon-lead" /> previous
                 </Link>
                 <strong data-testid="calendar-date">{formatWallDate(view.date)}</strong>
                 <Link
@@ -99,7 +99,8 @@ export default async function CalendarPage({
                   className="calendar-tab"
                   data-testid="calendar-next"
                 >
-                  next →
+                  next
+                  <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               </span>
             ) : null}

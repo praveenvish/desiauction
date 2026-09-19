@@ -49,6 +49,20 @@ const envSchema = z.object({
    * fallback"). `msg91` stays as the SMS fallback and is not deprecated.
    */
   OTP_PROVIDER: z.enum(["dev", "msg91", "whatsapp"]).default("dev"),
+  /**
+   * Which door /login opens on. `email` until SMS is live: Indian SMS needs DLT
+   * registration before a single code can be sent, and an email code needs
+   * nothing. Flip to `phone` once OTP_PROVIDER carries a live provider. Either
+   * way the other door is one tab away, and `/login?method=…` overrides it.
+   * No passwords either way (C-24) — both doors send a one-time code.
+   */
+  LOGIN_DEFAULT_METHOD: z.enum(["email", "phone"]).default("email"),
+  /**
+   * Platform-wide ceiling on sign-in codes minted per hour, per channel (SMS and
+   * email counted separately). Stops the platform being used to pump SMS from
+   * rotating addresses; see DEFAULT_GLOBAL_PER_HOUR in server/auth/otp.ts.
+   */
+  OTP_GLOBAL_HOURLY_CAP: z.coerce.number().int().positive().default(2_000),
   /** Meta phone number ID from the WhatsApp Business Account — not the number. */
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
   /** Permanent system-user token. Rotate via SECRET_ROTATION.md. */
@@ -158,6 +172,13 @@ const envSchema = z.object({
    */
   SETTLEMENT_JOB_SECRET: z.string().min(16).optional(),
   /**
+   * FR-1 feedback sweep (`POST /api/jobs/feedback`): the problem-report
+   * retention purge (screenshots and addresses at ninety days, reports at
+   * twenty-four months) and the automatic review-ask sweep (Phase 3).
+   * Same fail-closed posture as DEMO_JOB_SECRET — unset is a 404.
+   */
+  FEEDBACK_JOB_SECRET: z.string().min(16).optional(),
+  /**
    * The key demo booking links are DERIVED from (HMAC over the request id).
    *
    * A random token would be unrecoverable once hashed, which the reminder sweep
@@ -170,6 +191,13 @@ const envSchema = z.object({
    * that default is refused when actually serving — see the refinements below.
    */
   DEMO_TOKEN_SECRET: z.string().min(8).default("dev-demo-token-secret"),
+  /**
+   * FR-1 review links (`/review/[token]`) are an HMAC of the request id under
+   * this key, for the reason DEMO_TOKEN_SECRET gives: a resend must rebuild the
+   * link, and storing it would hand a leaked backup every review page. The dev
+   * default is refused when serving, exactly like the demo key's.
+   */
+  REVIEW_TOKEN_SECRET: z.string().min(8).default("dev-review-token-secret"),
   /**
    * Razorpay. All three together or the gateway is simply absent and every
    * payment stays on the manual adapters — a half-configured gateway that
@@ -243,6 +271,19 @@ const envSchema = z.object({
    * three separate places that say so.
    */
   ALLOW_INSECURE_LOCAL_PRODUCTION: z
+    .enum(["1", "true"])
+    .optional()
+    .transform((value) => value !== undefined),
+  /**
+   * ENFORCE THE SCRIPT POLICY, rather than only report it (middleware.ts).
+   *
+   * Unset, the nonce policy ships as `Content-Security-Policy-Report-Only`:
+   * browsers log what it would block and POST it to /api/csp-report, and block
+   * nothing. Set it once a deploy has run clean — the e2e suite asserts zero
+   * violations on every surface — and the same policy becomes enforced. It is a
+   * switch rather than a code change so that turning it off is just as quick.
+   */
+  CSP_ENFORCE: z
     .enum(["1", "true"])
     .optional()
     .transform((value) => value !== undefined),
@@ -333,6 +374,21 @@ const productionSchema = envSchema
       "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=msg91 with credentials",
     path: ["OTP_PROVIDER"],
   })
+  .refine(
+    (v) =>
+      !serving(v) ||
+      (v.EMAIL_PROVIDER !== "dev" &&
+        v.EMAIL_API_ENDPOINT !== undefined &&
+        v.EMAIL_API_KEY !== undefined &&
+        v.EMAIL_FROM !== undefined),
+    {
+      // `auto` without credentials silently falls back to the dev inbox: email
+      // sign-in codes land in plain text in otp_inbox and nobody receives them.
+      message:
+        "email needs EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM in production (and EMAIL_PROVIDER not dev) — otherwise sign-in codes go to a database table instead of a mailbox",
+      path: ["EMAIL_PROVIDER"],
+    },
+  )
   .refine((v) => !serving(v) || v.MEDIA_STORAGE === "bucket", {
     message:
       "MEDIA_STORAGE=local writes uploads to the app host and a built server does not serve them — set MEDIA_STORAGE=bucket",
@@ -392,6 +448,15 @@ const productionSchema = envSchema
   .refine((v) => !serving(v) || v.DEMO_TOKEN_SECRET.length >= 32, {
     message: "DEMO_TOKEN_SECRET must be at least 32 characters in production",
     path: ["DEMO_TOKEN_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.REVIEW_TOKEN_SECRET !== "dev-review-token-secret", {
+    message:
+      "REVIEW_TOKEN_SECRET must be set explicitly in production (review links are derived from it)",
+    path: ["REVIEW_TOKEN_SECRET"],
+  })
+  .refine((v) => !serving(v) || v.REVIEW_TOKEN_SECRET.length >= 32, {
+    message: "REVIEW_TOKEN_SECRET must be at least 32 characters in production",
+    path: ["REVIEW_TOKEN_SECRET"],
   })
   .refine((v) => !serving(v) || v.ENGINE_SECRET.length >= 32, {
     message: "ENGINE_SECRET must be at least 32 characters in production",

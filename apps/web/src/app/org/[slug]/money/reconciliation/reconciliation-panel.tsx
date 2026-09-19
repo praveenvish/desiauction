@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, Button, Card, Dialog, EmptyState, VisuallyHidden } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useFinopsAct } from "../use-finops-act";
 import {
@@ -12,6 +12,7 @@ import {
 import { postureLabel } from "../../../../../server/financial-operations/register";
 import "../../../../seasons/[slug]/money/money.css";
 import "../finance.css";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 /**
  * PX-8 §3 — the Reconciliation workspace.
@@ -63,10 +64,7 @@ export function ReconciliationPanel({
   workspace: ReconciliationWorkspace;
 }) {
   const [rewinding, setRewinding] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   const { reconciliation: view, viewer } = workspace;
 

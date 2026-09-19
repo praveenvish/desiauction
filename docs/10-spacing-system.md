@@ -43,6 +43,12 @@ One radius per component; nesting steps down one level (card `lg` → inner cont
 - **Daylight:** three shadow levels (`shadow-1` cards, `shadow-2` popovers, `shadow-3` dialogs), layered low-opacity, never single hard shadows.
 - **Dark (Ink):** shadows don't read on Ink — elevation = surface step (ink-900 → 850 → 800) + 1px inside border (ink-700/600) + optional 1px top-edge highlight. Glow (volt, low alpha) is reserved for the live/lit element only (05 law 1).
 
+### Depth and lift (2026-09-13)
+
+- A fourth shadow rung, `shadow-4`, exists for the one element a screen is about (a floating stage card, a peek). Cards rest at `shadow-1`; an **interactive** Card lifts to `shadow-2` on hover (`Card interactive`, doc 31) — never further.
+- `depth-lift-sm` (−2px) is the hover lift for cards; `depth-lift` (−4px) for hero-scale elements; `depth-tilt` (6deg) and `depth-perspective` (900px) drive the `Tilt` primitive. Depth is transform-only.
+- Rhythm tokens name the gaps between things: `rhythm-tight` (12) inside a group, `rhythm-block` (20) between cards, `rhythm-section` (32) between sections of a console page, `rhythm-band` (clamp 40–80) between marketing bands. A page that uses one gap for everything reads as a list; these are the rungs to reach for instead.
+
 ## Density modes
 
 Console tables and lists support **comfortable** (default) and **dense** (rows 40px → 32px, paddings step down one token). Density is a user preference, persisted, applied via a container token switch — components don't implement density individually (19). Live surfaces have no density modes; they have one perfect layout per breakpoint (14).

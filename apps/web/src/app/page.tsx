@@ -1,435 +1,485 @@
-import { ButtonLink, VisuallyHidden } from "@desiauction/ui";
 import type { Metadata } from "next";
-
+import Image from "next/image";
+import Link from "next/link";
+import { Suspense } from "react";
+import { SPORTS } from "@desiauction/core";
 import { env } from "../env";
-import { LANDING, PRICING, TRUST_MARKS } from "../content/marketing";
-import { HeroStage, type StagePlayer } from "../components/marketing/hero-stage";
+import { LANDING } from "../content/marketing";
 import { LiveTournaments } from "../components/marketing/live-tournaments";
+import { LandingVoices } from "../components/marketing/landing-voices";
+import { AuctionLab, HomeMotion } from "../components/marketing/guest-home";
 import {
   IconArrowRight,
-  IconBolt,
   IconCalendar,
   IconCheck,
   IconGavel,
-  IconGlobe,
-  IconLedger,
-  IconMapPin,
-  IconPhone,
   IconPlay,
   IconReceipt,
-  IconRefresh,
-  IconRupee,
   IconShieldCheck,
-  IconSpark,
-  IconStar,
   IconTrophy,
   IconTv,
   IconUsers,
 } from "../components/marketing/icons";
-import { slugify } from "../lib/slug";
-import "./content.css";
+import styles from "./guest-home.module.css";
 import "./marketing.css";
 
+const description =
+  "Your sport. Your players. Your tournament. Bring registration, live player auctions, teams and fixtures together with DesiAuction. Free during beta.";
 export const metadata: Metadata = {
-  title: "DesiAuction — SOLD, without the shouting",
-  description: LANDING.hero.sub,
+  title: "DesiAuction — Great teams start here",
+  description,
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/` },
   openGraph: {
-    title: "DesiAuction — SOLD, without the shouting",
-    description: LANDING.hero.sub,
+    title: "DesiAuction — Great teams start here",
+    description,
     url: `${env.PUBLIC_BASE_URL}/`,
     type: "website",
   },
 };
+const sports = SPORTS.map((sport) => ({
+  key: sport.key,
+  label: sport.label,
+  role: sport.roles.values[0]?.label ?? "Player",
+}));
+const questions = [
+  {
+    question: "Is DesiAuction only for cricket?",
+    answer: `No. Choose from ${SPORTS.map((sport) => sport.label.toLowerCase()).join(", ")}. Your tournament uses the roles and vocabulary of the sport you select.`,
+  },
+  {
+    question: "What does it cost to get started?",
+    answer:
+      "Everything is free during public beta, with no card required and no team or player limits enforced. Tournaments you start during beta stay free. See the pricing page for planned passes.",
+  },
+  ...LANDING.faq.items.slice(0, 2),
+];
 
-/**
- * The screen-reader equivalent of the hero stage. The stage is a looping,
- * decorative animation (aria-hidden) and must stay that way — announcing bid
- * numbers that change every 950ms would be noise, not information. But it is
- * also this page's ONLY proof that the product works, so a visitor who cannot
- * see it gets the same story as a finished sentence: one lot, opened, closed,
- * sold. Derived from the script the animation actually plays, so the two can
- * never drift apart, and deliberately worded WITHOUT the phrase "simulated
- * demo" — that exact string is the visible truth label below the stage, and
- * the e2e suite locates it by text.
- */
-function stageNarration(player: StagePlayer): string {
-  const rupees = (value: number) => `₹${value.toLocaleString("en-IN")}`;
-  return (
-    `Simulated auction, one lot. Lot ${String(player.lot)}: ${player.name}, ` +
-    `${player.role.toLowerCase()}. ` +
-    `Bidding opened at ${rupees(player.opening)} and closed at ${rupees(player.final)} — ` +
-    `sold to ${player.team}.`
-  );
-}
-
-const BEAT_ICONS = [IconUsers, IconGavel, IconReceipt] as const;
-const WORST_ICONS = [IconPhone, IconBolt, IconLedger] as const;
-const TRUST_ICONS = [IconShieldCheck, IconLedger, IconRupee, IconTv, IconPhone] as const;
-/** One glyph per lifecycle stage, in LANDING.lifecycle.stages order. */
-const STAGE_ICONS = [
-  IconGlobe,
-  IconTrophy,
-  IconRefresh,
-  IconUsers,
-  IconGavel,
-  IconStar,
-  IconMapPin,
-  IconCalendar,
-  IconPlay,
-  IconRupee,
-] as const;
-
-/**
- * The landing page, rebuilt to the 2026-07-24 Product Creation Council
- * blueprint. Seven sections, one CTA, and the page's only proof is the product
- * visibly working plus candor — no testimonials, no stat bar, no capability
- * grid, no photography. The hero stage is a scripted replay (HeroStage): a
- * static-asset simulation labelled as such, with zero server dependency, whose
- * server render is a truthful SOLD frame (the LCP is product DOM, not an
- * image). The no-fabrication rule is now uniform: nothing on this page names a
- * customer, a metric, or a real person.
- *
- * 2026-07-25 — five sections added, because the page sold ONE NIGHT of a
- * product that runs a season, and answered none of a guest's commercial
- * questions. In page order: live tournaments (real rows, the only unsimulated
- * proof here), the lifecycle beyond auction night, a pricing preview, the beta
- * candor that turns "no customers to name" from a hole into a statement, and an
- * FAQ. Two invariants they are all built against:
- *
- *   1. This page renders when Postgres does not. The one database read lives in
- *      <LiveTournaments/>, which degrades to rendering NOTHING — see the guard
- *      there. `GET /` with the database stopped must still be a 200.
- *   2. Anything the repository could not evidence is written AND flagged with a
- *      `TODO(founder):` in ../content/marketing.ts, never invented and never
- *      quietly dropped. Grep that file for the fact-check list.
- */
 export default function LandingPage() {
   return (
-    <div className="landing mk">
-      <main>
-        <div className="mk-progress" aria-hidden="true" />
-        {/* --- 1 · Hero: the promise, and the product proving it ------------ */}
-        <section className="mk-hero" data-theme="floodlight">
-          <div className="mk-hero-photo" aria-hidden="true" />
-          {/* Atmosphere: floodlight beams, stadium dust, film grain. */}
-          <div className="mk-fx" aria-hidden="true">
-            <i className="mk-fx-beam mk-fx-beam--left" />
-            <i className="mk-fx-beam mk-fx-beam--right" />
-            <i className="mk-fx-particles" />
+    <HomeMotion>
+      <main className={styles.home} data-theme="floodlight">
+        <section className={styles.hero} aria-labelledby="hero-title">
+          <div className={styles.heroArt}>
+            <Image
+              src="/marketing/multisport-hero.webp"
+              alt="Four fictional athletes representing basketball, football, badminton and cricket"
+              fill
+              priority
+              sizes="100vw"
+              className={styles.heroImage}
+            />
           </div>
-          <div className="mk-container">
-            <div className="mk-hero-grid">
-              <div className="mk-hero-copy">
-                <h1 className="mk-h1">
-                  SOLD, without the <span className="mk-hero-highlight">shouting.</span>
-                </h1>
-                <p className="mk-lead">{LANDING.hero.sub}</p>
-                <div className="mk-hero-actions">
-                  <ButtonLink href={LANDING.hero.ctaPrimary.href} variant="primary" size="lg">
-                    {LANDING.hero.ctaPrimary.label}
-                    <IconArrowRight width={18} height={18} />
-                  </ButtonLink>
-                  {/* Was a play glyph pointing at "#demo" — a promise of video
-                      that never played. The destination is the public directory
-                      now, so the icon is the spectator screen the visitor is
-                      being sent to. */}
-                  <ButtonLink href={LANDING.hero.ctaSecondary.href} variant="secondary" size="lg">
-                    <IconTv width={16} height={16} />
-                    {LANDING.hero.ctaSecondary.label}
-                  </ButtonLink>
-                </div>
-                <p className="mk-hero-note">{LANDING.hero.ctaNote}</p>
+          <div className={styles.heroInner}>
+            <div className={styles.heroCopy}>
+              <p className={styles.eyebrow}>
+                <span className={styles.goldLine} /> EVERY SPORT. ONE STAGE.
+              </p>
+              <h1 id="hero-title">
+                Great teams
+                <br />
+                <span>start here.</span>
+              </h1>
+              <p className={styles.heroLead}>
+                Turn a group of players into a tournament
+                <br className={styles.desktopBreak} /> everyone wants to be part of.
+              </p>
+              <p className={styles.heroSub}>
+                Player registrations. Live auctions. Ready-to-play squads.
+                <br className={styles.desktopBreak} /> One home for the game you love.
+              </p>
+              <div className={styles.actions}>
+                <Link className={styles.primary} href="/login">
+                  Create your tournament <IconArrowRight size={18} />
+                </Link>
+                <a className={styles.secondary} href="#playground">
+                  <IconPlay size={15} /> Try a live demo
+                </a>
               </div>
-              <div className="mk-hero-demo">
-                <HeroStage script={LANDING.hero.script} teams={LANDING.hero.demoTeams} />
-                <p className="mk-stage-note">
-                  {LANDING.hero.demoLabel}
-                  <VisuallyHidden>{stageNarration(LANDING.hero.script[0])}</VisuallyHidden>
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Full-width proof strip: verifiable capabilities, never metrics. */}
-        <section
-          className="mk-band mk-proof-band"
-          data-theme="floodlight"
-          aria-label="Platform capabilities"
-        >
-          <div className="mk-container">
-            <ul className="mk-proof">
-              {TRUST_MARKS.map((mark, index) => {
-                const Icon = TRUST_ICONS[index] ?? IconCheck;
-                return (
-                  <li key={mark}>
-                    <span className="mk-proof-tile">
-                      <Icon />
-                    </span>
-                    <span>{mark}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </section>
-
-        {/* --- 1b · Live tournaments: the page's only unsimulated proof -----
-            Placed directly under the capability strip, and kept on the
-            floodlight, because the proof band deliberately has NO bottom
-            padding — it is built to flow into the dark band beneath it. A light
-            band here would have butted the capability marks against a hard
-            edge. It also earns its position rhetorically: the strip above
-            claims, this one evidences, and only then does the page start
-            explaining. Renders nothing when the directory is empty or the
-            database is unreachable, which restores exactly today's layout. */}
-        <LiveTournaments />
-
-        {/* --- 2 · The night in three beats -------------------------------- */}
-        <section className="mk-band" id="how" aria-labelledby="how-heading">
-          <div className="mk-container">
-            <div className="mk-panel">
-              <div className="mk-band-head mk-band-head--center mk-center">
-                <p className="mk-kicker">{LANDING.beats.kicker}</p>
-                <h2 id="how-heading" className="mk-h2">
-                  {LANDING.beats.h2}
-                </h2>
-              </div>
-              <ol className="mk-steps">
-                {LANDING.beats.steps.map((step, index) => {
-                  const Icon = BEAT_ICONS[index] ?? IconGavel;
-                  return (
-                    <li key={step.title}>
-                      <div className="mk-step-top">
-                        <span className="mk-icon-tile">
-                          <Icon />
-                        </span>
-                      </div>
-                      <div className="mk-swap">
-                        <h3>{step.title}</h3>
-                        <p>{step.body}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-              <p className="mk-center mk-panel-actions">
-                <ButtonLink href="/features" variant="ghost">
-                  Explore all features
-                  <IconArrowRight width={16} height={16} />
-                </ButtonLink>
+              <p className={styles.microcopy}>
+                <IconCheck size={14} /> Free during beta <span>·</span> No card required
               </p>
             </div>
+            <div className={styles.heroCaption}>
+              <span>THE GAME CHANGES.</span>
+              <strong>The passion stays.</strong>
+              <span className={styles.captionLine} />
+            </div>
+          </div>
+          <div className={styles.heroFoot}>
+            <div>
+              <IconUsers size={20} />
+              <span>Bring your players</span>
+            </div>
+            <i aria-hidden="true" />
+            <div>
+              <IconGavel size={20} />
+              <span>Build your dream teams</span>
+            </div>
+            <i aria-hidden="true" />
+            <div>
+              <IconTrophy size={20} />
+              <span>Make it a tournament</span>
+            </div>
+            <a href="#playground" aria-label="Explore the sports and auction demo">
+              EXPLORE <span aria-hidden="true">↓</span>
+            </a>
           </div>
         </section>
 
-        {/* --- 3 · Built for the worst moment of the night ------------------ */}
-        <section className="mk-band mk-band--sunken" aria-labelledby="worst-heading">
-          <div className="mk-container">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">{LANDING.worst.kicker}</p>
-              <h2 id="worst-heading" className="mk-h2">
-                {LANDING.worst.h2}
-              </h2>
-            </div>
-            <div className="mk-cards">
-              {LANDING.worst.items.map((item, index) => {
-                const Icon = WORST_ICONS[index] ?? IconBolt;
-                return (
-                  <div key={item.title} className="mk-card mk-swapcard">
-                    <span className="mk-icon-tile">
-                      <Icon />
-                    </span>
-                    {/*
-                     * TITLE AND BODY TRADE PLACES; THE ICON DOES NOT MOVE.
-                     *
-                     * Both are always in the DOM and neither is aria-hidden, so
-                     * a screen reader reads the card whole — the crossfade is an
-                     * affordance, not a gate. Where there is no hover to give,
-                     * or motion is unwelcome, they simply stack and both show.
-                     */}
-                    <div className="mk-swap">
-                      <h3>{item.title}</h3>
-                      <p>{item.body}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mk-center mk-rehearse">
-              {LANDING.worst.rehearse}{" "}
-              <ButtonLink href="/login" variant="ghost">
-                Start rehearsing
-                <IconArrowRight width={16} height={16} />
-              </ButtonLink>
-            </p>
-          </div>
-        </section>
+        <AuctionLab sports={sports} />
 
-        {/* --- 3b · Beyond auction night: the whole lifecycle ---------------
-            The page sold one night; an organizer running a six-week league read
-            that as "this cannot run my league" and left. Ten stages, one line
-            each, and — as load-bearing as the list — the paragraph that says
-            what is NOT built. Dark, because it sits between two light bands and
-            because a list of ten short lines is exactly the content the
-            floodlight scope reads best. */}
-        <section
-          className="mk-band mk-band--dark mk-lifecycle-band"
-          data-theme="floodlight"
-          aria-labelledby="lifecycle-heading"
-        >
-          <div className="mk-container">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">{LANDING.lifecycle.kicker}</p>
-              <h2 id="lifecycle-heading" className="mk-h2">
-                {LANDING.lifecycle.h2}
-              </h2>
-              <p className="mk-lead">{LANDING.lifecycle.sub}</p>
-            </div>
-            {/* `mk-lifecycle`, not `mk-stage*`: the hero card owns that prefix
-                (.mk-stage-name, .mk-stage-lot, .mk-stage-sold …) and a second,
-                unrelated "stage" in the same stylesheet would be a trap for
-                whoever edits it next. */}
-            <ol className="mk-lifecycle">
-              {LANDING.lifecycle.stages.map((stage, index) => {
-                const Icon = STAGE_ICONS[index] ?? IconCheck;
-                return (
-                  <li key={stage.name}>
-                    <span className="mk-lifecycle-glyph" aria-hidden="true">
-                      <Icon width={18} height={18} />
-                    </span>
-                    <h3>{stage.name}</h3>
-                    <p>{stage.body}</p>
-                  </li>
-                );
-              })}
-            </ol>
-            {/* The candor that makes the list above trustworthy. It is a <p>,
-                not a card, so it reads as the section's own footnote rather
-                than as an eleventh feature. */}
-            <div className="mk-gap-note" role="note">
-              <IconSpark width={18} height={18} />
-              <p>
-                <strong>{LANDING.lifecycle.gap.title}:</strong> {LANDING.lifecycle.gap.body}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* --- 4 · The morning after: the receipt -------------------------- */}
-        <section className="mk-band" aria-labelledby="money-heading">
-          <div className="mk-container">
-            <div className="mk-show">
+        <section id="features" className={styles.toolkit} aria-labelledby="toolkit-title">
+          <div className={styles.container}>
+            <div className={styles.sectionHeading} data-reveal>
               <div>
-                <p className="mk-kicker">{LANDING.money.kicker}</p>
-                <h2 id="money-heading" className="mk-h2">
-                  {LANDING.money.h2}
+                <p className={styles.eyebrow}>BIG TOURNAMENT ENERGY. LESS ADMIN.</p>
+                <h2 id="toolkit-title">
+                  You bring the passion.
+                  <br />
+                  <span>We bring the playbook.</span>
                 </h2>
-                <p className="mk-money-body">{LANDING.money.body}</p>
               </div>
-              <div className="mk-show-visual">
-                <figure className="mk-receipt">
-                  <figcaption className="mk-receipt-head">
-                    <span>{LANDING.money.receipt.number}</span>
-                    <span>{LANDING.money.receipt.title}</span>
-                  </figcaption>
-                  <p className="mk-receipt-amount">{LANDING.money.receipt.amount}</p>
-                  <p className="mk-receipt-method">{LANDING.money.receipt.method}</p>
-                  <p className="mk-receipt-ledger">{LANDING.money.receipt.ledgerLine}</p>
-                  <p className="mk-receipt-note">{LANDING.money.receipt.note}</p>
-                </figure>
-              </div>
+              <p>
+                From the first registration to the final squad,
+                <br className={styles.desktopBreak} /> keep the moving parts in one place.
+              </p>
+            </div>
+            <div className={styles.bento}>
+              <article className={[styles.feature, styles.registration].join(" ")} data-reveal>
+                <div className={styles.featureCopy}>
+                  <span className={styles.iconTile}>
+                    <IconUsers size={23} />
+                  </span>
+                  <p className={styles.cardOverline}>01 / GET EVERYONE IN</p>
+                  <h3>
+                    One link.
+                    <br />A whole player pool.
+                  </h3>
+                  <p>
+                    Share your registration link. Review the players. Get your auction list ready.
+                  </p>
+                  <Link href="/help/registration-desk">
+                    Meet your registration desk <IconArrowRight size={16} />
+                  </Link>
+                </div>
+                <div
+                  className={styles.rosterVisual}
+                  aria-label="Illustrative player registration list"
+                >
+                  <div className={styles.visualHeader}>
+                    <span>Player registrations</span>
+                    <IconUsers size={17} />
+                  </div>
+                  <div className={styles.rosterRow}>
+                    <span className={styles.avatar}>AS</span>
+                    <div>
+                      <strong>Aarav Shah</strong>
+                      <small>Player application</small>
+                    </div>
+                    <span className={styles.approved}>
+                      <IconCheck size={12} /> Approved
+                    </span>
+                  </div>
+                  <div className={styles.rosterRow}>
+                    <span className={styles.avatar}>RM</span>
+                    <div>
+                      <strong>Riya Mehta</strong>
+                      <small>Player application</small>
+                    </div>
+                    <span className={styles.approved}>
+                      <IconCheck size={12} /> Approved
+                    </span>
+                  </div>
+                  <div className={styles.rosterRow}>
+                    <span className={styles.avatar}>NK</span>
+                    <div>
+                      <strong>Neel Kapoor</strong>
+                      <small>Player application</small>
+                    </div>
+                    <span className={styles.pending}>To review</span>
+                  </div>
+                  <p className={styles.visualNote}>Example player pool</p>
+                </div>
+              </article>
+              <article className={[styles.feature, styles.screenFeature].join(" ")} data-reveal>
+                <span className={styles.iconTile}>
+                  <IconTv size={23} />
+                </span>
+                <p className={styles.cardOverline}>02 / OWN THE ROOM</p>
+                <h3>
+                  Small screen.
+                  <br />
+                  Big moment.
+                </h3>
+                <p>Owners bid from their phones. The room follows on the big screen.</p>
+                <div className={styles.deviceVisual} aria-hidden="true">
+                  <div className={styles.monitor}>
+                    <span>THE WINNING MOMENT</span>
+                    <strong>
+                      SOLD<span>!</span>
+                    </strong>
+                    <small>YOUR NEXT TEAMMATE</small>
+                  </div>
+                  <div className={styles.phone}>
+                    <IconGavel size={21} />
+                    <span>YOUR BID</span>
+                    <strong>₹35,000</strong>
+                    <i>
+                      <IconCheck size={13} />
+                    </i>
+                  </div>
+                </div>
+                <Link href="/help/screens-for-the-room">
+                  Set the stage <IconArrowRight size={16} />
+                </Link>
+              </article>
+              <article className={[styles.feature, styles.fixturesFeature].join(" ")} data-reveal>
+                <span className={styles.iconTile}>
+                  <IconCalendar size={23} />
+                </span>
+                <p className={styles.cardOverline}>03 / GAME ON</p>
+                <h3>
+                  From squad lists
+                  <br />
+                  to match day.
+                </h3>
+                <p>Generate your fixtures, review the schedule and publish it for everyone.</p>
+                <div className={styles.fixtureVisual} aria-label="Illustrative fixture">
+                  <span>
+                    MATCH 01 <i>FIXTURE PREVIEW</i>
+                  </span>
+                  <div>
+                    <b>F</b>
+                    <strong>Falcons</strong>
+                    <small>VS</small>
+                    <strong>Voyagers</strong>
+                    <b>V</b>
+                  </div>
+                </div>
+                <Link href="/help/fixtures">
+                  Plan your fixtures <IconArrowRight size={16} />
+                </Link>
+              </article>
+              <article className={[styles.feature, styles.recordsFeature].join(" ")} data-reveal>
+                <div className={styles.featureCopy}>
+                  <span className={styles.iconTile}>
+                    <IconReceipt size={23} />
+                  </span>
+                  <p className={styles.cardOverline}>04 / KEEP IT CLEAR</p>
+                  <h3>
+                    Less chasing.
+                    <br />
+                    More playing.
+                  </h3>
+                  <p>
+                    Track collections, issue receipts and keep a clear record of the money coming
+                    in.
+                  </p>
+                  <Link href="/help/receipts-and-exports">
+                    Keep your books in order <IconArrowRight size={16} />
+                  </Link>
+                </div>
+                <div className={styles.receiptVisual} aria-label="Illustrative receipt">
+                  <span className={styles.receiptIcon}>
+                    <IconReceipt size={26} />
+                  </span>
+                  <small>COLLECTION RECORDED</small>
+                  <strong>
+                    ₹2,500<span>.00</span>
+                  </strong>
+                  <hr />
+                  <div>
+                    <span>Team</span>
+                    <b>Falcons</b>
+                  </div>
+                  <div>
+                    <span>Receipt</span>
+                    <b>#0001</b>
+                  </div>
+                  <p>
+                    <IconCheck size={14} /> Clear. Recorded. Organized.
+                  </p>
+                  <small>EXAMPLE RECEIPT</small>
+                </div>
+              </article>
             </div>
           </div>
         </section>
 
-        {/* --- 4b · Pricing preview ----------------------------------------
-            The page answered none of a guest's commercial questions. Tiers are
-            read from PRICING so the home page can never quote a price /pricing
-            has retired, and the two paid tiers show their real "Published at
-            GA" placeholder rather than a number nobody has decided.
-            Deliberately WITHOUT the pricing page's "Most popular" flag: with
-            zero customers, popularity is precisely the kind of claim this page
-            is not allowed to make. */}
-        <section className="mk-band mk-band--sunken" aria-labelledby="pricing-heading">
-          <div className="mk-container">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <p className="mk-kicker">{LANDING.pricingPreview.kicker}</p>
-              <h2 id="pricing-heading" className="mk-h2">
-                {LANDING.pricingPreview.h2}
+        <section className={styles.journey} aria-labelledby="journey-title">
+          <div className={styles.container}>
+            <div className={styles.journeyIntro} data-reveal>
+              <p className={styles.eyebrow}>FROM “LET’S PLAY” TO GAME DAY</p>
+              <h2 id="journey-title">
+                A big idea.
+                <br />
+                <span>Three simple moves.</span>
               </h2>
-              <p className="mk-lead">{LANDING.pricingPreview.sub}</p>
+              <Link className={styles.textLink} href="/help/getting-started">
+                Your getting-started guide <IconArrowRight size={17} />
+              </Link>
             </div>
-            <div className="mk-tiers mk-tiers--preview">
-              {PRICING.tiers.map((tier) => {
-                const tierId = `home-tier-${slugify(tier.name)}`;
-                return (
-                  <section
-                    key={tier.name}
-                    className={`mk-tier${tier.featured === true ? " mk-tier--featured" : ""}`}
-                    aria-labelledby={tierId}
-                  >
-                    <h3 id={tierId}>{tier.name}</h3>
-                    <p className="mk-tier-price">
-                      {/* Same rule as /pricing: the display slot is set for a
-                          numeral, so a tier whose price is a sentence drops to
-                          text scale instead of dwarfing the tier that has one. */}
-                      <span
-                        className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
-                      >
-                        {tier.price}
-                      </span>
-                      <span className="mk-tier-cadence">{tier.cadence}</span>
-                    </p>
-                    <p className="mk-tier-limits">{tier.limits}</p>
-                  </section>
-                );
-              })}
-            </div>
-            <p className="mk-trustline">
-              <IconShieldCheck />
-              <span>{PRICING.trustLine}</span>
-            </p>
-            <p className="mk-center mk-panel-actions">
-              <ButtonLink href={LANDING.pricingPreview.cta.href} variant="ghost">
-                {LANDING.pricingPreview.cta.label}
-                <IconArrowRight width={16} height={16} />
-              </ButtonLink>
-            </p>
+            <ol className={styles.steps}>
+              <li data-reveal>
+                <span>01</span>
+                <div>
+                  <h3>Make it yours.</h3>
+                  <p>Choose your sport. Create your tournament, add teams and set the rules.</p>
+                </div>
+                <IconTrophy size={24} />
+              </li>
+              <li data-reveal>
+                <span>02</span>
+                <div>
+                  <h3>Bring your people.</h3>
+                  <p>
+                    Invite players to register and owners to join. Your auction pool comes together.
+                  </p>
+                </div>
+                <IconUsers size={24} />
+              </li>
+              <li data-reveal>
+                <span>03</span>
+                <div>
+                  <h3>Let the bidding begin.</h3>
+                  <p>Run the live auction, build the squads and get your tournament moving.</p>
+                </div>
+                <IconGavel size={24} />
+              </li>
+            </ol>
           </div>
         </section>
 
-        {/* --- 5 · Closing CTA ---------------------------------------------- */}
-        <section className="mk-band mk-cta-band" data-theme="floodlight" aria-labelledby="beta">
-          <div className="mk-cta-photo" aria-hidden="true" />
-          {/* The hero's atmosphere returns for the closing scene. */}
-          <div className="mk-fx" aria-hidden="true">
-            <i className="mk-fx-beam mk-fx-beam--left" />
-            <i className="mk-fx-particles" />
-          </div>
-          <div className="mk-container">
-            <div className="mk-cta">
-              <div className="mk-cta-copy">
-                <p className="mk-kicker">{LANDING.beta.kicker}</p>
-                <h2 id="beta" className="mk-cta-title">
-                  {LANDING.beta.title}
-                </h2>
-                <p className="mk-cta-note">{LANDING.beta.note}</p>
-              </div>
-              <div className="mk-cta-actions">
-                <ButtonLink href={LANDING.beta.ctaPrimary.href} variant="primary" size="lg">
-                  {LANDING.beta.ctaPrimary.label}
-                  <IconArrowRight width={18} height={18} />
-                </ButtonLink>
-                <ButtonLink href={LANDING.beta.ctaSecondary.href} variant="secondary" size="lg">
-                  {LANDING.beta.ctaSecondary.label}
-                </ButtonLink>
-              </div>
+        <Suspense fallback={null}>
+          <LiveTournaments />
+        </Suspense>
+
+        {/* FR-1: real, permitted quotes — absent until there is one, and absent
+            when the database is (same guard as the strip above). */}
+        <Suspense fallback={null}>
+          <LandingVoices />
+        </Suspense>
+
+        <section className={styles.betaSection} aria-labelledby="beta-title">
+          <div className={styles.betaCard} data-reveal>
+            <div className={styles.betaCopy}>
+              <p className={styles.eyebrow}>
+                <IconSparkle /> AN OPEN INVITATION
+              </p>
+              <h2 id="beta-title">
+                Your next tournament.
+                <br />
+                On us.
+              </h2>
+              <p>
+                We’re in public beta. Explore the full platform, bring your teams and run the real
+                thing.
+              </p>
+              <Link className={styles.primary} href="/login">
+                Start free today <IconArrowRight size={18} />
+              </Link>
+            </div>
+            <div className={styles.price}>
+              <span>FREE DURING BETA</span>
+              <strong>
+                ₹0<span>/ tournament</span>
+              </strong>
+              <ul>
+                <li>
+                  <IconCheck size={16} /> Every feature included during beta
+                </li>
+                <li>
+                  <IconCheck size={16} /> No card required
+                </li>
+                <li>
+                  <IconCheck size={16} /> Tournaments started now stay free
+                </li>
+              </ul>
+              <Link href="/pricing">
+                View pricing & future passes <IconArrowRight size={16} />
+              </Link>
             </div>
           </div>
+          <div className={styles.trustLine}>
+            <span>
+              <IconShieldCheck size={17} /> Server-verified bidding
+            </span>
+            <span>
+              <IconReceipt size={17} /> A clear auction record
+            </span>
+            <span>
+              <IconTv size={17} /> Browser to big screen
+            </span>
+          </div>
+        </section>
+
+        <section className={styles.faqSection} aria-labelledby="faq-title">
+          <div>
+            <p className={styles.eyebrow}>BEFORE THE FIRST WHISTLE</p>
+            <h2 id="faq-title">
+              Good questions.
+              <br />
+              <span>Straight answers.</span>
+            </h2>
+            <Link className={styles.textLink} href="/help">
+              Explore the help centre <IconArrowRight size={17} />
+            </Link>
+          </div>
+          <div className={styles.faqList}>
+            {questions.map((item) => (
+              <details key={item.question}>
+                <summary>
+                  {item.question}
+                  <span aria-hidden="true">+</span>
+                </summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+        <section className={styles.finalCta} aria-labelledby="final-title">
+          <p className={styles.eyebrow}>YOUR SPORT. YOUR PEOPLE. YOUR MOMENT.</p>
+          <h2 id="final-title">
+            Let the games <span>begin.</span>
+          </h2>
+          {/*
+            TWO DOORS, BECAUSE THE PEOPLE WHO REACH THE BOTTOM WANT DIFFERENT THINGS.
+
+            The redesign kept only "Create your tournament" and dropped the
+            closing secondary, which was the ONE link from this page into
+            /schedule-demo — the booking calendar, the ICS invite, the reminder
+            sweep and the whole admin demo desk behind it. An organizer who read
+            the entire page and still wants to be shown it first had nowhere to
+            go but the footer. The label and destination come from
+            `LANDING.beta`, so the copy stays where every other marketing string
+            lives and `content.test.ts` keeps checking the href resolves.
+          */}
+          <div className={styles.actions}>
+            <Link className={styles.primary} href="/login">
+              Create your tournament <IconArrowRight size={18} />
+            </Link>
+            <Link className={styles.secondary} href={LANDING.beta.ctaSecondary.href}>
+              <IconCalendar size={15} /> {LANDING.beta.ctaSecondary.label}
+            </Link>
+          </div>
+          <p>Built for the people who bring people together.</p>
         </section>
       </main>
-    </div>
+    </HomeMotion>
+  );
+}
+function IconSparkle() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
+    </svg>
   );
 }

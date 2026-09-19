@@ -1,5 +1,6 @@
 import { Card } from "@desiauction/ui";
 
+import { compactINR, exactINR } from "../../../../lib/inr";
 import { roleLabeller } from "../../../../lib/role-label";
 import type { AuctionOverview } from "../../../../server/auction/auction-overview";
 
@@ -12,17 +13,6 @@ import type { AuctionOverview } from "../../../../server/auction/auction-overvie
  * same auction — this page does not fake a countdown it cannot keep.
  */
 
-function exactINR(paise: number): string {
-  return `₹${(paise / 100).toLocaleString("en-IN")}`;
-}
-
-function compactINR(paise: number): string {
-  const rupees = paise / 100;
-  if (rupees >= 10_000_000) return `₹${String(Math.round((rupees / 10_000_000) * 100) / 100)} Cr`;
-  if (rupees >= 100_000) return `₹${String(Math.round((rupees / 100_000) * 100) / 100)} L`;
-  return `₹${rupees.toLocaleString("en-IN")}`;
-}
-
 function initials(name: string | null): string {
   if (name === null || name.trim() === "") return "—";
   return name
@@ -33,7 +23,14 @@ function initials(name: string | null): string {
     .join("");
 }
 
-export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }) {
+export function AuctionOverviewPanel({
+  overview,
+  idleHint = "No lot is under the hammer. Open the cockpit to put the next one up.",
+}: {
+  overview: AuctionOverview;
+  /** What an empty block says — the organizer is told where to act; an observer is not. */
+  idleHint?: string;
+}) {
   const { counts, totalLots, moneyMoved, paddles, onBlock } = overview;
   const labelOf = roleLabeller(overview.roles);
   const pct = (n: number) => (totalLots > 0 ? (n / totalLots) * 100 : 0);
@@ -95,9 +92,7 @@ export function AuctionOverviewPanel({ overview }: { overview: AuctionOverview }
             </div>
           </div>
           {onBlock === null ? (
-            <p className="competitions-hint">
-              No lot is under the hammer. Open the cockpit to put the next one up.
-            </p>
+            <p className="competitions-hint">{idleHint}</p>
           ) : (
             <>
               <div className="auc-block-player">

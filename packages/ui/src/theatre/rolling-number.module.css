@@ -1,0 +1,52 @@
+/*
+ * THE ODOMETER. The wrapper is a run of inline columns; each column clips to
+ * one em so the outgoing digit (drawn by ::before, one em above) and the
+ * incoming digit (the real text, arriving from one em below) are only ever seen
+ * inside the line. Tabular numerals keep every column the same width, so the
+ * figure never re-flows while it rolls.
+ */
+.number {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.digit {
+  position: relative;
+  display: inline-block;
+  height: 1em;
+  line-height: 1;
+  vertical-align: top;
+  overflow: hidden;
+}
+
+.roll {
+  animation: roll-in var(--duration-slow) var(--ease-out) both;
+}
+
+/* The digit on its way out. Not in the DOM's text, and never text that fades:
+   it is carried off by the same transform that brings the new one in. */
+.roll::before {
+  content: attr(data-prev);
+  position: absolute;
+  left: 0;
+  top: -1em;
+}
+
+@keyframes roll-in {
+  from {
+    transform: translateY(1em);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roll {
+    animation: none;
+  }
+}

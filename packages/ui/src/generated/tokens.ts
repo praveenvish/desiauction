@@ -56,6 +56,7 @@ export const tokens = {
   "shadow-1": "var(--shadow-1)",
   "shadow-2": "var(--shadow-2)",
   "shadow-3": "var(--shadow-3)",
+  "shadow-4": "var(--shadow-4)",
 } as const;
 
 export type SemanticToken = keyof typeof tokens;

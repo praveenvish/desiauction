@@ -24,12 +24,13 @@ import type { SlotDay } from "../../server/marketing/demo-slots";
  */
 export function SlotPicker({
   days,
-  requestId,
+  requestHandle,
   token,
   submitLabel,
 }: {
   days: readonly SlotDay[];
-  requestId?: string;
+  /** The signed request handle (`pickHandleFor`), when booking a first time. */
+  requestHandle?: string;
   token?: string;
   submitLabel: string;
 }) {
@@ -47,7 +48,9 @@ export function SlotPicker({
 
   return (
     <form action={formAction}>
-      {requestId !== undefined ? <input type="hidden" name="requestId" value={requestId} /> : null}
+      {requestHandle !== undefined ? (
+        <input type="hidden" name="requestHandle" value={requestHandle} />
+      ) : null}
       {token !== undefined ? <input type="hidden" name="token" value={token} /> : null}
       <input type="hidden" name="slotStart" value={chosen ?? ""} />
 

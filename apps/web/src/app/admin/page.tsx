@@ -2,7 +2,13 @@ import { Badge, LoadingState } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { adminOutcomes, adminOverview, adminSportCatalogue } from "../../server/admin/actions";
+import {
+  adminDeskQueue,
+  adminOutcomes,
+  adminOverview,
+  adminSportCatalogue,
+} from "../../server/admin/actions";
+import { adminLiveNow } from "../../server/admin/live-watch";
 import { platformAdminPageGate } from "../../server/admin/authz";
 import type { SportCatalogueRow } from "../../server/admin/views";
 import { OverviewPanel } from "./overview-panel";
@@ -47,18 +53,26 @@ export default async function AdminPage() {
 }
 
 async function Board() {
-  const [overview, outcomes, catalogue] = await Promise.all([
+  const [overview, outcomes, catalogue, live, desks] = await Promise.all([
     adminOverview(),
     adminOutcomes(),
     adminSportCatalogue(),
+    adminLiveNow(),
+    adminDeskQueue(),
   ]);
-  if (overview === null || outcomes === null || catalogue === null) {
+  if (
+    overview === null ||
+    outcomes === null ||
+    catalogue === null ||
+    live === null ||
+    desks === null
+  ) {
     // Unreachable — the gate above already proved the grant. Fail closed anyway.
     notFound();
   }
   return (
     <>
-      <OverviewPanel overview={overview} outcomes={outcomes} />
+      <OverviewPanel overview={overview} outcomes={outcomes} live={live} desks={desks} />
       <SportCatalogue rows={catalogue} />
     </>
   );

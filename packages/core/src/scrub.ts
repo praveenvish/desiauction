@@ -45,6 +45,17 @@ const PATTERNS: readonly { readonly re: RegExp; readonly label: string }[] = [
   { re: /[\w.+-]+@[\w-]+\.[\w.-]+/g, label: "[email]" },
   // Long opaque credentials: provider keys and bearer tokens.
   { re: /\b(?:sk|rzp)_[A-Za-z0-9_]{8,}/g, label: "[key]" },
+  // A URL's sensitive query values. The SMS provider's API takes the one-time
+  // code and the number IN THE QUERY STRING, and Sentry's fetch spans record
+  // `url.full`/`url.query` — a live login code leaving the process.
+  {
+    re: /([?&](?:otp|code|token|mobile|phone|email|secret|signature|sig|key|authkey)=)[^&#\s"']*/gi,
+    label: "$1[redacted]",
+  },
+  // The same Indian mobile WITHOUT the plus, as providers write it (91XXXXXXXXXX).
+  { re: /(?<![\d+])91[6-9]\d{9}(?!\d)/g, label: "[phone]" },
+  // Capability links: the path segment IS the credential.
+  { re: /\/(join|owner-join|demo|review)\/[^/?#\s"']+/g, label: "/$1/[token]" },
 ];
 
 /** Redact sensitive shapes inside free text. */

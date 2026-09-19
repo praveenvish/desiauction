@@ -2,12 +2,12 @@
 
 import { headers } from "next/headers";
 
-import { newId, newsletterSubscribers } from "@desiauction/db";
-
 import { env } from "../../env";
 import { clientIp } from "../../lib/client-ip";
 import { db } from "../db";
 import { sendDemoRequestMail } from "./demo-mail";
+import { isSubscribeThrottled, subscribe, unsubscribe } from "./newsletter";
+import { pickHandleFor } from "./demo-booking";
 import {
   isThrottled,
   recordDemoRequest,
@@ -22,6 +22,15 @@ import { logger } from "../logger";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * THE FOOTER'S SIGN-UP — limited, retained for a stated time, and reversible.
+ *
+ * The limit is a row count per network address, like every other anonymous
+ * write here (see `server/marketing/newsletter.ts`); it used to live in process
+ * memory, which a restart forgot. A refused sign-up reads as the ordinary
+ * success, as `requestOtp` and `requestDemo` do: telling a script which of its
+ * attempts counted is telling it the shape of the limit.
+ */
 export async function subscribeNewsletterAction(
   _previous: { error?: string; success?: boolean },
   formData: FormData,
@@ -30,16 +39,28 @@ export async function subscribeNewsletterAction(
   if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
     return { error: "Enter a valid email address." };
   }
-  try {
-    await db
-      .insert(newsletterSubscribers)
-      .values({ id: newId(), email: email.trim().toLowerCase() });
-  } catch {
-    // Duplicate email (unique constraint) — treated as success, not an error;
-    // the person is already subscribed.
+  const ip = await requestIp();
+  if (await isSubscribeThrottled(db, ip)) {
     return { success: true };
   }
+  await subscribe(db, email, ip);
   return { success: true };
+}
+
+/**
+ * Take an address off the list. The answer is the same whether or not it was on
+ * it, so this page cannot be used to learn who subscribed.
+ */
+export async function unsubscribeNewsletterAction(
+  _previous: { error?: string; done?: boolean },
+  formData: FormData,
+): Promise<{ error?: string; done?: boolean }> {
+  const email = formData.get("email");
+  if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
+    return { error: "Enter a valid email address." };
+  }
+  await unsubscribe(db, email);
+  return { done: true };
 }
 
 /**
@@ -64,8 +85,11 @@ export interface DemoRequestState {
   readonly error?: string;
   readonly field?: ValidationField;
   readonly success?: boolean;
-  /** Phase 2: the picker needs the id of the request it is booking against. */
-  readonly requestId?: string;
+  /**
+   * The SIGNED handle the picker books with (`pickHandleFor`), never the bare
+   * request id — see demo-booking.ts for why the id alone is not enough.
+   */
+  readonly pickHandle?: string;
 }
 
 async function requestIp(): Promise<string | null> {
@@ -126,5 +150,5 @@ export async function requestDemoAction(
     logger().error({ demoRequestId: requestId, ...outcomes }, "demo.request_mail_failed");
   }
 
-  return { success: true, requestId };
+  return { success: true, pickHandle: pickHandleFor(requestId) };
 }

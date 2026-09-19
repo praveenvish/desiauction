@@ -24,6 +24,11 @@ if (env.SENTRY_DSN !== undefined) {
      * disagree about what is sensitive.
      */
     beforeSend: (event) => scrub(event) as typeof event,
+    // Transactions are NOT errors and never pass through beforeSend. Their
+    // spans record outgoing URLs (url.full / url.query) — the SMS provider's
+    // carries the one-time code and the mobile — and incoming paths that are
+    // capability links. Same scrub, second door.
+    beforeSendTransaction: (event) => scrub(event) as typeof event,
   });
 }
 
@@ -73,6 +78,7 @@ const { server, hub } = buildServer({
   allowedOrigins: env.ENGINE_ALLOWED_ORIGINS,
   maxSocketsPerRoom: env.WS_MAX_SOCKETS_PER_ROOM,
   maxSocketsPerIp: env.WS_MAX_SOCKETS_PER_IP,
+  trustedProxies: env.TRUSTED_PROXY_COUNT,
 });
 
 // The watchdog cadence: 250ms timer authority (lot expiry, closing-soon) and

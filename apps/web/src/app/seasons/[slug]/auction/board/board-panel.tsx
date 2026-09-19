@@ -9,6 +9,8 @@ import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
 import { purseRowKey, teamPurseRows, type TeamIdentity } from "../purse-board";
 import { useAuctionSocket } from "../use-auction-socket";
+import { useCeremonySound } from "../use-ceremony-sound";
+import { SoundToggle } from "../../../../../components/shell/sound-toggle";
 
 import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
 
@@ -144,7 +146,8 @@ export function BoardPanel({
   // DA-20: the board read `connection !== "open"` and ignored `stale`/`offline`
   // entirely, so six seconds offline left the projector byte-identical to the
   // online frame — pulsing green dot, "LIVE AUCTION", live money, no warning.
-  const { snapshot, remainingMs, stale, offline } = useAuctionSocket(wsUrl);
+  const { snapshot, remainingMs, ceremony, stale, offline } = useAuctionSocket(wsUrl);
+  useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   const feed = useLiveFeed(resolved, snapshot);
 
   const soldLots = feed.resolved.filter((entry) => entry.status === "sold");
@@ -279,6 +282,10 @@ export function BoardPanel({
       data-status={status ?? "connecting"}
       data-stale={stale ? "true" : "false"}
     >
+      {/* The projector's one control besides the browser: sound, off by
+          default, switched on by whoever set the laptop up. Floated so it
+          takes no row of the frame. */}
+      <SoundToggle className="board-sound" />
       <header className="board-head">
         <div className="board-head-main">
           {/* DA-15: this said "Live auction" whatever the auction was doing —

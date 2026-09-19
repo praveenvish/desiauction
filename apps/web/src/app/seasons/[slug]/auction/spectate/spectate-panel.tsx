@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { formatPaiseINR, paise, type AuctionSnapshot, type AuctionStatus } from "@desiauction/core";
-import { Badge, Card } from "@desiauction/ui";
+import { Badge, Card, IconArrowRight } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
 import { PageStatus } from "../../../../../components/shell/page-status";
@@ -19,6 +20,7 @@ import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
+import { useCeremonySound } from "../use-ceremony-sound";
 import { ShareAuction } from "./share-auction";
 
 import type { TeamIdentity } from "../purse-board";
@@ -28,6 +30,7 @@ import type {
   PreSignedPlayer,
   ResolvedLot,
 } from "../../../../../server/auction/live-summary";
+import { useHydrated } from "../../../../../lib/use-hydrated";
 
 // The spectator panel: the same lot hero, feed and purse board the owner room
 // reads, ALL derived from the broadcast AuctionSnapshot — minus every control.
@@ -38,7 +41,8 @@ type BidEntry = NonNullable<AuctionSnapshot["currentLot"]>["bidHistory"][number]
 interface RetainedBids {
   lotId: string;
   playerName: string;
-  history: BidEntry[];
+  /** The snapshot's own (immutable) array, kept by reference so a new one is detectable. */
+  history: readonly BidEntry[];
 }
 
 /**
@@ -53,29 +57,33 @@ interface RetainedBids {
  * which is exactly what `assertive` is for. Fires ONCE per resolution, keyed on
  * the outcome's sequence number (reconnect replays repeat it; `atSeq` does not).
  */
-function SaleAnnouncer({ snapshot }: { snapshot: AuctionSnapshot | null }) {
-  const [message, setMessage] = useState("");
-  const [seenSeq, setSeenSeq] = useState<number | null>(null);
+type Outcome = NonNullable<AuctionSnapshot["lastOutcome"]>;
 
-  useEffect(() => {
-    const outcome = snapshot?.lastOutcome ?? null;
-    if (outcome === null || outcome.atSeq === seenSeq) {
-      return;
-    }
-    setSeenSeq(outcome.atSeq);
-    const who = outcome.playerName ?? outcome.lotNumber;
-    setMessage(
-      outcome.kind === "sold"
-        ? `Sold. ${who} to ${outcome.teamName ?? "the leading team"}${
-            outcome.amount === null ? "" : ` for ${formatPaiseINR(paise(outcome.amount))}`
-          }.`
-        : outcome.kind === "unsold"
-          ? `${who} goes unsold.`
-          : outcome.kind === "withdrawn"
-            ? `${who} withdrawn from the auction.`
-            : `${who} is back on the block.`,
-    );
-  }, [snapshot, seenSeq]);
+function saleSentence(outcome: Outcome): string {
+  const who = outcome.playerName ?? outcome.lotNumber;
+  return outcome.kind === "sold"
+    ? `Sold. ${who} to ${outcome.teamName ?? "the leading team"}${
+        outcome.amount === null ? "" : ` for ${formatPaiseINR(paise(outcome.amount))}`
+      }.`
+    : outcome.kind === "unsold"
+      ? `${who} goes unsold.`
+      : outcome.kind === "withdrawn"
+        ? `${who} withdrawn from the auction.`
+        : `${who} is back on the block.`;
+}
+
+function SaleAnnouncer({ snapshot }: { snapshot: AuctionSnapshot | null }) {
+  // Adjusted during render, so the alert fires in the same commit as the
+  // SOLD card instead of one effect later.
+  const [announced, setAnnounced] = useState<{ seq: number | null; message: string }>({
+    seq: null,
+    message: "",
+  });
+  const outcome = snapshot?.lastOutcome ?? null;
+  if (outcome !== null && outcome.atSeq !== announced.seq) {
+    setAnnounced({ seq: outcome.atSeq, message: saleSentence(outcome) });
+  }
+  const message = announced.message;
 
   return (
     <p
@@ -159,8 +167,9 @@ export function SpectatePanel({
 }) {
   const { snapshot, connection, remainingMs, ceremony, stale, offline, clock } =
     useAuctionSocket(wsUrl);
+  useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   const feed = useLiveFeed(resolved, snapshot);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
   // PX-6 large-screen mode: the projector view — ceremony only, huge type.
   const [stage, setStage] = useState(false);
   // The bids that built the last price. They used to vanish the instant the
@@ -168,23 +177,19 @@ export function SpectatePanel({
   // became null — so the four bids that made the drama were replaced by "Bids
   // appear here once a lot opens." directly under the confetti.
   const [lastBids, setLastBids] = useState<RetainedBids | null>(null);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   const lot = snapshot?.currentLot ?? null;
   const outcome = snapshot?.lastOutcome ?? null;
 
-  useEffect(() => {
-    const current = snapshot?.currentLot ?? null;
-    if (current !== null && current.bidHistory.length > 0) {
-      setLastBids({
-        lotId: current.lotId,
-        playerName: current.playerName ?? "Unnamed",
-        history: [...current.bidHistory],
-      });
-    }
-  }, [snapshot]);
+  // Retained during render whenever the lot's history is a new array, so the
+  // list under the SOLD card never renders a frame without its bids.
+  if (lot !== null && lot.bidHistory.length > 0 && lastBids?.history !== lot.bidHistory) {
+    setLastBids({
+      lotId: lot.lotId,
+      playerName: lot.playerName ?? "Unnamed",
+      history: lot.bidHistory,
+    });
+  }
 
   // Escape leaves fullscreen without touching React, so `data-stage` used to
   // stay "true" over a windowed page: the toggle then read "Exit big screen"
@@ -310,6 +315,7 @@ export function SpectatePanel({
           ceremony={ceremony}
           remainingMs={remainingMs}
           lotMedia={lotMedia}
+          stampSize={stage ? "stage" : "lg"}
         />
       ) : (
         <div className="stage-hide">
@@ -441,9 +447,10 @@ export function SpectatePanel({
 
       <p className="spectate-footer stage-hide" data-testid="spectate-footer">
         <span>This auction is running on DesiAuction. Yours can too.</span>
-        <a href="/" data-testid="spectate-footer-cta">
-          Run your own auction →
-        </a>
+        <Link href="/" data-testid="spectate-footer-cta">
+          Run your own auction
+          <IconArrowRight size={16} className="icon-trail" />
+        </Link>
       </p>
     </div>
   );

@@ -13,9 +13,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
-import { dbHandle, systemDb } from "../db";
+import { dbHandle } from "../db";
 import { can } from "../orgs/authz";
-import { resolveTenant } from "../orgs/orgs";
+import { orgsFor, resolveTenant } from "../orgs/orgs";
+import { acrossOrgs, asPerson } from "../tenant";
+import { resolveMemberCompetition } from "./resolve";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   isResultOutcome,
@@ -28,12 +30,7 @@ import {
   type LobbyResultEntry,
   type StandingsView,
 } from "./results";
-import {
-  resolveCompetition,
-  teamsOf,
-  type CompetitionSummary,
-  type TeamSummary,
-} from "./competitions";
+import { teamsOf, type CompetitionSummary, type TeamSummary } from "./competitions";
 import {
   cancelFixture,
   completeFixture,
@@ -123,7 +120,7 @@ async function fixtureGate(
   { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
 > {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
@@ -373,7 +370,7 @@ export async function fixtureDashboard(
   params: FixtureDashboardParams,
 ): Promise<FixtureDashboard | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -675,7 +672,7 @@ export async function calendarView(
   params: { view?: string; date?: string },
 ): Promise<CalendarView | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -719,7 +716,7 @@ export async function matchDayView(
   params: { date?: string },
 ): Promise<MatchDayView | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -747,8 +744,24 @@ export async function matchDayView(
 /** The organizer schedule strip on /competitions (across every org they belong to). */
 export async function organizerScheduleView(): Promise<OrganizerFixture[]> {
   const session = await requireSession();
-  // Cross-org union scoped by the membership join — system pool by design.
-  return organizerSchedule(systemDb, session.personId, nowWallClock());
+  /*
+   * ONE BOUNDARY PER CLUB, then merged — never one query over every club on the
+   * bypass pool. Each club contributes its own next ten; the merged list is
+   * re-sorted on the same (kickoff, seq) key the query uses and cut to ten, so
+   * the strip shows exactly what the single cross-club query used to.
+   */
+  const LIMIT = 10;
+  const from = nowWallClock();
+  const orgs = await asPerson(session.personId, (db) => orgsFor(db, session.personId));
+  const perOrg = await acrossOrgs(
+    session.personId,
+    orgs.map((org) => org.id),
+    (db) => organizerSchedule(db, session.personId, from, LIMIT),
+  );
+  return perOrg
+    .flat()
+    .sort((a, b) => (a.kickoffAt ?? "9999").localeCompare(b.kickoffAt ?? "9999") || a.seq - b.seq)
+    .slice(0, LIMIT);
 }
 
 // --- CSV import (validate → preview → commit) + export --------------------------------
@@ -855,7 +868,7 @@ export interface StandingsPageView {
  */
 export async function standingsView(slug: string): Promise<StandingsPageView | null> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
@@ -898,7 +911,7 @@ export async function recordResultAction(
   },
 ): Promise<{ ok: boolean; error?: string | undefined; amended?: boolean | undefined }> {
   const session = await requireSession();
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
@@ -993,7 +1006,7 @@ export async function lobbyParticipantsAction(
   if (session === null) {
     return [];
   }
-  const competition = await resolveCompetition(systemDb, session.personId, slug);
+  const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return [];
   }

@@ -92,3 +92,80 @@
     }
   }
 }
+
+/*
+ * SCROLL REVEAL — content below the fold arrives as the reader reaches it.
+ * Transform only, deliberately: the accessibility scans sample contrast at
+ * every frame, and a text block fading in from opacity 0 fails mid-frame.
+ * `backwards`, not `both`: a filled animation outranks a plain declaration
+ * and would make every :hover transform on the same element inert.
+ *
+ * Anything already in view at load sits past its own entry range, so
+ * above-the-fold content never animates — only what scrolls in.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .da-reveal {
+      animation: da-reveal linear backwards;
+      animation-timeline: view();
+      animation-range-start: entry calc(var(--reveal-index, 0) * 5%);
+      animation-range-end: entry calc(45% + var(--reveal-index, 0) * 5%);
+    }
+  }
+}
+
+@keyframes da-reveal {
+  from {
+    transform: translateY(var(--space-6)) scale(0.985);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+/*
+ * FIRST-PAINT STAGGER — for what is already on screen when a page opens: the
+ * children of a `.da-stagger` settle into place one after another, 60ms
+ * apart, inside the slow rung. Transform only, for the same reason as above.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .da-stagger > * {
+    animation: da-settle var(--duration-slow) var(--ease-out) backwards;
+    animation-delay: calc(var(--stagger-index, 0) * 60ms);
+  }
+
+  .da-stagger > :nth-child(2) {
+    --stagger-index: 1;
+  }
+
+  .da-stagger > :nth-child(3) {
+    --stagger-index: 2;
+  }
+
+  .da-stagger > :nth-child(4) {
+    --stagger-index: 3;
+  }
+
+  .da-stagger > :nth-child(5) {
+    --stagger-index: 4;
+  }
+
+  .da-stagger > :nth-child(6) {
+    --stagger-index: 5;
+  }
+
+  .da-stagger > :nth-child(n + 7) {
+    --stagger-index: 6;
+  }
+}
+
+@keyframes da-settle {
+  from {
+    transform: translateY(var(--space-3)) scale(0.99);
+  }
+
+  to {
+    transform: none;
+  }
+}

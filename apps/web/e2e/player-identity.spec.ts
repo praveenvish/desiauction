@@ -115,7 +115,7 @@ test("a settled season renders on /me/cricket with its verdict and price", async
   await page.goto("/home");
   const career = page.getByTestId("home-career-link");
   await expect(career).toBeVisible();
-  await expect(career).toHaveText("My cricket →");
+  await expect(career).toHaveText("My cricket");
   await expect(career).toHaveAttribute("href", "/me/cricket");
 });
 

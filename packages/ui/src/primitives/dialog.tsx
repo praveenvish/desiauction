@@ -38,6 +38,15 @@ export function Dialog({ open, onClose, title, children, footer, size = "default
   }, [open]);
 
   return (
+    /*
+     * jsx-a11y reads `<dialog>` as a non-interactive element and asks for a
+     * keyboard equivalent of the backdrop click below. There already is one and
+     * it is the platform's: a modal `<dialog>` closes on Escape natively, which
+     * fires `onClose` — the same handler the click ends up calling. Adding a key
+     * listener here would be a second, worse implementation of Escape, on an
+     * element a keyboard user cannot focus in the first place.
+     */
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <dialog
       ref={ref}
       className={[styles["dialog"], size === "wide" ? styles["wide"] : ""]

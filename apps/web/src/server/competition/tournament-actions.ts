@@ -14,20 +14,20 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { currentSession } from "../auth/actions";
-import { dbHandle, systemDb } from "../db";
+import { dbHandle } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { orgsFor } from "../orgs/orgs";
+import { acrossOrgs } from "../tenant";
 import { competitionsView } from "./actions";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   byEditionDate,
-  competitionsForPerson,
-  competitionsOfTournament,
   createTournament,
   isoToday,
   isRunningNow,
   type CompetitionSummary,
 } from "./competitions";
+import { memberCompetitions, memberTournamentSeasons, resolveMemberTournament } from "./resolve";
 
 /**
  * The tournament surface.
@@ -78,15 +78,23 @@ const NO_COUNTS: SeasonCounts = { teams: 0, matches: 0, pending: 0 };
  * own lifecycle rail would not say.
  */
 async function settlementStatusFor(
+  personId: string,
+  orgIds: string[],
   competitionIds: string[],
 ): Promise<Map<string, "settling" | "settled">> {
   if (competitionIds.length === 0) {
     return new Map();
   }
-  const rows = await systemDb
-    .select({ competitionId: settlementCases.competitionId, status: settlementCases.status })
-    .from(settlementCases)
-    .where(inArray(settlementCases.competitionId, competitionIds));
+  // One boundary per club (see `acrossOrgs`): settlement cases are money rows,
+  // and the policy that fences them has to be the thing doing the fencing.
+  const rows = (
+    await acrossOrgs(personId, orgIds, (db) =>
+      db
+        .select({ competitionId: settlementCases.competitionId, status: settlementCases.status })
+        .from(settlementCases)
+        .where(inArray(settlementCases.competitionId, competitionIds)),
+    )
+  ).flat();
   const by = new Map<string, "settling" | "settled">();
   for (const row of rows) {
     if (row.status === "voided") {
@@ -237,24 +245,30 @@ export interface TournamentsView {
  * The empty-id guard is not defensive noise: `inArray` with no values compiles
  * to `in ()`, which Postgres rejects outright.
  */
-async function countsFor(competitionIds: string[]): Promise<Map<string, SeasonCounts>> {
+async function countsFor(
+  personId: string,
+  orgIds: string[],
+  competitionIds: string[],
+): Promise<Map<string, SeasonCounts>> {
   const counts = new Map<string, SeasonCounts>();
   if (competitionIds.length === 0) {
     return counts;
   }
   const tally = sql<number>`count(*)::int`;
-  const [teamRows, fixtureRows, pendingRows] = await Promise.all([
-    systemDb
+  // Grouped by season, and every season belongs to exactly one club, so the
+  // per-club results concatenate without double-counting anything.
+  const slices = await acrossOrgs(personId, orgIds, async (db) => ({
+    teamRows: await db
       .select({ competitionId: teams.competitionId, count: tally })
       .from(teams)
       .where(inArray(teams.competitionId, competitionIds))
       .groupBy(teams.competitionId),
-    systemDb
+    fixtureRows: await db
       .select({ competitionId: fixtures.competitionId, count: tally })
       .from(fixtures)
       .where(inArray(fixtures.competitionId, competitionIds))
       .groupBy(fixtures.competitionId),
-    systemDb
+    pendingRows: await db
       .select({ competitionId: registrations.competitionId, count: tally })
       .from(registrations)
       .where(
@@ -265,7 +279,10 @@ async function countsFor(competitionIds: string[]): Promise<Map<string, SeasonCo
         ),
       )
       .groupBy(registrations.competitionId),
-  ]);
+  }));
+  const teamRows = slices.flatMap((slice) => slice.teamRows);
+  const fixtureRows = slices.flatMap((slice) => slice.fixtureRows);
+  const pendingRows = slices.flatMap((slice) => slice.pendingRows);
   const read = (id: string): SeasonCounts => {
     const existing = counts.get(id);
     if (existing !== undefined) {
@@ -297,26 +314,35 @@ export async function tournamentsView(): Promise<TournamentsView> {
     withTenantDb(dbHandle, { personId: session.personId }, (db) => orgsFor(db, session.personId)),
     // Cross-org union scoped by the membership join — the same system-pool
     // pattern competitionsView uses.
-    competitionsForPerson(systemDb, session.personId),
+    memberCompetitions(session.personId),
   ]);
   const orgIds = orgs.map((org) => org.id);
   const orgNames = new Map(orgs.map((org) => [org.id, org.name]));
-  const rows =
-    orgIds.length === 0
-      ? []
-      : await systemDb
-          .select({
-            id: tournaments.id,
-            name: tournaments.name,
-            slug: tournaments.slug,
-            orgId: tournaments.orgId,
-            createdAt: tournaments.createdAt,
-          })
-          .from(tournaments)
-          .where(inArray(tournaments.orgId, orgIds))
-          .orderBy(tournaments.name);
-  const counts = await countsFor(seasons.map((season) => season.id));
-  const settlementBy = await settlementStatusFor(seasons.map((season) => season.id));
+  // Each club's own tournaments, read inside its own boundary, then merged into
+  // the single alphabetical list the page has always shown.
+  const rows = (
+    await acrossOrgs(session.personId, orgIds, (db, orgId) =>
+      db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          slug: tournaments.slug,
+          orgId: tournaments.orgId,
+          createdAt: tournaments.createdAt,
+        })
+        .from(tournaments)
+        // Stated as well as enforced: the policy confines this to the club, and
+        // the WHERE says so to anyone reading the query.
+        .where(eq(tournaments.orgId, orgId)),
+    )
+  )
+    .flat()
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const seasonIds = seasons.map((season) => season.id);
+  const [counts, settlementBy] = await Promise.all([
+    countsFor(session.personId, orgIds, seasonIds),
+    settlementStatusFor(session.personId, orgIds, seasonIds),
+  ]);
   const today = isoToday();
   const enriched: SeasonRow[] = byEditionDate(seasons).map((season) => ({
     ...season,
@@ -377,21 +403,14 @@ export interface TournamentHeader {
  */
 const tournamentHeaderOnce = cache(async (slug: string): Promise<TournamentHeader | null> => {
   const session = await requireSession();
-  const [[row], orgs] = await Promise.all([
-    systemDb
-      .select({
-        id: tournaments.id,
-        name: tournaments.name,
-        slug: tournaments.slug,
-        orgId: tournaments.orgId,
-      })
-      .from(tournaments)
-      .where(eq(tournaments.slug, slug))
-      .limit(1),
+  // Membership is part of the resolution itself (see `resolve.ts`): a person
+  // outside the club gets null here, which the page turns into a 404.
+  const [row, orgs] = await Promise.all([
+    resolveMemberTournament(session.personId, slug),
     withTenantDb(dbHandle, { personId: session.personId }, (db) => orgsFor(db, session.personId)),
   ]);
   const org = orgs.find((candidate) => candidate.id === row?.orgId);
-  if (row === undefined || org === undefined) {
+  if (row === null || org === undefined) {
     return null;
   }
   const canCreateSeason = await withTenantDb(
@@ -424,21 +443,9 @@ export async function tournamentSeasons(
   if (session === null) {
     return [];
   }
-  const [tournament] = await systemDb
-    .select({ orgId: tournaments.orgId })
-    .from(tournaments)
-    .where(eq(tournaments.id, tournamentId))
-    .limit(1);
-  if (tournament === undefined) {
-    return [];
-  }
-  const orgs = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    orgsFor(db, session.personId),
-  );
-  if (!orgs.some((org) => org.id === tournament.orgId)) {
-    return [];
-  }
-  const seasons = await competitionsOfTournament(systemDb, tournamentId);
+  // Empty for a non-member or an unknown id — the membership check is in the
+  // same SQL as the tournament lookup, before any edition is read.
+  const seasons = await memberTournamentSeasons(session.personId, tournamentId);
   const today = isoToday();
   return byEditionDate(seasons).map((season) => ({
     ...season,

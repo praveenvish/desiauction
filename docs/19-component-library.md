@@ -28,6 +28,9 @@
 | `LotCard` | The current player: identity, base price, role — the lit thing (05) |
 | `BidTicker` | Current bid + leading team with landing animation (11) |
 | `TimerRing` | Depleting ring; anti-snipe refill; reduced-motion numeric fallback |
+| `RollingNumber` | Odometer figure — changed digits roll, text content is exactly the figure (PREMIUM-1) |
+| `SoldStamp` / `HammerStrike` | The gold SOLD stamp with the gavel strike; `unsold` tone is neutral ink, no hammer (PREMIUM-1) |
+| `GoldDrift` | Deterministic rising gold motes behind a ceremony; aria-hidden, gone under reduced motion (PREMIUM-1) |
 | `PurseMeter` | Team budget: spent/remaining/reserve-locked segments |
 | `GavelButton` | Cockpit hold-to-close with progress (15) |
 | `SoldStamp` | The ceremony (11); sole consumer of ceremony tokens |

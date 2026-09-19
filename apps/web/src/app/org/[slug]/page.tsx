@@ -7,6 +7,8 @@ import {
   AnnouncerProvider,
   ToastProvider,
   VisuallyHidden,
+  IconArrowRight,
+  IconCheck,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { enabledSports } from "../../../server/competition/sports";
@@ -66,6 +68,8 @@ const ACTIVITY_PHRASE: Record<string, string> = {
   "grant.revoked": "Access revoked",
   "org.members.invite": "Member invited",
   "org.members.removed": "Member removed",
+  // The privacy desk erased somebody at their request (server/privacy/erasure.ts).
+  "person.erased": "A member's account was erased",
   "team.created": "Team added",
   "payment.captured": "Payment received",
   "settlement.CaseClosed": "Settlement closed",
@@ -180,7 +184,7 @@ function OrgLadder({ rungs, current }: { rungs: OrgRung[]; current: number }) {
           return (
             <li key={rung.key} className={`od-rung od-rung--${state}`}>
               <span className="od-rung-mark" aria-hidden>
-                {rung.done ? "✓" : rung.step}
+                {rung.done ? <IconCheck size={14} /> : rung.step}
               </span>
               <span className="od-rung-text">
                 <strong>
@@ -203,20 +207,26 @@ function OrgLadder({ rungs, current }: { rungs: OrgRung[]; current: number }) {
 export default async function OrgHomePage({ params }: { params: Promise<{ slug: string }> }) {
   // The sports currently switched on — the picker renders only when there is
   // more than one (SP-1 Phase 1).
-  const sportOptions = await enabledSports();
   const { slug } = await params;
-  const view = await orgView(slug);
+  // ONE batch, not three steps in series. The gate still decides the answer
+  // before anything renders — `notFound()` below — but the panel reads no longer
+  // wait for it: each re-checks membership itself and returns null for a
+  // stranger, so running them alongside the gate reveals nothing and saves two
+  // round-trip depths on every visit.
+  const [sportOptions, view, authority, finance, catalogue, overview, messaging] =
+    await Promise.all([
+      enabledSports(),
+      orgView(slug),
+      moneyAuthority(slug),
+      financeAuthority(slug),
+      orgCatalogue(slug),
+      orgOverview(slug),
+      orgMessagingSettingsView(slug),
+    ]);
   if (view === null) {
     // Non-members and unknown slugs are indistinguishable (M-IP2-3 tenancy).
     notFound();
   }
-  const [authority, finance, catalogue, overview, messaging] = await Promise.all([
-    moneyAuthority(slug),
-    financeAuthority(slug),
-    orgCatalogue(slug),
-    orgOverview(slug),
-    orgMessagingSettingsView(slug),
-  ]);
 
   // Counts fold from the reads already in hand — no extra query.
   const editions = [
@@ -331,8 +341,16 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   // hand. Shown only to somebody who can actually climb them.
   const canManageOrg = view.viewer.canCreateTournament;
   const editionNeedingTeams = editions.find((edition) => edition.teams === 0) ?? editions[0];
+  /*
+   * A SEASON THAT HAS NOT REACHED REGISTRATION YET — not merely one that is not
+   * open right now. The old test was `status !== "registration_open"`, which
+   * matches a season whose registration has CLOSED and whose auction has been
+   * conducted and completed, and then points "Open registration" at it.
+   */
+  const reachedRegistration = (status: string): boolean =>
+    status === "registration_open" || status === "registration_closed";
   const editionToOpen =
-    editions.find((edition) => edition.status !== "registration_open") ?? editions[0];
+    editions.find((edition) => !reachedRegistration(edition.status)) ?? editions[0];
   const rungs: OrgRung[] = [
     {
       key: "tournament",
@@ -381,7 +399,20 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       step: 5,
       title: "Open registration",
       blurb: "Players sign up, you approve them, and they become the auction pool.",
-      done: editions.some((edition) => edition.status === "registration_open"),
+      /*
+       * DONE MEANS "YOU HAVE DONE IT", NOT "IT IS HAPPENING RIGHT NOW".
+       *
+       * This asked whether some season is CURRENTLY `registration_open`, so the
+       * rung un-completed itself the moment registration closed — and the whole
+       * ladder came back, on a club that had already run and completed an
+       * auction, telling the owner to open registration and offering the button.
+       * `/home`'s equivalent rung tests `registrations > 0` and was right all
+       * along; this one tested the transient state instead of the durable fact.
+       *
+       * `registration_closed` counts because the machine only reaches it
+       * THROUGH `registration_open` — closing is proof the step was taken.
+       */
+      done: editions.some((edition) => reachedRegistration(edition.status)),
       cta:
         editionToOpen === undefined ? null : (
           <ButtonLink href={`/seasons/${editionToOpen.slug}`} size="touch">
@@ -439,7 +470,10 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
         <Card className="od-panel">
           <div className="od-panel-head">
             <h2>Live &amp; open now</h2>
-            <Link href={`/org/${slug}#tournaments`}>All tournaments →</Link>
+            <Link href={`/org/${slug}#tournaments`}>
+              All tournaments
+              <IconArrowRight size={16} className="icon-trail" />
+            </Link>
           </div>
           {liveOpen.length === 0 ? (
             <p className="competitions-hint">Nothing live or taking entries right now.</p>
@@ -453,7 +487,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                       {row.tone === "live" ? "Live" : "Open"}
                     </Badge>
                     <span className="od-live-go" aria-hidden>
-                      →
+                      <IconArrowRight size={16} aria-hidden />
                     </span>
                   </Link>
                 </li>
@@ -507,7 +541,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
               size="touch"
               data-testid="open-venues"
             >
-              Venues →
+              Venues
+              <IconArrowRight size={16} className="icon-trail" />
             </ButtonLink>
           ) : null}
         </div>
@@ -577,7 +612,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                 </span>
               </span>
               <span className="od-moneydoor-go" aria-hidden>
-                →
+                <IconArrowRight size={16} aria-hidden />
               </span>
             </Link>
           ) : null}

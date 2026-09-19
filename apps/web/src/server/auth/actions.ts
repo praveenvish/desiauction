@@ -20,6 +20,7 @@ import { db, dbHandle } from "../db";
 import { createPlayerSmsSender } from "../competition/registration-notify";
 import { maySend } from "../messaging/consent";
 import { SMS_TEMPLATES, renderTemplate } from "../messaging/templates";
+import { openChallenge, sealChallenge } from "./challenge-cookie";
 import { requestOtp, verifyOtp } from "./otp";
 import {
   confirmEmailVerification,
@@ -30,6 +31,7 @@ import { requestEmailLogin, verifyEmailLogin } from "./email-login";
 import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
+import { logger } from "../logger";
 import { safeNext } from "./redirect";
 import { ensureTermsConsent } from "./terms-consent";
 import {
@@ -55,11 +57,13 @@ import {
   getSessionByToken,
   listSessions,
   revokeOtherSessions,
+  signedInRecently,
   revokeSession,
   revokeSessionByToken,
   type SessionSummary,
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
+import { cache } from "react";
 
 const CHALLENGE_COOKIE = "da_pk_challenge";
 
@@ -88,8 +92,15 @@ const CHALLENGE_COOKIE = "da_pk_challenge";
  */
 const secureCookie = env.NODE_ENV === "production" && !env.ALLOW_INSECURE_LOCAL_PRODUCTION;
 
+/**
+ * The key the challenge cookie is sealed with. Derived, domain-separated, from a
+ * secret production already requires to be strong (preflight refuses the dev
+ * default), so sealing adds no new variable an operator can forget to set.
+ */
+const CHALLENGE_KEY = `passkey-challenge-key:${env.ENGINE_SECRET}`;
+
 async function setChallenge(challenge: string): Promise<void> {
-  (await cookies()).set(CHALLENGE_COOKIE, challenge, {
+  (await cookies()).set(CHALLENGE_COOKIE, sealChallenge(CHALLENGE_KEY, challenge), {
     httpOnly: true,
     secure: secureCookie,
     sameSite: "lax",
@@ -102,7 +113,7 @@ async function takeChallenge(): Promise<string | null> {
   const store = await cookies();
   const value = store.get(CHALLENGE_COOKIE)?.value ?? null;
   store.delete(CHALLENGE_COOKIE);
-  return value;
+  return value === null ? null : openChallenge(CHALLENGE_KEY, value);
 }
 
 async function requestIp(): Promise<string | null> {
@@ -183,7 +194,14 @@ export async function requestOtpAction(
   const phone = formString(formData, "phone");
   let result: Awaited<ReturnType<typeof requestOtp>>;
   try {
-    result = await requestOtp(db, sender, phone, await requestIp());
+    result = await requestOtp(
+      db,
+      sender,
+      phone,
+      await requestIp(),
+      "login",
+      env.OTP_GLOBAL_HOURLY_CAP,
+    );
   } catch (error) {
     // PX-3: provider failure (or open breaker) is an honest, retryable state —
     // never a crash screen on the front door.
@@ -218,6 +236,14 @@ export async function requestOtpAction(
         phone: normalized.ok ? normalized.phone : phone,
         ...carriedNext,
         error: "Code already sent — wait 30 seconds before requesting again.",
+      };
+    }
+    if (result.reason === "busy") {
+      return {
+        step: "phone",
+        phone,
+        ...carriedNext,
+        error: "We're sending a lot of codes right now. Try again in a few minutes.",
       };
     }
     if (result.reason === "hourly-limit") {
@@ -337,11 +363,16 @@ export async function requestEmailLoginAction(
   // `exactOptionalPropertyTypes` is on: spreading a state whose `error` is
   // `string | undefined` is not the same as omitting the key, so every return
   // below sets `error` explicitly rather than carrying an absent one through.
-  const result = await requestEmailLogin(db, { email, requestIp: await requestIp() });
+  const result = await requestEmailLogin(db, {
+    email,
+    requestIp: await requestIp(),
+    globalPerHour: env.OTP_GLOBAL_HOURLY_CAP,
+  });
   if (!result.ok) {
     const message: Record<typeof result.reason, string> = {
       "invalid-email": "Enter the email address on your account.",
       "hourly-limit": "Too many codes for that address. Try again in an hour.",
+      busy: "We're sending a lot of codes right now. Try again in a few minutes.",
     };
     return { ...base, error: message[result.reason] };
   }
@@ -362,6 +393,7 @@ export async function requestEmailLoginAction(
       );
     } catch (error) {
       if (error instanceof MailSendError) {
+        logger().warn({ reason: error.message }, "email.send_failed");
         return { ...base, error: "We couldn't send that email right now. Try again shortly." };
       }
       throw error;
@@ -433,11 +465,16 @@ export async function verifyEmailLoginAction(
   redirect(target);
 }
 
+/** Step-up refusal (sessions.ts STEP_UP_WINDOW_MS): one sentence for every credential change. */
+const SIGN_IN_AGAIN =
+  "For your security, sign in again before making this change — it has been a while since you last did.";
+
 // --- Passkeys (M-IP2-2) -----------------------------------------------------
 
 export async function startPasskeyEnrollmentAction(): Promise<PublicKeyCredentialCreationOptionsJSON | null> {
   const session = await currentSession();
-  if (session === null) {
+  // Step-up: a passkey outlives "sign out other devices" (sessions.ts).
+  if (session === null || !signedInRecently(session)) {
     return null;
   }
   const options = await startEnrollment(db, session.personId);
@@ -453,6 +490,9 @@ export async function finishPasskeyEnrollmentAction(
   const challenge = await takeChallenge();
   if (session === null) {
     return { ok: false, error: SESSION_LAPSED };
+  }
+  if (!signedInRecently(session)) {
+    return { ok: false, error: SIGN_IN_AGAIN };
   }
   if (challenge === null) {
     return {
@@ -480,9 +520,16 @@ export async function startPasskeyLoginAction(): Promise<PublicKeyCredentialRequ
   return options;
 }
 
+/**
+ * `target` is where to go next, decided HERE with the same `safeNext` the code
+ * paths redirect through — the passkey button used to push /home whatever the
+ * page had been asked to continue to, so "sign in to continue where you were
+ * headed" was false for exactly the fastest way in.
+ */
 export async function finishPasskeyLoginAction(
   response: AuthenticationResponseJSON,
-): Promise<{ ok: boolean }> {
+  next?: string,
+): Promise<{ ok: false } | { ok: true; target: string }> {
   const challenge = await takeChallenge();
   if (challenge === null) {
     return { ok: false };
@@ -497,7 +544,7 @@ export async function finishPasskeyLoginAction(
     return { ok: false };
   }
   await issueSessionCookie(result.personId);
-  return { ok: true };
+  return { ok: true, target: safeNext(next) };
 }
 
 /**
@@ -689,12 +736,23 @@ export async function logoutToAction(next: string): Promise<void> {
   redirect(safe);
 }
 
-export async function currentSession() {
+/**
+ * The session, read ONCE per request. The root layout, every gate it fans out
+ * to, and the page itself each ask; uncached, that was six or more session
+ * lookups (each able to write a slide) before a page rendered anything.
+ * Internal because this module is `"use server"`: `cache()` returns a plain
+ * function, and every export here must be async.
+ */
+const currentSessionOnce = cache(async () => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (token === undefined) {
     return null;
   }
   return getSessionByToken(db, token);
+});
+
+export async function currentSession() {
+  return currentSessionOnce();
 }
 
 // --- Profile (PX-3) -----------------------------------------------------------
@@ -799,6 +857,9 @@ export async function requestPhoneChangeAction(
   if (session === null) {
     redirect("/login?next=/account");
   }
+  if (!signedInRecently(session)) {
+    return { step: previous.step, error: SIGN_IN_AGAIN };
+  }
   const phone = formString(formData, "phone");
   let result: Awaited<ReturnType<typeof requestPhoneChange>>;
   try {
@@ -806,6 +867,7 @@ export async function requestPhoneChangeAction(
       personId: session.personId,
       newPhone: phone,
       requestIp: await requestIp(),
+      globalPerHour: env.OTP_GLOBAL_HOURLY_CAP,
     });
   } catch (error) {
     // Same contract as the front door: a melted provider is a retryable state,
@@ -825,6 +887,7 @@ export async function requestPhoneChangeAction(
       "same-number": "That is already the number on this account.",
       cooldown: "Code already sent — wait 30 seconds before requesting another.",
       "hourly-limit": "Too many codes for that number. Try again in an hour.",
+      busy: "We're sending a lot of codes right now. Try again in a few minutes.",
     };
     return { step: previous.step, error: message[result.reason] };
   }
@@ -981,6 +1044,9 @@ export async function requestEmailVerificationAction(
   if (session === null) {
     redirect("/login?next=/account");
   }
+  if (!signedInRecently(session)) {
+    return { step: previous.step, error: SIGN_IN_AGAIN };
+  }
   const raw = formString(formData, "email");
   const result = await requestEmailVerification(db, { personId: session.personId, email: raw });
   if (!result.ok) {
@@ -996,6 +1062,7 @@ export async function requestEmailVerificationAction(
     await createCodeMailer(db).send(result.email, result.code, "email_change");
   } catch (error) {
     if (error instanceof MailSendError) {
+      logger().warn({ reason: error.message }, "email.send_failed");
       // The code is already minted and will simply go unused. Saying so beats a
       // crash screen, and beats a code step for a message that never arrived.
       return { step: "idle", error: "We couldn't send that email right now. Try again shortly." };
@@ -1032,6 +1099,10 @@ export async function confirmEmailVerificationAction(
     return { step: "code", email: previous.email ?? "", error: message[result.reason] };
   }
   await logSecurityEvent(session.personId, "profile.email.verified");
+  // Same rule as a phone change: a new way into the account is the moment to
+  // close every other door. A session that planted this address from a stolen
+  // cookie cannot outlive it, and the person here keeps theirs.
+  await revokeOtherSessions(db, session.personId, session.sessionId);
   revalidatePath("/account");
   return { step: "idle", done: true, email: result.email };
 }

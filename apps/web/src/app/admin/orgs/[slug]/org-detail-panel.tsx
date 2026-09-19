@@ -1,4 +1,4 @@
-import { Badge, ButtonLink, Card, EmptyState } from "@desiauction/ui";
+import { Badge, ButtonLink, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
@@ -107,17 +107,27 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                       </Badge>
                     </td>
                     <td data-label="Visibility">
-                      <Badge tone={competition.visibility === "public" ? "info" : "neutral"}>
-                        {lifecycleLabel(competition.visibility)}
-                      </Badge>
+                      {competition.held ? (
+                        <Badge tone="danger">Taken down</Badge>
+                      ) : (
+                        <Badge tone={competition.visibility === "public" ? "info" : "neutral"}>
+                          {lifecycleLabel(competition.visibility)}
+                        </Badge>
+                      )}
                     </td>
                     <td data-label="Auction">
-                      {competition.auctionStatus === null ? (
+                      {competition.auctionStatus === null || competition.auctionId === null ? (
                         <span className="admin-meta">No auction</span>
                       ) : (
-                        <Badge tone={statusTone(competition.auctionStatus)}>
-                          {lifecycleLabel(competition.auctionStatus)}
-                        </Badge>
+                        <Link
+                          href={`/admin/auctions/${competition.auctionId}`}
+                          className="admin-badge-link"
+                          aria-label={`Watch this auction (${lifecycleLabel(competition.auctionStatus)})`}
+                        >
+                          <Badge tone={statusTone(competition.auctionStatus)}>
+                            {lifecycleLabel(competition.auctionStatus)}
+                          </Badge>
+                        </Link>
                       )}
                     </td>
                     <td data-label="Settlement">
@@ -221,7 +231,8 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                 ))}
               </ul>
               <Link href={`/admin/audit?scopeId=${org.id}`} className="admin-meta">
-                All audit for this organization →
+                All audit for this organization
+                <IconArrowRight size={16} className="icon-trail" />
               </Link>
             </>
           )}

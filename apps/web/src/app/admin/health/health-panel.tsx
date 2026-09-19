@@ -1,4 +1,4 @@
-import { Badge, Card, EmptyState } from "@desiauction/ui";
+import { Badge, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatCount, waitedFor } from "../../../server/admin/format";
@@ -15,6 +15,10 @@ import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
 export function HealthPanel({ health }: { health: PlatformHealth }) {
   const { runner, runnerVerdict, orgs, followers } = health;
   const schedules = runner.schedules;
+  // A SERVER component: it renders once per request and never hydrates, so
+  // reading the clock here cannot disagree with a client pass. The rule cannot
+  // tell a server component from a client one.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   return (
     <>
@@ -150,7 +154,10 @@ function OrgHealth({ org }: { org: OrgHealthRow }) {
       <div className="admin-health-row">
         <h2 className="admin-section-title">{org.orgName}</h2>
         <span className="admin-meta">
-          <Link href={`/org/${org.orgSlug}/money`}>Finance console →</Link>{" "}
+          <Link href={`/org/${org.orgSlug}/money`}>
+            Finance console
+            <IconArrowRight size={16} className="icon-trail" />
+          </Link>{" "}
           {/* Named, not promised: `platform:admin` carries no finops capability,
               so this door opens only for someone who also holds one on THIS
               organization. Saying so beats a 404. */}

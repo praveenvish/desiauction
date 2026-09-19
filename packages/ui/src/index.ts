@@ -6,8 +6,8 @@ export { Button, ButtonLink, buttonClassName } from "./primitives/button";
 export type { ButtonProps, ButtonLinkProps, ButtonVariant, ButtonSize } from "./primitives/button";
 export { Badge } from "./primitives/badge";
 export type { BadgeProps, BadgeTone } from "./primitives/badge";
-export { Card } from "./primitives/card";
-export type { CardProps } from "./primitives/card";
+export { Card, cardClassName } from "./primitives/card";
+export type { CardProps, CardElevation } from "./primitives/card";
 export { Money } from "./primitives/money";
 export type { MoneyProps, MoneyTone } from "./primitives/money";
 export { Skeleton } from "./primitives/skeleton";
@@ -26,10 +26,35 @@ export { ToastProvider, useToast } from "./primitives/toast";
 export type { ToastOptions, ToastTone } from "./primitives/toast";
 
 export { useHoldGate } from "./motion/use-hold-gate";
+export { Tilt } from "./motion/tilt";
+export type { TiltProps } from "./motion/tilt";
+export { Reveal } from "./motion/reveal";
+export type { RevealProps } from "./motion/reveal";
+export { createSoundEngine } from "./sound/engine";
+export type { SoundEngine } from "./sound/engine";
+export { SOUND_CUES, scheduleCue } from "./sound/cues";
+export type { SoundCue } from "./sound/cues";
+export {
+  soundEngine,
+  useSoundPreference,
+  useSoundCue,
+  readSoundPreference,
+  resetSoundPreferenceForTests,
+  SOUND_STORAGE_KEY,
+} from "./sound/use-sound";
+export type { SoundPreference } from "./sound/use-sound";
 export type { HoldGate, HoldGateBind, HoldGateOptions } from "./motion/use-hold-gate";
 export { AnnouncerProvider, useAnnouncer } from "./live/announcer";
 export type { Announce, AnnounceChannel } from "./live/announcer";
 export { VisuallyHidden } from "./live/visually-hidden";
+
+// The auction theatre (PREMIUM-1): the primitives every SOLD shares.
+export { RollingNumber } from "./theatre/rolling-number";
+export type { RollingNumberProps } from "./theatre/rolling-number";
+export { SoldStamp, HammerStrike } from "./theatre/sold-stamp";
+export type { SoldStampProps, StampTone, StampSize } from "./theatre/sold-stamp";
+export { GoldDrift } from "./theatre/gold-drift";
+export type { GoldDriftProps } from "./theatre/gold-drift";
 
 export { paintOnFill, relativeLuminance, textOnFill } from "./identity/fill-contrast";
 export type { FillPaint, FillTextToken } from "./identity/fill-contrast";
@@ -72,26 +97,6 @@ export { LoadingState } from "./shell/loading-state";
 export type { LoadingStateProps } from "./shell/loading-state";
 export { ErrorState } from "./primitives/error-state";
 export type { ErrorStateProps } from "./primitives/error-state";
-export {
-  IconHome,
-  IconTrophy,
-  IconUsers,
-  IconRupee,
-  IconHelp,
-  IconSearch,
-  IconBell,
-  IconMenu,
-  IconClose,
-  IconChevronDown,
-  IconArrowLeft,
-  IconAlert,
-  IconCalendar,
-  IconMatch,
-  IconPin,
-  IconArrowRight,
-  IconList,
-  IconGrid,
-  IconKebab,
-  IconExternal,
-  BrandGlyph,
-} from "./shell/icons";
+export { BrandGlyph } from "./shell/icons";
+// The one icon set. Every glyph the product draws — shell, marketing, content.
+export * from "./icons/icons";

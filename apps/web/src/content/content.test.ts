@@ -5,7 +5,7 @@
 // — the "broken-link detection" the milestone requires, run at the source rather
 // than by crawling a live site. If any content link ever points at a route that
 // does not exist, this fails before it ships.
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -325,6 +325,33 @@ describe("PX-10 · Content integrity", () => {
     expect(FEATURE_GROUPS.length).toBeGreaterThan(0);
     expect(RELEASES.length).toBeGreaterThan(0);
     expect(FAQS.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * AMENDED 2026-09-17 (founder decision, FR-1 §8.4) — and only in one place.
+   *
+   * The static copy below stays exactly as banned as before: nothing WE write
+   * may be a testimonial. What the founder allowed is quoting what somebody
+   * ELSE wrote, when they wrote it through their own review link, an operator
+   * published it, and they ticked the box that lets us quote it. That door is
+   * one function (`server/reviews/voices.ts`, proven against Postgres in
+   * voices.regression.test.ts) rendered by one component. This test pins that
+   * the door stays the only one: the marketing copy carries no quotes of its
+   * own, and the landing's quotes come from that function and nowhere else.
+   */
+  it("the landing's only quotes are real, permitted reviews (2026-09-17 amendment)", () => {
+    const marketing = readFileSync(join(import.meta.dirname, "marketing.ts"), "utf8");
+    expect(marketing, "static marketing copy must not carry quotes").not.toMatch(
+      /\b(quote|quotes|testimonials?)\s*:/,
+    );
+    const section = readFileSync(
+      join(import.meta.dirname, "../components/marketing/landing-voices.tsx"),
+      "utf8",
+    );
+    expect(section).toContain('from "../../server/reviews/voices"');
+    expect(section).not.toMatch(/content\/marketing/);
+    const page = readFileSync(join(import.meta.dirname, "../app/page.tsx"), "utf8");
+    expect(page).toContain("<LandingVoices />");
   });
 
   it("the landing page is uniformly no-fabrication (2026-07-24 council ruling)", () => {

@@ -56,9 +56,21 @@ import type { GrantLike } from "@desiauction/core";
  * uninsertable by the application role whatever its set. It is seeded
  * out-of-band or it does not exist.
  */
-export type PlatformCapability = "platform.admin" | "platform.pass" | "platform.demo";
+export type PlatformCapability =
+  | "platform.admin"
+  | "platform.pass"
+  | "platform.demo"
+  | "platform.privacy"
+  | "platform.support"
+  | "platform.moderate";
 
-export type PlatformCapabilitySet = "platform:admin" | "platform:billing" | "platform:demo";
+export type PlatformCapabilitySet =
+  | "platform:admin"
+  | "platform:billing"
+  | "platform:demo"
+  | "platform:privacy"
+  | "platform:support"
+  | "platform:moderation";
 
 const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   "platform:admin": ["platform.admin"],
@@ -84,12 +96,49 @@ const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
    * or it does not exist.
    */
   "platform:demo": ["platform.demo"],
+  /**
+   * THE FOURTH SET: the privacy desk, which can ERASE a person.
+   *
+   * Every other platform power is about reading the platform or answering a
+   * customer. This one ends somebody's account, anonymizes them across every
+   * club they were ever in and cannot be undone, which is precisely why it is
+   * nobody's side effect: not administration's (seeing everyone is not a licence
+   * to delete anyone), not billing's, not the demo desk's. An operator who needs
+   * it is handed it deliberately, seeded out-of-band like the other three, and
+   * inherits both structural locks unchanged.
+   */
+  "platform:privacy": ["platform.privacy"],
+  /**
+   * THE FIFTH SET (FR-1). Behind it: what people typed when something broke,
+   * their reply addresses, and pictures of their screens — squads, purses and
+   * names included. Seeing the platform does not license reading those, and
+   * answering demo requests does not either. Same two structural locks as every
+   * set above: the pinned singleton scope, and a grant the app role cannot
+   * insert. Seeded out-of-band or it does not exist.
+   */
+  "platform:support": ["platform.support"],
+  /**
+   * THE SIXTH SET: the moderation desk, which can take a public page down.
+   *
+   * Anybody with an email can open a club and publish a season to the open
+   * web, where search engines index it — and until this set existed the
+   * platform had no way to take one down short of editing the database by
+   * hand. Unlisting is a different act from every other power here: it
+   * overrides an organizer's own publishing decision about their own season.
+   * Seeing the platform does not license that, and neither does answering a
+   * customer. Held deliberately, seeded out-of-band like the other five, with
+   * both structural locks unchanged.
+   */
+  "platform:moderation": ["platform.moderate"],
 };
 
 export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
   "platform:admin",
   "platform:billing",
   "platform:demo",
+  "platform:privacy",
+  "platform:support",
+  "platform:moderation",
 ];
 
 /** The singleton scope. `scope_id` is char(26); this is the nil ULID. */
