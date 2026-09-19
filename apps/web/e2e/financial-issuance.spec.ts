@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { completeAuction } from "./complete-auction";
+import { withRunnerHeld } from "./finops-runner";
 import { latestOtp } from "./otp";
 
 // PX-8 COMPLETION · FOUNDER DEMONSTRATION — a FRESH organization, no demo seed,
@@ -237,15 +238,23 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await page.getByTestId("record-payment").click();
   await expect(page.getByTestId("payments-table")).toContainText("Recorded", { timeout: 20_000 });
 
-  // THE CAPTURE — the fact the whole financial lifecycle hangs from.
-  await page.getByRole("button", { name: "Confirm received" }).first().click();
-  await expect(page.getByTestId("payments-table")).toContainText("Received", { timeout: 20_000 });
-  await expect(page.getByTestId("discharged")).toContainText("₹50,000");
+  // THE CAPTURE — the fact the whole financial lifecycle hangs from — and the
+  // moment after it, observed with the runner held: its one-second tick would
+  // otherwise issue the receipt before Finance could show it waiting.
+  await withRunnerHeld(async () => {
+    await page.getByRole("button", { name: "Confirm received" }).first().click();
+    await expect(page.getByTestId("payments-table")).toContainText("Received", {
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId("discharged")).toContainText("₹50,000");
 
-  // --- Finance names it as awaiting a receipt ---------------------------------
-  await page.goto(`/org/${orgSlug}/money`);
-  await expect(page.getByTestId("candidates-table")).toContainText("Risers", { timeout: 30_000 });
-  await expect(page.getByTestId("stat-awaiting")).toHaveText("1");
+    // --- Finance names it as awaiting a receipt -------------------------------
+    await page.goto(`/org/${orgSlug}/money`);
+    await expect(page.getByTestId("candidates-table")).toContainText("Risers", {
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId("stat-awaiting")).toHaveText("1");
+  });
 
   // --- THE POLICY ISSUES IT ----------------------------------------------------
   // No issue button is pressed. The follower is the platform's own ingest; the
