@@ -1,4 +1,3 @@
-import { sportPackFor } from "@desiauction/core";
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
@@ -38,7 +37,8 @@ export default async function RegistrationsPage({
     !dashboard.viewer.canReview ||
     dashboard.page === undefined ||
     dashboard.stats === undefined ||
-    dashboard.teams === undefined
+    dashboard.teams === undefined ||
+    dashboard.desk === undefined
   ) {
     return (
       <main className="registrations-dash">
@@ -62,15 +62,11 @@ export default async function RegistrationsPage({
             teams={dashboard.teams}
             orphanPreSigned={dashboard.orphanPreSigned ?? []}
             {...(dashboard.kit !== undefined ? { kit: dashboard.kit } : {})}
-            // Plain {key,label} pairs: a pack carries functions and cannot
-            // cross into a client component.
-            roles={sportPackFor(dashboard.competition.sport).roles.values.map((value) => ({
-              key: value.key,
-              label: value.label,
-            }))}
-            rolesRequired={sportPackFor(dashboard.competition.sport).roles.required}
+            desk={dashboard.desk}
             registrationOpen={dashboard.registrationOpen}
             categoryFlags={dashboard.categoryFlags ?? {}}
+            {...(sp["player"] !== undefined ? { initialPlayerId: sp["player"] } : {})}
+            startReview={sp["review"] === "1"}
             filters={{
               search: sp["q"] ?? "",
               status: sp["status"] ?? "",

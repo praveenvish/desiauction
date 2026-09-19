@@ -1,78 +1,64 @@
 "use client";
 
-import {
-  REJECTION_REASONS,
-  REQUIRED_IMPORT_FIELDS,
-  mappingOf,
-  type ColumnMapping,
-  type DateOrder,
-} from "@desiauction/core";
+import { formatPaiseINR, FEE_STATUSES, paise } from "@desiauction/core";
 import {
   Badge,
   Button,
-  Card,
+  ButtonLink,
   Dialog,
-  Field,
+  IconArrowRight,
+  IconChevronRight,
+  IconSearch,
   PlayerImage,
-  Select,
-  Tabs,
   useToast,
   VisuallyHidden,
-  IconCheck,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import {
-  addNoteAction,
-  assignTeamAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
+
+import { personContact, personLabel } from "../../../../lib/person-label";
+import { useHydrated } from "../../../../lib/use-hydrated";
+import {
   bulkTriageAction,
-  exportRegistrationsAction,
-  importCommitAction,
-  importInspectAction,
-  importPreviewAction,
-  saveImportMappingAction,
-  markRegistrationAction,
-  personHistoryAction,
-  registrationTimelineAction,
+  registrationDetailAction,
   selectAllMatchingAction,
   triageRegistrationAction,
-  type ImportPreview,
-  type ImportInspection,
-  type ImportShape,
   type RegistrationDashboard,
   type TriageAction,
 } from "../../../../server/competition/actions";
-import { AddPlayerDialog } from "./add-player-dialog";
-import { FEE_STATUSES, formatPaiseINR, paise, type FeeStatus } from "@desiauction/core";
-import type { UnplacedValue, ValueMaps } from "@desiauction/core";
-
-import { ColumnMapper } from "./column-mapper";
-import { ValueMapper } from "./value-mapper";
-import { PhotoImportPanel } from "./photo-import";
-import { PlayerPhotoUploader } from "./player-photo-uploader";
-import { formatDateTime } from "../../../../lib/format-date";
-import { personContact, personLabel } from "../../../../lib/person-label";
+import type { PlayerDeskContext } from "../../../../server/competition/player-desk";
 import type {
-  OrphanPreSigned,
   KitSizeCount,
   KitSummary,
+  OrphanPreSigned,
   RegistrationPage,
   RegistrationStats,
-  TimelineEntry,
 } from "../../../../server/competition/registrations";
-import { useHydrated } from "../../../../lib/use-hydrated";
-
-type Row = RegistrationPage["rows"][number];
-
-const REG_TONE = {
-  draft: "neutral",
-  submitted: "info",
-  approved: "success",
-  rejected: "danger",
-  waitlisted: "warning",
-  withdrawn: "neutral",
-} as const;
+import { DeclineDialog } from "../_players/decline-dialog";
+import { ExportDialog } from "../_players/export-dialog";
+import {
+  canTriage,
+  FEE_LABEL,
+  FEE_TONE,
+  PAST_TENSE,
+  REASON_LABEL,
+  STATUS_TONE,
+  type Row,
+} from "../_players/labels";
+import { decisionToast, PlayerSheet } from "../_players/player-sheet";
+import { useMutate } from "../_players/use-mutate";
+import { useRoster } from "../_players/use-roster";
+import { AddPlayerDialog } from "./add-player-dialog";
+import { ImportDialog } from "./import-dialog";
+import "../_players/players-desk.css";
 
 const STATUS_FILTERS = ["", "submitted", "approved", "rejected", "waitlisted", "withdrawn"];
 const STATUS_LABEL: Record<string, string> = {
@@ -84,74 +70,12 @@ const STATUS_LABEL: Record<string, string> = {
   withdrawn: "Withdrawn",
 };
 const SORTS = ["recent", "oldest", "name", "number", "status"];
-
-/**
- * The desk's four states, in the words a person uses.
- *
- * "Refunded" is a real state and not a synonym for pending: the money came and
- * went, which a club chasing payments needs to see as settled rather than as
- * outstanding.
- */
-const FEE_LABEL: Record<FeeStatus, string> = {
-  pending: "Not paid",
-  paid: "Paid",
-  waived: "Waived",
-  refunded: "Refunded",
-};
-
-const FEE_TONE: Record<FeeStatus, "warning" | "success" | "info" | "neutral"> = {
-  pending: "warning",
-  paid: "success",
-  waived: "info",
-  refunded: "neutral",
-};
 const SORT_LABEL: Record<string, string> = {
   recent: "Newest first",
   oldest: "Oldest first",
   name: "Name",
   number: "Registration number",
   status: "Status",
-};
-
-/**
- * DA-22: the toast built its verb as `${action}d`, which spelled "rejectd" and
- * "waitlistd". Approve was correct by luck.
- */
-const PAST_TENSE: Record<string, string> = {
-  approve: "approved",
-  reject: "declined",
-  waitlist: "waitlisted",
-  restore: "restored",
-};
-
-/** What a rejection reason is called where a human reads it. */
-const REASON_LABEL: Record<string, string> = {
-  duplicate: "Already registered",
-  ineligible: "Not eligible",
-  withdrew: "Player withdrew",
-  capacity: "Season is full",
-  other: "Other",
-};
-
-/**
- * DA-35: the timeline printed raw enum tails — "IMPORTED · APPROVE ·
- * MARKS_SET · WAITLIST" — and named no actor.
- */
-const TIMELINE_VERB: Record<string, string> = {
-  "registration.submitted": "Registered",
-  "registration.added": "Added by the organizer",
-  "registration.imported": "Imported from a CSV",
-  "registration.approve": "Approved",
-  "registration.reject": "Declined",
-  "registration.waitlist": "Waitlisted",
-  "registration.withdraw": "Withdrawn",
-  "registration.restore": "Restored to review",
-  "registration.marks_set": "Marks changed",
-  "registration.team_assigned": "Assigned to a team",
-  "registration.note": "Note added",
-  "registration.notified": "Player notified by SMS",
-  "registration.notify_failed": "SMS to the player failed",
-  "registration.exported": "Included in a CSV export",
 };
 
 /** A row the organizer has selected — remembered by identity, not by index, so
@@ -162,12 +86,6 @@ interface Picked {
   name: string | null;
 }
 
-/**
- * How the auction pool is arrived at, so the tile can be checked by eye.
- *
- * Both pre-signed marks subtract, and naming only the one that happens to be
- * set leaves a reader doing arithmetic that does not come out.
- */
 /**
  * What the desk still has to chase, and what it has taken.
  *
@@ -192,10 +110,18 @@ function feeHint(stats: RegistrationStats): string {
   return parts.length === 0 ? "Entry fees recorded at the desk" : parts.join(" · ");
 }
 
+/**
+ * How the auction pool is arrived at, so the tile can be checked by eye. Every
+ * pre-signing mark subtracts, and naming only the ones that happen to be set
+ * keeps the line short without leaving arithmetic that does not come out.
+ */
 function poolHint(stats: RegistrationStats): string {
   const terms: string[] = [];
   if (stats.icons > 0) {
     terms.push(`${String(stats.icons)} icon${stats.icons === 1 ? "" : "s"}`);
+  }
+  if (stats.captains > 0) {
+    terms.push(`${String(stats.captains)} captain${stats.captains === 1 ? "" : "s"}`);
   }
   if (stats.retained > 0) {
     terms.push(`${String(stats.retained)} retained`);
@@ -203,6 +129,14 @@ function poolHint(stats: RegistrationStats): string {
   return terms.length === 0
     ? "Approved players who go to the block"
     : `${String(stats.approved)} approved − ${terms.join(" − ")}`;
+}
+
+interface Filters {
+  search: string;
+  status: string;
+  fee: string;
+  team: string;
+  sort: string;
 }
 
 export function RegistrationDashboardPanel({
@@ -213,134 +147,214 @@ export function RegistrationDashboardPanel({
   filters,
   orphanPreSigned,
   kit,
-  roles,
-  rolesRequired,
+  desk,
   registrationOpen,
   categoryFlags = {},
+  initialPlayerId,
+  startReview = false,
 }: {
   slug: string;
   stats: RegistrationStats;
   page: RegistrationPage;
   teams: NonNullable<RegistrationDashboard["teams"]>;
-  filters: { search: string; status: string; fee: string; team: string; sort: string };
+  filters: Filters;
   orphanPreSigned: OrphanPreSigned[];
   /** What to order, once sizes exist — see `kitSummary`. */
   kit?: KitSummary;
-  /** The season's own roles — the add dialog offered cricket's to every sport. */
-  roles: readonly { key: string; label: string }[];
-  /** Whether this sport insists on one — esports does not. */
-  rolesRequired: boolean;
+  desk: PlayerDeskContext;
   registrationOpen: boolean;
   /** PI-1: organizer-channel category advisories, keyed by registration id. */
   categoryFlags?: NonNullable<RegistrationDashboard["categoryFlags"]>;
+  /** `?player=` — a sheet linked to directly opens on arrival. */
+  initialPlayerId?: string;
+  /** `?review=1` — "Start reviewing" landed here after filtering. */
+  startReview?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [selected, setSelected] = useState<Map<string, Picked>>(new Map());
-  const [busy, setBusy] = useState(false);
-  // DA-35: no default. The reason was silently "duplicate", so every organizer
-  // who did not open the select filed everybody as a duplicate.
-  const [rejectReason, setRejectReason] = useState("");
-  /*
-   * The organizer's own words about one decision, and ORGANIZER-ONLY.
-   *
-   * Invariant 6: the player is told a respectful sentence derived from the
-   * CATEGORY, never this. The two reject dialogs share this state the way they
-   * already share `rejectReason` — the same decision, reached two ways.
-   */
-  const [rejectNote, setRejectNote] = useState("");
-  const [cursor, setCursor] = useState(0);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [assignTeamId, setAssignTeamId] = useState("");
-  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
-  // PI-1: the person's other seasons in this org, shown in the details drawer.
-  const [history, setHistory] = useState<
-    { competitionName: string; startsOn: string | null; status: string }[]
-  >([]);
-  const [noteText, setNoteText] = useState("");
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  /* The mapping step. `inspection` null = we have not read the file's headers
-     yet, which is the state the dialog opens in. */
-  const [inspection, setInspection] = useState<ImportInspection | null>(null);
-  /*
-   * What the file's own vocabulary means in this season — "Category 1" is band
-   * A, "Arrows" is Andheri Arrows. The data path for this has existed since
-   * migration 0033 (`org_import_mappings.value_maps`) and `applyMapping` has
-   * always applied it; there was simply no way to author one, so it was sent as
-   * `{}` on every import.
-   */
-  const [valueMaps, setValueMaps] = useState<ValueMaps>({});
-  /** The values this season could not place — see `refreshPreview`. */
-  const [unplaced, setUnplaced] = useState<UnplacedValue[]>([]);
-  const [mapping, setMapping] = useState<ColumnMapping>({});
-  const [dateOrder, setDateOrder] = useState<DateOrder>("dmy");
-  const [remember, setRemember] = useState(true);
-  /* Fill blanks by default — a re-import must not silently revert a correction
-     somebody made by hand in the app. `file-wins` is an explicit choice. */
-  const [fileWins, setFileWins] = useState(false);
-  const [usingSaved, setUsingSaved] = useState(false);
-  const [ioOpen, setIoOpen] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [confirmBulk, setConfirmBulk] = useState<TriageAction | null>(null);
-  const [rowDecline, setRowDecline] = useState<Row | null>(null);
-  /**
-   * The SEASON's role labels. `roleLabel` asks cricket and falls back to the
-   * key with its underscores swapped, so a football roster read "midfielder"
-   * lower-cased in a column of Title Case.
-   */
-  const labelOf = useMemo(() => {
-    const byKey = new Map(roles.map((role) => [role.key, role.label]));
-    return (role: string | null): string =>
-      role === null ? "" : (byKey.get(role) ?? role.replace(/_/g, " "));
-  }, [roles]);
-  const [iconConfirm, setIconConfirm] = useState<Row | null>(null);
-  const [retainConfirm, setRetainConfirm] = useState<Row | null>(null);
-  const csvRef = useRef<HTMLTextAreaElement>(null);
-  const [search, setSearch] = useState(filters.search);
-  // Interactivity marker: this effect runs only after client hydration, so the
-  // attribute is a deterministic "the panel's handlers are live now" signal.
   const hydrated = useHydrated();
+  const [navigating, startNavigation] = useTransition();
+  const roster = useRoster(page.rows);
+  const mutate = useMutate(roster);
+  const rows = roster.rows;
 
-  const rows = page.rows;
-  const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
-  const filtersApplied =
-    filters.search !== "" ||
-    filters.status !== "" ||
-    filters.team !== "" ||
-    filters.sort !== "recent";
+  const [selected, setSelected] = useState<Map<string, Picked>>(new Map());
+  const [bulkBusy, setBulkBusy] = useState<TriageAction | "select" | null>(null);
+  const [search, setSearch] = useState(filters.search);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [bulkDecline, setBulkDecline] = useState(false);
+  const [declining, setDeclining] = useState<Row | null>(null);
 
-  /**
-   * DA-35: focus landed on <body> after every action, because `router.refresh()`
-   * replaces the subtree the button lived in. Each action records the stable key
-   * of the control it came from; the key is re-focused once the fresh rows land.
+  /* --- The sheet ------------------------------------------------------ */
+  const [sheetId, setSheetId] = useState<string | null>(initialPlayerId ?? null);
+  const [reviewing, setReviewing] = useState(false);
+  /* A player the sheet shows who is not on this page — a link, an orphan in
+     the warning list. Kept in its own tiny roster so edits stay optimistic. */
+  const [detachedRows, setDetachedRows] = useState<Row[]>([]);
+  const detached = useRoster(detachedRows);
+  const mutateDetached = useMutate(detached);
+
+  const onPage = sheetId === null ? undefined : rows.find((row) => row.id === sheetId);
+  /*
+   * The player the sheet shows can leave the page under it — approve someone
+   * while the list is filtered to "Submitted", and the refresh that follows no
+   * longer carries them. The sheet must not vanish mid-thought: their last
+   * known row moves to the detached roster and the sheet stays put.
    */
-  const restoreFocusRef = useRef<string | null>(null);
+  const [lastSheetRow, setLastSheetRow] = useState<Row | null>(null);
+  if (onPage !== undefined && onPage !== lastSheetRow) {
+    setLastSheetRow(onPage);
+  }
+  if (
+    sheetId !== null &&
+    onPage === undefined &&
+    lastSheetRow?.id === sheetId &&
+    !detachedRows.some((row) => row.id === sheetId)
+  ) {
+    setDetachedRows([lastSheetRow]);
+  }
+  const sheetRow =
+    sheetId === null ? null : (onPage ?? detached.rows.find((row) => row.id === sheetId) ?? null);
+  const sheetIndex = sheetRow === null ? -1 : rows.findIndex((row) => row.id === sheetRow.id);
+
+  /** Keep the address in step so a sheet can be linked, without a server trip. */
+  const writePlayerParam = useCallback((id: string | null) => {
+    const url = new URL(window.location.href);
+    if (id === null) {
+      url.searchParams.delete("player");
+    } else {
+      url.searchParams.set("player", id);
+    }
+    url.searchParams.delete("review");
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, []);
+
+  const openSheet = useCallback(
+    (id: string) => {
+      setSheetId(id);
+      writePlayerParam(id);
+      if (!rows.some((row) => row.id === id)) {
+        void registrationDetailAction(slug, id).then((result) => {
+          if (result.ok) {
+            setDetachedRows([result.row]);
+          } else {
+            toast({ title: result.error, tone: "danger" });
+            setSheetId(null);
+          }
+        });
+      }
+    },
+    [rows, slug, toast, writePlayerParam],
+  );
+
+  const closeSheet = useCallback(() => {
+    const id = sheetId;
+    setSheetId(null);
+    setReviewing(false);
+    writePlayerParam(null);
+    // Back to the row it came from — a keyboard user keeps their place.
+    if (id !== null) {
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>(`[data-focus-key="open-${id}"]`)?.focus();
+      });
+    }
+  }, [sheetId, writePlayerParam]);
+
+  // A linked sheet for a player not on this page still has to load.
   useEffect(() => {
-    const key = restoreFocusRef.current;
-    if (key === null) {
+    if (initialPlayerId === undefined || page.rows.some((row) => row.id === initialPlayerId)) {
       return;
     }
-    restoreFocusRef.current = null;
-    const target = document.querySelector<HTMLElement>(`[data-focus-key="${key}"]`);
-    target?.focus();
-  }, [rows]);
+    let live = true;
+    void registrationDetailAction(slug, initialPlayerId).then((result) => {
+      if (!live) {
+        return;
+      }
+      if (result.ok) {
+        setDetachedRows([result.row]);
+      } else {
+        setSheetId(null);
+      }
+    });
+    return () => {
+      live = false;
+    };
+    // Once, on arrival: a later page of rows is not a new link.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const pendingRows = useMemo(() => rows.filter(canTriage), [rows]);
+  const nextPendingAfter = useCallback(
+    (id: string): Row | undefined => {
+      const from = rows.findIndex((row) => row.id === id);
+      return (
+        rows.slice(from + 1).find((row) => canTriage(row) && row.id !== id) ??
+        rows.slice(0, Math.max(0, from)).find((row) => canTriage(row) && row.id !== id)
+      );
+    },
+    [rows],
+  );
+
+  // "Start reviewing" filtered the list to submitted players and came back
+  // with ?review=1: open the first one the moment the rows are here.
+  const [reviewStarted, setReviewStarted] = useState(false);
+  if (startReview && !reviewStarted && hydrated) {
+    setReviewStarted(true);
+    const first = page.rows.find(canTriage);
+    if (first !== undefined) {
+      setReviewing(true);
+      setSheetId(first.id);
+    }
+  }
+
+  const beginReview = () => {
+    const first = pendingRows[0];
+    if (first !== undefined) {
+      setReviewing(true);
+      openSheet(first.id);
+      return;
+    }
+    pushQuery({ status: "submitted", page: "1", review: "1" });
+  };
+
+  const afterDecision = (row: Row) => {
+    if (!reviewing) {
+      return;
+    }
+    const next = nextPendingAfter(row.id);
+    if (next === undefined) {
+      toast({ title: "All caught up — nobody is waiting for review.", tone: "success" });
+      closeSheet();
+    } else {
+      setSheetId(next.id);
+      writePlayerParam(next.id);
+    }
+  };
+
+  /* --- URL filters ---------------------------------------------------- */
   const pushQuery = useCallback(
     (patch: Record<string, string>) => {
       const next = new URLSearchParams();
-      const merged = {
+      const merged: Record<string, string> = {
         q: filters.search,
         status: filters.status,
+        fee: filters.fee,
         team: filters.team,
-        sort: filters.sort,
+        sort: filters.sort === "recent" ? "" : filters.sort,
         ...patch,
       };
       for (const [key, value] of Object.entries(merged)) {
-        if (value !== "") {
+        if (value !== "" && !(key === "page" && value === "1")) {
           next.set(key, value);
         }
       }
-      router.push(`/seasons/${slug}/registrations?${next.toString()}`);
+      startNavigation(() => {
+        router.push(`/seasons/${slug}/registrations${next.size > 0 ? `?${next.toString()}` : ""}`, {
+          scroll: false,
+        });
+      });
     },
     [router, slug, filters],
   );
@@ -352,20 +366,48 @@ export function RegistrationDashboardPanel({
    */
   const changeFilter = useCallback(
     (patch: Record<string, string>) => {
-      setSelected((prev) => {
-        if (prev.size > 0) {
-          toast({
-            title: `Selection cleared — ${String(prev.size)} row(s) were selected under the previous filter.`,
-            tone: "info",
-          });
-        }
-        return new Map();
-      });
+      if (selected.size > 0) {
+        toast({
+          title: `Selection cleared — ${String(selected.size)} row(s) were selected under the previous filter.`,
+          tone: "info",
+        });
+        setSelected(new Map());
+      }
       pushQuery({ ...patch, page: "1" });
     },
-    [pushQuery, toast],
+    [pushQuery, selected.size, toast],
   );
 
+  // Search as you type — a beat after the last key, so a name is one query.
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSearchInput = (value: string) => {
+    setSearch(value);
+    if (searchTimer.current !== null) {
+      clearTimeout(searchTimer.current);
+    }
+    searchTimer.current = setTimeout(() => {
+      if (value.trim() !== filters.search.trim()) {
+        changeFilter({ q: value.trim() });
+      }
+    }, 400);
+  };
+  useEffect(
+    () => () => {
+      if (searchTimer.current !== null) {
+        clearTimeout(searchTimer.current);
+      }
+    },
+    [],
+  );
+
+  const filtersApplied =
+    filters.search !== "" ||
+    filters.status !== "" ||
+    filters.fee !== "" ||
+    filters.team !== "" ||
+    filters.sort !== "recent";
+
+  /* --- Selection & bulk ----------------------------------------------- */
   const toggle = useCallback((row: Pick<Row, "id" | "number" | "name">) => {
     setSelected((prev) => {
       const next = new Map(prev);
@@ -378,14 +420,18 @@ export function RegistrationDashboardPanel({
     });
   }, []);
 
+  const allOnPageSelected = rows.length > 0 && rows.every((row) => selected.has(row.id));
+  const selectedOnPage = rows.filter((row) => selected.has(row.id)).length;
+  const offPage = selected.size - selectedOnPage;
+
   const selectAllMatching = async () => {
-    setBusy(true);
+    setBulkBusy("select");
     const result = await selectAllMatchingAction(slug, {
       ...(filters.search !== "" ? { search: filters.search } : {}),
       ...(filters.status !== "" ? { status: filters.status } : {}),
       ...(filters.team !== "" ? { teamId: filters.team } : {}),
     });
-    setBusy(false);
+    setBulkBusy(null);
     if (!result.ok) {
       toast({ title: result.error, tone: "danger" });
       return;
@@ -403,333 +449,75 @@ export function RegistrationDashboardPanel({
     });
   };
 
-  const announce = (
-    result: {
-      ok: boolean;
-      applied?: number;
-      skipped?: number;
-      notified?: number;
-      notifyFailed?: number;
-      error?: string;
-    },
-    action: TriageAction,
-  ) => {
+  const runBulk = async (action: TriageAction, reason?: string, note?: string) => {
+    if (selected.size === 0) {
+      return;
+    }
+    setBulkBusy(action);
+    const ids = [...selected.keys()];
+    const target =
+      action === "approve"
+        ? "approved"
+        : action === "waitlist"
+          ? "waitlisted"
+          : action === "reject"
+            ? "rejected"
+            : "submitted";
+    const undoes = rows
+      .filter((row) => selected.has(row.id))
+      .map((row) => roster.apply(row.id, { status: target }));
+    const result = await bulkTriageAction(slug, ids, action, reason, note);
+    setBulkBusy(null);
     if (!result.ok) {
+      undoes.forEach((undo) => {
+        undo();
+      });
       toast({ title: result.error ?? "Bulk action failed.", tone: "danger" });
       return;
     }
     const parts = [
       `${String(result.applied ?? 0)} ${PAST_TENSE[action] ?? action}`,
-      `${String(result.skipped ?? 0)} skipped`,
+      ...((result.skipped ?? 0) > 0 ? [`${String(result.skipped)} skipped`] : []),
+      // Say whether the PEOPLE will be told, not just whether the database
+      // changed (DA-35). Delivery itself is recorded on each timeline.
+      ...((result.notifying ?? 0) > 0 ? ["SMS on its way"] : []),
     ];
-    // DA-35: say whether the PEOPLE were told, not just whether the database
-    // changed. A silent success here is exactly the bug being fixed.
-    if ((result.notified ?? 0) > 0) {
-      parts.push(`${String(result.notified ?? 0)} notified`);
-    }
-    if ((result.notifyFailed ?? 0) > 0) {
-      parts.push(`${String(result.notifyFailed ?? 0)} could not be reached`);
-    }
-    toast({
-      title: parts.join(" · "),
-      tone: (result.notifyFailed ?? 0) > 0 ? "danger" : "success",
-    });
+    toast({ title: parts.join(" · "), tone: "success" });
+    setSelected(new Map());
+    setBulkDecline(false);
+    roster.settle();
   };
 
-  const runBulk = async (action: TriageAction) => {
-    if (selected.size === 0) {
-      return;
-    }
-    setBusy(true);
-    const result = await bulkTriageAction(
-      slug,
-      [...selected.keys()],
-      action,
-      action === "reject" ? rejectReason : undefined,
-      action === "reject" ? rejectNote : undefined,
+  /* --- One row -------------------------------------------------------- */
+  const decideRow = async (row: Row, action: TriageAction) => {
+    const status =
+      action === "approve" ? "approved" : action === "waitlist" ? "waitlisted" : row.status;
+    const result = await mutate(row, { status }, () =>
+      triageRegistrationAction(slug, row.id, action),
     );
-    setBusy(false);
-    announce(result, action);
     if (result.ok) {
-      setSelected(new Map());
-      setConfirmBulk(null);
-      setRejectNote("");
-      router.refresh();
+      toast({ title: decisionToast(row.name ?? row.number, action, result), tone: "success" });
     }
   };
 
-  const runSingle = async (
-    row: Row,
-    action: TriageAction,
-    reason?: string,
-    focusKey?: string,
-    note?: string,
-  ) => {
-    setBusy(true);
-    restoreFocusRef.current = focusKey ?? null;
-    const result = await triageRegistrationAction(slug, row.id, action, reason, note);
-    setBusy(false);
+  const declineRow = async (row: Row, reason: string, note: string) => {
+    const writer = detached.rows.some((entry) => entry.id === row.id) ? mutateDetached : mutate;
+    const result = await writer(row, { status: "rejected", rejectionReason: reason }, () =>
+      triageRegistrationAction(slug, row.id, "reject", reason, note),
+    );
     if (result.ok) {
-      // DA-35: a single approval used to toast only on FAILURE — success was
-      // announced to nobody, least of all a screen-reader user.
-      const told =
-        (result.notified ?? 0) > 0
-          ? " · player notified"
-          : (result.notifyFailed ?? 0) > 0
-            ? " · we could not reach them"
-            : "";
-      toast({
-        title: `${row.name ?? row.number} ${PAST_TENSE[action] ?? action}${told}`,
-        tone: (result.notifyFailed ?? 0) > 0 ? "danger" : "success",
-      });
-      setRowDecline(null);
-      setRejectNote("");
-      router.refresh();
-    } else {
-      toast({ title: result.error ?? "Action failed.", tone: "danger" });
+      toast({ title: decisionToast(row.name ?? row.number, "reject", result), tone: "success" });
+      setDeclining(null);
+      afterDecision(row);
     }
   };
 
-  /**
-   * A mark either took or was refused, and the refusal is a rule the organizer
-   * has to hear — Icon and Captain are mutually exclusive, and a click that
-   * quietly did nothing would teach them nothing.
-   */
-  const applyMark = (result: { ok: boolean; error?: string }, success: string) => {
-    if (result.ok) {
-      toast({ title: success, tone: "success" });
-      router.refresh();
-    } else {
-      toast({ title: result.error ?? "That mark could not be set.", tone: "danger" });
-    }
-  };
-
-  const openDetails = async (id: string) => {
-    if (expanded === id) {
-      setExpanded(null);
-      return;
-    }
-    setExpanded(id);
-    // DA-13: the panel renders AFTER the table, so on a 25-row page it opened
-    // ~2,400px below the row that was clicked. Clicking Details looked like
-    // nothing had happened at all.
-    requestAnimationFrame(() => {
-      document
-        .querySelector('[data-testid="timeline-panel"]')
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-    setNoteText("");
-    // PI-1: the timeline and the person's in-club history arrive together —
-    // two independent reads, one paint.
-    const [timelineRows, historyRows] = await Promise.all([
-      registrationTimelineAction(slug, id),
-      personHistoryAction(slug, id),
-    ]);
-    setTimeline(timelineRows);
-    setHistory(historyRows);
-  };
-
-  const submitNote = async (id: string) => {
-    const result = await addNoteAction(slug, id, noteText);
-    if (result.ok) {
-      setNoteText("");
-      setTimeline(await registrationTimelineAction(slug, id));
-    } else {
-      toast({ title: result.error ?? "Could not add note.", tone: "danger" });
-    }
-  };
-
-  const doExport = async () => {
-    const result = await exportRegistrationsAction(slug);
-    if (!result.ok) {
-      toast({ title: result.error, tone: "danger" });
-      return;
-    }
-    const blob = new Blob([result.csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = result.filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const resetImport = () => {
-    setPreview(null);
-    setInspection(null);
-    setMapping({});
-    setUsingSaved(false);
-    // A NEW file gets no answers from the last one. "Category 1 means band A"
-    // was true of the roster the organizer just imported; carrying it into the
-    // next file would rewrite values nobody looked at.
-    setValueMaps({});
-    setUnplaced([]);
-  };
-
-  const readCsvFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (csvRef.current) {
-        csvRef.current.value = typeof reader.result === "string" ? reader.result : "";
-      }
-      resetImport();
-    };
-    reader.readAsText(file);
-  };
-
-  const shape = (): ImportShape => ({
-    mapping,
-    valueMaps,
-    dateOrder,
-    policy: fileWins ? "file-wins" : "fill-blanks",
-  });
-
-  /**
-   * ONE BUTTON, AND THE MAPPING IS ALWAYS ON SCREEN BEFORE THE COMMIT IS.
-   *
-   * The first press reads the file's headers, settles on a mapping — one this
-   * club already confirmed for this exact layout if there is one, otherwise the
-   * detected guess — and validates under it. Later presses re-validate under
-   * whatever the organizer has since corrected.
-   *
-   * Deliberately not a separate "read the file" step. For a file whose headers
-   * are already ours (our own export, round-tripped) a mapping step would be
-   * pure friction, and for a foreign file the mapper renders right here beside
-   * the preview — so the translation is visible and correctable BEFORE anything
-   * is written, which is the property that actually matters.
-   */
-  const runPreview = async () => {
-    const text = csvRef.current?.value ?? "";
-    if (text.trim() === "") {
-      return;
-    }
-    let active = mapping;
-    if (inspection === null) {
-      const read = await importInspectAction(slug, text);
-      setInspection(read);
-      if (!read.ok) {
-        setMapping({});
-        setPreview(null);
-        return;
-      }
-      if (read.saved !== undefined) {
-        active = read.saved.mapping;
-        setDateOrder(read.saved.dateOrder);
-        // The saved VALUES too, which is the half that made saving worth it:
-        // a club whose bands are "Category 1/2/3" answers once, not once per
-        // season for the rest of the tournament's life.
-        setValueMaps(read.saved.valueMaps);
-        setUsingSaved(true);
-      } else {
-        active = read.detected === undefined ? {} : mappingOf(read.detected);
-        setUsingSaved(false);
-      }
-      setMapping(active);
-      // A file missing a required column cannot be previewed into anything
-      // useful; the mapper below says which, which is the actionable answer.
-      if (REQUIRED_IMPORT_FIELDS.some((field) => active[field] === undefined)) {
-        setPreview(null);
-        return;
-      }
-    }
-    // `active` rather than `shape()` because the mapping may have been settled
-    // a few lines above and `mapping` state has not caught up yet. Everything
-    // else comes from the shape, INCLUDING the value maps, which this call used
-    // to leave out — so an organizer's answer changed nothing until the second
-    // press, which reads as the feature not working.
-    await refreshPreview(text, { ...shape(), mapping: active });
-  };
-
-  /**
-   * Re-validate and keep the unplaced list, which outlives the preview.
-   *
-   * The list has to survive its own answers: mapping a value makes the preview
-   * stale, and a stale preview is cleared — but if the list lived on the
-   * preview it would vanish the instant the organizer touched it, halfway
-   * through a column of five. It is replaced only by a NEWER list, so it
-   * shrinks as it is filled in rather than disappearing.
-   */
-  const refreshPreview = async (text: string, active: ImportShape): Promise<void> => {
-    const result = await importPreviewAction(slug, text, active);
-    setPreview(result);
-    setUnplaced(result.unplaced);
-  };
-
-  /**
-   * `skipInvalid` is the organizer's explicit choice, taken on the button they
-   * pressed — never a default. A clean file commits whole; a file with errors
-   * commits only when they pressed the button that says how many it will leave
-   * behind, and those rows stay listed underneath by line number.
-   */
-  const commitImport = async (skipInvalid = false) => {
-    const text = csvRef.current?.value ?? "";
-    setBusy(true);
-    const result = await importCommitAction(slug, text, { skipInvalid, shape: shape() });
-    // Remember the mapping only once the import it describes actually landed —
-    // a mapping saved beside a failed import is a mapping nobody validated.
-    if (result.ok && remember && inspection?.ok === true && Object.keys(mapping).length > 0) {
-      await saveImportMappingAction(slug, {
-        signature: inspection.signature,
-        label: null,
-        mapping,
-        valueMaps,
-        dateOrder,
-        scope: "org",
-      });
-    }
-    setBusy(false);
-    if (result.ok) {
-      // Only the outcomes that happened: a run with nothing reinstated should
-      // not report "0 rejoined" as though it were a finding.
-      const parts = [`Imported ${String(result.imported ?? 0)}`];
-      if ((result.updated ?? 0) > 0) {
-        parts.push(`${String(result.updated)} updated`);
-      }
-      if ((result.reinstated ?? 0) > 0) {
-        parts.push(`${String(result.reinstated)} rejoined`);
-      }
-      if ((result.unchanged ?? 0) > 0) {
-        parts.push(`${String(result.unchanged)} unchanged`);
-      }
-      if ((result.skipped ?? 0) > 0) {
-        parts.push(`${String(result.skipped)} skipped`);
-      }
-      toast({ title: parts.join(" · "), tone: "success" });
-      router.refresh();
-      if ((result.skipped ?? 0) > 0) {
-        // Rows were left behind on purpose. Closing the dialog and wiping the
-        // textarea would take away the only copy of WHICH rows, and the whole
-        // point of skipping is that the organizer comes back to them.
-        // Under the SAME shape the commit just used: re-reading the leftover
-        // rows against no mapping at all would report every one of them broken
-        // for a reason the organizer had already fixed.
-        await refreshPreview(text, shape());
-        return;
-      }
-      resetImport();
-      if (csvRef.current) {
-        csvRef.current.value = "";
-      }
-      setIoOpen(false);
-    } else {
-      toast({ title: result.error ?? "Import failed.", tone: "danger" });
-    }
-  };
-
-  /**
-   * Keyboard cursor: j/k move, x toggles the cursor row's selection.
-   *
-   * DA-35: `a` used to APPROVE THE WHOLE SELECTION from a bare keypress with no
-   * dialog — 25 irreversible approvals from a typo in a page that has no undo.
-   * A destructive write has no business on an unmodified letter key listening
-   * at the window. Movement and selection stay; the writes are buttons.
-   */
-  // The listener reads `rows`, `cursor` and `toggle` directly and is
-  // re-registered when any of them changes — one addEventListener per cursor
-  // move, which costs nothing. It used to copy `rows` into a ref DURING render
-  // so the effect could skip that dependency; writing a ref while rendering is
-  // what the compiler rules forbid, and the saving was never worth it.
+  /* --- Keyboard: j/k in the list when no sheet is open ----------------- */
+  const [cursor, setCursor] = useState(-1);
   useEffect(() => {
+    if (sheetId !== null) {
+      return;
+    }
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (
@@ -747,58 +535,72 @@ export function RegistrationDashboardPanel({
         setCursor((c) => Math.max(c - 1, 0));
       } else if (event.key === "x") {
         const row = rows[cursor];
-        if (row) {
+        if (row !== undefined) {
           toggle(row);
         }
+      } else if (event.key === "Enter" && cursor >= 0) {
+        const row = rows[cursor];
+        if (row !== undefined && target?.tagName !== "BUTTON") {
+          openSheet(row.id);
+        }
+      } else if (event.key === "/") {
+        event.preventDefault();
+        document.getElementById("pd-search")?.focus();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [rows, cursor, toggle]);
+  }, [rows, cursor, toggle, sheetId, openSheet]);
 
-  // Keep the keyboard cursor in view (P2) — a cursor you cannot see is a cursor
-  // that selects rows you did not mean.
   useEffect(() => {
     document
       .querySelector<HTMLElement>('[data-cursor="true"]')
       ?.scrollIntoView({ block: "nearest" });
   }, [cursor]);
 
-  const allOnPageSelected = useMemo(
-    () => rows.length > 0 && rows.every((r) => selected.has(r.id)),
-    [rows, selected],
-  );
-  const selectedOnPage = useMemo(
-    () => rows.filter((r) => selected.has(r.id)).length,
-    [rows, selected],
-  );
-  const offPage = selected.size - selectedOnPage;
+  const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
+  const teamOptions = teams.map((team) => ({ id: team.id, name: team.name }));
 
   return (
-    <>
-      <div className="reg-toolbar">
-        <Button
-          size="sm"
-          variant="secondary"
-          data-testid="export-csv"
-          onClick={() => void doExport()}
-        >
-          Export CSV
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          data-testid="open-import"
-          onClick={() => {
-            setIoOpen(true);
-          }}
-        >
-          Import (CSV / photos)
-        </Button>
-        <AddPlayerDialog slug={slug} roles={roles} rolesRequired={rolesRequired} />
+    <div className="pd-desk" data-sheet-open={sheetRow !== null ? "true" : undefined}>
+      <NextStep
+        stats={stats}
+        orphans={orphanPreSigned}
+        desk={desk}
+        slug={slug}
+        teamsCount={teams.length}
+        onReview={beginReview}
+        onOpenPlayer={openSheet}
+      />
+
+      <div className="pd-toolbar">
+        <div className="pd-toolbar-actions">
+          <AddPlayerDialog slug={slug} roles={desk.roles} rolesRequired={desk.rolesRequired} />
+          <Button
+            size="sm"
+            variant="secondary"
+            data-testid="open-import"
+            onClick={() => {
+              setImportOpen(true);
+            }}
+          >
+            Import
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            data-testid="export-csv"
+            onClick={() => {
+              setExportOpen(true);
+            }}
+          >
+            Export
+          </Button>
+        </div>
       </div>
+
       <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
         <StatTile
           label="Total"
@@ -827,24 +629,14 @@ export function RegistrationDashboardPanel({
             changeFilter({ status: "approved" });
           }}
         />
-        {/* DA-35: the figure that decides what auction night contains. It sat on
-            the Auction tab only, computed from the same rows, and the two tabs
-            disagreed in public. */}
+        {/* DA-35: the figure that decides what auction night contains — the
+            same rule the Auction tab filters on, so the two cannot disagree. */}
         <StatTile
           label="Auction pool"
           value={stats.auctionPool}
           testId="stat-auction-pool"
-          hint={
-            // The subtraction has TWO terms now, and naming only the icons made
-            // the arithmetic look wrong the moment anybody was retained:
-            // "12 approved − 1 icon" printed beside a pool of 10.
-            poolHint(stats)
-          }
+          hint={poolHint(stats)}
         />
-        {/* THE DESK. Every one of these numbers has been in the database since
-            the desk columns landed and on no screen at all — a club took cash
-            at the ground, imported it, and still had to open their spreadsheet
-            to answer "who has paid?". */}
         <StatTile
           label="Fees paid"
           value={stats.fees.paid}
@@ -883,380 +675,248 @@ export function RegistrationDashboardPanel({
           }}
         />
       </div>
-      <p className="dash-hint" data-testid="pool-explainer">
-        <strong>Auction pool</strong> is what the auction will actually contain: approved players
-        minus Icons. An Icon is pre-signed to their team and never goes to the block — the Auction
-        tab counts the pool the same way.
-      </p>
 
-      {/* DA-35: the orphan. An Icon is only counted into a squad when their
-          registration carries the same team as the paddle, so an Icon with no
-          team is in NO auction and NO squad. One click created that state and
-          the product said nothing. */}
-      {/* WHAT TO ORDER. The rows have held every size since 0034 and nothing
-          added them up, so an organizer exported to Excel and wrote a pivot
-          table for a sum the product could have done. Rendered only once
-          somebody has recorded a size — a club that does not order kit never
-          sees this at all. */}
-      {kit !== undefined && (kit.tshirt.length > 0 || kit.trouser.length > 0) ? (
-        <Card data-testid="kit-summary">
-          <h2>Kit to order</h2>
-          <p className="dash-hint">
-            Approved players only — the ones who are actually coming.
-            {kit.missing > 0 ? ` ${String(kit.missing)} of them have no size recorded yet.` : ""}
+      {/* DA-35: the orphan. A pre-signed player with no team is in NO auction
+          and NO squad. Each name opens the player, one click from the fix. */}
+      {orphanPreSigned.length > 0 ? (
+        <div
+          className="pd-alert"
+          data-tone="danger"
+          data-testid="orphan-pre-signed-warning"
+          role="alert"
+        >
+          <p>
+            <strong>
+              {orphanPreSigned.length} pre-signed player
+              {orphanPreSigned.length === 1 ? " is" : "s are"} in no auction and no squad.
+            </strong>{" "}
+            They skip the auction but have no team. Pick one, or clear the mark.
           </p>
+          <ul className="pd-alert-list">
+            {orphanPreSigned.map((player) => (
+              <li key={player.id}>
+                <button
+                  type="button"
+                  className="pd-link"
+                  onClick={() => {
+                    openSheet(player.id);
+                  }}
+                >
+                  {player.name ?? "Unnamed"}
+                </button>{" "}
+                <Badge tone={player.kind === "icon" ? "success" : "info"}>
+                  {player.kind === "icon"
+                    ? "Icon"
+                    : player.kind === "captain"
+                      ? "Captain"
+                      : "Retained"}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {/* WHAT TO ORDER — summed by the product, not by a pivot table. Only once
+          somebody has recorded a size; a club that orders no kit never sees it. */}
+      {kit !== undefined && (kit.tshirt.length > 0 || kit.trouser.length > 0) ? (
+        <div className="pd-kit" data-testid="kit-summary">
+          <span className="pd-kit-title">Kit to order</span>
           {[
             ["T-shirts", kit.tshirt],
             ["Trousers", kit.trouser],
           ].map(([label, sizes]) =>
             (sizes as KitSizeCount[]).length === 0 ? null : (
-              <p key={label as string} className="reg-sub">
+              <span key={label as string} className="pd-kit-line">
                 <strong>{label as string}</strong>{" "}
                 {(sizes as KitSizeCount[])
                   .map((entry) => `${entry.size} × ${String(entry.count)}`)
                   .join(" · ")}
-              </p>
+              </span>
             ),
           )}
-        </Card>
+          {kit.missing > 0 ? (
+            <span className="pd-quiet">{kit.missing} approved without a size</span>
+          ) : null}
+        </div>
       ) : null}
 
-      {orphanPreSigned.length > 0 ? (
-        <Card data-testid="orphan-pre-signed-warning">
-          <p role="alert" className="reg-warning">
-            <strong>
-              {orphanPreSigned.length} pre-signed player
-              {orphanPreSigned.length === 1 ? " is" : "s are"} in no auction and no squad.
-            </strong>{" "}
-            An Icon or a retained player joins a team instead of being bid for, so one with no team
-            is not in the auction pool and will not appear in any squad. Assign a team, or clear the
-            mark to put them back in the pool.
-          </p>
-          <ul className="reg-warning-list">
-            {orphanPreSigned.map((player) => (
-              <li key={player.id}>
-                {player.name ?? "Unnamed"} <span className="reg-number">{player.number}</span>{" "}
-                {/* Which mark stranded them, because the two are cleared by
-                    different buttons and "pre-signed" names neither. */}
-                <Badge tone={player.kind === "icon" ? "success" : "info"}>
-                  {player.kind === "icon" ? "Icon" : "Retained"}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
-
-      <Card>
-        <form
-          className="filter-bar"
-          onSubmit={(event) => {
-            event.preventDefault();
-            changeFilter({ q: search });
-          }}
-        >
-          <Field
-            label="Search"
-            name="q"
-            placeholder="name, phone, number or team"
+      <form
+        className="pd-filters"
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          changeFilter({ q: search.trim() });
+        }}
+      >
+        <div className="pd-search">
+          {/* The magnifier IS the submit button — Enter works too, and the
+              list also follows typing, a beat after the last key. */}
+          <button
+            type="submit"
+            className="pd-search-icon"
+            data-testid="search-submit"
+            aria-label="Search"
+          >
+            <IconSearch size={16} aria-hidden />
+          </button>
+          <label htmlFor="pd-search" className="pd-visually-hidden">
+            Search
+          </label>
+          <input
+            id="pd-search"
+            type="text"
+            enterKeyHint="search"
+            autoComplete="off"
+            className="pd-input"
+            placeholder="Search name, phone, number or team   /"
             value={search}
             onChange={(event) => {
-              setSearch(event.target.value);
+              onSearchInput(event.target.value);
             }}
           />
-          <Select
-            label="Status"
-            name="status"
-            value={filters.status}
-            onChange={(event) => {
-              changeFilter({ status: event.target.value });
+        </div>
+        <FilterSelect
+          label="Status"
+          value={filters.status}
+          onChange={(value) => {
+            changeFilter({ status: value });
+          }}
+          options={STATUS_FILTERS.map((status) => ({
+            value: status,
+            label: STATUS_LABEL[status] ?? status,
+          }))}
+        />
+        <FilterSelect
+          label="Fee"
+          value={filters.fee}
+          onChange={(value) => {
+            changeFilter({ fee: value });
+          }}
+          options={[
+            { value: "", label: "Any fee state" },
+            ...FEE_STATUSES.map((state) => ({ value: state, label: FEE_LABEL[state] })),
+          ]}
+        />
+        <FilterSelect
+          label="Team"
+          value={filters.team}
+          onChange={(value) => {
+            changeFilter({ team: value });
+          }}
+          options={[
+            { value: "", label: "All teams" },
+            ...teams.map((team) => ({ value: team.id, label: team.name })),
+          ]}
+        />
+        <FilterSelect
+          label="Sort"
+          value={filters.sort}
+          onChange={(value) => {
+            changeFilter({ sort: value });
+          }}
+          options={SORTS.map((sort) => ({ value: sort, label: SORT_LABEL[sort] ?? sort }))}
+        />
+        {filtersApplied ? (
+          <button
+            type="button"
+            className="pd-link pd-clear"
+            onClick={() => {
+              setSearch("");
+              changeFilter({ q: "", status: "", fee: "", team: "", sort: "" });
             }}
           >
-            {STATUS_FILTERS.map((status) => (
-              <option key={status} value={status}>
-                {STATUS_LABEL[status] ?? status}
-              </option>
-            ))}
-          </Select>
-          {/* THE DESK'S OWN QUESTION. Status is about triage — approved,
-              waitlisted, declined. Whether the entry fee arrived is a different
-              axis entirely, and until now the only place it existed was a
-              column nobody could see. */}
-          <Select
-            label="Fee"
-            name="fee"
-            value={filters.fee}
-            onChange={(event) => {
-              changeFilter({ fee: event.target.value });
-            }}
-          >
-            <option value="">Any fee state</option>
-            {FEE_STATUSES.map((state) => (
-              <option key={state} value={state}>
-                {FEE_LABEL[state]}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Team"
-            name="team"
-            value={filters.team}
-            onChange={(event) => {
-              changeFilter({ team: event.target.value });
-            }}
-          >
-            <option value="">All teams</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Sort"
-            name="sort"
-            value={filters.sort}
-            onChange={(event) => {
-              changeFilter({ sort: event.target.value });
-            }}
-          >
-            {SORTS.map((sort) => (
-              <option key={sort} value={sort}>
-                {SORT_LABEL[sort] ?? sort}
-              </option>
-            ))}
-          </Select>
-          <Button type="submit" variant="secondary" data-testid="search-submit">
-            Search
-          </Button>
-        </form>
-        <p className="dash-hint">Shortcuts: j/k move the cursor · x selects the cursor row</p>
-      </Card>
-
-      {selected.size > 0 ? (
-        <Card data-testid="bulk-bar">
-          <div className="bulk-bar">
-            <strong data-testid="bulk-count">{selected.size} selected</strong>
-            {/* DA-35: the selection used to survive paging and filter changes
-                INVISIBLY — 25 selected, none of them on screen, and Reject
-                would have hit all 25. It now says so, out loud, every time. */}
-            {offPage > 0 ? (
-              <span className="bulk-offpage" data-testid="bulk-offpage">
-                {offPage} not shown on this page
-              </span>
-            ) : null}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setReviewOpen(true);
-              }}
-              data-testid="bulk-review"
-            >
-              Review selection
-            </Button>
-            {selected.size < page.total ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={busy}
-                onClick={() => void selectAllMatching()}
-                data-testid="bulk-select-all-matching"
-              >
-                Select all {page.total} matching
-              </Button>
-            ) : null}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setSelected(new Map());
-              }}
-              data-testid="bulk-clear"
-            >
-              Clear
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void runBulk("approve")}
-              loading={busy}
-              data-testid="bulk-approve"
-            >
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void runBulk("waitlist")}
-              loading={busy}
-              data-testid="bulk-waitlist"
-            >
-              Waitlist
-            </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => {
-                // Same reset the per-row door does: a note is about one
-                // decision and must not be inherited by the next.
-                setRejectReason("");
-                setRejectNote("");
-                setConfirmBulk("reject");
-              }}
-              loading={busy}
-              data-testid="bulk-reject"
-            >
-              Decline
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void runBulk("restore")}
-              loading={busy}
-            >
-              Restore
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
-      <Card>
-        {/* Select-all lives ABOVE the table, not inside <thead>: below 1100px
-            each row becomes a card and the header strip is gone, which would
-            have taken the only select-all with it. One control, every width. */}
-        {rows.length > 0 ? (
-          <label className="reg-select-all">
-            <input
-              type="checkbox"
-              className="reg-check"
-              aria-label="Select all on page"
-              checked={allOnPageSelected}
-              onChange={() => {
-                setSelected((prev) => {
-                  const next = new Map(prev);
-                  if (allOnPageSelected) {
-                    rows.forEach((r) => next.delete(r.id));
-                  } else {
-                    rows.forEach((r) => {
-                      next.set(r.id, { id: r.id, number: r.number, name: r.name });
-                    });
-                  }
-                  return next;
-                });
-              }}
-            />
-            <span>
-              Select all {rows.length} on this page
-              {page.total > rows.length ? ` (of ${String(page.total)} matching)` : ""}
-            </span>
-          </label>
+            Clear filters
+          </button>
         ) : null}
+      </form>
+
+      <div className="pd-table-wrap" data-busy={navigating ? "true" : undefined}>
+        <div className="pd-table-head">
+          {rows.length > 0 ? (
+            <label className="pd-check">
+              <input
+                type="checkbox"
+                aria-label="Select all on page"
+                checked={allOnPageSelected}
+                onChange={() => {
+                  setSelected((prev) => {
+                    const next = new Map(prev);
+                    if (allOnPageSelected) {
+                      rows.forEach((row) => next.delete(row.id));
+                    } else {
+                      rows.forEach((row) => {
+                        next.set(row.id, { id: row.id, number: row.number, name: row.name });
+                      });
+                    }
+                    return next;
+                  });
+                }}
+              />
+              <span>
+                {page.total} player{page.total === 1 ? "" : "s"}
+                {filtersApplied ? " match" : ""}
+              </span>
+            </label>
+          ) : (
+            <span />
+          )}
+          <span className="pd-quiet pd-shortcuts">
+            <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>x</kbd> select
+          </span>
+        </div>
+
         <div
-          className="table-scroll"
+          className="pd-table-scroll"
           role="region"
           aria-label="Registrations table"
           tabIndex={0}
-          data-testid="table-scroll"
         >
-          <table className="reg-table" data-testid="reg-table">
-            <caption className="reg-caption">
+          <table className="pd-table" data-testid="reg-table">
+            <caption className="pd-visually-hidden">
               {page.total} registration{page.total === 1 ? "" : "s"} match this view — page{" "}
               {page.page} of {totalPages}.
             </caption>
             <thead>
               <tr>
-                <th>
+                <th className="pd-col-check">
                   <VisuallyHidden>Select</VisuallyHidden>
                 </th>
-                <th>#</th>
                 <th>Player</th>
-                <th>Role</th>
+                <th className="pd-col-role">Role</th>
                 <th>Status</th>
-                <th>Team</th>
-                <th>
+                <th className="pd-col-team">Team</th>
+                <th className="pd-col-actions">
                   <VisuallyHidden>Actions</VisuallyHidden>
                 </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <RegRow
+                <PlayerRow
                   key={row.id}
                   row={row}
-                  active={index === cursor}
+                  cursor={index === cursor}
+                  open={row.id === sheetId}
                   checked={selected.has(row.id)}
                   categoryFlagged={categoryFlags[row.id] !== undefined}
+                  roleLabel={labelOf(desk.roles, row.role)}
                   onToggle={() => {
                     toggle(row);
                   }}
-                  onDetails={() => void openDetails(row.id)}
-                  onApprove={() => void runSingle(row, "approve", undefined, `approve-${row.id}`)}
-                  onWaitlist={() =>
-                    void runSingle(row, "waitlist", undefined, `waitlist-${row.id}`)
-                  }
+                  onOpen={() => {
+                    setCursor(index);
+                    openSheet(row.id);
+                  }}
+                  onApprove={() => void decideRow(row, "approve")}
                   onDecline={() => {
-                    setRejectReason("");
-                    // One player's private note must never open on the next
-                    // player's dialog.
-                    setRejectNote("");
-                    setRowDecline(row);
+                    setDeclining(row);
                   }}
-                  onIcon={() => {
-                    if (row.isIcon) {
-                      restoreFocusRef.current = `icon-${row.id}`;
-                      void markRegistrationAction(slug, row.id, { isIcon: false }).then(
-                        (result) => {
-                          applyMark(result, `${row.name ?? row.number} is no longer an Icon`);
-                        },
-                      );
-                    } else {
-                      setIconConfirm(row);
-                    }
-                  }}
-                  onRetain={() => {
-                    if (row.isRetained) {
-                      restoreFocusRef.current = `retain-${row.id}`;
-                      void markRegistrationAction(slug, row.id, { isRetained: false }).then(
-                        (result) => {
-                          applyMark(result, `${row.name ?? row.number} is no longer retained`);
-                        },
-                      );
-                    } else {
-                      setRetainConfirm(row);
-                    }
-                  }}
-                  onCaptain={() => {
-                    restoreFocusRef.current = `captain-${row.id}`;
-                    void markRegistrationAction(slug, row.id, { isCaptain: !row.isCaptain }).then(
-                      (result) => {
-                        applyMark(
-                          result,
-                          row.isCaptain
-                            ? `${row.name ?? row.number} is no longer Captain`
-                            : `${row.name ?? row.number} is Captain`,
-                        );
-                      },
-                    );
-                  }}
-                  busy={busy}
-                  labelOf={labelOf}
                 />
               ))}
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="reg-empty" data-testid="reg-empty">
-                    {/* DA-35: one string served two different situations — an
-                        empty season and a filter that matched nothing. The
-                        first is the START of this screen's life, and blaming a
-                        filter that has not been applied is a dead end.
-
-                        THIRD situation, found in review: no filters applied,
-                        the tiles count registrations, and the table still has
-                        zero rows. `stats.total > 0` used to shove that case
-                        into the filter branch, whose "Clear the filters"
-                        recovery is a no-op — the mismatch is a data problem
-                        (rows whose person no longer resolves), not a filter
-                        problem, and the message must not lie about it. */}
+                  <td colSpan={6} className="pd-empty" data-testid="reg-empty">
                     {!filtersApplied && stats.total > 0 ? (
                       <>
                         <strong>
@@ -1271,10 +931,10 @@ export function RegistrationDashboardPanel({
                         <strong>No registrations match these filters.</strong>{" "}
                         <button
                           type="button"
-                          className="link-button"
+                          className="pd-link"
                           onClick={() => {
                             setSearch("");
-                            changeFilter({ q: "", status: "", team: "", sort: "recent" });
+                            changeFilter({ q: "", status: "", fee: "", team: "", sort: "" });
                           }}
                         >
                           Clear the filters
@@ -1283,9 +943,8 @@ export function RegistrationDashboardPanel({
                       </>
                     ) : (
                       <>
-                        <strong>Nobody has registered yet.</strong> Share the link above —
-                        that&apos;s how players arrive. You can also add players yourself or import
-                        a CSV.
+                        <strong>Nobody has registered yet.</strong> Share the registration link —
+                        that&apos;s how players arrive — or add players yourself, or import a CSV.
                       </>
                     )}
                   </td>
@@ -1295,371 +954,257 @@ export function RegistrationDashboardPanel({
           </table>
         </div>
 
-        <div className="pager">
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={page.page <= 1}
-            onClick={() => {
-              pushQuery({ page: String(page.page - 1) });
-            }}
-            data-testid="page-prev"
-          >
-            Previous
-          </Button>
-          <span data-testid="page-indicator">
-            Page {page.page} of {totalPages} · {page.total} total
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={page.page >= totalPages}
-            onClick={() => {
-              pushQuery({ page: String(page.page + 1) });
-            }}
-            data-testid="page-next"
-          >
-            Next
-          </Button>
-        </div>
-      </Card>
-
-      {expanded !== null ? (
-        <Card data-testid="timeline-panel">
-          {(() => {
-            const detail = rows.find((r) => r.id === expanded);
-            return detail !== undefined ? (
-              <>
-                {/* DA-13: the panel had no heading, so once you found it you
-                    still could not tell whose record you were looking at. */}
-                <h2 data-testid="details-subject">
-                  {detail.name ?? "Player"}{" "}
-                  <span className="registration-phone">{detail.number}</span>
-                </h2>
-                {detail.status === "rejected" && detail.rejectionReason !== null ? (
-                  <p className="reg-reason" data-testid="details-reason">
-                    Declined — {REASON_LABEL[detail.rejectionReason] ?? detail.rejectionReason}. The
-                    player was told this reason.
-                  </p>
-                ) : null}
-                {/* The words behind the category, read back to the people who
-                    can act on them. This panel is behind `registration.review`;
-                    the player's own status page carries no such field, by
-                    construction — invariant 6. */}
-                {detail.status === "rejected" && detail.rejectionNote !== null ? (
-                  <p className="reg-reason" data-testid="details-reason-note">
-                    <strong>Your note:</strong> {detail.rejectionNote}{" "}
-                    <span className="registration-phone">Organizers only — not shown to them.</span>
-                  </p>
-                ) : null}
-                {/* HOW THEY PLAY.
-                    On a phone the row card drops the Role cell — role, age and
-                    the two playing styles — to keep the list scannable. That is
-                    only honest if the facts are somewhere, and this is where.
-                    They render at every width: a desktop reader who has the
-                    column anyway loses nothing by seeing it confirmed here, and
-                    a phone reader is one tap from the whole record rather than
-                    from a gap. */}
-                <dl className="details-facts" data-testid="details-facts">
-                  <div>
-                    <dt>Role</dt>
-                    <dd>{labelOf(detail.role)}</dd>
-                  </div>
-                  {detail.age !== null ? (
-                    <div>
-                      <dt>Age</dt>
-                      <dd>{detail.age} yrs</dd>
-                    </div>
-                  ) : null}
-                  {detail.battingStyle !== null ? (
-                    <div>
-                      <dt>Batting</dt>
-                      <dd>{detail.battingStyle.replace(/_/g, " ")}</dd>
-                    </div>
-                  ) : null}
-                  {detail.bowlingStyle !== null ? (
-                    <div>
-                      <dt>Bowling</dt>
-                      <dd>{detail.bowlingStyle.replace(/_/g, " ")}</dd>
-                    </div>
-                  ) : null}
-                  {/* Whatever else the SEASON'S sport asks about — a preferred
-                      foot, a raiding side. Labelled by the pack on the server,
-                      so this renders any sport without knowing any of them.
-                      Empty for cricket, whose two are the named rows above. */}
-                  {detail.attributes.map((attribute) => (
-                    <div key={attribute.key}>
-                      <dt>{attribute.label}</dt>
-                      <dd>{attribute.value}</dd>
-                    </div>
-                  ))}
-                  <div>
-                    <dt>Team</dt>
-                    <dd>{detail.teamName ?? "—"}</dd>
-                  </div>
-                  {/* THE DESK, which had nowhere to be read until now. The
-                      amount and the reference render only when the desk
-                      actually recorded them: a blank row would suggest the
-                      product had lost something it was never given. */}
-                  <div>
-                    <dt>Fee</dt>
-                    <dd data-testid="details-fee">
-                      {FEE_LABEL[detail.feeStatus]}
-                      {detail.feeAmountPaise !== null
-                        ? ` · ${formatPaiseINR(paise(detail.feeAmountPaise))}`
-                        : ""}
-                    </dd>
-                  </div>
-                  {detail.feeReference !== null && detail.feeReference !== "" ? (
-                    <div>
-                      <dt>Reference</dt>
-                      <dd data-testid="details-fee-reference">{detail.feeReference}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-                {/* THE KIT, which had nowhere to be read at all. Each field
-                    renders only when the desk recorded it: a row of blanks
-                    would suggest the product had lost something it was never
-                    given. */}
-                {detail.jerseyName !== null ||
-                detail.jerseyNumber !== null ||
-                detail.tshirtSize !== null ||
-                detail.trouserSize !== null ||
-                detail.fatherName !== null ? (
-                  <dl className="details-facts" data-testid="details-kit">
-                    {detail.fatherName !== null && detail.fatherName !== "" ? (
-                      <div>
-                        {/* Not kit. Indian entry forms ask for it as an identity
-                            check, so it belongs beside the player's own name. */}
-                        <dt>Father&apos;s name</dt>
-                        <dd>{detail.fatherName}</dd>
-                      </div>
-                    ) : null}
-                    {detail.jerseyName !== null && detail.jerseyName !== "" ? (
-                      <div>
-                        <dt>On the jersey</dt>
-                        <dd>
-                          {detail.jerseyName}
-                          {detail.jerseyNumber !== null && detail.jerseyNumber !== ""
-                            ? ` · ${detail.jerseyNumber}`
-                            : ""}
-                        </dd>
-                      </div>
-                    ) : null}
-                    {detail.tshirtSize !== null && detail.tshirtSize !== "" ? (
-                      <div>
-                        <dt>T-shirt</dt>
-                        <dd>{detail.tshirtSize}</dd>
-                      </div>
-                    ) : null}
-                    {detail.trouserSize !== null && detail.trouserSize !== "" ? (
-                      <div>
-                        <dt>Trousers</dt>
-                        <dd>{detail.trouserSize}</dd>
-                      </div>
-                    ) : null}
-                  </dl>
-                ) : null}
-                {detail.note !== null && detail.note !== "" ? (
-                  /* The organizer's own remark, imported or typed. It survives
-                     every status change, which is what makes it worth showing
-                     beside the record rather than in the timeline. */
-                  <p className="reg-sub" data-testid="details-note">
-                    {detail.note}
-                  </p>
-                ) : null}
-                <div className="reg-photo-manage">
-                  <PlayerPhotoUploader
-                    slug={slug}
-                    registrationId={detail.id}
-                    playerName={detail.name ?? "Player"}
-                    {...(detail.photoUrl !== null ? { currentUrl: detail.photoUrl } : {})}
-                  />
-                </div>
-              </>
-            ) : null;
-          })()}
-          {/* PI-1: welcome-back context — the club's own records only. */}
-          {history.length > 0 ? (
-            <>
-              <h3>Seen before in your club</h3>
-              <ul className="reg-person-history" data-testid="person-history">
-                {history.map((season, index) => (
-                  <li key={index}>
-                    {season.competitionName}
-                    {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""}
-                    {" · "}
-                    {season.status}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          <h3>Timeline</h3>
-          <ol className="timeline">
-            {timeline.map((entry, index) => (
-              <li key={index}>
-                <Badge tone="neutral">{TIMELINE_VERB[entry.action] ?? entry.action}</Badge>
-                <span className="timeline-at">{formatDateTime(entry.at)}</span>
-                <span className="timeline-actor">
-                  {entry.actorName !== null ? `by ${entry.actorName}` : "by the system"}
-                </span>
-                {isNote(entry.meta) ? (
-                  <span className="timeline-note">“{entry.meta.note}”</span>
-                ) : null}
-                {isReason(entry.meta) ? (
-                  <span className="timeline-note">
-                    Reason: {REASON_LABEL[entry.meta.reason] ?? entry.meta.reason}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-          <div className="note-row">
-            <Field
-              label="Add a note"
-              name="note"
-              value={noteText}
-              onChange={(event) => {
-                setNoteText(event.target.value);
-              }}
-              placeholder="Verified via club captain"
-            />
-            <Button
-              size="sm"
-              onClick={() => void submitNote(expanded)}
-              disabled={noteText.trim() === ""}
-            >
-              Add note
-            </Button>
-          </div>
-          {teams.length > 0 ? (
-            <div className="note-row" data-testid="assign-team-row">
-              <Select
-                label="Assign to team"
-                value={assignTeamId}
-                onChange={(event) => {
-                  setAssignTeamId(event.target.value);
-                }}
-              >
-                <option value="">Choose a team…</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </Select>
+        {totalPages > 1 || page.total > 0 ? (
+          <div className="pd-pager">
+            <span data-testid="page-indicator" className="pd-quiet">
+              Page {page.page} of {totalPages} · {page.total} total
+            </span>
+            <span className="pd-pager-buttons">
               <Button
                 size="sm"
-                disabled={assignTeamId === ""}
-                data-testid="assign-team"
+                variant="ghost"
+                disabled={page.page <= 1}
                 onClick={() => {
-                  // PX-4: the certified assignTeamAction finally gets a UI —
-                  // capability (team.manage) is enforced server-side.
-                  void assignTeamAction(slug, expanded, assignTeamId).then((result) => {
-                    if (result.ok) {
-                      toast({ title: "Assigned to team", tone: "success" });
-                      router.refresh();
-                    } else {
-                      toast({ title: result.error ?? "Assignment failed.", tone: "danger" });
-                    }
-                  });
+                  pushQuery({ page: String(page.page - 1) });
                 }}
+                data-testid="page-prev"
               >
-                Assign
+                Previous
               </Button>
-            </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={page.page >= totalPages}
+                onClick={() => {
+                  pushQuery({ page: String(page.page + 1) });
+                }}
+                data-testid="page-next"
+              >
+                Next
+              </Button>
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* The bulk bar floats over the table's foot: the selection and what
+          can be done to it stay in view however far down the list you are. */}
+      {selected.size > 0 ? (
+        <div className="pd-bulk" data-testid="bulk-bar" role="region" aria-label="Bulk actions">
+          <strong data-testid="bulk-count">{selected.size} selected</strong>
+          {/* DA-35: the selection survives paging, so it says when some of it
+              is not on screen — Decline would reach them too. */}
+          {offPage > 0 ? (
+            <span className="pd-quiet" data-testid="bulk-offpage">
+              {offPage} not shown on this page
+            </span>
           ) : null}
-        </Card>
+          <span className="pd-bulk-links">
+            <button
+              type="button"
+              className="pd-link"
+              onClick={() => {
+                setReviewOpen(true);
+              }}
+              data-testid="bulk-review"
+            >
+              Review
+            </button>
+            {selected.size < page.total ? (
+              <button
+                type="button"
+                className="pd-link"
+                disabled={bulkBusy !== null}
+                onClick={() => void selectAllMatching()}
+                data-testid="bulk-select-all-matching"
+              >
+                Select all {page.total}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="pd-link"
+              onClick={() => {
+                setSelected(new Map());
+              }}
+              data-testid="bulk-clear"
+            >
+              Clear
+            </button>
+          </span>
+          <span className="pd-bulk-actions">
+            <Button
+              size="sm"
+              onClick={() => void runBulk("approve")}
+              loading={bulkBusy === "approve"}
+              disabled={bulkBusy !== null}
+              data-testid="bulk-approve"
+            >
+              Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void runBulk("waitlist")}
+              loading={bulkBusy === "waitlist"}
+              disabled={bulkBusy !== null}
+              data-testid="bulk-waitlist"
+            >
+              Waitlist
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void runBulk("restore")}
+              loading={bulkBusy === "restore"}
+              disabled={bulkBusy !== null}
+            >
+              Restore
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                setBulkDecline(true);
+              }}
+              disabled={bulkBusy !== null}
+              data-testid="bulk-reject"
+            >
+              Decline…
+            </Button>
+          </span>
+        </div>
       ) : null}
 
-      {/* --- Bulk decline: a destructive act on people you may not be looking
-          at now asks first, and names how many and who. --- */}
-      <Dialog
-        open={confirmBulk === "reject"}
+      {sheetRow !== null ? (
+        <PlayerSheet
+          key="sheet"
+          slug={slug}
+          row={sheetRow}
+          desk={desk}
+          teams={teamOptions}
+          mutate={sheetIndex >= 0 ? mutate : mutateDetached}
+          categoryFlagged={categoryFlags[sheetRow.id] !== undefined}
+          onClose={closeSheet}
+          {...(sheetIndex >= 0
+            ? {
+                position: { index: sheetIndex, total: rows.length },
+                ...(sheetIndex > 0
+                  ? {
+                      onPrev: () => {
+                        const target = rows[sheetIndex - 1];
+                        if (target !== undefined) {
+                          setCursor(sheetIndex - 1);
+                          openSheet(target.id);
+                        }
+                      },
+                    }
+                  : {}),
+                ...(sheetIndex < rows.length - 1
+                  ? {
+                      onNext: () => {
+                        const target = rows[sheetIndex + 1];
+                        if (target !== undefined) {
+                          setCursor(sheetIndex + 1);
+                          openSheet(target.id);
+                        }
+                      },
+                    }
+                  : {}),
+              }
+            : {})}
+          onDecline={(row) => {
+            setDeclining(row);
+          }}
+          onDecided={(row) => {
+            afterDecision(row);
+          }}
+          reviewing={reviewing}
+          nextToReview={(() => {
+            const next = nextPendingAfter(sheetRow.id);
+            return next === undefined || reviewing
+              ? undefined
+              : {
+                  name: next.name ?? next.number,
+                  left: pendingRows.filter((row) => row.id !== sheetRow.id).length,
+                  go: () => {
+                    setReviewing(true);
+                    openSheet(next.id);
+                  },
+                };
+          })()}
+        />
+      ) : null}
+
+      <ImportDialog
+        slug={slug}
+        open={importOpen}
         onClose={() => {
-          setConfirmBulk(null);
-          setRejectNote("");
+          setImportOpen(false);
+        }}
+        registrationOpen={registrationOpen}
+      />
+
+      <ExportDialog
+        slug={slug}
+        open={exportOpen}
+        onClose={() => {
+          setExportOpen(false);
+        }}
+        sportAttributes={desk.attributes}
+        teams={teamOptions}
+        {...(filtersApplied
+          ? {
+              view: {
+                ...(filters.search !== "" ? { search: filters.search } : {}),
+                ...(filters.status !== "" ? { status: filters.status } : {}),
+                ...(filters.fee !== "" ? { fee: filters.fee } : {}),
+                ...(filters.team !== "" ? { teamId: filters.team } : {}),
+              },
+            }
+          : {})}
+      />
+
+      <DeclineDialog
+        open={declining !== null}
+        onClose={() => {
+          setDeclining(null);
+        }}
+        title={`Decline ${declining?.name ?? "this registration"}?`}
+        confirmLabel="Decline"
+        onConfirm={(reason, note) =>
+          declining === null ? Promise.resolve() : declineRow(declining, reason, note)
+        }
+        testIds={{ confirm: "confirm-row-decline", note: "row-reject-note" }}
+      >
+        <p>
+          {declining?.name ?? "This player"} is told their registration was not approved, with the
+          reason you choose. Restore is the only way back.
+        </p>
+      </DeclineDialog>
+
+      <DeclineDialog
+        open={bulkDecline}
+        onClose={() => {
+          setBulkDecline(false);
         }}
         title={`Decline ${String(selected.size)} registration${selected.size === 1 ? "" : "s"}?`}
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setConfirmBulk(null);
-                setRejectNote("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              loading={busy}
-              disabled={
-                rejectReason === "" || (rejectReason === "other" && rejectNote.trim() === "")
-              }
-              data-testid="confirm-bulk-reject"
-              onClick={() => void runBulk("reject")}
-            >
-              Decline {selected.size}
-            </Button>
-          </>
-        }
+        confirmLabel={`Decline ${String(selected.size)}`}
+        onConfirm={(reason, note) => runBulk("reject", reason, note)}
+        testIds={{ confirm: "confirm-bulk-reject", note: "bulk-reject-note" }}
       >
         <p>
           This tells {selected.size} {selected.size === 1 ? "person" : "people"} their registration
-          was not approved, and sends each of them the reason you choose. There is no undo — a
-          declined registration can only be put back with Restore.
+          was not approved, and sends each of them the reason you choose. A declined registration
+          can only be put back with Restore.
         </p>
         {offPage > 0 ? (
-          <p role="alert" className="reg-warning">
-            <strong>{offPage} of them are not shown on this page.</strong> Use “Review selection” to
-            see everyone this will affect.
+          <p role="alert" className="pd-callout" data-tone="warning">
+            <strong>{offPage} of them are not shown on this page.</strong> Use “Review” in the
+            selection bar to see everyone this will affect.
           </p>
         ) : null}
-        <Select
-          label="Reason (the player is told this)"
-          name="reason"
-          value={rejectReason}
-          onChange={(event) => {
-            setRejectReason(event.target.value);
-          }}
-        >
-          <option value="">Choose a reason…</option>
-          {REJECTION_REASONS.map((reason) => (
-            <option key={reason} value={reason}>
-              {REASON_LABEL[reason] ?? reason}
-            </option>
-          ))}
-        </Select>
-        {/*
-          THE OTHER HALF OF "OTHER". Doc 42 spells the categories as
-          "duplicate, ineligible, withdrew, capacity, other+note" — the note is
-          not a decoration, it is what makes `other` mean anything. Required
-          there, optional for the four that already say what they mean.
-
-          ORGANIZER-ONLY, and the label says so out loud, because the select
-          directly above it says the opposite about the reason. Invariant 6: the
-          player is told a respectful sentence built from the CATEGORY and never
-          sees these words.
-        */}
-        <Field
-          label={
-            rejectReason === "other"
-              ? "What was the reason? (organizers only)"
-              : "Note for your own records (organizers only)"
-          }
-          name="bulk-reject-note"
-          help="The player never sees this. It is here so \u201cother\u201d still means something a month from now."
-          value={rejectNote}
-          required={rejectReason === "other"}
-          onChange={(event) => {
-            setRejectNote(event.target.value);
-          }}
-          data-testid="bulk-reject-note"
-        />
-      </Dialog>
+      </DeclineDialog>
 
       {/* --- Review selection: the selection made inspectable. --- */}
       <Dialog
@@ -1691,14 +1236,14 @@ export function RegistrationDashboardPanel({
         }
       >
         <p>Everyone a bulk action would affect, including rows on other pages.</p>
-        <ul className="selection-list" data-testid="selection-list">
+        <ul className="pd-selection" data-testid="selection-list">
           {[...selected.values()].map((pick) => (
             <li key={pick.id}>
               <span>{pick.name ?? "Unnamed"}</span>
-              <span className="reg-number">{pick.number}</span>
+              <span className="pd-mono pd-quiet">{pick.number}</span>
               <button
                 type="button"
-                className="link-button"
+                className="pd-link"
                 onClick={() => {
                   setSelected((prev) => {
                     const next = new Map(prev);
@@ -1713,508 +1258,338 @@ export function RegistrationDashboardPanel({
           ))}
         </ul>
       </Dialog>
+    </div>
+  );
+}
 
-      {/* --- Per-row decline: the two outcomes that used to be reachable only
-          through a 13px checkbox and a scroll back up to the bulk bar. --- */}
-      <Dialog
-        open={rowDecline !== null}
-        onClose={() => {
-          setRowDecline(null);
-          setRejectNote("");
-        }}
-        title={`Decline ${rowDecline?.name ?? "this registration"}?`}
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setRowDecline(null);
-                setRejectNote("");
-              }}
+function labelOf(roles: readonly { key: string; label: string }[], role: string | null): string {
+  if (role === null) {
+    return "";
+  }
+  return roles.find((entry) => entry.key === role)?.label ?? role.replace(/_/g, " ");
+}
+
+/* --- What to do next ----------------------------------------------------- */
+
+/**
+ * ONE NEXT STEP, ALWAYS.
+ *
+ * The desk used to open on eight tiles and a table and leave the organizer to
+ * work out what the season needed. This names the single most useful thing to
+ * do now, in the order a season actually goes — review who registered, fix
+ * anyone stranded, then hand the pool to the auction — with one button that
+ * does it.
+ */
+function NextStep({
+  stats,
+  orphans,
+  desk,
+  slug,
+  teamsCount,
+  onReview,
+  onOpenPlayer,
+}: {
+  stats: RegistrationStats;
+  orphans: OrphanPreSigned[];
+  desk: PlayerDeskContext;
+  slug: string;
+  teamsCount: number;
+  onReview: () => void;
+  onOpenPlayer: (id: string) => void;
+}) {
+  const pending = stats.submitted + stats.waitlisted;
+  let eyebrow: string;
+  let title: string;
+  let why: string;
+  let action: ReactNode;
+  if (stats.total === 0) {
+    eyebrow = "Get players in";
+    title = "Nobody has registered yet";
+    why = "Share the registration link above, add players one by one, or import your sheet.";
+    action = null;
+  } else if (pending > 0) {
+    eyebrow = "Review";
+    title = `${String(pending)} player${pending === 1 ? " is" : "s are"} waiting for a decision`;
+    why = "Open each one, approve or decline, and the next opens by itself.";
+    action = (
+      <Button onClick={onReview} data-testid="start-review">
+        Start reviewing <IconArrowRight size={16} className="icon-trail" />
+      </Button>
+    );
+  } else if (orphans.length > 0) {
+    const first = orphans[0];
+    eyebrow = "Fix";
+    title = `${String(orphans.length)} pre-signed player${orphans.length === 1 ? " has" : "s have"} no team`;
+    why = "They skip the auction, so without a team they are in no squad at all.";
+    action =
+      first === undefined ? null : (
+        <Button
+          onClick={() => {
+            onOpenPlayer(first.id);
+          }}
+        >
+          Pick a team <IconArrowRight size={16} className="icon-trail" />
+        </Button>
+      );
+  } else if (teamsCount < 2) {
+    eyebrow = "Teams";
+    title = "Add the teams that will bid";
+    why = "An auction needs at least two teams — then pick each team's captain and icons.";
+    action = (
+      <ButtonLink href={`/seasons/${slug}/teams`}>
+        Go to teams <IconArrowRight size={16} className="icon-trail" />
+      </ButtonLink>
+    );
+  } else if (!desk.auctionExists && stats.auctionPool === 0 && stats.approved > 0) {
+    eyebrow = "Auction pool";
+    title = "Nobody is left for the auction";
+    why = `All ${String(stats.approved)} approved players are pre-signed (icons, captains or retained). Add or approve more players to fill the pool.`;
+    action = null;
+  } else if (!desk.auctionExists) {
+    eyebrow = "Auction";
+    title = `${String(stats.auctionPool)} player${stats.auctionPool === 1 ? "" : "s"} ready for the auction`;
+    why = "Everyone is reviewed. Pick captains and icons on each team, then set up the auction.";
+    action = (
+      <ButtonLink href={`/seasons/${slug}/auction`}>
+        Set up the auction <IconArrowRight size={16} className="icon-trail" />
+      </ButtonLink>
+    );
+  } else {
+    eyebrow = "All set";
+    title = "Every registration is decided";
+    why = "New registrations will appear here for review.";
+    action = null;
+  }
+  return (
+    <section className="pd-next" aria-label="Next step" data-testid="next-step">
+      <div>
+        <p className="pd-next-eyebrow">{eyebrow}</p>
+        <p className="pd-next-title">{title}</p>
+        <p className="pd-next-why">{why}</p>
+      </div>
+      {action}
+    </section>
+  );
+}
+
+/* --- One row ------------------------------------------------------------- */
+
+function PlayerRow({
+  row,
+  cursor,
+  open,
+  checked,
+  categoryFlagged,
+  roleLabel,
+  onToggle,
+  onOpen,
+  onApprove,
+  onDecline,
+}: {
+  row: Row;
+  cursor: boolean;
+  open: boolean;
+  checked: boolean;
+  categoryFlagged: boolean;
+  roleLabel: string;
+  onToggle: () => void;
+  onOpen: () => void;
+  onApprove: () => void;
+  onDecline: () => void;
+}) {
+  const triage = canTriage(row);
+  return (
+    <tr
+      className="pd-row"
+      data-testid={`reg-${row.personId}`}
+      data-cursor={cursor ? "true" : undefined}
+      data-open={open ? "true" : undefined}
+      data-selected={checked ? "true" : undefined}
+      onClick={(event) => {
+        // The whole row opens the player; its own controls do their own thing.
+        if ((event.target as HTMLElement).closest("button, a, input, label, select") === null) {
+          onOpen();
+        }
+      }}
+    >
+      <td className="pd-col-check">
+        <input
+          type="checkbox"
+          className="pd-row-check"
+          aria-label={`Select ${personLabel(row)}`}
+          checked={checked}
+          onChange={onToggle}
+        />
+      </td>
+      <td className="pd-col-player">
+        <div className="pd-player">
+          <PlayerImage
+            name={row.name ?? "Player"}
+            seed={row.personId}
+            size="sm"
+            {...(row.photoUrl !== null ? { src: row.photoUrl } : {})}
+          />
+          <div className="pd-player-text">
+            <button
+              type="button"
+              className="pd-player-name"
+              onClick={onOpen}
+              data-focus-key={`open-${row.id}`}
             >
-              Cancel
+              {row.name ?? "Unnamed"}
+            </button>
+            <span className="pd-player-meta">
+              <span className="pd-mono">{row.number}</span>
+              {/* DA-35: never raw E.164 at a human. */}
+              <span>{personContact(row)}</span>
+            </span>
+            {row.duplicateName || categoryFlagged ? (
+              <span className="pd-player-flags">
+                {row.duplicateName ? (
+                  <Badge tone="warning" data-testid="dup-flag">
+                    possible duplicate
+                  </Badge>
+                ) : null}
+                {categoryFlagged ? (
+                  // PI-1: the engine flags; the organizer decides (invariant 5).
+                  <Badge tone="warning" data-testid="category-flag">
+                    check entry category
+                  </Badge>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </td>
+      <td className="pd-col-role">
+        <span>{roleLabel}</span>
+        {row.age !== null ? <span className="pd-sub">{row.age} yrs</span> : null}
+      </td>
+      <td className="pd-col-status">
+        <span className="pd-status">
+          <Badge tone={STATUS_TONE[row.status]}>
+            {row.status === "rejected" ? "declined" : row.status}
+          </Badge>
+          {/* ONLY WHEN IT IS NOT PAID: the one an organizer acts on shows. */}
+          {row.feeStatus !== "paid" ? (
+            <Badge tone={FEE_TONE[row.feeStatus]} data-testid={`fee-${row.personId}`}>
+              {FEE_LABEL[row.feeStatus]}
+            </Badge>
+          ) : null}
+        </span>
+        {row.status === "rejected" && row.rejectionReason !== null ? (
+          <span className="pd-sub" data-testid={`reason-${row.personId}`}>
+            {REASON_LABEL[row.rejectionReason] ?? row.rejectionReason}
+          </span>
+        ) : null}
+      </td>
+      <td className="pd-col-team">
+        <span className="pd-team">{row.teamName ?? <span className="pd-quiet">—</span>}</span>
+        <span className="pd-marks-inline">
+          {row.isCaptain ? (
+            <span
+              className="pd-mark-chip"
+              data-kind="captain"
+              data-testid="captain-flag"
+              title="Captain — skips the auction"
+            >
+              C
+            </span>
+          ) : null}
+          {row.isIcon ? (
+            <span
+              className="pd-mark-chip"
+              data-kind="icon"
+              data-testid="icon-flag"
+              title="Icon — skips the auction"
+            >
+              Icon
+            </span>
+          ) : null}
+          {row.isRetained ? (
+            <span
+              className="pd-mark-chip"
+              data-kind="retained"
+              data-testid="retained-flag"
+              title="Retained — skips the auction"
+            >
+              Ret
+            </span>
+          ) : null}
+        </span>
+        {(row.isIcon || row.isCaptain || row.isRetained) && row.teamId === null ? (
+          <span className="pd-sub pd-sub-danger">No team — in no squad</span>
+        ) : null}
+      </td>
+      <td className="pd-col-actions">
+        {triage ? (
+          <span className="pd-row-actions">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onApprove}
+              data-focus-key={`approve-${row.id}`}
+            >
+              Approve
             </Button>
             <Button
-              variant="danger"
-              loading={busy}
-              disabled={
-                rejectReason === "" || (rejectReason === "other" && rejectNote.trim() === "")
-              }
-              data-testid="confirm-row-decline"
-              onClick={() => {
-                if (rowDecline !== null) {
-                  void runSingle(
-                    rowDecline,
-                    "reject",
-                    rejectReason,
-                    `decline-${rowDecline.id}`,
-                    rejectNote,
-                  );
-                }
-              }}
+              size="sm"
+              variant="ghost"
+              onClick={onDecline}
+              data-focus-key={`decline-${row.id}`}
+              data-testid={`decline-${row.personId}`}
             >
               Decline
             </Button>
-          </>
-        }
-      >
-        <p>
-          {rowDecline?.name ?? "This player"} is told their registration was not approved, with the
-          reason you choose. Restore is the only way back.
-        </p>
-        <Select
-          label="Reason (the player is told this)"
-          name="row-reason"
-          value={rejectReason}
-          onChange={(event) => {
-            setRejectReason(event.target.value);
-          }}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="pd-icon-btn pd-row-open"
+          aria-label="Details"
+          title="Open player"
+          onClick={onOpen}
         >
-          <option value="">Choose a reason…</option>
-          {REJECTION_REASONS.map((reason) => (
-            <option key={reason} value={reason}>
-              {REASON_LABEL[reason] ?? reason}
-            </option>
-          ))}
-        </Select>
-        {/*
-          THE OTHER HALF OF "OTHER". Doc 42 spells the categories as
-          "duplicate, ineligible, withdrew, capacity, other+note" — the note is
-          not a decoration, it is what makes `other` mean anything. Required
-          there, optional for the four that already say what they mean.
+          <IconChevronRight size={18} />
+        </button>
+      </td>
+    </tr>
+  );
+}
 
-          ORGANIZER-ONLY, and the label says so out loud, because the select
-          directly above it says the opposite about the reason. Invariant 6: the
-          player is told a respectful sentence built from the CATEGORY and never
-          sees these words.
-        */}
-        <Field
-          label={
-            rejectReason === "other"
-              ? "What was the reason? (organizers only)"
-              : "Note for your own records (organizers only)"
-          }
-          name="row-reject-note"
-          help="The player never sees this. It is here so \u201cother\u201d still means something a month from now."
-          value={rejectNote}
-          required={rejectReason === "other"}
-          onChange={(event) => {
-            setRejectNote(event.target.value);
-          }}
-          data-testid="row-reject-note"
-        />
-      </Dialog>
-
-      {/* --- Retention removes a player from the night exactly as an Icon
-          mark does, so it asks exactly as loudly. --- */}
-      <Dialog
-        open={retainConfirm !== null}
-        onClose={() => {
-          setRetainConfirm(null);
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly { value: string; label: string }[];
+}) {
+  const id = `pd-filter-${label.toLowerCase()}`;
+  return (
+    <span className="pd-filter">
+      <label htmlFor={id} className="pd-visually-hidden">
+        {label}
+      </label>
+      <select
+        id={id}
+        className="pd-input pd-select"
+        value={value}
+        data-active={value !== "" && !(label === "Sort" && value === "recent") ? "true" : undefined}
+        onChange={(event) => {
+          onChange(event.target.value);
         }}
-        title={`Retain ${retainConfirm?.name ?? "this player"} from a prior season?`}
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setRetainConfirm(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              data-testid="confirm-retain"
-              onClick={() => {
-                const target = retainConfirm;
-                setRetainConfirm(null);
-                if (target !== null) {
-                  restoreFocusRef.current = `retain-${target.id}`;
-                  void markRegistrationAction(slug, target.id, { isRetained: true }).then(
-                    (result) => {
-                      if (!result.ok) {
-                        toast({
-                          title: result.error ?? "That mark could not be set.",
-                          tone: "danger",
-                        });
-                        return;
-                      }
-                      // A retained player with no team is in no auction and no
-                      // squad, so the toast that follows the click is where the
-                      // organizer finds that out — not the warning card they
-                      // may scroll past.
-                      toast({
-                        title:
-                          target.teamId === null
-                            ? `${target.name ?? target.number} is retained — assign them a team`
-                            : `${target.name ?? target.number} is retained`,
-                        tone: target.teamId === null ? "danger" : "success",
-                      });
-                      router.refresh();
-                    },
-                  );
-                }
-              }}
-            >
-              Retain
-            </Button>
-          </>
-        }
       >
-        <p>
-          A retained player is kept from a prior season and joins their team directly instead of
-          being bid for. They leave the auction pool — the auction will have one fewer player on the
-          block — and they take up one of their team&apos;s squad slots.
-        </p>
-      </Dialog>
-
-      {/* --- Marking an Icon changes what auction night contains. It says so
-          before it happens, once, at the point of use. --- */}
-      <Dialog
-        open={iconConfirm !== null}
-        onClose={() => {
-          setIconConfirm(null);
-        }}
-        title={`Mark ${iconConfirm?.name ?? "this player"} as an Icon?`}
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setIconConfirm(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              data-testid="confirm-icon"
-              onClick={() => {
-                const target = iconConfirm;
-                setIconConfirm(null);
-                if (target !== null) {
-                  restoreFocusRef.current = `icon-${target.id}`;
-                  void markRegistrationAction(slug, target.id, { isIcon: true }).then((result) => {
-                    if (!result.ok) {
-                      toast({
-                        title: result.error ?? "That mark could not be set.",
-                        tone: "danger",
-                      });
-                      return;
-                    }
-                    toast({
-                      title:
-                        target.teamId === null
-                          ? `${target.name ?? target.number} is an Icon — assign them a team`
-                          : `${target.name ?? target.number} is an Icon`,
-                      tone: target.teamId === null ? "danger" : "success",
-                    });
-                    router.refresh();
-                  });
-                }
-              }}
-            >
-              Mark as Icon
-            </Button>
-          </>
-        }
-      >
-        <p>
-          An Icon is pre-signed to a team instead of being bid for. They leave the auction pool —
-          the auction will have one fewer player on the block — and they join their team&apos;s
-          squad directly.
-        </p>
-        {iconConfirm?.teamId === null ? (
-          <p role="alert" className="reg-warning">
-            <strong>{iconConfirm.name ?? "This player"} has no team.</strong> An Icon is only
-            counted into a squad through their team, so until you assign one they will be in no
-            auction and no squad at all.
-          </p>
-        ) : null}
-      </Dialog>
-
-      <Dialog
-        open={ioOpen}
-        onClose={() => {
-          setIoOpen(false);
-        }}
-        title="Import players & photos"
-        size="wide"
-        footer={
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setIoOpen(false);
-            }}
-          >
-            Close
-          </Button>
-        }
-      >
-        {!registrationOpen ? (
-          <p role="alert" className="reg-warning" data-testid="import-closed-note">
-            Registration is closed for this season. Players you add here are entered by you as the
-            organizer — they still pass the same approval gate.
-          </p>
-        ) : null}
-        <Tabs
-          label="Import kind"
-          tabs={[
-            {
-              id: "csv",
-              label: "Players (CSV)",
-              content: (
-                <div className="io-panel" data-testid="io-panel">
-                  <label className="io-file" htmlFor="csv-input">
-                    <span>
-                      Paste or choose a CSV — columns: name, phone, role, base_price_band ·
-                      optional: date_of_birth, batting_style, bowling_style
-                    </span>
-                  </label>
-                  <textarea
-                    id="csv-input"
-                    ref={csvRef}
-                    className="csv-input"
-                    data-testid="import-textarea"
-                    rows={5}
-                    placeholder="Paste CSV rows here, or choose a file"
-                    defaultValue=""
-                  />
-                  <div className="io-row">
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      aria-label="Choose a CSV file"
-                      data-testid="import-file"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) {
-                          readCsvFile(file);
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={() => void runPreview()}
-                      disabled={
-                        inspection !== null &&
-                        REQUIRED_IMPORT_FIELDS.some((field) => mapping[field] === undefined)
-                      }
-                      data-testid="import-preview-btn"
-                    >
-                      Preview
-                    </Button>
-                  </div>
-
-                  {inspection !== null && !inspection.ok ? (
-                    <p role="alert" className="reg-warning">
-                      {inspection.error ?? "That file could not be read."}
-                    </p>
-                  ) : null}
-
-                  {inspection !== null && inspection.ok ? (
-                    <>
-                      {usingSaved ? (
-                        <p className="dash-hint" data-testid="mapping-saved-note">
-                          Using the mapping you saved for this form. Change anything below and the
-                          new version replaces it.
-                        </p>
-                      ) : null}
-                      <ColumnMapper
-                        inspection={inspection}
-                        mapping={mapping}
-                        onChange={(next) => {
-                          setMapping(next);
-                          // The preview describes the OLD mapping the moment
-                          // the mapping changes; showing it on would be a lie.
-                          setPreview(null);
-                          // And the unplaced values were computed under it.
-                          setValueMaps({});
-                          setUnplaced([]);
-                        }}
-                      />
-                      {/* The values, under the columns — the order the
-                          organizer meets them in: which column is this, then
-                          what do the words in it mean. */}
-                      <ValueMapper
-                        unplaced={unplaced}
-                        valueMaps={valueMaps}
-                        onChange={(next) => {
-                          setValueMaps(next);
-                          // The preview counted rows this answer just fixed.
-                          setPreview(null);
-                        }}
-                      />
-                      <div className="io-row">
-                        <label className="io-inline" htmlFor="date-order">
-                          <span>Dates in this file read as</span>
-                          <select
-                            id="date-order"
-                            className="mapping-select"
-                            data-testid="date-order"
-                            value={dateOrder}
-                            onChange={(event) => {
-                              setDateOrder(event.target.value === "mdy" ? "mdy" : "dmy");
-                              setPreview(null);
-                            }}
-                          >
-                            <option value="dmy">day / month / year</option>
-                            <option value="mdy">month / day / year</option>
-                          </select>
-                        </label>
-                        <label className="io-inline" htmlFor="file-wins">
-                          <input
-                            id="file-wins"
-                            type="checkbox"
-                            data-testid="file-wins"
-                            checked={fileWins}
-                            onChange={(event) => {
-                              setFileWins(event.target.checked);
-                              // The preview described the other policy.
-                              setPreview(null);
-                            }}
-                          />
-                          <span>Let this file overwrite values already entered</span>
-                        </label>
-                        <label className="io-inline" htmlFor="remember-mapping">
-                          <input
-                            id="remember-mapping"
-                            type="checkbox"
-                            data-testid="remember-mapping"
-                            checked={remember}
-                            onChange={(event) => {
-                              setRemember(event.target.checked);
-                            }}
-                          />
-                          <span>Remember this mapping for next time</span>
-                        </label>
-                      </div>
-                    </>
-                  ) : null}
-                  {preview !== null ? (
-                    <div className="import-preview" data-testid="import-preview">
-                      <p>
-                        {preview.validCount} valid row(s) · {preview.errors.length} error(s)
-                      </p>
-                      {/* WHAT COMMITTING WOULD ACTUALLY DO. "197 valid rows" said
-                          the same thing whether they were all new or all already
-                          here — and the commit then silently did nothing with the
-                          second case. */}
-                      {preview.diff !== undefined ? (
-                        <p data-testid="import-diff-counts">
-                          <strong>{preview.diff.counts.new} new</strong>
-                          {" · "}
-                          <strong>{preview.diff.counts.changed} changed</strong>
-                          {" · "}
-                          {preview.diff.counts.unchanged} unchanged
-                          {preview.diff.counts.reinstate > 0
-                            ? ` · ${String(preview.diff.counts.reinstate)} rejoining`
-                            : ""}
-                        </p>
-                      ) : null}
-                      {preview.diff !== undefined && preview.diff.changes.length > 0 ? (
-                        <div className="table-scroll">
-                          <table className="reg-table" data-testid="import-diff-table">
-                            <thead>
-                              <tr>
-                                <th>Player</th>
-                                <th>Field</th>
-                                <th>Now</th>
-                                <th>After import</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {preview.diff.changes.flatMap((row) =>
-                                row.fields.map((field, index) => (
-                                  <tr key={`${String(row.line)}-${field.label}`}>
-                                    <td data-label="Player">{index === 0 ? row.name : ""}</td>
-                                    <td data-label="Field">{field.label}</td>
-                                    <td data-label="Now" className="mapping-sample">
-                                      {field.from}
-                                    </td>
-                                    <td data-label="After import" className="mapping-sample">
-                                      {field.to}
-                                    </td>
-                                  </tr>
-                                )),
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : null}
-                      {preview.diff !== undefined &&
-                      preview.diff.counts.changed + preview.diff.counts.reinstate >
-                        preview.diff.changes.length ? (
-                        <p className="dash-hint">
-                          Showing the first {preview.diff.changes.length}. The counts above cover
-                          every row.
-                        </p>
-                      ) : null}
-                      {preview.errors.length > 0 ? (
-                        <>
-                          <ul className="import-errors">
-                            {preview.errors.slice(0, 8).map((error, index) => (
-                              <li key={index}>
-                                Line {error.line}: {error.message}
-                              </li>
-                            ))}
-                          </ul>
-                          {preview.errors.length > 8 ? (
-                            <p className="dash-hint">
-                              and {preview.errors.length - 8} more error
-                              {preview.errors.length - 8 === 1 ? "" : "s"} not listed here.
-                            </p>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {/* A file with errors AND valid rows now has a way forward.
-                          The button states the whole bargain — what lands and what
-                          is left — so "skip" is a choice the organizer read, not a
-                          default they were given. */}
-                      {preview.errors.length > 0 && preview.validCount > 0 ? (
-                        <Button
-                          onClick={() => void commitImport(true)}
-                          loading={busy}
-                          data-testid="import-commit-partial"
-                        >
-                          {`Import ${String(preview.validCount)} valid, skip ${String(preview.errors.length)}`}
-                        </Button>
-                      ) : null}
-                      <Button
-                        onClick={() => void commitImport()}
-                        loading={busy}
-                        variant={preview.errors.length > 0 ? "ghost" : "primary"}
-                        disabled={preview.errors.length > 0 || preview.validCount === 0}
-                        data-testid="import-commit"
-                      >
-                        {/* DA-26: the button read "Import 2 player(s)" while disabled
-                            because four OTHER rows had errors, so it named the wrong
-                            number and never said what was blocking it. */}
-                        {preview.errors.length > 0
-                          ? `Fix ${String(preview.errors.length)} error${preview.errors.length === 1 ? "" : "s"} to import all`
-                          : preview.validCount === 0
-                            ? "Nothing to import"
-                            : `Import ${String(preview.validCount)} player${preview.validCount === 1 ? "" : "s"}`}
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              ),
-            },
-            {
-              id: "photos",
-              label: "Photos",
-              content: (
-                <PhotoImportPanel
-                  slug={slug}
-                  onDone={() => {
-                    setIoOpen(false);
-                  }}
-                />
-              ),
-            },
-          ]}
-        />
-      </Dialog>
-    </>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }
 
@@ -2256,284 +1631,5 @@ function StatTile({
     >
       {tile}
     </button>
-  );
-}
-
-function isNote(meta: unknown): meta is { note: string } {
-  return (
-    typeof meta === "object" &&
-    meta !== null &&
-    typeof (meta as { note?: unknown }).note === "string"
-  );
-}
-
-function isReason(meta: unknown): meta is { reason: string } {
-  return (
-    typeof meta === "object" &&
-    meta !== null &&
-    typeof (meta as { reason?: unknown }).reason === "string"
-  );
-}
-
-function RegRow({
-  row,
-  active,
-  checked,
-  categoryFlagged,
-  onToggle,
-  onDetails,
-  onApprove,
-  onWaitlist,
-  onDecline,
-  onIcon,
-  onRetain,
-  onCaptain,
-  labelOf,
-  busy,
-}: {
-  row: Row;
-  active: boolean;
-  checked: boolean;
-  /** PI-1: the eligibility engine's organizer advisory — flag, never block. */
-  categoryFlagged: boolean;
-  onToggle: () => void;
-  onDetails: () => void;
-  onApprove: () => void;
-  onWaitlist: () => void;
-  onDecline: () => void;
-  onIcon: () => void;
-  onRetain: () => void;
-  onCaptain: () => void;
-  labelOf: (role: string | null) => string;
-  busy: boolean;
-}) {
-  const canTriage = row.status === "submitted" || row.status === "waitlisted";
-  return (
-    <tr
-      className={active ? "reg-row active" : "reg-row"}
-      data-testid={`reg-${row.personId}`}
-      data-cursor={active ? "true" : undefined}
-    >
-      <td data-label="Select">
-        <input
-          type="checkbox"
-          className="reg-check"
-          aria-label={`Select ${personLabel(row)}`}
-          checked={checked}
-          onChange={onToggle}
-        />
-      </td>
-      <td className="reg-number" data-label="Number">
-        {row.number}
-      </td>
-      <td data-label="Player">
-        <div className="reg-identity">
-          <PlayerImage
-            name={row.name ?? "Player"}
-            seed={row.personId}
-            size="sm"
-            {...(row.photoUrl !== null ? { src: row.photoUrl } : {})}
-          />
-          <div className="reg-identity-text">
-            <span className="registration-name">
-              {row.name ?? "Unnamed"}
-              {row.isCaptain ? (
-                <Badge tone="info" data-testid="captain-flag">
-                  Captain
-                </Badge>
-              ) : null}
-              {row.isIcon ? (
-                <Badge tone="success" data-testid="icon-flag">
-                  Icon · not in the pool
-                </Badge>
-              ) : null}
-              {row.isRetained ? (
-                <Badge tone="info" data-testid="retained-flag">
-                  Retained · not in the pool
-                </Badge>
-              ) : null}
-            </span>
-            {/* DA-35: the fourth screen to echo raw E.164 back at a human. */}
-            <span className="registration-phone">{personContact(row)}</span>
-            {row.duplicateName ? (
-              <Badge tone="warning" data-testid="dup-flag">
-                possible duplicate
-              </Badge>
-            ) : null}
-            {categoryFlagged ? (
-              // PI-1: the season declares a gendered category and this
-              // person's own profile says otherwise. The engine flags; the
-              // organizer — who may know better — decides (invariant 5).
-              <Badge tone="warning" data-testid="category-flag">
-                check entry category
-              </Badge>
-            ) : null}
-          </div>
-        </div>
-      </td>
-      <td data-label="Role">
-        {labelOf(row.role)}
-        {row.age !== null ? <span className="reg-sub">{row.age} yrs</span> : null}
-        {/* Its own class because the phone hides THIS and not the role or the
-            age beside it: how somebody bats is what you read once you have
-            decided they are worth a second look, and it lives in Details there.
-            `.reg-sub` alone could not say which of the two sub-lines it was. */}
-        {row.battingStyle !== null || row.bowlingStyle !== null ? (
-          <span className="reg-sub reg-styles">
-            {[row.battingStyle, row.bowlingStyle]
-              .filter((s): s is string => s !== null)
-              .map((s) => s.replace(/_/g, " "))
-              .join(" · ")}
-          </span>
-        ) : null}
-      </td>
-      <td data-label="Status">
-        <Badge tone={REG_TONE[row.status]}>
-          {row.status === "rejected" ? "declined" : row.status}
-        </Badge>
-        {/* The reason was queried, shipped in every row payload, and rendered
-            in no place at all. */}
-        {row.status === "rejected" && row.rejectionReason !== null ? (
-          <span className="reg-sub" data-testid={`reason-${row.personId}`}>
-            {REASON_LABEL[row.rejectionReason] ?? row.rejectionReason}
-          </span>
-        ) : null}
-        {/* ONLY WHEN IT IS NOT PAID. Every registration has a fee state and
-            almost all of them are "pending" early on, so badging all four would
-            put a second status on every row and make the column unreadable.
-            The one an organizer acts on is the one that shows. */}
-        {row.feeStatus !== "paid" ? (
-          <Badge tone={FEE_TONE[row.feeStatus]} data-testid={`fee-${row.personId}`}>
-            {FEE_LABEL[row.feeStatus]}
-          </Badge>
-        ) : null}
-      </td>
-      <td data-label="Team">
-        {row.teamName ?? "—"}
-        {(row.isIcon || row.isRetained) && row.teamId === null ? (
-          <span className="reg-sub reg-sub-warning">
-            {row.isIcon ? "Icon" : "Retained"} with no team
-          </span>
-        ) : null}
-      </td>
-      <td className="reg-actions" data-label="Actions">
-        {canTriage ? (
-          <>
-            <Button
-              size="sm"
-              // One primary per screen: a row action is secondary (Phase 4).
-              variant="secondary"
-              onClick={onApprove}
-              loading={busy}
-              data-focus-key={`approve-${row.id}`}
-            >
-              Approve
-            </Button>
-            {row.status === "submitted" ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onWaitlist}
-                loading={busy}
-                data-focus-key={`waitlist-${row.id}`}
-                data-testid={`waitlist-${row.personId}`}
-              >
-                Waitlist
-              </Button>
-            ) : null}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onDecline}
-              data-focus-key={`decline-${row.id}`}
-              data-testid={`decline-${row.personId}`}
-            >
-              Decline
-            </Button>
-          </>
-        ) : null}
-        {/* Icon and Captain are mutually exclusive: an Icon is pre-signed and
-            never goes under the hammer, a Captain leads a squad that plays.
-            The server refuses the combination; the button says so first rather
-            than letting the click fail. */}
-        <Button
-          size="sm"
-          variant={row.isIcon ? "secondary" : "ghost"}
-          onClick={onIcon}
-          aria-pressed={row.isIcon}
-          disabled={row.isCaptain}
-          title={
-            row.isCaptain
-              ? "Can't be an Icon: they're the Captain, and a Captain leads a squad that plays. An Icon is pre-signed and never goes to the auction. Clear Captain first."
-              : row.isIcon
-                ? "Icon: pre-signed to their team, not in the auction pool. Click to put them back in the pool."
-                : "Mark as Icon: pre-signed to their team instead of going to the auction."
-          }
-          data-focus-key={`icon-${row.id}`}
-          data-testid={`icon-toggle-${row.personId}`}
-        >
-          {row.isIcon ? (
-            <>
-              Icon
-              <IconCheck size={14} className="icon-trail" />
-            </>
-          ) : (
-            "Icon"
-          )}
-        </Button>
-        {/* Retention is NOT exclusive with either of its neighbours, and the
-            button says so by never being disabled. You retain last season's
-            captain — the commonest retention there is — and a marquee player
-            kept from last year is honestly both. See `setRegistrationMarks`. */}
-        <Button
-          size="sm"
-          variant={row.isRetained ? "secondary" : "ghost"}
-          onClick={onRetain}
-          aria-pressed={row.isRetained}
-          title={
-            row.isRetained
-              ? "Retained from a prior season: joins their team directly, not in the auction pool. Click to put them back in the pool."
-              : "Retain: kept from a prior season, joins their team instead of going to the auction."
-          }
-          data-focus-key={`retain-${row.id}`}
-          data-testid={`retain-toggle-${row.personId}`}
-        >
-          {row.isRetained ? (
-            <>
-              Retained
-              <IconCheck size={14} className="icon-trail" />
-            </>
-          ) : (
-            "Retain"
-          )}
-        </Button>
-        <Button
-          size="sm"
-          variant={row.isCaptain ? "secondary" : "ghost"}
-          onClick={onCaptain}
-          aria-pressed={row.isCaptain}
-          disabled={row.isIcon}
-          title={
-            row.isIcon
-              ? "Can't be Captain: they're an Icon, pre-signed to their team and never in the auction. Clear Icon first."
-              : "Captain: wears the armband for their team. One per team."
-          }
-          data-focus-key={`captain-${row.id}`}
-          data-testid={`captain-toggle-${row.personId}`}
-        >
-          {row.isCaptain ? (
-            <>
-              Captain
-              <IconCheck size={14} className="icon-trail" />
-            </>
-          ) : (
-            "Captain"
-          )}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onDetails}>
-          Details
-        </Button>
-      </td>
-    </tr>
   );
 }

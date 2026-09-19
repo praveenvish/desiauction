@@ -14,6 +14,7 @@ import { auditLog, competitions, newId, registrations, type Db } from "@desiauct
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { logSecurityEvent, type SecurityAction } from "../auth/security-events";
+import type { RegistrationEditSet } from "./registration-edit";
 
 // THE COMPETITION REGISTRATION AGGREGATE (M-IP3-2). This module is the ONLY place
 // registration state mutates. Routes/services call it; nothing else writes the
@@ -342,7 +343,7 @@ export async function assignTeam(
   return { ok: true };
 }
 
-export type MarksResult = { ok: true } | { ok: false; reason: "not_found" | "icon_and_captain" };
+export type MarksResult = { ok: true } | { ok: false; reason: "not_found" };
 
 /**
  * Set organizer marks on a registration: icon (pre-signed marquee, excluded from
@@ -357,28 +358,20 @@ export type MarksResult = { ok: true } | { ok: false; reason: "not_found" | "ico
  * set it. Every consequence of retaining a player was built; retaining one
  * required hand-written SQL.
  *
- * RETENTION IS NOT EXCLUSIVE WITH ANYTHING, and that is deliberate rather than
- * an omission of the icon/captain rule below. Those two are competing answers
- * to the same question — what this player IS to the team — so one has to win.
- * Retention answers a different question: where the player CAME FROM. You
- * retain last season's captain, which is the commonest retention there is, and
- * a marquee player kept from last year is honestly both an Icon and retained.
- * Refusing either combination would block ordinary tournaments to enforce a
- * tidiness nothing needs: the pool filter and the squad cap both read
- * `isIcon OR isRetained`, so no arithmetic double-counts, and where a surface
- * must print ONE word `outcomeOf` already gives Icon precedence.
+ * NO MARK IS EXCLUSIVE WITH ANY OTHER. All three answer the same question —
+ * "does this player skip the auction and join their team directly?" — for three
+ * different reasons, and a real player can have every reason at once: last
+ * season's captain, retained, and the marquee name on the poster. The pool
+ * filter, the squad cap and the orphan warning all read `isPreSigned` (any of
+ * the three), so no arithmetic double-counts; where a surface must print ONE
+ * word, `preSignedKind` gives Icon precedence, then Captain, then Retained.
  *
- * INVARIANT: a registration is never both Icon and Captain. An Icon is
- * pre-signed and never goes under the hammer; a Captain leads a squad that
- * plays. Both at once is a player the auction skips and the team expects to
- * lead — a contradiction about ONE person, and the write path is the authority.
- *
- * Note the DA-04 rule immediately below, and why it does NOT extend here. Two
- * players competing for one armband is a preference — the organiser means "this
- * player instead", so the previous captain is demoted. This is not that. There
- * is no second player to prefer, and silently clearing a mark the organiser set
- * would move the armband without telling them: exactly the invisible state
- * change the Icon work is fixing. So: refuse, and say why.
+ * Icon and Captain used to be refused together, on the reasoning that an Icon
+ * "never goes under the hammer" while a Captain "leads a squad that plays". That
+ * only held while captains were auctioned. Local leagues pick their captains
+ * before the night — the founder's first real season did exactly that and
+ * expected the captain to stay out of the pool — and the marquee player is
+ * very often the captain. The refusal blocked the commonest case there is.
  */
 export async function setRegistrationMarks(
   db: Db,
@@ -423,14 +416,6 @@ export async function setRegistrationMarks(
   if (stored === undefined) {
     return { ok: false, reason: "not_found" };
   }
-  // The EFFECTIVE state after this patch, not the patch alone: setting
-  // `isIcon: true` on a row that is already Captain is the same contradiction
-  // as sending both flags in one call.
-  const effectiveIcon = set.isIcon ?? stored.isIcon;
-  const effectiveCaptain = set.isCaptain ?? stored.isCaptain;
-  if (effectiveIcon && effectiveCaptain) {
-    return { ok: false, reason: "icon_and_captain" };
-  }
   await db.transaction(async (tx) => {
     // DA-04: a team has exactly one captain. `registrations_team_captain_uq`
     // makes two unrepresentable, so the armband has to CHANGE HANDS rather
@@ -438,8 +423,13 @@ export async function setRegistrationMarks(
     // instead", not "error". The demote is scoped to the team the registration
     // is landing on, which is the one in this update when the caller moves it
     // and the stored one otherwise.
+    //
+    // The EFFECTIVE captaincy, not the patch alone: moving a player who is
+    // already captain onto a team that has one is the same collision as naming
+    // them captain there, and it used to surface as a raw unique violation.
     const landingTeamId = set.teamId !== undefined ? set.teamId : stored.teamId;
-    if (set.isCaptain === true && landingTeamId !== null) {
+    const landsAsCaptain = set.isCaptain ?? stored.isCaptain;
+    if (landsAsCaptain && landingTeamId !== null) {
       await tx
         .update(registrations)
         .set({ isCaptain: false })
@@ -493,4 +483,54 @@ export async function addNote(
     meta: { note: trimmed.slice(0, 500) },
   });
   return { ok: true };
+}
+
+/**
+ * Write an organizer's in-place correction — validated by `planRegistrationEdit`
+ * before it gets here — and say so on the timeline.
+ *
+ * The audit records WHICH fields changed, never their values: a note or a
+ * father's name copied into an append-only log would outlive the erasure that
+ * removes it from the row.
+ */
+export async function updateRegistrationDetails(
+  db: Db,
+  orgId: string,
+  competitionId: string,
+  registrationId: string,
+  set: RegistrationEditSet,
+  changed: readonly string[],
+  actorId: string,
+): Promise<{ ok: boolean }> {
+  if (changed.length === 0) {
+    return { ok: true };
+  }
+  return db.transaction(async (tx) => {
+    const updated =
+      Object.keys(set).length === 0
+        ? [{ id: registrationId }]
+        : await tx
+            .update(registrations)
+            .set(set)
+            .where(
+              and(
+                eq(registrations.id, registrationId),
+                eq(registrations.competitionId, competitionId),
+              ),
+            )
+            .returning({ id: registrations.id });
+    if (updated.length === 0) {
+      return { ok: false };
+    }
+    await tx.insert(auditLog).values({
+      id: newId(),
+      actor: actorId,
+      action: "registration.details_edited",
+      scopeType: "org",
+      scopeId: orgId,
+      subject: registrationId,
+      meta: { fields: changed.join(",") },
+    });
+    return { ok: true };
+  });
 }
