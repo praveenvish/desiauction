@@ -97,6 +97,9 @@ export function PhoneChange({ current }: { current: string | null }) {
       </p>
       {onCodeStep ? (
         <form action={confirm} className="profile-form">
+          {/* The number being confirmed — the confirm action's own state has
+              never seen it (see confirmPhoneChangeAction). */}
+          <input type="hidden" name="phone" value={requested.phone ?? ""} />
           <p className="notify-switch-detail">
             We sent a code to {formatPhone(requested.phone ?? "")}. Enter it to finish.
           </p>

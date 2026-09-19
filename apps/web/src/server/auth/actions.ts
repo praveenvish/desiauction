@@ -951,7 +951,20 @@ export async function confirmPhoneChangeAction(
       error: SIGN_IN_AGAIN,
     };
   }
-  const target = previous.phone ?? "";
+  /*
+   * WHICH NUMBER. The confirm form runs its own `useActionState`, so its
+   * `previous` is the CONFIRM state — which starts `{ step: "idle" }` and has
+   * never held the number the REQUEST step accepted. Reading only `previous`
+   * sent "" on the first try, every time: "Start again — that number could not
+   * be read", and an email-only account could never attach a phone (the
+   * register page's dead end, one layer down). The form now carries the number
+   * it is confirming, and that wins: after "use a different number" the
+   * confirm state still remembers the OLD one. Trust is unchanged — `previous`
+   * was client state too; the code is what proves the handset, and it is bound
+   * to this person, this number and this purpose in `consumeCode`.
+   */
+  const submitted = formString(formData, "phone");
+  const target = submitted !== "" ? submitted : (previous.phone ?? "");
   const result = await confirmPhoneChange(db, {
     personId: session.personId,
     newPhone: target,
