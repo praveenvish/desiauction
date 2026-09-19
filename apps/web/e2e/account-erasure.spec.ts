@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 
 import { clearNameGate } from "./onboarding";
-import { latestOtp, resetOtpBudget } from "./otp";
+import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
 
 // ACCOUNT ERASURE, as the person and the privacy desk each experience it:
 // a player asks from /account → the desk erases them → the player is signed out
@@ -30,16 +30,19 @@ const PLAYER_NAME = `Erasure Player ${STAMP}`;
 let grantId = "";
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
-  await resetOtpBudget(phone);
-  await page.goto("/login");
-  await page.getByLabel("Mobile number").fill(phone);
-  await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
-    timeout: 30_000,
+  // Serialized per phone across workers: see withSignInLock in otp.ts.
+  await withSignInLock(phone, async () => {
+    await resetOtpBudget(phone);
+    await page.goto("/login");
+    await page.getByLabel("Mobile number").fill(phone);
+    await page.getByRole("button", { name: "Send code" }).click();
+    await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+      timeout: 30_000,
+    });
+    await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page).not.toHaveURL(/\/login/);
   });
-  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
-  await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(page).not.toHaveURL(/\/login/);
 }
 
 async function axeClean(page: Page, surface: string): Promise<void> {

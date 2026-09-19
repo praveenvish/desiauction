@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-import { latestOtp, resetOtpBudget } from "./otp";
+import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
 
 // THE PRODUCT-NEWS LIST, end to end: the footer says how to leave, the leaving
 // page answers the same whether or not the address was there, and the list has
@@ -12,16 +12,19 @@ const ORG_OWNER = "9999000002"; // no platform grant
 const STAMP = String(Date.now()).slice(-8);
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
-  await resetOtpBudget(phone);
-  await page.goto("/login");
-  await page.getByLabel("Mobile number").fill(phone);
-  await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
-    timeout: 30_000,
+  // Serialized per phone across workers: see withSignInLock in otp.ts.
+  await withSignInLock(phone, async () => {
+    await resetOtpBudget(phone);
+    await page.goto("/login");
+    await page.getByLabel("Mobile number").fill(phone);
+    await page.getByRole("button", { name: "Send code" }).click();
+    await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+      timeout: 30_000,
+    });
+    await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page).not.toHaveURL(/\/login/);
   });
-  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
-  await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(page).not.toHaveURL(/\/login/);
 }
 
 test("sign up, find the way out in the footer, and leave", async ({ page }) => {
