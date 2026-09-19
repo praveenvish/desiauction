@@ -1,11 +1,13 @@
-import { ButtonLink, ToastProvider } from "@desiauction/ui";
+import { ButtonLink, IconArrowLeft, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { caseReview } from "../../../../../../server/settlement/actions";
 import { caseTabFrom } from "../../../../../../server/settlement/worklist";
 import { CasePanel } from "./case-panel";
 import "../../../../seasons.css";
+import "../../../_tabs/tabs.css";
 import "../../money.css";
+import "../../season-money.css";
 
 export const metadata = { title: "Case review · DesiAuction" };
 
@@ -32,20 +34,19 @@ export default async function CaseReviewPage({
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack money-stack">
-          <header className="dash-head">
-            {/* Title and trail are the shell's — a second copy of either here
-                would be a duplicate landmark, which axe rightly refuses. */}
-            <div className="competition-title-row title-row-actions">
-              <span className="date-row">
-                <ButtonLink href={`/seasons/${slug}/money`} variant="secondary">
-                  Back to settlement
-                </ButtonLink>
-              </span>
-            </div>
-            <p className="competitions-hint">
-              Everything this case did, folded from the log it cannot rewrite
+          {/* Title and trail are the shell's — a second copy of either here
+              would be a duplicate landmark, which axe rightly refuses. */}
+          <div className="st-head">
+            <p className="st-head-lede">
+              Everything this case did, folded from the log it cannot rewrite.
             </p>
-          </header>
+            <div className="st-actions">
+              <ButtonLink href={`/seasons/${slug}/money`} variant="secondary" size="sm">
+                <IconArrowLeft size={16} aria-hidden />
+                Back to settlement
+              </ButtonLink>
+            </div>
+          </div>
           <CasePanel slug={slug} review={review} initialTab={initialTab} />
         </div>
       </main>

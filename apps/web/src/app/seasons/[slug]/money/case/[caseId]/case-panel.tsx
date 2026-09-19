@@ -2,21 +2,32 @@
 
 import { formatPaiseINR, paise } from "@desiauction/core";
 import {
-  Badge,
+  IconAlert,
+  IconCheckCircle,
+  IconClock,
+  IconFileCheck,
+  IconReceipt,
+  IconShieldCheck,
+  IconWallet,
+  Notice,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
   Button,
-  Card,
   EmptyState,
   Tabs,
   useToast,
   VisuallyHidden,
-  type BadgeTone,
+  type KitTone,
 } from "@desiauction/ui";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { formatDateTime } from "../../../../../../lib/format-date";
 import { replayEvidence, type ReviewView } from "../../../../../../server/settlement/actions";
 import { CASE_STATE, PAYMENT_STATE } from "../../money-words";
 import "../../money.css";
+import "../../season-money.css";
 import { useHydrated } from "../../../../../../lib/use-hydrated";
 
 /**
@@ -29,23 +40,23 @@ import { useHydrated } from "../../../../../../lib/use-hydrated";
  * exists to be BELIEVED, not to act.
  */
 
-const STATUS_TONE: Record<string, BadgeTone> = {
-  opened: "info",
-  verified: "info",
-  discrepant: "danger",
-  settling: "warning",
-  settled: "success",
-  closed: "success",
+const STATUS_TONE: Record<string, KitTone> = {
+  opened: "blue",
+  verified: "blue",
+  discrepant: "red",
+  settling: "amber",
+  settled: "green",
+  closed: "green",
   voided: "neutral",
 };
 
-const PAYMENT_TONE: Record<string, BadgeTone> = {
-  created: "info",
-  authorized: "info",
-  captured: "success",
+const PAYMENT_TONE: Record<string, KitTone> = {
+  created: "blue",
+  authorized: "blue",
+  captured: "green",
   refunded: "neutral",
-  failed: "danger",
-  disputed: "warning",
+  failed: "red",
+  disputed: "amber",
 };
 
 const METHOD_LABEL: Record<string, string> = {
@@ -120,56 +131,78 @@ export function CasePanel({
 
   return (
     <div data-testid="case-panel" data-hydrated={hydrated ? "true" : "false"}>
-      <Card>
-        <div className="competition-title-row">
-          <div>
-            <h2>Case {settlementCase.caseId.slice(-8)}</h2>
-            <p className="section-note">
-              Opened {when(Date.parse(settlementCase.openedAt))} against auction{" "}
-              {settlementCase.auctionId.slice(-8)}
-              {settlementCase.closures > 0
-                ? ` · closed ${String(settlementCase.closures)} time${settlementCase.closures === 1 ? "" : "s"}`
-                : ""}
-              {settlementCase.reopenings > 0
-                ? ` · reopened ${String(settlementCase.reopenings)} time${settlementCase.reopenings === 1 ? "" : "s"}`
-                : ""}
-              {settlementCase.recoveries > 0
-                ? ` · recovered ${String(settlementCase.recoveries)} time${settlementCase.recoveries === 1 ? "" : "s"}`
-                : ""}
-            </p>
-          </div>
-          <Badge tone={STATUS_TONE[settlementCase.status] ?? "neutral"} data-testid="review-status">
-            {CASE_STATE[settlementCase.status] ?? settlementCase.status}
-          </Badge>
-        </div>
-        <div className="stat-row">
-          <Tile label="Total dues" value={settlementCase.financial.totalObligations} id="r-total" />
-          <Tile label="Collected" value={settlementCase.financial.discharged} id="r-collected" />
-          <Tile label="Waived" value={settlementCase.financial.waived} id="r-waived" />
+      <StatGrid>
+        <Tile
+          icon={<IconReceipt />}
+          tone="gold"
+          label="Total dues"
+          value={settlementCase.financial.totalObligations}
+          id="r-total"
+        />
+        <Tile
+          icon={<IconWallet />}
+          tone="green"
+          label="Collected"
+          value={settlementCase.financial.discharged}
+          id="r-collected"
+        />
+        <Tile
+          icon={<IconFileCheck />}
+          tone="blue"
+          label="Waived"
+          value={settlementCase.financial.waived}
+          id="r-waived"
+        />
+        <Tile
+          icon={settlementCase.financial.outstanding === 0 ? <IconCheckCircle /> : <IconAlert />}
+          tone={settlementCase.financial.outstanding === 0 ? "green" : "red"}
+          label="Outstanding"
+          value={settlementCase.financial.outstanding}
+          id="r-outstanding"
+        />
+        {/* Recorded, not yet confirmed — real money that moves no tile on the
+            books, and so used to move nothing on any screen either. */}
+        {settlementCase.pending > 0 ? (
           <Tile
-            label="Outstanding"
-            value={settlementCase.financial.outstanding}
-            id="r-outstanding"
+            icon={<IconClock />}
+            tone="amber"
+            label="Awaiting confirmation"
+            value={settlementCase.pending}
+            id="r-pending"
           />
-          {/* Recorded, not yet confirmed — real money that moves no tile on the
-              books, and so used to move nothing on any screen either. */}
-          {settlementCase.pending > 0 ? (
-            <Tile label="Awaiting confirmation" value={settlementCase.pending} id="r-pending" />
-          ) : null}
-        </div>
-      </Card>
+        ) : null}
+      </StatGrid>
 
       {settlementCase.status === "discrepant" ? (
-        <Card>
-          <Badge tone="danger">Discrepant</Badge>
-          <p className="section-note">
-            The auction log no longer matches the pin this case took when it opened. Money is frozen
-            until a controller re-verifies from the console.
-          </p>
-        </Card>
+        <Notice tone="danger" icon={<IconAlert size={18} />} title="Discrepant">
+          The auction log no longer matches the pin this case took when it opened. Money is frozen
+          until a controller re-verifies from the console.
+        </Notice>
       ) : null}
 
-      <Card>
+      <SectionCard
+        icon={<IconShieldCheck />}
+        tone={STATUS_TONE[settlementCase.status] ?? "neutral"}
+        title={`Case ${settlementCase.caseId.slice(-8)}`}
+        description={`Opened ${when(Date.parse(settlementCase.openedAt))} against auction ${settlementCase.auctionId.slice(-8)}${
+          settlementCase.closures > 0
+            ? ` · closed ${String(settlementCase.closures)} time${settlementCase.closures === 1 ? "" : "s"}`
+            : ""
+        }${
+          settlementCase.reopenings > 0
+            ? ` · reopened ${String(settlementCase.reopenings)} time${settlementCase.reopenings === 1 ? "" : "s"}`
+            : ""
+        }${
+          settlementCase.recoveries > 0
+            ? ` · recovered ${String(settlementCase.recoveries)} time${settlementCase.recoveries === 1 ? "" : "s"}`
+            : ""
+        }`}
+        action={
+          <Pill tone={STATUS_TONE[settlementCase.status] ?? "neutral"} dot testId="review-status">
+            {CASE_STATE[settlementCase.status] ?? settlementCase.status}
+          </Pill>
+        }
+      >
         <Tabs
           label="Case review sections"
           defaultTabId={initialTab}
@@ -200,19 +233,35 @@ export function CasePanel({
             },
           ]}
         />
-      </Card>
+      </SectionCard>
     </div>
   );
 }
 
-function Tile({ label, value, id }: { label: string; value: number; id: string }) {
+function Tile({
+  icon,
+  tone,
+  label,
+  value,
+  id,
+}: {
+  icon: ReactNode;
+  tone: KitTone;
+  label: string;
+  value: number;
+  id: string;
+}) {
   return (
-    <div className="stat-tile">
-      <span className="stat-value" data-testid={id}>
-        <Amount value={value} />
-      </span>
-      <span className="stat-label">{label}</span>
-    </div>
+    <StatCard
+      icon={icon}
+      tone={tone}
+      value={
+        <span data-testid={id}>
+          <Amount value={value} />
+        </span>
+      }
+      label={label}
+    />
   );
 }
 
@@ -231,31 +280,31 @@ function ObligationsTab({ review }: { review: ReviewView }) {
   }
   return (
     <div
-      className="table-scroll money-scroll"
+      className="st-table-wrap mn-scroll"
       tabIndex={0}
       role="region"
       aria-label="Every team's obligation"
     >
-      <table className="money-table" data-testid="review-obligations">
+      <table className="st-table mn-table" data-stack="" data-testid="review-obligations">
         <caption>
           <VisuallyHidden>Every team's obligation, with adjustments and waivers</VisuallyHidden>
         </caption>
         <thead>
           <tr>
             <th scope="col">Team</th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Computed
             </th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Waived
             </th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Collected
             </th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Reinstated
             </th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Outstanding
             </th>
           </tr>
@@ -268,21 +317,21 @@ function ObligationsTab({ review }: { review: ReviewView }) {
               <th scope="row" data-label="Team">
                 {row.teamName}
               </th>
-              <td data-label="Computed" className="num">
+              <td data-label="Computed" className="st-num">
                 <Amount value={row.amount} />
               </td>
-              <td data-label="Waived" className="num">
+              <td data-label="Waived" className="st-num">
                 <Amount value={row.waived} />
               </td>
-              <td data-label="Collected" className="num">
+              <td data-label="Collected" className="st-num">
                 <Amount value={row.discharged} />
               </td>
-              <td data-label="Reinstated" className="num">
+              <td data-label="Reinstated" className="st-num">
                 <Amount value={row.reinstated} />
               </td>
-              <td data-label="Outstanding" className="num">
+              <td data-label="Outstanding" className="st-num">
                 {row.outstanding === 0 ? (
-                  <Badge tone="success">Clear</Badge>
+                  <Pill tone="green">Clear</Pill>
                 ) : (
                   <Amount value={row.outstanding} />
                 )}
@@ -310,12 +359,12 @@ function PaymentsTab({ review }: { review: ReviewView }) {
   }
   return (
     <div
-      className="table-scroll money-scroll"
+      className="st-table-wrap mn-scroll"
       tabIndex={0}
       role="region"
       aria-label="Every payment against this case"
     >
-      <table className="money-table" data-testid="review-payments">
+      <table className="st-table mn-table" data-stack="" data-testid="review-payments">
         <caption>
           <VisuallyHidden>Every payment against this case</VisuallyHidden>
         </caption>
@@ -326,13 +375,13 @@ function PaymentsTab({ review }: { review: ReviewView }) {
             <th scope="col">Reference</th>
             <th scope="col">Method</th>
             <th scope="col">State</th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Amount
             </th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Collected
             </th>
-            <th scope="col" className="num">
+            <th scope="col" className="st-num">
               Refunded
             </th>
           </tr>
@@ -351,9 +400,9 @@ function PaymentsTab({ review }: { review: ReviewView }) {
               </td>
               <td data-label="Method">{METHOD_LABEL[row.method] ?? row.method}</td>
               <td data-label="State">
-                <Badge tone={PAYMENT_TONE[row.status] ?? "neutral"}>
+                <Pill tone={PAYMENT_TONE[row.status] ?? "neutral"}>
                   {PAYMENT_STATE[row.status] ?? row.status}
-                </Badge>
+                </Pill>
                 {/* `attestedBy` was fetched on every read and rendered nowhere,
                     while the action's own copy promised the money was "recorded
                     against your name". */}
@@ -364,13 +413,13 @@ function PaymentsTab({ review }: { review: ReviewView }) {
                   </span>
                 ) : null}
               </td>
-              <td data-label="Amount" className="num">
+              <td data-label="Amount" className="st-num">
                 <Amount value={row.amount} />
               </td>
-              <td data-label="Collected" className="num">
+              <td data-label="Collected" className="st-num">
                 <Amount value={row.captured} />
               </td>
-              <td data-label="Refunded" className="num">
+              <td data-label="Refunded" className="st-num">
                 <Amount value={row.refundedTotal} />
               </td>
             </tr>
@@ -482,7 +531,7 @@ function VerificationTab({
           <ul className="check-list" data-testid="review-sealed-checks">
             {Object.entries(CHECK_LABEL).map(([key, label]) => (
               <li key={key}>
-                <Badge tone="success">Passed</Badge>
+                <Pill tone="green">Passed</Pill>
                 <span>{label}</span>
               </li>
             ))}
@@ -501,7 +550,7 @@ function VerificationTab({
             <ul className="check-list" data-testid="review-blockers">
               {readiness.blockers.map((blocker) => (
                 <li key={blocker}>
-                  <Badge tone="danger">Blocked</Badge>
+                  <Pill tone="red">Blocked</Pill>
                   <span>{CHECK_LABEL[blocker] ?? blocker}</span>
                 </li>
               ))}
@@ -515,22 +564,22 @@ function VerificationTab({
         <p className="section-note">No money has moved on this case yet.</p>
       ) : (
         <div
-          className="table-scroll money-scroll"
+          className="st-table-wrap mn-scroll"
           tabIndex={0}
           role="region"
           aria-label="Accounts this case moved"
         >
-          <table className="money-table" data-testid="review-journal">
+          <table className="st-table mn-table" data-stack="" data-testid="review-journal">
             <caption>
               <VisuallyHidden>Accounts this case moved, with debits and credits</VisuallyHidden>
             </caption>
             <thead>
               <tr>
                 <th scope="col">Account</th>
-                <th scope="col" className="num">
+                <th scope="col" className="st-num">
                   Debit
                 </th>
-                <th scope="col" className="num">
+                <th scope="col" className="st-num">
                   Credit
                 </th>
               </tr>
@@ -547,10 +596,10 @@ function VerificationTab({
                     <br />
                     <span className="digest">{line.account}</span>
                   </th>
-                  <td data-label="Debit" className="num">
+                  <td data-label="Debit" className="st-num">
                     <Amount value={line.debit} />
                   </td>
-                  <td data-label="Credit" className="num">
+                  <td data-label="Credit" className="st-num">
                     <Amount value={line.credit} />
                   </td>
                 </tr>
@@ -653,13 +702,13 @@ function EvidenceTab({
         <p className="check-list" data-testid="replay-result" data-matches={replay.matches}>
           {replay.matches ? (
             <>
-              <Badge tone="success">Verified</Badge> The evidence reproduced byte-for-byte from the
-              log. Nothing has been altered since this case closed.
+              <Pill tone="green">Verified</Pill> The evidence reproduced byte-for-byte from the log.
+              Nothing has been altered since this case closed.
             </>
           ) : (
             <>
-              <Badge tone="danger">Mismatch</Badge> The replay did not reproduce the sealed
-              evidence. Do not trust this closure — raise it immediately.
+              <Pill tone="red">Mismatch</Pill> The replay did not reproduce the sealed evidence. Do
+              not trust this closure — raise it immediately.
             </>
           )}
         </p>

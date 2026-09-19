@@ -1,10 +1,12 @@
-import { AnnouncerProvider, ButtonLink, ToastProvider } from "@desiauction/ui";
+import { AnnouncerProvider, ButtonLink, IconFileCheck, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { settlementConsole } from "../../../../server/settlement/actions";
 import { MoneyPanel } from "./money-panel";
 import "../../seasons.css";
+import "../_tabs/tabs.css";
 import "./money.css";
+import "./season-money.css";
 
 export const metadata = { title: "Money · DesiAuction" };
 
@@ -29,24 +31,22 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
       <AnnouncerProvider>
         <main className="registrations-dash">
           <div className="dash-stack money-stack">
-            <header className="dash-head">
-              <div className="competition-title-row title-row-actions">
-                <span className="date-row">
-                  {view.case !== null ? (
-                    <ButtonLink
-                      href={`/seasons/${slug}/money/case/${view.case.caseId}`}
-                      variant="secondary"
-                      data-testid="open-case-review"
-                    >
-                      Case review
-                    </ButtonLink>
-                  ) : null}
-                </span>
-              </div>
-              <p className="competitions-hint">
-                Settlement — what was owed, what came in, what closed
-              </p>
-            </header>
+            <div className="st-head">
+              <p className="st-head-lede">Settlement — what was owed, what came in, what closed.</p>
+              {view.case !== null ? (
+                <div className="st-actions">
+                  <ButtonLink
+                    href={`/seasons/${slug}/money/case/${view.case.caseId}`}
+                    variant="secondary"
+                    size="sm"
+                    data-testid="open-case-review"
+                  >
+                    <IconFileCheck size={16} aria-hidden />
+                    Case review
+                  </ButtonLink>
+                </div>
+              ) : null}
+            </div>
             <MoneyPanel slug={slug} console={view} />
           </div>
         </main>
