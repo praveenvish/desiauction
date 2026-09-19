@@ -227,7 +227,7 @@ export function AppShell({
               so every console surface starts the same way. */}
           {!titleInBar &&
           (pageTitle !== undefined || breadcrumb !== undefined || pageAction !== undefined) ? (
-            <div className={styles["page-head"]}>
+            <div className={styles["page-head"]} data-page-head>
               {breadcrumb !== undefined ? (
                 <div className={styles["identity-trail"]}>{breadcrumb}</div>
               ) : null}

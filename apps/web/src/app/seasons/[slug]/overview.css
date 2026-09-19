@@ -6,9 +6,9 @@
 /* The hero carries this page's one <h1>, so the shell's page head (trail +
    title) stands down here. `PageTitleHidden` (page.tsx) removes its h1 once
    the page mounts; this rule keeps the head from painting before that, so the
-   hero does not jump down and back up on first load. The head's class is a
-   CSS-module name, hence the attribute match; `>` keeps it to the head alone. */
-#main-content:has(.ov-page) > [class*="page-head"] {
+   hero does not jump down and back up on first load. AppShell marks the head
+   with `data-page-head`; `>` keeps it to the head alone. */
+#main-content:has(.ov-page) > [data-page-head] {
   display: none;
 }
 
