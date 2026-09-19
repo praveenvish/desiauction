@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import {
-  Badge,
   Button,
-  Card,
   Dialog,
-  EmptyState,
   Field,
+  IconClock,
+  IconDevice,
+  IconKey,
+  IconLock,
+  IconTile,
+  Pill,
+  SectionCard,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -169,194 +173,231 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
 
   return (
     <>
-      <Card className="account-card" data-testid="passkeys-panel">
-        <h3 className="account-h3">Passkeys</h3>
-        {security.passkeys.length === 0 ? (
-          <EmptyState
-            title="No passkeys yet"
-            description="Add one to sign in with your fingerprint or face — no code needed."
-          />
-        ) : (
+      <SectionCard
+        id="security"
+        icon={<IconLock />}
+        tone="purple"
+        title="Sign-in & security"
+        description="Passkeys let you in without a code. Every device signed in to your account is listed here."
+        className="acct-card"
+      >
+        <div className="acct-block" data-testid="passkeys-panel">
+          <h3 className="acct-block-title">Passkeys</h3>
+          {security.passkeys.length === 0 ? (
+            <p className="acct-block-empty">
+              No passkeys yet. Add one to sign in with your fingerprint or face — no code needed.
+            </p>
+          ) : (
+            <ul className="security-list">
+              {security.passkeys.map((passkey) => (
+                <li key={passkey.id}>
+                  <IconTile icon={<IconKey />} tone="gold" size="sm" />
+                  <span className="security-text">
+                    <span className="security-name">{passkey.name}</span>
+                    <span className="security-meta">
+                      {passkey.lastUsedAt !== null
+                        ? `Last used ${formatDate(passkey.lastUsedAt)}`
+                        : "Never used"}
+                    </span>
+                  </span>
+                  <span className="security-actions">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setRenameTo(passkey.name);
+                        setDialogError(null);
+                        setPending({ kind: "rename-passkey", id: passkey.id, name: passkey.name });
+                      }}
+                    >
+                      Rename
+                      <VisuallyHidden> {passkey.name}</VisuallyHidden>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDialogError(null);
+                        setPending({ kind: "remove-passkey", id: passkey.id, name: passkey.name });
+                      }}
+                    >
+                      Remove
+                      <VisuallyHidden> {passkey.name}</VisuallyHidden>
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="enroll-row">
+            <Field
+              label="Device name"
+              /* The old placeholder shipped a developer's own name to every user
+                 of the product. An instruction beats an example here anyway. */
+              placeholder="e.g. My phone"
+              required
+              value={deviceName}
+              onChange={(event) => {
+                setDeviceName(event.target.value);
+                setEnrollError(null);
+              }}
+              {...(enrollError !== null ? { error: enrollError } : {})}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => void enroll()}
+              loading={busy}
+              data-testid="enroll-passkey"
+            >
+              Add passkey
+            </Button>
+          </div>
+        </div>
+
+        <div className="acct-block" data-testid="sessions-panel">
+          <div className="acct-block-head">
+            <h3 className="acct-block-title">Active sessions</h3>
+            {others.length > 0 ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                data-testid="revoke-other-sessions"
+                onClick={() => {
+                  setDialogError(null);
+                  setPending({ kind: "revoke-others", count: others.length });
+                }}
+              >
+                Sign out all other devices
+              </Button>
+            ) : null}
+          </div>
+          <p className="security-intro">
+            {security.sessions.length === 1
+              ? "This is the only device signed into your account."
+              : `${String(security.sessions.length)} devices are signed in. This device is first; the rest are ordered by when they were last used.`}
+          </p>
           <ul className="security-list">
-            {security.passkeys.map((passkey) => (
-              <li key={passkey.id}>
-                <span className="security-name">{passkey.name}</span>
-                <span className="security-meta">
-                  {passkey.lastUsedAt !== null
-                    ? `last used ${formatDate(passkey.lastUsedAt)}`
-                    : "never used"}
+            {security.sessions.slice(0, sessionsShown).map((session) => (
+              <li key={session.id} data-current={session.current}>
+                <IconTile
+                  icon={<IconDevice />}
+                  tone={session.current ? "green" : "neutral"}
+                  size="sm"
+                />
+                <span className="security-text">
+                  <span className="security-name">
+                    {session.device ?? "Unknown device"}
+                    {session.current ? (
+                      <>
+                        {" "}
+                        <Pill tone="green" dot>
+                          This device
+                        </Pill>
+                      </>
+                    ) : null}
+                  </span>
+                  <span className="security-meta" title={session.userAgent ?? undefined}>
+                    {/* `lastSeenAt` was fetched and thrown away. "Since March"
+                        tells you nothing about whether a session is still in
+                        use; "last active today" is the fact that decides a
+                        revoke. */}
+                    Last active{" "}
+                    <time dateTime={session.lastSeenAt.toISOString()}>
+                      {formatDate(session.lastSeenAt)}
+                    </time>{" "}
+                    · signed in {formatDate(session.createdAt)}
+                  </span>
                 </span>
                 <span className="security-actions">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setRenameTo(passkey.name);
-                      setDialogError(null);
-                      setPending({ kind: "rename-passkey", id: passkey.id, name: passkey.name });
-                    }}
-                  >
-                    Rename
-                    <VisuallyHidden> {passkey.name}</VisuallyHidden>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setDialogError(null);
-                      setPending({ kind: "remove-passkey", id: passkey.id, name: passkey.name });
-                    }}
-                  >
-                    Remove
-                    <VisuallyHidden> {passkey.name}</VisuallyHidden>
-                  </Button>
+                  {!session.current ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setDialogError(null);
+                        setPending({ kind: "revoke-session", session });
+                      }}
+                    >
+                      Revoke
+                      <VisuallyHidden>
+                        {" "}
+                        {session.device ?? "unknown device"}, last active{" "}
+                        {formatDate(session.lastSeenAt)}
+                      </VisuallyHidden>
+                    </Button>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {sessionsShown < security.sessions.length ? (
+            <div className="security-footer">
+              <Button
+                variant="secondary"
+                data-testid="show-more-sessions"
+                onClick={() => {
+                  setSessionsShown((shown) => shown + PAGE);
+                }}
+              >
+                Show more ({String(security.sessions.length - sessionsShown)} left)
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        id="activity"
+        icon={<IconClock />}
+        tone="neutral"
+        title="Security activity"
+        description="Sign-ins, new passkeys and changes to your number or email."
+        className="acct-card"
+        data-testid="events-panel"
+      >
+        {security.events.length === 0 ? (
+          <p className="security-note">
+            Nothing yet. Sign-ins, new passkeys and changes to your number or email appear here.
+          </p>
+        ) : (
+          <ul className="security-list events">
+            {security.events.slice(0, eventsShown).map((event, index) => (
+              <li key={`${event.action}-${event.at.toISOString()}-${String(index)}`}>
+                <span className="security-dot" aria-hidden />
+                <span className="security-name" data-raw={!isKnownEvent(event.action)}>
+                  {labelForEvent(event.action)}
+                </span>
+                <span className="security-meta">
+                  <time dateTime={event.at.toISOString()}>{formatDateTime(event.at)}</time>
                 </span>
               </li>
             ))}
           </ul>
         )}
-        <div className="enroll-row">
-          <Field
-            label="Device name"
-            /* The old placeholder shipped a developer's own name to every user
-               of the product. An instruction beats an example here anyway. */
-            placeholder="e.g. My phone"
-            required
-            value={deviceName}
-            onChange={(event) => {
-              setDeviceName(event.target.value);
-              setEnrollError(null);
-            }}
-            {...(enrollError !== null ? { error: enrollError } : {})}
-          />
-          <Button
-            variant="secondary"
-            onClick={() => void enroll()}
-            loading={busy}
-            data-testid="enroll-passkey"
-          >
-            Add passkey
-          </Button>
-        </div>
-      </Card>
-
-      <Card className="account-card" data-testid="sessions-panel">
-        <h3 className="account-h3">Active sessions</h3>
-        <p className="security-intro">
-          {security.sessions.length === 1
-            ? "This is the only device signed into your account."
-            : `${String(security.sessions.length)} devices are signed in. This device is first; the rest are ordered by when they were last used.`}
-        </p>
-        <ul className="security-list">
-          {security.sessions.slice(0, sessionsShown).map((session) => (
-            <li key={session.id} data-current={session.current}>
-              <span className="security-name">
-                {session.device ?? "Unknown device"}
-                {session.current ? (
-                  <>
-                    {" "}
-                    <Badge tone="info">This device</Badge>
-                  </>
-                ) : null}
-              </span>
-              <span className="security-meta" title={session.userAgent ?? undefined}>
-                {/* `lastSeenAt` was fetched and thrown away. "Since March" tells
-                    you nothing about whether a session is still in use; "last
-                    active today" is the fact that decides a revoke. */}
-                last active{" "}
-                <time dateTime={session.lastSeenAt.toISOString()}>
-                  {formatDate(session.lastSeenAt)}
-                </time>{" "}
-                · signed in {formatDate(session.createdAt)}
-              </span>
-              <span className="security-actions">
-                {!session.current ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setDialogError(null);
-                      setPending({ kind: "revoke-session", session });
-                    }}
-                  >
-                    Revoke
-                    <VisuallyHidden>
-                      {" "}
-                      {session.device ?? "unknown device"}, last active{" "}
-                      {formatDate(session.lastSeenAt)}
-                    </VisuallyHidden>
-                  </Button>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="security-footer">
-          {sessionsShown < security.sessions.length ? (
-            <Button
-              variant="secondary"
-              data-testid="show-more-sessions"
-              onClick={() => {
-                setSessionsShown((shown) => shown + PAGE);
-              }}
-            >
-              Show more ({String(security.sessions.length - sessionsShown)} left)
-            </Button>
-          ) : null}
-          {others.length > 0 ? (
-            <Button
-              variant="secondary"
-              data-testid="revoke-other-sessions"
-              onClick={() => {
-                setDialogError(null);
-                setPending({ kind: "revoke-others", count: others.length });
-              }}
-            >
-              Sign out all other devices
-            </Button>
-          ) : null}
-        </div>
-      </Card>
-
-      <Card className="account-card" data-testid="events-panel">
-        <h3 className="account-h3">Security activity</h3>
-        {security.events.length === 0 ? (
-          <p className="security-note">
-            Nothing yet. Sign-ins, new passkeys and changes to your number or email appear here.
-          </p>
+        {eventsShown < security.events.length || security.eventsTotal > security.events.length ? (
+          <div className="security-footer">
+            {eventsShown < security.events.length ? (
+              <Button
+                variant="secondary"
+                data-testid="show-more-events"
+                onClick={() => {
+                  setEventsShown((shown) => shown + PAGE);
+                }}
+              >
+                Show more ({String(security.events.length - eventsShown)} left)
+              </Button>
+            ) : null}
+            {/* Truncation is ADMITTED rather than performed silently. */}
+            {security.eventsTotal > security.events.length ? (
+              <p className="security-note" data-testid="events-truncated">
+                Showing the {String(security.events.length)} most recent of{" "}
+                {String(security.eventsTotal)} events. Need the full history?{" "}
+                <Link href="/support">Ask support</Link>.
+              </p>
+            ) : null}
+          </div>
         ) : null}
-        <ul className="security-list events">
-          {security.events.slice(0, eventsShown).map((event, index) => (
-            <li key={`${event.action}-${event.at.toISOString()}-${String(index)}`}>
-              <span className="security-name" data-raw={!isKnownEvent(event.action)}>
-                {labelForEvent(event.action)}
-              </span>
-              <span className="security-meta">
-                <time dateTime={event.at.toISOString()}>{formatDateTime(event.at)}</time>
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="security-footer">
-          {eventsShown < security.events.length ? (
-            <Button
-              variant="secondary"
-              data-testid="show-more-events"
-              onClick={() => {
-                setEventsShown((shown) => shown + PAGE);
-              }}
-            >
-              Show more ({String(security.events.length - eventsShown)} left)
-            </Button>
-          ) : null}
-          {/* Truncation is ADMITTED rather than performed silently. */}
-          {security.eventsTotal > security.events.length ? (
-            <p className="security-note" data-testid="events-truncated">
-              Showing the {String(security.events.length)} most recent of{" "}
-              {String(security.eventsTotal)} events. Need the full history?{" "}
-              <Link href="/support">Ask support</Link>.
-            </p>
-          ) : null}
-        </div>
-      </Card>
+      </SectionCard>
 
       <Dialog
         open={pending !== null}

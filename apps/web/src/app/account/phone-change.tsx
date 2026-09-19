@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Field, useToast } from "@desiauction/ui";
+import { Button, Field, IconPhone, IconTile, Pill, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
@@ -55,9 +55,25 @@ export function PhoneChange({ current }: { current: string | null }) {
     }
   }, [attaching, confirmed.done, router, toast]);
 
-  if (!open) {
-    return (
-      <div className="phone-change">
+  // The row is always there — what the number is, and the one button that
+  // opens the change. The form appears under it only when asked for.
+  const head = (
+    <div className="acct-contact-head">
+      <IconTile icon={<IconPhone />} tone="blue" size="sm" />
+      <div className="acct-contact-text">
+        <span className="acct-contact-label">Mobile number</span>
+        {attaching ? (
+          <span className="acct-contact-value acct-contact-empty">Not added yet</span>
+        ) : (
+          <span className="acct-contact-value">
+            <span data-private>{formatPhone(current)}</span>{" "}
+            <Pill tone="green" dot>
+              Verified
+            </Pill>
+          </span>
+        )}
+      </div>
+      {!open ? (
         <Button
           type="button"
           variant="secondary"
@@ -69,84 +85,99 @@ export function PhoneChange({ current }: { current: string | null }) {
         >
           {attaching ? "Add mobile number" : "Change mobile number"}
         </Button>
-      </div>
-    );
+      ) : null}
+    </div>
+  );
+
+  if (!open) {
+    return <div className="phone-change acct-contact">{head}</div>;
   }
 
   const onCodeStep = requested.step === "code" && confirmed.done !== true;
 
   return (
-    <div className="phone-change" data-testid="phone-change">
-      <h3 className="account-subhead">
-        {attaching ? "Add mobile number" : "Change mobile number"}
-      </h3>
-      <p className="notify-switch-detail">
-        {/* Said before the field, not after the mistake. Sign-in is phone-first,
+    <div className="phone-change acct-contact" data-testid="phone-change">
+      {head}
+      <div className="acct-contact-flow">
+        <h3 className="acct-flow-title">
+          {attaching ? "Add mobile number" : "Change mobile number"}
+        </h3>
+        <p className="acct-flow-note">
+          {/* Said before the field, not after the mistake. Sign-in is phone-first,
             so this is not a contact detail — it is the credential. */}
-        {attaching ? (
-          <>
-            You&rsquo;ll be able to sign in with this number as well as your email, and it&rsquo;s
-            what organizers need to enter you in a season.
-          </>
-        ) : (
-          <>
-            You sign in with this number. After the change, {formatPhone(current)} will no longer
-            sign in to this account, and we will text it to say so.
-          </>
-        )}
-      </p>
-      {onCodeStep ? (
-        <form action={confirm} className="profile-form">
-          {/* The number being confirmed — the confirm action's own state has
+          {attaching ? (
+            <>
+              You&rsquo;ll be able to sign in with this number as well as your email, and it&rsquo;s
+              what organizers need to enter you in a season.
+            </>
+          ) : (
+            <>
+              You sign in with this number. After the change,{" "}
+              <span data-private>{formatPhone(current)}</span> will no longer sign in to this
+              account, and we will text it to say so.
+            </>
+          )}
+        </p>
+        {onCodeStep ? (
+          <form action={confirm} className="acct-flow-form">
+            {/* The number being confirmed — the confirm action's own state has
               never seen it (see confirmPhoneChangeAction). */}
-          <input type="hidden" name="phone" value={requested.phone ?? ""} />
-          <p className="notify-switch-detail">
-            We sent a code to {formatPhone(requested.phone ?? "")}. Enter it to finish.
-          </p>
-          <Field
-            label="Six-digit code"
-            name="code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            required
-            data-testid="phone-change-code"
-            {...(confirmed.error !== undefined ? { error: confirmed.error } : {})}
-          />
-          <Button
-            type="submit"
-            size="touch"
-            disabled={confirming}
-            data-testid="phone-change-confirm"
-          >
-            {confirming ? "Checking…" : "Confirm new number"}
-          </Button>
-        </form>
-      ) : (
-        <form action={request} className="profile-form">
-          <Field
-            label="New mobile number"
-            name="phone"
-            inputMode="tel"
-            autoComplete="tel"
-            required
-            data-testid="phone-change-input"
-            {...(requested.error !== undefined ? { error: requested.error } : {})}
-          />
-          <Button type="submit" size="touch" disabled={requesting} data-testid="phone-change-send">
-            {requesting ? "Sending…" : "Send code to new number"}
-          </Button>
-        </form>
-      )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="touch"
-        onClick={() => {
-          setOpen(false);
-        }}
-      >
-        Cancel
-      </Button>
+            <input type="hidden" name="phone" value={requested.phone ?? ""} />
+            <p className="acct-flow-note">
+              We sent a code to <span data-private>{formatPhone(requested.phone ?? "")}</span>.
+              Enter it to finish.
+            </p>
+            <Field
+              label="Six-digit code"
+              name="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              data-testid="phone-change-code"
+              {...(confirmed.error !== undefined ? { error: confirmed.error } : {})}
+            />
+            <Button
+              type="submit"
+              size="touch"
+              disabled={confirming}
+              data-testid="phone-change-confirm"
+            >
+              {confirming ? "Checking…" : "Confirm new number"}
+            </Button>
+          </form>
+        ) : (
+          <form action={request} className="acct-flow-form">
+            <Field
+              label="New mobile number"
+              name="phone"
+              inputMode="tel"
+              autoComplete="tel"
+              required
+              data-testid="phone-change-input"
+              data-private
+              {...(requested.error !== undefined ? { error: requested.error } : {})}
+            />
+            <Button
+              type="submit"
+              size="touch"
+              disabled={requesting}
+              data-testid="phone-change-send"
+            >
+              {requesting ? "Sending…" : "Send code to new number"}
+            </Button>
+          </form>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="touch"
+          onClick={() => {
+            setOpen(false);
+          }}
+        >
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }

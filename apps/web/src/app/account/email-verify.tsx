@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, Field, useToast } from "@desiauction/ui";
+import { Button, Field, IconMail, IconTile, Pill, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
@@ -47,84 +47,107 @@ export function EmailVerify({ current, verified }: { current: string | null; ver
 
   const onCodeStep = requested.step === "code" && confirmed.done !== true;
 
+  const confirmedAddress = current !== null && verified;
+
   return (
-    <div className="email-verify" data-testid="email-verify">
-      {current !== null && verified ? (
-        <p className="notify-switch-detail">
-          <span data-testid="account-email">{current}</span> <Badge tone="success">Confirmed</Badge>
-        </p>
-      ) : (
-        <p className="notify-switch-detail">
-          {/* Says what it unlocks, not "add an email". A person deciding whether
-              to hand over an address deserves to know what arrives on it. */}
-          No email on file. Add one and receipts, invoices and corrections from clubs can reach your
-          inbox as well as this account — without one, they only exist inside DesiAuction.
-        </p>
-      )}
-      {!open ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="touch"
-          data-testid="open-email-verify"
-          onClick={() => {
-            setOpen(true);
-          }}
-        >
-          {current !== null && verified ? "Change email" : "Add an email"}
-        </Button>
-      ) : onCodeStep ? (
-        <form action={confirm} className="profile-form">
-          <p className="notify-switch-detail">
-            We sent a six-digit code to {requested.email ?? ""}. It expires in 15 minutes.
-          </p>
-          <Field
-            label="Six-digit code"
-            name="code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            required
-            data-testid="email-verify-code"
-            {...(confirmed.error !== undefined ? { error: confirmed.error } : {})}
-          />
+    <div className="email-verify acct-contact" data-testid="email-verify" id="email">
+      <div className="acct-contact-head">
+        <IconTile icon={<IconMail />} tone="purple" size="sm" />
+        <div className="acct-contact-text">
+          <span className="acct-contact-label">Email</span>
+          {confirmedAddress ? (
+            <span className="acct-contact-value">
+              <span data-testid="account-email" data-private>
+                {current}
+              </span>{" "}
+              <Pill tone="green" dot>
+                Confirmed
+              </Pill>
+            </span>
+          ) : (
+            <span className="acct-contact-value acct-contact-empty">
+              {/* Says what it unlocks, not "add an email". A person deciding
+                  whether to hand over an address deserves to know what arrives
+                  on it. */}
+              No email on file. Add one and receipts, invoices and corrections from clubs reach your
+              inbox too — without one, they only exist inside DesiAuction.
+            </span>
+          )}
+        </div>
+        {!open ? (
           <Button
-            type="submit"
+            type="button"
+            variant="secondary"
             size="touch"
-            disabled={confirming}
-            data-testid="email-verify-confirm"
+            data-testid="open-email-verify"
+            onClick={() => {
+              setOpen(true);
+            }}
           >
-            {confirming ? "Checking…" : "Confirm address"}
+            {confirmedAddress ? "Change email" : "Add an email"}
           </Button>
-        </form>
-      ) : (
-        <form action={request} className="profile-form">
-          <Field
-            label="Email address"
-            name="email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            help="We send a code to confirm it. Nothing is stored until you do."
-            required
-            data-testid="email-verify-input"
-            {...(requested.error !== undefined ? { error: requested.error } : {})}
-          />
-          <Button type="submit" size="touch" disabled={requesting} data-testid="email-verify-send">
-            {requesting ? "Sending…" : "Send confirmation code"}
-          </Button>
-        </form>
-      )}
+        ) : null}
+      </div>
       {open ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="touch"
-          onClick={() => {
-            setOpen(false);
-          }}
-        >
-          Cancel
-        </Button>
+        <div className="acct-contact-flow">
+          {onCodeStep ? (
+            <form action={confirm} className="acct-flow-form">
+              <p className="acct-flow-note">
+                We sent a six-digit code to <span data-private>{requested.email ?? ""}</span>. It
+                expires in 15 minutes.
+              </p>
+              <Field
+                label="Six-digit code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                data-testid="email-verify-code"
+                {...(confirmed.error !== undefined ? { error: confirmed.error } : {})}
+              />
+              <Button
+                type="submit"
+                size="touch"
+                disabled={confirming}
+                data-testid="email-verify-confirm"
+              >
+                {confirming ? "Checking…" : "Confirm address"}
+              </Button>
+            </form>
+          ) : (
+            <form action={request} className="acct-flow-form">
+              <Field
+                label="Email address"
+                name="email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                help="We send a code to confirm it. Nothing is stored until you do."
+                required
+                data-testid="email-verify-input"
+                {...(requested.error !== undefined ? { error: requested.error } : {})}
+              />
+              <Button
+                type="submit"
+                size="touch"
+                disabled={requesting}
+                data-testid="email-verify-send"
+              >
+                {requesting ? "Sending…" : "Send confirmation code"}
+              </Button>
+            </form>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="touch"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
       ) : null}
     </div>
   );
