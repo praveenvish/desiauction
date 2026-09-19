@@ -1236,6 +1236,94 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
         .where(eq(registrationsTable.id, incumbent));
       expect(old?.isCaptain, "the incumbent was demoted rather than colliding").toBe(false);
     });
+
+    /*
+     * The same rule when the file carries NO team column. The demote used to be
+     * scoped to the team the FILE named, so a captain-only sheet for a player
+     * already on a team skipped it, collided on `registrations_team_captain_uq`
+     * and aborted the whole import with a raw duplicate-key error.
+     */
+    const importedOnTeam = async (
+      name: string,
+      phone: string,
+      teamId: string,
+      marks: { isCaptain?: boolean } = {},
+    ): Promise<string> => {
+      await commitRegistrationImport(
+        db,
+        compId,
+        org.id,
+        owner,
+        parseRegistrationCsv(`name,phone,role\n${name},${phone},batter`).rows,
+      );
+      const [row] = await db
+        .select({ id: registrationsTable.id, personId: registrationsTable.personId })
+        .from(registrationsTable)
+        .innerJoin(people, eq(people.id, registrationsTable.personId))
+        .where(and(eq(registrationsTable.competitionId, compId), eq(people.phone, `+91${phone}`)));
+      if (row === undefined) throw new Error("the imported registration should exist");
+      seededPersonIds.push(row.personId);
+      await setRegistrationMarks(db, org.id, compId, row.id, { ...marks, teamId }, owner);
+      return row.id;
+    };
+    const captainsOf = async (teamId: string): Promise<string[]> =>
+      (
+        await db
+          .select({ id: registrationsTable.id })
+          .from(registrationsTable)
+          .where(and(eq(registrationsTable.teamId, teamId), eq(registrationsTable.isCaptain, true)))
+      ).map((row) => row.id);
+
+    it("hands the armband over when a captain-only file names a player already on the team", async () => {
+      const team = await createTeam(db, org.id, compId, owner, `Handover XI ${RUN}`);
+      expect(team.ok).toBe(true);
+      if (!team.ok) return;
+      const incumbent = await importedOnTeam("Sitting Captain", `93${RUN}1`, team.team.id, {
+        isCaptain: true,
+      });
+      const next = await importedOnTeam("Next Captain", `93${RUN}2`, team.team.id);
+
+      const result = await commitRegistrationImport(
+        db,
+        compId,
+        org.id,
+        owner,
+        parseRegistrationCsv(`name,phone,role,is_captain\nNext Captain,93${RUN}2,batter,yes`).rows,
+      );
+      expect(result.updated).toBe(1);
+      expect(await captainsOf(team.team.id)).toEqual([next]);
+      expect(await captainsOf(team.team.id)).not.toContain(incumbent);
+    });
+
+    it("hands the armband over when a file moves a sitting captain onto a team that has one", async () => {
+      const from = await createTeam(db, org.id, compId, owner, `File From ${RUN}`);
+      const to = await createTeam(db, org.id, compId, owner, `File To ${RUN}`);
+      expect(from.ok && to.ok).toBe(true);
+      if (!from.ok || !to.ok) return;
+      const mover = await importedOnTeam("Moving Captain", `93${RUN}3`, from.team.id, {
+        isCaptain: true,
+      });
+      await importedOnTeam("Home Captain", `93${RUN}4`, to.team.id, { isCaptain: true });
+
+      const parsed = parseRegistrationCsv(
+        `name,phone,role,team\nMoving Captain,93${RUN}3,batter,${to.team.name}`,
+        undefined,
+        { knownTeams: [from.team.name, to.team.name] },
+      );
+      expect(parsed.errors).toEqual([]);
+      // The stored team is a value, so only "let this file win" moves it.
+      const result = await commitRegistrationImport(
+        db,
+        compId,
+        org.id,
+        owner,
+        parsed.rows,
+        "file-wins",
+      );
+      expect(result.updated).toBe(1);
+      expect(await captainsOf(to.team.id)).toEqual([mover]);
+      expect(await captainsOf(from.team.id)).toEqual([]);
+    });
   });
 
   it("DA-04: a team has exactly one captain — naming a new one moves the armband", async () => {

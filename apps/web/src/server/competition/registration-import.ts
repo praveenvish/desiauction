@@ -60,7 +60,7 @@ export async function existingForImport(
   db: Db,
   competitionId: string,
   phones: readonly string[],
-): Promise<Map<string, ExistingRegistration & { id: string }>> {
+): Promise<Map<string, ExistingRegistration & { id: string; teamId: string | null }>> {
   if (phones.length === 0) {
     return new Map();
   }
@@ -86,6 +86,9 @@ export async function existingForImport(
       // The diff compares NAMES on both sides, so the stored side joins the
       // team in rather than making a pure module resolve a ULID.
       teamName: teams.name,
+      // The id beside the name: the armband's demote is scoped to the team the
+      // player is ON, which a file with no team column never names.
+      teamId: registrations.teamId,
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
@@ -407,8 +410,23 @@ export async function commitRegistrationImport(
               throw new CaptainImportRefused(refusal);
             }
           }
-          if (values["isCaptain"] === true && changedTeam !== null) {
-            await demoteOthers(changedTeam, record.id);
+          /*
+           * The EFFECTIVE captaincy on the EFFECTIVE team, as `setRegistrationMarks`
+           * reads it — not the file's columns alone. A captain-only file for a
+           * player already on a team carries no team column, so the demote used
+           * to be skipped and the armband collided on the unique index; a file
+           * that only MOVES a sitting captain collides the same way.
+           */
+          const landingTeam =
+            "teamId" in values ? (values["teamId"] as string | null) : record.teamId;
+          const landsAsCaptain =
+            typeof values["isCaptain"] === "boolean" ? values["isCaptain"] : record.isCaptain;
+          if (
+            landsAsCaptain &&
+            landingTeam !== null &&
+            ("isCaptain" in values || "teamId" in values)
+          ) {
+            await demoteOthers(landingTeam, record.id);
           }
           await tx.update(registrations).set(values).where(eq(registrations.id, record.id));
         }
