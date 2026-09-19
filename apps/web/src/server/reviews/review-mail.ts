@@ -1,4 +1,5 @@
 import { env } from "../../env";
+import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
 import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
 import { REVIEW_LINK_TTL_MS, type ValidReview } from "./reviews";
 
@@ -13,8 +14,6 @@ import { REVIEW_LINK_TTL_MS, type ValidReview } from "./reviews";
  * It goes through the consent gate (see `desk.ts`) under the `feedback` topic,
  * which is on /account, so "stop asking me" is one switch.
  */
-
-const SUPPORT_EMAIL = "support@desiauction.in";
 
 /**
  * Who the ask is addressed to, so the first line is true. An owner bid in an
@@ -42,27 +41,21 @@ export function reviewAskMail(
   name: string | null,
   link: string,
   audience: AskAudience = "general",
-): { subject: string; text: string } {
+): { subject: string; text: string; html: string } {
   const days = Math.round(REVIEW_LINK_TTL_MS / 86_400_000);
   return {
     subject: "How has DesiAuction worked for you?",
-    text: [
-      name === null ? "Hi," : `Hi ${name},`,
-      "",
-      ...OPENING[audience],
-      "",
-      `  ${link}`,
-      "",
-      `The link is yours and works for ${String(days)} days. Nothing you write is shown to`,
-      "anyone unless you tick the box that says we may quote it.",
-      "",
-      `Don't want to be asked? Switch off "Feedback requests" in your account settings:`,
-      `${env.PUBLIC_BASE_URL}/account`,
-      "",
-      `Questions: ${SUPPORT_EMAIL}`,
-      "",
-      "— DesiAuction",
-    ].join("\n"),
+    ...renderEmail({
+      preheader: "Two minutes on what worked and what got in your way.",
+      heading: "How has DesiAuction worked for you?",
+      paragraphs: [name === null ? "Hi," : `Hi ${name},`, OPENING[audience].join(" ")],
+      action: { label: "Write your review", url: link },
+      after: [
+        `The link is yours and works for ${String(days)} days. Nothing you write is shown to anyone unless you tick the box that says we may quote it.`,
+        `Don't want to be asked? Switch off "Feedback requests" in your account settings: ${env.PUBLIC_BASE_URL}/account`,
+      ],
+      footnote: "You received this because you used DesiAuction recently.",
+    }),
   };
 }
 
@@ -111,31 +104,27 @@ export function seasonAskMail(input: {
   orgName: string;
   role: "player" | "owner";
   link: string;
-}): { subject: string; text: string } {
+}): { subject: string; text: string; html: string } {
   const days = Math.round(REVIEW_LINK_TTL_MS / 86_400_000);
   // Season and club names are organizer-typed; keep the subject to one line.
   const season = input.seasonName.replace(/[\r\n]+/g, " ").slice(0, 80);
   return {
     subject: `How was ${season}?`,
-    text: [
-      input.name === null ? "Hi," : `Hi ${input.name},`,
-      "",
-      input.role === "owner"
-        ? `You bid for a team in ${season}, run by ${input.orgName}.`
-        : `You played in ${season}, run by ${input.orgName}.`,
-      "How did it go? Other players and owners deciding whether to join next time",
-      "would like to know. Two minutes:",
-      "",
-      `  ${input.link}`,
-      "",
-      "Once our team has read it, your review may appear on the season's public page.",
-      "It carries your name only if you tick the box that says so; otherwise it says",
-      input.role === "owner" ? '"A team owner".' : '"A player".',
-      "",
-      `The link is yours and works for ${String(days)} days. Don't want to be asked?`,
-      `Switch off "Feedback requests" at ${env.PUBLIC_BASE_URL}/account`,
-      "",
-      "— DesiAuction",
-    ].join("\n"),
+    ...renderEmail({
+      preheader: `Two minutes on ${season} — for the players and owners deciding on next season.`,
+      heading: `How was ${season}?`,
+      paragraphs: [
+        input.name === null ? "Hi," : `Hi ${input.name},`,
+        input.role === "owner"
+          ? `You bid for a team in ${season}, run by ${input.orgName}. How did it go? Other players and owners deciding whether to join next time would like to know.`
+          : `You played in ${season}, run by ${input.orgName}. How did it go? Other players and owners deciding whether to join next time would like to know.`,
+      ],
+      action: { label: "Review the season", url: input.link },
+      after: [
+        `Once our team has read it, your review may appear on the season's public page. It carries your name only if you tick the box that says so; otherwise it says ${input.role === "owner" ? '"A team owner"' : '"A player"'}.`,
+        `The link is yours and works for ${String(days)} days. Don't want to be asked? Switch off "Feedback requests" at ${env.PUBLIC_BASE_URL}/account`,
+      ],
+      footnote: `You received this because you took part in ${season} on DesiAuction.`,
+    }),
   };
 }

@@ -27,6 +27,8 @@ export interface OutgoingMail {
   readonly to: string;
   readonly subject: string;
   readonly text: string;
+  /** The branded HTML part (email-layout.ts). Plain text alone is still valid mail. */
+  readonly html?: string;
   /**
    * Optional file, in the shape Postmark/Resend/Brevo all accept. Providers
    * that want a different key override `buildRequest`, which is the same escape
@@ -58,6 +60,7 @@ const defaultBuildRequest = (mail: OutgoingMail, from: string, replyTo?: string)
   to: [mail.to],
   subject: mail.subject,
   text: mail.text,
+  ...(mail.html === undefined ? {} : { html: mail.html }),
   // Omitted rather than sent empty: a blank reply_to is a header some
   // providers reject and every client renders badly.
   ...(replyTo === undefined ? {} : { reply_to: replyTo }),

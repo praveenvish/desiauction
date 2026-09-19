@@ -1,4 +1,5 @@
 import { env } from "../../env";
+import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
 import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
 import { buildInvite, inviteUid } from "./demo-ics";
 import { IST_OFFSET_MINUTES, dayLabel, istDayKey, timeLabel } from "./demo-slots";
@@ -18,7 +19,6 @@ import { IST_OFFSET_MINUTES, dayLabel, istDayKey, timeLabel } from "./demo-slots
  * the gate, because by then we are the ones starting the conversation.
  */
 
-const SUPPORT_EMAIL = "support@desiauction.in";
 const MINUTE_MS = 60 * 1000;
 
 /** "Tue 9 Sep, 7:00 pm IST" — one string, one timezone, said out loud. */
@@ -45,78 +45,48 @@ function bookingUrl(token: string): string {
   return `${env.PUBLIC_BASE_URL}/demo/${token}`;
 }
 
-export async function sendBookingConfirmation(input: BookingMailInput): Promise<MailOutcome> {
-  const when = whenWords(input.slotStart);
-  const url = bookingUrl(input.token);
-  const ics = buildInvite({
-    uid: inviteUid(input.requestId),
-    start: input.slotStart,
-    end: input.slotEnd,
-    summary: `DesiAuction demo — ${input.orgName}`,
-    description: `A live walkthrough of a real auction. Manage this booking: ${url}`,
-    url,
-    organizerEmail: SUPPORT_EMAIL,
-    sequence: input.sequence,
-  });
-
-  return transactionalMailer().send({
-    to: input.to,
-    subject: `Your DesiAuction demo — ${when}`,
-    text: [
-      `Hi ${input.name},`,
-      "",
-      `You're booked in for ${when}.`,
-      "",
-      "We'll call the number you gave us. Twenty minutes, walking through a real",
-      "auction end to end — squads and purses, the bidding, the gavel, and the",
-      "settlement afterwards.",
-      "",
-      `Need to move it or call it off: ${url}`,
-      "",
-      "The calendar invite is attached.",
-      "",
-      "— DesiAuction",
-    ].join("\n"),
-    attachment: {
-      filename: "desiauction-demo.ics",
-      contentType: "text/calendar",
-      contentBase64: Buffer.from(ics, "utf8").toString("base64"),
-    },
-  });
+/** A composed mail: what the preview gallery renders and the senders send. */
+export interface ComposedMail {
+  readonly subject: string;
+  readonly text: string;
+  readonly html: string;
 }
 
-export async function sendBookingCancellation(input: BookingMailInput): Promise<MailOutcome> {
+export function bookingConfirmationMail(input: BookingMailInput): ComposedMail {
   const when = whenWords(input.slotStart);
-  const ics = buildInvite({
-    uid: inviteUid(input.requestId),
-    start: input.slotStart,
-    end: input.slotEnd,
-    summary: `DesiAuction demo — ${input.orgName}`,
-    description: "Cancelled.",
-    url: bookingUrl(input.token),
-    organizerEmail: SUPPORT_EMAIL,
-    sequence: input.sequence,
-    cancelled: true,
-  });
+  return {
+    subject: `Your DesiAuction demo — ${when}`,
+    ...renderEmail({
+      preheader: `You're booked in for ${when}. The calendar invite is attached.`,
+      heading: "Your demo is booked",
+      paragraphs: [`Hi ${input.name},`, `You're booked in for ${when}.`],
+      details: [
+        ["When", when],
+        ["How", "We call the number you gave us"],
+        ["Length", "About twenty minutes"],
+      ],
+      after: [
+        "We'll walk through a real auction end to end — squads and purses, the bidding, the gavel, and the settlement afterwards. The calendar invite is attached.",
+      ],
+      action: { label: "Move or cancel", url: bookingUrl(input.token) },
+      footnote: "You received this because you booked a DesiAuction demo.",
+    }),
+  };
+}
 
-  return transactionalMailer().send({
-    to: input.to,
+export function bookingCancellationMail(input: BookingMailInput): ComposedMail {
+  const when = whenWords(input.slotStart);
+  return {
     subject: `Cancelled: your DesiAuction demo — ${when}`,
-    text: [
-      `Hi ${input.name},`,
-      "",
-      `The demo on ${when} is cancelled and nobody will call.`,
-      "",
-      `Want another time? ${env.PUBLIC_BASE_URL}/schedule-demo`,
-      "",
-      "— DesiAuction",
-    ].join("\n"),
-    attachment: {
-      filename: "desiauction-demo.ics",
-      contentType: "text/calendar",
-      contentBase64: Buffer.from(ics, "utf8").toString("base64"),
-    },
-  });
+    ...renderEmail({
+      preheader: `The demo on ${when} is cancelled.`,
+      heading: "Your demo is cancelled",
+      paragraphs: [`Hi ${input.name},`, `The demo on ${when} is cancelled and nobody will call.`],
+      action: { label: "Pick another time", url: `${env.PUBLIC_BASE_URL}/schedule-demo` },
+      footnote:
+        "You received this because a DesiAuction demo booked with this address was cancelled.",
+    }),
+  };
 }
 
 /**
@@ -124,27 +94,69 @@ export async function sendBookingCancellation(input: BookingMailInput): Promise<
  * doing something else, and its only job is to put a time and a way out in
  * front of somebody.
  */
-export async function sendBookingReminder(
-  input: BookingMailInput,
-  hoursAhead: 24 | 1,
-): Promise<MailOutcome> {
+export function bookingReminderMail(input: BookingMailInput, hoursAhead: 24 | 1): ComposedMail {
   const when = whenWords(input.slotStart);
-  return transactionalMailer().send({
-    to: input.to,
+  return {
     subject:
       hoursAhead === 24
         ? `Tomorrow: your DesiAuction demo — ${when}`
         : `In an hour: your DesiAuction demo`,
-    text: [
-      `Hi ${input.name},`,
-      "",
-      hoursAhead === 24
-        ? `A reminder that we're speaking ${when}. We'll call the number you gave us.`
-        : `We're calling in about an hour, at ${when}.`,
-      "",
-      `Can't make it? ${bookingUrl(input.token)}`,
-      "",
-      "— DesiAuction",
-    ].join("\n"),
+    ...renderEmail({
+      preheader: hoursAhead === 24 ? `We're speaking ${when}.` : `We're calling in about an hour.`,
+      heading: hoursAhead === 24 ? "Your demo is tomorrow" : "Your demo is in an hour",
+      paragraphs: [
+        `Hi ${input.name},`,
+        hoursAhead === 24
+          ? `A reminder that we're speaking ${when}. We'll call the number you gave us.`
+          : `We're calling in about an hour, at ${when}.`,
+      ],
+      action: { label: "Can't make it? Move or cancel", url: bookingUrl(input.token) },
+      footnote: "You received this because you booked a DesiAuction demo.",
+    }),
+  };
+}
+
+function inviteFile(input: BookingMailInput, cancelled: boolean) {
+  const url = bookingUrl(input.token);
+  const ics = buildInvite({
+    uid: inviteUid(input.requestId),
+    start: input.slotStart,
+    end: input.slotEnd,
+    summary: `DesiAuction demo — ${input.orgName}`,
+    description: cancelled
+      ? "Cancelled."
+      : `A live walkthrough of a real auction. Manage this booking: ${url}`,
+    url,
+    organizerEmail: SUPPORT_EMAIL,
+    sequence: input.sequence,
+    ...(cancelled ? { cancelled: true } : {}),
   });
+  return {
+    filename: "desiauction-demo.ics",
+    contentType: "text/calendar",
+    contentBase64: Buffer.from(ics, "utf8").toString("base64"),
+  };
+}
+
+export async function sendBookingConfirmation(input: BookingMailInput): Promise<MailOutcome> {
+  return transactionalMailer().send({
+    to: input.to,
+    ...bookingConfirmationMail(input),
+    attachment: inviteFile(input, false),
+  });
+}
+
+export async function sendBookingCancellation(input: BookingMailInput): Promise<MailOutcome> {
+  return transactionalMailer().send({
+    to: input.to,
+    ...bookingCancellationMail(input),
+    attachment: inviteFile(input, true),
+  });
+}
+
+export async function sendBookingReminder(
+  input: BookingMailInput,
+  hoursAhead: 24 | 1,
+): Promise<MailOutcome> {
+  return transactionalMailer().send({ to: input.to, ...bookingReminderMail(input, hoursAhead) });
 }

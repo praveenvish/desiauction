@@ -1,0 +1,74 @@
+.email-gallery {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-5) var(--space-16);
+  font-family: var(--font-text);
+  color: var(--text-primary);
+}
+
+.email-gallery h1 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-2xl-size);
+  color: var(--text-heading);
+}
+
+.email-gallery-intro {
+  margin: 0 0 var(--space-8);
+  color: var(--text-secondary);
+}
+
+.email-sample {
+  padding: var(--space-8) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.email-sample h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg-size);
+  color: var(--text-heading);
+}
+
+.email-subject {
+  margin: 0 0 var(--space-4);
+  color: var(--text-primary);
+}
+
+.email-subject span {
+  margin-right: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.email-frames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: flex-start;
+}
+
+.email-frame {
+  width: 640px;
+  max-width: 100%;
+  height: 720px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: #f7f6f2;
+}
+
+.email-frame--phone {
+  width: 375px;
+}
+
+.email-sample details {
+  margin-top: var(--space-4);
+}
+
+.email-sample pre {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  background: var(--surface-sunken);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+}
