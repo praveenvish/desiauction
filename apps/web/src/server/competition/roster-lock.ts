@@ -20,12 +20,16 @@ import type { CsvRegistrationRow } from "@desiauction/core";
  * nothing; the moment one exists it would be a live way to change the rules
  * during the night.
  *
- * `isCaptain` decides nothing. `auctionReady` filters the pool on `isIcon`
- * alone; no purse, lot or squad count reads the captain badge. Freezing it with
- * the others made naming a captain impossible in either direction: before the
- * auction a drafted player has no team to captain, and after it the mark was
- * refused — so the window in which the answer is knowable was the one window
- * the product refused to write it down.
+ * `isCaptain` stays free, although it now pre-signs a player like the other
+ * two (lib/pre-signed.ts). What it decides about the POOL is settled once, when
+ * the auction opens (`settlePool`, packages/auction): a waiting lot of a player
+ * who is captain by then is withdrawn and they keep their team. After that the
+ * mark moves no lot — a captain named in the room or after it was bought
+ * already, and the engine's squad cap counts a sold captain once, through the
+ * sale. Freezing it would bring back the old defect: before the auction a
+ * drafted player has no team to captain, and after it the mark was refused —
+ * so the window in which the answer is knowable was the one window the product
+ * refused to write it down.
  */
 export function marksFreezeWithRoster(marks: {
   isIcon?: boolean;
