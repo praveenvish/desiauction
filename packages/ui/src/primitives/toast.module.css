@@ -11,7 +11,7 @@
 
 .toast {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   background: var(--surface-overlay);
@@ -65,6 +65,29 @@
   min-height: 24px;
   padding: 0;
   border-radius: var(--radius-sm);
+}
+
+.action {
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  background: none;
+  border: none;
+  color: var(--text-accent);
+  cursor: pointer;
+  min-height: 24px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+
+.action:hover {
+  text-decoration: underline;
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
 }
 
 .dismiss:hover {

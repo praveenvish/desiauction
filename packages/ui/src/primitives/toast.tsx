@@ -20,6 +20,11 @@ export interface ToastOptions {
   tone?: ToastTone;
   /** ms before auto-dismiss; sticky if 0. */
   duration?: number;
+  /**
+   * One follow-up the reader can take from the toast itself — "Undo" after a
+   * one-click decision. Pressing it runs the handler and dismisses the toast.
+   */
+  action?: { label: string; onSelect: () => void };
 }
 
 interface ActiveToast extends ToastOptions {
@@ -82,6 +87,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <div className={styles["title"]}>{item.title}</div>
               {item.description !== undefined ? <div>{item.description}</div> : null}
             </div>
+            {item.action !== undefined ? (
+              <button
+                type="button"
+                className={styles["action"]}
+                onClick={() => {
+                  item.action?.onSelect();
+                  dismiss(item.key);
+                }}
+              >
+                {item.action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               className={styles["dismiss"]}

@@ -6,7 +6,8 @@ import {
   type IncrementSlab,
 } from "@desiauction/core";
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { preSignedSql } from "../competition/pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "../competition/shown-name";
 
 // PX-6 live-experience reads (thin, additive, spectator-safe). The snapshot
@@ -183,8 +184,12 @@ export async function preSignedPlayers(db: Db, competitionId: string): Promise<P
       and(
         eq(registrations.competitionId, competitionId),
         eq(registrations.status, "approved"),
-        // teamId is the pre-signed assignment for these two, per the schema note.
-        or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
+        // teamId is the pre-signed assignment for all three marks.
+        preSignedSql,
+        // A captain named AFTER the night is a player the room already sold:
+        // `resolvedLots` lists them with their price, and listing them here
+        // too would seat one person twice on the squad board.
+        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold')`,
       ),
     )
     .orderBy(asc(shownName));

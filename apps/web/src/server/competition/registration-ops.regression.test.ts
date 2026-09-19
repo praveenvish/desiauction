@@ -1273,14 +1273,13 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(captains.map((row) => row.id)).toEqual([second]);
   });
 
-  it("a registration is never both Icon and Captain — the write path refuses, both ways", async () => {
+  it("Icon and Captain can be one player — both pre-sign them, neither refuses the other", async () => {
     const team = await createTeam(db, org.id, compId, owner, `Exclusive XI ${RUN}`);
     expect(team.ok).toBe(true);
     if (!team.ok) return;
     const captain = await seed(compId, org.id, "Armband Holder", "excl1");
     const icon = await seed(compId, org.id, "Marquee Signing", "excl2");
 
-    // Each mark on its own is legitimate and must keep working.
     expect(
       await setRegistrationMarks(
         db,
@@ -1302,45 +1301,65 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       ),
     ).toEqual({ ok: true });
 
-    // Icon onto a stored Captain: refused on the EFFECTIVE state, not the patch.
+    // Icon onto a stored Captain — the marquee name wearing the armband.
     expect(
       await setRegistrationMarks(db, org.id, compId, captain, { isIcon: true }, owner),
-    ).toEqual({ ok: false, reason: "icon_and_captain" });
-    // Captain onto a stored Icon: the mirror case.
-    expect(
-      await setRegistrationMarks(db, org.id, compId, icon, { isCaptain: true }, owner),
-    ).toEqual({ ok: false, reason: "icon_and_captain" });
-    // Both in one call.
-    expect(
-      await setRegistrationMarks(
-        db,
-        org.id,
-        compId,
-        captain,
-        { isIcon: true, isCaptain: true },
-        owner,
-      ),
-    ).toEqual({ ok: false, reason: "icon_and_captain" });
-
-    // A refusal writes NOTHING — not the flag, and not an audit row implying it.
-    const [afterCaptain] = await db
+    ).toEqual({ ok: true });
+    const [both] = await db
       .select({ isIcon: registrationsTable.isIcon, isCaptain: registrationsTable.isCaptain })
       .from(registrationsTable)
       .where(eq(registrationsTable.id, captain));
-    expect(afterCaptain).toEqual({ isIcon: false, isCaptain: true });
-    const [afterIcon] = await db
-      .select({ isIcon: registrationsTable.isIcon, isCaptain: registrationsTable.isCaptain })
-      .from(registrationsTable)
-      .where(eq(registrationsTable.id, icon));
-    expect(afterIcon).toEqual({ isIcon: true, isCaptain: false });
+    expect(both).toEqual({ isIcon: true, isCaptain: true });
 
-    // Clearing one mark unblocks the other — the rule is a rule, not a trap.
+    // Captain onto the stored Icon: the armband CHANGES HANDS (DA-04), it does
+    // not collide and it does not refuse.
     expect(
-      await setRegistrationMarks(db, org.id, compId, captain, { isCaptain: false }, owner),
+      await setRegistrationMarks(db, org.id, compId, icon, { isCaptain: true }, owner),
     ).toEqual({ ok: true });
+    const holders = await db
+      .select({ id: registrationsTable.id })
+      .from(registrationsTable)
+      .where(
+        and(eq(registrationsTable.teamId, team.team.id), eq(registrationsTable.isCaptain, true)),
+      );
+    expect(holders.map((row) => row.id)).toEqual([icon]);
+  });
+
+  it("moving a captain onto a team that has one hands the armband over instead of colliding", async () => {
+    const from = await createTeam(db, org.id, compId, owner, `Mover From ${RUN}`);
+    const to = await createTeam(db, org.id, compId, owner, `Mover To ${RUN}`);
+    expect(from.ok && to.ok).toBe(true);
+    if (!from.ok || !to.ok) return;
+    const incumbent = await seed(compId, org.id, "Sitting Captain", "move1");
+    const mover = await seed(compId, org.id, "Moving Captain", "move2");
+    await setRegistrationMarks(
+      db,
+      org.id,
+      compId,
+      incumbent,
+      { isCaptain: true, teamId: to.team.id },
+      owner,
+    );
+    await setRegistrationMarks(
+      db,
+      org.id,
+      compId,
+      mover,
+      { isCaptain: true, teamId: from.team.id },
+      owner,
+    );
+    // Only the team changes; the stored captaincy travels with them. This used
+    // to reach the database as a raw unique violation.
     expect(
-      await setRegistrationMarks(db, org.id, compId, captain, { isIcon: true }, owner),
+      await setRegistrationMarks(db, org.id, compId, mover, { teamId: to.team.id }, owner),
     ).toEqual({ ok: true });
+    const holders = await db
+      .select({ id: registrationsTable.id })
+      .from(registrationsTable)
+      .where(
+        and(eq(registrationsTable.teamId, to.team.id), eq(registrationsTable.isCaptain, true)),
+      );
+    expect(holders.map((row) => row.id)).toEqual([mover]);
   });
 
   it("statistics reconcile with the actual rows", async () => {
@@ -1355,7 +1374,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
   });
 
   it("export is deterministic, stable-ordered, and competition-scoped (no leakage)", async () => {
-    const csv = await exportRegistrationsCsv(db, compId);
+    const { csv } = await exportRegistrationsCsv(db, compId);
     const lines = csv.split("\n");
     // The header is the IMPORT's canonical vocabulary, so a file this product
     // exported re-imports with no mapping step — which it could not before, and
@@ -1376,8 +1395,35 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       name: `Rival Cup ${RUN}`,
     });
     await seed(rival.id, orgOutsider.id, "Rival Player", "rv01", "submitted");
-    const ourCsv = await exportRegistrationsCsv(db, compId);
+    const { csv: ourCsv } = await exportRegistrationsCsv(db, compId);
     expect(ourCsv).not.toContain("Rival Player");
+  });
+
+  it("export writes only the chosen columns, in registry order, whatever order they were asked in", async () => {
+    const { csv } = await exportRegistrationsCsv(db, compId, {
+      columns: ["jersey_number", "team", "name", "not_a_column"],
+    });
+    expect(csv.split("\n")[0]).toBe("name,team,jersey_number");
+    // Nothing chosen that exists falls back to the historical file, not to an
+    // empty one.
+    const { csv: fallback } = await exportRegistrationsCsv(db, compId, { columns: ["nope"] });
+    expect(fallback.split("\n")[0]?.startsWith("registration_number,name,phone,role,status")).toBe(
+      true,
+    );
+  });
+
+  it("an auction-pool export leaves out everyone who is not approved or is pre-signed", async () => {
+    const stats = await registrationStats(db, compId);
+    const { rowCount } = await exportRegistrationsCsv(db, compId, {
+      columns: ["registration_number"],
+      rows: "pool",
+    });
+    expect(rowCount).toBe(stats.auctionPool);
+    const { rowCount: approved } = await exportRegistrationsCsv(db, compId, {
+      columns: ["registration_number"],
+      rows: "approved",
+    });
+    expect(approved).toBe(stats.approved);
   });
 
   it("export authorization: an outsider lacks registration.review on this competition", async () => {

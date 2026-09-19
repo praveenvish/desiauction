@@ -66,6 +66,7 @@ export interface TeamRosterRow {
   buyPrice?: number | null;
   isIcon: boolean;
   isCaptain: boolean;
+  isRetained: boolean;
 }
 
 export interface TeamCard {
@@ -103,6 +104,8 @@ export interface TeamsWorkspace {
    * said "the pack declares the order" while using the wrong pack's.
    */
   roles: { key: string; label: string }[];
+  /** The pack's optional player details — the export offers them as columns. */
+  sportAttributes: { key: string; label: string }[];
   teams: TeamCard[];
   /** Purse per team (paise); 0 when no auction is configured. Money-gated. */
   purseTotal?: number;
@@ -149,6 +152,7 @@ export async function teamsWorkspace(
         role: registrations.role,
         isIcon: registrations.isIcon,
         isCaptain: registrations.isCaptain,
+        isRetained: registrations.isRetained,
         name: shownName,
         phone: people.phone,
       })
@@ -248,6 +252,7 @@ export async function teamsWorkspace(
       ...(options.money ? { buyPrice: priceByReg.get(row.registrationId) ?? null } : {}),
       isIcon: row.isIcon,
       isCaptain: row.isCaptain,
+      isRetained: row.isRetained,
     });
     rosterByTeam.set(row.teamId, list);
   }
@@ -294,6 +299,10 @@ export async function teamsWorkspace(
 
   return {
     competitionName: competition.name,
+    sportAttributes: sportPackFor(competition.sport).attributes.map((attribute) => ({
+      key: attribute.key,
+      label: attribute.label,
+    })),
     roles: sportPackFor(competition.sport).roles.values.map((value) => ({
       key: value.key,
       label: value.label,

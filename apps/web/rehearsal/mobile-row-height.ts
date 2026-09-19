@@ -11,9 +11,9 @@ async function main() {
   await p.waitForTimeout(1200);
   const out = await p.evaluate(
     ("(() => {" +
-      "const rows = Array.from(document.querySelectorAll('.reg-table tbody tr'));" +
+      "const rows = Array.from(document.querySelectorAll('.pd-table tbody tr'));" +
       "const hs = rows.map((r) => Math.round(r.getBoundingClientRect().height));" +
-      "const tbl = document.querySelector('.reg-table');" +
+      "const tbl = document.querySelector('.pd-table');" +
       "return { rows: rows.length, heights: hs.slice(0,4), median: hs.sort((a,b)=>a-b)[Math.floor(hs.length/2)], tableH: Math.round(tbl.getBoundingClientRect().height), perScreen: +(844 / hs[Math.floor(hs.length/2)]).toFixed(2) };" +
       "})()") as never,
   );

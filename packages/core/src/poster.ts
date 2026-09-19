@@ -47,7 +47,12 @@ export function isPosterSize(value: string): value is PosterSize {
 }
 
 /** How the sale reads. `sold` is the only one that carries a price. */
-export type PosterOutcome = "sold" | "unsold" | "retained" | "icon";
+/**
+ * `captain` is a pre-signed outcome like `icon` and `retained`: a captain the
+ * team picked before the night never went to the block, so SOLD would be false
+ * and there is no other verdict to print.
+ */
+export type PosterOutcome = "sold" | "unsold" | "retained" | "icon" | "captain";
 
 export interface PlayerPosterInput {
   playerName: string;
@@ -71,7 +76,7 @@ export interface PlayerPoster {
   roleLine: string;
   photoUrl: string | null;
   monogram: string;
-  /** "SOLD" / "UNSOLD" / "RETAINED" / "ICON" — the stamp. */
+  /** "SOLD" / "UNSOLD" / "RETAINED" / "ICON" / "CAPTAIN" — the stamp. */
   stamp: string;
   /** Formatted money, or null when the outcome carries none. */
   priceLabel: string | null;
@@ -88,6 +93,7 @@ const STAMP: Record<PosterOutcome, string> = {
   unsold: "UNSOLD",
   retained: "RETAINED",
   icon: "ICON",
+  captain: "CAPTAIN",
 };
 
 /** Names wrap badly on a poster long before they are truncated in a list. */
@@ -136,7 +142,9 @@ export function buildPlayerPoster(input: PlayerPosterInput): PlayerPoster {
         ? `RETAINED BY ${clamp(input.teamName, 22).toUpperCase()}`
         : input.outcome === "icon"
           ? `ICON · ${clamp(input.teamName, 22).toUpperCase()}`
-          : `SOLD TO ${clamp(input.teamName, 22).toUpperCase()}`;
+          : input.outcome === "captain"
+            ? `CAPTAIN · ${clamp(input.teamName, 22).toUpperCase()}`
+            : `SOLD TO ${clamp(input.teamName, 22).toUpperCase()}`;
   return {
     name: clamp(input.playerName, 22),
     numberLabel: input.number === null || input.number.trim() === "" ? null : input.number.trim(),

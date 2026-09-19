@@ -34,8 +34,10 @@ import {
   unplacedValues,
   type UnplacedValue,
   type ValueMaps,
+  type Capability,
 } from "@desiauction/core";
 import {
+  people,
   playerProfiles,
   registrations,
   teams as teamsTable,
@@ -45,6 +47,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cache } from "react";
 
 import { auctionOf } from "@desiauction/auction";
@@ -94,7 +97,15 @@ import {
   setRegistrationMarks,
   transition,
   transitionBatch,
+  updateRegistrationDetails,
 } from "./registration-aggregate";
+import {
+  planRegistrationEdit,
+  type EditableField,
+  type RegistrationEditInput,
+} from "./registration-edit";
+import { playerDeskContext, type PlayerDeskContext } from "./player-desk";
+import type { ExportRows } from "../../lib/export-columns";
 import { marksFreezeWithRoster, squadMarksIn } from "./roster-lock";
 import { commitRegistrationImport, existingForImport } from "./registration-import";
 import {
@@ -115,6 +126,7 @@ import {
   photoTargetsOf,
   queryRegistrations,
   recordRegistrationExport,
+  registrationRowById,
   registrationStats,
   registrationsOf,
   submitRegistration,
@@ -773,7 +785,7 @@ export async function triageRegistrationAction(
   reason?: string,
   /** Organizer-only. Never reaches the player — invariant 6. */
   note?: string,
-): Promise<{ ok: boolean; error?: string; notified?: number; notifyFailed?: number }> {
+): Promise<{ ok: boolean; error?: string; notifying?: number }> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
@@ -804,8 +816,47 @@ export async function triageRegistrationAction(
           : "That action isn't available for this registration.",
     };
   }
-  const notice = await notifyAffected(gate, [registrationId], event);
-  return { ok: true, ...notice };
+  return { ok: true, notifying: notifyLater(gate, [registrationId], event) };
+}
+
+/**
+ * THE DECISION RETURNS BEFORE THE TEXT MESSAGES GO.
+ *
+ * The SMS loop used to run inside the request: one provider round trip, one
+ * consent read and one audit write per person, serially, before the organizer's
+ * button stopped spinning. Approving thirty players took as long as thirty
+ * texts, and a slow provider made the whole desk feel hung — the "sometimes
+ * saving takes forever" report. The transition has committed by this line, so
+ * delivery was never part of the decision; it now runs after the response.
+ *
+ * Honesty is kept where it can be read: every outcome (sent, failed,
+ * suppressed) is still written to the registration's timeline by
+ * `notifyDecision`, and the count returned here is how many people we are
+ * about to text, never a claim that they were reached.
+ */
+function notifyLater(
+  gate: { personId: string; competition: CompetitionSummary },
+  registrationIds: readonly string[],
+  event: RegistrationEvent,
+): number {
+  if (registrationIds.length === 0 || event.type === "submit") {
+    return 0;
+  }
+  after(async () => {
+    const notice = await notifyAffected(gate, registrationIds, event);
+    if ((notice.notifyFailed ?? 0) > 0) {
+      logger().warn(
+        {
+          competitionId: gate.competition.id,
+          failed: notice.notifyFailed,
+          sent: notice.notified,
+          event: event.type,
+        },
+        "registration decision notices partly failed",
+      );
+    }
+  });
+  return registrationIds.length;
 }
 
 /**
@@ -851,8 +902,8 @@ export async function bulkTriageAction(
   ok: boolean;
   applied?: number;
   skipped?: number;
-  notified?: number;
-  notifyFailed?: number;
+  /** How many people will be texted — see `notifyLater`. */
+  notifying?: number;
   error?: string;
 }> {
   const gate = await reviewGate(slug);
@@ -873,8 +924,12 @@ export async function bulkTriageAction(
       event,
     ),
   );
-  const notice = await notifyAffected(gate, result.applied, event);
-  return { ok: true, applied: result.applied.length, skipped: result.skipped.length, ...notice };
+  return {
+    ok: true,
+    applied: result.applied.length,
+    skipped: result.skipped.length,
+    notifying: notifyLater(gate, result.applied, event),
+  };
 }
 
 // --- Player-facing registration (any authenticated person) -------------------
@@ -1344,6 +1399,8 @@ export interface RegistrationDashboard {
    * Review-gated like the rows it annotates. Keyed by registration id.
    */
   categoryFlags?: Record<string, "category_mismatch">;
+  /** What the player sheet needs about the season — review-gated. */
+  desk?: PlayerDeskContext;
 }
 
 const VALID_STATUS = new Set<RegistrationStatus>([
@@ -1394,12 +1451,13 @@ export async function registrationDashboard(
         viewer: { canReview },
       };
     }
-    const [stats, page, teams, orphans, kit] = await Promise.all([
+    const [stats, page, teams, orphans, kit, desk] = await Promise.all([
       registrationStats(db, competition.id),
       queryRegistrations(db, competition.id, query),
       teamsOf(db, competition.id),
       orphanPreSigned(db, competition.id),
       kitSummary(db, competition.id),
+      playerDeskContext(db, session.personId, competition),
     ]);
     // PI-1: the organizer-channel category advisory, computed by THE evaluator
     // (never by a second SQL copy of its rules) over just this page's people.
@@ -1446,6 +1504,7 @@ export async function registrationDashboard(
       registrationOpen: competition.status === "registration_open",
       viewer: { canReview },
       categoryFlags,
+      desk,
     };
   });
 }
@@ -1570,96 +1629,295 @@ export async function addNoteAction(
   return result.ok ? { ok: true } : { ok: false, error: "Write a note first." };
 }
 
+/**
+ * ONE TRANSACTION PER SAVE.
+ *
+ * A mark used to cost three tenant transactions before it wrote anything — the
+ * capability read, then the auction-lock read, then the write — each its own
+ * BEGIN / set_config / COMMIT. The checks and the write now share one boundary,
+ * which is also the more correct shape: the lock cannot change between being
+ * read and being relied on.
+ */
+async function inSeasonAs<T>(
+  slug: string,
+  capability: Capability,
+  fn: (ctx: { db: Db; personId: string; competition: CompetitionSummary }) => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; reason: "not_found" | "forbidden" }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, reason: "not_found" };
+  }
+  try {
+    const value = await inCompetitionOrg(session.personId, competition, async (db) => {
+      await requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        capability,
+      );
+      return fn({ db, personId: session.personId, competition });
+    });
+    return { ok: true, value };
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, reason: "forbidden" };
+    }
+    throw error;
+  }
+}
+
+/** `auctionLocksRoster`, read inside a boundary the caller already holds. */
+async function rosterLockedIn(db: Db, competitionId: string): Promise<boolean> {
+  const auction = await auctionOf(db, competitionId);
+  return auction !== null && auction.status !== "scheduled";
+}
+
 export async function assignTeamAction(
   slug: string,
   registrationId: string,
   teamId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const session = await requireSession();
-  const competition = await resolveCompetitionScoped(session.personId, slug);
-  if (competition === null) {
-    return { ok: false, error: "Not available." };
-  }
-  try {
-    await inCompetitionOrg(session.personId, competition, (db) =>
-      requireCompetitionCapability(
-        db,
-        session.personId,
-        { orgId: competition.orgId, competitionId: competition.id },
-        "team.manage",
-      ),
-    );
-  } catch {
-    return { ok: false, error: "You can't assign teams here." };
-  }
-  if (await auctionLocksRoster(session.personId, competition)) {
-    return { ok: false, error: ROSTER_LOCKED };
-  }
-  await inCompetitionOrg(session.personId, competition, (db) =>
-    assignTeam(
+  const result = await inSeasonAs(slug, "team.manage", async ({ db, personId, competition }) => {
+    if (await rosterLockedIn(db, competition.id)) {
+      return "locked" as const;
+    }
+    await assignTeam(
       db,
       competition.orgId,
       competition.id,
       registrationId,
       teamId === "" ? null : teamId,
-      session.personId,
-    ),
-  );
-  return { ok: true };
+      personId,
+    );
+    return "done" as const;
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.reason === "forbidden" ? "You can't assign teams here." : "Not available.",
+    };
+  }
+  return result.value === "locked" ? { ok: false, error: ROSTER_LOCKED } : { ok: true };
 }
 
 /**
  * Set icon / retained / captain / team marks on a registration (organizer,
- * `team.manage`). Icon and retained players are both pre-signed to their team
- * and excluded from the auction pool — an Icon because the organizer named them
- * marquee, a retained player because they were kept from a prior season.
+ * `team.manage`). All three marks pre-sign a player to their team and take them
+ * out of the auction pool — an Icon because the organizer named them marquee,
+ * a Captain because the team picked its leader before the night, a retained
+ * player because they were kept from a prior season.
  */
 export async function markRegistrationAction(
   slug: string,
   registrationId: string,
   marks: { isIcon?: boolean; isRetained?: boolean; isCaptain?: boolean; teamId?: string | null },
 ): Promise<{ ok: boolean; error?: string }> {
-  const session = await requireSession();
-  const competition = await resolveCompetitionScoped(session.personId, slug);
-  if (competition === null) {
-    return { ok: false, error: "Not available." };
-  }
-  try {
-    await inCompetitionOrg(session.personId, competition, (db) =>
-      requireCompetitionCapability(
-        db,
-        session.personId,
-        { orgId: competition.orgId, competitionId: competition.id },
-        "team.manage",
-      ),
-    );
-  } catch {
-    return { ok: false, error: "You can't manage players here." };
-  }
-  // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
-  if (marksFreezeWithRoster(marks) && (await auctionLocksRoster(session.personId, competition))) {
-    return { ok: false, error: ROSTER_LOCKED };
-  }
-  const result = await inCompetitionOrg(session.personId, competition, (db) =>
-    setRegistrationMarks(
+  const result = await inSeasonAs(slug, "team.manage", async ({ db, personId, competition }) => {
+    // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
+    if (marksFreezeWithRoster(marks) && (await rosterLockedIn(db, competition.id))) {
+      return { ok: false as const, reason: "locked" as const };
+    }
+    return setRegistrationMarks(
       db,
       competition.orgId,
       competition.id,
       registrationId,
       marks,
-      session.personId,
-    ),
+      personId,
+    );
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.reason === "forbidden" ? "You can't manage players here." : "Not available.",
+    };
+  }
+  if (!result.value.ok) {
+    return {
+      ok: false,
+      error:
+        result.value.reason === "locked"
+          ? ROSTER_LOCKED
+          : "That registration is not in this season.",
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * ONE PLAYER, for a sheet opened somewhere the row is not already on the page —
+ * a team's roster. Review-gated like the dashboard that normally carries it.
+ */
+export async function registrationDetailAction(
+  slug: string,
+  registrationId: string,
+): Promise<
+  { ok: true; row: RegistrationRow; desk: PlayerDeskContext } | { ok: false; error: string }
+> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const found = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const [row, desk] = await Promise.all([
+      registrationRowById(db, gate.competition.id, registrationId),
+      playerDeskContext(db, gate.personId, gate.competition),
+    ]);
+    return row === null ? null : { row, desk };
+  });
+  return found === null
+    ? { ok: false, error: "That player is not in this season." }
+    : { ok: true, ...found };
+}
+
+export interface SquadCandidate {
+  id: string;
+  number: string;
+  name: string | null;
+  role: string | null;
+  teamId: string | null;
+  teamName: string | null;
+  isIcon: boolean;
+  isCaptain: boolean;
+  isRetained: boolean;
+}
+
+/**
+ * Every approved player, for the team page's "pick a captain / add an icon"
+ * search. Review-gated: these are applicants' names. Bounded like "select all
+ * matching" — a season has hundreds, not tens of thousands.
+ */
+export async function squadCandidatesAction(slug: string): Promise<SquadCandidate[]> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return [];
+  }
+  return inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const out: SquadCandidate[] = [];
+    for (let page = 1; out.length < SELECT_ALL_CAP; page += 1) {
+      const result = await queryRegistrations(db, gate.competition.id, {
+        status: "approved",
+        sort: "name",
+        page,
+        pageSize: 100,
+      });
+      out.push(
+        ...result.rows.map((row) => ({
+          id: row.id,
+          number: row.number,
+          name: row.name,
+          role: row.role,
+          teamId: row.teamId,
+          teamName: row.teamName,
+          isIcon: row.isIcon,
+          isCaptain: row.isCaptain,
+          isRetained: row.isRetained,
+        })),
+      );
+      if (page * result.pageSize >= result.total) {
+        break;
+      }
+    }
+    return out;
+  });
+}
+
+export type RegistrationEditResult =
+  | { ok: true; row: RegistrationRow }
+  | {
+      ok: false;
+      error: string;
+      fieldErrors?: Partial<Record<EditableField, string>>;
+    };
+
+/**
+ * Correct a registration in place — the player sheet's autosave.
+ *
+ * `registration.review`, the same gate as the rows themselves: this is the
+ * organizer fixing their own record (a jersey size, a typo in a typed name,
+ * who has paid), not a squad decision, which stays `team.manage`. Validation is
+ * `planRegistrationEdit`, the CSV parser's rules one field at a time. Returns
+ * the row as the dashboard reads it, so the sheet reconciles to the truth.
+ */
+export async function updateRegistrationDetailsAction(
+  slug: string,
+  registrationId: string,
+  input: RegistrationEditInput,
+): Promise<RegistrationEditResult> {
+  const result = await inSeasonAs(
+    slug,
+    "registration.review",
+    async ({ db, personId, competition }): Promise<RegistrationEditResult> => {
+      const [stored] = await db
+        .select({
+          enteredName: registrations.enteredName,
+          attributes: registrations.attributes,
+          personPhotoKey: people.photoUrl,
+          personPhotoConsentAt: people.photoConsentAt,
+          personPhotoConsentVia: people.photoConsentVia,
+        })
+        .from(registrations)
+        .innerJoin(people, eq(people.id, registrations.personId))
+        .where(
+          and(
+            eq(registrations.id, registrationId),
+            eq(registrations.competitionId, competition.id),
+          ),
+        )
+        .limit(1);
+      if (stored === undefined) {
+        return { ok: false, error: "That player is not in this season." };
+      }
+      const auction = await auctionOf(db, competition.id);
+      const plan = planRegistrationEdit(input, {
+        pack: sportPackFor(competition.sport),
+        bands: Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands),
+        rosterLocked: auction !== null && auction.status !== "scheduled",
+        storedAttributes: (stored.attributes ?? {}) as Record<string, unknown>,
+        now: new Date(),
+      });
+      if (!plan.ok) {
+        return {
+          ok: false,
+          error: Object.values(plan.fieldErrors)[0] ?? "Check the highlighted field.",
+          fieldErrors: plan.fieldErrors,
+        };
+      }
+      // The first typed name switches this row to the entry's own photo
+      // (`shownPhotoKey`), so the photo the club already sees moves with it —
+      // renaming a player must not make their picture disappear.
+      const carryPhoto =
+        plan.set.enteredName !== undefined && stored.enteredName === null
+          ? {
+              enteredPhotoKey: stored.personPhotoKey,
+              enteredPhotoConsentAt: stored.personPhotoConsentAt,
+              enteredPhotoConsentVia: stored.personPhotoConsentVia,
+            }
+          : {};
+      const written = await updateRegistrationDetails(
+        db,
+        competition.orgId,
+        competition.id,
+        registrationId,
+        { ...plan.set, ...carryPhoto },
+        plan.changed,
+        personId,
+      );
+      const row = written.ok ? await registrationRowById(db, competition.id, registrationId) : null;
+      return row === null
+        ? { ok: false, error: "That player is not in this season." }
+        : { ok: true, row };
+    },
   );
   if (!result.ok) {
     return {
       ok: false,
       error:
-        result.reason === "icon_and_captain"
-          ? "A player can't be both an Icon and a Captain. An Icon is pre-signed to their team and never goes to the auction; a Captain leads a squad that plays. Clear one mark before setting the other."
-          : "That registration is not in this season.",
+        result.reason === "forbidden" ? "You can't edit players in this season." : "Not available.",
     };
   }
-  return { ok: true };
+  return result.value;
 }
 
 /** Set (or clear) a team's coach (organizer, `team.manage`). */
@@ -2312,16 +2570,24 @@ export async function importCommitAction(
 export async function exportRegistrationsAction(
   slug: string,
   /**
-   * DA-34: optional squad filter. The Teams tab offered "Export" on a single
-   * team and merely NAVIGATED to /registrations with a filter in the URL — a
-   * per-team export did not exist anywhere in the product.
+   * What to write. DA-34: `teamId` narrows to one squad — the Teams tab offered
+   * "Export" on a single team and merely NAVIGATED to a filtered list, so a
+   * per-team export did not exist anywhere in the product. `columns` and
+   * `rows` are the export dialog's choice; omitted, the file is the one this
+   * button always wrote.
    */
-  teamId?: string,
+  request: {
+    teamId?: string;
+    columns?: string[];
+    rows?: ExportRows;
+    view?: DashboardParams;
+  } = {},
 ): Promise<{ ok: true; csv: string; filename: string } | { ok: false; error: string }> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
+  const { teamId } = request;
   const { csv, filename } = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
     const team =
       teamId === undefined
@@ -2330,20 +2596,41 @@ export async function exportRegistrationsAction(
     if (teamId !== undefined && team === undefined) {
       return { csv: null, filename: null };
     }
-    const body = await exportRegistrationsCsv(db, gate.competition.id, teamId);
-    const suffix = team === undefined ? "registrations" : `${slugifyName(team.name)}-squad`;
+    const view = request.view ?? {};
+    const body = await exportRegistrationsCsv(db, gate.competition.id, {
+      ...(teamId !== undefined ? { teamId } : {}),
+      ...(request.columns !== undefined ? { columns: request.columns } : {}),
+      ...(request.rows !== undefined ? { rows: request.rows } : {}),
+      ...(request.rows === "view"
+        ? {
+            view: {
+              ...(view.search !== undefined && view.search !== "" ? { search: view.search } : {}),
+              ...(view.status !== undefined && VALID_STATUS.has(view.status as RegistrationStatus)
+                ? { status: view.status as RegistrationStatus }
+                : {}),
+              ...(isFeeStatus(view.fee ?? "") ? { fee: view.fee as FeeStatus } : {}),
+              ...(view.teamId !== undefined && view.teamId !== "" ? { teamId: view.teamId } : {}),
+            },
+          }
+        : {}),
+    });
+    const suffix =
+      team !== undefined
+        ? `${slugifyName(team.name)}-squad`
+        : request.rows === "pool"
+          ? "auction-pool"
+          : "registrations";
     const name = `${gate.competition.slug}-${suffix}.csv`;
     // DA-35: the export read personal data and returned it with no record that
     // it had happened. The evidence is written before the file reaches the
     // caller, in the same tenant boundary that authorized the read — a failure
     // here fails the export rather than releasing an unrecorded copy.
     await recordRegistrationExport(db, gate.competition.orgId, gate.competition.id, gate.personId, {
-      // The header line is not a person; the row count is what left.
-      rowCount: Math.max(0, body.trim() === "" ? 0 : body.trim().split("\n").length - 1),
+      rowCount: body.rowCount,
       ...(teamId !== undefined ? { teamId } : {}),
       filename: name,
     });
-    return { csv: body, filename: name };
+    return { csv: body.csv, filename: name };
   });
   if (csv === null) {
     return { ok: false, error: "That team is not in this season." };

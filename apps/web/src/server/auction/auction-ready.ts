@@ -2,6 +2,7 @@ import { registrations, type Db } from "@desiauction/db";
 import { eq, sql } from "drizzle-orm";
 
 import { countNoun } from "../../lib/plural";
+import { isPreSigned } from "../../lib/pre-signed";
 import type { CompetitionSummary } from "../competition/competitions";
 import { queryRegistrations } from "../competition/registrations";
 import { scheduleSnapshot } from "../competition/schedule-snapshot";
@@ -90,8 +91,12 @@ export async function auctionReady(
       // It was unreachable in practice only because nothing could SET the flag.
       // Now that an organizer can, it would be a live defect rather than a
       // latent one.
+      //
+      // And then a THIRD mark: a captain picked before the night is pre-signed
+      // too. `isPreSigned` is the one predicate now, so the next mark cannot be
+      // read by some filters and not others.
       ...result.rows
-        .filter((row) => !row.isIcon && !row.isRetained)
+        .filter((row) => !isPreSigned(row))
         .map((row) => ({
           registrationId: row.id,
           personId: row.personId,

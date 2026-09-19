@@ -192,9 +192,13 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   const poolValue = page.getByTestId("stat-auction-pool").locator(".stat-value");
   const poolHint = page.getByTestId("stat-auction-pool").locator(".stat-hint");
   await expect(poolValue).toHaveText("8");
-  const retain = page.getByTestId(/^retain-toggle-/).first();
+  // The marks live in the player sheet's Squad tab now (it opens there for an
+  // approved player), one click each and undoable — no confirm dialog.
+  await page.getByTestId("reg-table").getByRole("button", { name: "Details" }).first().click();
+  await expect(page.getByTestId("player-sheet")).toBeVisible();
+  const retain = page.getByTestId(/^retain-toggle-/);
   await retain.click();
-  await page.getByTestId("confirm-retain").click();
+  await expect(retain).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("retained-flag").first()).toBeVisible();
   await expect(poolValue).toHaveText("7");
   // The hint has to name BOTH pre-signed marks or the subtraction printed
@@ -204,11 +208,11 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   // no auction and no squad — the warning that used to name icons only.
   await expect(page.getByTestId("orphan-pre-signed-warning")).toContainText("Retained");
   // Clearing it puts them back on the block, and needs no confirmation.
-  await page
-    .getByTestId(/^retain-toggle-/)
-    .first()
-    .click();
+  await retain.click();
+  await expect(retain).toHaveAttribute("aria-pressed", "false");
   await expect(poolValue).toHaveText("8");
+  await page.getByTestId("sheet-close").click();
+  await expect(page.getByTestId("player-sheet")).toHaveCount(0);
 
   // Filter to approved and confirm the table only shows approved rows.
   await page.getByLabel("Status").selectOption("approved");
@@ -233,9 +237,11 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await expect(kit).toContainText("L × 5");
   await expect(kit).toContainText("XL × 3");
 
-  // Export produces a CSV download.
-  const downloadPromise = page.waitForEvent("download");
+  // Export opens the column picker; its download button produces the CSV.
   await page.getByTestId("export-csv").click();
+  await expect(page.getByTestId("export-dialog")).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("export-download").click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/registrations\.csv$/);
 });

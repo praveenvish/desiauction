@@ -13,6 +13,7 @@ import {
 import { and, asc, desc, eq, inArray, isNotNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
+import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { systemDb } from "../db";
 
 /**
@@ -53,7 +54,7 @@ export interface CareerSeason {
   jerseyNumber: string | null;
   /** How the auction concluded for this person, if one did. */
   auction:
-    { kind: "icon" | "retained" } | { kind: "sold"; soldPrice: number } | { kind: "unsold" } | null;
+    { kind: PreSignedKind } | { kind: "sold"; soldPrice: number } | { kind: "unsold" } | null;
 }
 
 export interface PlayerCareer {
@@ -132,12 +133,13 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
     isCaptain: row.isCaptain,
     isViceCaptain: row.isViceCaptain,
     jerseyNumber: row.jerseyNumber,
-    auction: row.isIcon
-      ? { kind: "icon" }
-      : row.isRetained
-        ? { kind: "retained" }
-        : row.lotStatus === "sold" && row.soldPrice !== null
-          ? { kind: "sold", soldPrice: row.soldPrice }
+    // The sale first: a captain named after the night was bought, and that
+    // is the fact their career records. Otherwise the pre-signed word.
+    auction:
+      row.lotStatus === "sold" && row.soldPrice !== null
+        ? { kind: "sold", soldPrice: row.soldPrice }
+        : isPreSigned(row)
+          ? { kind: preSignedKind(row) ?? "icon" }
           : row.lotStatus === "unsold"
             ? { kind: "unsold" }
             : null,
