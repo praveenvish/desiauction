@@ -1,22 +1,50 @@
 "use client";
 
 import {
-  Badge,
   Button,
-  ButtonLink,
-  Card,
+  CardGrid,
   Dialog,
   Field,
-  Select,
-  useToast,
-  VisuallyHidden,
+  HeroBanner,
   IconArrowRight,
-  IconCheck,
+  IconBall,
+  IconBat,
+  IconCalendar,
+  IconCheckCircle,
+  IconClock,
+  IconCopy,
+  IconExternal,
+  IconEye,
+  IconEyeOff,
+  IconInfo,
+  IconLayers,
+  IconLock,
+  IconPin,
+  IconRefresh,
+  IconShieldCheck,
+  IconStar,
+  IconTile,
+  IconTrophy,
+  IconUser,
+  IconUsers,
+  IconWallet,
+  JourneyStepper,
+  Notice,
+  Pill,
+  SectionCard,
+  Select,
+  StatCard,
+  StatGrid,
+  VisuallyHidden,
+  buttonClassName,
+  useToast,
+  type JourneyStep,
+  type KitTone,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { roleLabeller } from "../../../lib/role-label";
 
@@ -30,24 +58,26 @@ import {
 } from "../../../server/competition/actions";
 import { formatDate } from "../../../lib/format-date";
 import { track } from "../../../lib/telemetry";
-import { CompetitionLogoUploader } from "./competition-logo-uploader";
+import { SeasonImageCard } from "./season-image-card";
 import { ShareRegistration } from "./registrations/share-registration";
 
 /**
- * The Season Workspace overview (PX design "Season Workspace").
+ * The Season Workspace overview (founder mockup 1, 2026-09-19).
  *
  * A dashboard, not a desk: everything here READS. The work — adding teams,
  * triaging registrations, running the auction — lives in the tabs above, which
  * are full workspaces of their own. The exceptions earn their place because
  * they are statements about the season as a whole rather than about any one
- * tab: advancing the lifecycle (hosted by the stepper, which IS the lifecycle),
- * editing the season's own identity, and publishing the public page — which now
- * has a block of its own rather than riding in the footer of a card about
- * something else.
+ * tab: advancing the lifecycle (the next-step banner under the journey, which
+ * IS the lifecycle), editing the season's own identity — its details, crest and
+ * cover photo — and publishing the public page.
+ *
+ * Top to bottom: the hero (cover photo, status, where and when), the six-step
+ * journey with the one next step under it, four figures, who is spending and
+ * what the pool holds, then the season's public face.
  */
 
-// The lifecycle rendered as the design's six-step rail (doc 44's one-gate-at-a-
-// time, drawn as a whole so an organizer can see what is behind and ahead).
+// The lifecycle's next gate (doc 44's one-gate-at-a-time).
 const NEXT_STEP: Record<string, { to: string; label: string } | null> = {
   draft: { to: "setup", label: "Begin setup" },
   setup: { to: "registration_open", label: "Open registration" },
@@ -57,6 +87,22 @@ const NEXT_STEP: Record<string, { to: string; label: string } | null> = {
   // "Reopen registration" here made the single forward-looking control on the
   // page point backwards for the whole second half of the season.
   registration_closed: null,
+};
+
+/** What the banner says while a competition gate is next. */
+const NEXT_COPY: Record<string, { title: string; body: string }> = {
+  draft: {
+    title: "Start setting this season up.",
+    body: "Setup is where the teams come in. Registration opens after that.",
+  },
+  setup: {
+    title: "Next: open registration.",
+    body: "Players sign up through the registration link; every entry lands in Registrations for you to approve.",
+  },
+  registration_open: {
+    title: "Registration is open.",
+    body: "Close it when the pool is ready — the auction is built from the approved players.",
+  },
 };
 
 /** What just happened, said out loud — every advance used to be silent (DA-16). */
@@ -72,40 +118,56 @@ const ADVANCE_ANNOUNCEMENT: Record<string, string> = {
  * `canSettle` is the gate on the last two rungs and it is not optional. The
  * settlement desk is `settlement.view`, which by design is NOT implied by
  * `org:owner` or by `competition.manage` — the capability partition keeps money
- * powers an explicit act of trust. Nothing here honoured that, so the organizer
- * who had just conducted the auction was offered "Open settlement" as the
- * page's primary action and taken to a bare 404. Where the door is locked the
- * ladder now says who holds the key instead of pointing at it.
+ * powers an explicit act of trust. Where the door is locked the banner says who
+ * holds the key instead of pointing at it.
  */
 function nextDestination(
   slug: string,
   auctionStatus: string | null,
   canSettle: boolean,
-): { href: string; label: string } | { locked: true } {
+): { href: string; label: string; title: string } | { locked: true } {
   if (auctionStatus === null) {
-    return { href: `/seasons/${slug}/auction`, label: "Create the auction" };
+    return {
+      href: `/seasons/${slug}/auction`,
+      label: "Create the auction",
+      title: "Registration is closed. The auction is next.",
+    };
   }
   if (auctionStatus === "scheduled") {
-    return { href: `/seasons/${slug}/auction`, label: "Open the auction" };
+    return {
+      href: `/seasons/${slug}/auction`,
+      label: "Open the auction",
+      title: "The auction is set up. Open it when the room is ready.",
+    };
   }
   if (auctionStatus === "live" || auctionStatus === "paused") {
-    return { href: `/seasons/${slug}/auction/cockpit`, label: "Enter the auction room" };
+    return {
+      href: `/seasons/${slug}/auction/cockpit`,
+      label: "Enter the auction room",
+      title:
+        auctionStatus === "live" ? "The auction is live." : "The auction is paused mid-session.",
+    };
   }
   if (!canSettle) {
     return { locked: true };
   }
   if (auctionStatus === "completed") {
-    return { href: `/seasons/${slug}/money`, label: "Open settlement" };
+    return {
+      href: `/seasons/${slug}/money`,
+      label: "Open settlement",
+      title: "The auction is done. Settle the money next.",
+    };
   }
-  return { href: `/seasons/${slug}/money`, label: "Review settlement" };
+  return {
+    href: `/seasons/${slug}/money`,
+    label: "Review settlement",
+    title: "The season's books are being settled.",
+  };
 }
 
-// Role names come from core's sport pack — one prose name per role, shared by
-// every surface that shows one (Phase 0; the map used to live in four places).
-
 /**
- * Money the way the tiles show it: crores and lakhs, because a purse reads as
- * "₹6.63 Cr" to everyone who runs one of these. Exact rupees stay on the rows.
+ * Money the way the figures show it: crores and lakhs, because a purse reads
+ * as "₹6.63 Cr" to everyone who runs one of these. Exact rupees stay on rows.
  */
 function compactINR(paise: number): string {
   const rupees = paise / 100;
@@ -126,19 +188,9 @@ const STEP_LABELS = ["Setup", "Teams", "Registration", "Auction", "Fixtures", "S
 
 /**
  * The six gates, every one of them derived from data this season actually
- * holds (DA-09).
- *
- * Two of them used to be undeliverable. Rung 5 was the literal `false`, so
- * Fixtures could never tick under any data at all. Rung 6 asked for an auction
- * status of `reconciled` — a value no auction in the database has ever held and
- * no code path can produce, because the auction aggregate's command type
- * structurally excludes the `reconcile` transition. Adding that transition is
- * auction-engine work; deriving the truth is not. Fixtures now reads the
- * season's fixture count, and Settlement reads the settlement case's own
- * discharge — the same fold the money desk renders.
- *
- * The order is the lifecycle's, not the tab strip's: you build the franchises,
- * take entries, hold the auction, schedule the matches, settle the money.
+ * holds (DA-09): Fixtures reads the season's fixture count, Settlement reads
+ * the settlement case's own discharge — the same fold the money desk renders.
+ * The order is the lifecycle's, not the tab strip's.
  */
 function clearedRungs(view: SeasonOverviewView): boolean[] {
   const status = view.competition.status;
@@ -152,31 +204,45 @@ function clearedRungs(view: SeasonOverviewView): boolean[] {
   ];
 }
 
-// The console's one colour grammar (see STATUS_TONE in tournaments/season-card).
-const STATUS_TONE = {
-  draft: "neutral",
-  setup: "neutral",
-  registration_open: "info",
-  registration_closed: "warning",
-} as const;
-
-/** Where and when, at last: the hero never showed the season's own dates. */
-function heroMeta(view: SeasonOverviewView): string[] {
-  const { startsOn, endsOn, location } = view.competition;
-  const when =
-    startsOn !== null && endsOn !== null
-      ? `${formatDate(startsOn)} – ${formatDate(endsOn)}`
-      : startsOn !== null
-        ? `From ${formatDate(startsOn)}`
-        : endsOn !== null
-          ? `Until ${formatDate(endsOn)}`
-          : "Dates not set";
-  return [when, location, view.orgName].filter(
-    (part): part is string => part !== null && part !== "",
-  );
+/** Where each rung's work happens — linked only for someone who may go there. */
+function stepHref(index: number, slug: string, view: SeasonOverviewView): string | undefined {
+  const base = `/seasons/${slug}`;
+  if (index === 5) {
+    return view.viewer.canSettle ? `${base}/money` : undefined;
+  }
+  if (!view.viewer.canManage) {
+    return undefined;
+  }
+  return [
+    undefined,
+    `${base}/teams`,
+    `${base}/registrations`,
+    `${base}/auction`,
+    `${base}/fixtures`,
+  ][index];
 }
 
-/** The hero's secondary action, following the state instead of ignoring it. */
+// The top bar's grammar (product-shell SEASON_STATUS), so the two pills agree.
+const STATUS_PILL: Record<string, { tone: KitTone; icon: ReactNode }> = {
+  draft: { tone: "neutral", icon: <IconCalendar /> },
+  setup: { tone: "neutral", icon: <IconCalendar /> },
+  registration_open: { tone: "green", icon: <IconCheckCircle /> },
+  registration_closed: { tone: "amber", icon: <IconLock /> },
+};
+
+/** When: the one fact a season is most often looked up for. */
+function seasonDates(view: SeasonOverviewView): string {
+  const { startsOn, endsOn } = view.competition;
+  return startsOn !== null && endsOn !== null
+    ? `${formatDate(startsOn)} – ${formatDate(endsOn)}`
+    : startsOn !== null
+      ? `From ${formatDate(startsOn)}`
+      : endsOn !== null
+        ? `Until ${formatDate(endsOn)}`
+        : "Dates not set";
+}
+
+/** The hero's second action, following the state instead of ignoring it. */
 function secondaryAction(
   view: SeasonOverviewView,
   slug: string,
@@ -217,11 +283,47 @@ function missingForRegistration(competition: SeasonOverviewView["competition"]):
   return missing;
 }
 
-export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: string }) {
+/**
+ * A role's mark in the pool card: the bat and the ball for cricket's roles,
+ * and a plain person for every other sport's — a football pool drawn with
+ * cricket kit would be the multi-sport defect again, in pictures.
+ */
+const ROLE_MARK: Record<string, { icon: ReactNode; tone: KitTone }> = {
+  batter: { icon: <IconBat />, tone: "amber" },
+  bowler: { icon: <IconBall />, tone: "red" },
+  all_rounder: { icon: <IconStar />, tone: "purple" },
+  wicket_keeper: { icon: <IconShieldCheck />, tone: "blue" },
+};
+const OTHER_ROLE_MARK = { icon: <IconUser />, tone: "neutral" as KitTone };
+
+function percent(part: number, whole: number): number {
+  return whole > 0 ? Math.round((part / whole) * 100) : 0;
+}
+
+/** A share as words: a real but tiny spend reads "<1%", never a false "0%". */
+function shareLabel(part: number, pct: number): string {
+  return part > 0 && pct === 0 ? "<1%" : `${String(pct)}%`;
+}
+
+/** The first letter a team is known by, for its colour tile. */
+function teamInitial(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || "•";
+}
+
+export function OverviewPanel({
+  view,
+  slug,
+  pass,
+}: {
+  view: SeasonOverviewView;
+  slug: string;
+  /** The season pass card, laid into the page's last row. */
+  pass?: ReactNode;
+}) {
   const router = useRouter();
   const toast = useToast();
-  // The season's own roles: the pool breakdown named them through `roleLabel`,
-  // which asks cricket, so a football season's pool read in lower case.
+  // The season's own roles: named through the season's sport pack, so a
+  // football season's pool does not read in cricket's words.
   const labelOf = useMemo(
     () => roleLabeller(roleOptions(view.competition.sport)),
     [view.competition.sport],
@@ -230,19 +332,18 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  // DA-16: every action dropped focus to <body>. The control that started the
-  // work takes it back when the work is done — and it can only take it back
-  // once the button is no longer `disabled` by its own loading state, which is
-  // why this is an effect and not a call at the end of the handler. Which
-  // control to refocus is a ref, not state: it is a note from the handler to
-  // the effect, and rendering again just to clear it did nothing for anyone.
+  // DA-16: the control that started the work takes focus back when the work is
+  // done — once it is no longer `disabled` by its own loading state, which is
+  // why this is an effect and not a call at the end of the handler.
   const advanceRef = useRef<HTMLButtonElement>(null);
   const publishRef = useRef<HTMLButtonElement>(null);
   const pendingFocusRef = useRef<"advance" | "publish" | null>(null);
+  const journeyRef = useRef<HTMLDivElement>(null);
 
   const status = view.competition.status;
   const step = NEXT_STEP[status] ?? null;
   const onward = nextDestination(slug, view.auctionStatus, view.viewer.canSettle);
+  const locked = "locked" in onward;
   const cleared = clearedRungs(view);
   const activeIndex = cleared.indexOf(false);
   const auctionDone = cleared[3] === true;
@@ -252,6 +353,16 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   const missing = missingForRegistration(view.competition);
   const secondary = secondaryAction(view, slug, finished);
   const canPublish = view.publishBlockers.length === 0;
+  const isPublic = view.competition.visibility === "public";
+  const previewable = isPublic || status === "registration_open";
+  // ONE gold action per screen: the next step when there is one; otherwise the
+  // public page's own (the mockup's "View public page"), or "Run it again" on a
+  // finished season.
+  const nextIsPrimary =
+    view.viewer.canManage &&
+    !finished &&
+    (step !== null || (status === "registration_closed" && !locked));
+  const publicIsPrimary = !nextIsPrimary && !finished;
 
   useEffect(() => {
     const pendingFocus = pendingFocusRef.current;
@@ -261,7 +372,19 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
     (pendingFocus === "advance" ? advanceRef.current : publishRef.current)?.focus();
     pendingFocusRef.current = null;
   }, [busy, status, view.competition.visibility]);
-  const previewable = view.competition.visibility === "public" || status === "registration_open";
+
+  // On a phone the journey scrolls sideways and opened on "Setup · Teams" —
+  // the two steps longest behind you. Bring the step you are on into view.
+  useEffect(() => {
+    const rail = journeyRef.current?.querySelector("ol");
+    const here = rail?.querySelector('[aria-current="step"]') ?? rail?.lastElementChild;
+    if (rail === null || rail === undefined || !(here instanceof HTMLElement)) {
+      return;
+    }
+    if (rail.scrollWidth > rail.clientWidth) {
+      rail.scrollLeft += here.getBoundingClientRect().left - rail.getBoundingClientRect().left - 8;
+    }
+  }, [activeIndex]);
 
   const advance = async () => {
     if (step === null) {
@@ -289,8 +412,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   };
 
   // Retention ("run it again"): clone this season into a fresh draft and drop
-  // the organizer into next season's setup. Season-level, so it belongs on the
-  // lifecycle row rather than in any one tab.
+  // the organizer into next season's setup.
   const runItAgain = async () => {
     setBusy(true);
     const result = await cloneCompetitionAction(slug);
@@ -321,144 +443,252 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
     }
   };
 
-  return (
-    <>
-      <header className="season-hero">
-        <div className="season-hero-main">
-          <div className="season-hero-title">
-            <Badge
-              tone={finished ? "success" : STATUS_TONE[status]}
-              data-testid="competition-status"
-            >
-              {finished ? "completed" : status.replace(/_/g, " ")}
-            </Badge>
-            {view.auctionLive ? <span className="season-live-pill">AUCTION LIVE</span> : null}
-          </div>
-          {/* The dates existed on the row and were never rendered anywhere in
-              the workspace — the one fact a season is most often looked up for. */}
-          <p className="season-hero-meta" data-testid="season-meta">
-            {heroMeta(view).join(" · ")}
-          </p>
-        </div>
-        <div className="season-hero-actions">
-          {view.viewer.canManage ? (
-            <Button
-              variant="ghost"
-              data-testid="open-season-settings"
-              onClick={() => {
-                setSettingsOpen(true);
-              }}
-            >
-              Season details
-            </Button>
-          ) : null}
-          {/* The secondary action used to be "Fixtures" in every state — the
-              least useful destination for a draft with no teams. */}
-          <ButtonLink href={secondary.href} variant="secondary" data-testid="season-secondary">
-            {secondary.label}
-          </ButtonLink>
-          {view.auctionLive ? (
-            <ButtonLink href={`/seasons/${slug}/auction/live`}>
-              Go to live auction
-              <IconArrowRight size={16} className="icon-trail" />
-            </ButtonLink>
-          ) : null}
-        </div>
-      </header>
+  const copyPublicLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/c/${slug}`);
+      toast({ title: "Public page link copied", tone: "success" });
+    } catch {
+      toast({ title: "Couldn't copy — select the address and copy it.", tone: "danger" });
+    }
+  };
 
-      {finished ? (
-        <Retrospective view={view} slug={slug} busy={busy} onRunItAgain={runItAgain} />
-      ) : (
-        <Card className="season-stepper-card" data-testid="lifecycle-panel">
-          <p className="season-stepper-summary" data-testid="lifecycle-summary">
-            {activeIndex === -1
-              ? "All six steps complete"
-              : `Step ${String(activeIndex + 1)} of 6 · ${STEP_LABELS[activeIndex] ?? ""}`}
-          </p>
-          <ol className="season-stepper" aria-label="Season progress">
-            {STEP_LABELS.map((label, index) => {
-              const state =
-                cleared[index] === true ? "done" : index === activeIndex ? "now" : "next";
-              return (
-                <li
-                  key={label}
-                  className="season-step"
-                  data-state={state}
-                  {...(state === "now" ? { "aria-current": "step" as const } : {})}
-                >
-                  <span className="season-step-mark" aria-hidden>
-                    {state === "done" ? <IconCheck size={14} /> : String(index + 1)}
-                  </span>
-                  <span className="season-step-label">{label}</span>
-                  {/* The only carrier of state used to be aria-hidden, so a
-                      screen reader heard six bare nouns and no progress. */}
-                  <VisuallyHidden>
-                    {state === "done" ? " — done" : state === "now" ? " — in progress" : " — to do"}
-                  </VisuallyHidden>
-                </li>
-              );
-            })}
-          </ol>
-          <div className="season-stepper-actions">
-            <Link
-              href={`/seasons/${slug}/readiness`}
-              className="season-inline-link"
-              data-testid="open-readiness"
-            >
-              Review readiness
-            </Link>
-            {view.viewer.canManage ? (
-              <Button
-                variant="ghost"
-                size="touch"
-                loading={busy}
-                data-testid="run-it-again"
-                onClick={() => void runItAgain()}
-              >
-                Run it again
-              </Button>
-            ) : null}
-            {view.viewer.canManage && step !== null ? (
+  const statusPill = finished
+    ? { tone: "green" as KitTone, icon: <IconTrophy /> }
+    : (STATUS_PILL[status] ?? { tone: "neutral" as KitTone, icon: <IconCalendar /> });
+
+  const journey: JourneyStep[] = STEP_LABELS.map((label, index) => {
+    const state = cleared[index] === true ? "done" : index === activeIndex ? "current" : "upcoming";
+    const href = stepHref(index, slug, view);
+    return {
+      key: label,
+      // The mark is decorative, so the state is said in words as well.
+      label: (
+        <>
+          {label}
+          <VisuallyHidden>
+            {state === "done" ? " — done" : state === "current" ? " — in progress" : " — to do"}
+          </VisuallyHidden>
+        </>
+      ),
+      state,
+      ...(href !== undefined ? { href } : {}),
+    };
+  });
+
+  const runAgainButton = (primary: boolean) =>
+    view.viewer.canManage ? (
+      <Button
+        variant={primary ? "primary" : "secondary"}
+        loading={busy}
+        data-testid="run-it-again"
+        onClick={() => void runItAgain()}
+      >
+        <IconRefresh size={16} />
+        Run it again
+      </Button>
+    ) : null;
+
+  const readinessLink =
+    view.viewer.canManage && (view.auctionStatus === null || view.auctionStatus === "scheduled") ? (
+      <Link
+        href={`/seasons/${slug}/readiness`}
+        className={buttonClassName({ variant: "secondary" })}
+        data-testid="open-readiness"
+      >
+        Review readiness
+      </Link>
+    ) : null;
+
+  let nextNotice: ReactNode = null;
+  if (view.viewer.canManage && !finished) {
+    if (step !== null) {
+      const copy = NEXT_COPY[status];
+      nextNotice = (
+        <Notice
+          tone="info"
+          icon={<IconInfo size={20} />}
+          title={
+            status === "registration_open" && view.pendingPlayers > 0
+              ? `Registration is open — ${String(view.pendingPlayers)} waiting for your review.`
+              : copy?.title
+          }
+          action={
+            <>
+              {readinessLink}
               <Button
                 ref={advanceRef}
-                size="touch"
                 onClick={() => void advance()}
                 loading={busy}
                 data-testid="advance-status"
               >
                 {step.label}
+                <IconArrowRight size={16} />
               </Button>
-            ) : view.viewer.canManage &&
-              status === "registration_closed" &&
-              !("locked" in onward) ? (
-              <Button
-                size="touch"
-                onClick={() => {
-                  router.push(onward.href);
-                }}
+            </>
+          }
+          testId="next-step"
+        >
+          {copy?.body}
+        </Notice>
+      );
+    } else if (status === "registration_closed" && !locked) {
+      nextNotice = (
+        <Notice
+          tone="info"
+          icon={<IconInfo size={20} />}
+          title={onward.title}
+          action={
+            <>
+              {readinessLink}
+              {runAgainButton(false)}
+              <Link
+                href={onward.href}
+                className={buttonClassName({ variant: "primary" })}
                 data-testid="advance-status"
               >
                 {onward.label}
-              </Button>
-            ) : null}
-            {view.viewer.canManage && status === "registration_closed" && "locked" in onward ? (
-              <p className="season-guard" data-testid="settlement-locked">
-                <span>
-                  The auction is done. Settling it needs money authority for{" "}
-                  {view.orgName === "" ? "this club" : view.orgName} — a separate grant from running
-                  the season. Ask an owner of the club to give you one under Money &amp; roles.
-                </span>
-              </p>
-            ) : null}
-          </div>
-          {blocked && missing.length > 0 ? (
-            <p className="season-guard" role="alert" data-testid="advance-blocked">
-              <span>
-                This season still needs {missing.join(", ").replace(/, ([^,]*)$/, " and $1")} before
-                registration can open.
-              </span>
+                <IconArrowRight size={16} />
+              </Link>
+            </>
+          }
+          testId="next-step"
+        />
+      );
+    } else if (status === "registration_closed" && locked) {
+      nextNotice = (
+        <Notice
+          tone="warning"
+          icon={<IconInfo size={20} />}
+          title={`The auction is done. Settling it needs money authority for ${
+            view.orgName === "" ? "this club" : view.orgName
+          } — a separate grant from running the season.`}
+          action={runAgainButton(false)}
+          testId="settlement-locked"
+        >
+          Ask an owner of the club to give you one under Money &amp; roles.
+        </Notice>
+      );
+    }
+  }
+
+  // The figures. Before an auction exists there is no purse and there are no
+  // lots — two cards of zeroes about a thing that has not been created — so the
+  // review queue takes their place.
+  const approvedHint =
+    view.pendingPlayers > 0 && view.auctionStatus !== null
+      ? `${String(view.pendingPlayers)} awaiting review`
+      : undefined;
+  const lotsPct = percent(view.lotsSold, view.lotsTotal);
+
+  return (
+    <>
+      <div className="ov-hero">
+        <HeroBanner
+          image={view.coverUrl}
+          headingLevel={1}
+          testId="season-hero"
+          eyebrow={
+            <span className="ov-hero-pills">
+              <Pill tone={statusPill.tone} icon={statusPill.icon} testId="competition-status">
+                {finished ? "completed" : status.replace(/_/g, " ")}
+              </Pill>
+              {view.auctionLive ? (
+                <Pill tone="red" dot>
+                  Auction live
+                </Pill>
+              ) : null}
+            </span>
+          }
+          // The season's name is the page's one <h1>: the shell's page head
+          // stands down on this route (page.tsx) and the hero carries it.
+          title={<span data-testid="competition-name">{view.competition.name}</span>}
+          meta={[
+            <span key="when" className="ov-hero-fact" data-testid="season-meta">
+              <IconCalendar />
+              {seasonDates(view)}
+            </span>,
+            ...(view.competition.location !== null && view.competition.location !== ""
+              ? [
+                  <span key="where" className="ov-hero-fact">
+                    <IconPin />
+                    {view.competition.location}
+                  </span>,
+                ]
+              : []),
+            ...(view.orgName !== ""
+              ? [
+                  <Link
+                    key="club"
+                    href={`/org/${view.orgSlug}`}
+                    className="ov-hero-fact ov-hero-club"
+                  >
+                    <IconUsers />
+                    {view.orgName}
+                  </Link>,
+                ]
+              : []),
+          ]}
+          actions={
+            <>
+              {view.viewer.canManage ? (
+                <Button
+                  variant="secondary"
+                  className="ov-hero-btn"
+                  data-tone="glass"
+                  data-testid="open-season-settings"
+                  onClick={() => {
+                    setSettingsOpen(true);
+                  }}
+                >
+                  Season details
+                </Button>
+              ) : null}
+              <Link
+                href={secondary.href}
+                className={buttonClassName({ variant: "secondary" }, "ov-hero-btn")}
+                data-tone="solid"
+                data-testid="season-secondary"
+              >
+                {secondary.label}
+              </Link>
+              {view.auctionLive ? (
+                <Link
+                  href={`/seasons/${slug}/auction/live`}
+                  className={buttonClassName({ variant: "secondary" }, "ov-hero-btn")}
+                  data-tone="solid"
+                >
+                  Go to live auction
+                  <IconArrowRight size={16} />
+                </Link>
+              ) : null}
+            </>
+          }
+        />
+      </div>
+
+      <div className="ov-journey" data-testid="lifecycle-panel" ref={journeyRef}>
+        <VisuallyHidden>
+          <p data-testid="lifecycle-summary">
+            {activeIndex === -1
+              ? "All six steps complete"
+              : `Step ${String(activeIndex + 1)} of 6 · ${STEP_LABELS[activeIndex] ?? ""}`}
+          </p>
+        </VisuallyHidden>
+        <JourneyStepper steps={journey} linkComponent={Link} />
+        {finished ? (
+          <Retrospective view={view} slug={slug} runAgain={runAgainButton(true)} />
+        ) : (
+          nextNotice
+        )}
+        {blocked && missing.length > 0 ? (
+          <Notice
+            tone="danger"
+            icon={<IconInfo size={20} />}
+            title={`This season still needs ${missing
+              .join(", ")
+              .replace(/, ([^,]*)$/, " and $1")} before registration can open.`}
+            action={
               <Button
-                size="sm"
                 variant="secondary"
                 data-testid="open-season-settings-guard"
                 onClick={() => {
@@ -467,270 +697,355 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
               >
                 {missing.includes("dates") ? "Add dates" : "Edit season details"}
               </Button>
-            </p>
-          ) : null}
-        </Card>
-      )}
-
-      <div className="season-tiles">
-        <div className="season-tile">
-          <span className="season-tile-value">{view.approvedPlayers}</span>
-          <span className="season-tile-label">Approved players</span>
-        </div>
-        {view.pendingPlayers > 0 ? (
-          <Link
-            className="season-tile season-tile-link"
-            href={`/seasons/${slug}/registrations`}
-            data-testid="pending-tile"
-          >
-            <span className="season-tile-value season-tile-warn">{view.pendingPlayers}</span>
-            <span className="season-tile-label">
-              Awaiting your review
-              <IconArrowRight size={16} className="icon-trail" />
-            </span>
-          </Link>
-        ) : null}
-        {/* A finished season's summary above already states teams and lots;
-            the tiles saying them again read as a second, disagreeing report. */}
-        {!finished ? (
-          <div className="season-tile">
-            <span className="season-tile-value">{view.teamCount}</span>
-            <span className="season-tile-label">Teams</span>
-          </div>
-        ) : null}
-        {/* Before an auction exists there is no purse and there are no lots —
-            two tiles reporting zeroes about a thing that has not been created. */}
-        {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
-          <div className="season-tile">
-            <span className="season-tile-value">{compactINR(view.purseCommitted)}</span>
-            {/* The percentage came from a purse nobody set: DEFAULT_AUCTION_CONFIG's
-                ₹2 Cr per team, so a real ₹1 L read "<1%" of a denominator no
-                organizer ever chose. A figure whose scale is invented is worse
-                than no figure. */}
-            <span className="season-tile-label">Purse committed</span>
-          </div>
-        ) : null}
-        {view.auctionStatus !== null && !finished ? (
-          <div className="season-tile">
-            <span className="season-tile-value season-tile-accent">
-              {view.lotsSold}
-              <span className="season-tile-of">/{view.lotsTotal}</span>
-            </span>
-            <span className="season-tile-label">Lots sold</span>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="season-cards">
-        <Card data-testid="team-spend-card">
-          <div className="season-card-head">
-            <h2>{view.lotsSold > 0 && view.viewer.canSeeMoney ? "Top teams by spend" : "Teams"}</h2>
-            <Link className="season-inline-link" href={`/seasons/${slug}/teams`}>
-              All teams
-              <IconArrowRight size={16} className="icon-trail" />
-            </Link>
-          </div>
-          {view.topTeams.length === 0 ? (
-            <div className="season-empty">
-              <p className="competitions-hint">
-                No teams yet. The auction issues one paddle per team, so this is the first thing to
-                build.
-              </p>
-              {view.viewer.canManage ? (
-                <ButtonLink href={`/seasons/${slug}/teams`} data-testid="empty-add-teams">
-                  Add teams
-                </ButtonLink>
-              ) : null}
-            </div>
-          ) : (
-            <ul className="season-spend-list">
-              {view.topTeams.slice(0, 5).map((team) => (
-                <li key={team.teamId} className="season-spend-row">
-                  <span className="season-spend-top">
-                    <span
-                      className="season-spend-dot"
-                      style={team.color !== null ? { background: team.color } : undefined}
-                      aria-hidden
-                    />
-                    <span className="season-spend-name">{team.name}</span>
-                    {team.squadMax !== undefined && team.squadMax !== null ? (
-                      <span className="season-spend-squad">
-                        {team.squad}/{team.squadMax}
-                      </span>
-                    ) : null}
-                    {/* Before a hammer has fallen every team has spent ₹0, and
-                        a column of "₹0" is furniture, not a reading. */}
-                    {team.spend !== undefined && view.lotsSold > 0 ? (
-                      <span className="season-spend-amount">{exactINR(team.spend)}</span>
-                    ) : null}
-                  </span>
-                  {/* A bar of zero length is not a reading, it is furniture:
-                      three teams at ₹0 drew three empty tracks. */}
-                  {team.spend !== undefined && team.spend > 0 ? (
-                    <SpendBar spend={team.spend} max={view.topTeams[0]?.spend ?? 0} />
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card data-testid="pool-card">
-          <div className="season-card-head">
-            <h2>Pool by role</h2>
-          </div>
-          {view.poolByRole.length === 0 ? (
-            <div className="season-empty">
-              <p className="competitions-hint">
-                No approved players yet.{" "}
-                {status === "registration_open"
-                  ? "Share the registration link — every entry lands in the Registrations tab for you to approve."
-                  : "Players enter through the registration link once you open registration."}
-              </p>
-              {/* This branch only renders while registration is open. */}
-              {view.viewer.canReview && status === "registration_open" ? (
-                <ShareRegistration slug={slug} open />
-              ) : null}
-              {view.viewer.canReview && view.pendingPlayers > 0 ? (
-                <ButtonLink
-                  href={`/seasons/${slug}/registrations`}
-                  data-testid="empty-review-registrations"
-                >
-                  Review {view.pendingPlayers} waiting
-                </ButtonLink>
-              ) : null}
-            </div>
-          ) : (
-            <ul className="season-pool-list">
-              {view.poolByRole.map((entry) => (
-                <li key={entry.role} className="season-pool-row">
-                  <span className="season-pool-top">
-                    <span className="season-pool-name">{labelOf(entry.role)}</span>
-                    <span className="season-pool-count">{entry.count}</span>
-                  </span>
-                  <span className="season-bar" aria-hidden>
-                    <span
-                      className="season-bar-fill season-bar-accent"
-                      style={{
-                        width: `${String(Math.round((entry.count / (view.poolByRole[0]?.count ?? 1)) * 100))}%`,
-                      }}
-                    />
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      {/* The season's own mark. `competitions.logo_url` has been readable since
-          the media platform shipped — the public directory renders it — but no
-          screen in the product could ever write it, so every tournament fell
-          back to a text monogram. It sits directly above the publish block
-          because this is the mark that block puts on the internet, and it is
-          one of the identity statements that earn a place on a dashboard: it
-          describes the season as a whole rather than any one tab. */}
-      {view.viewer.canManage ? (
-        <Card className="season-branding-card" data-testid="season-branding">
-          <div className="season-card-head">
-            <h2>Tournament logo</h2>
-          </div>
-          <p className="competitions-hint">
-            Shown beside this season on the public directory and on its public page. Without one,
-            players see the season&rsquo;s initials.
-          </p>
-          <CompetitionLogoUploader
-            slug={slug}
-            competitionId={view.competition.id}
-            competitionName={view.competition.name}
-            {...(view.logoUrl !== null ? { currentUrl: view.logoUrl } : {})}
+            }
+            testId="advance-blocked"
           />
-        </Card>
-      ) : null}
+        ) : null}
+      </div>
 
-      {/* DA-12: publishing gets its own block. It used to be a ghost button in
-          the footer of the pool card, one click from the public internet. */}
-      <Card className="season-publish-card" data-testid="visibility-row">
-        <div className="season-card-head">
-          <h2>Public page</h2>
-          {view.platformHold !== null ? (
-            <Badge tone="danger" data-testid="platform-hold-badge">
-              Taken down
-            </Badge>
-          ) : (
-            <Badge tone={view.competition.visibility === "public" ? "success" : "neutral"}>
-              {view.competition.visibility === "public" ? "LIVE" : "Not listed"}
-            </Badge>
-          )}
-        </div>
-        <p className="competitions-hint">
-          {view.platformHold !== null
-            ? "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
-            : view.competition.visibility === "public"
-              ? "This season is listed publicly at /c/" +
-                slug +
-                " — anyone can see it and share it."
-              : "Publishing puts this season on the public directory, where players and spectators can find it."}
-        </p>
-        {view.viewer.canManage && !canPublish && view.competition.visibility !== "public" ? (
-          <ul className="season-blockers" data-testid="publish-blockers">
-            {view.publishBlockers.map((blocker) => (
-              <li key={blocker.code} className="season-blocker">
-                <span>{blocker.message}</span>
-                {blocker.code === "dates" || blocker.code === "location" ? (
+      <StatGrid testId="season-figures">
+        <StatCard
+          icon={<IconUser />}
+          tone="green"
+          value={view.approvedPlayers}
+          label="Approved players"
+          {...(approvedHint !== undefined
+            ? { hint: approvedHint, href: `/seasons/${slug}/registrations` }
+            : {})}
+          linkComponent={Link}
+          testId="overview-approved"
+        />
+        {view.auctionStatus === null && view.pendingPlayers > 0 ? (
+          <StatCard
+            icon={<IconClock />}
+            tone="amber"
+            value={view.pendingPlayers}
+            label="Awaiting your review"
+            href={`/seasons/${slug}/registrations`}
+            linkComponent={Link}
+            testId="pending-tile"
+          />
+        ) : null}
+        <StatCard
+          icon={<IconUsers />}
+          tone="red"
+          value={view.teamCount}
+          label={view.teamCount === 1 ? "Team" : "Teams"}
+          testId="overview-teams"
+        />
+        {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
+          <StatCard
+            icon={<IconWallet />}
+            tone="amber"
+            value={compactINR(view.purseCommitted)}
+            label="Purse committed"
+            {...(view.pursePct !== undefined && view.pursePct !== null
+              ? { hint: `${shareLabel(view.purseCommitted, view.pursePct)} of the total purse` }
+              : {})}
+            testId="overview-purse"
+          />
+        ) : null}
+        {view.auctionStatus !== null ? (
+          <StatCard
+            icon={<IconLayers />}
+            tone="green"
+            value={
+              <>
+                {view.lotsSold}
+                <span className="ov-stat-of">/{view.lotsTotal}</span>
+              </>
+            }
+            label="Lots sold"
+            hint={`${String(lotsPct)}% of the pool`}
+            progress={lotsPct}
+            testId="overview-lots"
+          />
+        ) : null}
+      </StatGrid>
+
+      <div className="ov-grid">
+        <CardGrid>
+          <SectionCard
+            title={view.lotsSold > 0 && view.viewer.canSeeMoney ? "Top teams by spend" : "Teams"}
+            data-testid="team-spend-card"
+            action={
+              <Link className="ov-card-link" href={`/seasons/${slug}/teams`}>
+                All teams
+                <IconArrowRight size={16} />
+              </Link>
+            }
+          >
+            {view.topTeams.length === 0 ? (
+              <div className="ov-empty">
+                <p>
+                  No teams yet. The auction issues one paddle per team, so this is the first thing
+                  to build.
+                </p>
+                {view.viewer.canManage ? (
+                  <Link
+                    href={`/seasons/${slug}/teams`}
+                    className={buttonClassName({ variant: "secondary" })}
+                    data-testid="empty-add-teams"
+                  >
+                    Add teams
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <ul className="ov-rows">
+                {view.topTeams.slice(0, 5).map((team) => {
+                  const spent = team.spend !== undefined && view.lotsSold > 0;
+                  const pct =
+                    team.spend !== undefined && team.purse !== undefined
+                      ? percent(team.spend, team.purse)
+                      : null;
+                  return (
+                    <li
+                      key={team.teamId}
+                      className="ov-team"
+                      style={
+                        team.color !== null
+                          ? ({ "--team": team.color } as CSSProperties)
+                          : undefined
+                      }
+                    >
+                      <span className="ov-team-tile" aria-hidden>
+                        {teamInitial(team.name)}
+                      </span>
+                      <span className="ov-team-name">{team.name}</span>
+                      <span className="ov-team-figs">
+                        {team.squadMax !== undefined && team.squadMax !== null ? (
+                          <span>
+                            <VisuallyHidden>Squad </VisuallyHidden>
+                            {team.squad}/{team.squadMax}
+                          </span>
+                        ) : (
+                          <span>
+                            {team.squad} {team.squad === 1 ? "player" : "players"}
+                          </span>
+                        )}
+                        {/* Before a hammer has fallen every team has spent ₹0, and
+                          a column of "₹0" is furniture, not a reading. */}
+                        {spent ? <span>{exactINR(team.spend ?? 0)}</span> : null}
+                        {spent && pct !== null ? (
+                          <span className="ov-team-pct">
+                            {shareLabel(team.spend ?? 0, pct)}
+                            <VisuallyHidden> of the purse</VisuallyHidden>
+                          </span>
+                        ) : null}
+                      </span>
+                      {spent && pct !== null && (team.spend ?? 0) > 0 ? (
+                        <span className="ov-bar ov-team-bar" aria-hidden>
+                          <span className="ov-bar-fill" style={{ width: `${String(pct)}%` }} />
+                        </span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Pool by role"
+            data-testid="pool-card"
+            {...(view.viewer.canReview && view.poolByRole.length > 0
+              ? {
+                  action: (
+                    <Link className="ov-card-link" href={`/seasons/${slug}/registrations`}>
+                      View all
+                      <IconArrowRight size={16} />
+                    </Link>
+                  ),
+                }
+              : {})}
+          >
+            {view.poolByRole.length === 0 ? (
+              <div className="ov-empty">
+                <p>
+                  No approved players yet.{" "}
+                  {status === "registration_open"
+                    ? "Share the registration link — every entry lands in the Registrations tab for you to approve."
+                    : "Players enter through the registration link once you open registration."}
+                </p>
+                {view.viewer.canReview && status === "registration_open" ? (
+                  <ShareRegistration slug={slug} open />
+                ) : null}
+                {view.viewer.canReview && view.pendingPlayers > 0 ? (
+                  <Link
+                    href={`/seasons/${slug}/registrations`}
+                    className={buttonClassName({ variant: "secondary" })}
+                    data-testid="empty-review-registrations"
+                  >
+                    Review {view.pendingPlayers} waiting
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <ul className="ov-rows">
+                {view.poolByRole.map((entry) => {
+                  const mark = (entry.role !== null ? ROLE_MARK[entry.role] : undefined) ?? {
+                    ...OTHER_ROLE_MARK,
+                  };
+                  return (
+                    <li key={entry.role ?? "none"} className="ov-role" data-tone={mark.tone}>
+                      <IconTile icon={mark.icon} tone={mark.tone} />
+                      <span className="ov-role-name">{labelOf(entry.role)}</span>
+                      <span className="ov-role-count">{entry.count}</span>
+                      <span className="ov-bar ov-role-bar" aria-hidden>
+                        <span
+                          className="ov-bar-fill"
+                          style={{
+                            width: `${String(percent(entry.count, view.poolByRole[0]?.count ?? 1))}%`,
+                          }}
+                        />
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </SectionCard>
+        </CardGrid>
+      </div>
+
+      <div className="ov-grid">
+        <CardGrid>
+          {/* The season's own mark. It sits beside the public page because this
+            is the mark that page puts on the internet. */}
+          {view.viewer.canManage ? (
+            <SeasonImageCard
+              slug={slug}
+              competitionId={view.competition.id}
+              competitionName={view.competition.name}
+              slot="logo"
+              currentUrl={view.logoUrl}
+            />
+          ) : null}
+
+          {/* DA-12: publishing has a block of its own, not a ghost button in the
+            footer of a card about something else. */}
+          <SectionCard
+            title="Public page"
+            data-testid="visibility-row"
+            action={
+              view.platformHold !== null ? (
+                <Pill tone="red" testId="platform-hold-badge">
+                  Taken down
+                </Pill>
+              ) : (
+                <Pill tone={isPublic ? "green" : "neutral"} dot={isPublic}>
+                  {isPublic ? "LIVE" : "Not listed"}
+                </Pill>
+              )
+            }
+          >
+            <div className="ov-public">
+              {previewable && view.platformHold === null ? (
+                <div className="ov-url-row">
+                  <span className="ov-url">
+                    <span className="ov-url-text">/c/{slug}</span>
+                    {isPublic ? (
+                      <button
+                        type="button"
+                        className="ov-icon-btn"
+                        aria-label="Copy the public page link"
+                        onClick={() => void copyPublicLink()}
+                      >
+                        <IconCopy size={18} />
+                      </button>
+                    ) : null}
+                  </span>
+                  <a
+                    className="ov-icon-btn ov-icon-btn-boxed"
+                    href={`/c/${slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open the public page in a new tab"
+                  >
+                    <IconExternal size={18} />
+                  </a>
+                </div>
+              ) : null}
+              <p className="ov-muted">
+                {view.platformHold !== null
+                  ? "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
+                  : isPublic
+                    ? "This season is listed publicly — anyone can see it and share it."
+                    : "Publishing puts this season on the public directory, where players and spectators can find it."}
+              </p>
+              {view.viewer.canManage && !canPublish && !isPublic ? (
+                <ul className="season-blockers" data-testid="publish-blockers">
+                  {view.publishBlockers.map((blocker) => (
+                    <li key={blocker.code} className="season-blocker">
+                      <span>{blocker.message}</span>
+                      {blocker.code === "dates" || blocker.code === "location" ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          data-testid={`fix-${blocker.code}`}
+                          onClick={() => {
+                            setSettingsOpen(true);
+                          }}
+                        >
+                          {blocker.code === "dates" ? "Add dates" : "Add location"}
+                        </Button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <div className="ov-public-actions">
+                {previewable ? (
+                  <Link
+                    className={buttonClassName({
+                      variant: publicIsPrimary && isPublic ? "primary" : "secondary",
+                    })}
+                    href={`/c/${slug}`}
+                    data-testid="open-public-page"
+                  >
+                    {isPublic ? "View public page" : "Preview the public page"}
+                    <IconArrowRight size={16} />
+                  </Link>
+                ) : null}
+                {view.viewer.canManage ? (
                   <Button
-                    size="sm"
-                    variant="secondary"
-                    data-testid={`fix-${blocker.code}`}
+                    ref={publishRef}
+                    variant={!isPublic && publicIsPrimary ? "primary" : "secondary"}
+                    loading={busy}
+                    disabled={!canPublish && !isPublic}
+                    data-testid="toggle-visibility"
                     onClick={() => {
-                      setSettingsOpen(true);
+                      if (isPublic) {
+                        void setVisibility("private");
+                      } else {
+                        setPublishOpen(true);
+                      }
                     }}
                   >
-                    {blocker.code === "dates" ? "Add dates" : "Add location"}
+                    {isPublic ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                    {isPublic ? "Unpublish" : "Publish"}
                   </Button>
                 ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="season-publish-actions">
-          {previewable ? (
-            <Link className="season-inline-link" href={`/c/${slug}`} data-testid="open-public-page">
-              {view.competition.visibility === "public"
-                ? "View the public page"
-                : "Preview the public page"}
-              <IconArrowRight size={16} className="icon-trail" />
-            </Link>
-          ) : null}
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* One grid for the season's public face, so a reader who cannot
+              manage the season sees the public page and the pass side by side
+              rather than two half-empty rows. */}
           {view.viewer.canManage ? (
-            <Button
-              ref={publishRef}
-              size="touch"
-              // A finished season's one primary is "Run it again": publishing
-              // its record is worth doing, but it is not the next step.
-              variant={
-                view.competition.visibility === "public"
-                  ? "ghost"
-                  : finished
-                    ? "secondary"
-                    : "primary"
-              }
-              loading={busy}
-              disabled={!canPublish && view.competition.visibility !== "public"}
-              data-testid="toggle-visibility"
-              onClick={() => {
-                if (view.competition.visibility === "public") {
-                  void setVisibility("private");
-                } else {
-                  setPublishOpen(true);
-                }
-              }}
-            >
-              {view.competition.visibility === "public" ? "Unpublish" : "Publish"}
-            </Button>
+            <SeasonImageCard
+              slug={slug}
+              competitionId={view.competition.id}
+              competitionName={view.competition.name}
+              slot="cover"
+              currentUrl={view.coverUrl}
+            />
           ) : null}
-        </div>
-      </Card>
+          {pass}
+        </CardGrid>
+      </div>
 
       <Dialog
         open={publishOpen}
@@ -763,7 +1078,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
           <ul>
             <li>{view.competition.name}</li>
             <li>{view.competition.location ?? "No location set"}</li>
-            <li>{heroMeta(view)[0]}</li>
+            <li>{seasonDates(view)}</li>
             <li>
               {view.teamCount} {view.teamCount === 1 ? "team" : "teams"} and {view.approvedPlayers}{" "}
               approved {view.approvedPlayers === 1 ? "player" : "players"}
@@ -801,17 +1116,6 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
   );
 }
 
-function SpendBar({ spend, max }: { spend: number; max: number }) {
-  return (
-    <span className="season-bar" aria-hidden>
-      <span
-        className="season-bar-fill"
-        style={{ width: `${String(max > 0 ? Math.round((spend / max) * 100) : 0)}%` }}
-      />
-    </span>
-  );
-}
-
 /**
  * What is true about this season's money, for THIS reader.
  *
@@ -846,85 +1150,63 @@ function retroLine(view: SeasonOverviewView): string {
 }
 
 /**
- * A season that is over (DA-14). A half-finished six-step checklist is the
- * wrong shape for something with no next step: what an organizer wants from a
- * finished season is what happened, and the offer to run it again.
+ * A season that is over (DA-14). A half-finished checklist is the wrong shape
+ * for something with no next step: what an organizer wants from a finished
+ * season is what happened, and the offer to run it again.
  */
 function Retrospective({
   view,
   slug,
-  busy,
-  onRunItAgain,
+  runAgain,
 }: {
   view: SeasonOverviewView;
   slug: string;
-  busy: boolean;
-  onRunItAgain: () => Promise<void>;
+  runAgain: ReactNode;
 }) {
   const settlement = view.settlement;
   return (
-    <Card className="season-stepper-card" data-testid="lifecycle-panel">
-      <div className="season-retro">
-        {/* The state badge is the hero's job — this line says what it means.
-            It used to be a hardcoded sentence that consulted no status at all:
-            "the books are settled" was printed over a case sitting in
-            `settling`, and printed to a viewer with no settlement grant, who
-            gets a 404 on /money. It now reads the case, and says nothing about
-            books it may not show. */}
-        <p className="season-retro-line" data-testid="season-completed">
-          {retroLine(view)}
-        </p>
-        <dl className="season-retro-figures">
-          <div>
-            <dt>Lots sold</dt>
-            <dd>
-              {view.lotsSold} of {view.lotsTotal}
-            </dd>
-          </div>
-          <div>
-            <dt>Teams</dt>
-            <dd>{view.teamCount}</dd>
-          </div>
-          {settlement?.collected !== undefined ? (
-            <div>
-              <dt>Collected</dt>
-              <dd data-testid="retro-collected">{exactINR(settlement.collected)}</dd>
-            </div>
-          ) : null}
-          {settlement?.outstanding !== undefined ? (
-            <div>
-              <dt>Outstanding</dt>
-              <dd data-testid="retro-outstanding">{exactINR(settlement.outstanding)}</dd>
-            </div>
-          ) : null}
-        </dl>
-      </div>
-      <div className="season-stepper-actions">
-        {/* This card is the FINISHED season. "Review readiness" sent an
-            organizer to the auction-readiness gates, where a season whose
-            auction is long over reads as a wall of failures — the gates
-            describe a night that already happened. The record of what
-            happened is the useful destination. */}
-        <Link
-          href={`/seasons/${slug}/auction/replay`}
-          className="season-inline-link"
-          data-testid="open-replay"
-        >
-          Replay the auction
-        </Link>
-        {/* "View results" lives in the hero above, once. */}
-        {view.viewer.canManage ? (
-          <Button
-            size="touch"
-            loading={busy}
-            data-testid="run-it-again"
-            onClick={() => void onRunItAgain()}
-          >
-            Run it again
-          </Button>
+    <SectionCard
+      title="Season complete"
+      icon={<IconTrophy />}
+      tone="green"
+      className="ov-retro"
+      description={
+        // The state is the hero's pill; this line says what it means — read
+        // from the case, and silent about books this viewer may not open.
+        <span data-testid="season-completed">{retroLine(view)}</span>
+      }
+    >
+      <div className="ov-retro-body">
+        {settlement?.collected !== undefined || settlement?.outstanding !== undefined ? (
+          <dl className="ov-retro-figures">
+            {settlement.collected !== undefined ? (
+              <div>
+                <dt>Collected</dt>
+                <dd data-testid="retro-collected">{exactINR(settlement.collected)}</dd>
+              </div>
+            ) : null}
+            {settlement.outstanding !== undefined ? (
+              <div>
+                <dt>Outstanding</dt>
+                <dd data-testid="retro-outstanding">{exactINR(settlement.outstanding)}</dd>
+              </div>
+            ) : null}
+          </dl>
         ) : null}
+        <div className="ov-retro-actions">
+          {/* The record of the night, not the readiness gates: a finished
+              season's gates describe an auction that already happened. */}
+          <Link
+            href={`/seasons/${slug}/auction/replay`}
+            className={buttonClassName({ variant: "secondary" })}
+            data-testid="open-replay"
+          >
+            Replay the auction
+          </Link>
+          {runAgain}
+        </div>
       </div>
-    </Card>
+    </SectionCard>
   );
 }
 

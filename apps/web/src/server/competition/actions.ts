@@ -82,6 +82,7 @@ import {
   updateCompetitionDetails,
   type CompetitionSummary,
   type PublishBlocker,
+  type SeasonListing,
   type TeamSummary,
 } from "./competitions";
 import {
@@ -191,7 +192,7 @@ function inCompetitionOrg<T>(
 
 export interface CompetitionsView {
   orgs: { id: string; name: string }[];
-  competitions: (CompetitionSummary & { orgName: string })[];
+  competitions: SeasonListing[];
 }
 
 /**

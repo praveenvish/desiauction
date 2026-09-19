@@ -88,7 +88,16 @@ export default async function PublicCompetitionPage({
         // a stored-XSS breakout.
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <header className="public-hero" data-theme="floodlight">
+      <header
+        className="public-hero"
+        data-theme="floodlight"
+        data-has-cover={view.coverUrl !== null ? "true" : undefined}
+      >
+        {/* The organizer's cover photo (0082), under a shade so the name and
+            the facts keep their contrast over any picture. */}
+        {view.coverUrl !== null ? (
+          <img className="public-hero-cover" src={view.coverUrl} alt="" />
+        ) : null}
         <div className="mk-container public-hero-inner">
           <span className="public-hero-badges">
             {live ? <Badge tone="live">Live now</Badge> : null}

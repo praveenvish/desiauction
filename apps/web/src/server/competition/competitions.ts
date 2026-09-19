@@ -162,12 +162,25 @@ export async function createCompetition(
   };
 }
 
+/**
+ * A season as the lists show it: the summary, its club's name, and its cover
+ * photo (0082) resolved to a readable URL — null for the designed gradient —
+ * so Home and Tournaments can put the picture on the card.
+ */
+export type SeasonListing = CompetitionSummary & { orgName: string; coverUrl: string | null };
+
+function withCoverUrl<T extends { coverKey: string | null }>(
+  rows: T[],
+): (Omit<T, "coverKey"> & { coverUrl: string | null })[] {
+  return rows.map(({ coverKey, ...rest }) => ({
+    ...rest,
+    coverUrl: coverKey === null ? null : storage.readUrl(coverKey),
+  }));
+}
+
 /** Competitions across every org the person belongs to (their organizer surface). */
-export async function competitionsForPerson(
-  db: Db,
-  personId: string,
-): Promise<(CompetitionSummary & { orgName: string })[]> {
-  return db
+export async function competitionsForPerson(db: Db, personId: string): Promise<SeasonListing[]> {
+  const rows = await db
     .select({
       id: competitions.id,
       orgId: competitions.orgId,
@@ -182,12 +195,14 @@ export async function competitionsForPerson(
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
       orgName: organizations.name,
+      coverKey: competitions.coverUrl,
     })
     .from(competitions)
     .innerJoin(orgMembers, eq(orgMembers.orgId, competitions.orgId))
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .where(eq(orgMembers.personId, personId))
     .orderBy(desc(competitions.createdAt));
+  return withCoverUrl(rows);
 }
 
 /**
@@ -201,8 +216,8 @@ export async function competitionsForPerson(
 export async function competitionsOfTournament(
   db: Db,
   tournamentId: string,
-): Promise<(CompetitionSummary & { orgName: string })[]> {
-  return db
+): Promise<SeasonListing[]> {
+  const rows = await db
     .select({
       id: competitions.id,
       orgId: competitions.orgId,
@@ -217,10 +232,12 @@ export async function competitionsOfTournament(
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
       orgName: organizations.name,
+      coverKey: competitions.coverUrl,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .where(eq(competitions.tournamentId, tournamentId));
+  return withCoverUrl(rows);
 }
 
 /**

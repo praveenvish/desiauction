@@ -1,7 +1,7 @@
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
-import { PageTitle } from "../../../components/shell/page-title";
+import { PageTitleHidden } from "../../../components/shell/page-title";
 import { requireOnboarded } from "../../../server/auth/onboarding-gate";
 import { seasonOverviewView } from "../../../server/competition/actions";
 import { seasonPass } from "../../../server/competition/pass";
@@ -9,6 +9,7 @@ import { CreatedToast } from "./created-toast";
 import { OverviewPanel } from "./overview-panel";
 import { SeasonPassCard } from "./season-pass";
 import "../seasons.css";
+import "./overview.css";
 
 export const metadata = { title: "Season · DesiAuction" };
 
@@ -28,17 +29,21 @@ export default async function CompetitionHomePage({
   return (
     <ToastProvider>
       <CreatedToast />
-      <main className="competition-home">
-        <div className="competition-stack">
-          {/* The season's name is the shell's h1, sticky above; the hero keeps
-              the state of play — status, live pill, where and when. The hero
-              itself moved into the panel: its secondary action and its "Season
-              details" trigger both depend on the panel's own state (DA-11). */}
-          <PageTitle title={view.competition.name} testId="competition-name" />
-          <OverviewPanel view={view} slug={slug} />
-          {/* What the season's pass covers, and how close it is — visible at 2
-              of 4 teams, not only at the refusal. */}
-          {pass === null ? null : <SeasonPassCard slug={slug} pass={pass} />}
+      {/* THE ONE <h1> ON THIS PAGE IS THE HERO'S. Every other season tab opens
+          with the shell's page head (trail, title); on the overview the hero
+          banner already says the season's name, over its cover photo, so the
+          shell's head stands down — `PageTitleHidden` drops its h1 from the DOM
+          and overview.css keeps the head from painting before hydration. */}
+      <PageTitleHidden />
+      <main className="ov-page">
+        <div className="ov-stack">
+          <OverviewPanel
+            view={view}
+            slug={slug}
+            // What the season's pass covers, and how close it is — visible at 2
+            // of 4 teams, not only at the refusal.
+            {...(pass === null ? {} : { pass: <SeasonPassCard slug={slug} pass={pass} /> })}
+          />
         </div>
       </main>
     </ToastProvider>

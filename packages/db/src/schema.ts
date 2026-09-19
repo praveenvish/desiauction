@@ -721,6 +721,9 @@ export const competitions = pgTable(
       .default("open"),
     // Storage KEY for the auction crest; signed at read time by the media port.
     logoUrl: text("logo_url"),
+    // Storage KEY for the season's wide cover photo (0082) — the hero banner's
+    // picture; signed at read time like the crest. Null → the designed gradient.
+    coverUrl: text("cover_url"),
     location: text("location"),
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),

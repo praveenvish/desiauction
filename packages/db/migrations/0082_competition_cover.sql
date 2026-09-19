@@ -1,0 +1,12 @@
+-- THE SEASON'S COVER PHOTO (founder, 2026-09-19: "organizer uploads a cover
+-- photo").
+--
+-- A wide picture behind the season's hero banner — the ground, last year's
+-- final, the club's colours. Like `logo_url` beside it, this is a storage KEY,
+-- never a signed URL: the media port signs it at read time, and the same
+-- `competition` media subject (competition.manage) writes it. Nullable, no
+-- default: a season without one gets the designed floodlight gradient.
+--
+-- No grant change: the app role holds ALL on every table and the system role's
+-- SELECT on `competitions` is table-level, so a new column is covered by both.
+ALTER TABLE "competitions" ADD COLUMN IF NOT EXISTS "cover_url" text;

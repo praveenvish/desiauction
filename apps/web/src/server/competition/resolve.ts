@@ -8,6 +8,7 @@ import {
   competitionsOfTournament,
   resolveCompetition,
   type CompetitionSummary,
+  type SeasonListing,
 } from "./competitions";
 import { publicRegistrationFacts } from "./registrations";
 
@@ -51,9 +52,7 @@ export function resolveMemberCompetition(
  * Every season across every club this person belongs to. The membership join
  * is inside the query, so a person sees their clubs' seasons and nothing else.
  */
-export function memberCompetitions(
-  personId: string,
-): Promise<(CompetitionSummary & { orgName: string })[]> {
+export function memberCompetitions(personId: string): Promise<SeasonListing[]> {
   return competitionsForPerson(systemDb, personId);
 }
 
@@ -107,7 +106,7 @@ export async function resolveMemberTournament(
 export async function memberTournamentSeasons(
   personId: string,
   tournamentId: string,
-): Promise<(CompetitionSummary & { orgName: string })[]> {
+): Promise<SeasonListing[]> {
   const [member] = await systemDb
     .select({ orgId: tournaments.orgId })
     .from(tournaments)
