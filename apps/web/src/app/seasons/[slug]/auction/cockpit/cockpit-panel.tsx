@@ -808,36 +808,42 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               somebody has <strong>accepted</strong> it they are in the club and hold a paddle grant
               — withdrawing the link no longer reaches them, and you remove the grant instead.
             </p>
-            <div className="date-row">
-              <Select
-                label="Team"
-                name="inviteTeam"
-                value={inviteTeam}
-                onChange={(event) => {
-                  setInviteTeam(event.target.value);
-                }}
-              >
-                <option value="">Choose…</option>
-                {view.teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </Select>
-              <Button
-                onClick={() => void invite()}
-                loading={pending === "invite"}
-                /* `finished` joins the derived blocked states. The control was
+            {/* Accepting a link makes the person a club member, so minting and
+                withdrawing links is the club owners' act. An appointed
+                auctioneer sees the board and grants paddles to people who
+                have already accepted. */}
+            {view.viewer.canManage ? (
+              <div className="date-row">
+                <Select
+                  label="Team"
+                  name="inviteTeam"
+                  value={inviteTeam}
+                  onChange={(event) => {
+                    setInviteTeam(event.target.value);
+                  }}
+                >
+                  <option value="">Choose…</option>
+                  {view.teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  onClick={() => void invite()}
+                  loading={pending === "invite"}
+                  /* `finished` joins the derived blocked states. The control was
                    offered on a completed auction and failed on click with
                    "This auction has ended." — the panel already derived
                    !auctionExists and !canConduct, and simply never asked the
                    auction what state it was in. */
-                disabled={inviteTeam === "" || finished}
-                data-testid="invite-owner"
-              >
-                Invite owner
-              </Button>
-            </div>
+                  disabled={inviteTeam === "" || finished}
+                  data-testid="invite-owner"
+                >
+                  Invite owner
+                </Button>
+              </div>
+            ) : null}
             {finished ? (
               <p className="competitions-hint" data-testid="invite-owner-blocked">
                 This auction has ended — there is no owner left to invite.
@@ -898,7 +904,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                           has already minted a membership and a paddle grant;
                           offering Withdraw there would promise to undo two
                           things it cannot touch. */}
-                      {entry.acceptedBy === null && !entry.expired ? (
+                      {view.viewer.canManage && entry.acceptedBy === null && !entry.expired ? (
                         <Button
                           size="sm"
                           variant="ghost"

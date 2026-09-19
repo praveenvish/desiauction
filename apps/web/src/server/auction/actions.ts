@@ -85,6 +85,32 @@ async function conductGate(
   return { ok: true, personId: session.personId, competition };
 }
 
+/**
+ * Conduct PLUS the season's management. An appointed auctioneer
+ * (`auction:conductor`) passes `conductGate` and runs the room; setting the
+ * room up (its purse and bands), switching owner plans, issuing a paddle to
+ * oneself and aborting stay with whoever runs the season — the club's owners.
+ */
+async function manageGate(
+  slug: string,
+): Promise<
+  { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
+> {
+  const gate = await conductGate(slug);
+  if (!gate.ok) {
+    return gate;
+  }
+  const manages = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    canCompetition(
+      db,
+      gate.personId,
+      { orgId: gate.competition.orgId, competitionId: gate.competition.id },
+      "competition.manage",
+    ),
+  );
+  return manages ? gate : { ok: false, error: "Only the club's owners can do that." };
+}
+
 async function requireAuction(db: Db, competitionId: string): Promise<AuctionRecord | null> {
   return auctionOf(db, competitionId);
 }
@@ -183,6 +209,8 @@ export interface AuctionDashboard {
   timerDemo: { initialSeconds: number; extensionSeconds: number; steps: TimerDemoStep[] };
   viewer: {
     canConduct: boolean;
+    /** Runs the season (competition.manage): sets the room up, may abort it. */
+    canManage: boolean;
     canPoster: boolean;
     /** WR-1: this person holds a team here and planning is switched on for this auction. */
     planAvailable: boolean;
@@ -264,6 +292,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     ready,
     view,
     canConduct,
+    canManage,
     canPoster,
     planAvailable,
     ownerPlans,
@@ -300,6 +329,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
       ready: readyProjection,
       view: auction === null ? null : gateAuctionView(await auctionView(db, auction), money),
       canConduct: conduct,
+      canManage: manage,
       /*
        * A TEAM OWNER MAY MAKE THEIR OWN SQUAD SHEET, so the button has to
        * offer it to them. `registration.review` alone was this button's whole
@@ -330,7 +360,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     view,
     machines: { auction: AUCTION_MACHINE, lot: LOT_MACHINE, bid: BID_MACHINE },
     timerDemo: timerDemo(),
-    viewer: { canConduct, canPoster, planAvailable },
+    viewer: { canConduct, canManage, canPoster, planAvailable },
     ...(ownerPlans === null ? {} : { ownerPlans }),
     rules,
     feasibility,
@@ -361,7 +391,7 @@ export async function createAuctionAction(
   slug: string,
   setup?: AuctionSetup,
 ): Promise<CreateAuctionResult> {
-  const gate = await conductGate(slug);
+  const gate = await manageGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
@@ -457,7 +487,7 @@ export async function issuePaddleAction(
   slug: string,
   teamId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const gate = await conductGate(slug);
+  const gate = await manageGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
@@ -566,6 +596,14 @@ export async function auctionLifecycleAction(
   if (type === undefined) {
     return { ok: false, error: "Unknown auction command." };
   }
+  // Ending the auction for good is the season manager's call, not the
+  // appointed auctioneer's (the gateway refuses it too).
+  if (command === "abort") {
+    const gate = await manageGate(slug);
+    if (!gate.ok) {
+      return { ok: false, error: gate.error };
+    }
+  }
   // The second place the arithmetic has to hold: the door to the room. An
   // auction opened short can be conducted but not closed without the
   // conductor's override, so say so here rather than at 11pm.
@@ -657,7 +695,7 @@ export async function setAuctionFeatureAction(
   slug: string,
   enabled: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
-  const gate = await conductGate(slug);
+  const gate = await manageGate(slug);
   if (!gate.ok) {
     return gate;
   }

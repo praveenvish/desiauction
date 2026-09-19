@@ -246,7 +246,9 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             THIS auction can never go live again; it is not a promise that the
             season is over.
         */}
-        {(view === null || view.auction.status === "abandoned") && viewer.canConduct ? (
+        {/* Setting the room up is the season manager's act; an appointed
+            auctioneer runs the night it produces. */}
+        {(view === null || view.auction.status === "abandoned") && viewer.canManage ? (
           <div className="auction-setup" data-testid="auction-setup">
             {/* DA-05: these are the numbers a league negotiates, and until now
                 every auction took ₹2 Cr purses, 8–15 squads and three fixed
@@ -415,7 +417,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 config on purpose — a switch flipped mid-season is not a rule of
                 the night. Layers above (platform, club, deploy) can only be
                 read here, so the row says when one of them has decided. */}
-            {viewer.canConduct && dashboard.ownerPlans !== undefined ? (
+            {viewer.canManage && dashboard.ownerPlans !== undefined ? (
               <label className="plan-switch" htmlFor="owner-plans-switch">
                 <input
                   id="owner-plans-switch"
@@ -514,7 +516,8 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                     </Button>
                   ),
                 )}
-                {view.auction.status !== "completed" &&
+                {viewer.canManage &&
+                view.auction.status !== "completed" &&
                 view.auction.status !== "reconciled" &&
                 view.auction.status !== "abandoned" ? (
                   /* Behind a confirmation now. This is the catastrophic exit —
@@ -627,7 +630,9 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 })}
               </ul>
             )}
-            {viewer.canConduct ? (
+            {/* Issuing a paddle hands its purse to whoever clicks — the
+                season manager's act, never the appointed auctioneer's. */}
+            {viewer.canManage ? (
               <div className="date-row">
                 <Select
                   label="Team"

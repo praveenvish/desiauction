@@ -3,7 +3,10 @@
 // is proven separately under desiauction_app; this suite proves the grant's
 // MEANING: it conducts one season, nothing more, and only for a club member.
 import {
+  auctionOwnerInvites,
+  auctions,
   createDb,
+  grants as grantsTable,
   newId,
   orgMembers,
   otpCodes,
@@ -22,7 +25,12 @@ import { createCompetition, type CompetitionSummary } from "../competition/compe
 import { createInvite } from "../orgs/invites";
 import { createOrg } from "../orgs/orgs";
 import { purgeOrg } from "../test-support/purge-org";
-import { assignAuctioneer, auctioneersOf, removeAuctioneer } from "./auctioneers";
+import {
+  assignAuctioneer,
+  auctioneerCandidates,
+  auctioneersOf,
+  removeAuctioneer,
+} from "./auctioneers";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -33,6 +41,7 @@ const PHONE_OWNER = `+9196${RUN}9`;
 let owner = "";
 let member = "";
 let stranger = "";
+let teamOwner = "";
 let orgId = "";
 let season: CompetitionSummary = null as unknown as CompetitionSummary;
 let otherSeason: CompetitionSummary = null as unknown as CompetitionSummary;
@@ -55,16 +64,21 @@ beforeAll(async () => {
   otherSeason = await createCompetition(db, orgId, owner, { ...base, name: `Night Two ${RUN}` });
   member = newId();
   stranger = newId();
+  teamOwner = newId();
   await db.insert(people).values([
     { id: member, phone: `+9195${RUN}1`, name: "Host Member" },
     { id: stranger, phone: `+9195${RUN}2`, name: "Stranger" },
+    { id: teamOwner, phone: `+9195${RUN}3`, name: "Team Owner" },
   ]);
-  await db.insert(orgMembers).values({ orgId, personId: member });
+  await db.insert(orgMembers).values([
+    { orgId, personId: member },
+    { orgId, personId: teamOwner },
+  ]);
 });
 
 afterAll(async () => {
   if (orgId !== "") await purgeOrg(db, orgId);
-  await db.delete(people).where(inArray(people.id, [member, stranger, owner]));
+  await db.delete(people).where(inArray(people.id, [member, stranger, teamOwner, owner]));
   await db.delete(otpCodes).where(eq(otpCodes.phone, PHONE_OWNER));
   await db.delete(otpInbox).where(eq(otpInbox.phone, PHONE_OWNER));
   await handle.sql.end();
@@ -131,6 +145,68 @@ describe("AUCTIONEER — conduct one season, nothing more", () => {
         actorId: owner,
       }),
     ).toEqual({ ok: false, reason: "not_assigned" });
+  });
+
+  it("never appoints someone who owns a team in the season (security review, Phase 5)", async () => {
+    // Team owners are viewer-level club members, so they pass the membership
+    // check — and conducting shows every rival's purse and every owner's phone.
+    const auctionId = newId();
+    await db.insert(auctions).values({
+      id: auctionId,
+      orgId,
+      competitionId: season.id,
+      name: `Night One ${RUN}`,
+      config: {},
+      createdBy: owner,
+    });
+    await db.insert(auctionOwnerInvites).values({
+      id: newId(),
+      orgId,
+      auctionId,
+      teamId: newId(),
+      tokenHash: `test-${RUN}-${newId()}`,
+      createdBy: owner,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      acceptedBy: teamOwner,
+      acceptedAt: new Date(),
+    });
+    const candidates = await auctioneerCandidates(db, orgId, season.id);
+    expect(candidates.map((row) => row.personId)).not.toContain(teamOwner);
+    expect(candidates.map((row) => row.personId)).toContain(member);
+    expect(
+      await assignAuctioneer(db, {
+        orgId,
+        competitionId: season.id,
+        personId: teamOwner,
+        actorId: owner,
+      }),
+    ).toEqual({ ok: false, reason: "team_owner" });
+    // Owning a team in ANOTHER season is no bar here.
+    expect(
+      (await auctioneerCandidates(db, orgId, otherSeason.id)).map((row) => row.personId),
+    ).toContain(teamOwner);
+  });
+
+  it("the database refuses any other set on a season scope, and a second live grant (0077)", async () => {
+    await expect(
+      db.insert(grantsTable).values({
+        id: newId(),
+        personId: member,
+        scopeType: "tournament",
+        scopeId: season.id,
+        capabilitySet: "org:owner",
+        grantedBy: owner,
+      }),
+    ).rejects.toThrow();
+    const grant = {
+      personId: member,
+      scopeType: "tournament" as const,
+      scopeId: otherSeason.id,
+      capabilitySet: "auction:conductor",
+      grantedBy: owner,
+    };
+    await db.insert(grantsTable).values({ id: newId(), ...grant });
+    await expect(db.insert(grantsTable).values({ id: newId(), ...grant })).rejects.toThrow();
   });
 
   it("an invite cannot carry the auctioneer set — it would conduct every season", async () => {

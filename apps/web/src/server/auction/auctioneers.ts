@@ -1,5 +1,15 @@
-import { auditLog, grants, newId, orgMembers, people, type Db } from "@desiauction/db";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import {
+  auctionOwnerInvites,
+  auctions,
+  auditLog,
+  grants,
+  newId,
+  orgMembers,
+  paddleGrants,
+  people,
+  type Db,
+} from "@desiauction/db";
+import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 
 /**
  * THE AUCTIONEER — a per-season conduct grant (launch polish, Phase 3).
@@ -46,13 +56,53 @@ export async function auctioneersOf(db: Db, competitionId: string): Promise<Auct
   }));
 }
 
-/** Club members who could be made auctioneer: anyone in the club not already one. */
+/**
+ * People who own a TEAM in this season: an accepted owner link, or a live
+ * paddle grant, on any of its auctions that was not abandoned.
+ *
+ * They can never be its auctioneer (security review, launch Phase 5). Team
+ * owners are viewer-level members of the club, so they pass the membership
+ * check — and conducting would show them every rival's remaining purse and
+ * every owner's phone, which DA-30 exists to keep from a bidder.
+ */
+async function teamOwnersOf(db: Db, competitionId: string): Promise<Set<string>> {
+  const [accepted, granted] = await Promise.all([
+    db
+      .select({ personId: auctionOwnerInvites.acceptedBy })
+      .from(auctionOwnerInvites)
+      .innerJoin(auctions, eq(auctions.id, auctionOwnerInvites.auctionId))
+      .where(
+        and(
+          eq(auctions.competitionId, competitionId),
+          ne(auctions.status, "abandoned"),
+          isNotNull(auctionOwnerInvites.acceptedBy),
+          isNull(auctionOwnerInvites.revokedAt),
+        ),
+      ),
+    db
+      .select({ personId: paddleGrants.personId })
+      .from(paddleGrants)
+      .innerJoin(auctions, eq(auctions.id, paddleGrants.auctionId))
+      .where(
+        and(
+          eq(auctions.competitionId, competitionId),
+          ne(auctions.status, "abandoned"),
+          isNull(paddleGrants.revokedAt),
+        ),
+      ),
+  ]);
+  return new Set(
+    [...accepted, ...granted].flatMap((row) => (row.personId === null ? [] : [row.personId])),
+  );
+}
+
+/** Club members who could be made auctioneer: in the club, not already one, not a team owner. */
 export async function auctioneerCandidates(
   db: Db,
   orgId: string,
   competitionId: string,
 ): Promise<{ personId: string; name: string }[]> {
-  const [members, current] = await Promise.all([
+  const [members, current, owners] = await Promise.all([
     db
       .select({ personId: orgMembers.personId, name: people.name })
       .from(orgMembers)
@@ -60,15 +110,20 @@ export async function auctioneerCandidates(
       .where(eq(orgMembers.orgId, orgId))
       .orderBy(asc(people.name)),
     auctioneersOf(db, competitionId),
+    teamOwnersOf(db, competitionId),
   ]);
   const already = new Set(current.map((row) => row.personId));
   return members
-    .filter((member) => !already.has(member.personId) && member.name !== null)
+    .filter(
+      (member) =>
+        !already.has(member.personId) && !owners.has(member.personId) && member.name !== null,
+    )
     .map((member) => ({ personId: member.personId, name: member.name ?? "" }));
 }
 
 export type AssignResult =
-  { ok: true } | { ok: false; reason: "not_a_member" | "already_assigned" | "not_assigned" };
+  | { ok: true }
+  | { ok: false; reason: "not_a_member" | "already_assigned" | "not_assigned" | "team_owner" };
 
 export async function assignAuctioneer(
   db: Db,
@@ -84,6 +139,9 @@ export async function assignAuctioneer(
   // them, and never lets a grant name a stranger.
   if (member === undefined) {
     return { ok: false, reason: "not_a_member" };
+  }
+  if ((await teamOwnersOf(db, input.competitionId)).has(input.personId)) {
+    return { ok: false, reason: "team_owner" };
   }
   const current = await auctioneersOf(db, input.competitionId);
   if (current.some((row) => row.personId === input.personId)) {

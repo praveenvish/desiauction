@@ -55,6 +55,8 @@ export async function auctioneerPanelView(slug: string): Promise<AuctioneerPanel
 const REFUSAL = {
   not_a_member: "They need to be a member of the club first — invite them from the club page.",
   already_assigned: "They're already an auctioneer for this season.",
+  team_owner:
+    "They own a team in this season. The auctioneer sees every team's purse, so it has to be someone without a team.",
   not_assigned: "They weren't an auctioneer for this season.",
 } as const;
 
