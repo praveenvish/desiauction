@@ -2,6 +2,8 @@ import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { teamsWorkspaceView } from "../../../../server/competition/actions";
+import { appointmentsPanelView } from "../../../../server/competition/appointment-actions";
+import { AppointmentsPanel } from "./appointments-panel";
 import { TeamsPanel } from "./teams-panel";
 import "../../seasons.css";
 
@@ -18,7 +20,10 @@ export default async function TeamsPage({
   searchParams: Promise<{ team?: string }>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  const view = await teamsWorkspaceView(slug);
+  const [view, appointments] = await Promise.all([
+    teamsWorkspaceView(slug),
+    appointmentsPanelView(slug),
+  ]);
   if (view === null) {
     notFound();
   }
@@ -28,6 +33,10 @@ export default async function TeamsPage({
       <main className="registrations-dash">
         <div className="dash-stack">
           <TeamsPanel view={view} slug={slug} selected={selectedTeam} />
+          {/* Only for whoever may set the roles (team.manage); null otherwise. */}
+          {appointments !== null && selectedTeam === null ? (
+            <AppointmentsPanel slug={slug} view={appointments} />
+          ) : null}
         </div>
       </main>
     </ToastProvider>
