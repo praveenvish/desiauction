@@ -1,0 +1,825 @@
+/* TEAMS — the franchise grid, one team's page, and the two send-outs under
+   the grid (founder mockup 3, 2026-09-19). Tokens only; a team's own colour
+   arrives as `--team` from its data and is only ever used for fills, never
+   for text. */
+
+/* The shell's content area already carries the page gutter; the legacy
+   `.registrations-dash` padding doubled it on a phone. */
+.registrations-dash.tm-page {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.dash-stack.tm-stack {
+  max-width: none;
+  gap: var(--space-5);
+}
+
+.tm-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Page lede: the head's second and third lines ---- */
+
+/* The shell's page head ends with a gap sized for a card; the lede belongs to
+   the title, so it closes most of it. */
+.tm-lede {
+  margin-top: calc(-1 * var(--space-5));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tm-lede p {
+  margin: 0;
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+  color: var(--text-secondary);
+}
+
+.tm-lede .tm-lede-rules {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.tm-lede-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tm-lede-link:hover {
+  color: var(--accent-hover);
+}
+
+@media (max-width: 719px) {
+  .tm-lede {
+    margin-top: calc(-1 * var(--space-3));
+  }
+}
+
+/* ---- Search (only past eight teams) ---- */
+
+.tm-toolbar {
+  position: relative;
+  max-width: 320px;
+}
+
+.tm-toolbar-icon {
+  position: absolute;
+  inset-inline-start: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.tm-search {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + 24px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+}
+
+.tm-search:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* ---- The grid of team cards ---- */
+
+.tm-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--space-4);
+}
+
+.tm-grid > li {
+  display: flex;
+  min-width: 0;
+}
+
+.tm-grid-empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.tm-grid .tm-card {
+  --team: var(--accent);
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.tm-grid .tm-card:has(.team-card-cover:hover) {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.tm-grid .tm-card .team-card-cover::after {
+  border-radius: var(--radius-xl);
+}
+
+.tm-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.tm-crest {
+  flex: none;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  background: var(--surface-sunken);
+}
+
+.tm-crest[data-size="lg"] {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+}
+
+.tm-crest-mono {
+  display: inline-grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.tm-crest-mono[data-size="lg"] {
+  font-size: var(--text-xl-size);
+}
+
+.tm-card-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tm-card-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-md-size);
+  line-height: 1.25;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.tm-card-short {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  line-height: 1.6;
+  font-weight: var(--font-weight-medium);
+}
+
+.tm-card-owner {
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-card-squad {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  line-height: 1.6;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-card-squad[data-full="true"] {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.tm-card-purse {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tm-card-purse-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tm-card-purse-head .tm-num {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-bar {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.tm-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--team);
+  transform-origin: left center;
+}
+
+.tm-card-money {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.tm-card-money > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tm-card-money dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.tm-card-money dd {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.tm-card-money dd[data-tone="left"] {
+  color: var(--success-strong);
+}
+
+.tm-card-money dd[data-tone="out"] {
+  color: var(--danger-strong);
+}
+
+.tm-topbuy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--warning-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.tm-topbuy[data-empty="true"] {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+.tm-topbuy-icon {
+  flex: none;
+  color: var(--warning-strong);
+}
+
+.tm-topbuy[data-empty="true"] .tm-topbuy-icon {
+  color: var(--text-muted);
+}
+
+.tm-topbuy-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.tm-topbuy[data-empty="true"] .tm-topbuy-name {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.tm-topbuy-price {
+  flex: none;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+/* "View team →" reads as a button; the ::after (seasons.css) makes the whole
+   card the target. */
+.tm-card-link {
+  box-sizing: border-box;
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.tm-grid .tm-card:has(.team-card-cover:hover) .tm-card-link {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+/* ---- Announce / squad sheets ---- */
+
+.tm-announce-scroll {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tm-announce {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.tm-announce th {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.tm-announce td {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  vertical-align: middle;
+  color: var(--text-primary);
+}
+
+.tm-announce th:first-child,
+.tm-announce td:first-child {
+  padding-inline-start: var(--space-5);
+}
+
+.tm-announce th:last-child,
+.tm-announce td:last-child {
+  padding-inline-end: var(--space-5);
+}
+
+.tm-announce-num {
+  width: 2.5rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-announce-player {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tm-announce-player .registration-name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-announce-roles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tm-announce tr[data-told="true"] .registration-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.tm-announce-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+[data-flush="true"] .tm-announce-foot {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.tm-foot-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.tm-foot-note[data-tone="info"] {
+  background: var(--info-subtle);
+}
+
+.tm-foot-note[data-tone="info"] svg {
+  flex: none;
+  color: var(--info-strong);
+}
+
+.tm-foot-note[data-tone="success"] {
+  background: var(--success-subtle);
+}
+
+.tm-foot-note[data-tone="success"] svg {
+  flex: none;
+  color: var(--success-strong);
+}
+
+/* A phone: the table's rows become cards of their own. */
+@media (max-width: 719px) {
+  .tm-announce thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tm-announce,
+  .tm-announce tbody,
+  .tm-announce tr,
+  .tm-announce td {
+    display: block;
+  }
+
+  /* Number and name on the first line; the role, team and status pills —
+     which name themselves — on the second, under the name. */
+  .tm-announce tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .tm-announce td,
+  .tm-announce td:first-child,
+  .tm-announce td:last-child {
+    padding: 0;
+    border: 0;
+  }
+
+  .tm-announce td.tm-announce-num {
+    width: 1.5rem;
+  }
+
+  .tm-announce td:nth-child(2) {
+    flex: 1 1 calc(100% - 2.5rem);
+    min-width: 0;
+  }
+
+  .tm-announce td[data-label="Role"] {
+    margin-inline-start: 2rem;
+  }
+
+  [data-flush="true"] .tm-announce-foot {
+    padding: var(--space-4);
+  }
+
+  .tm-announce-foot > button {
+    flex: 1 1 100%;
+  }
+}
+
+/* ---- One team ---- */
+
+.tm-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: calc(-1 * var(--space-4));
+}
+
+.tm-hero {
+  --team: var(--accent);
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--team) 14%, var(--surface-raised)),
+    var(--surface-raised) 70%
+  );
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.tm-hero::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--team);
+}
+
+.tm-hero-id {
+  flex: 1 1 16rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tm-hero-eyebrow {
+  margin: 0;
+}
+
+.tm-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tm-hero-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tm-hero-meta svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.tm-hero-actions {
+  flex: none;
+}
+
+.tm-stat-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-lg-size);
+}
+
+.tm-squad-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.tm-presign-card .pd-presign {
+  padding-block: 0;
+  border-block: 0;
+}
+
+.tm-tally {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.tm-tally b {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-roster-scroll {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tm-roster {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.tm-roster th {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.tm-roster td {
+  padding: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.tm-roster th:first-child,
+.tm-roster td:first-child {
+  padding-inline-start: var(--space-5);
+}
+
+.tm-roster th:last-child,
+.tm-roster td:last-child {
+  padding-inline-end: var(--space-5);
+}
+
+.tm-roster tbody tr {
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.tm-roster tbody tr:hover,
+.tm-roster tbody tr[data-open="true"] {
+  background: var(--surface-sunken);
+}
+
+.tm-roster-num {
+  width: 2.5rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-roster-price {
+  text-align: end;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-roster th.tm-roster-price {
+  text-align: end;
+}
+
+.tm-roster-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.tm-roster-person {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tm-roster-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.tm-roster-name .pd-player-name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-roster-phone {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 719px) {
+  .tm-hero {
+    padding: var(--space-4);
+  }
+
+  .tm-hero-actions {
+    flex: 1 1 100%;
+  }
+
+  .tm-roster thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tm-roster,
+  .tm-roster tbody,
+  .tm-roster td {
+    display: block;
+  }
+
+  .tm-roster tr {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .tm-roster td,
+  .tm-roster td:first-child,
+  .tm-roster td:last-child {
+    padding: 0;
+    border: 0;
+    text-align: start;
+  }
+
+  .tm-roster td.tm-roster-num {
+    width: auto;
+    grid-row: span 3;
+  }
+
+  .tm-roster td[data-label] {
+    grid-column: 2;
+    display: flex;
+    gap: var(--space-2);
+    color: var(--text-secondary);
+  }
+
+  .tm-roster td[data-label]::before {
+    content: attr(data-label);
+    min-width: 4.5rem;
+    color: var(--text-muted);
+    font-size: var(--text-xs-size);
+    font-weight: var(--font-weight-regular);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-grid .tm-card,
+  .tm-roster tbody tr {
+    transition: none;
+  }
+
+  .tm-grid .tm-card:has(.team-card-cover:hover) {
+    transform: none;
+  }
+}

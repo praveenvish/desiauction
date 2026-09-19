@@ -455,6 +455,15 @@ export interface TeamsWorkspaceView extends TeamsWorkspace {
  * obeys it; the keys never reach the wire.
  */
 export async function teamsWorkspaceView(slug: string): Promise<TeamsWorkspaceView | null> {
+  return teamsWorkspaceViewOnce(slug);
+}
+
+/**
+ * Once per request: the Teams page and its `@action` slot (the "+ Add team"
+ * button, which needs the lock and the colours already taken) render in the
+ * same request and ask the same question.
+ */
+const teamsWorkspaceViewOnce = cache(async (slug: string): Promise<TeamsWorkspaceView | null> => {
   const session = await requireSession();
   const competition = await resolveCompetitionScoped(session.personId, slug);
   if (competition === null) {
@@ -484,7 +493,7 @@ export async function teamsWorkspaceView(slug: string): Promise<TeamsWorkspaceVi
       viewer: { canManage, canManageTeams, canConduct, canSeeMoney, canSeeRoster },
     };
   });
-}
+});
 
 export async function advanceCompetitionAction(
   slug: string,

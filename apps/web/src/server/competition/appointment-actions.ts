@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
+import { storage } from "../media";
 import { canCompetition } from "./authz";
-import { announceAppointments, appointmentsView, rolesLabel } from "./appointments";
+import { announceAppointments, appointmentsView, roleLabel, rolesLabel } from "./appointments";
 import { resolveMemberCompetition } from "./resolve";
+import { consentedPhotoUrl } from "./shown-name";
 import { sendSquadSheets, squadSheetsView, type SquadSheetsView } from "./squad-sheets";
 
 /**
@@ -37,6 +39,18 @@ async function gate(slug: string) {
 export interface AppointmentsPanelView {
   readonly pending: readonly { name: string; role: string; team: string }[];
   readonly told: number;
+  /** Everyone named, told or not — the table. */
+  readonly rows: readonly {
+    registrationId: string;
+    name: string;
+    /** Each current role, labelled ("Captain", "Icon"). */
+    roles: readonly { key: string; label: string }[];
+    team: string;
+    teamColor: string | null;
+    /** Consent-gated (DPDP §5); null draws the initials mark. */
+    photoUrl: string | null;
+    told: boolean;
+  }[];
 }
 
 export async function appointmentsPanelView(slug: string): Promise<AppointmentsPanelView | null> {
@@ -53,6 +67,15 @@ export async function appointmentsPanelView(slug: string): Promise<AppointmentsP
       team: item.teamName,
     })),
     told: view.told,
+    rows: view.named.map((item) => ({
+      registrationId: item.registrationId,
+      name: item.listedName,
+      roles: item.roles.map((role) => ({ key: role, label: roleLabel(role) })),
+      team: item.teamName,
+      teamColor: item.teamColor,
+      photoUrl: consentedPhotoUrl(item, (key) => storage.readUrl(key)),
+      told: item.told,
+    })),
   };
 }
 

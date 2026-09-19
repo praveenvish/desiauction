@@ -1,6 +1,14 @@
 "use client";
 
-import { Button, Card, Dialog, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Dialog,
+  IconFile,
+  IconInfo,
+  IconSend,
+  SectionCard,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -53,24 +61,33 @@ export function SquadSheetsPanel({ slug, view }: { slug: string; view: SquadShee
       : `${people(view.pending)} on ${view.teams === 1 ? "1 team" : `${String(view.teams)} teams`} ${view.pending === 1 ? "hasn't" : "haven't"} had their squad sheet yet. Each gets the full squad, the captain and coach, and their first match — by email and in their inbox.${view.sent > 0 ? ` ${people(view.sent)} already sent.` : ""}`);
 
   return (
-    <Card data-testid="squad-sheets-panel">
-      <h2>Send squad sheets</h2>
-      <p className="competitions-hint" data-testid="squad-sheets-hint">
-        {hint}
-      </p>
-      {view.blocked === null && view.pending > 0 ? (
-        <div className="squad-sheets-actions">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setConfirming(true);
-            }}
-            data-testid="squad-sheets-send"
-          >
-            Send to {people(view.pending)}
-          </Button>
-        </div>
-      ) : null}
+    <>
+      <SectionCard
+        data-testid="squad-sheets-panel"
+        icon={<IconFile />}
+        tone="green"
+        title="Send squad sheets"
+        description={<span data-testid="squad-sheets-hint">{hint}</span>}
+      >
+        {view.blocked === null && view.pending > 0 ? (
+          <div className="tm-announce-foot">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setConfirming(true);
+              }}
+              data-testid="squad-sheets-send"
+            >
+              <IconSend size={18} className="icon-lead" aria-hidden />
+              Send to {people(view.pending)}
+            </Button>
+            <p className="tm-foot-note" data-tone="success">
+              <IconInfo size={18} aria-hidden />
+              Squad sheets include the team roster, captain, coach and first match.
+            </p>
+          </div>
+        ) : null}
+      </SectionCard>
       <Dialog
         open={confirming}
         onClose={() => {
@@ -99,6 +116,6 @@ export function SquadSheetsPanel({ slug, view }: { slug: string; view: SquadShee
           back, though anyone moved to another team later gets the new one.
         </p>
       </Dialog>
-    </Card>
+    </>
   );
 }

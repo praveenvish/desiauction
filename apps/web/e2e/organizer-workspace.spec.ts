@@ -189,7 +189,7 @@ test("founder demo: org → competition → approve → team roster → venue �
   await page.goto(`${competitionUrl}/teams`);
   await page
     .locator(".team-card", { hasText: "Malad Mavericks" })
-    .getByRole("link", { name: "Prepare roster" })
+    .getByRole("link", { name: "View team" })
     .click();
   // PX-5: registration captures names — the roster shows the person, not a number.
   await expect(page.getByTestId("roster-list")).toContainText("Player Two");

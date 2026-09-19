@@ -105,6 +105,10 @@ describe("ANNOUNCE — nobody hears until the organizer says so", () => {
       ["Arjun Sharma", ["captain"], "Cup Kings"],
     ]);
     expect(view.told).toBe(0);
+    // The organizer's table: everyone named, with their status.
+    expect(view.named.map((item) => [item.listedName, item.told])).toEqual([
+      ["Arjun Sharma", false],
+    ]);
     const queued = await db.select().from(messageOutbox).where(eq(messageOutbox.personId, captain));
     expect(queued).toHaveLength(0);
   });
@@ -134,6 +138,10 @@ describe("ANNOUNCE — nobody hears until the organizer says so", () => {
     const view = await appointmentsView(db, competitionId);
     expect(view.pending).toHaveLength(0);
     expect(view.told).toBe(1);
+    // Still in the table, now as told — with every role they hold.
+    expect(view.named.map((item) => [item.listedName, item.roles, item.told])).toEqual([
+      ["Arjun Sharma", ["captain"], true],
+    ]);
   });
 });
 

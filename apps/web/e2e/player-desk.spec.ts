@@ -170,7 +170,7 @@ test("the player desk: review in one pass, pre-sign, edit in place, export what 
   await page.goto(`${seasonUrl}/teams`);
   await page
     .locator(".team-card", { hasText: "Bandra Blasters" })
-    .getByRole("link", { name: "Prepare roster" })
+    .getByRole("link", { name: "View team" })
     .click();
   const icons = page.getByTestId("presign-isIcon");
   await icons.getByRole("combobox").fill("Desk Player 3");
