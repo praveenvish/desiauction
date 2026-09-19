@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, useToast } from "@desiauction/ui";
+import { Button, IconSend, SectionCard, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -41,41 +41,12 @@ export function AskReviewsCard({
   const askable = manage.askable.players + manage.askable.owners;
 
   return (
-    <Card data-testid="season-reviews-ask">
-      <h2>Ask for reviews</h2>
-      <p className="competitions-hint">
-        We email your players and team owners a link to review this season. What they write is read
-        by DesiAuction before it appears{isPublic ? " on your public season page" : ""}; you can
-        reply, but not edit or remove it.
-      </p>
-      <dl className="season-reviews-stats">
-        <div>
-          <dt>Could be asked now</dt>
-          <dd>
-            {manage.askable.players} {manage.askable.players === 1 ? "player" : "players"},{" "}
-            {manage.askable.owners} {manage.askable.owners === 1 ? "owner" : "owners"}
-          </dd>
-        </div>
-        <div>
-          <dt>Asked so far</dt>
-          <dd>{manage.asked}</dd>
-        </div>
-        <div>
-          <dt>Reviewed</dt>
-          <dd>
-            {manage.reviewed}
-            {manage.awaitingModeration > 0
-              ? ` (${String(manage.awaitingModeration)} being read)`
-              : ""}
-          </dd>
-        </div>
-      </dl>
-      <p className="competitions-hint">
-        Players are asked only if they&apos;re approved, have an email on file, and gave a date of
-        birth showing they&apos;re 18 or over. Anyone who has turned off feedback requests is
-        skipped.
-      </p>
-      <div>
+    <SectionCard
+      icon={<IconSend />}
+      tone="blue"
+      title="Ask for reviews"
+      description={`We email your players and team owners a link to review this season. What they write is read by DesiAuction before it appears${isPublic ? " on your public season page" : ""}; you can reply, but not edit or remove it.`}
+      action={
         <Button
           loading={pending}
           disabled={manage.nextAskAt !== null || askable === 0}
@@ -91,16 +62,33 @@ export function AskReviewsCard({
           }}
           data-testid="season-reviews-ask-button"
         >
+          <IconSend size={16} aria-hidden />
           {askable === 0 ? "Nobody left to ask" : `Ask ${String(askable)}`}
         </Button>
-      </div>
+      }
+      data-testid="season-reviews-ask"
+    >
+      <dl className="rv-ask-stats">
+        <div>
+          <dt>Could be asked now</dt>
+          <dd>
+            {manage.askable.players} {manage.askable.players === 1 ? "player" : "players"},{" "}
+            {manage.askable.owners} {manage.askable.owners === 1 ? "owner" : "owners"}
+          </dd>
+        </div>
+      </dl>
+      <p className="st-note rv-ask-note">
+        Players are asked only if they&apos;re approved, have an email on file, and gave a date of
+        birth showing they&apos;re 18 or over. Anyone who has turned off feedback requests is
+        skipped.
+      </p>
       {manage.nextAskAt !== null ? (
-        <p className="competitions-hint" data-testid="season-reviews-next-ask">
+        <p className="st-note rv-ask-note" data-testid="season-reviews-next-ask">
           You asked on {day(manage.lastAskedAt ?? manage.nextAskAt)}. You can ask again from{" "}
           {day(manage.nextAskAt)}.
         </p>
       ) : null}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -121,7 +109,7 @@ export function ReplyControl({
 
   if (!open) {
     return (
-      <div>
+      <div className="rv-reply-open">
         <Button
           size="sm"
           variant="ghost"
@@ -138,7 +126,7 @@ export function ReplyControl({
   const id = `reply-${reviewId}`;
   return (
     <form
-      className="season-reviews-reply"
+      className="rv-reply-form"
       onSubmit={(event) => {
         event.preventDefault();
         start(async () => {
@@ -153,7 +141,7 @@ export function ReplyControl({
         });
       }}
     >
-      <label htmlFor={id} className="season-reviews-reply-label">
+      <label htmlFor={id} className="rv-reply-label">
         Your reply, shown under the review
       </label>
       <textarea
@@ -161,12 +149,12 @@ export function ReplyControl({
         rows={3}
         maxLength={1000}
         value={text}
-        className="season-reviews-reply-input"
+        className="rv-reply-input"
         onChange={(event) => {
           setText(event.currentTarget.value);
         }}
       />
-      <div className="season-reviews-reply-actions">
+      <div className="rv-reply-actions">
         <Button type="submit" size="sm" loading={pending}>
           {text.trim() === "" && current !== null ? "Remove reply" : "Post reply"}
         </Button>
