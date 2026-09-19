@@ -165,7 +165,12 @@ const APP_WRITES_UNPROTECTED = [
  * the registration's own transaction, and this line is what keeps that grant
  * from being assumed again.
  */
-const APP_WRITES_PERSON = ["player_profiles", "consent_records"];
+/*
+ * `notification_preferences` joined 2026-09-19: the /account switches wrote it
+ * through the SYSTEM pool, which holds no INSERT here, so every switch failed in
+ * production and passed locally as the owner. It rides the app pool now.
+ */
+const APP_WRITES_PERSON = ["player_profiles", "consent_records", "notification_preferences"];
 
 function expectations(allTables: string[]): Expectation[] {
   const out: Expectation[] = [];

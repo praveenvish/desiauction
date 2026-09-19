@@ -27,6 +27,8 @@ const SAMPLE: Record<string, string> = {
   team: "Cup Kings",
   price: "Rs 75,000",
   role: "captain",
+  opponent: "Tigers",
+  when: "Sun, 4 Oct, 7:30 pm",
 };
 
 const PURPOSE: Record<TemplateKey, string> = {
@@ -41,6 +43,8 @@ const PURPOSE: Record<TemplateKey, string> = {
     "A player was bought by a team in their season's auction (sent when results are announced).",
   "team.appointed":
     "A player was named captain, vice-captain, icon or retained player of their team (sent when the organizer announces it).",
+  "lineup.announced":
+    "A player was named in their team's lineup for an upcoming match (sent when the organizer announces it).",
 };
 
 /** The one-time sign-in code. Sent through MSG91's OTP API, not the registry. */
@@ -139,12 +143,12 @@ lines.push(
   OTP_BODY.replace("{#var#}", "482913"),
   "```",
   "",
-  "## WhatsApp (optional, later)",
+  "## WhatsApp",
   "",
-  "WhatsApp authentication templates use Meta's fixed wording (\"{{1}} is your",
-  'verification code. For your security, do not share this code.") and are approved',
-  "in Meta Business Manager, not on DLT. Set `WHATSAPP_TEMPLATE_NAME` to the approved",
-  "template's name.",
+  "WhatsApp templates are approved in Meta Business Manager, not on DLT. The sign-in",
+  "code uses Meta's fixed authentication wording (set `WHATSAPP_TEMPLATE_NAME`); the",
+  "personal messages (a sale, a named role, a lineup) have their own sheet:",
+  "[WHATSAPP_TEMPLATES.md](WHATSAPP_TEMPLATES.md).",
   "",
 );
 

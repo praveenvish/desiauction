@@ -7,6 +7,7 @@ import {
 import { requesterAcknowledgement } from "../../../server/marketing/demo-mail";
 import {
   appointmentMail,
+  lineupMail,
   ownerSummaryMail,
   soldMail,
   squadSheetMail,
@@ -112,6 +113,22 @@ export default function EmailGalleryPage() {
         ],
         coach: "Suresh Iyer",
         firstMatch: "vs Tigers · Sun, 4 Oct 2026, 7:30 am · Malad Ground",
+      }),
+    },
+    {
+      name: "In the lineup — before a match (organizer presses Announce)",
+      mail: lineupMail({
+        name: "Arjun",
+        season: "Malad Premier League 2026",
+        teamName: "Cup Kings",
+        opponent: "Tigers",
+        when: "Sun, 4 Oct 2026, 7:30 am",
+        where: "Malad Ground",
+        lineup: [
+          { name: "Vikram Patel", note: "Captain" },
+          { name: "Arjun Sharma (you)", note: "Player" },
+          { name: "Rahul Desai", note: "Player" },
+        ],
       }),
     },
     {

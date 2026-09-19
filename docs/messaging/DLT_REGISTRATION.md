@@ -205,6 +205,28 @@ Example as received:
 DesiAuction: You are named captain of Cup Kings for Malad Premier League 2026. https://desiauction.in/home
 ```
 
+### lineup.announced (v1)
+
+A player was named in their team's lineup for an upcoming match (sent when the organizer announces it).
+
+| Field | Value |
+|---|---|
+| Content category | Service Implicit |
+| Variables | 3 — `team` (≤ 30), `opponent` (≤ 30), `when` (≤ 21) |
+| Env var for the MSG91 template id | `MSG91_TEMPLATE_LINEUP_ANNOUNCED` |
+
+Template text to register:
+
+```text
+DesiAuction: You are in the {#var#} lineup vs {#var#} on {#var#}. https://desiauction.in/home
+```
+
+Example as received:
+
+```text
+DesiAuction: You are in the Cup Kings lineup vs Tigers on Sun, 4 Oct, 7:30 pm. https://desiauction.in/home
+```
+
 ### Sign-in code (OTP)
 
 Sent through MSG91's OTP API (`MSG91_TEMPLATE_ID` in the web env), not the
@@ -222,10 +244,10 @@ Example as received:
 482913 is your DesiAuction sign-in code. It expires in 5 minutes. Never share it with anyone, including us.
 ```
 
-## WhatsApp (optional, later)
+## WhatsApp
 
-WhatsApp authentication templates use Meta's fixed wording ("{{1}} is your
-verification code. For your security, do not share this code.") and are approved
-in Meta Business Manager, not on DLT. Set `WHATSAPP_TEMPLATE_NAME` to the approved
-template's name.
+WhatsApp templates are approved in Meta Business Manager, not on DLT. The sign-in
+code uses Meta's fixed authentication wording (set `WHATSAPP_TEMPLATE_NAME`); the
+personal messages (a sale, a named role, a lineup) have their own sheet:
+[WHATSAPP_TEMPLATES.md](WHATSAPP_TEMPLATES.md).
 

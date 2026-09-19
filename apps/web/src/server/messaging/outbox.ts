@@ -11,6 +11,14 @@ import {
 import { db as appDb } from "../db";
 import { maySend } from "./consent";
 import { renderTemplate, SMS_TEMPLATES, type TemplateKey } from "./templates";
+import {
+  createWhatsAppSender,
+  whatsappOptedIn,
+  whatsappParams,
+  whatsappTemplateName,
+  WHATSAPP_TEMPLATES,
+  type PersonalWhatsAppSender,
+} from "./whatsapp";
 import { transactionalMailer, type TransactionalMailer } from "./transactional-mail";
 
 /**
@@ -60,6 +68,8 @@ export interface QueuedSms {
   readonly dedupeKey: string;
   readonly templateKey: TemplateKey;
   readonly slots: Readonly<Record<string, string>>;
+  /** The picture WhatsApp shows with it (0081) — the player card on a sale. */
+  readonly mediaUrl?: string | null;
 }
 
 /**
@@ -86,6 +96,7 @@ export async function enqueueSms(texts: readonly QueuedSms[], db: Db = appDb): P
         bodyHtml: "",
         templateKey: text.templateKey,
         slots: rendered.slots,
+        mediaUrl: text.mediaUrl ?? null,
       },
     ];
   });
@@ -165,6 +176,10 @@ export async function drainOutbox(
     db?: Db;
     mailer?: TransactionalMailer;
     sms?: PlayerSmsSender;
+    /** Omitted: the platform's (null when WhatsApp is not set up). */
+    whatsapp?: PersonalWhatsAppSender | null;
+    /** The approved template name for a key — injected by tests. */
+    whatsappTemplate?: (key: string) => string | undefined;
     now?: Date;
     limit?: number;
     /** Only these people's rows — a test's own, in a shared database. */
@@ -191,6 +206,7 @@ export async function drainOutbox(
     body_html: string;
     template_key: string | null;
     slots: Record<string, string> | null;
+    media_url: string | null;
     attempts: number;
   }>(sql`
     update ${messageOutbox}
@@ -204,7 +220,7 @@ export async function drainOutbox(
       for update skip locked
     )
     returning id, person_id, org_id, channel, subject, body_text, body_html,
-              template_key, slots, attempts
+              template_key, slots, media_url, attempts
   `);
 
   let sent = 0;
@@ -212,10 +228,14 @@ export async function drainOutbox(
   let failed = 0;
   let retrying = 0;
   let sms: PlayerSmsSender | null = null;
+  const whatsapp: TextChannels["whatsapp"] = {
+    sender: options.whatsapp === undefined ? createWhatsAppSender() : options.whatsapp,
+    templateName: options.whatsappTemplate ?? whatsappTemplateName,
+  };
   for (const row of claimed) {
     if (row.channel === "sms") {
       sms ??= options.sms ?? createPlayerSmsSender(db);
-      const result = await sendText(db, row, sms, options.now ?? new Date());
+      const result = await sendText(db, row, { sms, whatsapp }, options.now ?? new Date());
       if (result === "sent") sent += 1;
       else if (result === "suppressed") suppressed += 1;
       else if (result === "failed") failed += 1;
@@ -303,6 +323,14 @@ export function textWindowOpensAt(now: Date): Date {
   return new Date(opens.getTime() - IST_OFFSET_MS);
 }
 
+interface TextChannels {
+  readonly sms: PlayerSmsSender;
+  readonly whatsapp: {
+    readonly sender: PersonalWhatsAppSender | null;
+    readonly templateName: (key: string) => string | undefined;
+  };
+}
+
 async function sendText(
   db: Db,
   row: {
@@ -312,9 +340,10 @@ async function sendText(
     body_text: string;
     template_key: string | null;
     slots: Record<string, string> | null;
+    media_url: string | null;
     attempts: number;
   },
-  sender: PlayerSmsSender,
+  channels: TextChannels,
   now: Date,
 ): Promise<TextResult> {
   const opens = textWindowOpensAt(now);
@@ -335,7 +364,7 @@ async function sendText(
     return "failed";
   }
   const [person] = await db
-    .select({ phone: people.phone })
+    .select({ phone: people.phone, name: people.name })
     .from(people)
     .where(eq(people.id, row.person_id))
     .limit(1);
@@ -355,8 +384,45 @@ async function sendText(
     await settle(db, row.id, "suppressed", decision.reason);
     return "suppressed";
   }
+  /*
+   * WHATSAPP INSTEAD, for a player who opted in (founder decision, Phase 3):
+   * the same moment, one ping. Only when their latest answer is yes AND Meta
+   * has approved this template (its name is configured) AND the account is set
+   * up — otherwise it is the SMS below, exactly as before. The STOP list and
+   * the "Auction updates" switch above have already been honoured: they are
+   * about being messaged at all, whichever app it lands in.
+   *
+   * A WhatsApp failure is not the end of the moment: it falls straight back to
+   * SMS in this same pass (C-19, "SMS when WhatsApp is undeliverable"), and the
+   * row keeps the WhatsApp error so the fallback is visible.
+   */
+  let whatsappError: string | null = null;
+  const waTemplate = WHATSAPP_TEMPLATES[template.key];
+  const waName = channels.whatsapp.templateName(template.key);
+  if (
+    channels.whatsapp.sender !== null &&
+    waTemplate !== undefined &&
+    waName !== undefined &&
+    (await whatsappOptedIn(db, row.person_id))
+  ) {
+    try {
+      await channels.whatsapp.sender.send(person.phone, {
+        name: waName,
+        template: waTemplate,
+        params: whatsappParams(waTemplate, row.slots, person.name?.trim() || "there"),
+        imageUrl: row.media_url,
+      });
+      await db
+        .update(messageOutbox)
+        .set({ status: "sent", channel: "whatsapp", sentAt: now, lastError: null })
+        .where(eq(messageOutbox.id, row.id));
+      return "sent";
+    } catch (error) {
+      whatsappError = `WhatsApp: ${error instanceof Error ? error.message : "send failed"}`;
+    }
+  }
   try {
-    await sender.send(person.phone, { template, slots: row.slots, body: row.body_text });
+    await channels.sms.send(person.phone, { template, slots: row.slots, body: row.body_text });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "send failed";
     // A template with no registered DLT id will never deliver: fail it once,
@@ -376,7 +442,8 @@ async function sendText(
   }
   await db
     .update(messageOutbox)
-    .set({ status: "sent", sentAt: now, lastError: null })
+    // A WhatsApp failure that SMS covered stays on the row, so it is seen.
+    .set({ status: "sent", sentAt: now, lastError: whatsappError })
     .where(eq(messageOutbox.id, row.id));
   return "sent";
 }

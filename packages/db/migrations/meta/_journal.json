@@ -561,6 +561,13 @@
       "when": 1790611200000,
       "tag": "0080_message_outbox_sms",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1790697600000,
+      "tag": "0081_message_outbox_whatsapp",
+      "breakpoints": true
     }
   ]
 }

@@ -105,6 +105,7 @@ import {
   type RegistrationEditInput,
 } from "./registration-edit";
 import { playerDeskContext, type PlayerDeskContext } from "./player-desk";
+import { setWhatsappOptIn } from "../messaging/whatsapp";
 import type { ExportRows } from "../../lib/export-columns";
 import { captainLockRefusal } from "./captain-lock";
 import { captainRefusalMessage, marksFreezeWithRoster, squadMarksIn } from "./roster-lock";
@@ -1179,6 +1180,9 @@ export async function submitRegistrationAction(
   const source = formString(formData, "source");
   const consentText = formString(formData, "publicationConsentText");
   const guardianWording = formString(formData, "guardianConsentText");
+  // Phase 3: WhatsApp instead of SMS. Only a tick records anything — leaving
+  // it unticked is not a withdrawal of a yes given on /account.
+  const whatsappOptIn = formString(formData, "whatsappOptIn") === "true";
   /*
    * THE REGISTRATION AND WHAT THE PERSON AGREED TO COMMIT TOGETHER, OR NOT AT ALL.
    *
@@ -1220,6 +1224,14 @@ export async function submitRegistrationAction(
             publicationWording: consentText === "" ? null : consentText,
             guardian: minor ? { name: guardianName, wording: guardianWording || null } : null,
           });
+          if (whatsappOptIn) {
+            await setWhatsappOptIn(db, {
+              personId: session.personId,
+              granted: true,
+              source: "registration",
+              competition: slug,
+            });
+          }
         }
         return entered;
       },

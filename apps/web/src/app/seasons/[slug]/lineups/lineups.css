@@ -169,10 +169,16 @@
 
 .lineups-side-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
   padding-top: var(--space-3);
+}
+
+/* Save and Announce side by side, each on one line; the row wraps instead. */
+.lineups-side-foot > button {
+  white-space: nowrap;
 }
 
 .lineups-status {

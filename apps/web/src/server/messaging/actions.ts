@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { withTenantDb } from "@desiauction/db";
 
 import { currentSession } from "../auth/actions";
-import { dbHandle, systemDb } from "../db";
+import { db as appDb, dbHandle, systemDb } from "../db";
+import { setWhatsappOptIn, whatsappOptedIn } from "./whatsapp";
 import { ForbiddenError, can, requireCapability } from "../orgs/authz";
 import { resolveTenant } from "../orgs/orgs";
 import {
@@ -31,6 +32,8 @@ async function resolveTenantScoped(personId: string, slug: string) {
 
 export interface NotificationSettings {
   readonly topics: readonly { topic: string; label: string; detail: string; allowed: boolean }[];
+  /** Phase 3: auction and team texts on WhatsApp instead of SMS. */
+  readonly whatsapp: boolean;
 }
 
 export async function notificationSettings(): Promise<NotificationSettings | null> {
@@ -38,8 +41,12 @@ export async function notificationSettings(): Promise<NotificationSettings | nul
   if (session === null) {
     return null;
   }
-  const current = await preferencesFor(systemDb, session.personId, "sms");
+  const [current, whatsapp] = await Promise.all([
+    preferencesFor(systemDb, session.personId, "sms"),
+    whatsappOptedIn(systemDb, session.personId),
+  ]);
   return {
+    whatsapp,
     topics: NOTIFICATION_TOPICS.map((entry) => ({
       topic: entry.topic,
       label: entry.label,
@@ -64,9 +71,33 @@ export async function setNotificationPreferenceAction(
   }
   // Both channels. This wrote SMS alone, so switching Auction updates off
   // stopped the texts and never the emails (0079 checks the email row).
+  //
+  // On the APP pool. This wrote through `systemDb`, which in production holds
+  // INSERT on four tables and this is not one (verify-grants SYSTEM_MAY_WRITE):
+  // every switch on /account failed with "permission denied" on a live server
+  // and worked everywhere else, because every local process is the DB owner.
+  // No RLS on the table; the lock is that it only ever writes the session's
+  // own person.
   for (const channel of ["sms", "email"] as const) {
-    await setPreference(systemDb, { personId: session.personId, topic, channel, allowed });
+    await setPreference(appDb, { personId: session.personId, topic, channel, allowed });
   }
+  revalidatePath("/account");
+  return { ok: true };
+}
+
+/**
+ * WhatsApp instead of SMS (Phase 3). Consent, not a preference: every change is
+ * a new `consent_records` row with the wording shown, and the latest one wins.
+ * On the app pool, which may write consent (the system pool may not).
+ */
+export async function setWhatsappPreferenceAction(
+  granted: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Sign in to change your notification settings." };
+  }
+  await setWhatsappOptIn(appDb, { personId: session.personId, granted, source: "account" });
   revalidatePath("/account");
   return { ok: true };
 }

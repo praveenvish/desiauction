@@ -37,7 +37,8 @@ export type TemplateKey =
   | "registration.restored"
   | "security.phone_changed"
   | "auction.sold"
-  | "team.appointed";
+  | "team.appointed"
+  | "lineup.announced";
 
 /**
  * Transactional messages may be delivered to numbers on the DND registry;
@@ -245,6 +246,26 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
       { name: "competition", maxLength: DLT_VAR_MAX },
     ],
     providerTemplateEnv: "MSG91_TEMPLATE_TEAM_APPOINTED",
+  },
+  /*
+   * "Lineup", never "XI": the platform runs twelve sports and a kabaddi side is
+   * seven. Sent when the organizer presses Announce for a match still to come;
+   * a lineup recorded after the match tells nobody anything.
+   */
+  "lineup.announced": {
+    key: "lineup.announced",
+    version: "1",
+    channel: "sms",
+    locale: "en-IN",
+    category: "transactional",
+    // `{when}` is "Sun, 4 Oct, 7:30 pm" (smsWhen) — "Wed, 30 Sep, 12:30 pm", 21, at the longest.
+    body: `DesiAuction: You are in the {team} lineup vs {opponent} on {when}. ${SMS_LINK}`,
+    slots: [
+      { name: "team", maxLength: DLT_VAR_MAX },
+      { name: "opponent", maxLength: DLT_VAR_MAX },
+      { name: "when", maxLength: 21 },
+    ],
+    providerTemplateEnv: "MSG91_TEMPLATE_LINEUP_ANNOUNCED",
   },
 };
 

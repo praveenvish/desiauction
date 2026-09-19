@@ -205,6 +205,12 @@ export async function auctionOutcomeMessages(
         kind: "auction.sold",
         dedupeKey: `sms:auction.sold:${input.auctionId}:${sale.registrationId}`,
         templateKey: "auction.sold",
+        // The picture on WhatsApp: the player card itself where it is public
+        // (a public season, an adult); the brand card otherwise, never a minor.
+        mediaUrl:
+          publicCard === null
+            ? `${env.PUBLIC_BASE_URL}/brand/lockup.png`
+            : `${publicCard}/opengraph-image`,
         slots: {
           team: smsFit(sale.teamName),
           price: smsPrice(formatPaiseINR(paise(soldPrice))),
