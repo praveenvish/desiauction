@@ -229,7 +229,14 @@
    *
    * 420px clears every phase at 400px and up, with ~24px of headroom for a
    * longer name than the demo's; 460px clears the two-line name a narrow screen
-   * forces. Nothing is lost by the extra space: the phases that gain it —
+   * forces.
+   *
+   * THE PORTRAIT is then added on top, counted rather than measured: a lot on
+   * the block and an outcome splash both carry the player's face in a box of
+   * fixed size (`.ceremony-portrait` — 120px plus its 12px margin at 400px and
+   * up, 88px plus 12px below), so 420 + 132 = 552 and 460 + 100 = 560. The
+   * phases without a subject (connecting, between lots, complete) simply gain
+   * the space. Nothing is lost by the extra space: the phases that gain it —
    * connecting, between lots, complete — are exactly the phases with NO bid
    * control on screen, so the button a bidder reaches for is never pushed down
    * by this. When a lot is live the stage is at its natural height anyway.
@@ -239,7 +246,7 @@
    * TOP of the number above, and the stage renders 466px where the comment
    * promises 400. Measured that way round the first time. */
   box-sizing: border-box;
-  min-height: 420px;
+  min-height: 552px;
   padding: 32px 24px;
   text-align: center;
   background: var(--surface-sunken);
@@ -254,7 +261,7 @@
    at 390px. */
 @media (max-width: 399px) {
   .ceremony {
-    min-height: 460px;
+    min-height: 560px;
   }
 }
 
@@ -309,6 +316,33 @@
     color-mix(in srgb, var(--surface-sunken) 74%, transparent) 66%,
     color-mix(in srgb, var(--surface-sunken) 32%, transparent) 100%
   );
+}
+
+/* --- the portrait ----------------------------------------------------------- */
+/* The player's face — photo or branded mark — in a box of FIXED size, so it is
+   part of the stage's measured height (see `.ceremony`) rather than a row that
+   appears and disappears. The image fills the box (`PlayerImage fluid`). */
+.ceremony-portrait {
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 12px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+}
+
+@media (max-width: 399px) {
+  .ceremony-portrait {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+/* SOLD: the frame turns gold with the stage, and the face settles in with the
+   name — transform only, like every fact on this stage. */
+.ceremony-sold .ceremony-portrait {
+  box-shadow: 0 0 0 2px var(--ceremony-gold);
+  animation: ceremony-fact var(--duration-emphatic) var(--ease-out) both;
 }
 
 /* The registration number, inline inside a line the stage already had. */
@@ -477,7 +511,7 @@
 
 /* Beat 3's atmosphere: gold climbs the height of the stage. */
 .ceremony-drift {
-  --drift-height: 420px;
+  --drift-height: 552px;
 }
 
 /* Beat 2 — the stamp takes the title's place. */
@@ -610,6 +644,7 @@
 
   .ceremony-sold,
   .ceremony-sold .ceremony-backdrop img,
+  .ceremony-sold .ceremony-portrait,
   .ceremony-sold .ceremony-player,
   .ceremony-sold .ceremony-bid,
   .ceremony-leader--sold {
@@ -1376,7 +1411,9 @@
    whose whole job is naming players must never eat a name to fit a badge. */
 .squad-row {
   display: flex;
-  align-items: baseline;
+  /* Centre, not baseline: the row now opens with the player's face, and a
+     baseline row sits a 24px image on the text's baseline, not beside it. */
+  align-items: center;
   flex-wrap: wrap;
   gap: 2px var(--space-2);
   padding: var(--space-2) 0;
@@ -2094,6 +2131,13 @@
   letter-spacing: 0.24em;
 }
 
+/* The hall's portrait: bounded by the short edge like everything else here,
+   so a 16:9 wall still has room for the name, the price and the clock. */
+.stage-mode .ceremony-portrait {
+  width: clamp(7rem, min(18vw, 20vh), 13rem);
+  height: clamp(7rem, min(18vw, 20vh), 13rem);
+}
+
 .stage-mode .ceremony-player {
   font-size: clamp(2.5rem, min(11vw, 12vh), 8.5rem);
   line-height: 1.02;
@@ -2308,12 +2352,21 @@
 
 .up-next-list li {
   display: flex;
-  align-items: baseline;
+  /* Centre: each line opens with the player's face (see `.squad-row`). */
+  align-items: center;
   flex-wrap: wrap;
   gap: 2px var(--space-2);
   padding: var(--space-2) 0;
   border-top: 1px solid var(--border-subtle);
   font-size: var(--text-sm-size);
+}
+
+/* The live timeline and the owner's squad list open lines with a face; a
+   baseline (or top) row would hang the text off the image's edge. Scoped by
+   modifier because `.timeline` and `.conflict-list` are shared app-wide. */
+.timeline--faces li,
+.my-squad-list li {
+  align-items: center;
 }
 
 .up-next-list li:first-child {
@@ -2824,4 +2877,23 @@
   padding: 0;
   background: transparent;
   color: var(--text-muted);
+}
+
+/* --- faces on the record surfaces (ledger, replay) ------------------------- */
+/* The ledger's Lot cell and the replay's subject line open with the player's
+   face; the text keeps its own node, so the evidence reads exactly as before. */
+.ledger-lot,
+.replay-subject {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.replay-subject {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.replay-subject > p {
+  margin: 0;
 }

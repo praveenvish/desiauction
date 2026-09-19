@@ -1,3 +1,4 @@
+import { isMinor } from "@desiauction/core";
 import { people, registrations } from "@desiauction/db";
 import { sql } from "drizzle-orm";
 
@@ -27,3 +28,36 @@ export const shownPhotoKey = sql<
  * same place the photo came from. Always select the two together.
  */
 export const shownPhotoConsentAt = sql<Date | null>`case when ${registrations.enteredName} is null then ${people.photoConsentAt} else ${registrations.enteredPhotoConsentAt} end`;
+
+/** The two columns `shownPhotoKey` / `shownPhotoConsentAt` select, as read. */
+export interface ShownPhotoRow {
+  photoKey: string | null;
+  photoConsentAt: Date | null;
+}
+
+/**
+ * The shown photo as a URL for an AUTHENTICATED, capability-gated desk (the
+ * organizer's registrations, teams, squad and lineup screens): consent decides.
+ * Consent is checked before signing, so an unconsented photo never gets a URL
+ * that could leak.
+ */
+export function consentedPhotoUrl(
+  row: ShownPhotoRow,
+  readUrl: (key: string) => string,
+): string | null {
+  return row.photoConsentAt !== null && row.photoKey !== null ? readUrl(row.photoKey) : null;
+}
+
+/**
+ * The shown photo as a URL for anything a spectator, a rival or the public can
+ * reach (live rooms, broadcast pages, posters, share cards): consent AND age.
+ * PRR P0-2 (DPDP §9) — a minor's face never rides a public surface, whatever
+ * consent was recorded. Same rule as `toShowcasePlayer` on /c.
+ */
+export function publicPhotoUrl(
+  row: ShownPhotoRow & { dateOfBirth: string | null },
+  now: Date,
+  readUrl: (key: string) => string,
+): string | null {
+  return isMinor(row.dateOfBirth, now) ? null : consentedPhotoUrl(row, readUrl);
+}

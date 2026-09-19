@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, useToast } from "@desiauction/ui";
+import { Button, PlayerImage, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 
@@ -50,6 +50,7 @@ export function SquadPreSign({
   slug,
   teamId,
   teamName,
+  teamColor,
   roster,
   locked,
   settlesAtOpen,
@@ -57,6 +58,8 @@ export function SquadPreSign({
   slug: string;
   teamId: string;
   teamName: string;
+  /** Tints each holder's initials mark, as the roster below draws it. */
+  teamColor: string | null;
   roster: readonly TeamRosterRow[];
   /** The auction has started — Icon and Retained are frozen with the roster. */
   locked: boolean;
@@ -90,11 +93,15 @@ export function SquadPreSign({
   }, [slug, roster]);
 
   const members = useMemo(() => {
-    const byId = new Map<string, { id: string; name: string } & Record<Slot, boolean>>();
+    const byId = new Map<
+      string,
+      { id: string; name: string; photoUrl: string | null } & Record<Slot, boolean>
+    >();
     for (const row of roster) {
       byId.set(row.registrationId, {
         id: row.registrationId,
         name: row.name ?? "Unnamed",
+        photoUrl: row.photoUrl,
         isCaptain: row.isCaptain,
         isIcon: row.isIcon,
         isRetained: row.isRetained,
@@ -104,6 +111,8 @@ export function SquadPreSign({
       const current = byId.get(id) ?? {
         id,
         name: patch.name ?? "Player",
+        // Picked a moment ago and not on the roster yet: the picker's own row has the photo.
+        photoUrl: candidates?.find((candidate) => candidate.id === id)?.photoUrl ?? null,
         isCaptain: false,
         isIcon: false,
         isRetained: false,
@@ -111,7 +120,7 @@ export function SquadPreSign({
       byId.set(id, { ...current, ...stripName(patch) });
     }
     return [...byId.values()];
-  }, [roster, pending]);
+  }, [roster, pending, candidates]);
 
   const write = async (
     id: string,
@@ -196,6 +205,15 @@ export function SquadPreSign({
             <ul className="pd-presign-list">
               {holders.map((member) => (
                 <li key={member.id} className="pd-presign-person">
+                  <PlayerImage
+                    name={member.name}
+                    seed={member.id}
+                    src={member.photoUrl}
+                    size="sm"
+                    shape="round"
+                    teamColor={teamColor ?? undefined}
+                    decorative
+                  />
                   <span>{member.name}</span>
                   {!frozen ? (
                     <button
@@ -394,7 +412,17 @@ function PlayerPicker({
                   setActive(index);
                 }}
               >
-                <span>{candidate.name ?? "Unnamed"}</span>
+                <span className="pd-picker-who">
+                  <PlayerImage
+                    name={candidate.name ?? "Unnamed"}
+                    seed={candidate.id}
+                    src={candidate.photoUrl}
+                    size="xs"
+                    shape="round"
+                    decorative
+                  />
+                  <span>{candidate.name ?? "Unnamed"}</span>
+                </span>
                 <span className="pd-quiet">
                   {candidate.teamId === teamId
                     ? "on this team"

@@ -12,7 +12,12 @@ import {
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { rulesOf } from "./live-summary";
-import { shownName } from "../competition/shown-name";
+import {
+  publicPhotoUrl,
+  shownName,
+  shownPhotoConsentAt,
+  shownPhotoKey,
+} from "../competition/shown-name";
 
 /**
  * The Auction tab's operational dashboard (PX "Season Workspace" → Auction):
@@ -51,8 +56,18 @@ export interface AuctionPaddleRow {
 }
 
 export interface AuctionOnBlock {
+  lotId: string;
+  /** The mark's seed (lib/player-seed): the registration behind the lot. */
+  registrationId: string;
   lotNumber: string;
   playerName: string | null;
+  /**
+   * The player's face, under the broadcast rule (consent AND not a minor —
+   * `publicPhotoUrl`): this read reaches every member of the org, rival owners
+   * included, and the same face is about to go up on the projector anyway.
+   * Null without a signer (see `options.readUrl`) — the mark stands in.
+   */
+  photoUrl: string | null;
   /** Null in a sport whose pack declares no playing roles (Phase 2). */
   role: string | null;
   basePrice: number;
@@ -110,7 +125,11 @@ export async function auctionOverview(
    */
   /** The season's sport — it decides what a role is called. */
   sport: string,
-  options: { money: boolean } = { money: true },
+  options: {
+    money: boolean;
+    /** Signs the on-block player's photo key; injected so this read stays free of the storage adapter. */
+    readUrl?: (key: string) => string;
+  } = { money: true },
 ): Promise<AuctionOverview> {
   const rules = rulesOf(config);
 
@@ -126,6 +145,10 @@ export async function auctionOverview(
         soldToPaddleId: lots.soldToPaddleId,
         playerName: shownName,
         role: registrations.role,
+        registrationId: lots.registrationId,
+        photoKey: shownPhotoKey,
+        photoConsentAt: shownPhotoConsentAt,
+        dateOfBirth: registrations.dateOfBirth,
       })
       .from(lots)
       .innerJoin(registrations, eq(registrations.id, lots.registrationId))
@@ -191,8 +214,12 @@ export async function auctionOverview(
       .limit(1);
     const leading = top === undefined ? undefined : paddleById.get(top.paddleId);
     onBlock = {
+      lotId: live.lotId,
+      registrationId: live.registrationId,
       lotNumber: live.lotNumber,
       playerName: live.playerName,
+      photoUrl:
+        options.readUrl === undefined ? null : publicPhotoUrl(live, new Date(), options.readUrl),
       role: live.role,
       basePrice: live.basePrice,
       currentBid: top?.amount ?? null,

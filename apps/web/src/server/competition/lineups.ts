@@ -9,7 +9,8 @@ import {
   type Db,
 } from "@desiauction/db";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import { shownName } from "./shown-name";
+import { storage } from "../media";
+import { consentedPhotoUrl, shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
  * WHO PLAYED EACH MATCH (launch polish, Phase 3) — the domain half.
@@ -28,6 +29,8 @@ export interface LineupSide {
   players: {
     registrationId: string;
     name: string;
+    /** The shown photo, signed only with recorded consent (DPDP §5); null → initials mark. */
+    photoUrl: string | null;
     role: string | null;
     isCaptain: boolean;
     played: boolean;
@@ -109,6 +112,8 @@ export async function lineupSides(
         registrationId: registrations.id,
         teamId: registrations.teamId,
         name: shownName,
+        photoKey: shownPhotoKey,
+        photoConsentAt: shownPhotoConsentAt,
         role: registrations.role,
         isCaptain: registrations.isCaptain,
       })
@@ -138,6 +143,7 @@ export async function lineupSides(
       .map((row) => ({
         registrationId: row.registrationId,
         name: row.name ?? "Unnamed player",
+        photoUrl: consentedPhotoUrl(row, (key) => storage.readUrl(key)),
         role: row.role,
         isCaptain: row.isCaptain,
         played: playedIds.has(row.registrationId),

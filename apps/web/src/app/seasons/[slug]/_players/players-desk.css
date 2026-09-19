@@ -1383,6 +1383,14 @@
   font-size: var(--text-sm-size);
 }
 
+/* Photo (or initials mark) + name, kept together on the left of the option. */
+.pd-picker-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .pd-picker-option[aria-selected="true"],
 .pd-picker-option:hover {
   background: var(--surface-sunken);

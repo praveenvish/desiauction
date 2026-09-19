@@ -1801,9 +1801,12 @@ export async function registrationDetailAction(
 }
 
 export interface SquadCandidate {
+  /** The registration id — also the seed of the player's initials mark. */
   id: string;
   number: string;
   name: string | null;
+  /** Consent-gated (DPDP §5) by `queryRegistrations`; null → initials mark. */
+  photoUrl: string | null;
   role: string | null;
   teamId: string | null;
   teamName: string | null;
@@ -1836,6 +1839,7 @@ export async function squadCandidatesAction(slug: string): Promise<SquadCandidat
           id: row.id,
           number: row.number,
           name: row.name,
+          photoUrl: row.photoUrl,
           role: row.role,
           teamId: row.teamId,
           teamName: row.teamName,

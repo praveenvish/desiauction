@@ -222,9 +222,10 @@ export function ShowcaseGrid({
                   >
                     <PlayerImage
                       name={p.name}
-                      seed={p.number}
+                      seed={p.registrationId}
                       size="xl"
-                      {...(p.photoUrl !== null ? { src: p.photoUrl } : {})}
+                      src={p.photoUrl}
+                      decorative
                     />
                     <span className="showcase-card-body">
                       <span className="showcase-card-name">{p.name}</span>
@@ -268,9 +269,10 @@ export function ShowcaseGrid({
           <div className="showcase-detail">
             <PlayerImage
               name={selected.name}
-              seed={selected.number}
+              seed={selected.registrationId}
               size="hero"
-              {...(selected.photoUrl !== null ? { src: selected.photoUrl } : {})}
+              src={selected.photoUrl}
+              decorative
             />
             <dl className="showcase-detail-meta">
               <dt>Number</dt>

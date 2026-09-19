@@ -92,7 +92,8 @@ body:has(.obs-overlay) {
 }
 .obs-ticker-item {
   display: inline-flex;
-  align-items: baseline;
+  /* Centre: a sale opens with the player's face, which has no baseline to share. */
+  align-items: center;
   gap: 8px;
   margin: 0 28px;
   font-size: 15px;

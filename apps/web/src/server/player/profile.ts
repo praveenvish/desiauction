@@ -13,6 +13,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { dbHandle } from "../db";
 import { logSecurityEvent } from "../auth/security-events";
+import { storage } from "../media";
 
 /**
  * THE PERSON-LEVEL CRICKET PROFILE (PI-1).
@@ -276,6 +277,24 @@ export async function profileCompletenessFor(
     defaultBowlingStyle: anyAttribute("bowling_style"),
     passkeyCount: knownPasskeys,
   });
+}
+
+/**
+ * The person's OWN photo, as a URL for their own pages (/me, /me/[sport],
+ * /account), or null. Self-scoped like everything here: the caller passes the
+ * session's person id. Consent is captured at upload (`media/authz`) and the
+ * render stays gated on it (DPDP §5) — an erased or consent-less key never gets
+ * a URL. No age gate: this is a person looking at their own face, signed in.
+ */
+export async function ownPhotoUrl(personId: string): Promise<string | null> {
+  const [row] = await dbHandle.db
+    .select({ photoKey: people.photoUrl, photoConsentAt: people.photoConsentAt })
+    .from(people)
+    .where(eq(people.id, personId))
+    .limit(1);
+  return row !== undefined && row.photoConsentAt !== null && row.photoKey !== null
+    ? storage.readUrl(row.photoKey)
+    : null;
 }
 
 /** Whether a profile row exists at all — the /home nudge's "is this a player?" half. */

@@ -1433,9 +1433,10 @@ function PlayerRow({
         <div className="pd-player">
           <PlayerImage
             name={row.name ?? "Player"}
-            seed={row.personId}
+            seed={row.id}
             size="sm"
-            {...(row.photoUrl !== null ? { src: row.photoUrl } : {})}
+            src={row.photoUrl}
+            decorative
           />
           <div className="pd-player-text">
             <button

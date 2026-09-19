@@ -1227,6 +1227,13 @@
   color: var(--text-primary);
 }
 
+/* The on-block player: their mark, then the name — one line, aligned. */
+.home-live-facts dd.home-live-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .home-live-role,
 .home-live-team {
   color: var(--text-secondary);

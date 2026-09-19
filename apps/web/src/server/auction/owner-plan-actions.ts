@@ -17,7 +17,13 @@ import { dbHandle } from "../db";
 import { featureEnabled } from "../feature-settings";
 import { storage } from "../media";
 import { liveGate } from "./live-actions";
-import { lotMediaOf, preSignedPlayers, rulesOf, type AuctionRules } from "./live-summary";
+import {
+  lotMediaOf,
+  preSignedPlayers,
+  rulesOf,
+  type AuctionRules,
+  type LotMedia,
+} from "./live-summary";
 import {
   addTarget,
   lotSalesOf,
@@ -86,7 +92,7 @@ export interface PlanView {
   /** The pool: every lot of the auction, as the queue already shows it. */
   lots: PlanLotRow[];
   /** Consent-gated photo and registration number per lot (the live room's `lotMedia`). */
-  lotMedia: Record<string, { photoUrl: string | null; number: string | null }>;
+  lotMedia: Record<string, LotMedia>;
   targets: TargetRow[];
   /** Roles of the pre-signed players already on this team (icons, retained). */
   preSignedRoles: string[];
@@ -140,7 +146,7 @@ export async function planView(
           .where(inArray(teams.id, gate.planTeamIds)),
         planLots(db, gate.auction.id),
         targetsOf(db, gate.auction.id, gated.teamId),
-        preSignedPlayers(db, gate.competition.id),
+        preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
         lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
       ]);
       const team = teamRows.find((row) => row.id === gated.teamId);

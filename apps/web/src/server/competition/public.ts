@@ -164,6 +164,13 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
 }
 
 export interface ShowcasePlayer {
+  /**
+   * The registration's id — the avatar SEED, so the initials mark this player
+   * wears here is the one they wear on the organizer's desk and in the live
+   * room. Already public on /spectate (`ResolvedLot.registrationId`); it names
+   * a season entry, not a person, and unlocks nothing without a grant.
+   */
+  registrationId: string;
   number: string;
   name: string;
   role: string | null;
@@ -193,6 +200,7 @@ export interface ShowcasePlayer {
 }
 
 interface ShowcaseRow {
+  registrationId: string;
   number: string;
   name: string | null;
   role: string | null;
@@ -218,6 +226,16 @@ interface ShowcaseRow {
 const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold'))`;
 
 /**
+ * The stored photo KEY a public surface may render, or null — the same two
+ * gates `toShowcasePlayer` applies to `photoUrl` (consent AND not a minor), for
+ * the one caller that needs bytes rather than a URL: the share card inlines
+ * the image because the rasterizer cannot fetch a relative path.
+ */
+function publicPhotoKey(r: ShowcaseRow, now: Date): string | null {
+  return isMinor(r.dateOfBirth, now) || r.photoConsentAt === null ? null : r.photoKey;
+}
+
+/**
  * Row → public player: consent-gates the photo, derives age, maps squad→status.
  *
  * Status was derived from `team_id` alone, so an APPROVED ICON with no team yet
@@ -238,7 +256,9 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
   // organizer still sees the full roster on the authenticated, capability-gated
   // review screens; only public exposure is withheld.
   const minor = isMinor(r.dateOfBirth, now);
+  const photoKey = publicPhotoKey(r, now);
   return {
+    registrationId: r.registrationId,
     number: r.number,
     name: r.name ?? "Unnamed",
     role: r.role,
@@ -251,10 +271,7 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
       sport,
       (r.attributes ?? {}) as Readonly<Record<string, unknown>>,
     ),
-    photoUrl:
-      !minor && r.photoConsentAt !== null && r.photoKey !== null
-        ? storage.readUrl(r.photoKey)
-        : null,
+    photoUrl: photoKey === null ? null : storage.readUrl(photoKey),
     status: r.preSigned ? "retained" : r.teamId === null ? "available" : "sold",
     preSignedAs: r.preSigned ? preSignedKind(r) : null,
     teamName: r.teamName,
@@ -320,6 +337,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
   const now = new Date();
   const rows = await systemDb
     .select({
+      registrationId: registrations.id,
       number: registrations.registrationNumber,
       name: shownName,
       role: registrations.role,
@@ -388,6 +406,19 @@ export interface PublicPlayer extends ShowcasePlayer {
  * link.
  */
 export async function publicPlayer(slug: string, number: string): Promise<PublicPlayer | null> {
+  return (await publicPlayerCard(slug, number))?.player ?? null;
+}
+
+/**
+ * The player share card's read (`/c/[slug]/p/[number]` OG + Twitter images):
+ * the public player, plus the stored photo key ONLY when the public gate
+ * passes (consent recorded, not a minor). Server-side only — the key never
+ * reaches a page payload; the image route inlines its bytes.
+ */
+export async function publicPlayerCard(
+  slug: string,
+  number: string,
+): Promise<{ player: PublicPlayer; photoKey: string | null } | null> {
   const [comp] = await systemDb
     .select({
       id: competitions.id,
@@ -410,6 +441,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
   const [row] = await systemDb
     .select({
       personId: registrations.personId,
+      registrationId: registrations.id,
       number: registrations.registrationNumber,
       name: shownName,
       role: registrations.role,
@@ -461,13 +493,17 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
     )
     .orderBy(desc(competitions.startsOn))
     .limit(6);
+  const now = new Date();
   return {
-    ...toShowcasePlayer(row, new Date(), comp.sport),
-    competitionName: comp.name,
-    competitionSlug: comp.slug,
-    sport: comp.sport,
-    competitionOpen: comp.status === "registration_open",
-    alsoPlayedIn,
+    player: {
+      ...toShowcasePlayer(row, now, comp.sport),
+      competitionName: comp.name,
+      competitionSlug: comp.slug,
+      sport: comp.sport,
+      competitionOpen: comp.status === "registration_open",
+      alsoPlayedIn,
+    },
+    photoKey: publicPhotoKey(row, now),
   };
 }
 

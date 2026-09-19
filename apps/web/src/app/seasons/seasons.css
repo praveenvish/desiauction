@@ -2107,20 +2107,6 @@ p + .date-row {
   gap: var(--space-3);
 }
 
-.roster-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  flex-shrink: 0;
-}
-
 .roster-person {
   display: flex;
   flex-direction: column;

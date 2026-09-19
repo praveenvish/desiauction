@@ -196,7 +196,7 @@ export async function seasonOverview(
   const rules = rulesOf(auction.config);
   const [lots, preSigned] = await Promise.all([
     resolvedLots(db, auction.id),
-    preSignedPlayers(db, competition.id),
+    preSignedPlayers(db, competition.id, (key) => storage.readUrl(key)),
   ]);
 
   // Fold the sold lots into per-team spend and squad counts. Icons and retained

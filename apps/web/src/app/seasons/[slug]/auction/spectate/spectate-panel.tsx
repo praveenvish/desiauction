@@ -260,6 +260,7 @@ export function SpectatePanel({
           variant="shell"
           audience="public"
           offline={offline}
+          lotMedia={lotMedia}
         />
       </PageStatus>
       <SaleAnnouncer snapshot={snapshot} />
@@ -404,7 +405,7 @@ export function SpectatePanel({
             </div>
           </Card>
 
-          <AuctionTimeline feed={feed} />
+          <AuctionTimeline feed={feed} lotMedia={lotMedia} />
         </div>
 
         <div className="live-col">
@@ -420,7 +421,7 @@ export function SpectatePanel({
               squadSizes={squadSizesOf(teams, preSigned, feed.resolved)}
             />
           </div>
-          <UpNext snapshot={snapshot} />
+          <UpNext snapshot={snapshot} lotMedia={lotMedia} />
           <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
           {/* Same reason as the live room and the cockpit: the component renders
               its own connecting state, so guarding it here would move everything
@@ -438,6 +439,7 @@ export function SpectatePanel({
         <SquadBoard
           roles={roles}
           teams={teams}
+          lotMedia={lotMedia}
           preSigned={preSigned}
           resolved={feed.resolved}
           snapshot={snapshot}

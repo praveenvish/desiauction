@@ -1,10 +1,11 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type PlanState } from "@desiauction/core";
-import { Badge, ButtonLink, Card, IconTrophy } from "@desiauction/ui";
+import { Badge, ButtonLink, Card, IconTrophy, PlayerImage } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
-import type { AuctionRules, ResolvedLot } from "../../../../server/auction/live-summary";
+import { lotSeed } from "../../../../lib/player-seed";
+import type { AuctionRules, LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
 import { fitBadge } from "./plan/plan-model";
 
 // PX-6 live-experience kit: presentation over the broadcast AuctionSnapshot
@@ -26,6 +27,42 @@ export interface FeedEvent {
     | "completed";
   label: string;
   detail: string | null;
+  /**
+   * The lot an outcome is about, so the timeline can put the player's face on
+   * the line. Absent on auction-wide events (paused, recovered, completed).
+   */
+  subject?: { lotId: string; playerName: string | null };
+}
+
+/** Faces keyed by lot id, as every live view carries them (`lotMediaOf`). */
+type MediaByLot = Readonly<Record<string, LotMedia>>;
+
+/**
+ * A player's face on a live list row: photo or branded mark, seeded by the
+ * registration (lib/player-seed). Decorative — every caller prints the name
+ * right beside it.
+ */
+function LotFace({
+  lotId,
+  name,
+  lotMedia,
+  size = "xs",
+}: {
+  lotId: string;
+  name: string;
+  lotMedia: MediaByLot;
+  size?: "xs" | "sm";
+}) {
+  return (
+    <PlayerImage
+      name={name}
+      seed={lotSeed(lotId, lotMedia)}
+      src={lotMedia[lotId]?.photoUrl}
+      size={size}
+      shape="round"
+      decorative
+    />
+  );
 }
 
 export interface LiveFeed {
@@ -105,6 +142,7 @@ export function foldSnapshot(feed: FeedState, snapshot: AuctionSnapshot): FeedSt
                   ? `${outcome.playerName ?? outcome.lotNumber} — reopened (undo)`
                   : `${outcome.playerName ?? outcome.lotNumber} — withdrawn`,
         detail: outcome.amount !== null ? formatPaiseINR(paise(outcome.amount)) : null,
+        subject: { lotId: outcome.lotId, playerName: outcome.playerName },
       },
       ...events,
     ];
@@ -195,17 +233,32 @@ const FEED_TONE: Record<FeedEvent["kind"], "success" | "neutral" | "warning" | "
   };
 
 /** The auction timeline: outcomes and conduct events, newest first. */
-export function AuctionTimeline({ feed, limit = 12 }: { feed: LiveFeed; limit?: number }) {
+export function AuctionTimeline({
+  feed,
+  limit = 12,
+  lotMedia = {},
+}: {
+  feed: LiveFeed;
+  limit?: number;
+  lotMedia?: MediaByLot;
+}) {
   if (feed.events.length === 0) {
     return null;
   }
   return (
     <Card data-testid="auction-timeline">
       <h2>Auction timeline</h2>
-      <ol className="timeline">
+      <ol className="timeline timeline--faces">
         {feed.events.slice(0, limit).map((event) => (
           <li key={event.key} data-testid={`timeline-${event.kind}`}>
             <Badge tone={FEED_TONE[event.kind]}>{event.kind}</Badge>
+            {event.subject === undefined ? null : (
+              <LotFace
+                lotId={event.subject.lotId}
+                name={event.subject.playerName ?? ""}
+                lotMedia={lotMedia}
+              />
+            )}
             <span>{event.label}</span>
             {event.detail !== null ? <span className="timeline-at">{event.detail}</span> : null}
           </li>
@@ -278,6 +331,7 @@ export function MyTeamCard({
   feed,
   squadSize,
   plan = null,
+  lotMedia = {},
 }: {
   snapshot: AuctionSnapshot | null;
   myTeamId: string;
@@ -299,6 +353,8 @@ export function MyTeamCard({
    * none — in which case the card is exactly what it was before plans existed.
    */
   plan?: PlanState | null;
+  /** Faces for the squad list, keyed by lot id. */
+  lotMedia?: MediaByLot;
 }) {
   const paddle = snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null;
   const fit = plan === null ? null : fitBadge(plan.budget.fit);
@@ -361,10 +417,16 @@ export function MyTeamCard({
         </div>
       ) : null}
       {squad.length > 0 ? (
-        <ul className="conflict-list" data-testid="my-squad">
+        <ul className="conflict-list my-squad-list" data-testid="my-squad">
           {squad.map((lot) => (
             <li key={lot.lotId}>
               <Badge tone="success">{lot.lotNumber}</Badge>
+              <LotFace
+                lotId={lot.lotId}
+                name={lot.playerName ?? "Unnamed"}
+                lotMedia={lotMedia}
+                size="sm"
+              />
               <span className="registration-name">{lot.playerName ?? "Unnamed"}</span>
               <span className="registration-phone">
                 {lot.soldPrice !== null ? formatPaiseINR(paise(lot.soldPrice)) : ""}
@@ -499,9 +561,12 @@ export function AuctionSummaryCard({
 export function UpNext({
   snapshot,
   limit = 5,
+  lotMedia = {},
 }: {
   snapshot: AuctionSnapshot | null;
   limit?: number;
+  /** Faces for the queue, keyed by lot id. */
+  lotMedia?: MediaByLot;
 }) {
   const queue = snapshot?.queue ?? [];
   if (queue.length === 0) {
@@ -519,6 +584,12 @@ export function UpNext({
             <span className="up-next-pos" aria-hidden>
               {index + 1}
             </span>
+            <LotFace
+              lotId={entry.lotId}
+              name={entry.playerName ?? entry.lotNumber}
+              lotMedia={lotMedia}
+              size="sm"
+            />
             <span className="up-next-name">{entry.playerName ?? entry.lotNumber}</span>
             <span className="up-next-role">{entry.role.replace(/_/g, " ")}</span>
             <span className="up-next-base">base {formatPaiseINR(paise(entry.basePrice))}</span>

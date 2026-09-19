@@ -11,20 +11,6 @@
   gap: var(--space-5);
 }
 
-.me-avatar {
-  width: 64px;
-  height: 64px;
-  flex: none;
-  border-radius: var(--radius-full);
-  background: var(--identity-field-deep);
-  color: var(--identity-accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--text-xl-size);
-  font-weight: var(--font-weight-semibold);
-}
-
 .me-who {
   flex: 1 1 auto;
   min-width: 0;
