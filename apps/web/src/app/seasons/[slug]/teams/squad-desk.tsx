@@ -244,8 +244,8 @@ export function SquadPreSign({
       })}
       {settlesAtOpen ? (
         <p className="pd-setting-hint pd-presign-note" data-testid="presign-settles-at-open">
-          The auction is set up, and these still count: when it opens, anyone marked here is
-          taken off the block and anyone unmarked gets a lot.
+          The auction is set up, and these still count: when it opens, anyone marked here is taken
+          off the block and anyone unmarked gets a lot.
         </p>
       ) : null}
     </section>
