@@ -506,7 +506,7 @@ function RosterDetail({
                                 account with no number, because SMS is the only way a
                                 season reaches them. The fallback is for the rows that
                                 predate that rule, not a state the product creates. */}
-                            <span className="tm-roster-phone">
+                            <span className="tm-roster-phone roster-phone" data-private>
                               {row.phone !== null ? formatPhone(row.phone) : "—"}
                             </span>
                           </span>

@@ -1617,7 +1617,7 @@ function PlayerRow({
             <span className="pd-player-meta">
               <span className="pd-mono">{row.number}</span>
               {/* DA-35: never raw E.164 at a human. */}
-              <span>{personContact(row)}</span>
+              <span data-private>{personContact(row)}</span>
             </span>
             {row.duplicateName || categoryFlagged ? (
               <span className="pd-player-flags">

@@ -237,7 +237,7 @@ export function PlayerSheet({
             </h2>
             <p className="pd-sheet-meta">
               <span className="pd-mono">{row.number}</span>
-              <span>{personContact(row)}</span>
+              <span data-private>{personContact(row)}</span>
               {row.age !== null ? <span>{row.age} yrs</span> : null}
             </p>
             <div className="pd-chips">
@@ -526,7 +526,9 @@ function DetailsTab({
             <div className="pd-setting-head">
               <span>Contact</span>
             </div>
-            <p className="pd-readonly">{personContact(row)}</p>
+            <p className="pd-readonly" data-private>
+              {personContact(row)}
+            </p>
             <p className="pd-setting-hint">A number is who the player is — it can’t be edited.</p>
           </div>
           <TextSetting
