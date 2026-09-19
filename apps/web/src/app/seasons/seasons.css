@@ -3418,3 +3418,8 @@ p + .date-row {
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border-subtle);
 }
+
+/* Send squad sheets: the button keeps the list's rhythm below the hint. */
+.squad-sheets-actions {
+  margin-top: var(--space-4);
+}

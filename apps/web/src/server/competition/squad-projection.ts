@@ -1,6 +1,8 @@
 import { registrations, teams, type Db } from "@desiauction/db";
 import { and, eq, sql } from "drizzle-orm";
 
+import { preSignedSql } from "./pre-signed";
+
 /**
  * THE squad read model (DA-09).
  *
@@ -20,7 +22,7 @@ export interface TeamSquad {
   teamId: string;
   /** Auction wins plus pre-signed players — everyone who occupies a slot. */
   size: number;
-  /** Pre-signed (icon) players, already inside `size`. */
+  /** Pre-signed (icon / captain / retained) players, already inside `size`. */
   preSigned: number;
 }
 
@@ -29,7 +31,7 @@ export async function squadSizes(db: Db, competitionId: string): Promise<Map<str
     .select({
       teamId: registrations.teamId,
       size: sql<number>`count(*)::int`,
-      preSigned: sql<number>`count(*) filter (where ${registrations.isIcon})::int`,
+      preSigned: sql<number>`count(*) filter (where ${preSignedSql})::int`,
     })
     .from(registrations)
     .where(

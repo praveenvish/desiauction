@@ -16,7 +16,8 @@ import { and, asc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
 import { env } from "../../env";
 import { shownName } from "../competition/shown-name";
-import type { QueuedMail } from "../messaging/outbox";
+import type { QueuedMail, QueuedSms } from "../messaging/outbox";
+import { smsFit, smsPrice, smsSeasonName } from "../messaging/templates";
 import { ownerSummaryMail, soldMail, unsoldMail, type SquadLine } from "../messaging/player-mail";
 
 /**
@@ -46,11 +47,17 @@ interface SaleRow {
   teamName: string | null;
 }
 
-export async function auctionOutcomeMails(
+export interface OutcomeMessages {
+  readonly mails: QueuedMail[];
+  /** One line of SMS per SALE. Never for "not picked", never for owners. */
+  readonly texts: QueuedSms[];
+}
+
+export async function auctionOutcomeMessages(
   db: Db,
   input: { auctionId: string; competitionId: string },
   now: Date = new Date(),
-): Promise<QueuedMail[]> {
+): Promise<OutcomeMessages> {
   const [context] = await db
     .select({
       season: competitions.name,
@@ -66,7 +73,7 @@ export async function auctionOutcomeMails(
     .where(eq(auctions.id, input.auctionId))
     .limit(1);
   if (context === undefined) {
-    return [];
+    return { mails: [], texts: [] };
   }
   const config = context.config as { pursePerTeam?: number; squadMin?: number; squadMax?: number };
 
@@ -157,6 +164,7 @@ export async function auctionOutcomeMails(
   const topCount = soldPrices.filter((price) => price === topPrice).length;
 
   const mails: QueuedMail[] = [];
+  const texts: QueuedSms[] = [];
   for (const sale of sales) {
     const name = sale.personName?.trim() || "there";
     if (sale.status === "sold" && sale.teamId !== null && sale.teamName !== null) {
@@ -190,6 +198,18 @@ export async function auctionOutcomeMails(
           squad: squadOf(sale.teamId),
           cardUrl: publicCard,
         }),
+      });
+      texts.push({
+        personId: sale.personId,
+        orgId: context.orgId,
+        kind: "auction.sold",
+        dedupeKey: `sms:auction.sold:${input.auctionId}:${sale.registrationId}`,
+        templateKey: "auction.sold",
+        slots: {
+          team: smsFit(sale.teamName),
+          price: smsPrice(formatPaiseINR(paise(soldPrice))),
+          competition: smsSeasonName(context.season),
+        },
       });
     } else if (sale.status === "unsold") {
       mails.push({
@@ -246,5 +266,5 @@ export async function auctionOutcomeMails(
       }),
     });
   }
-  return mails;
+  return { mails, texts };
 }

@@ -62,12 +62,11 @@ export async function setNotificationPreferenceAction(
   if (!NOTIFICATION_TOPICS.some((entry) => entry.topic === topic)) {
     return { ok: false, error: "That is not a notification you can change." };
   }
-  await setPreference(systemDb, {
-    personId: session.personId,
-    topic,
-    channel: "sms",
-    allowed,
-  });
+  // Both channels. This wrote SMS alone, so switching Auction updates off
+  // stopped the texts and never the emails (0079 checks the email row).
+  for (const channel of ["sms", "email"] as const) {
+    await setPreference(systemDb, { personId: session.personId, topic, channel, allowed });
+  }
   revalidatePath("/account");
   return { ok: true };
 }
@@ -145,13 +144,19 @@ export async function setOrgMessagingSettingAction(
         { scopeType: "org", scopeId: org.id },
         "org.manage",
       );
-      await setOrgMessagingSetting(db, {
-        orgId: org.id,
-        topic,
-        channel: "sms",
-        enabled,
-        actorId: session.personId,
-      });
+      // One switch per topic, both channels: since the personal messages
+      // (0079/0080) a club tells its players by email as well as by text, and
+      // "stop sending this" has to mean both. The view reads the SMS row; the
+      // two are only ever written together.
+      for (const channel of ["sms", "email"] as const) {
+        await setOrgMessagingSetting(db, {
+          orgId: org.id,
+          topic,
+          channel,
+          enabled,
+          actorId: session.personId,
+        });
+      }
     });
   } catch (error) {
     if (error instanceof ForbiddenError) {

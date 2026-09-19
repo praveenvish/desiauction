@@ -92,7 +92,7 @@ async function latestMail(personId: string) {
   const [row] = await db
     .select({ subject: messageOutbox.subject, text: messageOutbox.bodyText })
     .from(messageOutbox)
-    .where(eq(messageOutbox.personId, personId))
+    .where(and(eq(messageOutbox.personId, personId), eq(messageOutbox.channel, "email")))
     .orderBy(desc(messageOutbox.createdAt), desc(messageOutbox.id))
     .limit(1);
   return row;
@@ -115,6 +115,13 @@ describe("ANNOUNCE — nobody hears until the organizer says so", () => {
     expect(mail?.subject).toBe("You're the captain of Cup Kings");
     // Named before any auction: a captain is signed directly now.
     expect(mail?.text).toContain("without going through the auction");
+    // And one line of SMS, on the registered template.
+    const [text] = await db
+      .select({ slots: messageOutbox.slots, body: messageOutbox.bodyText })
+      .from(messageOutbox)
+      .where(and(eq(messageOutbox.personId, captain), eq(messageOutbox.channel, "sms")));
+    expect(text?.slots).toMatchObject({ role: "captain", team: "Cup Kings" });
+    expect(text?.body).toContain("You are named captain of Cup Kings");
     const inbox = await db
       .select({ meta: auditLog.meta })
       .from(auditLog)

@@ -1009,6 +1009,10 @@ export function replayAuction(events: readonly AuctionEventEnvelope[]): ReplayRe
       }
       case "AuctionOpened":
         projection.status = "live";
+        // Nothing has been called when the night starts. The pool settles just
+        // before this event (settlePool), and its withdrawals are tidying, not
+        // a result the room should see as the last thing that happened.
+        projection.lastOutcome = null;
         break;
       case "AuctionPaused":
         projection.status = "paused";

@@ -98,14 +98,14 @@ describe("the squad columns", () => {
 });
 
 describe("the invariants, refused in bulk instead of one row at a time", () => {
-  it("refuses a player who is both an Icon and a Captain", () => {
-    // An Icon is pre-signed and never goes under the hammer; a Captain leads a
-    // squad that plays. The dashboard refuses the combination one row at a
-    // time, and a file asserting both has a mistake in it rather than a
-    // preference the import could honour.
+  it("accepts a player who is both an Icon and a Captain", () => {
+    // Both marks pre-sign the player to their team; the marquee name is very
+    // often the captain. Refusing the pair blocked the commonest local-league
+    // setup there is.
     const result = parse("Rohit,9876543210,batter,Andheri Arrows,yes,yes,");
-    expect(result.rows).toEqual([]);
-    expect(result.errors[0]?.message).toContain("cannot be both an Icon and a Captain");
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.isIcon).toBe(true);
+    expect(result.rows[0]?.isCaptain).toBe(true);
   });
 
   it("refuses a second captain for one team, naming the line that claimed it", () => {

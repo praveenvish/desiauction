@@ -35,7 +35,9 @@ export type TemplateKey =
   | "registration.rejected"
   | "registration.withdrawn"
   | "registration.restored"
-  | "security.phone_changed";
+  | "security.phone_changed"
+  | "auction.sold"
+  | "team.appointed";
 
 /**
  * Transactional messages may be delivered to numbers on the DND registry;
@@ -203,7 +205,53 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
     slots: [{ name: "last4", maxLength: 4 }],
     providerTemplateEnv: "MSG91_TEMPLATE_SECURITY_PHONE_CHANGED",
   },
+  /*
+   * THE PERSONAL MOMENTS (Phase 2). Most players register by phone and never
+   * verify an email, so the rich email reaches the few; these one-liners reach
+   * everyone. Transactional: each is the direct consequence of the season the
+   * player registered for — and "Auction updates" switches them off.
+   *
+   * Only the two moments worth a text. "Not picked" is never an SMS: a text
+   * that says you were unsold lands hard, and the inbox and email say it gently.
+   */
+  "auction.sold": {
+    key: "auction.sold",
+    version: "1",
+    channel: "sms",
+    locale: "en-IN",
+    category: "transactional",
+    // `{price}` is GSM-7 ("Rs 75,000", smsPrice): the rupee sign is not, and
+    // would halve the segment. 15 holds "Rs 1,99,99,999" — past any purse.
+    body: `DesiAuction: Congratulations! {team} bought you for {price} in {competition}. ${SMS_LINK}`,
+    slots: [
+      { name: "team", maxLength: DLT_VAR_MAX },
+      { name: "price", maxLength: 15 },
+      { name: "competition", maxLength: DLT_VAR_MAX },
+    ],
+    providerTemplateEnv: "MSG91_TEMPLATE_AUCTION_SOLD",
+  },
+  "team.appointed": {
+    key: "team.appointed",
+    version: "1",
+    channel: "sms",
+    locale: "en-IN",
+    category: "transactional",
+    // `{role}` is one of a closed set of phrases (smsRole), "captain and icon"
+    // at the longest — every one fits the variable.
+    body: `DesiAuction: You are named {role} of {team} for {competition}. ${SMS_LINK}`,
+    slots: [
+      { name: "role", maxLength: DLT_VAR_MAX },
+      { name: "team", maxLength: DLT_VAR_MAX },
+      { name: "competition", maxLength: DLT_VAR_MAX },
+    ],
+    providerTemplateEnv: "MSG91_TEMPLATE_TEAM_APPOINTED",
+  },
 };
+
+/** A price as GSM-7: "Rs 75,000". The rupee sign would make the text UCS-2. */
+export function smsPrice(formatted: string): string {
+  return formatted.replace(/₹\s*/g, "Rs ").trim();
+}
 
 /**
  * A season name as it fits one DLT variable: whole words up to the cap. No
@@ -213,6 +261,11 @@ export const SMS_TEMPLATES: Readonly<Record<TemplateKey, MessageTemplate>> = {
  * undeliverable notice would tell them nothing.
  */
 export function smsSeasonName(name: string): string {
+  return smsFit(name);
+}
+
+/** Any name — a season, a team — as whole words inside one DLT variable. */
+export function smsFit(name: string): string {
   const trimmed = name.trim().replace(/\s+/g, " ");
   if (trimmed.length <= DLT_VAR_MAX) {
     return trimmed;

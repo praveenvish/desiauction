@@ -404,6 +404,129 @@ export async function auctionReadiness(db: Db, auctionId: string, auction?: Auct
   };
 }
 
+/** `isPreSigned` (apps/web lib/pre-signed.ts) in SQL — any of the three marks. */
+const preSignedSql = sql<boolean>`(${registrations.isIcon} or ${registrations.isCaptain} or ${registrations.isRetained})`;
+
+/**
+ * THE POOL SETTLES WHEN THE AUCTION OPENS.
+ *
+ * Lots are drawn from the pool when the auction is CREATED, but the marks that
+ * decide the pool — Icon, Captain, Retained — and approval itself stay editable
+ * for as long as the auction is scheduled (the roster locks only once it
+ * leaves `scheduled`). So a captain picked at the owners' meeting a week after
+ * the auction was set up kept the lot drawn for them, and went under the
+ * hammer: a rival could buy another team's captain.
+ *
+ * Opening is the last moment anything about the pool can change and the first
+ * moment a lot can reach the block, so the lot list is reconciled here, in the
+ * same transaction as `AuctionOpened`, through the events replay already knows:
+ *
+ * - a prepared or queued lot whose player is now pre-signed, or no longer
+ *   approved, is WITHDRAWN. Unlike the conductor's withdraw it keeps the
+ *   registration's team: a pre-signed player's team is the point.
+ * - an approved player who is not pre-signed and has NO lot at all — marked
+ *   when the auction was created and unmarked since, or approved late — gets
+ *   one, at the end of the queue. A player whose lot was withdrawn by hand is
+ *   left out: that was a decision, not drift.
+ *
+ * Returns the lots queued once it has settled. The open guard counted them
+ * BEFORE, so it is asked again here: a queue whose every player was pre-signed
+ * since would otherwise open a room with nothing to sell.
+ */
+async function settlePool(
+  tx: Tx,
+  auction: AuctionRecord,
+  actorId: string,
+  correlationId: string,
+  atMs: number,
+): Promise<number> {
+  const current = await tx
+    .select({
+      lotId: lots.id,
+      status: lots.status,
+      seq: lots.seq,
+      registrationId: lots.registrationId,
+      approved: sql<boolean>`${registrations.status} = 'approved'`,
+      preSigned: preSignedSql,
+    })
+    .from(lots)
+    .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+    .where(eq(lots.auctionId, auction.id));
+
+  for (const lot of current) {
+    const waiting = lot.status === "prepared" || lot.status === "queued";
+    if (!waiting || (lot.approved && !lot.preSigned)) {
+      continue;
+    }
+    await tx.update(lots).set({ status: "withdrawn" }).where(eq(lots.id, lot.lotId));
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "LotWithdrawn",
+      { lotId: lot.lotId },
+      lot.lotId,
+      lot.preSigned ? "pre_signed" : "not_approved",
+    );
+  }
+
+  const hasLot = new Set(current.map((lot) => lot.registrationId));
+  const eligible = await tx
+    .select({ id: registrations.id, band: registrations.basePriceBand })
+    .from(registrations)
+    .where(
+      and(
+        eq(registrations.competitionId, auction.competitionId),
+        eq(registrations.status, "approved"),
+        sql`not ${preSignedSql}`,
+      ),
+    )
+    .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
+  let seq = current.reduce((max, lot) => Math.max(max, lot.seq), 0);
+  for (const entry of eligible) {
+    if (hasLot.has(entry.id)) {
+      continue;
+    }
+    seq += 1;
+    const lotId = newId();
+    const number = lotNumber(seq);
+    const base = basePriceFor(auction.config, entry.band);
+    await tx.insert(lots).values({
+      id: lotId,
+      orgId: auction.orgId,
+      auctionId: auction.id,
+      registrationId: entry.id,
+      lotNumber: number,
+      seq,
+      basePrice: base,
+      status: "queued",
+    });
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "LotPrepared",
+      { lotId, registrationId: entry.id, lotNumber: number, basePrice: base },
+      lotId,
+    );
+    // Opening requires a queued lot, so the queue has been built: join it.
+    await appendEvent(tx, auction, actorId, correlationId, atMs, "LotQueued", { lotId }, lotId);
+  }
+
+  const [queuedRow] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(lots)
+    .where(and(eq(lots.auctionId, auction.id), eq(lots.status, "queued")));
+  return queuedRow?.count ?? 0;
+}
+
+/** Thrown inside the open transaction to roll the settle back with the status. */
+class EmptyQueueAtOpen extends Error {}
+
 /** open / pause / resume / complete / abort — one machine-decided audited step. */
 export async function transitionAuction(
   db: Db,
@@ -439,54 +562,70 @@ export async function transitionAuction(
           )
           .limit(1)
       : [];
-  await db.transaction(async (tx) => {
-    await tx.update(auctions).set({ status: decision.next }).where(eq(auctions.id, auction.id));
-    await appendEvent(
-      tx,
-      auction,
-      actorId,
-      correlationId,
-      atMs,
-      AUCTION_EVENT_OF[command],
-      { from: auction.status },
-      auction.id,
-      reason,
-    );
-    if (command === "pause" && openLot !== undefined && openLot.endsAtMs !== null) {
-      const remaining = holdRemainingMs(
-        { opensAtMs: 0, endsAtMs: openLot.endsAtMs, extensions: openLot.timerExtensions },
-        atMs,
-      );
-      await tx
-        .update(lots)
-        .set({ heldRemainingMs: remaining, endsAtMs: null })
-        .where(eq(lots.id, openLot.id));
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(auctions).set({ status: decision.next }).where(eq(auctions.id, auction.id));
+      // Settled BEFORE `AuctionOpened`, which clears the last outcome: the room
+      // goes live with nothing called, not with a captain's lot "withdrawn".
+      // The same guard the machine applied, on the settled queue: nothing opens.
+      if (command === "open" && (await settlePool(tx, auction, actorId, correlationId, atMs)) < 1) {
+        throw new EmptyQueueAtOpen();
+      }
       await appendEvent(
         tx,
         auction,
         actorId,
         correlationId,
         atMs,
-        "TimerHeld",
-        { lotId: openLot.id, heldRemainingMs: remaining },
-        openLot.id,
+        AUCTION_EVENT_OF[command],
+        { from: auction.status },
+        auction.id,
+        reason,
       );
+      if (command === "pause" && openLot !== undefined && openLot.endsAtMs !== null) {
+        const remaining = holdRemainingMs(
+          { opensAtMs: 0, endsAtMs: openLot.endsAtMs, extensions: openLot.timerExtensions },
+          atMs,
+        );
+        await tx
+          .update(lots)
+          .set({ heldRemainingMs: remaining, endsAtMs: null })
+          .where(eq(lots.id, openLot.id));
+        await appendEvent(
+          tx,
+          auction,
+          actorId,
+          correlationId,
+          atMs,
+          "TimerHeld",
+          { lotId: openLot.id, heldRemainingMs: remaining },
+          openLot.id,
+        );
+      }
+      if (command === "resume" && openLot !== undefined && openLot.heldRemainingMs !== null) {
+        const endsAtMs = atMs + openLot.heldRemainingMs;
+        await tx
+          .update(lots)
+          .set({ endsAtMs, heldRemainingMs: null })
+          .where(eq(lots.id, openLot.id));
+        await appendEvent(
+          tx,
+          auction,
+          actorId,
+          correlationId,
+          atMs,
+          "TimerResumed",
+          { lotId: openLot.id, endsAtMs },
+          openLot.id,
+        );
+      }
+    });
+  } catch (error) {
+    if (error instanceof EmptyQueueAtOpen) {
+      return { ok: false, reason: "guard_failed" };
     }
-    if (command === "resume" && openLot !== undefined && openLot.heldRemainingMs !== null) {
-      const endsAtMs = atMs + openLot.heldRemainingMs;
-      await tx.update(lots).set({ endsAtMs, heldRemainingMs: null }).where(eq(lots.id, openLot.id));
-      await appendEvent(
-        tx,
-        auction,
-        actorId,
-        correlationId,
-        atMs,
-        "TimerResumed",
-        { lotId: openLot.id, endsAtMs },
-        openLot.id,
-      );
-    }
-  });
+    throw error;
+  }
   return { ok: true, status: decision.next };
 }
 
@@ -848,6 +987,15 @@ export async function placeBid(
   // squadMax like anyone else. Counting only auction wins let a team with an
   // icon finish on squadMax + 1 and every board render "16/15" — a fraction
   // above its own denominator, which is how you know the cap was not real.
+  //
+  // ALL THREE pre-signing marks, and never a lot of this auction. The count read
+  // `isIcon` alone, so a team with a retained player (and, once captains were
+  // picked before the night, a captain) could still buy up to squadMax at the
+  // hammer and finish one over. Excluding this auction's lots is what keeps the
+  // sum honest the other way: a captain named AFTER being bought is already in
+  // `purseRow.squad` and must not be counted a second time here. SOLD lots
+  // only: a pre-signed player whose waiting lot was withdrawn when the auction
+  // opened (`settlePool`) is in no purse count and has to be counted here.
   const [preSignedRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(registrations)
@@ -855,7 +1003,8 @@ export async function placeBid(
       and(
         eq(registrations.competitionId, auction.competitionId),
         eq(registrations.teamId, paddle.teamId),
-        eq(registrations.isIcon, true),
+        preSignedSql,
+        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
       ),
     );
   const squadSize = (purseRow?.squad ?? 0) + (preSignedRow?.count ?? 0);

@@ -183,13 +183,11 @@ describe("RETENTION — the mark an organizer can finally set", () => {
     expect(await retainedOf(id)).toBe(false);
   });
 
-  it("lets a retained player wear the armband, unlike an Icon", async () => {
+  it("lets a retained player wear the armband, and an Icon too", async () => {
     /*
-     * The icon/captain refusal is a rule about two competing answers to ONE
-     * question — what this player is to the team. Retention answers a different
-     * question: where they came from. Retaining last season's captain is the
-     * commonest retention there is, so extending that refusal by analogy would
-     * block ordinary tournaments to enforce a tidiness nothing needs.
+     * No pre-signing mark excludes another. Retaining last season's captain is
+     * the commonest retention there is, and the marquee name is very often the
+     * one wearing the armband — so all three can sit on one row.
      */
     const id = await seedApproved("Retain Captain", "r02", teamId);
     expect(
@@ -202,11 +200,24 @@ describe("RETENTION — the mark an organizer can finally set", () => {
         owner,
       ),
     ).toEqual({ ok: true });
-    // The contrast, on the same row: Icon and Captain together is still refused.
     expect(await setRegistrationMarks(db, org.id, comp.id, id, { isIcon: true }, owner)).toEqual({
-      ok: false,
-      reason: "icon_and_captain",
+      ok: true,
     });
+  });
+});
+
+describe("CAPTAINS — picked before the night, never on the block", () => {
+  it("takes a captain off the block and counts them as pre-signed", async () => {
+    const before = await auctionReady(db, comp);
+    const statsBefore = await registrationStats(db, comp.id);
+    const id = await seedApproved("Captain Kohli", "c01", teamId);
+    await setRegistrationMarks(db, org.id, comp.id, id, { isCaptain: true }, owner);
+    const after = await auctionReady(db, comp);
+    expect(after.pool.map((entry) => entry.registrationId)).not.toContain(id);
+    expect(after.pool.length).toBe(before.pool.length);
+    const stats = await registrationStats(db, comp.id);
+    expect(stats.auctionPool).toBe(statsBefore.auctionPool);
+    expect(stats.captains).toBe(statsBefore.captains + 1);
   });
 });
 
@@ -235,10 +246,10 @@ describe("RETENTION — the two readers that disagreed with the schema", () => {
     expect(after.retained).toBe(before.retained + 1);
     expect(after.auctionPool).toBe(before.auctionPool - 1);
 
-    // The identity the tile's own hint prints: approved, minus both pre-signed
+    // The identity the tile's own hint prints: approved, minus every pre-signed
     // marks, is what auction night contains — and it agrees with the projection
     // rather than merely looking plausible.
-    expect(after.auctionPool + after.icons + after.retained).toBe(after.approved);
+    expect(after.auctionPool + after.icons + after.captains + after.retained).toBe(after.approved);
     const ready = await auctionReady(db, comp);
     expect(ready.pool.length).toBe(after.auctionPool);
   });

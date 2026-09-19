@@ -561,9 +561,9 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                 a message, and it can never start one for somebody who has
                 already said no. `maySend` reads the person first. */}
             <p className="competitions-hint">
-              Text messages this club sends on your behalf. Switching one off stops it for everyone
-              here. Switching one on does not override anybody who has turned it off in their own
-              account — their answer always wins.
+              Texts and emails this club sends on your behalf. Switching one off stops it for
+              everyone here. Switching one on does not override anybody who has turned it off in
+              their own account — their answer always wins.
             </p>
             {messaging === null ? (
               <p className="competitions-hint">Not available.</p>

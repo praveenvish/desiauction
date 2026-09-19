@@ -1,0 +1,1570 @@
+/* ==========================================================================
+   THE PLAYER DESK — registrations table, player sheet, team roster.
+   Flat by the console's rule (hairlines and whitespace, one contained surface
+   per page: the next-step panel). Every colour is a theme token, so daylight
+   and floodlight are the same design.
+   ========================================================================== */
+
+.pd-desk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.pd-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pd-quiet {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.pd-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.01em;
+}
+
+.pd-link {
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+.pd-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.pd-link:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+.pd-link:focus-visible,
+.pd-icon-btn:focus-visible,
+.pd-player-name:focus-visible,
+.pd-mark:focus-visible,
+.pd-tab:focus-visible,
+.pd-segment-item:focus-visible,
+.pd-preset:focus-visible,
+.pd-next-review:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.pd-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.pd-icon-btn:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.pd-icon-btn:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+/* --- Next step: the one contained surface ------------------------------- */
+
+.pd-next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.pd-next p {
+  margin: 0;
+}
+
+.pd-next-eyebrow {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.pd-next-title {
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.pd-next-why {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* --- Toolbar & filters -------------------------------------------------- */
+
+.pd-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pd-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pd-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pd-search {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.pd-search .pd-input {
+  width: 100%;
+  padding-inline-start: 34px;
+}
+
+.pd-search-icon {
+  position: absolute;
+  inset-inline-start: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pd-search-icon:hover {
+  color: var(--text-primary);
+}
+
+.pd-search-icon:focus-visible {
+  outline: 2px solid var(--focus-ring);
+}
+
+.pd-input {
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-base-size);
+  min-width: 0;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.pd-input::placeholder {
+  color: var(--text-muted);
+}
+
+.pd-input:hover:not(:disabled) {
+  border-color: var(--border-interactive);
+}
+
+.pd-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.pd-input:disabled {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.pd-input[aria-invalid="true"] {
+  border-color: var(--danger-base);
+}
+
+.pd-select {
+  padding-inline-end: var(--space-8);
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 50%,
+    calc(100% - 11px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.pd-filter .pd-select[data-active="true"] {
+  border-color: var(--accent);
+  background-color: var(--accent-subtle);
+  color: var(--text-heading);
+}
+
+.pd-textarea {
+  height: auto;
+  min-height: 76px;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+  line-height: var(--text-base-line);
+}
+
+.pd-clear {
+  font-size: var(--text-sm-size);
+  margin-inline-start: var(--space-1);
+}
+
+/* --- Alerts ---------------------------------------------------------- */
+
+.pd-alert {
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 3px solid var(--danger-base);
+  background: var(--danger-subtle);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-primary);
+}
+
+.pd-alert p {
+  margin: 0;
+}
+
+.pd-alert-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pd-alert-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pd-kit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-5);
+  padding-block: var(--space-3);
+  border-block: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.pd-kit-title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+/* --- The table ----------------------------------------------------------- */
+
+.pd-table-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A filter or page change is in flight: the old rows stay and the table's top
+   rule turns into a running bar, so the screen never goes blank between two
+   answers. Not opacity — faded text fails a contrast scan mid-transition. */
+.pd-table-wrap[data-busy="true"] .pd-table-scroll {
+  border-top-color: transparent;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent) top / 40% 2px
+    no-repeat;
+  animation: pd-busy var(--duration-shimmer) linear infinite;
+}
+
+@keyframes pd-busy {
+  from {
+    background-position: -40% 0;
+  }
+
+  to {
+    background-position: 140% 0;
+  }
+}
+
+.pd-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.pd-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.pd-check input,
+.pd-row-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.pd-shortcuts kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border-subtle);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.pd-table-scroll {
+  overflow-x: auto;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pd-table-scroll:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.pd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-base-size);
+}
+
+.pd-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.pd-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.pd-row {
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.pd-row:hover td {
+  background: var(--surface-sunken);
+}
+
+.pd-row[data-selected="true"] td {
+  background: var(--accent-subtle);
+}
+
+.pd-row[data-open="true"] td {
+  background: var(--accent-subtle);
+}
+
+.pd-row[data-open="true"] td:first-child,
+.pd-row[data-cursor="true"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.pd-col-check {
+  width: 36px;
+  padding-inline-end: 0 !important;
+}
+
+.pd-col-actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: end;
+}
+
+.pd-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pd-player-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pd-player-name {
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: start;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.pd-row:hover .pd-player-name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pd-player-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.pd-player-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: 2px;
+}
+
+.pd-sub {
+  display: block;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.pd-sub-danger {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-medium);
+}
+
+.pd-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.pd-status > :first-child {
+  text-transform: capitalize;
+}
+
+.pd-team {
+  color: var(--text-primary);
+}
+
+.pd-marks-inline {
+  display: inline-flex;
+  gap: 3px;
+  margin-inline-start: var(--space-2);
+  vertical-align: 1px;
+}
+
+.pd-mark-chip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  background: var(--info-subtle);
+  color: var(--info-strong);
+}
+
+.pd-mark-chip[data-kind="icon"] {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.pd-mark-chip[data-kind="captain"] {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.pd-row-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  margin-inline-end: var(--space-1);
+  opacity: 0.9;
+}
+
+.pd-row-open {
+  vertical-align: middle;
+}
+
+.pd-empty {
+  padding: var(--space-10) var(--space-4) !important;
+  text-align: center;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.pd-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+}
+
+.pd-pager-buttons {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+/* --- Bulk bar: floats over the foot of the page -------------------------- */
+
+.pd-bulk {
+  position: sticky;
+  bottom: var(--space-4);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-inline: auto;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-3);
+  animation: pd-rise var(--duration-base) var(--ease-out);
+}
+
+.pd-bulk-links {
+  display: inline-flex;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.pd-bulk-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.pd-selection {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.pd-selection li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pd-selection li > :first-child {
+  flex: 1;
+}
+
+@keyframes pd-rise {
+  from {
+    transform: translateY(var(--space-3));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* --- The player sheet -------------------------------------------------- */
+
+.pd-sheet {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100vw);
+  box-sizing: border-box;
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  border-inline-start: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-4);
+  animation: pd-slide var(--duration-slow) var(--ease-out);
+}
+
+@keyframes pd-slide {
+  from {
+    transform: translateX(24px);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-sheet,
+  .pd-bulk,
+  .pd-table-wrap[data-busy="true"] .pd-table-scroll {
+    animation: none;
+  }
+}
+
+/* Room for the sheet on a wide screen: the list stays readable beside it. */
+@media (min-width: 1280px) {
+  .pd-desk[data-sheet-open="true"] {
+    padding-inline-end: min(560px, 40vw);
+    transition: padding var(--duration-slow) var(--ease-out);
+  }
+}
+
+.pd-sheet-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pd-sheet-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.pd-sheet-count {
+  margin-inline-start: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-review-chip {
+  margin-inline-start: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pd-sheet-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-5) var(--space-6) var(--space-10);
+}
+
+.pd-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.pd-sheet-id {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.pd-sheet-id h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.pd-sheet-id h2:focus {
+  outline: none;
+}
+
+.pd-sheet-id h2:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.pd-sheet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.pd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.pd-team-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  min-height: 20px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.pd-callout {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+.pd-callout p {
+  margin: 0;
+}
+
+.pd-callout p + p {
+  margin-top: var(--space-1);
+}
+
+.pd-callout[data-tone="danger"] {
+  background: var(--danger-subtle);
+}
+
+.pd-callout[data-tone="warning"] {
+  background: var(--warning-subtle);
+}
+
+.pd-callout[data-tone="success"] {
+  background: var(--success-subtle);
+}
+
+.pd-callout[data-tone="info"] {
+  background: var(--info-subtle);
+}
+
+.pd-decision {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.pd-decision > :first-child {
+  min-width: 140px;
+}
+
+.pd-decision-note {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.pd-next-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  text-align: start;
+  cursor: pointer;
+}
+
+.pd-next-review:hover {
+  border-style: solid;
+  background: var(--surface-sunken);
+}
+
+.pd-tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pd-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.pd-tab:hover {
+  color: var(--text-primary);
+}
+
+.pd-tab[aria-selected="true"] {
+  color: var(--text-heading);
+}
+
+.pd-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: var(--space-2);
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.pd-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--warning-base);
+}
+
+.pd-tab-dot[data-tone="danger"] {
+  background: var(--danger-base);
+}
+
+.pd-sheet-panel {
+  padding-top: var(--space-5);
+}
+
+/* --- Self-saving fields -------------------------------------------------- */
+
+.pd-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.pd-form > .pd-callout {
+  margin: 0;
+}
+
+.pd-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pd-form-section h3 {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pd-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-4);
+}
+
+.pd-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pd-setting-wide {
+  grid-column: 1 / -1;
+}
+
+.pd-setting .pd-input {
+  width: 100%;
+}
+
+.pd-setting-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.pd-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-muted);
+}
+
+.pd-save[data-state="saved"] {
+  color: var(--success-strong);
+}
+
+.pd-setting-hint {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-muted);
+}
+
+.pd-setting-error {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--danger-strong);
+}
+
+.pd-readonly {
+  margin: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: var(--text-base-size);
+  color: var(--text-primary);
+}
+
+.pd-segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.pd-segment-item {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.pd-segment-item:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.pd-segment-item[aria-pressed="true"] {
+  background: var(--surface-overlay);
+  color: var(--text-heading);
+  box-shadow: var(--shadow-1);
+}
+
+/* --- Squad marks --------------------------------------------------------- */
+
+.pd-marks {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pd-mark {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.pd-mark:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.pd-mark[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.pd-mark:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pd-mark-box {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-on-accent);
+}
+
+.pd-mark[aria-pressed="true"] .pd-mark-box {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.pd-mark-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pd-mark-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.pd-mark-help {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* --- Activity ------------------------------------------------------------ */
+
+.pd-note-form {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pd-note-form .pd-input {
+  flex: 1;
+}
+
+.pd-history,
+.pd-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pd-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.pd-timeline li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 var(--space-4) var(--space-5);
+}
+
+.pd-timeline li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 4px;
+  top: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+}
+
+.pd-timeline li::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 7px;
+  top: 18px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--border-subtle);
+}
+
+.pd-timeline li:last-child::after {
+  display: none;
+}
+
+.pd-timeline-verb {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.pd-timeline-note {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* --- Export dialog ------------------------------------------------------- */
+
+.pd-export {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.pd-export section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pd-export-h {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.pd-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--space-2);
+}
+
+.pd-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.pd-preset:hover {
+  border-color: var(--border-strong);
+}
+
+.pd-preset[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.pd-preset-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.pd-preset-purpose {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.pd-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+}
+
+.pd-export-cols-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.pd-export-bulk {
+  display: inline-flex;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.pd-export-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+.pd-export-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.pd-export-group legend {
+  padding: 0 0 var(--space-1);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pd-export-group .pd-check {
+  font-size: var(--text-sm-size);
+}
+
+.pd-export-summary {
+  margin-inline-end: auto;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* --- Team roster pre-sign block ----------------------------------------- */
+
+.pd-presign {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4) var(--space-8);
+  padding-block: var(--space-4);
+  border-block: 1px solid var(--border-subtle);
+}
+
+/* Spans the row under the three slots rather than taking a fourth column. */
+.pd-presign-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.pd-presign-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.pd-presign-slot h3 {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pd-presign-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pd-presign-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+}
+
+.pd-presign-person > button:first-of-type {
+  flex: 1;
+  min-width: 0;
+  text-align: start;
+}
+
+.pd-picker {
+  position: relative;
+}
+
+.pd-picker-list {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-3);
+}
+
+.pd-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm-size);
+}
+
+.pd-picker-option[aria-selected="true"],
+.pd-picker-option:hover {
+  background: var(--surface-sunken);
+}
+
+.pd-picker-empty {
+  padding: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.pd-roster-row {
+  cursor: pointer;
+}
+
+.pd-roster-row:hover td {
+  background: var(--surface-sunken);
+}
+
+/* --- Small screens --------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .pd-next {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pd-toolbar {
+    justify-content: stretch;
+  }
+
+  .pd-toolbar-actions {
+    width: 100%;
+  }
+
+  .pd-toolbar-actions > * {
+    flex: 1;
+  }
+
+  .pd-filter {
+    flex: 1 1 calc(50% - var(--space-2));
+  }
+
+  .pd-filter .pd-select {
+    width: 100%;
+  }
+
+  .pd-shortcuts {
+    display: none;
+  }
+
+  /* The table becomes a list of two-line rows: who and what state, then the
+     actions. Role and team live in the sheet, one tap away. */
+  .pd-table thead {
+    display: none;
+  }
+
+  .pd-table,
+  .pd-table tbody {
+    display: block;
+  }
+
+  .pd-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check player open"
+      ". status status"
+      ". team team"
+      ". actions actions";
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .pd-row td {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent !important;
+  }
+
+  .pd-row td.pd-col-check {
+    grid-area: check;
+    width: auto;
+  }
+
+  .pd-row td.pd-col-player {
+    grid-area: player;
+  }
+
+  .pd-row td.pd-col-role {
+    display: none;
+  }
+
+  .pd-row td.pd-col-status {
+    grid-area: status;
+  }
+
+  /* Who they play for, and why they skip the auction — on the phone too; a
+     player with no team shows nothing rather than a dash. */
+  .pd-row td.pd-col-team {
+    grid-area: team;
+    font-size: var(--text-sm-size);
+  }
+
+  .pd-row td.pd-col-team:has(.pd-team > .pd-quiet):not(:has(.pd-sub-danger)) {
+    display: none;
+  }
+
+  .pd-row td.pd-col-actions {
+    display: contents;
+  }
+
+  .pd-row .pd-row-actions {
+    grid-area: actions;
+    margin: var(--space-1) 0 0;
+  }
+
+  .pd-row .pd-row-open {
+    grid-area: open;
+    align-self: start;
+    width: 44px;
+    height: 44px;
+  }
+
+  .pd-row .pd-row-check {
+    width: 20px;
+    height: 20px;
+  }
+
+  .pd-row[data-open="true"],
+  .pd-row[data-selected="true"] {
+    background: var(--accent-subtle);
+  }
+
+  .pd-row[data-open="true"] td:first-child,
+  .pd-row[data-cursor="true"] td:first-child {
+    box-shadow: none;
+  }
+
+  .pd-sheet {
+    width: 100vw;
+    border-inline-start: 0;
+  }
+
+  .pd-sheet-scroll {
+    padding: var(--space-4) var(--space-4) var(--space-12);
+  }
+
+  .pd-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pd-tabs {
+    overflow-x: auto;
+  }
+
+  .pd-bulk {
+    bottom: var(--space-2);
+    width: 100%;
+    border-radius: var(--radius-lg);
+  }
+
+  .pd-bulk-actions {
+    width: 100%;
+  }
+
+  .pd-bulk-actions > * {
+    flex: 1;
+  }
+}
+
+/* An empty slot is as tall as a filled one, so the three search boxes line up. */
+.pd-presign-slot > .pd-quiet {
+  margin: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.pd-presign-list:empty {
+  display: none;
+}
