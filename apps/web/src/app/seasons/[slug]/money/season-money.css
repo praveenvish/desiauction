@@ -1,0 +1,217 @@
+/* THE SEASON'S MONEY TAB (money-panel.tsx) and the case review, in the card
+   language of the other season tabs. money.css stays as it was — the org
+   money desks share it. Tokens only. */
+
+.money-stack {
+  gap: var(--space-5);
+}
+
+/* The panel's own wrapper holds the stat cards and every card after them. */
+.money-stack > [data-testid="money-panel"],
+.money-stack > [data-testid="case-panel"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.mn-review-link {
+  align-self: flex-start;
+  white-space: normal;
+}
+
+/* ---- The case card ---- */
+
+.mn-case {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mn-stepper {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.mn-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.mn-step[data-state="current"] {
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  color: var(--text-heading);
+}
+
+.mn-step[data-state="done"] {
+  color: var(--text-heading);
+}
+
+.mn-step-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs-size);
+}
+
+.mn-step[data-state="done"] .mn-step-mark {
+  border-color: var(--success-base);
+  background: var(--success-base);
+  color: var(--surface-raised);
+}
+
+.mn-step[data-state="current"] .mn-step-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.mn-step-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mn-identity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.mn-identity > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.mn-identity dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.mn-identity dd {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Next step ---- */
+
+.mn-step-card .section-note + .section-note {
+  margin-top: var(--space-2);
+}
+
+.mn-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.mn-checks {
+  margin: var(--space-3) 0 0;
+}
+
+/* ---- Forms ---- */
+
+.mn-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.mn-form > * {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.mn-form > button {
+  flex: 0 0 auto;
+}
+
+.mn-fixed {
+  margin-top: var(--space-4);
+}
+
+/* ---- Tables ---- */
+
+.mn-scroll:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.mn-table th.mn-team {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mn-table .settled-row > * {
+  color: var(--text-secondary);
+}
+
+.mn-table .settled-row th.mn-team {
+  color: var(--text-heading);
+}
+
+.mn-owed {
+  font-weight: var(--font-weight-semibold);
+  color: var(--danger-strong);
+}
+
+.mn-table .money-row-actions {
+  justify-content: flex-end;
+}
+
+.mn-table .section-note {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs-size);
+}
+
+@media (max-width: 719px) {
+  .mn-stepper {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .mn-step {
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-1);
+    font-size: var(--text-xs-size);
+    text-align: center;
+  }
+
+  .mn-step-label {
+    max-width: 100%;
+  }
+
+  .mn-table .money-row-actions {
+    justify-content: flex-start;
+  }
+}

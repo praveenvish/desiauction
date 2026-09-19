@@ -1,0 +1,96 @@
+/* THE TABLE (page.tsx). Page-local; the flush table itself is ../_tabs/tabs.css.
+   The top three wear a quiet mark on their position — no podium colours, no
+   row fills that would compete with the points column. Tokens only. */
+
+.sd-table abbr {
+  text-decoration: none;
+}
+
+.sd-table th.sd-pos,
+.sd-table td.sd-pos {
+  width: 3rem;
+  text-align: center;
+}
+
+.sd-rank {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-table tr[data-rank] .sd-rank {
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+}
+
+.sd-table tr[data-rank="1"] .sd-rank {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.sd-table tr[data-rank="1"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.sd-table td.sd-pts strong {
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+}
+
+.sd-table th.sd-pts,
+.sd-table td.sd-pts {
+  background: color-mix(in srgb, var(--surface-sunken) 60%, transparent);
+}
+
+.sd-table .st-team-name {
+  max-width: 16rem;
+}
+
+@media (max-width: 719px) {
+  .sd-table .st-team-name {
+    max-width: 9rem;
+  }
+
+  .sd-table .st-team .st-sub {
+    display: none;
+  }
+
+  .st-table.sd-table thead th,
+  .st-table.sd-table tbody td {
+    padding-inline: var(--space-2);
+  }
+
+  .st-table.sd-table tr > :first-child {
+    padding-inline-start: var(--space-3);
+  }
+
+  .st-table.sd-table tr > :last-child {
+    padding-inline-end: var(--space-3);
+  }
+
+  /* On a phone the table keeps what decides a place — played, won, lost,
+     points and the first tiebreak — and drops the rarer columns. */
+  .sd-table .sd-minor {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .sd-table .st-crest {
+    display: none;
+  }
+
+  .sd-table th.sd-pos,
+  .sd-table td.sd-pos {
+    width: 2.25rem;
+  }
+
+  .sd-table .st-team-name {
+    max-width: 6.5rem;
+  }
+}

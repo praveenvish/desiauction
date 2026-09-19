@@ -1,5 +1,19 @@
-import { Badge, ButtonLink, Card, PageIntro } from "@desiauction/ui";
+import {
+  ButtonLink,
+  IconCalendar,
+  IconCheck,
+  IconFlag,
+  IconTile,
+  IconLayers,
+  IconPin,
+  IconUser,
+  IconUsers,
+  Pill,
+  SectionCard,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 
 import { auctionDashboard } from "../../../../server/auction/actions";
@@ -7,6 +21,8 @@ import { competitionView, registrationDashboard } from "../../../../server/compe
 import { fixtureDashboard, venuesView } from "../../../../server/competition/fixture-actions";
 import { myOrgs } from "../../../../server/orgs/actions";
 import "../../seasons.css";
+import "../_tabs/tabs.css";
+import "./readiness.css";
 
 export const metadata = { title: "Readiness · DesiAuction" };
 
@@ -66,141 +82,202 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <PageIntro
-          subtitle="Every row links to the screen that changes it. Pass/fail comes from the platform's own auction-readiness checks."
-          actions={
-            auction !== null && blockers === 0 ? (
-              <Badge tone={runningShort ? "warning" : "success"} data-testid="readiness-verdict">
-                {runningShort ? "Ready — but running short" : "Ready for auction"}
-              </Badge>
-            ) : (
-              <Badge tone="warning" data-testid="readiness-verdict">
-                {blockers > 0
-                  ? `${String(blockers)} blocker${blockers === 1 ? "" : "s"}`
-                  : "In preparation"}
-              </Badge>
-            )
-          }
-        />
-
-        <Card data-testid="readiness-auction">
-          <h2>Auction gates</h2>
-          {auction === null ? (
-            <p className="competitions-hint">
-              Sign-in lacks access to this season&apos;s auction view.
-            </p>
+        <div className="st-head">
+          <p className="st-head-lede">
+            Every row links to the screen that changes it. Pass or fail comes from the
+            platform&apos;s own auction-readiness checks.
+          </p>
+          {auction !== null && blockers === 0 ? (
+            <Pill tone={runningShort ? "amber" : "green"} dot testId="readiness-verdict">
+              {runningShort ? "Ready — but running short" : "Ready for auction"}
+            </Pill>
           ) : (
-            <ul className="readiness-list">
+            <Pill tone="amber" dot testId="readiness-verdict">
+              {blockers > 0
+                ? `${String(blockers)} blocker${blockers === 1 ? "" : "s"}`
+                : "In preparation"}
+            </Pill>
+          )}
+        </div>
+
+        <SectionCard
+          icon={<IconFlag />}
+          tone={blockers > 0 ? "red" : "green"}
+          title="Auction gates"
+          description={
+            auction === null
+              ? undefined
+              : blockers > 0
+                ? `${String(blockers)} of ${String(checks.length)} still blocked`
+                : "Every gate passes"
+          }
+          data-testid="readiness-auction"
+        >
+          {auction === null ? (
+            <p className="st-note">Sign-in lacks access to this season&apos;s auction view.</p>
+          ) : (
+            <ul className="rd-checks">
               {checks.map((check) => (
-                <li key={check.id} className="readiness-row" data-testid={`check-${check.id}`}>
-                  <Badge tone={check.pass ? "success" : "warning"}>
-                    {check.pass ? "Pass" : "Blocked"}
-                  </Badge>
-                  <span className="registration-name">{check.label}</span>
-                  <span className="competitions-hint">{check.detail}</span>
+                <li key={check.id} data-pass={check.pass} data-testid={`check-${check.id}`}>
+                  <span className="rd-mark" aria-hidden>
+                    <IconCheck size={14} />
+                  </span>
+                  <span className="rd-text">
+                    <strong>{check.label}</strong>
+                    <span className="st-note">
+                      <span className="st-sr">{check.pass ? "Pass: " : "Blocked: "}</span>
+                      {check.detail}
+                    </span>
+                  </span>
                   {/* A blocked gate names where it is cleared — the page's own
                       promise, which the three gates were the only rows to break. */}
                   {!check.pass ? (
-                    <Link href={fixOf(check.id, base).href}>{fixOf(check.id, base).label}</Link>
-                  ) : null}
+                    <Link className="st-link" href={fixOf(check.id, base).href}>
+                      {fixOf(check.id, base).label}
+                    </Link>
+                  ) : (
+                    <Pill tone="green">Pass</Pill>
+                  )}
                 </li>
               ))}
               {/* The sum that decides whether the night can end normally.
                   Deliberately not counted as a blocker: a league may knowingly
                   run short, but it must not find out at closing time. */}
-              <li className="readiness-row" data-testid="check-squads_fillable">
-                <Badge tone={auction.feasibility.ok ? "success" : "warning"}>
+              <li
+                data-pass={auction.feasibility.ok}
+                data-soft="true"
+                data-testid="check-squads_fillable"
+              >
+                <span className="rd-mark" aria-hidden>
+                  <IconCheck size={14} />
+                </span>
+                <span className="rd-text">
+                  <strong>Pool against squads</strong>
+                  <span className="st-note">{auction.feasibility.headline}</span>
+                </span>
+                <Pill tone={auction.feasibility.ok ? "green" : "amber"}>
                   {auction.feasibility.ok ? "Fits" : "Short"}
-                </Badge>
-                <span className="registration-name">Pool against squads</span>
-                <span className="competitions-hint">{auction.feasibility.headline}</span>
+                </Pill>
               </li>
-              <li className="readiness-row">
-                <Badge tone={auction.view !== null ? "success" : "neutral"}>
-                  {auction.view !== null ? "Created" : "Not created"}
-                </Badge>
-                <span className="registration-name">Auction</span>
-                <Link href={`${base}/auction`}>Open auction setup</Link>
+              <li data-pass={auction.view !== null}>
+                <span className="rd-mark" aria-hidden>
+                  <IconCheck size={14} />
+                </span>
+                <span className="rd-text">
+                  <strong>Auction</strong>
+                  <span className="st-note">
+                    {auction.view !== null ? "Created" : "Not created yet"}
+                  </span>
+                </span>
+                <Link className="st-link" href={`${base}/auction`}>
+                  Open auction setup
+                </Link>
               </li>
             </ul>
           )}
-        </Card>
+        </SectionCard>
 
-        <Card data-testid="readiness-sections">
-          <h2>Preparation</h2>
-          <ul className="readiness-list">
-            <li className="readiness-row" data-testid="readiness-lifecycle">
-              <Badge tone="info">{view.competition.status.replace(/_/g, " ")}</Badge>
-              <span className="registration-name">Season lifecycle</span>
-              <Link href={base}>Manage on Overview</Link>
-            </li>
-            <li className="readiness-row" data-testid="readiness-registrations">
-              <Badge
-                tone={
-                  registrations?.stats !== undefined && registrations.stats.submitted > 0
-                    ? "warning"
-                    : "neutral"
-                }
-              >
-                {registrations?.stats !== undefined
-                  ? `${String(registrations.stats.submitted)} pending`
-                  : "—"}
-              </Badge>
-              <span className="registration-name">
-                Registrations —{" "}
-                {registrations?.stats !== undefined
+        <SectionCard
+          icon={<IconLayers />}
+          tone="blue"
+          title="Preparation"
+          description="Where each part of the season stands"
+          data-testid="readiness-sections"
+        >
+          <ul className="rd-areas">
+            <Area
+              testId="readiness-lifecycle"
+              icon={<IconFlag />}
+              tone="gold"
+              title="Season lifecycle"
+              detail="Where the season is in its steps"
+              pill={(() => {
+                const words = view.competition.status.replace(/_/g, " ");
+                return words.charAt(0).toUpperCase() + words.slice(1);
+              })()}
+              pillTone="blue"
+              href={base}
+              link="Manage on Overview"
+            />
+            <Area
+              testId="readiness-registrations"
+              icon={<IconUser />}
+              tone="green"
+              title="Registrations"
+              detail={
+                registrations?.stats !== undefined
                   ? `${String(registrations.stats.approved)} approved of ${String(registrations.stats.total)}`
-                  : "no access"}
-              </span>
-              <Link href={`${base}/registrations?status=submitted`}>Review queue</Link>
-            </li>
-            <li className="readiness-row" data-testid="readiness-teams">
-              <Badge tone={view.teams.length >= 2 ? "success" : "warning"}>
-                {String(view.teams.length)}
-              </Badge>
-              <span className="registration-name">Teams</span>
-              <Link href={`${base}/teams`}>Open team workspace</Link>
-            </li>
-            <li className="readiness-row" data-testid="readiness-venues">
-              <Badge tone={activeGrounds > 0 ? "success" : "neutral"}>
-                {String(activeGrounds)} active
-              </Badge>
-              <span className="registration-name">
-                Grounds
-                {venues !== null
-                  ? ` across ${String(venues.venues.length)} venue${venues.venues.length === 1 ? "" : "s"}`
-                  : ""}
-              </span>
-              {org !== null ? <Link href={`/org/${org.slug}/venues`}>Manage venues</Link> : null}
-            </li>
-            <li className="readiness-row" data-testid="readiness-fixtures">
-              <Badge
-                tone={
-                  fixtures !== null && (fixtures.conflicts ?? []).length > 0
-                    ? "danger"
-                    : fixtures !== null && fixtures.stats.published > 0
-                      ? "success"
-                      : "neutral"
-                }
-              >
-                {fixtures !== null
+                  : "No access"
+              }
+              pill={
+                registrations?.stats !== undefined
+                  ? `${String(registrations.stats.submitted)} pending`
+                  : "—"
+              }
+              pillTone={
+                registrations?.stats !== undefined && registrations.stats.submitted > 0
+                  ? "amber"
+                  : "neutral"
+              }
+              href={`${base}/registrations?status=submitted`}
+              link="Review queue"
+            />
+            <Area
+              testId="readiness-teams"
+              icon={<IconUsers />}
+              tone="purple"
+              title="Teams"
+              detail={view.teams.length >= 2 ? "Enough to hold an auction" : "At least two needed"}
+              pill={String(view.teams.length)}
+              pillTone={view.teams.length >= 2 ? "green" : "amber"}
+              href={`${base}/teams`}
+              link="Open team workspace"
+            />
+            <Area
+              testId="readiness-venues"
+              icon={<IconPin />}
+              tone="blue"
+              title="Grounds"
+              detail={
+                venues !== null
+                  ? `Across ${String(venues.venues.length)} venue${venues.venues.length === 1 ? "" : "s"}`
+                  : "Venues of the organization"
+              }
+              pill={`${String(activeGrounds)} active`}
+              pillTone={activeGrounds > 0 ? "green" : "neutral"}
+              {...(org !== null ? { href: `/org/${org.slug}/venues`, link: "Manage venues" } : {})}
+            />
+            <Area
+              testId="readiness-fixtures"
+              icon={<IconCalendar />}
+              tone="amber"
+              title="Fixtures"
+              detail={
+                fixtures !== null
+                  ? `${String(fixtures.stats.total)} total, ${String(fixtures.stats.scheduled)} scheduled`
+                  : "No access"
+              }
+              pill={
+                fixtures !== null
                   ? (fixtures.conflicts ?? []).length > 0
                     ? `${String((fixtures.conflicts ?? []).length)} conflict${(fixtures.conflicts ?? []).length === 1 ? "" : "s"}`
                     : `${String(fixtures.stats.published)} published`
-                  : "—"}
-              </Badge>
-              <span className="registration-name">
-                Fixtures —{" "}
-                {fixtures !== null
-                  ? `${String(fixtures.stats.total)} total, ${String(fixtures.stats.scheduled)} scheduled`
-                  : "no access"}
-              </span>
-              <Link href={`${base}/fixtures`}>Open fixtures</Link>
-            </li>
+                  : "—"
+              }
+              pillTone={
+                fixtures !== null && (fixtures.conflicts ?? []).length > 0
+                  ? "red"
+                  : fixtures !== null && fixtures.stats.published > 0
+                    ? "green"
+                    : "neutral"
+              }
+              href={`${base}/fixtures`}
+              link="Open fixtures"
+            />
           </ul>
-        </Card>
+        </SectionCard>
 
-        <div className="readiness-actions">
+        <div className="rd-actions">
           {/* ONE next step. While a gate is blocked, creating the auction is not
               it — the first blocker's fix is, so that is the ink button and the
               auction is the secondary one. */}
@@ -228,5 +305,48 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
         </div>
       </div>
     </main>
+  );
+}
+
+/** One area of preparation: what it is, where it stands, where to change it. */
+function Area({
+  testId,
+  icon,
+  tone,
+  title,
+  detail,
+  pill,
+  pillTone,
+  href,
+  link,
+}: {
+  testId: string;
+  icon: ReactNode;
+  tone: KitTone;
+  title: string;
+  detail: string;
+  pill: string;
+  pillTone: KitTone;
+  href?: string;
+  link?: string;
+}) {
+  return (
+    <li data-testid={testId}>
+      <IconTile icon={icon} tone={tone} size="sm" />
+      <span className="rd-text">
+        <strong>{title}</strong>
+        <span className="st-note">{detail}</span>
+      </span>
+      <span className="rd-state">
+        <Pill tone={pillTone}>{pill}</Pill>
+      </span>
+      {href !== undefined && link !== undefined ? (
+        <Link className="st-link" href={href}>
+          {link}
+        </Link>
+      ) : (
+        <span />
+      )}
+    </li>
   );
 }

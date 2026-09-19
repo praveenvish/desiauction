@@ -1,0 +1,209 @@
+/* REVIEWS (page.tsx, review-card.tsx, season-reviews-panel.tsx): the ask
+   card, the rating summary, and one card per review. Tokens only. */
+
+.rv-ask-stats {
+  display: flex;
+  margin: 0;
+}
+
+.rv-ask-stats > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.rv-ask-stats dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.rv-ask-stats dd {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-ask-note {
+  margin-top: var(--space-3);
+}
+
+/* ---- Summary + list ---- */
+
+.rv-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.rv-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.rv-average {
+  font-size: var(--text-2xl-size);
+  line-height: 1;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-stars {
+  display: inline-flex;
+  align-items: center;
+}
+
+.rv-stars-row {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.rv-star-on {
+  color: var(--accent);
+  fill: currentColor;
+}
+
+.rv-star-off {
+  color: var(--border-strong);
+}
+
+.rv-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.rv-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.rv-avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.rv-avatar[data-named="true"] {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.rv-who {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rv-who strong {
+  overflow-wrap: anywhere;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+}
+
+.rv-text {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.rv-reply {
+  padding: var(--space-3);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.rv-reply-by {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.rv-reply-open {
+  margin-top: auto;
+}
+
+.rv-reply-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.rv-reply-label {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.rv-reply-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  resize: vertical;
+}
+
+.rv-reply-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.rv-reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .rv-head {
+    flex-wrap: wrap;
+  }
+
+  .rv-head .rv-stars {
+    flex-basis: 100%;
+    padding-inline-start: calc(40px + var(--space-3));
+  }
+}
