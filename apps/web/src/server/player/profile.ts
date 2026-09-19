@@ -13,6 +13,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { dbHandle } from "../db";
 import { logSecurityEvent } from "../auth/security-events";
+import { storage } from "../media";
 
 /**
  * THE PERSON-LEVEL CRICKET PROFILE (PI-1).
@@ -107,6 +108,29 @@ export async function sportProfileFor(personId: string, sport: string): Promise<
     defaultRole: row.defaultRole,
     attributes: (row.attributes ?? {}) as Record<string, string>,
   };
+}
+
+/**
+ * The person's OWN photo, as a URL they can be shown, or null.
+ *
+ * The register wizard opens on this person's face — or their initials mark —
+ * because the photo is what makes the player card theirs. Held to the same
+ * render gate as every other reader of `people.photo_url` (DPDP §5): a stored
+ * key without a recorded consent is not shown, even to its owner, so the
+ * wizard never displays a photo the season pages would refuse to.
+ *
+ * Self-scoped like the rest of this module: the id comes from the session.
+ */
+export async function ownPhotoUrl(personId: string): Promise<string | null> {
+  const [row] = await dbHandle.db
+    .select({ key: people.photoUrl, consentAt: people.photoConsentAt })
+    .from(people)
+    .where(eq(people.id, personId))
+    .limit(1);
+  if (row === undefined || row.key === null || row.consentAt === null) {
+    return null;
+  }
+  return storage.readUrl(row.key);
 }
 
 /** Every sport this person has said anything about. */

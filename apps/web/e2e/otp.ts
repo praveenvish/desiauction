@@ -40,7 +40,9 @@ const DATABASE_URL =
  * belt to that braces, and it turns a rare flake into a slightly slower pass.
  */
 export async function latestOtp(phone: string, timeoutMs = 5000): Promise<string> {
-  const e164 = phone.startsWith("+") ? phone : `+91${phone}`;
+  // An email address is its own inbox key: the dev mailer files the email
+  // door's codes under the address, in the same table.
+  const e164 = phone.startsWith("+") || phone.includes("@") ? phone : `+91${phone}`;
   const handle = createDb(DATABASE_URL);
   const deadline = Date.now() + timeoutMs;
   try {

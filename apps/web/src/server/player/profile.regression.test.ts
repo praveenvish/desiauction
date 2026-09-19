@@ -3,8 +3,10 @@ import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
+import { storage } from "../media";
 import {
   EMPTY_PLAYER_PROFILE,
+  ownPhotoUrl,
   playerProfileFor,
   upsertPlayerProfile,
   sportProfileFor,
@@ -169,5 +171,23 @@ describe("player profile document (PI-1)", () => {
     expect(refusal).not.toBeNull();
     const cause = (refusal as { cause?: { constraint_name?: string } }).cause;
     expect(cause?.constraint_name).toBe("player_profiles_gender_check");
+  });
+
+  /*
+   * The register wizard opens on the person's own photo. Same DPDP §5 render
+   * gate as every other reader: a key with no recorded consent is not shown,
+   * and one person's photo never answers another person's read.
+   */
+  it("shows a person their own photo only once consent is recorded", async () => {
+    expect(await ownPhotoUrl(personA)).toBeNull();
+    const key = `player/${personA}/synthetic-${RUN}.jpg`;
+    await db.update(people).set({ photoUrl: key }).where(eq(people.id, personA));
+    expect(await ownPhotoUrl(personA)).toBeNull();
+    await db
+      .update(people)
+      .set({ photoConsentAt: new Date(), photoConsentVia: "self_upload" })
+      .where(eq(people.id, personA));
+    expect(await ownPhotoUrl(personA)).toBe(storage.readUrl(key));
+    expect(await ownPhotoUrl(personB)).toBeNull();
   });
 });

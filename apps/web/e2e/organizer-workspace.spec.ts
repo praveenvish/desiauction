@@ -158,7 +158,7 @@ test("founder demo: org → competition → approve → team roster → venue �
     // account is nameless, so the profile step comes first).
     await playerPage.getByLabel("Your name").fill("Player Two");
     await playerPage.getByRole("button", { name: "Continue" }).click();
-    await playerPage.getByLabel("Playing role").selectOption("batter");
+    await playerPage.getByRole("radio", { name: "Batter", exact: true }).check();
     await playerPage.getByTestId("register-continue").click();
     // The publication-consent checkbox is an affirmative act the register
     // flow requires before Submit does anything — see register-flow.tsx.
