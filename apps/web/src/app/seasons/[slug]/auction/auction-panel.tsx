@@ -2,11 +2,20 @@
 
 import { formatPaiseINR, paise } from "@desiauction/core";
 import {
-  Badge,
   Button,
   ButtonLink,
+  IconAlert,
+  IconClock,
+  IconCog,
+  IconGavel,
+  IconList,
+  IconUsers,
+  Notice,
+  Pill,
   PlayerImage,
+  SectionCard,
   Select,
+  TeamChip,
   useToast,
   type TabItem,
 } from "@desiauction/ui";
@@ -23,15 +32,20 @@ import {
   type AuctionDashboard,
   type ReplayVerifyReport,
 } from "../../../../server/auction/actions";
+import type { AppointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { formatTime } from "../../../../lib/format-date";
-import { compactINR } from "../../../../lib/inr";
+import { exactINR } from "../../../../lib/inr";
+import { roleLabeller } from "../../../../lib/role-label";
 import { lotSeed } from "../../../../lib/player-seed";
 import { AbortDialog } from "./abort-dialog";
 import { AuctionSetupFlow } from "./setup/setup-flow";
-import { ConnectionCheck, RulesCard } from "./live-experience";
+import { RulesCard } from "./live-experience";
+import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
+import { OverviewDashboard } from "./overview-dashboard";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import "./hub.css";
+import "./dashboard.css";
 
 /*
  * THE AUCTION DESK, ONE SECTION AT A TIME.
@@ -45,20 +59,10 @@ import "./hub.css";
  * controls), the players, the paddles, the room's screens and settings, and
  * the log. The tab lives in the URL hash, so a reload keeps its place.
  *
- * Server-rendered pieces (the overview, the broadcast links, the auctioneer
- * panel) arrive as slots from page.tsx.
+ * Once the room has opened, the Overview tab is the founder's dashboard
+ * (overview-dashboard.tsx): a grid of cards over the same reads, each with a
+ * door to its own tab. The auctioneer panel arrives as a slot from page.tsx.
  */
-
-const LOT_TONE = {
-  prepared: "neutral",
-  queued: "info",
-  on_block: "success",
-  closing_soon: "warning",
-  sold: "success",
-  unsold: "neutral",
-  frozen: "warning",
-  withdrawn: "danger",
-} as const;
 
 // One legal next step per status, rendered one gate at a time.
 const AUCTION_NEXT: Partial<Record<string, { command: string; label: string }[]>> = {
@@ -101,27 +105,18 @@ function lotMatches(filter: LotFilter, status: string): boolean {
   }
 }
 
-/** "LotClosingSoon" → "Lot closing soon": the log reads as sentences. */
-function eventLabel(type: string): string {
-  const words = type.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 const LOG_PREVIEW = 12;
 
 export function AuctionPanel({
   slug,
   dashboard,
-  overviewSlot,
-  broadcastSlot,
+  appointments = null,
   auctioneersSlot,
 }: {
   slug: string;
   dashboard: AuctionDashboard;
-  /** The operational read (progress, block, burndown) — live and after. */
-  overviewSlot?: ReactNode;
-  /** The board and overlay addresses, for anyone who can conduct. */
-  broadcastSlot?: ReactNode;
+  /** Captains & icons not yet told — only for whoever may set them (team.manage). */
+  appointments?: AppointmentsPanelView | null;
   /** Who else may run this room. */
   auctioneersSlot?: ReactNode;
 }) {
@@ -232,43 +227,6 @@ export function AuctionPanel({
   );
   const counts = dashboard.overview?.counts ?? null;
 
-  /* ---- Figures: where the night stands, before any tab is opened. ---------- */
-  // Four figures, the four a phone can hold two-by-two. Before and during
-  // the night "still to come" is the number that matters; after it, the money.
-  const figures =
-    view !== null && counts !== null ? (
-      <div className="stat-row auc-figures" data-testid="auction-figures">
-        <div className="stat-tile">
-          <span className="stat-value">{view.lots.length}</span>
-          <span className="stat-label">Players in the auction</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">
-            {claimedTeams}/{ready.teams.length}
-          </span>
-          <span className="stat-label">{terminal ? "Teams that bid" : "Teams ready to bid"}</span>
-        </div>
-        {terminal ? null : (
-          <div className="stat-tile">
-            <span className="stat-value">{counts.queued + counts.prepared + counts.onBlock}</span>
-            <span className="stat-label">Still to come</span>
-          </div>
-        )}
-        <div className="stat-tile">
-          <span className="stat-value">{counts.sold}</span>
-          <span className="stat-label">
-            Sold{counts.unsold > 0 ? ` · ${String(counts.unsold)} unsold` : ""}
-          </span>
-        </div>
-        {terminal && dashboard.overview !== null ? (
-          <div className="stat-tile">
-            <span className="stat-value">{compactINR(dashboard.overview.moneyMoved)}</span>
-            <span className="stat-label">Spent</span>
-          </div>
-        ) : null}
-      </div>
-    ) : null;
-
   /* ---- Overview (once the room has opened): the read + its controls. ------- */
   const lifecycleButtons =
     view !== null && viewer.canConduct && !setupMode
@@ -291,7 +249,7 @@ export function AuctionPanel({
             <Button
               key={step.command}
               size="touch"
-              variant={step.command === "complete" ? "secondary" : "primary"}
+              variant="secondary"
               onClick={() =>
                 void act(
                   () =>
@@ -314,53 +272,65 @@ export function AuctionPanel({
   const overviewTab = (
     <div className="auc-section-stack">
       {lifecycleButtons.length > 0 ? (
-        <section className="auc-section" aria-labelledby="auc-controls-title">
-          <div className="auc-section-head">
-            <h2 id="auc-controls-title">Run the room</h2>
-            <p className="auc-section-hint">
-              Bidding itself happens in the cockpit. These pause or close the whole auction.
-            </p>
-          </div>
-          <div className="date-row">{lifecycleButtons}</div>
-        </section>
+        <SectionCard
+          icon={<IconGavel />}
+          title="Run the room"
+          description="Bidding itself happens in the cockpit. These pause or close the whole auction."
+          action={<div className="auc-lifecycle">{lifecycleButtons}</div>}
+        />
       ) : null}
       {/* The shortfall follows the auction to its close — stated every time
           the page is opened, not discovered at 11pm behind a refusal. */}
       {view !== null && !liveFeasibility.ok && !terminal ? (
-        <p className="auction-feasibility is-short" data-testid="feasibility-banner">
+        <Notice tone="warning" icon={<IconAlert />} testId="feasibility-banner">
           {liveFeasibility.headline} Closing this auction will need the conductor&apos;s override on
           the cockpit (Close auction → “Close short — on the record”).
-        </p>
+        </Notice>
       ) : null}
-      {overviewSlot}
+      <OverviewDashboard
+        slug={slug}
+        dashboard={dashboard}
+        appointments={appointments}
+        idleHint={
+          terminal
+            ? "The hammer is down on every player — the squads are final."
+            : "No lot is under the hammer. Open the cockpit to put the next one up."
+        }
+      />
     </div>
   );
 
   /* ---- Players: the lot list, with faces. --------------------------------- */
+  const labelOf = roleLabeller(dashboard.overview?.roles ?? []);
+  const colorOfPaddle = new Map(
+    (dashboard.overview?.paddles ?? []).map((row) => [row.paddleNumber, row.color]),
+  );
+  const colorOfTeam = new Map(
+    (dashboard.overview?.paddles ?? []).map((row) => [row.teamId, row.color]),
+  );
   const visibleLots = (view?.lots ?? []).filter((lot) => lotMatches(lotFilter, lot.status));
   const playersTab =
     view === null ? null : (
-      <section className="auc-section" data-testid="lot-queue" aria-labelledby="auc-lots-title">
-        <div className="auc-section-head auc-section-head-row">
-          <div>
-            <h2 id="auc-lots-title">Players under the hammer</h2>
-            <p className="auc-section-hint">
-              {view.lots.length} players, in registration-number order. Queued players come up one
-              by one.
-            </p>
-          </div>
-          {viewer.canConduct && !setupMode && (counts?.prepared ?? 0) > 0 ? (
+      <SectionCard
+        icon={<IconList />}
+        title="Players under the hammer"
+        description={`${String(view.lots.length)} players, in registration-number order. Queued players come up one by one.`}
+        data-testid="lot-queue"
+        flush
+        action={
+          viewer.canConduct && !setupMode && (counts?.prepared ?? 0) > 0 ? (
             <Button
               variant="secondary"
-              size="touch"
+              size="sm"
               onClick={() => void act(() => queueAllLotsAction(slug), "Lots queued")}
               loading={busy}
               data-testid="queue-all"
             >
               Queue {counts?.prepared ?? 0} waiting
             </Button>
-          ) : null}
-        </div>
+          ) : undefined
+        }
+      >
         <div className="auc-filter" role="group" aria-label="Show players">
           {LOT_FILTERS.map((option) => {
             const n = view.lots.filter((lot) => lotMatches(option.id, lot.status)).length;
@@ -379,6 +349,12 @@ export function AuctionPanel({
               </button>
             );
           })}
+        </div>
+        <div className="auc-lots-head" aria-hidden>
+          <span>#</span>
+          <span>Player</span>
+          <span>Status</span>
+          <span>Result</span>
         </div>
         <ul className="auc-lots" data-testid="lots-table">
           {visibleLots.map((lot) => {
@@ -405,17 +381,21 @@ export function AuctionPanel({
                 <span className="auc-lot-who">
                   <span className="auc-lot-name">{lot.playerName ?? "Unnamed"}</span>
                   <span className="auc-lot-meta">
-                    {lot.role.replace(/_/g, " ")} · base {formatPaiseINR(paise(lot.basePrice))}
+                    {labelOf(lot.role)} · base {formatPaiseINR(paise(lot.basePrice))}
                   </span>
                 </span>
                 <span className="auc-lot-status">
-                  <Badge tone={LOT_TONE[lot.status]}>{lot.status.replace(/_/g, " ")}</Badge>
+                  <LotStatusPill status={lot.status} />
                 </span>
                 <span className="auc-lot-result">
                   {lot.soldPrice !== null ? (
                     <>
                       <strong>{formatPaiseINR(paise(lot.soldPrice))}</strong>
-                      {soldTo !== null ? <span> → {soldTo}</span> : null}
+                      {soldTo !== null && lot.soldToPaddle !== null ? (
+                        <TeamChip color={colorOfPaddle.get(lot.soldToPaddle) ?? null}>
+                          {soldTo}
+                        </TeamChip>
+                      ) : null}
                     </>
                   ) : lot.bidCount > 0 ? (
                     `${String(lot.bidCount)} bid${lot.bidCount === 1 ? "" : "s"}`
@@ -430,87 +410,112 @@ export function AuctionPanel({
             </li>
           ) : null}
         </ul>
-      </section>
+      </SectionCard>
     );
 
   /* ---- Paddles: who holds each team's paddle. ----------------------------- */
   const paddlesTab =
     view === null ? null : (
-      <section className="auc-section" data-testid="paddles-panel" aria-labelledby="auc-pad-title">
-        <div className="auc-section-head">
-          <h2 id="auc-pad-title">Paddles</h2>
-          {/* THE PADDLE TRAP, stated before auction night instead of
-              discovered in the hall: "Issue paddle" hands the paddle to
-              WHOEVER CLICKS IT, and one browser can hold one paddle. */}
-          <p className="auc-section-hint">
-            {setupMode ? (
-              <>
-                Owners get their paddle through the <strong>Team owners</strong> setup step. Issuing
-                one here gives it to <strong>you</strong> — only useful for a test run on your own
-                devices.
-              </>
-            ) : (
-              <>
-                One paddle per team, held by the team&apos;s owner on their own device. Issuing here
-                gives the paddle to <strong>you</strong>. Release hands one back.
-              </>
-            )}
-          </p>
-        </div>
+      <SectionCard
+        icon={<IconUsers />}
+        tone="amber"
+        title="Paddles"
+        data-testid="paddles-panel"
+        flush
+        /* THE PADDLE TRAP, stated before auction night instead of discovered
+           in the hall: "Issue paddle" hands the paddle to WHOEVER CLICKS IT,
+           and one browser can hold one paddle. */
+        description={
+          setupMode ? (
+            <>
+              Owners get their paddle through the <strong>Team owners</strong> setup step. Issuing
+              one here gives it to <strong>you</strong> — only useful for a test run on your own
+              devices.
+            </>
+          ) : (
+            <>
+              One paddle per team, held by the team&apos;s owner on their own device. Issuing here
+              gives the paddle to <strong>you</strong>. Release hands one back.
+            </>
+          )
+        }
+      >
         {view.paddles.length === 0 ? (
           <p className="auc-empty">No paddles yet.</p>
         ) : (
-          <ul className="auc-pad-list">
-            {view.paddles.map((paddle) => {
-              // The overview lists ACTIVE paddles only (released ones are
-              // filtered at the read), which is how a released paddle is told
-              // apart from a live one here.
-              const active =
-                dashboard.overview === null ||
-                dashboard.overview.paddles.some((row) => row.paddleNumber === paddle.paddleNumber);
-              return (
-                <li
-                  key={paddle.id}
-                  className="auc-pad-row"
-                  data-active={active ? "true" : "false"}
-                  data-testid={`paddle-${paddle.paddleNumber}`}
-                >
-                  <span className="auc-pad-number">{paddle.paddleNumber}</span>
-                  <span className="auc-pad-team">
-                    <span className="auc-lot-name">{paddle.teamName}</span>
-                    <span className="auc-lot-meta">
-                      {active ? (paddle.holderName ?? "Not claimed") : "Released"}
-                    </span>
-                  </span>
-                  <span className="auc-pad-figures">
-                    {paddle.committed !== undefined ? (
-                      <span>
-                        <strong>{formatPaiseINR(paise(paddle.committed))}</strong> spent
+          <>
+            <div className="auc-pad-head" aria-hidden>
+              <span>Paddle</span>
+              <span>Team · owner</span>
+              <span>Status</span>
+              <span>Spent · signed</span>
+              <span />
+            </div>
+            <ul className="auc-pad-list">
+              {view.paddles.map((paddle) => {
+                // The overview lists ACTIVE paddles only (released ones are
+                // filtered at the read), which is how a released paddle is told
+                // apart from a live one here.
+                const active =
+                  dashboard.overview === null ||
+                  dashboard.overview.paddles.some(
+                    (row) => row.paddleNumber === paddle.paddleNumber,
+                  );
+                return (
+                  <li
+                    key={paddle.id}
+                    className="auc-pad-row"
+                    data-active={active ? "true" : "false"}
+                    data-testid={`paddle-${paddle.paddleNumber}`}
+                  >
+                    <PaddleChip
+                      number={paddle.paddleNumber}
+                      color={colorOfTeam.get(paddle.teamId) ?? null}
+                    />
+                    <span className="auc-pad-team">
+                      <span className="auc-lot-name">{paddle.teamName}</span>
+                      <span className="auc-lot-meta">
+                        {active ? (paddle.holderName ?? "Not claimed") : "Released"}
                       </span>
-                    ) : null}
-                    <span>
-                      <strong>{paddle.squadSize}</strong> signed
                     </span>
-                  </span>
-                  {viewer.canConduct && active ? (
-                    <Button
-                      variant="ghost"
-                      size="touch"
-                      onClick={() =>
-                        void act(() => releasePaddleAction(slug, paddle.teamId), "Paddle released")
-                      }
-                      loading={busy}
-                      data-testid={`release-paddle-${paddle.paddleNumber}`}
-                    >
-                      Release
-                    </Button>
-                  ) : (
-                    <span />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    <span className="auc-pad-status">
+                      <Pill tone={active ? "green" : "neutral"} dot>
+                        {active ? "Active" : "Released"}
+                      </Pill>
+                    </span>
+                    <span className="auc-pad-figures">
+                      {paddle.committed !== undefined ? (
+                        <span>
+                          <strong>{exactINR(paddle.committed)}</strong> spent
+                        </span>
+                      ) : null}
+                      <span>
+                        <strong>{paddle.squadSize}</strong> signed
+                      </span>
+                    </span>
+                    {viewer.canConduct && active ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          void act(
+                            () => releasePaddleAction(slug, paddle.teamId),
+                            "Paddle released",
+                          )
+                        }
+                        loading={busy}
+                        data-testid={`release-paddle-${paddle.paddleNumber}`}
+                      >
+                        Release
+                      </Button>
+                    ) : (
+                      <span />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
         {/* Issuing a paddle hands its purse to whoever clicks — the season
             manager's act, never the appointed auctioneer's. */}
@@ -543,29 +548,20 @@ export function AuctionPanel({
             </Button>
           </div>
         ) : null}
-      </section>
+      </SectionCard>
     );
 
-  /* ---- Room: screens, rules, settings, staff. ------------------------------ */
+  /* ---- Room: rules (before the night), settings, staff. -------------------- */
+  // Once the room is open, the screens, the connection check and the rules
+  // sit on the Overview dashboard — rendered once, so no test id is doubled.
   const showOwnerPlans = view !== null && viewer.canManage && dashboard.ownerPlans !== undefined;
   const showAbort = view !== null && viewer.canManage && !terminal;
-  // Two columns on a wide screen: what you open elsewhere on the left, what
-  // is set for this room on the right.
   const roomTab = (
     <div className="auc-room">
       <div className="auc-section-stack">
-        {broadcastSlot}
-        {dashboard.wsUrl !== null && !setupMode ? (
-          <ConnectionCheck wsUrl={dashboard.wsUrl} />
-        ) : null}
-        {dashboard.rules !== null ? <RulesCard rules={dashboard.rules} /> : null}
-      </div>
-      <div className="auc-section-stack">
+        {setupMode && dashboard.rules !== null ? <RulesCard rules={dashboard.rules} /> : null}
         {showOwnerPlans && dashboard.ownerPlans !== undefined ? (
-          <section className="auc-section" aria-labelledby="auc-settings-title">
-            <div className="auc-section-head">
-              <h2 id="auc-settings-title">Settings</h2>
-            </div>
+          <SectionCard icon={<IconCog />} tone="neutral" title="Settings">
             {/* WR-1: the organizer's switch for owner plans. Outside the locked
               config on purpose — a switch flipped mid-season is not a rule of
               the night. Layers above (platform, club, deploy) can only be read
@@ -611,17 +607,25 @@ export function AuctionPanel({
                 </span>
               </span>
             </label>
-          </section>
+          </SectionCard>
         ) : null}
+        {!setupMode && dashboard.rules !== null ? (
+          <p className="auc-room-note">
+            The rules of the night, the screens for the room and your connection check are on the{" "}
+            <a href="#overview">Overview</a>.
+          </p>
+        ) : null}
+      </div>
+      <div className="auc-section-stack">
         {auctioneersSlot}
         {showAbort ? (
-          <section className="auc-section auc-danger" aria-labelledby="auc-danger-title">
-            <div className="auc-section-head">
-              <h2 id="auc-danger-title">Abort this auction</h2>
-              <p className="auc-section-hint">
-                Ends it for good — there is no way back, and the reason goes on the record.
-              </p>
-            </div>
+          <SectionCard
+            icon={<IconAlert />}
+            tone="red"
+            title="Abort this auction"
+            description="Ends it for good — there is no way back, and the reason goes on the record."
+            className="auc-danger"
+          >
             {/* Behind a confirmation: `abandoned` is terminal and there is no
               command back. */}
             <div className="date-row">
@@ -632,7 +636,7 @@ export function AuctionPanel({
                 }}
               />
             </div>
-          </section>
+          </SectionCard>
         ) : null}
       </div>
     </div>
@@ -642,27 +646,27 @@ export function AuctionPanel({
   const logEvents = view === null ? [] : logOpen ? view.events : view.events.slice(0, LOG_PREVIEW);
   const logTab =
     view === null ? null : (
-      <section className="auc-section" data-testid="replay-panel" aria-labelledby="auc-log-title">
-        <div className="auc-section-head auc-section-head-row">
-          <div>
-            <h2 id="auc-log-title">Event log</h2>
-            <p className="auc-section-hint">
-              {view.eventCount} events, written once and never edited. Replaying them rebuilds the
-              auction from scratch.
-            </p>
-          </div>
-          {viewer.canConduct ? (
+      <SectionCard
+        icon={<IconClock />}
+        tone="neutral"
+        title="Event log"
+        description={`${String(view.eventCount)} events, written once and never edited. Replaying them rebuilds the auction from scratch.`}
+        data-testid="replay-panel"
+        flush
+        action={
+          viewer.canConduct ? (
             <Button
               variant="secondary"
-              size="touch"
+              size="sm"
               onClick={() => void verify()}
               loading={busy}
               data-testid="verify-replay"
             >
               Replay &amp; verify
             </Button>
-          ) : null}
-        </div>
+          ) : undefined
+        }
+      >
         {report !== null ? (
           <p data-testid="replay-report" className="auc-report" data-ok={report.ok}>
             {report.ok
@@ -672,6 +676,11 @@ export function AuctionPanel({
               : `Replay failed closed: ${report.reason ?? ""}`}
           </p>
         ) : null}
+        <div className="auc-ev-head" aria-hidden>
+          <span>#</span>
+          <span>Event</span>
+          <span>Time</span>
+        </div>
         <ol className="auc-ev-list">
           {logEvents.map((event) => (
             <li key={event.seq}>
@@ -682,18 +691,20 @@ export function AuctionPanel({
           ))}
         </ol>
         {view.events.length > LOG_PREVIEW ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setLogOpen((open) => !open);
-            }}
-            data-testid="log-toggle"
-          >
-            {logOpen ? "Show fewer" : `Show all ${String(view.events.length)} events`}
-          </Button>
+          <div className="auc-ev-more">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setLogOpen((open) => !open);
+              }}
+              data-testid="log-toggle"
+            >
+              {logOpen ? "Show fewer" : `Show all ${String(view.events.length)} events`}
+            </Button>
+          </div>
         ) : null}
-      </section>
+      </SectionCard>
     );
 
   const tabs: TabItem[] = [];
@@ -728,7 +739,6 @@ export function AuctionPanel({
       data-testid="auction-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
-      {figures}
       <HashTabs tabs={tabs} label="Auction sections" defaultId={setupMode ? "setup" : "overview"} />
     </div>
   );

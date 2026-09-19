@@ -2692,13 +2692,11 @@
   min-width: 32px;
 }
 
-/* Auctioneer appointment (launch polish, Phase 3) — flat section. */
-.auctioneers {
+/* Auctioneer appointment (launch polish, Phase 3) — a console-kit card. */
+.auctioneers-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--border-subtle);
 }
 
 .auctioneers-head h2 {

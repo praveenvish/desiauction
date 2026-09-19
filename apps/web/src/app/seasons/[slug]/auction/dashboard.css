@@ -1,0 +1,641 @@
+/* ==========================================================================
+   THE OVERVIEW DASHBOARD (overview-dashboard.tsx) and the pieces the other
+   auction tabs share with it: paddle chips, status pills, flush tables, the
+   screens switch, the rules list and the connection check. Tokens only.
+   ========================================================================== */
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* Cards in one row share a height, the way the mockup's pairs line up. */
+.dash > div:not([data-testid]) {
+  align-items: stretch;
+}
+
+.auc-card-meta {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.auc-card-note {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.auc-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.auc-card-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auc-card-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.auc-card-link svg {
+  transition: transform var(--duration-fast) ease;
+}
+
+.auc-card-link:hover svg {
+  transform: translateX(2px);
+}
+
+.auc-lifecycle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- Chips and pills ------------------------------------------------------ */
+
+.auc-paddle-chip > span {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  letter-spacing: 0.02em;
+}
+
+.auc-status-pill {
+  display: inline-flex;
+  text-transform: capitalize;
+}
+
+/* ---- Progress ------------------------------------------------------------- */
+
+.dash-progress {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.dash-progress-seg,
+.dash-key {
+  background: var(--text-muted);
+}
+
+.dash-progress-seg {
+  display: block;
+  height: 100%;
+}
+
+.dash-progress-seg[data-kind="sold"],
+.dash-key[data-kind="sold"] {
+  background: var(--success-base);
+}
+
+.dash-progress-seg[data-kind="block"],
+.dash-key[data-kind="block"] {
+  background: var(--accent);
+}
+
+.dash-progress-seg[data-kind="queued"],
+.dash-key[data-kind="queued"] {
+  background: var(--info-base);
+}
+
+.dash-progress-seg[data-kind="prepared"],
+.dash-key[data-kind="prepared"] {
+  background: var(--violet-base);
+}
+
+.dash-progress-seg[data-kind="unsold"],
+.dash-key[data-kind="unsold"] {
+  background: var(--border-strong);
+}
+
+.dash-progress-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-6);
+  margin-top: var(--space-3);
+}
+
+.dash-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.dash-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dash-legend strong,
+.dash-money strong {
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-key {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+}
+
+.dash-money {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.dash-money-sub {
+  color: var(--text-muted);
+}
+
+/* ---- On the block --------------------------------------------------------- */
+
+.dash-block-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.dash-block-player,
+.dash-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.dash-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.dash-who strong {
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+}
+
+.dash-block-bid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-8);
+  margin: 0;
+}
+
+.dash-block-bid dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.dash-block-bid dd {
+  margin: 2px 0 0;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-inline-start: calc(32px + var(--space-3));
+}
+
+.dash-block-body + .dash-block-actions {
+  padding-inline-start: 0;
+}
+
+/* ---- Purses --------------------------------------------------------------- */
+
+.dash-purses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-purses li {
+  display: grid;
+  grid-template-columns: auto minmax(4rem, 7rem) minmax(0, 1fr) auto 4.5rem;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.dash-purse-team {
+  overflow: hidden;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dash-bar {
+  --team: var(--accent);
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.dash-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--team);
+}
+
+.dash-purse-left {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.dash-purse-pct {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* ---- Ready to open -------------------------------------------------------- */
+
+.dash-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-checks li {
+  display: grid;
+  grid-template-columns: auto minmax(8rem, 12rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.dash-check-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--success-base);
+  color: var(--text-on-dark);
+}
+
+.dash-checks li[data-pass="false"] .dash-check-mark {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+}
+
+.dash-check-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.dash-check-detail {
+  color: var(--text-secondary);
+}
+
+.dash-code {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+/* ---- Owner plans ---------------------------------------------------------- */
+
+.dash-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-plans li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.dash-plan-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.dash-plan-text strong {
+  color: var(--text-heading);
+}
+
+/* ---- Flush tables --------------------------------------------------------- */
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.dash-table th {
+  padding: var(--space-2) var(--space-3);
+  border-block: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-align: start;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dash-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+  color: var(--text-primary);
+}
+
+.dash-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.dash-table th:first-child,
+.dash-table td:first-child {
+  padding-inline-start: var(--space-5);
+}
+
+.dash-table th:last-child,
+.dash-table td:last-child {
+  padding-inline-end: var(--space-5);
+}
+
+.dash-strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.dash-muted {
+  color: var(--text-secondary);
+}
+
+.dash-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-variant-ligatures: none;
+}
+
+.dash-result {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-result strong {
+  color: var(--text-heading);
+}
+
+.dash-pad {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+/* ---- Screens switch (broadcast-links.tsx) --------------------------------- */
+
+.bc-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.bc-switch-option {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
+}
+
+.bc-switch-option:hover {
+  color: var(--text-heading);
+}
+
+.bc-switch-option[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text-heading);
+}
+
+.bc-switch-option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.bc-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.bc-url-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.bc-url {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bc-note {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.bc-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bc-open:hover {
+  text-decoration: underline;
+}
+
+/* ---- Rules (live-experience RulesCard) ------------------------------------ */
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.rules-list > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr);
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.rules-list dt {
+  color: var(--text-secondary);
+}
+
+.rules-list dd {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Connection check ----------------------------------------------------- */
+
+.conn-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.conn-check-text {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.conn-check-text strong {
+  color: var(--text-heading);
+}
+
+/* ---- Phone ---------------------------------------------------------------- */
+
+@media (max-width: 719px) {
+  .dash-hide-sm {
+    display: none;
+  }
+
+  /* The legend under the bar already says every count. */
+  [data-testid="auction-progress-summary"] .auc-card-meta {
+    display: none;
+  }
+
+  .dash-purses li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .dash-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .dash-purse-pct {
+    display: none;
+  }
+
+  .dash-checks li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .dash-check-detail {
+    grid-column: 2;
+  }
+
+  .dash-table th:first-child,
+  .dash-table td:first-child {
+    padding-inline-start: var(--space-4);
+  }
+
+  .dash-table th:last-child,
+  .dash-table td:last-child {
+    padding-inline-end: var(--space-4);
+  }
+
+  .rules-list > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .bc-url-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

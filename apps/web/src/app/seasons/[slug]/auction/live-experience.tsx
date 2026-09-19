@@ -1,12 +1,23 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type PlanState } from "@desiauction/core";
-import { Badge, ButtonLink, Card, IconTrophy, PlayerImage } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  IconBroadcast,
+  IconFile,
+  IconTrophy,
+  Pill,
+  PlayerImage,
+  SectionCard,
+} from "@desiauction/ui";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { lotSeed } from "../../../../lib/player-seed";
 import type { AuctionRules, LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
 import { fitBadge } from "./plan/plan-model";
+import "./dashboard.css";
 
 // PX-6 live-experience kit: presentation over the broadcast AuctionSnapshot
 // and the resolved-lot history. NOTHING here decides — money math comes from
@@ -613,44 +624,52 @@ export function UpNext({
  */
 export function RulesCard({
   rules,
+  action,
 }: {
   rules: Omit<AuctionRules, "pursePerTeam"> & { pursePerTeam?: number };
+  /** A header link ("Room & settings →") where the card sits on a dashboard. */
+  action?: ReactNode;
 }) {
   return (
-    <Card data-testid="auction-rules">
-      <h2>Rules of the night</h2>
-      <ul className="conflict-list">
+    <SectionCard
+      icon={<IconFile />}
+      tone="amber"
+      title="Rules of the night"
+      action={action}
+      data-testid="auction-rules"
+    >
+      <dl className="rules-list">
         {rules.pursePerTeam !== undefined ? (
-          <li>
-            <span className="registration-name">Purse per team</span>
-            <span className="registration-phone">{formatPaiseINR(paise(rules.pursePerTeam))}</span>
-          </li>
+          <div>
+            <dt>Purse per team</dt>
+            <dd>{formatPaiseINR(paise(rules.pursePerTeam))}</dd>
+          </div>
         ) : null}
-        <li>
-          <span className="registration-name">Squad size</span>
-          <span className="registration-phone">
+        <div>
+          <dt>Squad size</dt>
+          <dd>
             {rules.squadMin}–{rules.squadMax} players
-          </span>
-        </li>
-        <li>
-          <span className="registration-name">Timer</span>
-          <span className="registration-phone">
+          </dd>
+        </div>
+        <div>
+          <dt>Timer</dt>
+          <dd>
             {rules.initialSeconds}s per lot · +{rules.extensionSeconds}s anti-snipe extension
-          </span>
-        </li>
-        <li>
-          <span className="registration-name">Bid increments</span>
-          <span className="registration-phone">
-            {rules.slabs
-              .map(
-                (slab) =>
-                  `${formatPaiseINR(paise(slab.step))}${slab.upTo !== null ? ` up to ${formatPaiseINR(paise(slab.upTo))}` : " beyond"}`,
-              )
-              .join(" · ")}
-          </span>
-        </li>
-      </ul>
-    </Card>
+          </dd>
+        </div>
+        <div>
+          <dt>Bid increments</dt>
+          <dd>
+            {rules.slabs.map((slab) => (
+              <span key={`${String(slab.step)}-${String(slab.upTo)}`} className="rules-slab">
+                {formatPaiseINR(paise(slab.step))}
+                {slab.upTo !== null ? ` up to ${formatPaiseINR(paise(slab.upTo))}` : " beyond"}
+              </span>
+            ))}
+          </dd>
+        </div>
+      </dl>
+    </SectionCard>
   );
 }
 
@@ -691,24 +710,38 @@ export function ConnectionCheck({ wsUrl }: { wsUrl: string }) {
     };
   }, [wsUrl]);
   return (
-    <Card data-testid="connection-check">
-      <h2>Your connection</h2>
-      <p className="competitions-hint">
+    <SectionCard
+      icon={<IconBroadcast />}
+      tone={state === "unreachable" ? "red" : "green"}
+      title="Your connection"
+      data-testid="connection-check"
+    >
+      <div className="conn-check" data-state={state}>
         {state === "checking" ? (
-          "Checking the auction room…"
+          <p className="conn-check-text">Checking the auction room…</p>
         ) : state === "ok" ? (
           <>
-            <Badge tone="success">Ready</Badge> Engine reachable in {rttMs ?? 0}ms — this device can
-            join the room.
+            <Pill tone="green" dot>
+              Ready
+            </Pill>
+            <p className="conn-check-text">
+              <strong>Engine reachable in {rttMs ?? 0}ms</strong>
+              <span>This device can join the room.</span>
+            </p>
           </>
         ) : (
           <>
-            <Badge tone="danger">Unreachable</Badge> Couldn&apos;t reach the auction room from this
-            device — check your network and reload.
+            <Pill tone="red" dot>
+              Unreachable
+            </Pill>
+            <p className="conn-check-text">
+              <strong>Couldn&apos;t reach the auction room</strong>
+              <span>Check this device&apos;s network and reload.</span>
+            </p>
           </>
         )}
-      </p>
-    </Card>
+      </div>
+    </SectionCard>
   );
 }
 

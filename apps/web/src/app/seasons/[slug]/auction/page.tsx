@@ -1,14 +1,23 @@
-import { ButtonLink, ToastProvider } from "@desiauction/ui";
+import {
+  ButtonLink,
+  IconChart,
+  IconGavel,
+  IconImage,
+  IconPlay,
+  IconUser,
+  Pill,
+  ToastProvider,
+  type KitTone,
+} from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { PageTitle } from "../../../../components/shell/page-title";
 import { auctionDashboard } from "../../../../server/auction/actions";
 import { auctioneerPanelView } from "../../../../server/auction/auctioneer-actions";
+import { appointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
-import { AuctionOverviewPanel } from "./auction-overview-panel";
 import { AuctionPanel } from "./auction-panel";
 import { AuctioneerPanel } from "./auctioneer-panel";
-import { BroadcastLinks } from "./broadcast-links";
 import "../../seasons.css";
 // The hub renders <BroadcastLinks>, and every rule that dresses it —
 // `.broadcast-row`, `.share-auction-button`, `.broadcast-url` — lives in
@@ -40,22 +49,24 @@ const TITLE_OF: Record<string, string> = {
 
 // Labels are the status words themselves (capitalized in CSS): the pill is
 // also the page's one machine-readable status, `auction-status`.
-const PILL_OF: Record<string, { label: string; className: string }> = {
-  scheduled: { label: "scheduled", className: "auc-title-pill is-scheduled" },
-  live: { label: "live", className: "auc-title-pill is-live" },
-  paused: { label: "paused", className: "auc-title-pill is-paused" },
-  completed: { label: "completed", className: "auc-title-pill is-done" },
-  reconciled: { label: "settled", className: "auc-title-pill is-done" },
-  abandoned: { label: "abandoned", className: "auc-title-pill is-abandoned" },
+const PILL_OF: Record<string, { label: string; tone: KitTone }> = {
+  scheduled: { label: "scheduled", tone: "blue" },
+  live: { label: "live", tone: "green" },
+  paused: { label: "paused", tone: "amber" },
+  completed: { label: "completed", tone: "green" },
+  reconciled: { label: "settled", tone: "green" },
+  abandoned: { label: "abandoned", tone: "red" },
 };
 
 export default async function AuctionPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   // See /seasons: `auction/spectate` next door is public, so no gate layout.
   await requireOnboarded();
-  const [dashboard, auctioneers] = await Promise.all([
+  const [dashboard, auctioneers, appointments] = await Promise.all([
     auctionDashboard(slug),
     auctioneerPanelView(slug),
+    // Captains & icons still to be told — null unless this viewer may set them.
+    appointmentsPanelView(slug),
   ]);
   if (dashboard === null) {
     notFound();
@@ -79,8 +90,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           {status !== null ? (
             <header className="auc-head">
               {pill !== null ? (
-                <span className={pill.className} data-testid="auction-status">
-                  {pill.label}
+                <span className="auc-status">
+                  <Pill tone={pill.tone} dot testId="auction-status">
+                    {pill.label}
+                  </Pill>
                 </span>
               ) : null}
               <div className="auc-head-actions">
@@ -88,9 +101,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                   {inProgress ? (
                     <ButtonLink
                       href={`/seasons/${slug}/auction/live`}
-                      size="touch"
+                      size="sm"
                       data-testid="open-live"
                     >
+                      <IconPlay size={16} />
                       Go live
                     </ButtonLink>
                   ) : null}
@@ -101,9 +115,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     <ButtonLink
                       href={`/seasons/${slug}/auction/cockpit`}
                       variant="secondary"
-                      size="touch"
+                      size="sm"
                       data-testid="open-cockpit"
                     >
+                      <IconGavel size={16} />
                       Cockpit
                     </ButtonLink>
                   ) : null}
@@ -115,9 +130,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     <ButtonLink
                       href={`/seasons/${slug}/auction/plan`}
                       variant="secondary"
-                      size="touch"
+                      size="sm"
                       data-testid="open-plan"
                     >
+                      <IconUser size={16} />
                       My plan
                     </ButtonLink>
                   ) : null}
@@ -125,9 +141,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     <ButtonLink
                       href={`/seasons/${slug}/auction/replay`}
                       variant="secondary"
-                      size="touch"
+                      size="sm"
                       data-testid="open-replay"
                     >
+                      <IconChart size={16} />
                       Review the night
                     </ButtonLink>
                   ) : null}
@@ -142,10 +159,11 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                     <ButtonLink
                       href={`/seasons/${slug}/posters`}
                       variant="secondary"
-                      size="touch"
+                      size="sm"
                       data-testid="open-posters"
                     >
-                      Share the squads
+                      <IconImage size={16} />
+                      Share results
                     </ButtonLink>
                   ) : null}
                 </span>
@@ -155,31 +173,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           <AuctionPanel
             slug={slug}
             dashboard={dashboard}
-            overviewSlot={
-              dashboard.overview !== null && status !== "scheduled" ? (
-                // Keyed: an element handed across to a client component is
-                // checked as a list child when it renders there.
-                <div key="overview" className="auc-section-stack">
-                  <AuctionOverviewPanel
-                    overview={dashboard.overview}
-                    {...(status === "completed" || status === "reconciled"
-                      ? { idleHint: "The hammer is down on every player — the squads are final." }
-                      : {})}
-                  />
-                </div>
-              ) : null
-            }
-            // The board and the overlay were unreachable from anywhere in the
-            // product; this is where an organizer collects the two URLs they
-            // will open elsewhere. During setup they sit in the "Go live" step.
-            broadcastSlot={
-              dashboard.viewer.canConduct &&
-              status !== null &&
-              status !== "scheduled" &&
-              status !== "abandoned" ? (
-                <BroadcastLinks key="broadcast" slug={slug} />
-              ) : null
-            }
+            appointments={appointments}
             auctioneersSlot={
               auctioneers !== null ? (
                 <AuctioneerPanel key="auctioneers" slug={slug} view={auctioneers} />

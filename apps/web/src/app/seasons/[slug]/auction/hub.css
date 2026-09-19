@@ -1,7 +1,7 @@
 /* ==========================================================================
-   THE AUCTION DESK — a figure strip, then tabs. Flat like the rest of the
-   console: sections are a heading, a hairline and whitespace; rows are
-   hairline-separated; gold appears only on what is selected.
+   THE AUCTION DESK — tabs of console-kit cards (founder mockup 4). Tables sit
+   in flush cards with a sunken header row; rows are hairline-separated; gold
+   appears only on what is selected and on the one primary action.
    ========================================================================== */
 
 /* The page head: where the auction stands on the left, where to go on the right. */
@@ -13,8 +13,8 @@
   gap: var(--space-3) var(--space-4);
 }
 
-.auc-head .auc-title-pill {
-  margin-inline-start: 0;
+.auc-status {
+  text-transform: capitalize;
 }
 
 .auc-head-actions .date-row {
@@ -40,7 +40,7 @@
 .auc-section-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-5);
 }
 
 .auc-section {
@@ -94,13 +94,13 @@
 .auc-room {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-8);
+  gap: var(--space-5);
 }
 
 @media (min-width: 1100px) {
   .auc-room {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    gap: var(--space-12);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-5);
     align-items: start;
   }
 }
@@ -152,7 +152,16 @@
   color: var(--text-muted);
 }
 
-/* --- Player rows ----------------------------------------------------------- */
+/* --- Rows inside flush cards: the table header and hairline rows ---------- */
+
+/* A flush SectionCard runs its body edge to edge; rows carry their own inset. */
+.auc-hub {
+  --row-inset: var(--space-5);
+}
+
+.auc-filter {
+  padding: 0 var(--row-inset) var(--space-4);
+}
 
 .auc-lots,
 .auc-pad-list,
@@ -160,20 +169,53 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--border-subtle);
+}
+
+.auc-lots-head,
+.auc-pad-head,
+.auc-ev-head {
+  display: grid;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--row-inset);
+  border-block: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.auc-lots-head {
+  grid-template-columns: 4.5rem minmax(0, 1fr) 8rem minmax(9rem, 14rem);
+}
+
+.auc-lots-head > :last-child {
+  text-align: end;
 }
 
 .auc-lot {
   display: grid;
-  grid-template-columns: 4.5rem auto minmax(0, 1fr) 8rem minmax(9rem, 12rem);
+  grid-template-columns: 4.5rem auto minmax(0, 1fr) 8rem minmax(9rem, 14rem);
   align-items: center;
   gap: var(--space-3) var(--space-4);
-  padding: var(--space-3) 0;
+  padding: var(--space-3) var(--row-inset);
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.auc-lot:last-child,
+.auc-pad-row:last-child,
+.auc-ev-list li:last-child {
+  border-bottom: 0;
+}
+
+/* The header's "Player" column spans the face and the name. */
+.auc-lot > .auc-lot-number {
+  grid-column: 1;
+}
+
 .auc-lot-number,
-.auc-pad-number,
 .auc-ev-seq {
   font-family: var(--font-mono);
   font-size: var(--text-xs-size);
@@ -200,13 +242,20 @@
 .auc-lot-meta {
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
+}
+
+.auc-lot-status .auc-status-pill {
   text-transform: capitalize;
 }
 
 .auc-lot-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1) var(--space-2);
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
-  text-align: end;
   font-variant-numeric: tabular-nums;
 }
 
@@ -226,17 +275,25 @@
 
 /* --- Paddles --------------------------------------------------------------- */
 
+.auc-pad-head,
+.auc-pad-row {
+  grid-template-columns: 4rem minmax(0, 1fr) 7rem minmax(10rem, auto) 6rem;
+}
+
 .auc-pad-row {
   display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-3) var(--space-4);
-  padding: var(--space-3) 0;
+  padding: var(--space-3) var(--row-inset);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.auc-pad-row[data-active="false"] {
-  opacity: 0.6;
+.auc-pad-row[data-active="false"] .auc-pad-team {
+  opacity: 0.7;
+}
+
+.auc-pad-row > :last-child {
+  justify-self: end;
 }
 
 .auc-pad-figures {
@@ -256,22 +313,30 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-3);
+  padding: var(--space-4) var(--row-inset) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
 }
 
 /* --- Log ------------------------------------------------------------------- */
 
+.auc-ev-head,
+.auc-ev-list li {
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+}
+
 .auc-ev-list li {
   display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--row-inset);
   border-bottom: 1px solid var(--border-subtle);
   font-size: var(--text-sm-size);
 }
 
 .auc-ev-type {
   color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .auc-ev-at {
@@ -279,8 +344,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.auc-ev-more {
+  padding: var(--space-2) var(--row-inset) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
 .auc-report {
-  margin: 0;
+  margin: 0 var(--row-inset) var(--space-4);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   background: var(--success-subtle);
@@ -292,22 +362,35 @@
   background: var(--danger-subtle);
 }
 
-/* --- Danger ---------------------------------------------------------------- */
+.auc-room-note {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
 
-.auc-danger {
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--border-subtle);
+.auc-room-note a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* --- Phone ------------------------------------------------------------------ */
 
 @media (max-width: 760px) {
+  .auc-hub {
+    --row-inset: var(--space-4);
+  }
+
   .auc-head-actions {
     width: 100%;
   }
 
   .auc-head-actions .date-row > * {
     flex: 1 1 auto;
+  }
+
+  .auc-lots-head,
+  .auc-pad-head {
+    display: none;
   }
 
   .auc-lot {
@@ -340,7 +423,11 @@
   }
 
   .auc-pad-row {
-    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .auc-pad-status {
+    display: none;
   }
 
   .auc-pad-figures {
