@@ -43,11 +43,13 @@ export function sportBanner(sport: string): SportArt | null {
  * the whole site is lit by, because a per-sport hue would invent eleven brand
  * colours nobody chose and drag the gold off-palette. What varies is the
  * direction the light comes from, which is enough to keep a grid of gradients
- * from reading as one repeated tile. Seasons of the same sport match.
+ * from reading as one repeated tile. A `seed` (a season's slug) varies it
+ * again within one sport, because a directory page of a single sport — which
+ * is most of them today — was twelve identical tiles.
  */
-export function sportGradientAngle(sport: string): number {
+export function sportGradientAngle(sport: string, seed = ""): number {
   let hash = 0;
-  for (const char of sport) {
+  for (const char of `${sport}${seed}`) {
     hash = (hash * 31 + char.charCodeAt(0)) % 360;
   }
   // Snap to 15° steps: neighbouring cards differ visibly, and no card lands on

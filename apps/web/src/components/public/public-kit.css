@@ -158,6 +158,7 @@
 .pk-hero-art {
   position: relative;
   display: grid;
+  gap: var(--space-3);
   justify-items: center;
   min-width: 0;
 }
@@ -174,10 +175,11 @@
   transform: rotate(-4deg);
 }
 
+/* Under the art, not over it: absolutely positioned, a three-word tag ran
+   straight across the picture it was meant to sign. */
 .pk-hero-art .pk-script {
-  position: absolute;
-  right: 0;
-  bottom: var(--space-2);
+  justify-self: end;
+  max-width: 100%;
 }
 
 .pk-hero-script-alone {
@@ -217,6 +219,49 @@
   max-width: 100%;
   object-fit: cover;
   border-radius: var(--radius-xl);
+}
+
+/* Five sports on one ground — see `SportMontage`. The cells are slanted the
+   way the mockup's photo strip is, and the middle one is largest, so the row
+   reads as a composition rather than as an icon toolbar. */
+.pk-montage {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--accent) 20%, var(--surface-raised)),
+    var(--surface-sunken) 70%
+  );
+  overflow: hidden;
+}
+
+.pk-montage-cell {
+  display: grid;
+  place-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-sunken) 70%, transparent);
+  color: color-mix(in srgb, var(--accent) 70%, transparent);
+  transform: skewX(-8deg);
+}
+
+.pk-montage-cell svg {
+  width: 62%;
+  height: auto;
+  transform: skewX(8deg);
+}
+
+.pk-montage-cell:nth-child(3) {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-sunken));
 }
 
 /* ------------------------------------------------------------------ body -- */
@@ -517,4 +562,16 @@
 .pk-chip[data-active]:hover {
   background: var(--accent-hover);
   color: var(--text-on-accent);
+}
+
+/* ---- a player's portrait in the hero (c/[slug]/p/[number]) ---- */
+
+.player-portrait {
+  width: min(320px, 70vw);
+  aspect-ratio: 1;
+}
+
+.player-portrait > * {
+  width: 100%;
+  height: 100%;
 }

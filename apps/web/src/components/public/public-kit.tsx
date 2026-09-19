@@ -129,7 +129,7 @@ export function ScriptTag({
 /* ------------------------------------------------------------------- art -- */
 
 /** The designed fallback: the night gradient with the sport's glyph in it. */
-export function SportWatermark({ sport }: { sport: string }) {
+export function SportWatermark({ sport, seed = "" }: { sport: string; seed?: string }) {
   return (
     <span
       className="pk-sport-art"
@@ -138,7 +138,7 @@ export function SportWatermark({ sport }: { sport: string }) {
       // it reads as a missing image rather than as the designed fallback.
       data-theme="floodlight"
       data-sport={sport}
-      style={{ "--pk-art-angle": `${sportGradientAngle(sport)}deg` } as CSSProperties}
+      style={{ "--pk-art-angle": `${sportGradientAngle(sport, seed)}deg` } as CSSProperties}
     >
       <SportIcon sport={sport} size={220} className="pk-sport-glyph" />
     </span>
@@ -146,13 +146,45 @@ export function SportWatermark({ sport }: { sport: string }) {
 }
 
 /**
+ * THE SITE-WIDE ART: several sports at once.
+ *
+ * The directory and the help centre are not about one sport, and a lone cricket
+ * ball on either says the opposite of "every sport, one platform" — the exact
+ * claim the page under it makes. Five glyphs, the five we can run today that a
+ * visitor is most likely to recognise, laid on the same night ground as a
+ * single sport's art so the two read as one family.
+ */
+export function SportMontage({ sports = MONTAGE_SPORTS }: { sports?: readonly string[] }) {
+  return (
+    <span className="pk-montage" aria-hidden>
+      {sports.map((sport) => (
+        <span className="pk-montage-cell" key={sport}>
+          <SportIcon sport={sport} size={72} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+const MONTAGE_SPORTS = ["cricket", "football", "basketball", "hockey", "kabaddi"] as const;
+
+/**
  * A sport's banner: the photograph when one exists, the gradient when it does
  * not. Callers never branch on which — that decision lives in `sport-art.ts`.
  */
-export function SportBanner({ sport, alt = "" }: { sport: string; alt?: string }) {
+export function SportBanner({
+  sport,
+  alt = "",
+  seed = "",
+}: {
+  sport: string;
+  alt?: string;
+  /** Varies the fallback gradient between seasons of the same sport. */
+  seed?: string;
+}) {
   const art = sportBanner(sport);
   if (art === null) {
-    return <SportWatermark sport={sport} />;
+    return <SportWatermark sport={sport} seed={seed} />;
   }
   return (
     <Image

@@ -91,6 +91,23 @@ export function TournamentCard({
     entryCategory,
   } = tournament;
 
+  /**
+   * How big the event is — omitting any count that is zero, and the whole row
+   * when both are. "0 teams · 0 players" is true of every season on the day it
+   * is published, and it reads as a failed load rather than as a new event.
+   */
+  const size =
+    [
+      teamCount === undefined || teamCount === 0
+        ? null
+        : `${teamCount} ${teamCount === 1 ? "team" : "teams"}`,
+      playerCount === undefined || playerCount === 0
+        ? null
+        : `${playerCount} ${playerCount === 1 ? "player" : "players"}`,
+    ]
+      .filter((part): part is string => part !== null)
+      .join(" • ") || null;
+
   const href = `/c/${slug}`;
   const category = entryCategory === undefined ? undefined : CATEGORY_LABEL[entryCategory];
   const action = live
@@ -106,7 +123,7 @@ export function TournamentCard({
     <article className="tc" data-feature={feature ? "" : undefined}>
       <div className="tc-banner">
         {coverUrl == null || coverUrl === "" ? (
-          <SportBanner sport={sport} />
+          <SportBanner sport={sport} seed={slug} />
         ) : (
           <Image className="tc-cover" src={coverUrl} alt="" width={800} height={320} />
         )}
@@ -159,22 +176,13 @@ export function TournamentCard({
             </dt>
             <dd>{dates}</dd>
           </div>
-          {teamCount === undefined && playerCount === undefined ? null : (
+          {size === null ? null : (
             <div className="tc-fact">
               <dt>
                 <IconUsers width={15} height={15} aria-hidden />
                 <span className="tc-sr">Size</span>
               </dt>
-              <dd>
-                {[
-                  teamCount === undefined ? null : `${teamCount} ${teamCount === 1 ? "team" : "teams"}`,
-                  playerCount === undefined
-                    ? null
-                    : `${playerCount} ${playerCount === 1 ? "player" : "players"}`,
-                ]
-                  .filter((part) => part !== null)
-                  .join(" • ")}
-              </dd>
+              <dd>{size}</dd>
             </div>
           )}
         </dl>
@@ -194,6 +202,16 @@ export function TournamentCard({
 }
 
 /** The grid tournament cards sit in. */
-export function TournamentGrid({ children }: { children: ReactNode }) {
-  return <div className="tc-grid">{children}</div>;
+export function TournamentGrid({
+  children,
+  testId,
+}: {
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div className="tc-grid" data-testid={testId}>
+      {children}
+    </div>
+  );
 }

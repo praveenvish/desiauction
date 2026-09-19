@@ -568,6 +568,13 @@ export interface DirectoryEntry {
   endsOn: string | null;
   open: boolean;
   logoUrl: string | null;
+  /** The season's cover photo (0082), for the card's banner. */
+  coverUrl: string | null;
+  /** The season's sport — the card's tag, and which art it falls back to. */
+  sport: string;
+  /** Teams entered. A card that says "8 teams · 64 players" describes an event;
+   *  one that says neither describes a row in a table. */
+  teamCount: number;
   /** The auction's lifecycle status, or null when no auction exists yet. */
   auctionStatus: string | null;
   /**
@@ -588,11 +595,13 @@ export interface DirectoryEntry {
 
 /** URL-backed facets. Anything else in `?filter=` / `?sort=` falls back to the
  *  default rather than erroring — a hand-typed or stale link still renders. */
-export type DirectoryFilter = "all" | "open" | "live";
+export type DirectoryFilter = "all" | "open" | "live" | "upcoming" | "closed";
 export type DirectorySort = "opportunity" | "soon" | "name";
 
 export function parseDirectoryFilter(raw: string | undefined): DirectoryFilter {
-  return raw === "open" || raw === "live" ? raw : "all";
+  return raw === "open" || raw === "live" || raw === "upcoming" || raw === "closed"
+    ? raw
+    : "all";
 }
 
 export function parseDirectorySort(raw: string | undefined): DirectorySort {
@@ -605,6 +614,10 @@ export interface DirectoryCounts {
   all: number;
   open: number;
   live: number;
+  /** Registration is shut and the first day has not arrived: it is coming. */
+  upcoming: number;
+  /** Shut, and either under way or already run. */
+  closed: number;
 }
 
 export interface DirectoryPage {
@@ -704,12 +717,27 @@ export async function publicCompetitionsDirectory(params: {
   // The search predicate WITHOUT the facet: the chip counts have to describe
   // the facets a visitor could switch TO, not the one already applied.
   const searchWhere = search === undefined ? published : and(published, search);
+  // Competition dates are bare, IST-implied dates (doc 05). A UTC "today" would
+  // still call an Indian tournament upcoming for the first 5½ hours of its
+  // opening day.
+  const istToday = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  /** Shut to registrations, not being auctioned, and its first day is ahead. */
+  const isUpcoming = sql<boolean>`(
+    ${competitions.status} <> 'registration_open'
+    and not ${isLive}
+    and ${competitions.startsOn} is not null
+    and ${competitions.startsOn} > ${istToday}
+  )`;
   const facet =
     filter === "open"
       ? eq(competitions.status, "registration_open")
       : filter === "live"
         ? isLive
-        : undefined;
+        : filter === "upcoming"
+          ? isUpcoming
+          : filter === "closed"
+            ? sql<boolean>`(${competitions.status} <> 'registration_open' and not ${isLive} and not ${isUpcoming})`
+            : undefined;
   const where = facet === undefined ? searchWhere : and(searchWhere, facet);
   // One pass over the published set yields the catalogue size and all three
   // chip counts. FILTER (WHERE …) is parenthesised before the ::int cast —
@@ -722,6 +750,11 @@ export async function publicCompetitionsDirectory(params: {
       all: sql<number>`(count(*) filter (where ${matches}))::int`,
       open: sql<number>`(count(*) filter (where ${matches} and ${competitions.status} = 'registration_open'))::int`,
       live: sql<number>`(count(*) filter (where ${matches} and ${isLive}))::int`,
+      upcoming: sql<number>`(count(*) filter (where ${matches} and ${isUpcoming}))::int`,
+      closed: sql<number>`(count(*) filter (where ${matches}
+        and ${competitions.status} <> 'registration_open'
+        and not ${isLive}
+        and not ${isUpcoming}))::int`,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -730,13 +763,11 @@ export async function publicCompetitionsDirectory(params: {
     all: countRow?.all ?? 0,
     open: countRow?.open ?? 0,
     live: countRow?.live ?? 0,
+    upcoming: countRow?.upcoming ?? 0,
+    closed: countRow?.closed ?? 0,
   };
   const total = counts[filter];
   const page = Math.max(params.page ?? 1, 1);
-  // Competition dates are bare, IST-implied dates (doc 05). A UTC "today" would
-  // still call an Indian tournament upcoming for the first 5½ hours of its
-  // opening day.
-  const istToday = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const rows = await systemDb
     .select({
       name: competitions.name,
@@ -748,6 +779,10 @@ export async function publicCompetitionsDirectory(params: {
       endsOn: competitions.endsOn,
       orgName: organizations.name,
       logoKey: competitions.logoUrl,
+      coverKey: competitions.coverUrl,
+      sport: competitions.sport,
+      teamCount: sql<number>`(select count(*)::int from ${teams}
+        where ${teams.competitionId} = ${competitions.id})`,
       auctionStatus: latestAuctionStatus,
       // The row's own badge must agree with the facet count and the sort that
       // placed it — three renderings of one question, answered once.
@@ -772,6 +807,9 @@ export async function publicCompetitionsDirectory(params: {
       endsOn: row.endsOn,
       open: row.status === "registration_open",
       logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
+      coverUrl: row.coverKey === null ? null : storage.readUrl(row.coverKey),
+      sport: row.sport,
+      teamCount: row.teamCount,
       auctionStatus: row.auctionStatus,
       live: row.live,
       playerCount: row.playerCount,

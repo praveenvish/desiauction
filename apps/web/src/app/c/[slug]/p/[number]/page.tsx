@@ -8,6 +8,14 @@ import { Fragment } from "react";
 import { env } from "../../../../../env";
 import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed";
 import { publicPlayer } from "../../../../../server/competition/public";
+import {
+  HeroFact,
+  PageBody,
+  PageHero,
+  PageSection,
+  StatStrip,
+  type Stat,
+} from "../../../../../components/public/public-kit";
 import { SharePlayer } from "./share-player";
 import "../../../../marketing.css";
 import "../../../directory.css";
@@ -105,102 +113,54 @@ export default async function PlayerProfilePage({
     player.age !== null
       ? `${roleLabelIn(sportPackFor(player.sport), player.role)} · ${String(player.age)} yrs`
       : roleLabelIn(sportPackFor(player.sport), player.role);
+  /** The detail rows, as a strip of figures rather than a two-column table. */
+  const facts: Stat[] = [
+    { value: player.number, label: "Number" },
+    { value: roleLabelIn(sportPackFor(player.sport), player.role), label: "Role" },
+    ...(player.age !== null ? [{ value: `${String(player.age)} yrs`, label: "Age" }] : []),
+    ...(batting !== null ? [{ value: batting, label: "Batting" }] : []),
+    ...(bowling !== null ? [{ value: bowling, label: "Bowling" }] : []),
+    // Whatever else this season's sport asks about, already labelled by its
+    // pack — see `describeAttributes`. Empty for cricket.
+    ...player.attributes.map((attribute) => ({ value: attribute.value, label: attribute.label })),
+    { value: status, label: "Status", aside: true },
+  ];
+
   return (
     <main className="public-page mk">
-      <header className="public-hero" data-theme="floodlight">
-        <div className="mk-container public-hero-inner">
-          <Badge tone={signed ? "neutral" : "success"} data-testid="player-status">
-            {status}
-          </Badge>
-          <h1>{player.name}</h1>
-          <div className="public-hero-meta">
-            <span>#{player.number}</span>
-            <span>{roleAge}</span>
-            <span>
-              <Link href={`/c/${slug}`}>{player.competitionName}</Link>
-            </span>
-          </div>
-        </div>
-      </header>
-
-      <div className="mk-container public-sections">
-        <section className="public-section" aria-labelledby="profile-heading">
-          <h2 id="profile-heading" className="visually-hidden">
-            Player profile
-          </h2>
-          <div className="showcase-detail">
+      <PageHero
+        sport={player.sport}
+        /* The photograph IS the page — it is why the card gets forwarded — so
+           it sits in the hero rather than floating alone in a card below it,
+           which is where a 1440px-wide title band left it. The consent and
+           under-18 gates are upstream, in `publicPlayer`: a `photoUrl` of null
+           arrives here already decided and draws the initials portrait. */
+        art={
+          <div className="player-portrait">
             <PlayerImage
               name={player.name}
               seed={player.registrationId}
               size="hero"
               src={player.photoUrl}
+              // The caller sizes the box (see `fluid` in player-image.tsx): at
+              // 160px fixed, the portrait sat like a thumbnail in a half-width
+              // hero column.
+              fluid
               decorative
             />
-            <dl className="showcase-detail-meta">
-              <dt>Number</dt>
-              <dd>{player.number}</dd>
-              <dt>Role</dt>
-              <dd>{roleLabelIn(sportPackFor(player.sport), player.role)}</dd>
-              {player.age !== null ? (
-                <>
-                  <dt>Age</dt>
-                  <dd>{player.age} yrs</dd>
-                </>
-              ) : null}
-              {batting !== null ? (
-                <>
-                  <dt>Batting</dt>
-                  <dd>{batting}</dd>
-                </>
-              ) : null}
-              {bowling !== null ? (
-                <>
-                  <dt>Bowling</dt>
-                  <dd>{bowling}</dd>
-                </>
-              ) : null}
-              {/* Whatever else this season's sport asks about, already labelled
-                  by its pack — see `describeAttributes`. Empty for cricket. */}
-              {player.attributes.map((attribute) => (
-                <Fragment key={attribute.key}>
-                  <dt>{attribute.label}</dt>
-                  <dd>{attribute.value}</dd>
-                </Fragment>
-              ))}
-              <dt>Status</dt>
-              <dd>{status}</dd>
-            </dl>
           </div>
-        </section>
-
-        {/* The page the OG route calls "the viral unit — a player posts their
-            own card" had exactly one action on it: a back link. No way for the
-            player to share the thing built to be shared, and no way for the
-            stranger who received it to join the tournament they were just shown.
-            Both, now, and the CTA only while the door is open. */}
-        {/* PI-1: the same person's other published seasons IN THIS ORG — each
-            card covered by its own season's publication consent; cross-org
-            history never renders publicly (doc 38). */}
-        {player.alsoPlayedIn.length > 0 ? (
-          <section className="public-section" aria-labelledby="also-played-heading">
-            <h2 id="also-played-heading">Also played in</h2>
-            <ul className="player-also-played" data-testid="player-also-played">
-              {player.alsoPlayedIn.map((appearance) => (
-                <li key={appearance.competitionSlug}>
-                  <Link href={`/c/${appearance.competitionSlug}/p/${appearance.playerNumber}`}>
-                    {appearance.competitionName}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-        <section className="public-section" aria-labelledby="share-heading">
-          <h2 id="share-heading" className="visually-hidden">
-            Share and register
-          </h2>
-          <SharePlayer playerName={player.name} />
-          <div className="public-cta-row">
+        }
+        status={
+          <Badge tone={signed ? "neutral" : "success"} data-testid="player-status">
+            {status}
+          </Badge>
+        }
+        eyebrow={<Link href={`/c/${slug}`}>{player.competitionName}</Link>}
+        title={player.name}
+        lede={roleAge}
+        meta={<HeroFact>#{player.number}</HeroFact>}
+        actions={
+          <>
             {player.competitionOpen ? (
               <ButtonLink
                 href={`/seasons/${slug}/register`}
@@ -213,9 +173,42 @@ export default async function PlayerProfilePage({
             <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg">
               <IconArrowLeft size={18} /> Back to {player.competitionName}
             </ButtonLink>
-          </div>
-        </section>
-      </div>
+          </>
+        }
+      />
+
+      <PageBody>
+        <StatStrip label={`${player.name} — player details`} stats={facts} />
+
+        {/* The page the OG route calls "the viral unit — a player posts their
+            own card" had exactly one action on it: a back link. No way for the
+            player to share the thing built to be shared, and no way for the
+            stranger who received it to join the tournament they were just shown.
+            Both, now, and the CTA only while the door is open. */}
+        {/* PI-1: the same person's other published seasons IN THIS ORG — each
+            card covered by its own season's publication consent; cross-org
+            history never renders publicly (doc 38). */}
+        {player.alsoPlayedIn.length > 0 ? (
+          <PageSection headingId="also-played-heading" title="Also played in">
+            <ul className="player-also-played" data-testid="player-also-played">
+              {player.alsoPlayedIn.map((appearance) => (
+                <li key={appearance.competitionSlug}>
+                  <Link href={`/c/${appearance.competitionSlug}/p/${appearance.playerNumber}`}>
+                    {appearance.competitionName}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </PageSection>
+        ) : null}
+
+        {/* The actions moved up into the hero, where a visitor who has just
+            been handed this card is looking. What stays here is the share
+            control itself — the thing the player came back for. */}
+        <PageSection headingId="share-heading" title="Share">
+          <SharePlayer playerName={player.name} />
+        </PageSection>
+      </PageBody>
     </main>
   );
 }
