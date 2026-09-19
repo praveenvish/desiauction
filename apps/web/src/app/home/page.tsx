@@ -1,35 +1,63 @@
 import { formatPaiseINR, paise, roleLabelIn, sportPackFor } from "@desiauction/core";
-
-import { roleLabeller } from "../../lib/role-label";
 import {
-  Badge,
   ButtonLink,
-  Card,
+  CardGrid,
+  IconAlert,
+  IconArrowRight,
+  IconBolt,
+  IconCalendar,
+  IconCheck,
+  IconCheckCircle,
+  IconChevronRight,
+  IconFileCheck,
+  IconGavel,
+  IconPlus,
+  IconRupee,
+  IconTile,
+  IconTrophy,
+  IconUser,
+  IconUsers,
+  IconWallet,
+  JourneyStepper,
   LoadingState,
   Money,
+  Notice,
+  Pill,
   PlayerImage,
-  SectionHeader,
+  SectionCard,
+  StatCard,
+  StatGrid,
   VisuallyHidden,
-  IconArrowRight,
-  IconCheck,
+  type JourneyStep,
+  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Fragment, Suspense, type ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { FormDialog } from "../../components/form-dialog";
+import { monogram } from "../../components/season-hero/season-hero";
 import { PageTitle } from "../../components/shell/page-title";
+import { roleLabeller } from "../../lib/role-label";
 import { auctionDashboard } from "../../server/auction/actions";
 import { currentSession } from "../../server/auth/actions";
-import { competitionsView, registrationDashboard } from "../../server/competition/actions";
+import {
+  competitionsView,
+  registrationDashboard,
+  seasonOverviewView,
+} from "../../server/competition/actions";
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { myRegistrations } from "../../server/competition/public";
 import { homeDashboard } from "../../server/home/dashboard";
 import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
 import { currentTeam, rolesOf } from "../../server/roles/roles";
-import type { HomeDashboardData, HomeStages } from "../../server/home/dashboard";
+import type { HomeDashboardData } from "../../server/home/dashboard";
 import { CreateOrgForm } from "../orgs/create-org-form";
 import { CreateTournamentForm } from "../tournaments/create-tournament-form";
+import { dateRange } from "../tournaments/season-card";
+import { seasonJourney } from "../tournaments/season-journey";
+import { ClubHero } from "./club-hero";
+import { activityLabel, activityStyle, ago } from "./home-activity";
 import { HomeShortcuts } from "./home-shortcuts";
 import { chooseNextStep } from "./next-step";
 import { NextStepBanner } from "./next-step-banner";
@@ -38,13 +66,13 @@ import "./home.css";
 
 export const metadata = { title: "Home · DesiAuction" };
 
-type Tone = "info" | "success" | "warning" | "danger" | "neutral";
+type Tone = KitTone;
 
 const REG_TONE: Record<string, Tone> = {
-  submitted: "info",
-  approved: "success",
-  waitlisted: "warning",
-  rejected: "danger",
+  submitted: "blue",
+  approved: "green",
+  waitlisted: "amber",
+  rejected: "red",
   withdrawn: "neutral",
   draft: "neutral",
 };
@@ -53,9 +81,9 @@ function statusTone(status: string): Tone {
   switch (status) {
     // The console's one colour grammar — see STATUS_TONE in season-card.
     case "registration_open":
-      return "info";
+      return "blue";
     case "registration_closed":
-      return "warning";
+      return "amber";
     default:
       return "neutral";
   }
@@ -94,10 +122,10 @@ function seasonBadge(row: { status: string; settlement: "settling" | "settled" |
   tone: Tone;
 } {
   if (row.settlement === "settled") {
-    return { label: "Settled", tone: "success" };
+    return { label: "Settled", tone: "green" };
   }
   if (row.settlement === "settling") {
-    return { label: "Settling", tone: "warning" };
+    return { label: "Settling", tone: "amber" };
   }
   return { label: statusLabel(row.status), tone: statusTone(row.status) };
 }
@@ -186,136 +214,6 @@ async function attentionFor(
   };
 }
 
-/* ---- glyphs ------------------------------------------------------------- */
-const G = {
-  trophy: (
-    <path
-      d="M7 4h10v3a5 5 0 0 1-10 0V4ZM4 5H2v2a3 3 0 0 0 3 3M20 5h2v2a3 3 0 0 1-3 3M9 15h6v5H9z"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-  users: (
-    <path
-      d="M16 11a4 4 0 1 0-8 0M4 20a6 6 0 0 1 16 0"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  ),
-  gavel: (
-    <path
-      d="M4 20 14 10M17 7l-3-3 4-1 3 3-1 4-3-3z"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-  rupee: (
-    <path
-      d="M7 6h9M7 10h9M13 6c3 0 4 4 0 4H9l6 8"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-  chart: (
-    <path
-      d="m4 19 5-5 3 3 8-8M14 9h6v6"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-  check: (
-    <path
-      d="m9 11 3 3L22 4M21 12v7H3V5h12"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-  doc: (
-    <path
-      d="M6 3h9l5 5v13H6zM14 3v5h5M9 13h6M9 17h6"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-  bolt: (
-    <path
-      d="M13 3 5 14h6l-1 7 8-11h-6z"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-  calendar: (
-    <path
-      d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  ),
-} as const;
-
-function Glyph({ d }: { d: ReactNode }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      {d}
-    </svg>
-  );
-}
-
-/** An empty panel should still sell the next move, not just report nothing. */
-function PanelEmpty({
-  icon,
-  text,
-  ctaHref,
-  ctaLabel,
-}: {
-  icon: ReactNode;
-  text: string;
-  ctaHref?: string;
-  ctaLabel?: string;
-}) {
-  return (
-    <div className="home-blank">
-      <span className="home-blank-ic" aria-hidden>
-        {icon}
-      </span>
-      <p>{text}</p>
-      {ctaHref !== undefined && ctaLabel !== undefined ? (
-        <Link href={ctaHref} className="home-blank-cta">
-          {ctaLabel}
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
-function monogram(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "—"
-  );
-}
-
 function rupees(value: number): string {
   return formatPaiseINR(paise(value));
 }
@@ -354,129 +252,6 @@ const IST_HOUR = new Intl.DateTimeFormat("en-GB", {
 const IST_DAY = new Intl.DateTimeFormat("en-IN", { timeZone: IST, day: "2-digit" });
 const IST_MONTH = new Intl.DateTimeFormat("en-IN", { timeZone: IST, month: "short" });
 
-/**
- * The feed is read by organizers, not operators, so the raw event name is the
- * wrong thing to print: "finops.PeriodClosed" is a fact about our ledger
- * machinery, not about their night. Known events get the sentence a human would
- * say; anything unmapped falls back to the mechanical transform below, with the
- * internal domain word translated so "Finops" never reaches a screen.
- */
-const ACTIVITY_PHRASE: Record<string, string> = {
-  "auction.BidAccepted": "Bid accepted",
-  "auction.AuctionAborted": "Auction stopped",
-  "auction.conduct": "Auction conducted",
-  "competition.created": "Season created",
-  "competition.cloned": "Season cloned",
-  "finops.PeriodOpened": "Books opened",
-  "finops.PeriodClosed": "Books closed",
-  "finops.PeriodReopened": "Books reopened",
-  "finops.DayAttested": "Day's books attested",
-  "finops.ProfileDeclared": "Finance profile declared",
-  "finops.dispatch": "Receipt delivered",
-  "finops.document": "Document issued",
-  // These four are what the ledger actually emits, and none of them were
-  // mapped: the feed had never been read against real finance data, so they
-  // fell through to the mechanical transform ("Finance certification derived"
-  // came out of the fallback, not out of a decision).
-  "finops.CertificationDerived": "Books certified",
-  "finops.ExportRequested": "Export requested",
-  "finops.ExportCompleted": "Export ready",
-  "finops.SeriesOpened": "Numbering series opened",
-  "finops.DocumentIssued": "Document issued",
-  "finops.DispatchRequested": "Receipt queued",
-  "finops.DispatchSent": "Receipt sent",
-  "finops.DispatchConfirmed": "Receipt delivered",
-  "competition.status_changed": "Season status changed",
-  "registration.approved": "Registration approved",
-  "registration.imported": "Registrations imported",
-  "registration.added": "Player added",
-  "registration.team_assigned": "Player assigned to a team",
-  "tournament.created": "Tournament created",
-  "team.coach_set": "Coach set",
-  "venue.created": "Venue added",
-  "ground.created": "Ground added",
-  "invite.created": "Invitation sent",
-  "invite.accepted": "Invitation accepted",
-  "fixture.generated": "Fixtures generated",
-  "fixture.schedule": "Fixtures scheduled",
-  "fixture.publish": "Fixtures published",
-  "auction.AuctionCreated": "Auction created",
-  "auction.AuctionOpened": "Auction opened",
-  "auction.AuctionClosed": "Auction closed",
-  "auction.LotSold": "Lot sold",
-  "auction.LotUnsold": "Lot went unsold",
-  "auction.owner_join": "Team owner joined",
-  "grant.issued": "Paddle granted",
-  "grant.revoked": "Paddle revoked",
-  "org.created": "Organization created",
-  // Written by the privacy desk when a member or player asked to be erased.
-  "person.erased": "A member's account was erased",
-  "payment.captured": "Payment received",
-  "payment.failed": "Payment failed",
-  "registration.submitted": "New registration",
-  "registration.approve": "Registration approved",
-  "registration.waitlist": "Registration waitlisted",
-  "settlement.PaymentCaptured": "Payment received",
-  "settlement.ObligationWaived": "Amount waived",
-  "settlement.CaseClosed": "Settlement closed",
-  "team.created": "Team added",
-};
-
-/** Internal domain words → what the organizer calls the same thing. */
-const ACTIVITY_DOMAIN: Record<string, string> = {
-  finops: "Finance",
-  competition: "Season",
-  grant: "Access",
-  auth: "Sign-in",
-  org: "Organization",
-};
-
-/** "grant.issued" -> "Paddle granted"; unmapped "x.YDone" -> "X y done". */
-function activityLabel(action: string): string {
-  const phrase = ACTIVITY_PHRASE[action];
-  if (phrase !== undefined) return phrase;
-  const parts = action.split(".");
-  const domain = parts[0] ?? action;
-  const tail = parts.slice(1).join(" ");
-  const named = ACTIVITY_DOMAIN[domain] ?? domain.charAt(0).toUpperCase() + domain.slice(1);
-  if (tail === "") return named;
-  const words = tail
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_.-]/g, " ")
-    .toLowerCase();
-  return `${named} ${words}`;
-}
-
-const ACTIVITY_STYLE: Record<string, { tone: string; icon: ReactNode }> = {
-  auction: { tone: "gold", icon: <Glyph d={G.gavel} /> },
-  registration: { tone: "green", icon: <Glyph d={G.check} /> },
-  competition: { tone: "accent", icon: <Glyph d={G.trophy} /> },
-  team: { tone: "info", icon: <Glyph d={G.users} /> },
-  org: { tone: "info", icon: <Glyph d={G.users} /> },
-  grant: { tone: "violet", icon: <Glyph d={G.users} /> },
-  auth: { tone: "violet", icon: <Glyph d={G.users} /> },
-  profile: { tone: "violet", icon: <Glyph d={G.users} /> },
-  settlement: { tone: "info", icon: <Glyph d={G.rupee} /> },
-  payment: { tone: "info", icon: <Glyph d={G.rupee} /> },
-  finops: { tone: "teal", icon: <Glyph d={G.doc} /> },
-};
-
-function activityStyle(action: string): { tone: string; icon: ReactNode } {
-  return (
-    ACTIVITY_STYLE[action.split(".")[0] ?? ""] ?? { tone: "accent", icon: <Glyph d={G.bolt} /> }
-  );
-}
-
-function ago(iso: string): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${String(minutes)}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${String(hours)}h`;
-  return `${String(Math.floor(hours / 24))}d`;
-}
-
 /** Build a polyline `points` string for a 7-value series. */
 function points(series: number[], max: number): string {
   const x0 = 44;
@@ -496,111 +271,6 @@ function points(series: number[], max: number): string {
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /**
- * The platform in one row. Every tournament walks these four stages, so the
- * strip doubles as an explanation of what DesiAuction does and a read on where
- * this organiser's competitions actually are.
- *
- * Each stage carries the number that matters AT that stage. That is deliberate:
- * a separate grid of stat tiles sat directly under this strip and restated the
- * same facts in different units — "Auction night 0" over "Active auctions 0",
- * "Settlement 1" over "Collected", and a "Registrations" tile counting players
- * beside a "Registration" stage counting competitions. Nine cards, five facts.
- * The counts belong to the stages that own them.
- */
-function lifecycleFor(dash: HomeDashboardData): {
-  key: keyof HomeStages;
-  name: string;
-  count: number;
-  detail: string;
-  tone: string;
-  icon: ReactNode;
-  href: string;
-}[] {
-  const { setup, registration, auction, settlement } = dash.stages;
-  const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
-  return [
-    {
-      key: "setup",
-      name: "Set up",
-      count: setup.competitions,
-      detail:
-        setup.competitions === 0
-          ? "Nothing in setup"
-          : `${String(setup.teams)} ${plural(setup.teams, "team", "teams")} added`,
-      tone: "info",
-      icon: <Glyph d={G.trophy} />,
-      href: "/tournaments?view=seasons",
-    },
-    {
-      key: "registration",
-      name: "Registration",
-      count: registration.competitions,
-      detail:
-        registration.competitions === 0
-          ? "Nobody taking entries"
-          : `${registration.registered.toLocaleString("en-IN")} registered · ${registration.approved.toLocaleString("en-IN")} approved`,
-      tone: "green",
-      icon: <Glyph d={G.check} />,
-      href: "/tournaments?view=seasons",
-    },
-    {
-      key: "auction",
-      name: "Auction night",
-      count: auction.competitions,
-      detail:
-        auction.live > 0
-          ? `${String(auction.live)} live right now`
-          : auction.competitions === 0
-            ? "Nothing at auction"
-            : auction.bids > 0
-              ? `${auction.bids.toLocaleString("en-IN")} ${plural(auction.bids, "bid", "bids")} placed`
-              : "Ready to run",
-      tone: "gold",
-      icon: <Glyph d={G.gavel} />,
-      href: "/tournaments?view=seasons",
-    },
-    {
-      key: "settlement",
-      name: "Settlement",
-      count: settlement.competitions,
-      /**
-       * "settled" used to be derived from `outstanding === 0`. It is not the
-       * same claim: a case with every rupee collected stays `settling` until
-       * somebody settles it, so this rail told an organizer "₹2L collected ·
-       * settled" while the Money tab correctly said COLLECTING. Settlement is a
-       * case STATUS, and only the case may say it.
-       *
-       * The money words are also gated: without a settlement grant on the org
-       * the figures fold to zero, and "₹0 collected" must not be reported as a
-       * fact about books this person cannot open.
-       */
-      detail:
-        settlement.competitions === 0
-          ? "Nothing due yet"
-          : settlement.visible === 0
-            ? settlement.awaiting > 0
-              ? "Settling"
-              : "Settled"
-            : settlement.outstandingPaise > 0
-              ? `${rupeesShort(settlement.outstandingPaise)} still outstanding`
-              : settlement.awaiting > 0
-                ? `${rupeesShort(settlement.collectedPaise)} collected · not settled yet`
-                : `${rupeesShort(settlement.collectedPaise)} collected · settled`,
-      tone: "violet",
-      icon: <Glyph d={G.rupee} />,
-      // NOT /money. That surface renders "This area is being built during the
-      // beta" and was pulled from the rail for it (nav.ts: "a primary
-      // navigation item is a promise; this one led to an apology"). The rail
-      // was cleaned and this page was not, so the stage holding real settled
-      // money led to an apology. The season's own Money tab IS built —
-      // `moneyHref` is it, when one season owns the total and this person may
-      // open its books; otherwise the season list, which is also real.
-      href: dash.moneyHref ?? "/tournaments?view=seasons",
-    },
-  ];
-}
-
-/**
  * GATE FIRST, then stream — the pattern worked out in
  * `app/org/[slug]/settlement/page.tsx`.
  *
@@ -618,8 +288,12 @@ function lifecycleFor(dash: HomeDashboardData): {
  * `<Suspense>`, which streams exactly as the old `loading.tsx` did — but under
  * a status code that has already been decided.
  */
-export default async function HomePage() {
-  const session = await currentSession();
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [session, params] = await Promise.all([currentSession(), searchParams]);
   if (session === null) {
     redirect("/login?next=/home");
   }
@@ -629,13 +303,29 @@ export default async function HomePage() {
   return (
     <main className="home">
       <Suspense fallback={<LoadingState variant="page" />}>
-        <HomeBody personId={session.personId} name={session.name} />
+        <HomeBody
+          personId={session.personId}
+          name={session.name}
+          focusSlug={typeof params.season === "string" ? params.season : null}
+        />
       </Suspense>
     </main>
   );
 }
 
-async function HomeBody({ personId, name }: { personId: string; name: string }) {
+/** The season /home leads with when the URL names none. */
+const IN_FLIGHT = new Set(["setup", "registration_open", "registration_closed"]);
+
+async function HomeBody({
+  personId,
+  name,
+  focusSlug,
+}: {
+  personId: string;
+  name: string;
+  /** `?season=` — the hero's switcher writes it; anything unknown is ignored. */
+  focusSlug: string | null;
+}) {
   const [view, schedule, registrationsMine, dash, hasProfile, completeness, roles] =
     await Promise.all([
       competitionsView(),
@@ -648,11 +338,12 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
     ]);
   /*
    * WHO IS READING (launch polish, Phase 2). The organizer dashboard below —
-   * lifecycle, attention, money, seasons, activity — is for people who MANAGE a
-   * club. A team owner, a plain member and a player used to get it too, with an
-   * offer to create tournaments they had no power to create.
+   * hero, journey, figures, attention, seasons, activity — is for people who
+   * MANAGE a club. A team owner, a plain member and a player used to get it
+   * too, with an offer to create tournaments they had no power to create.
    */
   const manages = roles.organizes.length > 0;
+  const managedOrgs = new Set(roles.organizes.map((club) => club.orgId));
   const brandNew =
     !manages &&
     roles.memberOf.length === 0 &&
@@ -666,38 +357,47 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
     (registrationsMine.length > 0 || hasProfile) && completeness.done < completeness.total;
   /*
    * The sport this person most recently registered in — the career link should
-   * take them to a page with their record on it, not to cricket's on the
-   * assumption that cricket is what everybody plays.
-   *
-   * The LAST row, not the first: `myRegistrations` is ordered by start date
-   * ASCENDING because that is the order the list reads in, so the most recent
-   * season is at the end.
+   * take them to a page with their record on it. The LAST row: `myRegistrations`
+   * is ordered by start date ascending.
    */
   const careerPack = sportPackFor(registrationsMine[registrationsMine.length - 1]?.sport ?? null);
   const careerSport = careerPack.key;
   const careerSportLabel = careerPack.label.toLowerCase();
 
-  // The night in progress leads the page. One extra read, and only when there
-  // IS one: the hero needs what the list row could not say — who is on the
-  // block, what the top bid is, and who is holding it.
+  // The night in progress leads the page (managers only).
   const liveRow = dash.auctions.find((auction) => auction.status === "live") ?? null;
-
-  // The hero owns the live auction, so the panel below lists only what the hero
-  // is not already showing — the design's "no duplication" rule.
+  // The live panel owns the live auction, so the list lists only the rest.
   const otherAuctions = dash.auctions.filter((auction) => auction.auctionId !== liveRow?.auctionId);
 
-  // The scan used to be a sequential `for` loop doing up to eight composite
-  // reads one after another — eight round-trip depths for work that has no
-  // ordering between its items. `Promise.all` collapses it to one.
-  // The live hero's read rides in the same batch: it depends on nothing the
-  // scan does, and awaiting it first added one more round trip in series.
-  // Only managers are asked what is waiting on them: for anyone else every
-  // row would come back empty after a composite read per season.
+  /*
+   * THE SEASON IN FOCUS — what the club hero, the journey row and the four
+   * figures describe. The switcher's choice when it names one of this person's
+   * managed seasons; otherwise the live night, then the newest season still in
+   * flight, then the newest of all (the list is newest-created first).
+   */
+  const managedSeasons = view.competitions.filter((competition) =>
+    managedOrgs.has(competition.orgId),
+  );
+  const focus = !manages
+    ? undefined
+    : (managedSeasons.find((competition) => competition.slug === focusSlug) ??
+      managedSeasons.find((competition) => competition.slug === liveRow?.competitionSlug) ??
+      managedSeasons.find(
+        (competition) =>
+          IN_FLIGHT.has(competition.status) &&
+          dash.top.find((row) => row.slug === competition.slug)?.settlement !== "settled",
+      ) ??
+      managedSeasons[0]);
+
+  // The scan used to be a sequential loop of composite reads; one batch now,
+  // with the live board and the focus season's overview riding along.
+  // Only managers are asked what is waiting on them.
   const scanned = manages ? view.competitions.slice(0, ATTENTION_SCAN_LIMIT) : [];
-  const [liveBoard, scannedRows] = await Promise.all([
+  const [liveBoard, focusOverview, scannedRows] = await Promise.all([
     liveRow === null || !manages
       ? Promise.resolve(null)
       : auctionDashboard(liveRow.competitionSlug).then((board) => board?.overview ?? null),
+    focus === undefined ? Promise.resolve(null) : seasonOverviewView(focus.slug),
     Promise.all(scanned.map((competition) => attentionFor(competition, dash))),
   ]);
   const attention = scannedRows.filter((row): row is AttentionRow => row !== null);
@@ -731,15 +431,10 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
 
   /* ---- where this organizer actually is ---------------------------------
    *
-   * `isEmpty` was binary — orgs AND seasons AND registrations all zero — but
-   * the journey has five rungs, and the instant a club existed the flag flipped
-   * and the whole analytics dashboard unfurled: four lifecycle stages at 0, a
-   * seven-day chart flat at ₹0, three ₹0 money cells, a "Top seasons" table
-   * that was a bare header row over nothing, three empty panels, and "All clear
-   * — nothing is waiting on you", at the moment 1 of 5 steps was done. That is
-   * not a dashboard, it is a dashboard's skeleton, and it teaches nothing.
-   *
-   * Every rung below is derived from data already loaded — no extra read.
+   * A club with nothing in it used to unfurl the whole analytics dashboard as
+   * a skeleton of zeros. The five rungs below are derived from data already
+   * loaded — no extra read — and the ladder owns the page until the last one
+   * is done.
    */
   const totalTeams = Object.values(dash.counts).reduce((sum, row) => sum + row.teams, 0);
   const seasonNeedingTeams =
@@ -818,14 +513,11 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
         ),
     },
   ];
-  // The ladder retires when the LAST rung is done — the first registrations
-  // land — not when the first gap closes. Rungs can complete out of order: a
-  // season may be a one-off, which leaves the tournament rung open forever, and
-  // "first unfinished rung exists" would then keep the ladder on screen over a
-  // mature account with a live auction behind it.
+  // The ladder retires when the LAST rung is done — rungs can complete out of
+  // order (a one-off season leaves the tournament rung open forever).
   const currentRung = rungs.findIndex((rung) => !rung.done);
-  // The ladder is an ORGANIZER's first-run guide. A brand-new account chooses a
-  // path first (the next-step banner); a player or a member never climbs it.
+  // An ORGANIZER's first-run guide. A brand-new account chooses a path first
+  // (the next-step card); a player or a member never climbs it.
   const laddering = manages && currentRung !== -1 && !(rungs[rungs.length - 1]?.done ?? false);
 
   const latest = registrationsMine[registrationsMine.length - 1] ?? null;
@@ -849,739 +541,912 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
           ) ?? null,
       });
 
-  /* ---- which panels have earned their space ------------------------------
-   *
-   * An empty chart, an empty seasons table and three empty panels are noise,
-   * not a dashboard. While the ladder is up it owns the "what next" question —
-   * including the attention panel's, so the two never say the same thing twice.
-   */
+  /* ---- which panels have earned their space ------------------------------ */
   const moneyTotal =
     dash.money.collectedPaise + dash.money.outstandingPaise + dash.money.waivedPaise;
-  // One capture is not a trend: a lone payment drew six flat days and a spike,
-  // which reads as a collapse followed by a recovery that never happened.
+  // One capture is not a trend: a lone payment drew six flat days and a spike.
   const chartDays = [...dash.money.thisWeek, ...dash.money.lastWeek].filter(
     (value) => value > 0,
   ).length;
   const showChart = chartDays >= 2;
-  // The banner already leads with the first thing waiting; the panel lists only
-  // what comes after it, and steps aside entirely when nothing does.
+  // The next step leads the attention card with the first thing waiting; the
+  // rows under it list only what comes after it.
   const restAttention = nextStep?.key === "organizer-attention" ? attention.slice(1) : attention;
-  const showAttention = !laddering && (nextStep === null || restAttention.length > 0);
+  const attentionCount = restAttention.length + (nextStep !== null ? 1 : 0);
   const showMoney = moneyTotal > 0;
   const showSeasons = dash.top.length > 0;
   const showAuctions = otherAuctions.length > 0 || (!laddering && liveRow === null);
   const showEvents = schedule.length > 0 || !laddering;
   const showActivity = dash.activity.length > 0;
-  const showLeft = showAttention || showMoney || showSeasons;
-  const showRight = showAuctions || showEvents || showActivity;
 
   const liveDone =
     liveRow !== null && liveRow.lotsTotal > 0 && liveRow.lotsSold === liveRow.lotsTotal;
 
+  const bySlug = new Map(view.competitions.map((competition) => [competition.slug, competition]));
+  const seasonMeta = (slug: string): string | null => {
+    const competition = bySlug.get(slug);
+    if (competition === undefined) return null;
+    const parts = [
+      dateRange(competition.startsOn, competition.endsOn),
+      competition.location,
+    ].filter((part): part is string => part !== null);
+    return parts.length === 0 ? null : parts.join(" · ");
+  };
+
+  // Offered to people who MANAGE a club, in the clubs they manage — the same
+  // gate as the top bar's "+ New tournament".
+  const creatableOrgs = view.orgs.filter((org) => managedOrgs.has(org.id));
+  const createCard =
+    manages && creatableOrgs.length > 0 ? (
+      <FormDialog
+        title="New tournament"
+        triggerAsLink
+        triggerClassName="home-create-card"
+        triggerTestId="home-create-tournament-card"
+        triggerLabel={
+          <>
+            <span className="home-create-plus" aria-hidden>
+              <IconPlus size={20} />
+            </span>
+            <span className="home-create-text">
+              <strong>Create a new tournament</strong>
+              <span>Start a new season and build your next story.</span>
+            </span>
+          </>
+        }
+      >
+        <CreateTournamentForm orgs={creatableOrgs} />
+      </FormDialog>
+    ) : undefined;
+
+  const shortcuts = (
+    <HomeShortcuts
+      competitions={view.competitions.map((competition) => {
+        const meta = seasonMeta(competition.slug);
+        return {
+          slug: competition.slug,
+          name: competition.name,
+          orgName: competition.orgName,
+          ...(meta !== null ? { meta } : {}),
+        };
+      })}
+      {...(createCard !== undefined ? { createCard } : {})}
+    />
+  );
+
+  /* ---- the focus season: journey + figures ------------------------------- */
+  const focusBase = focus === undefined ? "" : `/seasons/${focus.slug}`;
+  const journey =
+    focusOverview === null
+      ? null
+      : seasonJourney(
+          {
+            status: focusOverview.competition.status,
+            teams: focusOverview.teamCount,
+            registrations: focusOverview.approvedPlayers + focusOverview.pendingPlayers,
+            auctionStatus: focusOverview.auctionStatus,
+            settlement: focusOverview.settlement?.status ?? null,
+          },
+          { withTeams: false },
+        );
+  // With several seasons, each stage also says how many of them sit there —
+  // the portfolio figures the old lifecycle strip carried.
+  const stageCount: Record<string, number> = {
+    setup: dash.stages.setup.competitions,
+    registration: dash.stages.registration.competitions,
+    auction: dash.stages.auction.competitions,
+    settlement: dash.stages.settlement.competitions,
+  };
+  const journeyHref: Record<string, string | undefined> = {
+    setup: `${focusBase}/teams`,
+    registration: `${focusBase}/registrations`,
+    auction: `${focusBase}/auction`,
+    // The Money tab 404s without `settlement.view`: no link beats a dead end.
+    settlement: focusOverview?.viewer.canSettle === true ? `${focusBase}/money` : undefined,
+  };
+  const journeyIcon: Record<string, ReactNode> = {
+    setup: <IconTrophy size={14} />,
+    registration: <IconFileCheck size={14} />,
+    auction: <IconGavel size={14} />,
+    settlement: <IconRupee size={14} />,
+  };
+  const lotsPct =
+    focusOverview === null || focusOverview.lotsTotal === 0
+      ? 0
+      : Math.round((focusOverview.lotsSold / focusOverview.lotsTotal) * 100);
+
+  const attentionCard = (
+    <SectionCard
+      data-testid="attention-queue"
+      className="home-attention"
+      icon={<IconAlert />}
+      tone={attentionCount > 0 ? "red" : "green"}
+      title="Needs attention"
+      action={
+        attentionCount > 0 ? (
+          <span className="home-count" aria-live="polite">
+            {attentionCount}
+            <VisuallyHidden>
+              {" "}
+              item{attentionCount === 1 ? "" : "s"} needing attention
+            </VisuallyHidden>
+          </span>
+        ) : undefined
+      }
+    >
+      {nextStep !== null ? <NextStepBanner step={nextStep} embedded /> : null}
+      {restAttention.length > 0 ? (
+        <ul className="home-list">
+          {restAttention.map((row) => (
+            <li key={row.key}>
+              <Link href={row.href} className="home-row-link">
+                <IconTile icon={<IconBolt />} tone="amber" size="sm" />
+                <span className="home-row-text">
+                  <strong>{row.label}</strong>
+                  <span>{row.detail}</span>
+                </span>
+                <IconChevronRight size={18} className="home-row-go" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {nextStep === null && restAttention.length === 0 ? (
+        <div className="home-clear">
+          <IconTile icon={<IconCheckCircle />} tone="green" size="lg" />
+          <span className="home-row-text">
+            <strong>All clear — nothing is waiting on you.</strong>
+            <span>You&apos;re all caught up.</span>
+          </span>
+        </div>
+      ) : null}
+      {/* The scan stops at eight and says so, so a portfolio of twenty never
+          reads as "these eight are all there is". */}
+      {unscanned > 0 ? (
+        <p className="home-scan-note">
+          Checked the {ATTENTION_SCAN_LIMIT} most recent of {view.competitions.length} seasons.{" "}
+          <Link href="/tournaments?view=seasons">See every season</Link>
+        </p>
+      ) : null}
+    </SectionCard>
+  );
+
   return (
     <>
-      {/* The greeting IS this surface's title — the shell's derived "Home"
-          gives way to it — and the portfolio line is its lede, so both ride the
-          identity bar and the page opens on the work. */}
+      {/* The greeting IS this surface's title and the portfolio line its lede;
+          both ride the shell's bar, and so does "+ New tournament"
+          (`app/@action/home`). */}
       <PageTitle title={greeting} subtitle={headline} />
-      {/* The primary action moved to `app/@action/home/page.tsx`. It is the same
-          control with the same gate; what changed is that the ROUTER resolves
-          it alongside this page, so the shell's bar carries it in the server
-          render instead of growing a row once hydration published it here. */}
 
       {laddering ? <SetupLadder rungs={rungs} current={currentRung} /> : null}
-      {nextStep !== null ? <NextStepBanner step={nextStep} /> : null}
-      {team !== null ? <OwnerSection team={team} /> : null}
+      {/* Everyone who does not run a club opens on their one next step. */}
+      {!manages && nextStep !== null ? <NextStepBanner step={nextStep} /> : null}
+      {!manages && team !== null ? <OwnerSection team={team} /> : null}
 
-      <>
-        {/* ---- the night in progress: nothing outranks a live auction ---- */}
-        {manages && liveRow !== null ? (
-          <section
-            className={`home-live${liveDone ? " home-live--done" : ""}`}
-            aria-labelledby="home-live-name"
-            data-testid="home-live"
-          >
-            <div className="home-live-body">
-              <p className="home-live-kicker">
-                {/* Every lot has gone. The hero still said LIVE NOW over a
-                      100% progress bar with one CTA into the room, which is the
-                      one state where "live" is the wrong word: the bidding is
-                      over and what is left is closing it out. */}
-                <span className="home-live-badge">
-                  {liveDone ? null : <i aria-hidden />}
-                  {liveDone ? "ALL LOTS SOLD" : "LIVE NOW"}
-                </span>
-              </p>
-              <h2 id="home-live-name" className="home-live-name">
-                {liveRow.competitionName}
-              </h2>
-              <dl className="home-live-facts">
-                {liveBoard?.onBlock !== null && liveBoard?.onBlock !== undefined ? (
-                  <div>
-                    <dt>On the block</dt>
-                    <dd className="home-live-player">
-                      {/* The face under the hammer (broadcast rule, gated in
-                          the read); the registration's initials mark without one. */}
-                      <PlayerImage
-                        name={liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
-                        seed={liveBoard.onBlock.registrationId}
-                        src={liveBoard.onBlock.photoUrl}
-                        size="xs"
-                        shape="round"
-                        decorative
-                      />
-                      <span>
-                        {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
-                        <span className="home-live-role">
-                          {" · "}
-                          {roleLabeller(liveBoard.roles)(liveBoard.onBlock.role)}
-                        </span>
+      {/* ---- the night in progress: nothing outranks a live auction ---- */}
+      {manages && liveRow !== null ? (
+        <section
+          className={`home-live${liveDone ? " home-live--done" : ""}`}
+          aria-labelledby="home-live-name"
+          data-testid="home-live"
+        >
+          <div className="home-live-body">
+            <p className="home-live-kicker">
+              {/* Every lot has gone: "live" is the wrong word, closing out is. */}
+              <span className="home-live-badge">
+                {liveDone ? null : <i aria-hidden />}
+                {liveDone ? "ALL LOTS SOLD" : "LIVE NOW"}
+              </span>
+            </p>
+            <h2 id="home-live-name" className="home-live-name">
+              {liveRow.competitionName}
+            </h2>
+            <dl className="home-live-facts">
+              {liveBoard?.onBlock !== null && liveBoard?.onBlock !== undefined ? (
+                <div>
+                  <dt>On the block</dt>
+                  <dd className="home-live-player">
+                    <PlayerImage
+                      name={liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
+                      seed={liveBoard.onBlock.registrationId}
+                      src={liveBoard.onBlock.photoUrl}
+                      size="xs"
+                      shape="round"
+                      decorative
+                    />
+                    <span>
+                      {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
+                      <span className="home-live-role">
+                        {" · "}
+                        {roleLabeller(liveBoard.roles)(liveBoard.onBlock.role)}
                       </span>
-                    </dd>
-                  </div>
-                ) : null}
-                {liveBoard?.onBlock?.currentBid != null ? (
-                  <div>
-                    <dt>Top bid</dt>
-                    <dd className="home-live-bid">
-                      {rupees(liveBoard.onBlock.currentBid)}
-                      {liveBoard.onBlock.leadingTeamName !== null ? (
-                        <span className="home-live-team">
-                          {" · "}
-                          {liveBoard.onBlock.leadingTeamName}
-                        </span>
-                      ) : null}
-                    </dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt>Spend</dt>
-                  <dd>{rupeesShort(liveRow.spendPaise)}</dd>
-                </div>
-                <div>
-                  <dt>Lots sold</dt>
-                  <dd className="home-mono">
-                    {liveRow.lotsSold} / {liveRow.lotsTotal}
+                    </span>
                   </dd>
                 </div>
-              </dl>
-              <span
-                className="home-live-bar"
-                aria-hidden
-                data-sold={liveRow.lotsSold}
-                data-total={liveRow.lotsTotal}
-              >
-                <i
-                  style={{
-                    width: `${String(liveRow.lotsTotal === 0 ? 0 : Math.round((liveRow.lotsSold / liveRow.lotsTotal) * 100))}%`,
-                  }}
-                />
-              </span>
-            </div>
-            <ButtonLink
-              href={`/seasons/${liveRow.competitionSlug}/auction/live`}
-              data-testid="home-enter-room"
-            >
-              {liveDone ? "Close out the auction" : "Enter auction room"}
-              <IconArrowRight size={16} className="icon-trail" />
-            </ButtonLink>
-          </section>
-        ) : null}
-
-        {/* ---- lifecycle: what the platform does, and where your work sits ---- */}
-        {/* The chevrons are ITEMS in this row, not decoration pinned to a
-            step's edge. Pinned, they sat on the column boundary — which is
-            flush against the next stage's icon and nowhere near the middle of
-            the whitespace. As items they take an equal share of the free
-            space, so each one lands midway between the stages it joins.
-
-            It renders in the empty state too, greyed, as a MAP. It is the best
-            teaching device on the screen — the whole product in one row — and
-            it used to appear only once the reader already understood the
-            model. */}
-        {manages ? (
-          <section
-            className={`home-flow${laddering ? " home-flow--map" : ""}`}
-            aria-label="Season lifecycle"
-          >
-            {lifecycleFor(dash).map((stage, index) => {
-              const count = stage.count;
-              return (
-                <Fragment key={stage.key}>
-                  {index > 0 ? <span className="home-step-sep" aria-hidden /> : null}
-                  <Link
-                    href={stage.href}
-                    className={`home-step${count > 0 ? " home-step--on" : ""}`}
-                    style={{ ["--step" as string]: String(index + 1) }}
-                  >
-                    <span className={`home-ic home-ic--${stage.tone} home-ic--sm`}>
-                      {stage.icon}
-                    </span>
-                    <span className="home-step-text">
-                      <span className="home-step-head">
-                        <span className="home-step-name">{stage.name}</span>
-                        <span className="home-step-count">{count}</span>
+              ) : null}
+              {liveBoard?.onBlock?.currentBid != null ? (
+                <div>
+                  <dt>Top bid</dt>
+                  <dd className="home-live-bid">
+                    {rupees(liveBoard.onBlock.currentBid)}
+                    {liveBoard.onBlock.leadingTeamName !== null ? (
+                      <span className="home-live-team">
+                        {" · "}
+                        {liveBoard.onBlock.leadingTeamName}
                       </span>
-                      <span className="home-step-blurb">{stage.detail}</span>
-                    </span>
-                  </Link>
-                </Fragment>
-              );
-            })}
-          </section>
-        ) : null}
-
-        {manages && (showLeft || showRight) ? (
-          <div className={`home-main${showLeft && showRight ? "" : " home-main--single"}`}>
-            {/* ================= LEFT ================= */}
-            {showLeft ? (
-              <div className="home-col">
-                {showAttention ? (
-                  <Card
-                    data-testid="attention-queue"
-                    className={
-                      restAttention.length > 0 ? "home-panel home-panel--alert" : "home-panel"
-                    }
-                  >
-                    <div className="home-head">
-                      <SectionHeader title="Needs attention" />
-                      {restAttention.length > 0 ? (
-                        <span className="home-count" aria-live="polite">
-                          {restAttention.length}
-                          <VisuallyHidden>
-                            {" "}
-                            item{restAttention.length === 1 ? "" : "s"} needing attention
-                          </VisuallyHidden>
-                        </span>
-                      ) : null}
-                    </div>
-                    {restAttention.length === 0 ? (
-                      <PanelEmpty
-                        icon={<Glyph d={G.check} />}
-                        text="All clear — nothing is waiting on you."
-                      />
-                    ) : (
-                      <ul className="home-list">
-                        {restAttention.map((row) => (
-                          <li key={row.key}>
-                            <Link href={row.href} className="home-attn">
-                              <span className="home-ic home-ic--warn home-ic--sm">
-                                <Glyph d={G.bolt} />
-                              </span>
-                              <span className="home-attn-text">
-                                <strong>{row.label}</strong>
-                                <span>{row.detail}</span>
-                              </span>
-                              <span className="home-go" aria-hidden>
-                                <IconArrowRight size={16} aria-hidden />
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {/* The scan stops at eight and used to say so nowhere, so a
-                    portfolio of twenty read as "these eight are all there is". */}
-                    {unscanned > 0 ? (
-                      <p className="home-scan-note">
-                        <span>
-                          Checked the {ATTENTION_SCAN_LIMIT} most recent of{" "}
-                          {view.competitions.length} seasons.
-                        </span>
-                        <Link href="/tournaments?view=seasons" className="home-blank-cta">
-                          See every season
-                        </Link>
-                      </p>
                     ) : null}
-                  </Card>
-                ) : null}
-
-                {showMoney ? (
-                  <Card className="home-panel">
-                    <div className="home-head">
-                      <SectionHeader title="Money overview" />
-                      {showChart ? (
-                        <span className="home-legend">
-                          <span>
-                            <i className="home-dot home-dot--accent" />
-                            This week
-                          </span>
-                          <span>
-                            <i className="home-dot home-dot--muted" />
-                            Last week
-                          </span>
-                        </span>
-                      ) : null}
-                    </div>
-                    {showChart ? (
-                      <div className="home-chart-wrap">
-                        {chartMax > 0 ? (
-                          <span className="home-chart-peak">Peak {rupeesShort(chartMax)}/day</span>
-                        ) : null}
-                        <svg
-                          className="home-chart"
-                          viewBox="0 0 470 156"
-                          role="img"
-                          aria-label="Money collected per day, this week versus last week"
-                        >
-                          <defs>
-                            <linearGradient id="home-area" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0" stopColor="var(--accent)" stopOpacity="0.24" />
-                              <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
-                            </linearGradient>
-                          </defs>
-                          {[16, 45, 74, 103, 132].map((y) => (
-                            <line
-                              key={y}
-                              x1="44"
-                              y1={y}
-                              x2="452"
-                              y2={y}
-                              stroke="var(--border-subtle)"
-                              strokeWidth="1"
-                            />
-                          ))}
-                          <polygon
-                            fill="url(#home-area)"
-                            points={`44,132 ${points(dash.money.thisWeek, chartMax)} 452,132`}
-                          />
-                          <polyline
-                            fill="none"
-                            stroke="var(--text-muted)"
-                            strokeWidth="2"
-                            strokeDasharray="4 5"
-                            strokeLinecap="round"
-                            points={points(dash.money.lastWeek, chartMax)}
-                          />
-                          <polyline
-                            fill="none"
-                            stroke="var(--accent)"
-                            strokeWidth="2.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            points={points(dash.money.thisWeek, chartMax)}
-                          />
-                          {DAY_LABELS.map((label, index) => (
-                            <text
-                              key={label}
-                              x={44 + index * ((452 - 44) / 6)}
-                              y="150"
-                              fill="var(--text-muted)"
-                              fontSize="10"
-                              textAnchor="middle"
-                            >
-                              {label}
-                            </text>
-                          ))}
-                        </svg>
-                        {/* The chart is the only place these seven numbers exist, and
-                      a polyline says nothing to a screen reader. */}
-                        <VisuallyHidden>
-                          Collected per day this week:{" "}
-                          {DAY_LABELS.map(
-                            (label, index) =>
-                              `${label} ${rupeesShort(dash.money.thisWeek[index] ?? 0)}`,
-                          ).join(", ")}
-                          .
-                        </VisuallyHidden>
-                      </div>
-                    ) : null}
-                    <div className="home-money">
-                      <MoneyCell href={dash.moneyHref} label="Collected" tone="remaining">
-                        {rupees(dash.money.collectedPaise)}
-                      </MoneyCell>
-                      <MoneyCell href={dash.moneyHref} label="Outstanding" tone="frozen">
-                        {rupees(dash.money.outstandingPaise)}
-                      </MoneyCell>
-                      <MoneyCell href={dash.moneyHref} label="Waived" tone="spent">
-                        {rupees(dash.money.waivedPaise)}
-                      </MoneyCell>
-                    </div>
-                  </Card>
-                ) : null}
-
-                {showSeasons ? (
-                  <Card className="home-panel home-panel--flush">
-                    <div className="home-head home-head--pad">
-                      <SectionHeader title="Top seasons" />
-                      <Link href="/tournaments?view=seasons" className="home-more">
-                        View all
-                      </Link>
-                    </div>
-                    {/* Two renderings, one visible at a time (see home.css).
-                    `table-layout: fixed` plus three pinned numeric columns left
-                    the season name 0px wide on every phone — 262px of a 316px
-                    row was spoken for before the name got a pixel — and
-                    `overflow-x: auto` could never rescue it because a
-                    `width: 100%` fixed table cannot exceed its wrapper. Below
-                    640px the rows become cards with the name first and full
-                    width; a horizontally scrolling table would have been the
-                    lesser fix and a worse phone. */}
-                    <div className="home-table-wrap" data-testid="home-competitions">
-                      <table className="home-table">
-                        <thead>
-                          <tr>
-                            <th>Season</th>
-                            <th className="home-num">Teams</th>
-                            <th className="home-num">Players</th>
-                            <th className="home-num">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dash.top.map((row) => {
-                            const badge = seasonBadge(row);
-                            return (
-                              <tr key={row.slug}>
-                                <td>
-                                  <Link href={`/seasons/${row.slug}`} className="home-tcell">
-                                    <span className="home-crest home-crest--sm" aria-hidden>
-                                      {monogram(row.name)}
-                                    </span>
-                                    <span className="home-tcell-text">
-                                      <strong>{row.name}</strong>
-                                      {row.canSeeMoney ? (
-                                        <span>{rupeesShort(row.collectedPaise)} collected</span>
-                                      ) : null}
-                                    </span>
-                                  </Link>
-                                </td>
-                                <td className="home-num home-mono">{row.teams}</td>
-                                <td className="home-num home-mono">{row.registrations}</td>
-                                <td className="home-num">
-                                  <Badge tone={badge.tone}>{badge.label}</Badge>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      <ul className="home-season-cards">
-                        {dash.top.map((row) => {
-                          const badge = seasonBadge(row);
-                          return (
-                            <li key={row.slug}>
-                              <Link href={`/seasons/${row.slug}`} className="home-season-card">
-                                <span className="home-season-top">
-                                  <span className="home-crest home-crest--sm" aria-hidden>
-                                    {monogram(row.name)}
-                                  </span>
-                                  <strong className="home-season-name">{row.name}</strong>
-                                  <Badge tone={badge.tone}>{badge.label}</Badge>
-                                </span>
-                                <span className="home-season-meta">
-                                  <span>
-                                    <b className="home-mono">{row.teams}</b> team
-                                    {row.teams === 1 ? "" : "s"}
-                                  </span>
-                                  <span>
-                                    <b className="home-mono">{row.registrations}</b> player
-                                    {row.registrations === 1 ? "" : "s"}
-                                  </span>
-                                  {row.canSeeMoney ? (
-                                    <span>{rupeesShort(row.collectedPaise)} collected</span>
-                                  ) : null}
-                                </span>
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  </Card>
-                ) : null}
+                  </dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>Spend</dt>
+                <dd>{rupeesShort(liveRow.spendPaise)}</dd>
               </div>
-            ) : null}
-
-            {/* ================= RIGHT ================= */}
-            {showRight ? (
-              <div className="home-col">
-                {showAuctions ? (
-                  <Card className="home-panel">
-                    <div className="home-head">
-                      <SectionHeader title="Active auctions" />
-                      <Link href="/tournaments?view=seasons" className="home-more">
-                        View all
-                      </Link>
-                    </div>
-                    {otherAuctions.length === 0 ? (
-                      <PanelEmpty
-                        icon={<Glyph d={G.gavel} />}
-                        text={
-                          liveRow === null
-                            ? "No auction running yet."
-                            : "Nothing else scheduled right now."
-                        }
-                        ctaHref={
-                          seasonToOpen === undefined
-                            ? "/tournaments?view=seasons"
-                            : `/seasons/${seasonToOpen.slug}/auction`
-                        }
-                        ctaLabel={liveRow === null ? "Set one up" : "Plan the next one"}
-                      />
-                    ) : (
-                      <ul className="home-list">
-                        {otherAuctions.map((auction) => (
-                          <li key={auction.auctionId}>
-                            <Link
-                              href={`/seasons/${auction.competitionSlug}/auction`}
-                              className="home-auction"
-                            >
-                              <span className="home-crest" aria-hidden>
-                                {monogram(auction.competitionName)}
-                              </span>
-                              <span className="home-auction-main">
-                                <span className="home-auction-top">
-                                  <strong>{auction.competitionName}</strong>
-                                  <span
-                                    className={`home-chip home-chip--${auction.status === "live" ? "live" : "soon"}`}
-                                  >
-                                    {auction.status === "live" ? "LIVE" : "SCHEDULED"}
-                                  </span>
-                                </span>
-                                <span className="home-auction-meta">
-                                  <span>
-                                    Spend <b>{rupeesShort(auction.spendPaise)}</b>
-                                  </span>
-                                  <span>
-                                    Lots{" "}
-                                    <b>
-                                      {auction.lotsSold}/{auction.lotsTotal}
-                                    </b>
-                                  </span>
-                                </span>
-                                <span className="home-progress" aria-hidden>
-                                  <i
-                                    style={{
-                                      width: `${String(auction.lotsTotal === 0 ? 0 : Math.round((auction.lotsSold / auction.lotsTotal) * 100))}%`,
-                                    }}
-                                  />
-                                </span>
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Card>
-                ) : null}
-
-                {showEvents ? (
-                  <Card className="home-panel">
-                    <div className="home-head">
-                      <SectionHeader title="Upcoming events" />
-                    </div>
-                    {schedule.length === 0 ? (
-                      <PanelEmpty
-                        icon={<Glyph d={G.calendar} />}
-                        text="No fixtures scheduled."
-                        ctaHref={
-                          seasonToOpen === undefined
-                            ? "/tournaments?view=seasons"
-                            : `/seasons/${seasonToOpen.slug}/fixtures`
-                        }
-                        ctaLabel="Generate a schedule"
-                      />
-                    ) : (
-                      <ul className="home-list">
-                        {schedule.slice(0, 5).map((fixture) => {
-                          const when =
-                            fixture.kickoffAt !== null ? new Date(fixture.kickoffAt) : null;
-                          return (
-                            <li key={fixture.id}>
-                              <Link
-                                href={`/seasons/${fixture.competitionSlug}/fixtures`}
-                                className="home-event"
-                              >
-                                <span className="home-date">
-                                  <b>{when !== null ? IST_DAY.format(when) : "--"}</b>
-                                  <span>
-                                    {when !== null ? IST_MONTH.format(when).toUpperCase() : "TBD"}
-                                  </span>
-                                </span>
-                                <span className="home-event-text">
-                                  <strong>
-                                    {fixture.homeTeamName} vs {fixture.awayTeamName}
-                                  </strong>
-                                  <span>{fixture.competitionName}</span>
-                                </span>
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </Card>
-                ) : null}
-
-                {showActivity ? (
-                  <Card className="home-panel">
-                    <div className="home-head">
-                      <SectionHeader title="Recent activity" />
-                      <Link href="/inbox" className="home-more">
-                        View all
-                      </Link>
-                    </div>
-                    {dash.activity.length === 0 ? (
-                      <PanelEmpty icon={<Glyph d={G.bolt} />} text="No activity recorded yet." />
-                    ) : (
-                      <ul className="home-list">
-                        {dash.activity.map((row) => {
-                          const style = activityStyle(row.action);
-                          return (
-                            <li key={row.id} className="home-feed">
-                              <span className={`home-ic home-ic--${style.tone} home-ic--sm`}>
-                                {style.icon}
-                              </span>
-                              <span className="home-feed-text">
-                                <strong>
-                                  {row.action === "finops.summary"
-                                    ? `${String(row.count)} finance ${row.count === 1 ? "update" : "updates"}`
-                                    : activityLabel(row.action)}
-                                </strong>
-                                {/* Which season the event belongs to — six
-                                    anonymous "Paddle granted" lines answer
-                                    nothing without it. */}
-                                {row.scope !== null ? (
-                                  <span className="home-feed-scope">{row.scope}</span>
-                                ) : null}
-                              </span>
-                              <span className="home-time">{ago(row.at)}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </Card>
-                ) : null}
+              <div>
+                <dt>Lots sold</dt>
+                <dd className="home-mono">
+                  {liveRow.lotsSold} / {liveRow.lotsTotal}
+                </dd>
               </div>
-            ) : null}
+            </dl>
+            <span
+              className="home-live-bar"
+              aria-hidden
+              data-sold={liveRow.lotsSold}
+              data-total={liveRow.lotsTotal}
+            >
+              <i
+                style={{
+                  width: `${String(liveRow.lotsTotal === 0 ? 0 : Math.round((liveRow.lotsSold / liveRow.lotsTotal) * 100))}%`,
+                }}
+              />
+            </span>
           </div>
-        ) : null}
+          <ButtonLink
+            href={`/seasons/${liveRow.competitionSlug}/auction/live`}
+            data-testid="home-enter-room"
+          >
+            {liveDone ? "Close out the auction" : "Enter auction room"}
+            <IconArrowRight size={16} className="icon-trail" />
+          </ButtonLink>
+        </section>
+      ) : null}
 
-        {/* A member who manages nothing still belongs to a club: its seasons,
-            as plain doors, without the organizer's figures or offers. */}
-        {!manages && view.competitions.length > 0 ? (
-          <section className="home-member" aria-labelledby="home-member-title">
-            <header className="home-flat-head">
-              <h2 id="home-member-title" className="home-flat-title">
-                Seasons in your {roles.memberOf.length === 1 ? "club" : "clubs"}
-              </h2>
-            </header>
-            <ul className="home-rows">
-              {view.competitions.map((competition) => (
-                <li key={competition.id}>
-                  <Link href={`/seasons/${competition.slug}`} className="home-row">
-                    <span className="home-row-main">
-                      <strong>{competition.name}</strong>
-                      <span>{competition.orgName}</span>
-                    </span>
-                    {(() => {
-                      const top = dash.top.find((row) => row.slug === competition.slug);
-                      const badge = seasonBadge({
-                        status: competition.status,
-                        settlement: top?.settlement ?? null,
-                      });
-                      return <Badge tone={badge.tone}>{badge.label}</Badge>;
-                    })()}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        <HomeShortcuts
-          competitions={view.competitions.map((competition) => ({
+      {/* ---- the club hero, its road and its four figures ---- */}
+      {manages && focusOverview !== null ? (
+        <ClubHero
+          overview={focusOverview}
+          seasonsInClub={
+            view.competitions.filter(
+              (competition) => competition.orgId === focusOverview.competition.orgId,
+            ).length
+          }
+          switchable={managedSeasons.map((competition) => ({
             slug: competition.slug,
             name: competition.name,
-            orgName: competition.orgName,
           }))}
         />
+      ) : null}
 
-        {showProfileNudge ? (
-          <Card className="home-profile-nudge" data-testid="home-profile-nudge">
-            <div className="home-attn">
-              <span className="home-attn-text">
-                <strong>
-                  Complete your player profile — {completeness.done}/{completeness.total}
-                </strong>
-                <span>
-                  {completeness.missing.length === 1
-                    ? "One thing left"
-                    : `${String(completeness.missing.length)} things left`}{" "}
-                  — the next registration form starts filled in.
-                </span>
-              </span>
-              <Link href="/account" className="home-own-poster">
-                Finish it
-              </Link>
-            </div>
-          </Card>
-        ) : null}
-
-        {registrationsMine.length > 0 ? (
-          <>
-            <SectionHeader
-              title="My registrations"
-              actions={
-                /*
-                 * The career page of a sport this person ACTUALLY plays, taken
-                 * from their most recent registration. It said "My cricket" and
-                 * pointed there regardless — which sent a football player to an
-                 * empty cricket career and told them that was their record.
-                 */
-                <Link href={`/me/${careerSport}`} data-testid="home-career-link">
-                  My {careerSportLabel}
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              }
-            />
-            <Card data-testid="home-registrations">
-              <ul className="home-list">
-                {registrationsMine.map((registration) => (
-                  <li key={registration.registrationId}>
-                    <Link
-                      href={`/seasons/${registration.competitionSlug}/register`}
-                      className="home-attn"
-                    >
-                      <span className="home-crest home-crest--sm" aria-hidden>
-                        {monogram(registration.competitionName)}
+      {manages && journey !== null ? (
+        <div className="home-journey">
+          <JourneyStepper
+            label={`${focusOverview?.competition.name ?? "Season"} progress`}
+            linkComponent={Link}
+            steps={journey.map((step): JourneyStep => {
+              const href = journeyHref[step.key];
+              // Zero is left unsaid: a "0" beside a completed step reads as a fault.
+              const many = view.competitions.length > 1 && (stageCount[step.key] ?? 0) > 0;
+              const item: JourneyStep = {
+                key: step.key,
+                label: (
+                  <>
+                    {step.label}
+                    {many ? (
+                      <span className="home-journey-count">
+                        {stageCount[step.key] ?? 0}
+                        <VisuallyHidden>
+                          {" "}
+                          of your seasons {(stageCount[step.key] ?? 0) === 1 ? "is" : "are"} here
+                        </VisuallyHidden>
                       </span>
-                      <span className="home-attn-text">
-                        <strong>{registration.competitionName}</strong>
-                        <span>
-                          {registration.orgName} ·{" "}
-                          {roleLabelIn(sportPackFor(registration.sport), registration.role)} ·{" "}
-                          {registration.number}
-                        </span>
-                      </span>
-                      <Badge tone={REG_TONE[registration.status] ?? "neutral"}>
-                        {registration.status}
-                      </Badge>
-                    </Link>
-                    {/* The player's own card. A sibling of the row rather than
-                        something inside it: the row is already one big link,
-                        and an anchor nested in an anchor is invalid HTML that
-                        browsers repair by dropping one of them — usually not
-                        the one you meant. Offered only where a verdict exists,
-                        so it never leads to the route's "no poster yet". */}
-                    {registration.posterReady ? (
-                      <Link
-                        href={`/seasons/${registration.competitionSlug}/posters`}
-                        className="home-own-poster"
-                        data-testid="my-poster"
-                      >
-                        Get your card
-                      </Link>
                     ) : null}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          </>
-        ) : null}
-      </>
+                  </>
+                ),
+                state: step.state,
+                hint: step.hint,
+                icon: journeyIcon[step.key],
+              };
+              return href === undefined ? item : { ...item, href };
+            })}
+          />
+        </div>
+      ) : null}
+
+      {manages && focusOverview !== null ? (
+        <StatGrid testId="home-figures">
+          <StatCard
+            icon={<IconUsers />}
+            tone="green"
+            value={focusOverview.teamCount.toLocaleString("en-IN")}
+            label="Teams"
+            href={`${focusBase}/teams`}
+            linkComponent={Link}
+          />
+          <StatCard
+            icon={<IconUser />}
+            tone="blue"
+            value={focusOverview.approvedPlayers.toLocaleString("en-IN")}
+            label="Players"
+            hint={
+              focusOverview.pendingPlayers > 0
+                ? `${focusOverview.pendingPlayers.toLocaleString("en-IN")} to review`
+                : "In the auction pool"
+            }
+            href={`${focusBase}/registrations`}
+            linkComponent={Link}
+          />
+          {/* Money-gated in the read: absent for a reader without money sight,
+              who gets the season's fixtures in its place. */}
+          {focusOverview.purseCommitted !== undefined ? (
+            <StatCard
+              icon={<IconWallet />}
+              tone="amber"
+              value={rupeesShort(focusOverview.purseCommitted)}
+              label="Purse committed"
+              {...(focusOverview.pursePct != null
+                ? { hint: `${String(focusOverview.pursePct)}% of every purse` }
+                : {})}
+              href={`${focusBase}/auction`}
+              linkComponent={Link}
+            />
+          ) : (
+            <StatCard
+              icon={<IconCalendar />}
+              tone="amber"
+              value={focusOverview.fixtureCount.toLocaleString("en-IN")}
+              label="Fixtures"
+              href={`${focusBase}/fixtures`}
+              linkComponent={Link}
+            />
+          )}
+          <StatCard
+            icon={<IconGavel />}
+            tone="purple"
+            value={`${String(focusOverview.lotsSold)}/${String(focusOverview.lotsTotal)}`}
+            label="Lots sold"
+            hint={focusOverview.lotsTotal === 0 ? "No lots yet" : `${String(lotsPct)}%`}
+            progress={lotsPct}
+            href={`${focusBase}/auction`}
+            linkComponent={Link}
+          />
+        </StatGrid>
+      ) : null}
+
+      {manages && team !== null ? <OwnerSection team={team} /> : null}
+
+      {manages ? (
+        <CardGrid weight="wide-left">
+          {/* ================= LEFT ================= */}
+          <div className="home-col">
+            {!laddering ? attentionCard : null}
+
+            {showSeasons ? (
+              <SectionCard
+                flush
+                icon={<IconTrophy />}
+                tone="gold"
+                title="Top seasons"
+                action={
+                  <Link href="/tournaments?view=seasons" className="home-more">
+                    View all
+                    <IconArrowRight size={14} />
+                  </Link>
+                }
+              >
+                {/* Two renderings, one visible at a time (see home.css): a
+                    table on a laptop, one card per season on a phone — a fixed
+                    table left the name 0px wide at 390. */}
+                <div className="home-table-wrap" data-testid="home-competitions">
+                  <table className="home-table">
+                    <thead>
+                      <tr>
+                        <th>Season</th>
+                        <th className="home-num">Teams</th>
+                        <th className="home-num">Players</th>
+                        <th>Status</th>
+                        <th className="home-end">
+                          <VisuallyHidden>Actions</VisuallyHidden>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dash.top.map((row) => {
+                        const badge = seasonBadge(row);
+                        const meta = seasonMeta(row.slug);
+                        return (
+                          <tr key={row.slug}>
+                            <td>
+                              <span className="home-tcell">
+                                <span className="home-crest" aria-hidden>
+                                  {monogram(row.name)}
+                                </span>
+                                <span className="home-tcell-text">
+                                  <Link href={`/seasons/${row.slug}`}>{row.name}</Link>
+                                  {meta !== null || row.canSeeMoney ? (
+                                    <span>
+                                      {[
+                                        meta,
+                                        row.canSeeMoney
+                                          ? `${rupeesShort(row.collectedPaise)} collected`
+                                          : null,
+                                      ]
+                                        .filter((part) => part !== null)
+                                        .join(" · ")}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </span>
+                            </td>
+                            <td className="home-num home-mono">{row.teams}</td>
+                            <td className="home-num home-mono">{row.registrations}</td>
+                            <td>
+                              <Pill tone={badge.tone}>{badge.label}</Pill>
+                            </td>
+                            <td className="home-end">
+                              <Link
+                                href={`/seasons/${row.slug}`}
+                                className="home-view"
+                                aria-label={`View ${row.name}`}
+                              >
+                                View
+                                <IconArrowRight size={14} />
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <ul className="home-season-cards">
+                    {dash.top.map((row) => {
+                      const badge = seasonBadge(row);
+                      const meta = seasonMeta(row.slug);
+                      return (
+                        <li key={row.slug}>
+                          <Link href={`/seasons/${row.slug}`} className="home-season-card">
+                            <span className="home-crest" aria-hidden>
+                              {monogram(row.name)}
+                            </span>
+                            <span className="home-season-main">
+                              <strong className="home-season-name">{row.name}</strong>
+                              <span className="home-season-meta">
+                                {[
+                                  `${String(row.teams)} team${row.teams === 1 ? "" : "s"}`,
+                                  `${String(row.registrations)} player${row.registrations === 1 ? "" : "s"}`,
+                                  meta,
+                                ]
+                                  .filter((part) => part !== null)
+                                  .join(" · ")}
+                              </span>
+                            </span>
+                            <Pill tone={badge.tone}>{badge.label}</Pill>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </SectionCard>
+            ) : null}
+
+            {showMoney ? (
+              <SectionCard
+                icon={<IconRupee />}
+                tone="blue"
+                title="Money overview"
+                action={
+                  showChart ? (
+                    <span className="home-legend">
+                      <span>
+                        <i className="home-dot home-dot--accent" />
+                        This week
+                      </span>
+                      <span>
+                        <i className="home-dot home-dot--muted" />
+                        Last week
+                      </span>
+                    </span>
+                  ) : undefined
+                }
+              >
+                {showChart ? (
+                  <div className="home-chart-wrap">
+                    {chartMax > 0 ? (
+                      <span className="home-chart-peak">Peak {rupeesShort(chartMax)}/day</span>
+                    ) : null}
+                    <svg
+                      className="home-chart"
+                      viewBox="0 0 470 156"
+                      role="img"
+                      aria-label="Money collected per day, this week versus last week"
+                    >
+                      <defs>
+                        <linearGradient id="home-area" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stopColor="var(--accent)" stopOpacity="0.24" />
+                          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      {[16, 45, 74, 103, 132].map((y) => (
+                        <line
+                          key={y}
+                          x1="44"
+                          y1={y}
+                          x2="452"
+                          y2={y}
+                          stroke="var(--border-subtle)"
+                          strokeWidth="1"
+                        />
+                      ))}
+                      <polygon
+                        fill="url(#home-area)"
+                        points={`44,132 ${points(dash.money.thisWeek, chartMax)} 452,132`}
+                      />
+                      <polyline
+                        fill="none"
+                        stroke="var(--text-muted)"
+                        strokeWidth="2"
+                        strokeDasharray="4 5"
+                        strokeLinecap="round"
+                        points={points(dash.money.lastWeek, chartMax)}
+                      />
+                      <polyline
+                        fill="none"
+                        stroke="var(--accent)"
+                        strokeWidth="2.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={points(dash.money.thisWeek, chartMax)}
+                      />
+                      {DAY_LABELS.map((label, index) => (
+                        <text
+                          key={label}
+                          x={44 + index * ((452 - 44) / 6)}
+                          y="150"
+                          fill="var(--text-muted)"
+                          fontSize="10"
+                          textAnchor="middle"
+                        >
+                          {label}
+                        </text>
+                      ))}
+                    </svg>
+                    {/* A polyline says nothing to a screen reader. */}
+                    <VisuallyHidden>
+                      Collected per day this week:{" "}
+                      {DAY_LABELS.map(
+                        (label, index) =>
+                          `${label} ${rupeesShort(dash.money.thisWeek[index] ?? 0)}`,
+                      ).join(", ")}
+                      .
+                    </VisuallyHidden>
+                  </div>
+                ) : null}
+                <div className="home-money">
+                  <MoneyCell href={dash.moneyHref} label="Collected" tone="remaining">
+                    {rupees(dash.money.collectedPaise)}
+                  </MoneyCell>
+                  <MoneyCell href={dash.moneyHref} label="Outstanding" tone="frozen">
+                    {rupees(dash.money.outstandingPaise)}
+                  </MoneyCell>
+                  <MoneyCell href={dash.moneyHref} label="Waived" tone="spent">
+                    {rupees(dash.money.waivedPaise)}
+                  </MoneyCell>
+                </div>
+              </SectionCard>
+            ) : null}
+
+            {shortcuts}
+          </div>
+
+          {/* ================= RIGHT ================= */}
+          <div className="home-col">
+            {showAuctions ? (
+              <SectionCard
+                icon={<IconGavel />}
+                tone="gold"
+                title="Active auctions"
+                action={
+                  <Link href="/tournaments?view=seasons" className="home-more">
+                    View all
+                    <IconArrowRight size={14} />
+                  </Link>
+                }
+              >
+                {otherAuctions.length === 0 ? (
+                  <PanelEmpty
+                    icon={<IconGavel />}
+                    title={liveRow === null ? "No auction running yet." : "Nothing else scheduled."}
+                    text={
+                      liveRow === null
+                        ? "Set one up to start the action."
+                        : "The live night is above; plan the next one here."
+                    }
+                    ctaHref={
+                      seasonToOpen === undefined
+                        ? "/tournaments?view=seasons"
+                        : `/seasons/${seasonToOpen.slug}/auction`
+                    }
+                    ctaLabel={liveRow === null ? "Set up auction" : "Plan the next one"}
+                  />
+                ) : (
+                  <ul className="home-list">
+                    {otherAuctions.map((auction) => {
+                      const pct =
+                        auction.lotsTotal === 0
+                          ? 0
+                          : Math.round((auction.lotsSold / auction.lotsTotal) * 100);
+                      return (
+                        <li key={auction.auctionId}>
+                          <Link
+                            href={`/seasons/${auction.competitionSlug}/auction`}
+                            className="home-row-link home-auction"
+                          >
+                            <span className="home-crest" aria-hidden>
+                              {monogram(auction.competitionName)}
+                            </span>
+                            <span className="home-row-text">
+                              <strong>{auction.competitionName}</strong>
+                              <span>
+                                Spend {rupeesShort(auction.spendPaise)} · Lots {auction.lotsSold}/
+                                {auction.lotsTotal}
+                              </span>
+                              <span className="home-progress" aria-hidden>
+                                <i style={{ width: `${String(pct)}%` }} />
+                              </span>
+                            </span>
+                            {auction.status === "live" ? (
+                              <Pill tone="red" dot>
+                                Live
+                              </Pill>
+                            ) : (
+                              <Pill tone="blue">Scheduled</Pill>
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </SectionCard>
+            ) : null}
+
+            {showEvents ? (
+              <SectionCard icon={<IconCalendar />} tone="blue" title="Upcoming events">
+                {schedule.length === 0 ? (
+                  <PanelEmpty
+                    icon={<IconCalendar />}
+                    title="No fixtures scheduled."
+                    text="Create a match schedule to keep your community engaged."
+                    ctaHref={
+                      seasonToOpen === undefined
+                        ? "/tournaments?view=seasons"
+                        : `/seasons/${seasonToOpen.slug}/fixtures`
+                    }
+                    ctaLabel="Generate a schedule"
+                  />
+                ) : (
+                  <ul className="home-list">
+                    {schedule.slice(0, 5).map((fixture) => {
+                      const when = fixture.kickoffAt !== null ? new Date(fixture.kickoffAt) : null;
+                      return (
+                        <li key={fixture.id}>
+                          <Link
+                            href={`/seasons/${fixture.competitionSlug}/fixtures`}
+                            className="home-row-link"
+                          >
+                            <span className="home-date">
+                              <b>{when !== null ? IST_DAY.format(when) : "--"}</b>
+                              <span>
+                                {when !== null ? IST_MONTH.format(when).toUpperCase() : "TBD"}
+                              </span>
+                            </span>
+                            <span className="home-row-text">
+                              <strong>
+                                {fixture.homeTeamName} vs {fixture.awayTeamName}
+                              </strong>
+                              <span>{fixture.competitionName}</span>
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </SectionCard>
+            ) : null}
+
+            {showActivity ? (
+              <SectionCard
+                icon={<IconBolt />}
+                tone="purple"
+                title="Recent activity"
+                action={
+                  <Link href="/inbox" className="home-more">
+                    View all
+                    <IconArrowRight size={14} />
+                  </Link>
+                }
+              >
+                <ul className="home-list">
+                  {dash.activity.map((row) => {
+                    const style = activityStyle(row.action);
+                    return (
+                      <li key={row.id} className="home-feed">
+                        <IconTile icon={style.icon} tone={style.tone} size="sm" />
+                        <span className="home-row-text">
+                          <strong>
+                            {row.action === "finops.summary"
+                              ? `${String(row.count)} finance ${row.count === 1 ? "update" : "updates"}`
+                              : activityLabel(row.action)}
+                          </strong>
+                          {/* Which season the event belongs to — six anonymous
+                              "Paddle granted" lines answer nothing without it. */}
+                          {row.scope !== null ? <span>{row.scope}</span> : null}
+                        </span>
+                        <span className="home-time">{ago(row.at)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </SectionCard>
+            ) : null}
+          </div>
+        </CardGrid>
+      ) : null}
+
+      {/* A member who manages nothing still belongs to a club: its seasons,
+          as plain doors, without the organizer's figures or offers. */}
+      {!manages && view.competitions.length > 0 ? (
+        <SectionCard
+          icon={<IconTrophy />}
+          tone="gold"
+          title={`Seasons in your ${roles.memberOf.length === 1 ? "club" : "clubs"}`}
+        >
+          <ul className="home-list">
+            {view.competitions.map((competition) => {
+              const top = dash.top.find((row) => row.slug === competition.slug);
+              const badge = seasonBadge({
+                status: competition.status,
+                settlement: top?.settlement ?? null,
+              });
+              const meta = seasonMeta(competition.slug);
+              return (
+                <li key={competition.id}>
+                  <Link href={`/seasons/${competition.slug}`} className="home-row-link">
+                    <span className="home-crest" aria-hidden>
+                      {monogram(competition.name)}
+                    </span>
+                    <span className="home-row-text">
+                      <strong>{competition.name}</strong>
+                      <span>
+                        {[competition.orgName, meta].filter((part) => part !== null).join(" · ")}
+                      </span>
+                    </span>
+                    <Pill tone={badge.tone}>{badge.label}</Pill>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </SectionCard>
+      ) : null}
+
+      {!manages ? shortcuts : null}
+
+      {showProfileNudge ? (
+        <Notice
+          tone="info"
+          icon={<IconUser size={20} />}
+          testId="home-profile-nudge"
+          title={`Complete your player profile — ${String(completeness.done)}/${String(completeness.total)}`}
+          action={
+            <ButtonLink href="/account" variant="secondary" size="sm">
+              Finish it
+            </ButtonLink>
+          }
+        >
+          {completeness.missing.length === 1
+            ? "One thing left"
+            : `${String(completeness.missing.length)} things left`}{" "}
+          — the next registration form starts filled in.
+        </Notice>
+      ) : null}
+
+      {registrationsMine.length > 0 ? (
+        <SectionCard
+          data-testid="home-registrations"
+          icon={<IconFileCheck />}
+          tone="green"
+          title="My registrations"
+          action={
+            /*
+             * The career page of a sport this person ACTUALLY plays, taken from
+             * their most recent registration — not "My cricket" for everyone.
+             */
+            <Link href={`/me/${careerSport}`} className="home-more" data-testid="home-career-link">
+              My {careerSportLabel}
+              <IconArrowRight size={14} />
+            </Link>
+          }
+        >
+          <ul className="home-list">
+            {registrationsMine.map((registration) => (
+              <li key={registration.registrationId} className="home-reg">
+                <Link
+                  href={`/seasons/${registration.competitionSlug}/register`}
+                  className="home-row-link"
+                >
+                  <span className="home-crest" aria-hidden>
+                    {monogram(registration.competitionName)}
+                  </span>
+                  <span className="home-row-text">
+                    <strong>{registration.competitionName}</strong>
+                    <span>
+                      {registration.orgName} ·{" "}
+                      {roleLabelIn(sportPackFor(registration.sport), registration.role)} ·{" "}
+                      {registration.number}
+                    </span>
+                  </span>
+                  <Pill tone={REG_TONE[registration.status] ?? "neutral"}>
+                    {registration.status}
+                  </Pill>
+                </Link>
+                {/* The player's own card — a sibling of the row link, never
+                    nested in it, and offered only where a verdict exists. */}
+                {registration.posterReady ? (
+                  <Link
+                    href={`/seasons/${registration.competitionSlug}/posters`}
+                    className="home-own-poster"
+                    data-testid="my-poster"
+                  >
+                    Get your card
+                  </Link>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      ) : null}
     </>
+  );
+}
+
+/** An empty panel should still sell the next move, not just report nothing. */
+function PanelEmpty({
+  icon,
+  title,
+  text,
+  ctaHref,
+  ctaLabel,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  ctaHref: string;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="home-blank">
+      <IconTile icon={icon} tone="gold" size="md" />
+      <span className="home-row-text">
+        <strong>{title}</strong>
+        <span>{text}</span>
+      </span>
+      <ButtonLink href={ctaHref} variant="secondary" size="sm" className="home-blank-cta">
+        {ctaLabel}
+      </ButtonLink>
+    </div>
   );
 }
 
