@@ -16,6 +16,7 @@ import {
   createDb,
   grants as grantsTable,
   lots as lotsTable,
+  messageOutbox as messageOutboxTable,
   newId,
   organizations,
   orgMembers,
@@ -513,6 +514,18 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
     expect(meta["competitionId"]).toBe(comp.id);
     expect(meta["team"]).toBe(must(buyer, "buying team").name);
     expect(meta["price"]).toBe("₹55,000");
+
+    // And one line of SMS on the registered template — most players have no
+    // verified email. The price is GSM-7 ("Rs"), the rupee sign would split it.
+    const [text] = await db
+      .select({ template: messageOutboxTable.templateKey, slots: messageOutboxTable.slots })
+      .from(messageOutboxTable)
+      .where(and(eq(messageOutboxTable.personId, kohli), eq(messageOutboxTable.channel, "sms")));
+    expect(text?.template).toBe("auction.sold");
+    expect(text?.slots).toMatchObject({
+      team: must(buyer, "buying team").name,
+      price: "Rs 55,000",
+    });
 
     // A half-written sale is never announced: 0030 forbids sold-without-price at
     // the database, so reaching that state means something is wrong, and "sold

@@ -24,6 +24,9 @@ const SAMPLE: Record<string, string> = {
   competition: "Malad Premier League 2026",
   reason: "the season is full",
   last4: "4321",
+  team: "Cup Kings",
+  price: "Rs 75,000",
+  role: "captain",
 };
 
 const PURPOSE: Record<TemplateKey, string> = {
@@ -34,6 +37,10 @@ const PURPOSE: Record<TemplateKey, string> = {
   "registration.restored": "A declined or withdrawn registration was put back under review.",
   "security.phone_changed":
     "Security alert to the OLD number when an account's mobile number is changed.",
+  "auction.sold":
+    "A player was bought by a team in their season's auction (sent when results are announced).",
+  "team.appointed":
+    "A player was named captain, vice-captain, icon or retained player of their team (sent when the organizer announces it).",
 };
 
 /** The one-time sign-in code. Sent through MSG91's OTP API, not the registry. */

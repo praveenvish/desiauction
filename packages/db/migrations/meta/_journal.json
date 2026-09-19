@@ -554,6 +554,13 @@
       "when": 1790524800000,
       "tag": "0079_message_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1790611200000,
+      "tag": "0080_message_outbox_sms",
+      "breakpoints": true
     }
   ]
 }

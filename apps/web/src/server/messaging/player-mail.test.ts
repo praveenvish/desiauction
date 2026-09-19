@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { DLT_VAR_MAX, smsPrice } from "./templates";
+
 import {
   appointmentMail,
   bidStory,
   ownerSummaryMail,
   rolesTitle,
+  smsRolePhrase,
   soldMail,
+  squadSheetMail,
   unsoldMail,
   type SoldFacts,
 } from "./player-mail";
@@ -136,5 +140,56 @@ describe("the owner's night", () => {
     });
     expect(mail.text).toContain("Purse left: ₹1,99,00,000");
     expect(mail.text).toContain("6 short of the minimum of 8");
+  });
+});
+
+describe("the squad sheet", () => {
+  const facts = {
+    name: "Arjun",
+    season: "MPL 2026",
+    orgName: "Malad CC",
+    teamName: "Cup Kings",
+    squad: [
+      { name: "Vikram Patel", note: "Captain" },
+      { name: "Arjun Sharma (you)", note: "Player" },
+    ],
+    coach: "Ravi Shastri",
+    firstMatch: "vs Tigers · Sun, 4 Oct 2026, 7:30 am · Malad Ground",
+  };
+
+  it("names the team, the whole squad with the reader marked, the coach and the first match", () => {
+    const mail = squadSheetMail(facts);
+    expect(mail.subject).toBe("Meet your Cup Kings squad");
+    expect(mail.text).toContain("Arjun Sharma (you)");
+    expect(mail.text).toContain("Vikram Patel");
+    expect(mail.text).toContain("Ravi Shastri");
+    expect(mail.text).toContain("Your first match: vs Tigers");
+  });
+
+  it("promises fixtures rather than inventing one, and leaves out a coach nobody named", () => {
+    const mail = squadSheetMail({ ...facts, coach: null, firstMatch: null });
+    expect(mail.text).toContain("will share the fixtures soon");
+    expect(mail.text).not.toContain("Coach");
+  });
+});
+
+describe("the SMS words", () => {
+  it("fits every combination of roles into one DLT variable", () => {
+    const all = ["captain", "vice_captain", "icon", "retained"] as const;
+    for (let mask = 1; mask < 16; mask += 1) {
+      const roles = all.filter((_, index) => (mask >> index) & 1);
+      expect(smsRolePhrase(roles).length, roles.join("+")).toBeLessThanOrEqual(DLT_VAR_MAX);
+    }
+  });
+
+  it("says the whole thing when it fits, and shortens only when it must", () => {
+    expect(smsRolePhrase(["icon", "captain"])).toBe("captain and icon player");
+    expect(smsRolePhrase(["icon", "retained"])).toBe("icon and retained");
+    expect(smsRolePhrase(["retained"])).toBe("retained player");
+  });
+
+  it("writes a price without the rupee sign, which is not GSM-7", () => {
+    expect(smsPrice("₹75,000")).toBe("Rs 75,000");
+    expect(smsPrice("₹1,99,00,000")).toBe("Rs 1,99,00,000");
   });
 });
