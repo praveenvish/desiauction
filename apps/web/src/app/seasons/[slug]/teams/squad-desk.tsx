@@ -52,6 +52,7 @@ export function SquadPreSign({
   teamName,
   roster,
   locked,
+  settlesAtOpen,
 }: {
   slug: string;
   teamId: string;
@@ -59,6 +60,8 @@ export function SquadPreSign({
   roster: readonly TeamRosterRow[];
   /** The auction has started — Icon and Retained are frozen with the roster. */
   locked: boolean;
+  /** An auction is set up but not open: its lot list is rebuilt from these marks when it opens. */
+  settlesAtOpen: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -239,6 +242,12 @@ export function SquadPreSign({
           </div>
         );
       })}
+      {settlesAtOpen ? (
+        <p className="pd-setting-hint pd-presign-note" data-testid="presign-settles-at-open">
+          The auction is set up, and these still count: when it opens, anyone marked here is
+          taken off the block and anyone unmarked gets a lot.
+        </p>
+      ) : null}
     </section>
   );
 }

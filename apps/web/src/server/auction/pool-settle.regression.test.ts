@@ -46,6 +46,7 @@ import {
   resolveCompetition,
   type CompetitionSummary,
 } from "../competition/competitions";
+import { captainLockRefusal } from "../competition/captain-lock";
 import { createOrg } from "../orgs/orgs";
 import { auctionReady } from "./auction-ready";
 import { resolvedLots } from "./live-summary";
@@ -262,5 +263,107 @@ describe("THE POOL SETTLES WHEN THE AUCTION OPENS", () => {
       bidderAuthorized: true,
     });
     expect(refused).toEqual({ ok: false, code: "SQUAD_FULL" });
+  });
+});
+
+describe("THE ARMBAND, ONCE THE AUCTION HAS OPENED", () => {
+  // State from above: Plain Player was bought by Tigers, Later Captain joined
+  // Tigers as captain without the auction, Former Icon is queued.
+  it("refuses a captain who is still waiting for the block", async () => {
+    expect(await captainLockRefusal(db, auction.id, reg["Former Icon"] ?? "", true)).toEqual({
+      kind: "not_in_squad",
+      name: "Former Icon",
+    });
+  });
+
+  it("refuses to clear a captain whose place on the squad came from the armband", async () => {
+    expect(await captainLockRefusal(db, auction.id, reg["Later Captain"] ?? "", false)).toEqual({
+      kind: "joined_as_captain",
+      name: "Later Captain",
+    });
+  });
+
+  it("refuses to hand that captain's armband to a bought player", async () => {
+    expect(await captainLockRefusal(db, auction.id, reg["Plain Player"] ?? "", true)).toEqual({
+      kind: "armband_holder",
+      name: "Later Captain",
+    });
+  });
+
+  it("lets it change hands when the incumbent is pre-signed some other way", async () => {
+    await db
+      .update(registrationsTable)
+      .set({ isRetained: true })
+      .where(eq(registrationsTable.id, reg["Later Captain"] ?? ""));
+    expect(await captainLockRefusal(db, auction.id, reg["Plain Player"] ?? "", true)).toBeNull();
+    expect(await captainLockRefusal(db, auction.id, reg["Later Captain"] ?? "", false)).toBeNull();
+  });
+
+  it("says nothing when the mark would not change", async () => {
+    expect(await captainLockRefusal(db, auction.id, reg["Former Icon"] ?? "", false)).toBeNull();
+  });
+});
+
+describe("A QUEUE THE SETTLE EMPTIES DOES NOT OPEN", () => {
+  it("rolls the settle back and leaves the auction scheduled", async () => {
+    const empty = await createCompetition(db, orgId, owner, {
+      sport: "cricket",
+      name: `Settle Empty ${RUN}`,
+      location: "Pune",
+      startsOn: "2026-10-01",
+      endsOn: "2026-10-30",
+    });
+    const teamsHere: string[] = [];
+    for (const name of ["Empty Kings", "Empty Tigers"]) {
+      const team = await createTeam(db, orgId, empty.id, owner, name);
+      if (!team.ok) throw new Error("team setup failed");
+      teamsHere.push(team.team.id);
+    }
+    for (const stage of ["setup", "registration_open", "registration_closed"] as const) {
+      const current = await resolveCompetition(db, owner, empty.slug);
+      if (current === null) throw new Error("competition missing");
+      expect((await advanceCompetition(db, current, owner, stage)).ok).toBe(true);
+    }
+    const personId = newId();
+    await db.insert(people).values({ id: personId, phone: `+9193${RUN}06`, name: "Only Player" });
+    personIds.push(personId);
+    const only = newId();
+    await db.insert(registrationsTable).values({
+      id: only,
+      orgId,
+      competitionId: empty.id,
+      personId,
+      role: "batter",
+      status: "approved",
+      registrationNumber: registrationNumber(only),
+    });
+    const summary = (await resolveCompetition(db, owner, empty.slug)) ?? empty;
+    const ready = await auctionReady(db, summary);
+    expect((await createAuction(db, summary, ready, owner, DEFAULT_AUCTION_CONFIG)).ok).toBe(true);
+    const record = await auctionOf(db, empty.id);
+    if (record === null) throw new Error("no auction");
+    for (const teamId of teamsHere) {
+      expect((await issuePaddle(db, record, owner, teamId, owner)).ok).toBe(true);
+    }
+    expect(await queueAllLots(db, record, owner)).toEqual({ applied: 1, skipped: 0 });
+    const eventsBefore = (await loadEvents(db, record.id)).length;
+
+    // The only player in the queue is named captain before the night.
+    await db
+      .update(registrationsTable)
+      .set({ isCaptain: true, teamId: teamsHere[0] })
+      .where(eq(registrationsTable.id, only));
+
+    expect(await transitionAuction(db, record, owner, "open")).toEqual({
+      ok: false,
+      reason: "guard_failed",
+    });
+    expect((await auctionOf(db, empty.id))?.status).toBe("scheduled");
+    const [lot] = await db
+      .select({ status: lotsTable.status })
+      .from(lotsTable)
+      .where(eq(lotsTable.auctionId, record.id));
+    expect(lot?.status).toBe("queued");
+    expect(await loadEvents(db, record.id)).toHaveLength(eventsBefore);
   });
 });

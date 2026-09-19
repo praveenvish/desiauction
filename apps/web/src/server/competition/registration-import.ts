@@ -12,7 +12,9 @@ import {
 import { auditLog, newId, people, registrations, teams, type Db } from "@desiauction/db";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 
+import { captainLockRefusal } from "./captain-lock";
 import { reinstateWithdrawn } from "./registrations";
+import type { CaptainRefusal } from "./roster-lock";
 
 /** New people per INSERT statement — well inside Postgres's 65,535 bind limit. */
 const PEOPLE_INSERT_CHUNK = 500;
@@ -204,6 +206,13 @@ function deskFields(row: CsvRegistrationRow): Record<string, unknown> {
   return out;
 }
 
+/** A captain change in the file that the opened auction refuses; the file is not imported. */
+export class CaptainImportRefused extends Error {
+  constructor(readonly refusal: CaptainRefusal) {
+    super(`captain import refused: ${refusal.kind}`);
+  }
+}
+
 export async function commitRegistrationImport(
   db: Db,
   competitionId: string,
@@ -212,6 +221,12 @@ export async function commitRegistrationImport(
   rows: readonly CsvRegistrationRow[],
   /** Default is the safe one: add what is missing, never revert a hand edit. */
   policy: ImportPolicy = "fill-blanks",
+  /**
+   * The season's auction, once it has left `scheduled`. A captain the file
+   * changes is then held to the dashboard's rule (`captainChangeRefusal`), and
+   * the first refusal aborts the whole file with `CaptainImportRefused`.
+   */
+  lockedAuctionId: string | null = null,
 ): Promise<ImportResult> {
   if (rows.length === 0) {
     return { imported: 0, updated: 0, unchanged: 0, reinstated: 0, named: 0 };
@@ -381,6 +396,17 @@ export async function commitRegistrationImport(
         const changedTeam = teamIdFor(row);
         const values = changedValues(plan.changes, row, changedTeam);
         if (Object.keys(values).length > 0) {
+          if (lockedAuctionId !== null && typeof values["isCaptain"] === "boolean") {
+            const refusal = await captainLockRefusal(
+              tx,
+              lockedAuctionId,
+              record.id,
+              values["isCaptain"],
+            );
+            if (refusal !== null) {
+              throw new CaptainImportRefused(refusal);
+            }
+          }
           if (values["isCaptain"] === true && changedTeam !== null) {
             await demoteOthers(changedTeam, record.id);
           }
@@ -455,6 +481,14 @@ export async function commitRegistrationImport(
         })
         .returning({ id: registrations.id });
       if (inserted.length > 0) {
+        // A new registration is on no squad the auction knows of, so it cannot
+        // arrive as a captain once the auction has opened — the answer the
+        // dashboard gives any player who is not on a squad. Thrown after the
+        // insert so a withdrawn row the conflict skipped is not refused for a
+        // mark the reinstatement below never writes.
+        if (lockedAuctionId !== null && row.isCaptain === true) {
+          throw new CaptainImportRefused({ kind: "not_in_squad", name: row.name || row.phone });
+        }
         imported++;
         // DA-27: the batch row below is subject=competition, so a timeline
         // keyed on the REGISTRATION found nothing and an imported player's

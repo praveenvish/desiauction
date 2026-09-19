@@ -20,16 +20,20 @@ import type { CsvRegistrationRow } from "@desiauction/core";
  * nothing; the moment one exists it would be a live way to change the rules
  * during the night.
  *
- * `isCaptain` stays free, although it now pre-signs a player like the other
- * two (lib/pre-signed.ts). What it decides about the POOL is settled once, when
- * the auction opens (`settlePool`, packages/auction): a waiting lot of a player
- * who is captain by then is withdrawn and they keep their team. After that the
- * mark moves no lot — a captain named in the room or after it was bought
- * already, and the engine's squad cap counts a sold captain once, through the
- * sale. Freezing it would bring back the old defect: before the auction a
- * drafted player has no team to captain, and after it the mark was refused —
- * so the window in which the answer is knowable was the one window the product
- * refused to write it down.
+ * WHILE THE AUCTION IS SCHEDULED every mark stays open, although lots were
+ * drawn when it was created: the pool is settled again when it OPENS
+ * (`settlePool`, packages/auction) — a waiting lot of a player pre-signed by
+ * then is withdrawn and they keep their team, and a player unmarked since gets
+ * a lot. So an organizer who names captains at the owners' meeting, after the
+ * auction was set up, loses nothing by doing it in that order.
+ *
+ * `isCaptain` is not frozen with the others, although it pre-signs a player
+ * like they do (lib/pre-signed.ts). Freezing it would bring back the old
+ * defect: before the auction a drafted player has no team to captain, and
+ * after it the mark was refused — so the window in which the answer is
+ * knowable was the one window the product refused to write it down. Once the
+ * auction has opened it is judged per player instead: see
+ * `captainChangeRefusal`.
  */
 export function marksFreezeWithRoster(marks: {
   isIcon?: boolean;
@@ -71,4 +75,71 @@ export function squadMarksIn(rows: readonly CsvRegistrationRow[]): {
     }
   }
   return carried;
+}
+
+/** What the captain rule needs to know about one registration. */
+export interface CaptainFacts {
+  name: string;
+  isIcon: boolean;
+  isRetained: boolean;
+  isCaptain: boolean;
+  /** Bought in this auction: their place on the team came through a sale. */
+  bought: boolean;
+}
+
+export type CaptainRefusal =
+  | { kind: "not_in_squad"; name: string }
+  | { kind: "joined_as_captain"; name: string }
+  | { kind: "armband_holder"; name: string };
+
+/**
+ * THE CAPTAIN MARK, ONCE THE AUCTION HAS OPENED.
+ *
+ * The pool settled when the auction opened. From then on the armband may still
+ * change — the team's leader is often picked from the players it just bought —
+ * but only where it cannot move a player into or out of the pool, or a squad
+ * count the engine is pricing bids against. The mark matters to that
+ * arithmetic only for a player whom nothing else pre-signs and who was not
+ * bought:
+ *
+ * - naming one captain would pre-sign a player still WAITING for the block (or
+ *   one the auction has not placed): they would go under the hammer as another
+ *   team's captain, and the sale would collide with the buyer's own captain on
+ *   `registrations_team_captain_uq` — a lot the gavel cannot close;
+ * - clearing a captain who joined that way would drop them from their team's
+ *   squad count while they are still on its sheet;
+ * - and handing the armband to someone else DEMOTES the incumbent (DA-04),
+ *   which clears their mark just the same.
+ *
+ * A bought player, an Icon or a retained player can take or give up the
+ * armband freely: nothing but the badge changes.
+ */
+export function captainChangeRefusal(
+  player: CaptainFacts,
+  isCaptain: boolean,
+  incumbent: CaptainFacts | null,
+): CaptainRefusal | null {
+  if (player.isCaptain === isCaptain) {
+    return null;
+  }
+  const signedByArmband = (p: CaptainFacts) => !p.isIcon && !p.isRetained && !p.bought;
+  if (signedByArmband(player)) {
+    return { kind: isCaptain ? "not_in_squad" : "joined_as_captain", name: player.name };
+  }
+  if (isCaptain && incumbent !== null && signedByArmband(incumbent)) {
+    return { kind: "armband_holder", name: incumbent.name };
+  }
+  return null;
+}
+
+/** The organizer's sentence for a refused captain change. */
+export function captainRefusalMessage(refusal: CaptainRefusal): string {
+  switch (refusal.kind) {
+    case "not_in_squad":
+      return `${refusal.name} isn't on a squad yet. Now that the auction has started, a captain is picked from the players a team has bought or pre-signed.`;
+    case "joined_as_captain":
+      return `${refusal.name} joined their team as captain, without the auction. Now that the auction has started, that place on the squad is fixed.`;
+    case "armband_holder":
+      return `${refusal.name} joined this team as captain, without the auction, so the armband can't change hands now that the auction has started.`;
+  }
 }
