@@ -282,7 +282,7 @@ export const messageOutbox = pgTable(
       .references(() => people.id, { onDelete: "cascade" }),
     orgId: char("org_id", { length: 26 }),
     kind: text("kind").notNull(),
-    channel: text("channel", { enum: ["email"] }).notNull(),
+    channel: text("channel", { enum: ["email", "sms"] }).notNull(),
     dedupeKey: text("dedupe_key").notNull(),
     subject: text("subject").notNull(),
     bodyText: text("body_text").notNull(),
@@ -294,6 +294,12 @@ export const messageOutbox = pgTable(
     nextAttemptAt: ts("next_attempt_at").notNull().defaultNow(),
     sentAt: ts("sent_at"),
     lastError: text("last_error"),
+    /**
+     * SMS only (0080): the DLT template and its slot values — what the gateway
+     * is actually given. `bodyText` is the local render; subject/html are "".
+     */
+    templateKey: text("template_key"),
+    slots: jsonb("slots").$type<Record<string, string>>(),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [

@@ -195,15 +195,16 @@ export default async function AccountPage() {
                     Stays in <Link href="/inbox">your notifications</Link> here in the app.
                   </dd>
                 </dl>
-                <h3 className="account-subhead">What we may text you</h3>
+                <h3 className="account-subhead">What we may send you</h3>
                 <p className="account-prose">
-                  Switch any of these off and we stop sending it. Sign-in codes are not on the list
-                  because turning them off would lock you out of your own account.
+                  Switch any of these off and we stop sending it, by text and by email. Sign-in
+                  codes are not on the list because turning them off would lock you out of your own
+                  account.
                 </p>
                 {settings === null ? null : <NotificationSwitches settings={settings} />}
                 <p className="account-prose">
-                  You can also reply <strong>STOP</strong> to any message to stop all of them at
-                  once, and <strong>START</strong> to turn them back on.
+                  You can also reply <strong>STOP</strong> to any text to stop all of them at once,
+                  and <strong>START</strong> to turn them back on.
                 </p>
               </Card>
             </section>

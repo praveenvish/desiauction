@@ -161,6 +161,50 @@ Example as received:
 DesiAuction: Your account's mobile number was changed to one ending 4321. Not you? Get help now at https://desiauction.in/support
 ```
 
+### auction.sold (v1)
+
+A player was bought by a team in their season's auction (sent when results are announced).
+
+| Field | Value |
+|---|---|
+| Content category | Service Implicit |
+| Variables | 3 — `team` (≤ 30), `price` (≤ 15), `competition` (≤ 30) |
+| Env var for the MSG91 template id | `MSG91_TEMPLATE_AUCTION_SOLD` |
+
+Template text to register:
+
+```text
+DesiAuction: Congratulations! {#var#} bought you for {#var#} in {#var#}. https://desiauction.in/home
+```
+
+Example as received:
+
+```text
+DesiAuction: Congratulations! Cup Kings bought you for Rs 75,000 in Malad Premier League 2026. https://desiauction.in/home
+```
+
+### team.appointed (v1)
+
+A player was named captain, vice-captain, icon or retained player of their team (sent when the organizer announces it).
+
+| Field | Value |
+|---|---|
+| Content category | Service Implicit |
+| Variables | 3 — `role` (≤ 30), `team` (≤ 30), `competition` (≤ 30) |
+| Env var for the MSG91 template id | `MSG91_TEMPLATE_TEAM_APPOINTED` |
+
+Template text to register:
+
+```text
+DesiAuction: You are named {#var#} of {#var#} for {#var#}. https://desiauction.in/home
+```
+
+Example as received:
+
+```text
+DesiAuction: You are named captain of Cup Kings for Malad Premier League 2026. https://desiauction.in/home
+```
+
 ### Sign-in code (OTP)
 
 Sent through MSG91's OTP API (`MSG91_TEMPLATE_ID` in the web env), not the
