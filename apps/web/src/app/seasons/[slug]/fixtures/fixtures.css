@@ -244,6 +244,81 @@
   gap: var(--space-3) var(--space-4);
 }
 
+/* Match times: the two ways to set them, then the live "how many a day". */
+.fx-times {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fx-times legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.fx-mode {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  align-self: flex-start;
+}
+
+.fx-mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.fx-mode-option[data-checked="true"] {
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  color: var(--text-heading);
+}
+
+.fx-mode-option input {
+  accent-color: var(--accent-pressed);
+}
+
+.fx-mode-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.fx-capacity {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--info-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+.fx-capacity strong {
+  color: var(--text-heading);
+}
+
+.fx-capacity strong[data-past-season="true"] {
+  color: var(--danger-strong);
+}
+
 .fx-grounds {
   min-width: 0;
   margin: 0;

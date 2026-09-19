@@ -295,6 +295,24 @@ export interface GenerateInput {
   kickoffTimes: readonly string[];
   groundIds: readonly string[];
   durationMinutes: number;
+  /** Fill each day's slots across rounds (see core `GeneratePlanInput.pack`). */
+  pack?: boolean;
+  /** With `pack`: most matches one team plays in a day; null = no limit. */
+  maxPerTeamPerDay?: number | null;
+}
+
+/** The planner's input from the organizer's, forwarding the packing options only when set. */
+function planInputOf(teamIds: string[], input: GenerateInput): GeneratePlanInput {
+  return {
+    teamIds,
+    rounds: input.rounds,
+    startDate: input.startDate,
+    kickoffTimes: input.kickoffTimes,
+    groundIds: input.groundIds,
+    durationMinutes: input.durationMinutes,
+    ...(input.pack === true ? { pack: true } : {}),
+    ...(input.maxPerTeamPerDay !== undefined ? { maxPerTeamPerDay: input.maxPerTeamPerDay } : {}),
+  };
 }
 
 /**
@@ -328,7 +346,6 @@ export type GenerateResult =
 function outsideWindow(
   competition: CompetitionSummary,
   planned: readonly { kickoffAt: string }[],
-  input: GenerateInput,
 ): OutsideWindow | null {
   const dates = planned.map((f) => f.kickoffAt.slice(0, 10)).sort();
   const firstDate = dates[0];
@@ -349,7 +366,13 @@ function outsideWindow(
     firstDate,
     lastDate,
     daysNeeded: new Set(dates).size,
-    perDay: Math.max(1, input.kickoffTimes.length) * Math.max(1, input.groundIds.length),
+    // The busiest day the plan actually has — the per-team cap and the
+    // round-per-day rule can hold a day below kickoffs × grounds.
+    perDay: Math.max(
+      ...[
+        ...dates.reduce((acc, d) => acc.set(d, (acc.get(d) ?? 0) + 1), new Map<string, number>()),
+      ].map(([, n]) => n),
+    ),
   };
 }
 
@@ -401,19 +424,16 @@ export async function generateFixtures(
       return { ok: false, reason: "unknown_ground" };
     }
   }
-  const planInput: GeneratePlanInput = {
-    teamIds: teamRows.map((t) => t.id),
-    rounds: input.rounds,
-    startDate: input.startDate,
-    kickoffTimes: input.kickoffTimes,
-    groundIds: input.groundIds,
-    durationMinutes: input.durationMinutes,
-  };
-  const plan = planRoundRobin(planInput);
+  const plan = planRoundRobin(
+    planInputOf(
+      teamRows.map((t) => t.id),
+      input,
+    ),
+  );
   if (!plan.ok) {
     return { ok: false, reason: plan.reason };
   }
-  const miss = outsideWindow(competition, plan.fixtures, input);
+  const miss = outsideWindow(competition, plan.fixtures);
   if (miss !== null) {
     return miss;
   }
@@ -513,20 +533,18 @@ export async function previewGeneration(
     .from(teams)
     .where(eq(teams.competitionId, competition.id))
     .orderBy(asc(teams.name), asc(teams.id));
-  const plan = planRoundRobin({
-    teamIds: teamRows.map((t) => t.id),
-    rounds: input.rounds,
-    startDate: input.startDate,
-    kickoffTimes: input.kickoffTimes,
-    groundIds: input.groundIds,
-    durationMinutes: input.durationMinutes,
-  });
+  const plan = planRoundRobin(
+    planInputOf(
+      teamRows.map((t) => t.id),
+      input,
+    ),
+  );
   if (!plan.ok) {
     return { ok: false, reason: plan.reason };
   }
   // The preview says what the confirm would refuse, so the organizer fixes it
   // here rather than after pressing "Generate".
-  const miss = outsideWindow(competition, plan.fixtures, input);
+  const miss = outsideWindow(competition, plan.fixtures);
   if (miss !== null) {
     return miss;
   }

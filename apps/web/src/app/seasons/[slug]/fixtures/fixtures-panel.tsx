@@ -1,6 +1,6 @@
 "use client";
 
-import { FIXTURE_CSV_HEADER } from "@desiauction/core";
+import { FIXTURE_CSV_HEADER, dailyKickoffs, planRoundRobin } from "@desiauction/core";
 import { useSportTerms } from "../../../../components/sport-terms";
 import {
   Button,
@@ -185,6 +185,15 @@ export function FixturesPanel({
   const [genStart, setGenStart] = useState(seasonStartsOn ?? "");
   const [genTimes, setGenTimes] = useState("18:00");
   const [genDuration, setGenDuration] = useState("180");
+  // HOW MANY MATCHES A DAY. "fit" works the kickoffs out from the playing day
+  // (first match, last finish, match length + break); "custom" takes typed
+  // times. Either way the planner packs each day — a round no longer forces a
+  // new day, so a 4-team league is not three days by construction.
+  const [genMode, setGenMode] = useState<"fit" | "custom">("fit");
+  const [genFirst, setGenFirst] = useState("09:00");
+  const [genLastEnd, setGenLastEnd] = useState("21:00");
+  const [genBreak, setGenBreak] = useState("15");
+  const [genPerTeam, setGenPerTeam] = useState("1");
   // One ground is the only answer, so it starts ticked.
   const [genGrounds, setGenGrounds] = useState<Set<string>>(
     () => new Set(grounds.length === 1 && grounds[0] !== undefined ? [grounds[0].id] : []),
@@ -281,16 +290,76 @@ export function FixturesPanel({
     return result;
   };
 
+  const durationMinutes = Number.parseInt(genDuration, 10);
+  const kickoffTimes =
+    genMode === "fit"
+      ? dailyKickoffs(genFirst, genLastEnd, durationMinutes, Number.parseInt(genBreak, 10) || 0)
+      : genTimes
+          .split(",")
+          .map((t) => t.trim())
+          .filter((t) => t !== "");
+  const maxPerTeamPerDay = genPerTeam === "any" ? null : Number.parseInt(genPerTeam, 10);
   const generateInput = () => ({
     rounds: genRounds === "2" ? (2 as const) : (1 as const),
     startDate: genStart,
-    kickoffTimes: genTimes
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t !== ""),
+    kickoffTimes,
     groundIds: [...genGrounds],
-    durationMinutes: Number.parseInt(genDuration, 10),
+    durationMinutes,
+    pack: true,
+    maxPerTeamPerDay,
   });
+
+  /*
+   * THE LIVE ANSWER to "how many a day, and how many days?" — the same planner
+   * the server runs, over the same team order (name, then id), so what this
+   * says is what "Generate" will do.
+   */
+  const capacity = useMemo(() => {
+    if (isLobby || genStart === "" || genGrounds.size === 0 || kickoffTimes.length === 0) {
+      return null;
+    }
+    const teamIds = [...teams]
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .map((team) => team.id);
+    const planned = planRoundRobin({
+      teamIds,
+      rounds: genRounds === "2" ? 2 : 1,
+      startDate: genStart,
+      kickoffTimes,
+      groundIds: [...genGrounds],
+      durationMinutes,
+      pack: true,
+      maxPerTeamPerDay,
+    });
+    if (!planned.ok) {
+      return null;
+    }
+    const dates = [...new Set(planned.fixtures.map((f) => f.kickoffAt.slice(0, 10)))].sort();
+    const last = dates[dates.length - 1] ?? genStart;
+    return {
+      matches: planned.fixtures.length,
+      days: dates.length,
+      first: dates[0] ?? genStart,
+      last,
+      pastSeason: seasonEndsOn !== null && last > seasonEndsOn,
+    };
+    // `kickoffTimes` is derived each render; its inputs are the dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isLobby,
+    teams,
+    genRounds,
+    genStart,
+    genGrounds,
+    genMode,
+    genTimes,
+    genFirst,
+    genLastEnd,
+    genBreak,
+    genDuration,
+    genPerTeam,
+    seasonEndsOn,
+  ]);
 
   const askToGenerate = async () => {
     setBusy(true);
@@ -518,23 +587,123 @@ export function FixturesPanel({
           }}
         />
         <Field
-          label="Kickoff times"
-          name="kickoffTimes"
-          value={genTimes}
-          onChange={(event) => {
-            setGenTimes(event.target.value);
-          }}
-          placeholder="18:00,20:00"
-        />
-        <Field
-          label="Duration (min)"
+          label="Match length (min)"
           name="duration"
+          inputMode="numeric"
           value={genDuration}
           onChange={(event) => {
             setGenDuration(event.target.value);
           }}
         />
+        <Select
+          label="Matches per team per day"
+          name="perTeam"
+          value={genPerTeam}
+          onChange={(event) => {
+            setGenPerTeam(event.target.value);
+          }}
+        >
+          <option value="1">1 match</option>
+          <option value="2">Up to 2</option>
+          <option value="3">Up to 3</option>
+          <option value="any">No limit</option>
+        </Select>
       </div>
+      <fieldset className="fx-times">
+        <legend>Match times</legend>
+        <div className="fx-mode" role="radiogroup" aria-label="How to set match times">
+          <label className="fx-mode-option" data-checked={genMode === "fit" ? "true" : undefined}>
+            <input
+              type="radio"
+              name="genMode"
+              checked={genMode === "fit"}
+              onChange={() => {
+                setGenMode("fit");
+              }}
+            />
+            Fit matches into the day
+          </label>
+          <label
+            className="fx-mode-option"
+            data-checked={genMode === "custom" ? "true" : undefined}
+          >
+            <input
+              type="radio"
+              name="genMode"
+              checked={genMode === "custom"}
+              onChange={() => {
+                setGenMode("custom");
+              }}
+            />
+            My own kickoff times
+          </label>
+        </div>
+        {genMode === "fit" ? (
+          <div className="fx-form-grid">
+            <Field
+              label="First match at"
+              name="firstKickoff"
+              type="time"
+              value={genFirst}
+              onChange={(event) => {
+                setGenFirst(event.target.value);
+              }}
+            />
+            <Field
+              label="Last match ends by"
+              name="lastEnd"
+              type="time"
+              value={genLastEnd}
+              onChange={(event) => {
+                setGenLastEnd(event.target.value);
+              }}
+            />
+            <Field
+              label="Break between matches (min)"
+              name="breakMinutes"
+              inputMode="numeric"
+              value={genBreak}
+              onChange={(event) => {
+                setGenBreak(event.target.value);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="fx-form-grid">
+            <Field
+              label="Kickoff times"
+              name="kickoffTimes"
+              value={genTimes}
+              onChange={(event) => {
+                setGenTimes(event.target.value);
+              }}
+              placeholder="10:00, 14:00, 18:00"
+            />
+          </div>
+        )}
+        <p className="fx-capacity" data-testid="generate-capacity" aria-live="polite">
+          {kickoffTimes.length === 0
+            ? genMode === "fit"
+              ? "Not even one match fits between those times — start earlier, finish later or shorten the match."
+              : "Enter at least one kickoff time (HH:MM)."
+            : `${String(kickoffTimes.length)} match${kickoffTimes.length === 1 ? "" : "es"} a day on each ${terms.ground.toLowerCase()}: ${kickoffTimes.join(", ")}.`}
+          {capacity !== null ? (
+            <>
+              {" "}
+              <strong data-past-season={capacity.pastSeason ? "true" : undefined}>
+                {capacity.matches} matches → {capacity.days} day{capacity.days === 1 ? "" : "s"}
+                {capacity.days > 1
+                  ? ` (${formatWallDate(capacity.first)} – ${formatWallDate(capacity.last)})`
+                  : ` (${formatWallDate(capacity.first)})`}
+                .
+              </strong>
+              {capacity.pastSeason && seasonEndsOn !== null
+                ? ` That runs past the season's last day (${formatWallDate(seasonEndsOn)}) — allow more matches per team per day, add a ${terms.ground.toLowerCase()}, lengthen the day, or extend the season.`
+                : null}
+            </>
+          ) : null}
+        </p>
+      </fieldset>
       <fieldset className="fx-grounds">
         <legend>{terms.ground}s</legend>
         {grounds.length === 0 ? (
@@ -574,7 +743,7 @@ export function FixturesPanel({
           variant={primary === "generate" ? "primary" : "secondary"}
           onClick={() => void askToGenerate()}
           loading={busy}
-          disabled={genStart === "" || genGrounds.size === 0}
+          disabled={genStart === "" || genGrounds.size === 0 || kickoffTimes.length === 0}
           aria-describedby="generate-why"
           data-testid="generate-fixtures"
         >

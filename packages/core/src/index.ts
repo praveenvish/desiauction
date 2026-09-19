@@ -129,6 +129,7 @@ export {
   addDays,
   roundRobinPairings,
   planRoundRobin,
+  dailyKickoffs,
   detectConflicts,
   conflictsInvolving,
   blockingConflicts,

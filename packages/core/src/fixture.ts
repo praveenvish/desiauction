@@ -249,6 +249,49 @@ export interface GeneratePlanInput {
   kickoffTimes: readonly string[]; // HH:MM, in the order slots fill each day
   groundIds: readonly string[]; // rotation order; ≥ 1
   durationMinutes: number;
+  /**
+   * PACK THE DAYS. Off (the original planner): every round opens a new day and
+   * a day holds exactly kickoffTimes × grounds matches — a 4-team league was
+   * three days however many slots a day had. On: matches fill each day's slots
+   * in round order, a team never plays two overlapping matches, and a team
+   * plays at most `maxPerTeamPerDay` matches in a day.
+   */
+  pack?: boolean;
+  /** With `pack`: the most matches one team plays in a day; null = no limit. Default 1. */
+  maxPerTeamPerDay?: number | null;
+}
+
+/**
+ * Every kickoff that fits in a playing day: first match at `firstKickoff`,
+ * each next one `durationMinutes + breakMinutes` later, the last one ENDING by
+ * `lastEnd`. "09:00 → 21:00, 150 min + 15 min" gives 09:00, 11:45, 14:30, 17:15.
+ * Empty when not even one fits (or an input is malformed).
+ */
+export function dailyKickoffs(
+  firstKickoff: string,
+  lastEnd: string,
+  durationMinutes: number,
+  breakMinutes: number,
+): string[] {
+  if (!TIME_RE.test(firstKickoff) || !TIME_RE.test(lastEnd)) {
+    return [];
+  }
+  if (
+    !Number.isInteger(durationMinutes) ||
+    durationMinutes <= 0 ||
+    !Number.isInteger(breakMinutes) ||
+    breakMinutes < 0
+  ) {
+    return [];
+  }
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const start = toMin(firstKickoff);
+  const end = toMin(lastEnd) === 0 ? 24 * 60 : toMin(lastEnd);
+  const out: string[] = [];
+  for (let t = start; t + durationMinutes <= end; t += durationMinutes + breakMinutes) {
+    out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+  }
+  return out;
 }
 
 export interface PlannedFixture {
@@ -305,7 +348,18 @@ export function planRoundRobin(input: GeneratePlanInput): GeneratePlanResult {
     return { ok: false, reason: "invalid_duration" };
   }
 
+  if (
+    input.maxPerTeamPerDay !== undefined &&
+    input.maxPerTeamPerDay !== null &&
+    (!Number.isInteger(input.maxPerTeamPerDay) || input.maxPerTeamPerDay < 1)
+  ) {
+    return { ok: false, reason: "invalid_kickoff_times" };
+  }
+
   const pairings = roundRobinPairings(input.teamIds, input.rounds);
+  if (input.pack === true) {
+    return { ok: true, fixtures: packDays(input, pairings) };
+  }
   const slotsPerDay = input.kickoffTimes.length * input.groundIds.length;
   const fixtures: PlannedFixture[] = [];
   let dayOffset = 0;
@@ -338,6 +392,75 @@ export function planRoundRobin(input: GeneratePlanInput): GeneratePlanResult {
     slotInDay++;
   }
   return { ok: true, fixtures };
+}
+
+/**
+ * The packed planner (see `GeneratePlanInput.pack`). Deterministic: pairings
+ * in round order, each placed in the EARLIEST slot — day, then kickoff, then
+ * ground in the order given — where the ground is free, neither team is
+ * already playing at an overlapping time, and neither team has reached its
+ * matches for the day. A fresh day always has room, so every pairing lands.
+ */
+function packDays(
+  input: GeneratePlanInput,
+  pairings: ReturnType<typeof roundRobinPairings>,
+): PlannedFixture[] {
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const times = [...new Set(input.kickoffTimes)].sort((a, b) => toMin(a) - toMin(b));
+  const cap =
+    input.maxPerTeamPerDay === null ? Number.POSITIVE_INFINITY : (input.maxPerTeamPerDay ?? 1);
+  interface Day {
+    ground: Set<string>;
+    teamStarts: Map<string, number[]>;
+  }
+  const days: Day[] = [];
+  const dayAt = (index: number): Day => {
+    let day = days[index];
+    if (day === undefined) {
+      day = { ground: new Set(), teamStarts: new Map() };
+      days[index] = day;
+    }
+    return day;
+  };
+  const clashes = (starts: readonly number[] | undefined, at: number) =>
+    (starts ?? []).some((other) => Math.abs(other - at) < input.durationMinutes);
+  const fixtures: PlannedFixture[] = [];
+  for (const pairing of pairings) {
+    placing: for (let d = 0; ; d++) {
+      const day = dayAt(d);
+      const home = day.teamStarts.get(pairing.homeTeamId);
+      const away = day.teamStarts.get(pairing.awayTeamId);
+      if ((home?.length ?? 0) >= cap || (away?.length ?? 0) >= cap) {
+        continue;
+      }
+      for (const time of times) {
+        const at = toMin(time);
+        if (clashes(home, at) || clashes(away, at)) {
+          continue;
+        }
+        for (const groundId of input.groundIds) {
+          const key = `${time}|${groundId}`;
+          if (day.ground.has(key)) {
+            continue;
+          }
+          day.ground.add(key);
+          day.teamStarts.set(pairing.homeTeamId, [...(home ?? []), at]);
+          day.teamStarts.set(pairing.awayTeamId, [...(away ?? []), at]);
+          fixtures.push({
+            round: pairing.round,
+            match: pairing.match,
+            homeTeamId: pairing.homeTeamId,
+            awayTeamId: pairing.awayTeamId,
+            groundId,
+            kickoffAt: `${addDays(input.startDate, d)}T${time}`,
+            durationMinutes: input.durationMinutes,
+          });
+          break placing;
+        }
+      }
+    }
+  }
+  return fixtures;
 }
 
 // --- The reusable conflict engine (CTO addition 4) ------------------------------
