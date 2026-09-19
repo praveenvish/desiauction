@@ -69,11 +69,14 @@ function LotFace({
   name,
   lotMedia,
   size = "xs",
+  teamColor,
 }: {
   lotId: string;
   name: string;
   lotMedia: MediaByLot;
-  size?: "xs" | "sm";
+  size?: "xs" | "sm" | "md";
+  /** The buying franchise's colour, when the row has one — it rings the face. */
+  teamColor?: string | null;
 }) {
   return (
     <PlayerImage
@@ -83,6 +86,7 @@ function LotFace({
       size={size}
       shape="round"
       decorative
+      {...(teamColor === null || teamColor === undefined ? {} : { teamColor, ring: true })}
     />
   );
 }
@@ -258,11 +262,18 @@ export function AuctionTimeline({
   feed,
   limit = 12,
   lotMedia = {},
+  teamColors,
 }: {
   feed: LiveFeed;
   limit?: number;
   lotMedia?: MediaByLot;
+  /**
+   * Team NAME → colour. The timeline is the night's history of PEOPLE: the face
+   * is read at a glance and the ring says which franchise took them.
+   */
+  teamColors?: ReadonlyMap<string, string | null>;
 }) {
+  const teamOfLot = new Map(feed.resolved.map((lot) => [lot.lotId, lot.teamName]));
   if (feed.events.length === 0) {
     return null;
   }
@@ -281,6 +292,8 @@ export function AuctionTimeline({
                 lotId={event.subject.lotId}
                 name={event.subject.playerName ?? ""}
                 lotMedia={lotMedia}
+                size="md"
+                teamColor={teamColors?.get(teamOfLot.get(event.subject.lotId) ?? "") ?? null}
               />
             )}
             <span className="live-rail-label">{event.label}</span>

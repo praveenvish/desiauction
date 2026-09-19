@@ -47,7 +47,7 @@ import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
-import { BrandMark } from "./brand";
+import { BrandMark, BrandWordmark } from "./brand";
 import {
   ADMIN_TABS,
   PUBLIC_DESTINATIONS,
@@ -670,7 +670,8 @@ export function ProductShell({
           exitHref={exit.href}
           exitLabel={exit.label}
           linkComponent={Link}
-          brand={<BrandMark size={26} />}
+          brand={<BrandMark size={32} />}
+          wordmark={<BrandWordmark tone="live" />}
           // A spectator arrives with no account and the mark was dead text on
           // the one screen the product is most often shared from.
           brandHref="/"
@@ -700,12 +701,9 @@ export function ProductShell({
     const atLoginGate = pathname === "/login";
     return (
       <PublicShell
-        wordmark={
-          <span className="public-brand-name">
-            Desi<span>Auction</span>
-            <small aria-hidden="true">THE GAME STARTS HERE</small>
-          </span>
-        }
+        // THE reference lockup: every other surface renders this same
+        // component (brand.tsx), in its own tone.
+        wordmark={<BrandWordmark tone="header" />}
         wordmarkHref="/"
         glyph={<BrandMark size={42} />}
         nav={publicNav(pathname)}
@@ -1024,16 +1022,13 @@ export function ProductShell({
             },
           ]}
           linkComponent={Link}
-          // ONE tagline in the sidebar (founder, 2026-09-19): the brand line
-          // "Bid · Build · Win" below; the wordmark carries just the name.
-          wordmark={
-            <span className="public-brand-name">
-              Desi<span>Auction</span>
-            </span>
-          }
+          // The guest header's lockup, tagline included (founder, 2026-09-20:
+          // "the guest page one is final"). The rail used to carry its own
+          // line, "Bid · Build · Win", under a display-face wordmark — a second
+          // brand one click away from the first.
+          wordmark={<BrandWordmark tone="rail" />}
           wordmarkHref="/home"
-          glyph={<BrandMark size={32} />}
-          tagline="Bid · Build · Win"
+          glyph={<BrandMark size={38} />}
           {...(title !== null ? { pageTitle: title } : {})}
           {...(titleTestId !== undefined ? { pageTitleAttrs: { "data-testid": titleTestId } } : {})}
           {...(identity.crumbs.length > 0

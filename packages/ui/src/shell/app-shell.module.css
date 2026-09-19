@@ -444,6 +444,21 @@ a.wordmark:hover .wordmark-glyph {
     align-items: center;
   }
 
+  /* The rail's mark at the public header's proportion (mark ≈ 1.8× the
+     wordmark's size), and with the header's bare corners: the app's mark
+     carries its own gold tile, so the chip's gradient and border only drew a
+     second, darker edge around it. */
+  .rail-brand .wordmark {
+    gap: 10px;
+  }
+
+  .rail-brand .wordmark-glyph {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 28%;
+  }
+
   /* The wordmark and its tagline are one column beside the glyph, so the column
      is as wide as the longer of the two — and with the tagline set small enough
      to be the shorter, that is the wordmark. */

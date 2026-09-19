@@ -477,6 +477,8 @@ export function LivePanel({
                   ceremony={ceremony}
                   remainingMs={remainingMs}
                   lotMedia={view.lotMedia}
+                  resolved={feed.resolved}
+                  teams={view.teams}
                 />
               )}
 
@@ -507,7 +509,11 @@ export function LivePanel({
               </Card>
 
               <div id="live-timeline" className="live-anchor">
-                <AuctionTimeline feed={feed} lotMedia={view.lotMedia} />
+                <AuctionTimeline
+                  feed={feed}
+                  lotMedia={view.lotMedia}
+                  teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
+                />
               </div>
             </div>
 

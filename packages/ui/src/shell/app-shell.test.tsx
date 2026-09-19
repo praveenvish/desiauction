@@ -79,7 +79,12 @@ describe("AppShell", () => {
    */
   it("names both brand links by the wordmark, with the mark kept decorative", () => {
     const { container } = render(
-      <AppShell nav={NAV} wordmark="DesiAuction" wordmarkHref="/home" tagline="Bid · Build · Win">
+      <AppShell
+        nav={NAV}
+        wordmark="DesiAuction"
+        wordmarkHref="/home"
+        tagline="THE GAME STARTS HERE"
+      >
         <p>x</p>
       </AppShell>,
     );

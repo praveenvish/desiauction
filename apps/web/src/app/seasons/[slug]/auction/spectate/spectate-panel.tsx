@@ -317,6 +317,8 @@ export function SpectatePanel({
           remainingMs={remainingMs}
           lotMedia={lotMedia}
           stampSize={stage ? "stage" : "lg"}
+          resolved={feed.resolved}
+          teams={teams}
         />
       ) : (
         <div className="stage-hide">
@@ -328,6 +330,8 @@ export function SpectatePanel({
             leadColor={leadColor}
             clock={clock}
             media={lotMedia[lot.lotId]}
+            /* The guest's stage: the person on the block, large. */
+            face="lg"
             testId="spectate-lot"
           />
         </div>
@@ -406,7 +410,11 @@ export function SpectatePanel({
             </div>
           </Card>
 
-          <AuctionTimeline feed={feed} lotMedia={lotMedia} />
+          <AuctionTimeline
+            feed={feed}
+            lotMedia={lotMedia}
+            teamColors={new Map(teams.map((team) => [team.name, team.primaryColor]))}
+          />
         </div>
 
         <div className="live-col">

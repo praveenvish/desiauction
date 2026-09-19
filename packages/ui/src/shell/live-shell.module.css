@@ -95,9 +95,10 @@
 
 .live-brand-mark {
   display: block;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  /* The app's mark carries its own gold tile; this only clips to its corners. */
+  border-radius: 28%;
   overflow: hidden;
   flex: none;
 }

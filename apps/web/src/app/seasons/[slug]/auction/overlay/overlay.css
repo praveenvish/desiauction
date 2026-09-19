@@ -359,6 +359,26 @@ body:has(.obs-overlay) {
   gap: 10px;
   text-align: right;
 }
+/* The "powered by" bug: the product's one mark on a broadcast frame. Plated
+   and blurred like the watch box beside it, so it reads over any video. */
+.obs-bug {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 8px 14px;
+  background: var(--surface-sunken);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg, 14px);
+}
+.obs-bug-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 .obs-sponsor {
   padding: 9px 16px;
   background: var(--surface);
