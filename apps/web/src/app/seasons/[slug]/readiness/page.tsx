@@ -14,6 +14,20 @@ export const metadata = { title: "Readiness · DesiAuction" };
 // The only pass/fail authority here is the platform's own AuctionReady
 // projection (auction-ready.ts); everything else is counts from existing
 // dashboards with links to the screen that changes them. No rules invented.
+/** Where each auction gate is cleared. */
+function fixOf(id: string, base: string): { href: string; label: string } {
+  switch (id) {
+    case "intake_closed":
+      return { href: base, label: "Close registration" };
+    case "pool_present":
+      return { href: `${base}/registrations`, label: "Review registrations" };
+    case "teams_present":
+      return { href: `${base}/teams`, label: "Add teams" };
+    default:
+      return { href: `${base}/auction`, label: "Open auction setup" };
+  }
+}
+
 export default async function ReadinessPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const view = await competitionView(slug);
@@ -47,6 +61,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
    * reconciled them. The verdict now carries the caveat it was hiding.
    */
   const runningShort = auction !== null && !auction.feasibility.ok;
+  const firstBlocked = checks.find((check) => !check.pass);
 
   return (
     <main className="registrations-dash">
@@ -83,6 +98,11 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                   </Badge>
                   <span className="registration-name">{check.label}</span>
                   <span className="competitions-hint">{check.detail}</span>
+                  {/* A blocked gate names where it is cleared — the page's own
+                      promise, which the three gates were the only rows to break. */}
+                  {!check.pass ? (
+                    <Link href={fixOf(check.id, base).href}>{fixOf(check.id, base).label}</Link>
+                  ) : null}
                 </li>
               ))}
               {/* The sum that decides whether the night can end normally.
@@ -181,7 +201,23 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
         </Card>
 
         <div className="readiness-actions">
-          <ButtonLink href={`${base}/auction`} size="touch">
+          {/* ONE next step. While a gate is blocked, creating the auction is not
+              it — the first blocker's fix is, so that is the ink button and the
+              auction is the secondary one. */}
+          {firstBlocked !== undefined ? (
+            <ButtonLink
+              href={fixOf(firstBlocked.id, base).href}
+              size="touch"
+              data-testid="readiness-next"
+            >
+              {fixOf(firstBlocked.id, base).label}
+            </ButtonLink>
+          ) : null}
+          <ButtonLink
+            href={`${base}/auction`}
+            size="touch"
+            {...(firstBlocked !== undefined ? { variant: "secondary" as const } : {})}
+          >
             {auction !== null && auction.view !== null
               ? "Open auction setup"
               : "Create the auction"}

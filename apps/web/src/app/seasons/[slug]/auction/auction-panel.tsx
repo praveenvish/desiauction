@@ -210,10 +210,14 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
         <p className="competitions-hint">
           Every gate that has to be green before the auction can open.
         </p>
-        <ul className="conflict-list">
+        <ul className="conflict-list gate-list">
           {ready.checks.map((check) => (
             <li key={check.id} data-testid={`check-${check.id}`}>
-              <Badge tone={check.pass ? "success" : "danger"}>{check.pass ? "pass" : "fail"}</Badge>
+              {/* Amber, not red: a gate not yet met is waiting on a step, the
+                  same grammar as the readiness page's "blocked". */}
+              <Badge tone={check.pass ? "success" : "warning"}>
+                {check.pass ? "pass" : "fail"}
+              </Badge>
               <span>{check.label}</span>
               <span className="registration-phone">{check.detail}</span>
             </li>
@@ -255,9 +259,10 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 bands because the config was a constant. Pre-filled with those
                 same defaults, so an organiser who does not care still clicks
                 one button. */}
+            <h3 className="auction-setup-title">Rules of the night</h3>
             <p className="competitions-hint">
-              Rules of the night — these lock when the auction is created. Nothing here is guessed
-              for you: a value that isn&apos;t a whole number is refused, not replaced.
+              These lock when the auction is created. Nothing here is guessed for you: a value that
+              isn&apos;t a whole number is refused, not replaced.
             </p>
             <div className="date-row">
               <Field
@@ -758,7 +763,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                   : `Replay failed closed: ${report.reason ?? ""}`}
               </p>
             ) : null}
-            <ol className="timeline">
+            <ol className="timeline event-log">
               {view.events.map((event) => (
                 <li key={event.seq}>
                   <Badge tone="neutral">#{event.seq}</Badge>

@@ -2708,3 +2708,120 @@
   font-size: var(--text-sm-size);
   color: var(--danger-strong);
 }
+
+/* ==========================================================================
+   SETUP AND RECORD, READ IN COLUMNS (design review leftovers).
+   ========================================================================== */
+
+/* The gates: badge, what, detail — one aligned row each, not a run-on. */
+.gate-list {
+  margin-top: var(--space-3);
+  gap: 0;
+}
+
+.gate-list > li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.gate-list > li > :first-child {
+  justify-self: start;
+}
+
+@media (max-width: 599px) {
+  .gate-list > li {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+  }
+
+  .gate-list > li > :nth-child(3) {
+    grid-column: 2;
+  }
+}
+
+/* Rules of the night: a heading, then a three-column form whose rows have
+   room — the labels used to sit on the inputs above them. */
+.auction-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* A column, so its children stretch — but the action is a button, not a bar. */
+.auction-setup > button,
+.auction-setup > .auction-ack {
+  align-self: flex-start;
+}
+
+.auction-setup-title {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.auction-setup .competitions-hint {
+  margin: calc(-1 * var(--space-2)) 0 0;
+}
+
+.auction-setup > .date-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+  max-width: 720px;
+}
+
+@media (max-width: 599px) {
+  .auction-setup > .date-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The event log: number, event, time in fixed columns — "#9" and "#20" used
+   to start every event name at a different x. */
+.event-log {
+  margin-top: var(--space-4);
+  gap: 0;
+}
+
+.event-log > li {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.event-log > li > :first-child {
+  justify-self: start;
+}
+
+.event-log .timeline-at {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Screens for the room: rows between hairlines, the URL as quiet mono text —
+   no box, no grey block. */
+[data-surface="console"] .broadcast-row {
+  padding: var(--space-4) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-surface="console"] .broadcast-url {
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
