@@ -11,6 +11,7 @@
  * a way to see the rest. It shows names and numbers only. Sale prices, purses
  * and phone numbers are not in the read model it is given.
  */
+import { IconStar } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -84,8 +85,16 @@ export function TeamCard({
                 {player.photo ?? initials(player.name)}
               </span>
               <span className="team-card-player-name">{player.name}</span>
+              {/* A star, not the word "Pre-signed": the word cost about 70px
+                  on a row that already carries a name and a number, and every
+                  name in a squad of pre-signed players was truncated to make
+                  room for a label repeated down the whole card. The meaning is
+                  kept for anyone not reading visually. */}
               {player.preSigned === true ? (
-                <span className="team-card-tag">Pre-signed</span>
+                <span className="team-card-tag" title="Pre-signed">
+                  <IconStar width={13} height={13} aria-hidden />
+                  <span className="team-card-sr">Pre-signed</span>
+                </span>
               ) : null}
               <span className="team-card-number">#{player.number}</span>
             </li>

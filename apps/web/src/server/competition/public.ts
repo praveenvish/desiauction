@@ -1,4 +1,4 @@
-import { deriveAge, describeAttributes, isMinor } from "@desiauction/core";
+import { deriveAge, describeAttributes, isMinor, paise, type Paise } from "@desiauction/core";
 import {
   auctionEvents,
   auctions,
@@ -86,10 +86,51 @@ export interface PublicCompetitionView {
   coverUrl: string | null;
   /** PX-6: the live door on the public page (null until an auction exists). */
   auctionStatus: string | null;
+  /**
+   * THE TWO AUCTION RULES A STRANGER MAY READ (founder, 2026-09-19).
+   *
+   * Everything else about the money stays private — no sold price, no bid, no
+   * purse SPENT, no dues. These two are the tournament's published terms: what
+   * every owner starts with and how many players they must end with. A player
+   * deciding whether to register is choosing between tournaments on exactly
+   * these numbers, and until now had to ask the organizer for both.
+   *
+   * Null when no auction exists yet: the rules are not set, so the page says
+   * nothing rather than showing a default nobody chose.
+   */
+  pursePerTeam: Paise | null;
+  /** The squad size owners are bidding towards (`squadMax`). */
+  squadSize: number | null;
   teams: TeamSummary[];
   fixtures: PublicFixture[];
   /** Every published fixture, including any beyond the rendered bound. */
   fixtureTotal: number;
+}
+
+/**
+ * The publishable half of an auction's config.
+ *
+ * The config is a jsonb blob written by the console, so it is READ
+ * defensively: a season configured by an older build, or by a sport pack that
+ * does not price squads, must not take the public page down. Anything that is
+ * not a positive number is simply not published.
+ */
+function publicAuctionRules(config: unknown): {
+  pursePerTeam: Paise | null;
+  squadSize: number | null;
+} {
+  if (config === null || typeof config !== "object") {
+    return { pursePerTeam: null, squadSize: null };
+  }
+  const record = config as Record<string, unknown>;
+  const purse = record["pursePerTeam"];
+  const squad = record["squadMax"];
+  return {
+    pursePerTeam:
+      typeof purse === "number" && Number.isFinite(purse) && purse > 0 ? paise(purse) : null,
+    squadSize:
+      typeof squad === "number" && Number.isInteger(squad) && squad > 0 ? squad : null,
+  };
 }
 
 function toPublicFixture(row: FixtureSnapshot): PublicFixture {
@@ -138,7 +179,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
   const open = row.status === "registration_open";
   const [auctionRows, teams, fixtures] = await Promise.all([
     systemDb
-      .select({ status: auctions.status })
+      .select({ status: auctions.status, config: auctions.config })
       .from(auctions)
       .where(eq(auctions.competitionId, row.id))
       .limit(1),
@@ -163,6 +204,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     logoUrl: row.logoKey === null ? null : storage.readUrl(row.logoKey),
     coverUrl: row.coverKey === null ? null : storage.readUrl(row.coverKey),
     auctionStatus: auctionRows[0]?.status ?? null,
+    ...publicAuctionRules(auctionRows[0]?.config),
     teams,
     fixtures: fixtures.rows.map(toPublicFixture),
     // Carried so the page can say "showing 500 of 640" rather than presenting a

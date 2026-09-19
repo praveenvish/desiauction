@@ -17,7 +17,7 @@ import {
 import { preSignedWord } from "../../../lib/pre-signed";
 import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer, ShowcasePool } from "../../../server/competition/public";
-import { SquadsView } from "./squads-view";
+import { SquadsView, type SquadTeam } from "./squads-view";
 
 /**
  * Public player showcase (parity §3.3). Server-rendered list, client search /
@@ -39,11 +39,14 @@ export function ShowcaseGrid({
   pool,
   slug,
   roles,
+  teams,
 }: {
   pool: ShowcasePool;
   slug: string;
   /** The SEASON's roles — `roleLabel` asks cricket, and this page is public. */
   roles: readonly { key: string; label: string }[];
+  /** The season's teams, for the Squads view's cards (colour, crest, coach). */
+  teams: readonly SquadTeam[];
 }) {
   const { players, total, truncated } = pool;
   const labelOf = (role: string | null): string =>
@@ -56,12 +59,24 @@ export function ShowcaseGrid({
   // Seed state from the URL (only the useState initializers below read this, on
   // first render); subsequent URL writes are driven by state, never read back.
   const initial = parseShowcaseParams(new URLSearchParams(searchParams.toString()));
+  // WHICH VIEW OPENS. The URL wins whenever it says (a shared "?view=players"
+  // link opens on players). With nothing in the URL, the season decides: once
+  // anyone is on a team sheet, the squads ARE the answer to "what happened
+  // here?", and opening on a 200-tile pool made every visitor after auction
+  // night press a toggle to reach it. Before that, there are no squads to show.
+  const hasSquads = pool.players.some((player) => player.status !== "available");
+  const urlView = searchParams.get("view");
+  const openOn: ShowcaseView = urlView === "players" || urlView === "squads"
+    ? initial.view
+    : hasSquads
+      ? "squads"
+      : "players";
 
   const [query, setQuery] = useState(initial.query);
   const [filter, setFilter] = useState<ShowcaseFilter>(initial.filter);
   const [sort, setSort] = useState<ShowcaseSort>(initial.sort);
   const [selected, setSelected] = useState<ShowcasePlayer | null>(null);
-  const [view, setView] = useState<ShowcaseView>(initial.view);
+  const [view, setView] = useState<ShowcaseView>(openOn);
 
   // Keep the URL in sync so a filtered/squads view is shareable + back-friendly.
   useEffect(() => {
@@ -139,7 +154,7 @@ export function ShowcaseGrid({
       </div>
 
       {view === "squads" ? (
-        <SquadsView players={players} />
+        <SquadsView players={players} teams={teams} />
       ) : (
         <>
           <div className="showcase-controls">

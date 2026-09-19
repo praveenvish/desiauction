@@ -33,10 +33,14 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
+  /* The scrim is `--text-on-accent` (near-black in BOTH themes), not
+     `--surface-inverse`, which is dark in daylight and LIGHT in floodlight —
+     mixing that whitened every team colour in the dark theme, so a red club
+     read as dusty pink. */
   background:
     linear-gradient(
       100deg,
-      color-mix(in srgb, var(--surface-inverse) 42%, transparent),
+      color-mix(in srgb, var(--text-on-accent) 38%, transparent),
       transparent 70%
     ),
     var(--team-color);
@@ -51,7 +55,7 @@
   block-size: 40px;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface-inverse) 35%, transparent);
+  background: color-mix(in srgb, var(--text-on-accent) 32%, transparent);
   color: inherit;
   font-weight: 700;
 }
@@ -92,9 +96,12 @@
   align-content: start;
 }
 
+/* Four columns, always: the pre-signed tag is optional, and with three
+   declared columns an optional fourth child wrapped the NUMBER onto its own
+   line — so a squad of pre-signed players drew a ragged two-line list. */
 .team-card-player {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2);
@@ -125,21 +132,33 @@
   object-fit: cover;
 }
 
+/* A person's name wraps rather than being cut: "Praveen Vis…" is worse than
+   two lines, and a squad list is exactly where people look for their own. */
 .team-card-player-name {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   font-size: 0.9375rem;
+  line-height: 1.3;
   color: var(--text-primary);
 }
 
 .team-card-tag {
-  padding: 2px var(--space-2);
+  display: grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
   border-radius: var(--radius-full);
   background: var(--accent-subtle);
   color: var(--text-accent);
-  font-size: 0.6875rem;
+}
+
+.team-card-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
