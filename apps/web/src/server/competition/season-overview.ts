@@ -43,6 +43,12 @@ export interface SeasonTeamSpend {
   squad: number;
   /** Squad max; money-adjacent auction configuration, gated with the spend. */
   squadMax?: number | null;
+  /**
+   * The purse each team was given for the auction, in paise — the scale the
+   * spend bar reads against ("100%" is a team that spent it all). Money-gated
+   * with the spend; absent before an auction exists.
+   */
+  purse?: number;
 }
 
 export interface SeasonRoleCount {
@@ -254,7 +260,9 @@ export async function seasonOverview(
           name: team.name,
           color: team.primaryColor,
           squad: entry?.squad ?? 0,
-          ...(options.money ? { spend: entry?.spend ?? 0, squadMax: rules.squadMax } : {}),
+          ...(options.money
+            ? { spend: entry?.spend ?? 0, squadMax: rules.squadMax, purse: rules.pursePerTeam }
+            : {}),
         };
       })
       // Without money sight there is no spend to rank by, so the list is

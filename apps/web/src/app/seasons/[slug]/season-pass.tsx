@@ -1,6 +1,15 @@
 "use client";
 
-import { Button, Card, Dialog, Field, Select, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Dialog,
+  Field,
+  IconCrown,
+  Pill,
+  SectionCard,
+  Select,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -49,47 +58,70 @@ export function SeasonPassCard({ slug, pass }: { slug: string; pass: SeasonPassV
     });
   };
 
+  // The body exists only when it has something to say: an uncounted pass is
+  // one sentence, and that sentence is the card's description.
+  const hasBody = !uncounted || pass.pending !== null;
+
   return (
-    <Card className="season-pass-card" data-testid="season-pass">
-      <div className="competition-head">
-        <h2>Season pass</h2>
-        <span className="season-pass-tier" data-testid="season-pass-tier">
-          {pass.tierName}
-        </span>
-      </div>
+    <>
+      <SectionCard
+        title="Season pass"
+        icon={<IconCrown />}
+        tone="gold"
+        className="season-pass-card"
+        data-testid="season-pass"
+        action={
+          <Pill tone="neutral" testId="season-pass-tier">
+            {pass.tierName}
+          </Pill>
+        }
+        {...(uncounted
+          ? {
+              description: (
+                <span data-testid="season-pass-uncounted">
+                  This season has no team or player limit. Tournaments started during beta keep
+                  every tier and every feature, free, for good.
+                </span>
+              ),
+            }
+          : {})}
+      >
+        {hasBody ? (
+          <div className="season-pass-body">
+            {uncounted ? null : (
+              <ul className="season-pass-meters">
+                <Meter label="Teams" usage={pass.teams} testId="pass-meter-teams" />
+                <Meter
+                  label="Players in the pool"
+                  usage={pass.players}
+                  testId="pass-meter-players"
+                />
+              </ul>
+            )}
 
-      {uncounted ? (
-        <p className="competitions-hint" data-testid="season-pass-uncounted">
-          This season has no team or player limit. Tournaments started during beta keep every tier
-          and every feature, free, for good.
-        </p>
-      ) : (
-        <ul className="season-pass-meters">
-          <Meter label="Teams" usage={pass.teams} testId="pass-meter-teams" />
-          <Meter label="Players in the pool" usage={pass.players} testId="pass-meter-players" />
-        </ul>
-      )}
+            {pass.pending !== null ? (
+              <p className="teams-notice" role="status" data-testid="season-pass-pending">
+                You&apos;ve asked for a bigger pass. We&apos;re on it — we&apos;ll come back to you
+                before you need it.
+              </p>
+            ) : null}
 
-      {pass.pending !== null ? (
-        <p className="teams-notice" role="status" data-testid="season-pass-pending">
-          You&apos;ve asked for a bigger pass. We&apos;re on it — we&apos;ll come back to you before
-          you need it.
-        </p>
-      ) : null}
-
-      {pass.viewer.canRequest && pass.pending === null && !uncounted ? (
-        <div className="season-pass-actions">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setOpen(true);
-            }}
-            data-testid="open-pass-request"
-          >
-            Ask for more room
-          </Button>
-        </div>
-      ) : null}
+            {pass.viewer.canRequest && pass.pending === null && !uncounted ? (
+              <div className="season-pass-actions">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setOpen(true);
+                  }}
+                  data-testid="open-pass-request"
+                >
+                  Ask for more room
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : undefined}
+      </SectionCard>
 
       <Dialog
         open={open}
@@ -144,7 +176,7 @@ export function SeasonPassCard({ slug, pass }: { slug: string; pass: SeasonPassV
           />
         </div>
       </Dialog>
-    </Card>
+    </>
   );
 }
 
