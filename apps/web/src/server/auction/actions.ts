@@ -25,7 +25,15 @@ import { ownedTeamIdsOn } from "../competition/posters";
 import { dbHandle } from "../db";
 import { featureEnabled, setAuctionFeature } from "../feature-settings";
 import { auctionReadiness, createAuction, type AuctionRecord } from "@desiauction/auction";
-import { auctionOf, auctionView, type AuctionView, type PaddleView } from "@desiauction/auction";
+import {
+  auctionOf,
+  auctionView,
+  ownerBoard,
+  type AuctionView,
+  type OwnerBoard,
+  type PaddleView,
+} from "@desiauction/auction";
+import { ownerAcceptancesOf, type OwnerAcceptance } from "./owner-acceptances";
 import { auctionReady, type AuctionReadyProjection } from "./auction-ready";
 import {
   parseAuctionSetup,
@@ -226,6 +234,13 @@ export interface AuctionDashboard {
   wsUrl: string | null;
   /** The operational dashboard: progress, block, burndown, queue, log. */
   overview: AuctionOverview | null;
+  /**
+   * The owner road per team — invites, who accepted, grants, claims — for the
+   * setup checklist. The cockpit's own read, served here too so the organizer
+   * sets the night up on one page. Conductors only (it carries owner phones);
+   * absent before an auction exists.
+   */
+  owners?: { board: OwnerBoard; acceptances: OwnerAcceptance[] };
 }
 
 /** A deterministic worked example of the timer model — computed, not animated. */
@@ -292,6 +307,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     wsUrl,
     overview,
     feasibility,
+    owners,
   } = await inCompetitionOrg(session.personId, competition, async (db) => {
     const [readyProjection, auction, conduct, manage, review, ownTeams] = await Promise.all([
       auctionReady(db, competition),
@@ -344,6 +360,13 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
         auction === null
           ? null
           : await auctionOverview(db, auction.id, auction.config, competition.sport, { money }),
+      owners:
+        auction === null || !conduct
+          ? null
+          : await Promise.all([
+              ownerBoard(db, auction),
+              ownerAcceptancesOf(db, auction.id, competition.orgId),
+            ]).then(([board, acceptances]) => ({ board, acceptances })),
     };
   });
   return {
@@ -358,6 +381,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     feasibility,
     wsUrl,
     overview,
+    ...(owners === null ? {} : { owners }),
   };
 }
 

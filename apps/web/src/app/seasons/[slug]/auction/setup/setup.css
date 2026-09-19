@@ -1,0 +1,339 @@
+/* ==========================================================================
+   AUCTION SETUP — the five-step checklist. Flat like the rest of the console:
+   hairlines between steps, the open step is the only thing with weight.
+   ========================================================================== */
+
+.as-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.as-flow-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.as-flow-head h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.as-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.as-progress-dot {
+  width: 18px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--border-subtle);
+}
+
+.as-progress-dot[data-state="done"] {
+  background: var(--success-base);
+}
+
+.as-progress-dot[data-state="current"] {
+  background: var(--accent);
+}
+
+.as-progress-text {
+  margin-inline-start: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.as-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.as-step {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.as-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.as-step-head:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.as-step-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-strong);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.as-step[data-state="current"] .as-step-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.as-step[data-state="done"] .as-step-mark {
+  border-color: var(--success-base);
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.as-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.as-step-title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.as-step[data-state="upcoming"] .as-step-title {
+  color: var(--text-secondary);
+}
+
+.as-step-summary {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.as-step-state {
+  flex: none;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.as-step[data-state="current"] .as-step-state {
+  color: var(--text-accent);
+}
+
+.as-step-body {
+  padding: 0 0 var(--space-5) calc(28px + var(--space-3));
+}
+
+.as-step-body[hidden] {
+  display: none;
+}
+
+.as-hint {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.as-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.as-link {
+  font-size: var(--text-sm-size);
+  color: var(--text-accent);
+}
+
+/* --- Gates ---------------------------------------------------------------- */
+
+.as-gates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+}
+
+.as-gates li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* --- Rules ---------------------------------------------------------------- */
+
+.as-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+/* --- Owners --------------------------------------------------------------- */
+
+.as-owners {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.as-owner-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.as-owner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.as-owner:last-child {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.as-owner-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.as-owner-team {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.as-owner[data-stage="claimed"] .as-owner-team::after {
+  content: " ✓";
+  color: var(--success-strong);
+}
+
+.as-owner-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.as-owner-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.as-link-url {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+}
+
+.as-owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.as-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--success-subtle);
+  color: var(--success-strong);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.as-whatsapp:hover {
+  text-decoration: underline;
+}
+
+.as-whatsapp:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- Go live -------------------------------------------------------------- */
+
+.as-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.as-blockers {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.as-details-title {
+  margin: var(--space-6) 0 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@media (max-width: 760px) {
+  .as-step-body {
+    padding-inline-start: 0;
+  }
+
+  .as-step-state {
+    display: none;
+  }
+}

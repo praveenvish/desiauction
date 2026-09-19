@@ -1,13 +1,12 @@
 "use client";
 
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast, Field, ButtonLink } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast, ButtonLink } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
   auctionLifecycleAction,
-  createAuctionAction,
   issuePaddleAction,
   queueAllLotsAction,
   releasePaddleAction,
@@ -16,13 +15,9 @@ import {
   type AuctionDashboard,
   type ReplayVerifyReport,
 } from "../../../../server/auction/actions";
-import {
-  squadFeasibility,
-  type AuctionSetupFieldErrors,
-} from "../../../../server/auction/auction-setup";
 import { formatTime } from "../../../../lib/format-date";
-import { compactINR, exactINR } from "../../../../lib/inr";
 import { AbortDialog } from "./abort-dialog";
+import { AuctionSetupFlow } from "./setup/setup-flow";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 import { useHydrated } from "../../../../lib/use-hydrated";
 
@@ -63,46 +58,13 @@ const AUCTION_NEXT: Partial<Record<string, { command: string; label: string }[]>
   ],
 };
 
-/**
- * The figure a rupee field holds, read back in grouped rupees ("₹2,00,00,000 ·
- * ₹2 Cr"). A purse typed as 20000000 is one missing zero from a tenth of the
- * league it meant; the read-back is how an organizer sees that before it
- * locks. Nothing for a value the server would refuse anyway.
- */
-function rupeeReadBack(value: string): { help: string } | Record<string, never> {
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) return {};
-  const inPaise = Number(trimmed) * 100;
-  if (!Number.isSafeInteger(inPaise)) return {};
-  return {
-    help:
-      inPaise >= 10_000_000 ? `${exactINR(inPaise)} · ${compactINR(inPaise)}` : exactINR(inPaise),
-  };
-}
-
 export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: AuctionDashboard }) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  // DA-05: pre-filled with the values every auction used to get unconditionally.
-  const [purse, setPurse] = useState("20000000");
-  const [squadMin, setSquadMin] = useState("8");
-  const [squadMax, setSquadMax] = useState("15");
-  const [timer, setTimer] = useState("30");
-  const [extension, setExtension] = useState("15");
-  const [baseDefault, setBaseDefault] = useState("10000");
-  const [bands, setBands] = useState<Record<string, string>>({
-    A: "50000",
-    B: "25000",
-    C: "10000",
-  });
   const [paddleTeam, setPaddleTeam] = useState("");
   const [report, setReport] = useState<ReplayVerifyReport | null>(null);
   const hydrated = useHydrated();
-  // The config locks at creation, so a refusal has to say which field is wrong
-  // rather than quietly substituting a value the organizer never chose.
-  const [fieldErrors, setFieldErrors] = useState<AuctionSetupFieldErrors>({});
-  const [acceptShortSquads, setAcceptShortSquads] = useState(false);
   const [acceptShortOpen, setAcceptShortOpen] = useState(false);
   // WR-1: optimistic, then reconciled — a fully server-controlled checkbox
   // snaps back before the refresh lands, which reads as a switch that ignores
@@ -123,16 +85,16 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
   };
 
   const { ready, view, viewer } = dashboard;
+  /*
+   * Before the room opens, the page is the guided setup (setup/setup-flow.tsx):
+   * the gates, the rules form, owners, queueing and "Open auction" all live in
+   * its steps. What stays below is the room's record — rules, status, paddles,
+   * the lot list, the event log — so each control exists exactly once.
+   */
+  const setupMode =
+    view === null || view.auction.status === "scheduled" || view.auction.status === "abandoned";
 
-  // The same sum the server will do, run against whatever is typed right now.
-  const unplacedPool = ready.pool.filter((entry) => entry.teamId === null).length;
-  const typedFeasibility = squadFeasibility({
-    poolSize: unplacedPool,
-    squadSizes: ready.squadSizes,
-    squadMin: /^\d+$/.test(squadMin.trim()) ? Number(squadMin) : dashboard.feasibility.squadMin,
-    squadMax: /^\d+$/.test(squadMax.trim()) ? Number(squadMax) : dashboard.feasibility.squadMax,
-  });
-  const liveFeasibility = view === null ? typedFeasibility : dashboard.feasibility;
+  const liveFeasibility = dashboard.feasibility;
 
   /**
    * THE GO-LIVE GUARD, SAID BEFORE THE CLICK INSTEAD OF AFTER IT (PA-1 §13).
@@ -202,202 +164,10 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
       data-testid="auction-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
+      {setupMode ? <AuctionSetupFlow slug={slug} dashboard={dashboard} /> : null}
+      {setupMode && view !== null ? <h2 className="as-details-title">Room details</h2> : null}
       {dashboard.rules !== null ? <RulesCard rules={dashboard.rules} /> : null}
-      {dashboard.wsUrl !== null ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
-
-      <Card data-testid="ready-panel">
-        <h2>Ready to open</h2>
-        <p className="competitions-hint">
-          Every gate that has to be green before the auction can open.
-        </p>
-        <ul className="conflict-list gate-list">
-          {ready.checks.map((check) => (
-            <li key={check.id} data-testid={`check-${check.id}`}>
-              {/* Amber, not red: a gate not yet met is waiting on a step, the
-                  same grammar as the readiness page's "blocked". */}
-              <Badge tone={check.pass ? "success" : "warning"}>
-                {check.pass ? "pass" : "fail"}
-              </Badge>
-              <span>{check.label}</span>
-              <span className="registration-phone">{check.detail}</span>
-            </li>
-          ))}
-          {/* Not one of the gates: a shortfall does not stop an auction being
-              created, it stops one being CLOSED. It is stated here because
-              this is where an organizer decides the squad minimum. */}
-          <li data-testid="check-squads_fillable">
-            <Badge tone={liveFeasibility.ok ? "success" : "warning"}>
-              {liveFeasibility.ok ? "fits" : "short"}
-            </Badge>
-            <span>Pool against squads</span>
-            <span className="registration-phone">{liveFeasibility.headline}</span>
-          </li>
-          <li>
-            <Badge tone="neutral">info</Badge>
-            <span>
-              Auction pool {ready.pool.length} · Teams {ready.teams.length} · Fixtures{" "}
-              {ready.scheduledFixtures} · Code {ready.competitionCode}
-            </span>
-          </li>
-        </ul>
-        {/*
-            An abandoned auction is a season with no auction, not a season that
-            can never hold one: `createAuction` allows a replacement "unless the
-            previous one was abandoned" (packages/auction/src/aggregate.ts).
-            Gating this form on `view === null` alone contradicted that — an
-            abort left the organiser with no way back, and because intake cannot
-            be reopened either, the season was finished. The abort dialog says
-            THIS auction can never go live again; it is not a promise that the
-            season is over.
-        */}
-        {/* Setting the room up is the season manager's act; an appointed
-            auctioneer runs the night it produces. */}
-        {(view === null || view.auction.status === "abandoned") && viewer.canManage ? (
-          <div className="auction-setup" data-testid="auction-setup">
-            {/* DA-05: these are the numbers a league negotiates, and until now
-                every auction took ₹2 Cr purses, 8–15 squads and three fixed
-                bands because the config was a constant. Pre-filled with those
-                same defaults, so an organiser who does not care still clicks
-                one button. */}
-            <h3 className="auction-setup-title">Rules of the night</h3>
-            <p className="competitions-hint">
-              These lock when the auction is created. Nothing here is guessed for you: a value that
-              isn&apos;t a whole number is refused, not replaced.
-            </p>
-            <div className="date-row">
-              <Field
-                label="Purse per team (₹)"
-                name="pursePerTeam"
-                inputMode="numeric"
-                value={purse}
-                {...rupeeReadBack(purse)}
-                error={fieldErrors["pursePerTeam"]}
-                onChange={(event) => {
-                  setPurse(event.target.value);
-                }}
-              />
-              <Field
-                label="Squad minimum"
-                name="squadMin"
-                inputMode="numeric"
-                value={squadMin}
-                error={fieldErrors["squadMin"]}
-                onChange={(event) => {
-                  setSquadMin(event.target.value);
-                }}
-              />
-              <Field
-                label="Squad maximum"
-                name="squadMax"
-                inputMode="numeric"
-                value={squadMax}
-                error={fieldErrors["squadMax"]}
-                onChange={(event) => {
-                  setSquadMax(event.target.value);
-                }}
-              />
-            </div>
-            <div className="date-row">
-              <Field
-                label="Lot timer (seconds)"
-                name="timerSeconds"
-                inputMode="numeric"
-                value={timer}
-                error={fieldErrors["timerSeconds"]}
-                onChange={(event) => {
-                  setTimer(event.target.value);
-                }}
-              />
-              <Field
-                label="Anti-snipe extension (seconds)"
-                name="extensionSeconds"
-                inputMode="numeric"
-                value={extension}
-                error={fieldErrors["extensionSeconds"]}
-                onChange={(event) => {
-                  setExtension(event.target.value);
-                }}
-              />
-              <Field
-                label="Default base price (₹)"
-                name="basePriceDefault"
-                inputMode="numeric"
-                value={baseDefault}
-                {...rupeeReadBack(baseDefault)}
-                error={fieldErrors["basePriceDefault"]}
-                onChange={(event) => {
-                  setBaseDefault(event.target.value);
-                }}
-              />
-            </div>
-            <div className="date-row">
-              {(["A", "B", "C"] as const).map((label) => (
-                <Field
-                  key={label}
-                  label={`Band ${label} base price (₹)`}
-                  name={`band${label}`}
-                  inputMode="numeric"
-                  value={bands[label]}
-                  error={fieldErrors[`band${label}`]}
-                  help="Clear the field to drop this band."
-                  onChange={(event) => {
-                    setBands({ ...bands, [label]: event.target.value });
-                  }}
-                />
-              ))}
-            </div>
-            {/* The arithmetic, before the room exists. */}
-            <p
-              className={typedFeasibility.ok ? "competitions-hint" : "auction-feasibility is-short"}
-              data-testid="feasibility-preview"
-            >
-              {typedFeasibility.headline}
-              {typedFeasibility.note !== null ? ` ${typedFeasibility.note}` : ""}
-            </p>
-            {!typedFeasibility.ok ? (
-              <label className="auction-ack">
-                <input
-                  type="checkbox"
-                  checked={acceptShortSquads}
-                  data-testid="accept-short-squads"
-                  onChange={(event) => {
-                    setAcceptShortSquads(event.target.checked);
-                  }}
-                />
-                <span>
-                  Create anyway — I accept that {typedFeasibility.shortfall} squad place
-                  {typedFeasibility.shortfall === 1 ? "" : "s"} cannot be filled, and that closing
-                  short needs the conductor&apos;s override on the cockpit.
-                </span>
-              </label>
-            ) : null}
-            <Button
-              size="touch"
-              onClick={() =>
-                void act(async () => {
-                  const result = await createAuctionAction(slug, {
-                    pursePerTeam: purse,
-                    squadMin,
-                    squadMax,
-                    timerSeconds: timer,
-                    extensionSeconds: extension,
-                    basePriceDefault: baseDefault,
-                    bands,
-                    acceptShortSquads,
-                  });
-                  setFieldErrors(result.fieldErrors ?? {});
-                  return result;
-                }, "Auction created")
-              }
-              loading={busy}
-              disabled={!ready.ok}
-              data-testid="create-auction"
-            >
-              Create auction
-            </Button>
-          </div>
-        ) : null}
-      </Card>
+      {dashboard.wsUrl !== null && !setupMode ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
 
       {view !== null ? (
         <>
@@ -476,7 +246,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             ) : null}
             {viewer.canConduct ? (
               <div className="date-row">
-                {(AUCTION_NEXT[view.auction.status] ?? []).map((step) =>
+                {(setupMode ? [] : (AUCTION_NEXT[view.auction.status] ?? [])).map((step) =>
                   // DO NOT OFFER WHAT THIS SCREEN CANNOT DO.
                   //
                   // Closing an auction whose squads are short needs a REASON on
@@ -546,13 +316,17 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 it names the blocker AND who can clear it — several of these are
                 not things the organizer can do from this screen at all. */}
             {viewer.canConduct &&
+            !setupMode &&
             view.auction.status === "scheduled" &&
             goLiveBlockers.length > 0 ? (
               <p className="competitions-hint" data-testid="auction-open-blockers">
                 Not ready to open: {goLiveBlockers.join("; ")}.
               </p>
             ) : null}
-            {viewer.canConduct && view.auction.status === "scheduled" && !liveFeasibility.ok ? (
+            {viewer.canConduct &&
+            !setupMode &&
+            view.auction.status === "scheduled" &&
+            !liveFeasibility.ok ? (
               <label className="auction-ack">
                 <input
                   type="checkbox"
@@ -578,17 +352,23 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 needs two teams able to bid. An organizer who clicks twice ends
                 up holding both paddles and cannot run the room. */}
             <p className="competitions-hint">
-              One paddle per team. Issuing gives the paddle to <strong>you</strong> — the person
-              clicking — so bidding needs each team&apos;s owner on their own device. Invite team
-              owners from the{" "}
-              <a href={`/seasons/${slug}/teams`} className="auction-inline-link">
-                Teams tab
-              </a>{" "}
-              (or the{" "}
-              <a href={`/seasons/${slug}/auction/cockpit`} className="auction-inline-link">
-                cockpit
-              </a>
-              ), and they claim their own paddle. Release hands one back.
+              {setupMode ? (
+                <>
+                  Owners get their paddle through the <strong>Team owners</strong> step above.
+                  Issuing one here gives it to <strong>you</strong> — the person clicking — which is
+                  only useful for a test run on your own devices.
+                </>
+              ) : (
+                <>
+                  One paddle per team. Issuing gives the paddle to <strong>you</strong> — the person
+                  clicking — so bidding needs each team&apos;s owner on their own device. Owners are
+                  invited from the{" "}
+                  <a href={`/seasons/${slug}/auction/cockpit`} className="auction-inline-link">
+                    cockpit
+                  </a>
+                  , and they claim their own paddle. Release hands one back.
+                </>
+              )}
             </p>
             {view.paddles.length === 0 ? (
               <p className="competitions-hint">No paddles issued yet.</p>
@@ -676,7 +456,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 {view.lots.length} lots · registration-number order
               </span>
             </div>
-            {viewer.canConduct ? (
+            {viewer.canConduct && !setupMode ? (
               <div className="date-row">
                 <Button
                   variant="secondary"
