@@ -404,6 +404,116 @@ export async function auctionReadiness(db: Db, auctionId: string, auction?: Auct
   };
 }
 
+/** `isPreSigned` (apps/web lib/pre-signed.ts) in SQL — any of the three marks. */
+const preSignedSql = sql<boolean>`(${registrations.isIcon} or ${registrations.isCaptain} or ${registrations.isRetained})`;
+
+/**
+ * THE POOL SETTLES WHEN THE AUCTION OPENS.
+ *
+ * Lots are drawn from the pool when the auction is CREATED, but the marks that
+ * decide the pool — Icon, Captain, Retained — and approval itself stay editable
+ * for as long as the auction is scheduled (the roster locks only once it
+ * leaves `scheduled`). So a captain picked at the owners' meeting a week after
+ * the auction was set up kept the lot drawn for them, and went under the
+ * hammer: a rival could buy another team's captain.
+ *
+ * Opening is the last moment anything about the pool can change and the first
+ * moment a lot can reach the block, so the lot list is reconciled here, in the
+ * same transaction as `AuctionOpened`, through the events replay already knows:
+ *
+ * - a prepared or queued lot whose player is now pre-signed, or no longer
+ *   approved, is WITHDRAWN. Unlike the conductor's withdraw it keeps the
+ *   registration's team: a pre-signed player's team is the point.
+ * - an approved player who is not pre-signed and has NO lot at all — marked
+ *   when the auction was created and unmarked since, or approved late — gets
+ *   one, at the end of the queue. A player whose lot was withdrawn by hand is
+ *   left out: that was a decision, not drift.
+ */
+async function settlePool(
+  tx: Tx,
+  auction: AuctionRecord,
+  actorId: string,
+  correlationId: string,
+  atMs: number,
+): Promise<void> {
+  const current = await tx
+    .select({
+      lotId: lots.id,
+      status: lots.status,
+      seq: lots.seq,
+      registrationId: lots.registrationId,
+      approved: sql<boolean>`${registrations.status} = 'approved'`,
+      preSigned: preSignedSql,
+    })
+    .from(lots)
+    .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+    .where(eq(lots.auctionId, auction.id));
+
+  for (const lot of current) {
+    const waiting = lot.status === "prepared" || lot.status === "queued";
+    if (!waiting || (lot.approved && !lot.preSigned)) {
+      continue;
+    }
+    await tx.update(lots).set({ status: "withdrawn" }).where(eq(lots.id, lot.lotId));
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "LotWithdrawn",
+      { lotId: lot.lotId },
+      lot.lotId,
+      lot.preSigned ? "pre_signed" : "not_approved",
+    );
+  }
+
+  const hasLot = new Set(current.map((lot) => lot.registrationId));
+  const eligible = await tx
+    .select({ id: registrations.id, band: registrations.basePriceBand })
+    .from(registrations)
+    .where(
+      and(
+        eq(registrations.competitionId, auction.competitionId),
+        eq(registrations.status, "approved"),
+        sql`not ${preSignedSql}`,
+      ),
+    )
+    .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
+  let seq = current.reduce((max, lot) => Math.max(max, lot.seq), 0);
+  for (const entry of eligible) {
+    if (hasLot.has(entry.id)) {
+      continue;
+    }
+    seq += 1;
+    const lotId = newId();
+    const number = lotNumber(seq);
+    const base = basePriceFor(auction.config, entry.band);
+    await tx.insert(lots).values({
+      id: lotId,
+      orgId: auction.orgId,
+      auctionId: auction.id,
+      registrationId: entry.id,
+      lotNumber: number,
+      seq,
+      basePrice: base,
+      status: "queued",
+    });
+    await appendEvent(
+      tx,
+      auction,
+      actorId,
+      correlationId,
+      atMs,
+      "LotPrepared",
+      { lotId, registrationId: entry.id, lotNumber: number, basePrice: base },
+      lotId,
+    );
+    // Opening requires a queued lot, so the queue has been built: join it.
+    await appendEvent(tx, auction, actorId, correlationId, atMs, "LotQueued", { lotId }, lotId);
+  }
+}
+
 /** open / pause / resume / complete / abort — one machine-decided audited step. */
 export async function transitionAuction(
   db: Db,
@@ -441,6 +551,11 @@ export async function transitionAuction(
       : [];
   await db.transaction(async (tx) => {
     await tx.update(auctions).set({ status: decision.next }).where(eq(auctions.id, auction.id));
+    // Settled BEFORE `AuctionOpened`, which clears the last outcome: the room
+    // goes live with nothing called, not with a captain's lot "withdrawn".
+    if (command === "open") {
+      await settlePool(tx, auction, actorId, correlationId, atMs);
+    }
     await appendEvent(
       tx,
       auction,
@@ -854,7 +969,9 @@ export async function placeBid(
   // picked before the night, a captain) could still buy up to squadMax at the
   // hammer and finish one over. Excluding this auction's lots is what keeps the
   // sum honest the other way: a captain named AFTER being bought is already in
-  // `purseRow.squad` and must not be counted a second time here.
+  // `purseRow.squad` and must not be counted a second time here. SOLD lots
+  // only: a pre-signed player whose waiting lot was withdrawn when the auction
+  // opened (`settlePool`) is in no purse count and has to be counted here.
   const [preSignedRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(registrations)
@@ -862,8 +979,8 @@ export async function placeBid(
       and(
         eq(registrations.competitionId, auction.competitionId),
         eq(registrations.teamId, paddle.teamId),
-        sql`(${registrations.isIcon} or ${registrations.isCaptain} or ${registrations.isRetained})`,
-        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id})`,
+        preSignedSql,
+        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
       ),
     );
   const squadSize = (purseRow?.squad ?? 0) + (preSignedRow?.count ?? 0);
