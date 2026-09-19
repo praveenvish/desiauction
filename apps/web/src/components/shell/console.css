@@ -196,3 +196,204 @@
 [data-surface="console"] .season-cards > :not(.x-a):not(.x-b):not(.x-c) {
   border-top: 0;
 }
+
+/* ==========================================================================
+   TABLES ON A PHONE ARE ROWS, NOT BOXES.
+   Below 1100px `.reg-table` lays each row out as its own labelled block. It
+   drew every one as a bordered, filled card under SHOUTED uppercase labels —
+   a schedule of twelve matches was twelve boxes, an admin list of forty
+   suppressed contacts forty. Rows now sit on the page between hairlines, and
+   the labels read as quiet sentence-case captions. (The league table opts
+   out: it stays a real table, see `.standings-table`.)
+   ========================================================================== */
+@media (max-width: 1100px) {
+  [data-surface="console"] .reg-table:not(.standings-table) tbody tr {
+    margin: 0;
+    padding: var(--space-3) 0;
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  [data-surface="console"] .reg-table:not(.standings-table) td {
+    padding-block: var(--space-1);
+  }
+
+  [data-surface="console"] .reg-table:not(.standings-table) td::before {
+    color: var(--text-secondary);
+    font-size: var(--text-xs-size);
+    font-weight: var(--font-weight-regular);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  [data-surface="console"] .reg-table:not(.standings-table) .reg-actions {
+    border-top: 0;
+    margin-top: var(--space-1);
+    padding-top: var(--space-1);
+  }
+
+  /* A round header is a caption over its rows, not one more box. */
+  [data-surface="console"] .reg-table tr.round-head {
+    padding: var(--space-5) 0 var(--space-1);
+    border-bottom: 1px solid var(--border-strong);
+  }
+
+  [data-surface="console"] .reg-table tr.round-head th {
+    padding: 0;
+    background: transparent;
+  }
+
+  /* THE SCHEDULE. Number and status on the first line, the match as the
+     row's headline, kickoff and ground side by side, then the actions — the
+     order someone at the ground reads it in. Columns by position, because
+     the ground's label is the sport's own word (ground, court, lane…). */
+  [data-surface="console"] .fixtures-table tbody tr[data-testid^="fixture-"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "num status"
+      "match match"
+      "kick ground"
+      "actions actions";
+    column-gap: var(--space-4);
+    align-items: start;
+  }
+
+  [data-surface="console"] .fixtures-table tbody tr[data-testid^="fixture-"] > td {
+    display: block;
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(1) {
+    grid-area: num;
+    font-size: var(--text-xs-size);
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(2) {
+    grid-area: match;
+    padding-block: var(--space-1) var(--space-2);
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(3) {
+    grid-area: kick;
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(4) {
+    grid-area: ground;
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(5) {
+    grid-area: status;
+    justify-self: end;
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(6) {
+    grid-area: actions;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* The number, the match and the status name themselves. */
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(1)::before,
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(2)::before,
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(5)::before,
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(6)::before {
+    content: none;
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(3)::before,
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] > td:nth-child(4)::before {
+    display: block;
+    max-width: none;
+    padding: 0 0 2px;
+  }
+
+  [data-surface="console"] .fixtures-table tr[data-testid^="fixture-"] .registration-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: var(--space-1);
+    font-size: var(--text-md-size);
+  }
+}
+
+/* The keyboard cursor (j/k) painted each CELL of the active row, so on a
+   phone — where the row is a stack of cells and nobody has a j key — the
+   first row wore a patchwork of grey. There it becomes a slim rule on the
+   row's edge; on desktop the whole row is tinted, not its cells. */
+@media (max-width: 1100px) {
+  [data-surface="console"] .reg-row.active td {
+    background: transparent;
+  }
+
+  [data-surface="console"] .reg-table tbody tr.reg-row.active {
+    box-shadow: inset 2px 0 0 var(--accent);
+    padding-inline-start: var(--space-3);
+  }
+}
+
+/* SAVED VIEWS (settlement, finance): one row of quiet pills that scrolls,
+   not uppercase tinted badges wrapping two to a line. */
+[data-surface="console"] .saved-views {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: var(--space-2);
+  padding-bottom: 2px;
+}
+
+[data-surface="console"] .saved-views a {
+  flex: none;
+  min-height: 36px;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+[data-surface="console"] .saved-views a:hover {
+  color: var(--text-heading);
+  border-color: var(--border-strong);
+}
+
+[data-surface="console"] .saved-views a[aria-current="page"] {
+  border-color: var(--text-heading);
+  color: var(--text-heading);
+  background: var(--surface-sunken);
+}
+
+/* The badge inside is only the label now. */
+[data-surface="console"] .saved-views a > span {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* 44px under a finger — the product's convention, held by hand because axe's
+   target-size rule is outside the tag set it runs (see money.css). */
+@media (pointer: coarse) {
+  [data-surface="console"] .saved-views a {
+    min-height: 44px;
+  }
+}
+
+[data-surface="console"] .saved-views {
+  margin-bottom: var(--space-4);
+}
+
+/* A round is a caption over its matches at every width — the grey band
+   was the last filled slab on the schedule. */
+[data-surface="console"] .reg-table tr.round-head th {
+  padding: var(--space-5) var(--space-3) var(--space-2) 0;
+  background: transparent;
+  border-bottom: 1px solid var(--border-strong);
+}
