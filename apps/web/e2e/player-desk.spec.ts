@@ -183,6 +183,25 @@ test("the player desk: review in one pass, pre-sign, edit in place, export what 
   await expect(page.getByTestId("stat-auction-pool").locator(".stat-value")).toHaveText("2");
 
   /*
+   * ON A PHONE AT THE GROUND: the list is two-line rows with no sideways
+   * scroll, and the sheet takes the whole screen.
+   */
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: test.info().outputPath("phone-list.png"), fullPage: true });
+  await page.getByTestId("reg-table").getByRole("button", { name: "Details" }).first().click();
+  const box = await sheet.boundingBox();
+  expect(Math.round(box?.width ?? 0)).toBe(390);
+  await page.screenshot({ path: test.info().outputPath("phone-sheet.png") });
+  await page.getByTestId("sheet-close").click();
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  /*
    * EXPORT WHAT YOU CHOOSE: the jersey order, approved players only — no
    * phone numbers leave for the vendor.
    */

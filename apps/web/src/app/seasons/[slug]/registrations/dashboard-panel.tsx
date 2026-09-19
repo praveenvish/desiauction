@@ -1495,7 +1495,7 @@ function PlayerRow({
               data-testid="captain-flag"
               title="Captain — skips the auction"
             >
-              C
+              Captain
             </span>
           ) : null}
           {row.isIcon ? (
@@ -1515,7 +1515,7 @@ function PlayerRow({
               data-testid="retained-flag"
               title="Retained — skips the auction"
             >
-              Ret
+              Retained
             </span>
           ) : null}
         </span>

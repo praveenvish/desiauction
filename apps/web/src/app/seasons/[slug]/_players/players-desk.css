@@ -1445,6 +1445,7 @@
     grid-template-areas:
       "check player open"
       ". status status"
+      ". team team"
       ". actions actions";
     align-items: center;
     gap: var(--space-1) var(--space-2);
@@ -1476,7 +1477,14 @@
     grid-area: status;
   }
 
+  /* Who they play for, and why they skip the auction — on the phone too; a
+     player with no team shows nothing rather than a dash. */
   .pd-row td.pd-col-team {
+    grid-area: team;
+    font-size: var(--text-sm-size);
+  }
+
+  .pd-row td.pd-col-team:has(.pd-team > .pd-quiet):not(:has(.pd-sub-danger)) {
     display: none;
   }
 
