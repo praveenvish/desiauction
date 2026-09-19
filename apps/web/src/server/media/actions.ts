@@ -15,12 +15,15 @@ import { publicCompetitionBySlug, resolveMemberCompetition } from "../competitio
 import { dbHandle } from "../db";
 import {
   ForbiddenError,
+  clearCompetitionImage,
   clearEntryPhoto,
+  currentCompetitionImageKey,
   clearPlayerPhoto,
   currentPlayerPhotoKey,
   persistMediaKey,
   requireMediaWrite,
   resolveMediaSubject,
+  type CompetitionImageSlot,
 } from "./authz";
 import { storage } from "./index";
 
@@ -96,6 +99,11 @@ export interface AttachInput {
   subject: MediaSubject;
   subjectId: string;
   key: string;
+  /**
+   * For a `competition` subject only: the crest (default) or the wide cover
+   * photo (0082). Refused on any other subject rather than ignored.
+   */
+  slot?: CompetitionImageSlot;
 }
 
 export type AttachResult = { ok: true; url: string } | { ok: false; error: string };
@@ -105,6 +113,11 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
   if (session === null) {
     return { ok: false, error: "Please sign in." };
   }
+  if (input.slot !== undefined && input.subject !== "competition") {
+    return { ok: false, error: "You don't have permission to attach this image." };
+  }
+  // The input is untrusted wire data: anything but "cover" is the crest.
+  const slot: CompetitionImageSlot = input.slot === "cover" ? "cover" : "logo";
   const competition = await resolveMemberCompetition(session.personId, input.slug);
   if (competition === null) {
     return { ok: false, error: "Competition not found." };
@@ -141,7 +154,7 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
           resolved.ownerPersonId === session.personId
             ? "self_upload"
             : "organizer_upload_attestation";
-        await persistMediaKey(db, input.subject, resolved, input.key, new Date(), via);
+        await persistMediaKey(db, input.subject, resolved, input.key, new Date(), via, slot);
         // Append-only evidence (S3, DPDP §6): who attached media to what, and how
         // consent was captured. Metadata only — never the image or PII content.
         await db.insert(auditLog).values({
@@ -151,7 +164,12 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
           scopeType: "org",
           scopeId: competition.orgId,
           subject: resolved.storageSubjectId,
-          meta: { subject: input.subject, competitionId: competition.id, via },
+          meta: {
+            subject: input.subject,
+            competitionId: competition.id,
+            via,
+            ...(input.subject === "competition" ? { slot } : {}),
+          },
         });
       },
     );
@@ -165,6 +183,77 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
   } catch (error) {
     if (error instanceof ForbiddenError) {
       return { ok: false, error: "You don't have permission to attach this image." };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Take one of the season's own pictures down — the crest or the cover photo.
+ * Same gate as the upload (`competition.manage`, through the one media guard);
+ * the column goes back to null, so the page falls back to the initials or the
+ * designed gradient, and the storage object is deleted best-effort after the
+ * row has committed.
+ */
+export async function removeCompetitionImage(input: {
+  slug: string;
+  slot: CompetitionImageSlot;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Please sign in." };
+  }
+  const slot: CompetitionImageSlot = input.slot === "cover" ? "cover" : "logo";
+  const competition = await resolveMemberCompetition(session.personId, input.slug);
+  if (competition === null) {
+    return { ok: false, error: "Competition not found." };
+  }
+  try {
+    const removedKey = await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId: competition.orgId },
+      async (db) => {
+        const resolved = await resolveMediaSubject(
+          db,
+          competition,
+          "competition",
+          competition.id,
+          session.personId,
+        );
+        if (resolved === null) {
+          throw new ForbiddenError();
+        }
+        await requireMediaWrite(db, session.personId, competition, "competition", resolved);
+        const removed = await currentCompetitionImageKey(db, competition.id, slot);
+        if (removed === null) {
+          return null;
+        }
+        await clearCompetitionImage(db, competition.id, slot);
+        await db.insert(auditLog).values({
+          id: newId(),
+          actor: session.personId,
+          action: "media.removed",
+          scopeType: "org",
+          scopeId: competition.orgId,
+          subject: competition.id,
+          meta: { subject: "competition", competitionId: competition.id, slot },
+        });
+        return removed;
+      },
+    );
+    if (removedKey !== null) {
+      try {
+        await storage.delete(removedKey);
+      } catch {
+        // Already gone or not deletable; the row no longer points at it.
+      }
+    }
+    revalidatePath(`/c/${competition.slug}`);
+    revalidatePath(`/seasons/${competition.slug}`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: "You don't have permission to remove this image." };
     }
     throw error;
   }

@@ -79,6 +79,11 @@ export interface SeasonOverview {
    * both shows the mark and offers to change it.
    */
   logoUrl: string | null;
+  /**
+   * The season's wide cover photo (0082), resolved the same way — the hero
+   * banner's picture. Null → the designed floodlight gradient.
+   */
+  coverUrl: string | null;
   approvedPlayers: number;
   /**
    * Applications waiting on a human. The overview used to report only the
@@ -131,6 +136,7 @@ export async function seasonOverview(
         orgName: organizations.name,
         orgSlug: organizations.slug,
         logoKey: competitions.logoUrl,
+        coverKey: competitions.coverUrl,
       })
       .from(competitions)
       .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -158,11 +164,13 @@ export async function seasonOverview(
   ]);
 
   const logoKey = head[0]?.logoKey ?? null;
+  const coverKey = head[0]?.coverKey ?? null;
   const base = {
     competition,
     orgName: head[0]?.orgName ?? "",
     orgSlug: head[0]?.orgSlug ?? "",
     logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
+    coverUrl: coverKey === null ? null : storage.readUrl(coverKey),
     approvedPlayers: stats.approved,
     pendingPlayers: stats.submitted,
     teamCount: teams.length,
