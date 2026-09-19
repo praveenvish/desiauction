@@ -97,14 +97,17 @@
   padding-inline: var(--space-5);
 }
 
+/* The header action drops under the title whenever the two do not fit side
+   by side (a phone), instead of squeezing the title into a one-word column. */
 .card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
 }
 
 .card-titles {
-  flex: 1;
+  flex: 1 1 14rem;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -373,7 +376,10 @@ button.stat:focus-visible {
   padding: 2px 10px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--team) 14%, var(--surface-raised));
-  color: color-mix(in srgb, var(--team) 70%, var(--text-heading));
+  /* Half team colour, half heading ink: the heading token flips with the
+     theme, so the label stays readable on the wash in daylight AND floodlight
+     (70% team read as low-contrast blue/purple on the dark surface). */
+  color: color-mix(in srgb, var(--team) 50%, var(--text-heading));
   font-size: var(--text-xs-size);
   line-height: 1.6;
   font-weight: var(--font-weight-semibold);
