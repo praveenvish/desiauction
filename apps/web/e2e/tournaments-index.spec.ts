@@ -111,12 +111,14 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await expect(page.getByTestId("competition-name")).toHaveText(`Alpha One ${STAMP}`, COLD);
 
   await page.goto("/tournaments");
-  const summary = page.getByRole("list", { name: "Tournament summary" });
+  const summary = page.getByTestId("tg-summary");
   await expect(summary).toBeVisible();
-  // Two tournaments, one season, and no teams yet — the band counts what the
-  // page can actually see, not a global total.
-  await expect(summary).toContainText("Tournaments");
-  await expect(summary).toContainText("Seasons");
+  // Two tournaments, one season — the cards count what the page can actually
+  // see, not a global total; the tournament count rides the first card's hint.
+  await expect(summary).toContainText("Total seasons");
+  await expect(summary).toContainText("Across 2 tournaments");
+  // The one season is featured above the list, and links into its workspace.
+  await expect(page.getByTestId("tg-featured")).toContainText(`Alpha One ${STAMP}`);
 
   const alphaGroup = page.getByTestId(`tg-${alpha}`);
   const zuluGroup = page.getByTestId(`tg-${zulu}`);
@@ -198,9 +200,8 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await page.getByTestId("tg-mode-seasons").click();
   await expect(page).toHaveURL(/\?view=seasons$/);
   await expect(page.getByTestId("tg-mode-seasons")).toHaveAttribute("aria-pressed", "true");
-  // The band follows the view — a union of the two would describe neither.
-  await expect(page.getByRole("list", { name: "Season summary" })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Tournament summary" })).toHaveCount(0);
+  // One summary for both views: every figure on it is about seasons.
+  await expect(page.getByTestId("tg-summary")).toBeVisible();
   // Flat: the accordion is gone, the seasons are cards, and the layout pair
   // goes with it (this view IS the grid, so it has only one state to offer).
   await expect(page.getByTestId(`tg-${alpha}`)).toHaveCount(0);

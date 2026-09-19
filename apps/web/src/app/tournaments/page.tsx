@@ -2,13 +2,14 @@ import {
   ButtonLink,
   Card,
   IconAlert,
+  IconArrowRight,
   IconCalendar,
-  IconExternal,
-  IconMatch,
+  IconPlay,
+  IconTile,
   IconTrophy,
   IconUsers,
-  Stat,
-  StatRow,
+  StatCard,
+  StatGrid,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { enabledSports } from "../../server/competition/sports";
@@ -16,9 +17,11 @@ import { redirect } from "next/navigation";
 
 import { FormDialog } from "../../components/form-dialog";
 import { currentSession } from "../../server/auth/actions";
+import { seasonOverviewView } from "../../server/competition/actions";
 import { tournamentsView } from "../../server/competition/tournament-actions";
 import { CreateCompetitionForm } from "../seasons/create-competition-form";
 import { CreateTournamentForm } from "./create-tournament-form";
+import { FeaturedSeason, pickFeatured } from "./featured-season";
 import { TournamentsBrowser, type BrowsableGroup, type ViewMode } from "./tournaments-browser";
 import "../seasons/seasons.css";
 import "./tournaments.css";
@@ -72,6 +75,24 @@ export default async function TournamentsPage({
   // The forms are handed the creatable list too, so a multi-org picker cannot
   // offer an org the server will refuse.
   const createIn = view.creatableOrgs;
+
+  // The season the page leads with, and its overview — the one extra read on
+  // this page, and only when there is a season to feature.
+  const featuredSeason = pickFeatured([
+    ...view.tournaments.flatMap((tournament) => tournament.seasons),
+    ...view.standalone,
+  ]);
+  const featured =
+    featuredSeason === null
+      ? null
+      : {
+          season: featuredSeason,
+          tournamentName:
+            view.tournaments.find((tournament) => tournament.id === featuredSeason.tournamentId)
+              ?.name ?? null,
+        };
+  const featuredOverview =
+    featuredSeason === null ? null : await seasonOverviewView(featuredSeason.slug);
 
   const groups: BrowsableGroup[] = [
     ...view.tournaments.map((tournament) => ({
@@ -140,120 +161,70 @@ export default async function TournamentsPage({
     </FormDialog>
   );
 
-  /* A person whose seasons are all one-offs was greeted by "0 Tournaments" in
-     the accent tile — over a list of things they created from a button called
-     "+ New tournament". Zero recurring brands is not the headline of a page
-     with seasons on it: Seasons leads in that case, and the tournament tile
-     explains itself instead of shouting the zero. */
-  const hasTournaments = view.totals.tournaments > 0;
-  const tournamentsTile = (
-    <Stat
-      icon={<IconTrophy />}
-      value={count(view.totals.tournaments)}
-      label="Tournaments"
-      hint={hasTournaments ? "Total" : "None yet — your seasons are one-offs"}
-      tone={hasTournaments ? "accent" : "neutral"}
-    />
-  );
-  const seasonsTile = (
-    <Stat
-      icon={<IconCalendar />}
-      value={count(view.totals.seasons)}
-      label="Seasons"
-      /* Not "Across all tournaments": some of these belong to no
-         tournament at all, and the page renders that group two
-         inches below. The hint says what the figure actually is. */
-      hint={
-        view.totals.standalone === 0
-          ? "Across all tournaments"
-          : `${count(view.totals.seasons - view.totals.standalone)} in tournaments · ${count(view.totals.standalone)} one-off`
-      }
-      tone={hasTournaments ? "info" : "accent"}
-    />
-  );
-  const bandGrouped = (
-    <StatRow label="Tournament summary">
-      {hasTournaments ? tournamentsTile : seasonsTile}
-      {hasTournaments ? seasonsTile : tournamentsTile}
-      <Stat
-        icon={<IconUsers />}
-        value={count(view.totals.teams)}
-        label="Teams"
-        hint="Participating"
-        tone="success"
-      />
-      {/* The only figure here that is a to-do rather than a fact, so it
-          is the only one allowed to go warm — and only when non-zero.
-          It counts what THIS person may decide: a viewer holding no
-          `registration.review` was being shown "2 awaiting your
-          decision" in warning orange over a decision that was never
-          theirs to make. */}
-      <Stat
-        icon={<IconAlert />}
-        value={count(view.canReviewAnywhere ? view.totals.pending : 0)}
-        label="Registrations to review"
-        hint={
-          !view.canReviewAnywhere
-            ? "Owners and staff review these"
-            : view.totals.pending === 0
-              ? "Nothing waiting"
-              : "Awaiting your decision"
-        }
-        tone={view.canReviewAnywhere && view.totals.pending > 0 ? "warning" : "neutral"}
-      />
-    </StatRow>
-  );
-
-  /* The season-centric four /seasons carried. A union of the two bands would
-     have described neither view, so the band follows the view instead. */
-  const bandSeasons = (
-    <StatRow label="Season summary">
-      <Stat
+  /*
+   * ONE summary, whichever view is showing (founder mockup, 2026-09-19). The
+   * index used to swap between a tournament band and a season band; both led
+   * with counts of the same rows in different units. The four figures that
+   * matter are all about seasons — how many, how many taking entries, how many
+   * in flight, and the one to-do — and the tournament count rides the first
+   * card's hint rather than taking a card of its own.
+   */
+  const tournamentsHint =
+    view.totals.tournaments === 0
+      ? "All one-off seasons"
+      : `Across ${count(view.totals.tournaments)} tournament${view.totals.tournaments === 1 ? "" : "s"}`;
+  const pending = view.canReviewAnywhere ? view.totals.pending : 0;
+  const summary = (
+    <StatGrid testId="tg-summary">
+      <StatCard
         icon={<IconCalendar />}
+        tone="gold"
         value={count(view.totals.seasons)}
-        label="Seasons"
-        hint="Every edition you can see"
-        tone="accent"
+        label="Total seasons"
+        hint={tournamentsHint}
       />
-      <Stat
+      <StatCard
         icon={<IconUsers />}
+        tone="green"
         value={count(view.totals.open)}
         label="Accepting entries"
-        hint={view.totals.open === 0 ? "Nobody taking entries" : "Registration open"}
-        tone={view.totals.open > 0 ? "success" : "neutral"}
+        hint={view.totals.open === 0 ? "Nobody taking entries" : "Players can register"}
       />
-      <Stat
-        icon={<IconMatch />}
+      <StatCard
+        icon={<IconPlay />}
+        tone="blue"
         value={count(view.totals.inFlight)}
         label="In flight"
         hint="In setup or open"
-        tone="info"
       />
-      {/* Organizations was the fourth tile /seasons carried, and it lost the
-          slot deliberately. "All seasons" is the show-me-everything view, and
-          the thing you most need when looking at everything is what is waiting
-          on YOU — the one figure here that is a to-do rather than a fact. An
-          org count is static, almost never actionable, and already the whole
-          subject of /orgs. Losing the pending tile in this view would mean an
-          organizer who prefers the flat list never sees that two registrations
-          need a decision. Same capability-aware behaviour as the grouped band:
-          it counts only what this person may decide, and only goes warm when
-          there is something to do. */}
-      <Stat
+      {/* The only figure here that is a to-do rather than a fact, and it
+          counts only what THIS person may decide: a viewer holding no
+          `registration.review` was once shown "2 awaiting your decision" over
+          a decision that was never theirs to make. */}
+      <StatCard
         icon={<IconAlert />}
-        value={count(view.canReviewAnywhere ? view.totals.pending : 0)}
+        tone={pending > 0 ? "amber" : "neutral"}
+        value={count(pending)}
         label="Registrations to review"
         hint={
           !view.canReviewAnywhere
             ? "Owners and staff review these"
-            : view.totals.pending === 0
+            : pending === 0
               ? "Nothing waiting"
-              : "Awaiting your decision"
+              : "Awaiting approval"
         }
-        tone={view.canReviewAnywhere && view.totals.pending > 0 ? "warning" : "neutral"}
       />
-    </StatRow>
+    </StatGrid>
   );
+
+  const featuredNode =
+    featured === null ? null : (
+      <FeaturedSeason
+        season={featured.season}
+        tournamentName={featured.tournamentName}
+        overview={featuredOverview}
+      />
+    );
 
   return (
     <main className="competitions">
@@ -314,16 +285,35 @@ export default async function TournamentsPage({
             <TournamentsBrowser
               groups={groups}
               initialMode={mode}
-              bandGrouped={bandGrouped}
-              bandSeasons={bandSeasons}
+              summary={summary}
+              featured={featuredNode}
               {...(canCreate ? { actionGrouped: newTournament, actionSeasons: newSeason } : {})}
             />
+
+            {canCreate ? (
+              <section className="tg-cta" aria-labelledby="tg-cta-title">
+                <IconTile icon={<IconTrophy />} tone="gold" size="lg" />
+                <div className="tg-cta-text">
+                  <h2 id="tg-cta-title">Looking to create a new season?</h2>
+                  <p>Run another edition, invite more players and keep the excitement going.</p>
+                </div>
+                <FormDialog
+                  title="New season"
+                  triggerLabel="+ New season"
+                  variant="secondary"
+                  size="touch"
+                  triggerTestId="cta-new-season"
+                >
+                  <CreateCompetitionForm sports={sportOptions} orgs={createIn} />
+                </FormDialog>
+              </section>
+            ) : null}
 
             <p className="tg-footnote">
               Need help managing tournaments?{" "}
               <Link href="/help">
                 Visit our help center
-                <IconExternal width={14} height={14} />
+                <IconArrowRight size={14} />
               </Link>
             </p>
           </>

@@ -1,0 +1,237 @@
+/* What goes inside a season's HeroBanner (see season-hero.tsx). The banner is
+   always a dark bed — floodlight gradient or a shaded photo — in BOTH themes, so
+   everything here is drawn in the hero ink tokens, never the page's text. */
+
+.sh-crest-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sh-crest-mono {
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  color: var(--ceremony-gold);
+}
+
+/* ---- figures: 4 Teams | 16 Players | … ---- */
+/* Figures ride the banner's meta row as its last item, so they sit under the
+   dates at the bottom left (mockup) — the banner's `aside` is a narrow right
+   column meant for a quote. `flex-basis: 100%` gives them a line of their own. */
+li:has(> .sh-figures) {
+  flex-basis: 100%;
+  margin-top: var(--space-3);
+}
+
+.sh-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sh-figure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-5);
+}
+
+.sh-figure:first-child {
+  padding-inline-start: 0;
+}
+
+.sh-figure + .sh-figure {
+  border-inline-start: 1px solid var(--hero-crest-line);
+}
+
+.sh-figure-icon {
+  display: inline-flex;
+  color: var(--ceremony-gold);
+}
+
+/* Two classes: the banner's own `.hero-meta svg` sizes every icon in the meta
+   row to 16px, and these sit in that row. */
+.sh-figures .sh-figure-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sh-figure-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sh-figure-value {
+  font-size: var(--text-xl-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--hero-ink);
+  white-space: nowrap;
+}
+
+.sh-figure-label {
+  font-size: var(--text-xs-size);
+  color: var(--hero-ink-soft);
+  white-space: nowrap;
+}
+
+/* ---- chip + ghost controls on the dark bed ---- */
+.sh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--hero-crest-line);
+  border-radius: var(--radius-md);
+  background: var(--hero-crest-bed);
+  color: var(--hero-ink);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.sh-ghost,
+.sh-ghost-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--hero-crest-line);
+  border-radius: var(--radius-md);
+  background: var(--hero-crest-bed);
+  color: var(--hero-ink);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) ease;
+}
+
+.sh-ghost:hover,
+.sh-ghost-trigger:hover {
+  border-color: var(--hero-ink-soft);
+}
+
+.sh-ghost:focus-visible,
+.sh-ghost-trigger:focus-visible {
+  outline: 2px solid var(--ceremony-gold);
+  outline-offset: 2px;
+}
+
+.sh-ghost svg,
+.sh-ghost-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 719px) {
+  .sh-figure {
+    padding-inline: var(--space-3);
+  }
+
+  .sh-figure-value {
+    font-size: var(--text-lg-size);
+  }
+
+  .sh-figures .sh-figure-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 419px) {
+  /* Two by two on the narrowest phones: four figures in one row would wrap
+     one orphan onto a second line with a stray rule before it. */
+  .sh-figures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sh-figure,
+  .sh-figure:first-child {
+    padding-inline: 0;
+  }
+
+  .sh-figure + .sh-figure {
+    border-inline-start: 0;
+  }
+}
+
+/* ---- status on the dark bed ---- */
+.sh-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+  background: var(--ceremony-gold);
+  color: var(--text-on-accent);
+  font-size: var(--text-xs-size);
+  line-height: 1.6;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sh-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--text-on-accent);
+}
+
+/* HeroBanner bottom-aligns its side column, which is right for a quote and
+   wrong for a chip + menu: the mockup pins those to the top right. The kit has
+   no prop for it; this is the one override, scoped to heroes that ask. */
+.sh-top-actions [class*="hero-inner"] {
+  align-items: flex-start;
+}
+
+@media (min-width: 720px) {
+  .sh-top-actions [class*="hero-inner"] {
+    flex-wrap: nowrap;
+  }
+
+  .sh-top-actions [class*="hero-side"] {
+    flex: none;
+  }
+
+  .sh-top-actions [class*="hero-actions"] {
+    flex-wrap: nowrap;
+  }
+}
+
+/* A banner with no side column: the main column takes the full width, and the
+   eyebrow row carries the status on the left and the controls on the right. */
+.sh-full-main [class*="hero-main"] {
+  flex: 1;
+}
+
+.sh-eyebrow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sh-eyebrow-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
