@@ -1383,8 +1383,18 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
                   ...(mine === undefined ? [] : [inArray(registrations.id, mine.players)]),
                 ),
               )
-              // Sold first, then by the number the player already knows themselves by.
-              .orderBy(desc(lots.soldPrice), asc(registrations.registrationNumber)),
+              /*
+               * Sold first, then by the number the player already knows
+               * themselves by. NULLS LAST is the load-bearing half: Postgres
+               * sorts nulls FIRST on a descending order, so the studio opened
+               * on an unsold player in a settled season — the picker's comment
+               * has said "sold players lead" since the day it was written, and
+               * the query had been doing the opposite.
+               */
+              .orderBy(
+                sql`${lots.soldPrice} desc nulls last`,
+                asc(registrations.registrationNumber),
+              ),
         mine !== undefined && mine.teams.length === 0
           ? []
           : db

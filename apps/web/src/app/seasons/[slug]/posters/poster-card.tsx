@@ -212,6 +212,7 @@ export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOpt
             height={metrics.crest}
             radius={Math.round(metrics.crest * 0.28)}
             fontSize={metrics.crestMonogramSize}
+            fit="contain"
             ring={ringFor(ctx, model.teamColor)}
           />
           <div
@@ -451,7 +452,14 @@ function FaceGrid({
       style={{
         display: "flex",
         flexWrap: "wrap",
-        width: "100%",
+        /*
+         * The FITTED width, not the frame's. Flex-wrap packs by cell width, and
+         * a cell is wider than its photo when the photo was capped — so a grid
+         * fitted as 2x2 wrapped as 3 + 1 on a real squad, with one face
+         * stranded in the middle of the poster. Holding the container to the
+         * grid's own width makes the render agree with the arithmetic.
+         */
+        width: fit.gridWidth,
         height,
         alignItems: "center",
         alignContent: "center",
@@ -502,6 +510,7 @@ function SquadHero({
         height={height}
         radius={Math.round(height * 0.24)}
         fontSize={Math.round(height * 0.4)}
+        fit="contain"
         ring={ringFor(ctx, model.teamColor)}
         ringWidth={model.teamColor === null ? undefined : 5}
       />
@@ -649,6 +658,7 @@ export function renderRevealPoster(model: TeamPoster, options: PosterRenderOptio
           height={heroHeight}
           radius={Math.round(heroHeight * 0.24)}
           fontSize={Math.round(heroHeight * 0.36)}
+          fit="contain"
           ring={ringFor(ctx, model.teamColor)}
           ringWidth={model.teamColor === null ? undefined : 5}
         />
@@ -927,7 +937,12 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
                     style={{
                       display: "flex",
                       flexWrap: "wrap",
-                      padding: grid.inset,
+                      // Same reason as the squad grid: the fitted width is what
+                      // makes the rows wrap where the fit said they would.
+                      width: faces.gridWidth,
+                      marginLeft: "auto",
+                      marginRight: "auto",
+                      paddingTop: grid.inset,
                       gap: faces.gap,
                       alignContent: "flex-start",
                       justifyContent: "center",

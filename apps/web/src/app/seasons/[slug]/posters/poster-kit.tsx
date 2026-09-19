@@ -136,6 +136,12 @@ export interface TileProps {
   ring?: string | null;
   ringWidth?: number | undefined;
   round?: boolean;
+  /**
+   * A FACE is cropped to fill its tile; a LOGO is not. A club's wordmark is
+   * usually wider than it is tall, and `cover` took the ends off the founder's
+   * own sponsor lockup on the first real render.
+   */
+  fit?: "cover" | "contain";
 }
 
 /**
@@ -159,6 +165,7 @@ export function Tile({
   ring = null,
   ringWidth,
   round = false,
+  fit = "cover",
 }: TileProps) {
   const { skin } = ctx;
   const { palette } = skin;
@@ -194,7 +201,16 @@ export function Tile({
       {src === null || !shown(ctx, layer) ? (
         monogram
       ) : (
-        <img src={src} width={width} height={height} style={{ objectFit: "cover" }} alt="" />
+        <img
+          src={src}
+          width={width}
+          height={height}
+          style={{
+            objectFit: fit,
+            ...(fit === "contain" ? { padding: Math.round(width * 0.08) } : {}),
+          }}
+          alt=""
+        />
       )}
     </div>
   );
@@ -279,6 +295,7 @@ export function Header({
           height={metrics.headerTile}
           radius={Math.round(metrics.headerTile * 0.28)}
           fontSize={Math.round(metrics.headerTile * 0.4)}
+          fit="contain"
         />
         <div
           style={{

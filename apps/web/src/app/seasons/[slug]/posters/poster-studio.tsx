@@ -2,6 +2,7 @@
 
 import {
   POSTER_KIND_SIZES,
+  POSTER_SIZES,
   POSTER_THEMES,
   TOP_BUY_COUNTS,
   type PosterKind,
@@ -63,13 +64,13 @@ const KIND_LABEL: Record<PosterKind, { label: string; hint: string }> = {
  * beside each one is the palette itself, taken from the renderer's own skins —
  * so the picker can never advertise a colour the poster does not use.
  */
-const THEME_LABEL: Record<PosterTheme, string> = {
-  floodlight: "Floodlight — the night look",
-  matchday: "Matchday — the team's own colour",
-  minimal: "Minimal — light and editorial",
-  gold: "Gold — the trophy look",
-  arena: "Arena — bold and high-contrast",
-  ink: "Ink — quiet and printable",
+const THEME_LABEL: Record<PosterTheme, { name: string; hint: string }> = {
+  floodlight: { name: "Floodlight", hint: "The night look" },
+  matchday: { name: "Matchday", hint: "The team's own colour" },
+  minimal: { name: "Minimal", hint: "Light and editorial" },
+  gold: { name: "Gold", hint: "The trophy look" },
+  arena: { name: "Arena", hint: "Bold and high-contrast" },
+  ink: { name: "Ink", hint: "Quiet and printable" },
 };
 
 const SIZE_LABEL: Record<PosterSize, { label: string; hint: string }> = {
@@ -270,7 +271,10 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                       <span style={{ background: palette.accent }} />
                       <span style={{ background: palette.heading }} />
                     </span>
-                    <span className="ps-swatch-label">{THEME_LABEL[value]}</span>
+                    <span className="ps-swatch-label">
+                      {THEME_LABEL[value].name}
+                      <small>{THEME_LABEL[value].hint}</small>
+                    </span>
                   </label>
                 );
               })}
@@ -436,8 +440,10 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
         if (canvas === null) {
           return;
         }
-        canvas.width = scene.width;
-        canvas.height = scene.height;
+        if (canvas.width !== scene.width || canvas.height !== scene.height) {
+          canvas.width = scene.width;
+          canvas.height = scene.height;
+        }
         setState("ready");
         player = playScene(canvas, scene);
       } catch {
@@ -457,8 +463,26 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
   return (
     <div className="ps-motion">
       <div className="poster-preview" data-poster-size={size}>
-        <canvas ref={canvasRef} className="poster-preview-image" aria-label="Animated poster" />
+        {/*
+          The canvas is BORN the poster's shape. Sized only by the effect, it
+          spent the first seconds as the 300x150 box every canvas starts as —
+          a blank letterbox where the poster was about to be, which reads as a
+          broken screen rather than one that is working.
+        */}
+        <canvas
+          ref={canvasRef}
+          width={POSTER_SIZES[size].width}
+          height={POSTER_SIZES[size].height}
+          className="poster-preview-image"
+          aria-label="Animated poster"
+          data-state={state}
+        />
       </div>
+      {state === "loading" ? (
+        <p className="st-note" aria-live="polite">
+          Building the animation from the poster…
+        </p>
+      ) : null}
       {state === "failed" ? (
         <Notice tone="warning" title="The animation could not be built">
           The poster itself is fine — switch back to Poster and download the PNG.

@@ -491,12 +491,27 @@ export function fitTiles(
   }
   const maxCols = Math.min(count, options.maxCols ?? 12);
   let best: TileFit | null = null;
+  let bestScore = -1;
   for (let cols = 1; cols <= maxCols; cols += 1) {
     const fit = tryCols(count, cols, width, height, options);
-    if (
-      fit !== null &&
-      (best === null || fit.photoWidth * fit.photoHeight > best.photoWidth * best.photoHeight)
-    ) {
+    if (fit === null) {
+      continue;
+    }
+    /*
+     * Area alone picked a single row of four faces across the top of a squad
+     * poster with half the frame empty underneath it — it won by three per
+     * cent of face area and lost the whole design. So a grid that FILLS its
+     * band is worth a slightly smaller face: 2x2 beats 4x1 for a franchise
+     * that signed four players, which is every franchise early on.
+     */
+    const fill = Math.min(1, fit.gridHeight / height);
+    // And a ragged last row is worth avoiding: four players as 3 + 1 leaves one
+    // face stranded in the middle of the poster, 2 + 2 does not.
+    const missing = (cols - (count % cols)) % cols;
+    const balance = 1 - (0.18 * missing) / cols;
+    const score = fit.photoWidth * fit.photoHeight * (0.6 + 0.4 * fill) * balance;
+    if (score > bestScore) {
+      bestScore = score;
       best = fit;
     }
   }

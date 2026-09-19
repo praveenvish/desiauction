@@ -436,7 +436,15 @@ export function drawFrame(target: CanvasRenderingContext2D, scene: Scene, now: n
       // on the poster and not on an impression of it.
       const settle = progress(now, start + length * 0.8, length * 0.2);
       if (scene.pricePaise !== null && rect !== undefined && settle < 1) {
-        const value = Math.round(scene.pricePaise * easeOut(Math.min(1, t / 0.85)));
+        /*
+         * Whole RUPEES on the way up. A fraction of the target is a number of
+         * paise, and `formatPaiseINR` prints those honestly — so the counter
+         * spent a second reading "₹59,854.56", which is not a price anybody
+         * ever bid. The final frame is the exact stored value either way,
+         * because the rendered band takes over before the film ends.
+         */
+        const raw = scene.pricePaise * easeOut(Math.min(1, t / 0.85));
+        const value = Math.min(scene.pricePaise, Math.round(raw / 100) * 100);
         const size = Math.round(rect.h / 0.74);
         target.save();
         target.globalAlpha = 1 - settle;
