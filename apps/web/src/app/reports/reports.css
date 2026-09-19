@@ -1,0 +1,224 @@
+/* /reports — one season, summed up. CSS bars only; tokens only; both themes. */
+
+.rp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.rp-scope {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  min-width: 0;
+}
+
+.rp-scope-name {
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.rp-scope-org {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.rp-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.rp-picker .px-select {
+  min-width: 0;
+}
+
+/* ---- bars ---- */
+
+.rp-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-bar-row {
+  display: grid;
+  grid-template-columns: minmax(88px, 34%) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.rp-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-bar-track {
+  --rp-fill: var(--accent);
+  position: relative;
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.rp-bar-track[data-tone="green"] {
+  --rp-fill: var(--success-base);
+}
+
+.rp-bar-track[data-tone="blue"] {
+  --rp-fill: var(--info-base);
+}
+
+.rp-bar-track[data-tone="amber"] {
+  --rp-fill: var(--warning-base);
+}
+
+.rp-bar-track[data-tone="red"] {
+  --rp-fill: var(--danger-base);
+}
+
+.rp-bar-track[data-tone="purple"] {
+  --rp-fill: var(--violet-base);
+}
+
+.rp-bar-track[data-tone="neutral"] {
+  --rp-fill: var(--text-muted);
+}
+
+.rp-bar-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--rp-fill);
+  transform-origin: left center;
+}
+
+.rp-bar-value {
+  min-width: 3ch;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.rp-bar-note {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.rp-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+/* ---- top buys ---- */
+
+.rp-buys {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-buy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rp-buy:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rp-rank {
+  flex: none;
+  width: 2ch;
+  color: var(--text-muted);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-buy-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rp-buy-name {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.rp-buy-sub {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.rp-buy-price {
+  flex: none;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.rp-foot a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 719px) {
+  .rp-bar-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .rp-bar-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .rp-picker {
+    width: 100%;
+  }
+
+  .rp-picker .px-select {
+    flex: 1;
+  }
+}

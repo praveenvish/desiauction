@@ -24,7 +24,9 @@ import {
   IconMenu,
   IconRupee,
   IconTrophy,
+  IconUser,
   IconUsers,
+  IconChart,
   InlineSearch,
   LiveShell,
   PopoverMenu,
@@ -206,6 +208,9 @@ const RAIL_ICONS: Record<string, ReactNode> = {
   home: <IconHome />,
   tournaments: <IconTrophy />,
   orgs: <IconUsers />,
+  players: <IconUser />,
+  auctions: <IconGavel />,
+  reports: <IconChart />,
   money: <IconRupee />,
   help: <IconHelp />,
 };
@@ -1205,6 +1210,17 @@ export function ProductShell({
               {personContact(session)}
             </div>
             <ul className="shell-drawer-list">
+              {/* What the bottom tab bar leaves out (`mobile: false`) is carried
+                  here, so no rail destination is unreachable on a phone. */}
+              {nav
+                .filter((item) => item.mobile === false)
+                .map((item) => (
+                  <li key={`rail-${item.key}`}>
+                    <Link href={item.href} className="shell-drawer-link">
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
               {orgs.map((org) => (
                 <li key={org.slug}>
                   <Link href={`/org/${org.slug}`} className="shell-drawer-link">

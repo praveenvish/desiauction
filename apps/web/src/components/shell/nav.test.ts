@@ -49,11 +49,23 @@ describe("shellKind", () => {
 });
 
 describe("rail", () => {
-  it("has exactly four items, forever", () => {
-    // Four since DA-18 retired the /money placeholder from the rail. A primary
-    // nav item is a promise; that one led to "being built during the beta".
-    expect(RAIL).toHaveLength(4);
-    expect(RAIL.map((item) => item.key)).toEqual(["home", "tournaments", "orgs", "help"]);
+  it("has the seven ruled items, in order", () => {
+    // DA-18 retired the /money placeholder (a primary nav item is a promise);
+    // the 2026-09-19 ruling added the three cross-season indexes.
+    expect(RAIL.map((item) => item.key)).toEqual([
+      "home",
+      "tournaments",
+      "orgs",
+      "players",
+      "auctions",
+      "reports",
+      "help",
+    ]);
+  });
+
+  it("leaves at most five items for the phone's bottom tab bar", () => {
+    const phone = RAIL.filter((item) => item.mobile !== false).map((item) => item.key);
+    expect(phone).toEqual(["home", "tournaments", "players", "auctions", "help"]);
   });
 
   it("maps paths to the owning rail item", () => {
@@ -66,6 +78,11 @@ describe("rail", () => {
     expect(activeRailKey("/orgs")).toBe("orgs");
     expect(activeRailKey("/money")).toBe("money");
     expect(activeRailKey("/help")).toBe("help");
+    expect(activeRailKey("/players")).toBe("players");
+    expect(activeRailKey("/auctions")).toBe("auctions");
+    expect(activeRailKey("/reports")).toBe("reports");
+    expect(activeRailKey("/reports/export")).toBe("reports");
+    expect(activeRailKey("/playersx")).toBeNull();
     expect(activeRailKey("/account")).toBeNull();
     expect(activeRailKey("/inbox")).toBeNull();
   });
@@ -207,6 +224,9 @@ describe("pageIdentity", () => {
   it("gives every ancestor-less surface a lede, and none to a page with a trail", () => {
     expect(pageIdentity("/tournaments", ctx).subtitle).toMatch(/recurring competitions/);
     expect(pageIdentity("/orgs", ctx).subtitle).toMatch(/clubs and academies/);
+    expect(pageIdentity("/players", ctx)).toMatchObject({ crumbs: [], title: "Players" });
+    expect(pageIdentity("/auctions", ctx).title).toBe("Auctions");
+    expect(pageIdentity("/reports", ctx).subtitle).toMatch(/auction spend/);
     expect(pageIdentity("/account", ctx).subtitle).toMatch(/sign-in/);
     // /home's lede is data (the portfolio line), published by the page itself.
     expect(pageIdentity("/home", ctx).subtitle).toBeUndefined();

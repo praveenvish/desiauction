@@ -28,6 +28,11 @@ export interface ShellNavItem {
   testId?: string;
   /** Happening now (an auction in progress): a LIVE marker instead of a count. */
   live?: boolean;
+  /**
+   * `false`: rail only. The phone's bottom tab bar has room for five, so the
+   * rest ride the app's drawer instead of squeezing every label unreadable.
+   */
+  mobile?: boolean;
 }
 
 export interface AppShellProps {
@@ -246,19 +251,21 @@ export function AppShell({
           "Sections" was also simply wrong — the section tabs are a separate
           strip (the `tabs` prop, rendered above). */}
       <nav className={styles["bottom-tabs"]} aria-label="Primary">
-        {nav.map((item) => (
-          <Link
-            key={item.key}
-            href={item.href}
-            className={[styles["tab"], item.active === true ? styles["tab-active"] : ""]
-              .filter(Boolean)
-              .join(" ")}
-            aria-current={item.active === true ? "page" : undefined}
-          >
-            <span className={styles["tab-icon"]}>{item.icon}</span>
-            <span className={styles["tab-label"]}>{item.label}</span>
-          </Link>
-        ))}
+        {nav
+          .filter((item) => item.mobile !== false)
+          .map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={[styles["tab"], item.active === true ? styles["tab-active"] : ""]
+                .filter(Boolean)
+                .join(" ")}
+              aria-current={item.active === true ? "page" : undefined}
+            >
+              <span className={styles["tab-icon"]}>{item.icon}</span>
+              <span className={styles["tab-label"]}>{item.label}</span>
+            </Link>
+          ))}
       </nav>
     </div>
   );

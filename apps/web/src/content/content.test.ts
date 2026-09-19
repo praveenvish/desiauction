@@ -222,7 +222,7 @@ describe("PX-10 · Content integrity", () => {
     // Each phrase below shipped on a public page and was disproved by the code:
     // the exporter is reachable from no screen, the issuance lane refuses to
     // issue an invoice, /inbox has no finance writer, there is no fiscal close,
-    // and the rail has four items. This is the regression net — a rewrite that
+    // and the rail had four items. This is the regression net — a rewrite that
     // reintroduces any of them fails here rather than in front of a customer.
     // Marketing, pricing, /features and the release notes SELL. Nothing here
     // may name a capability as delivered.

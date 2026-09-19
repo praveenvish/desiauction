@@ -86,39 +86,40 @@ export interface RailTarget {
   key: string;
   label: string;
   href: string;
+  /**
+   * `false` keeps the item on the desktop rail but out of the phone's bottom
+   * tab bar, which has room for five. The drawer carries what the bar drops.
+   */
+  mobile?: false;
 }
 
 /**
- * FOUR items. The canon (docs/16; PX-1 01 §1) said "exactly five, forever", and
- * this comment went on asserting it two lines above a four-item array — while
- * the help centre, reading the same canon, told customers about "the five
- * places you'll work" and named a Money page that is not in the rail.
+ * SEVEN items, by product ruling (2026-09-19): the founder's sidebar mockups add
+ * Players, Auctions and Reports between Organizations and Help, and chose to
+ * build all three. The canon (docs/16; PX-1 01 §1) once said "exactly five,
+ * forever"; the RULE that survives is a short, fixed, primary rail where every
+ * item is a place a signed-in person actually works — each of the three new
+ * items is a real, gated cross-season index, not a placeholder. Adding an
+ * eighth needs a product ruling.
  *
- * The count stopped being five under DA-18 (see the note on the removed slot
- * below), and a comment that contradicts the array under it is how a false
- * claim survives a rewrite of the array. The canon here is the RULE — a short,
- * fixed, primary rail, every item a place a signed-in person actually works —
- * not the number. Adding a fifth needs a product ruling; so does the sixth.
+ * DA-18 is why Money is not here: /money was a placeholder, and a primary
+ * navigation item is a promise. The season's own Money tab is unaffected.
  *
- * Slot 2 was "Seasons". It is now "Tournaments", by an explicit product ruling:
- * the recurring tournament is how organizers name their calendar ("BPL", then
- * "BPL 1", "BPL 2"), the schema has modelled it since IP-3, and the layer was
- * unreachable — no route, no create flow, every UI-made season a one-off.
- * Seasons have not moved: they live under their tournament. The /seasons INDEX
- * is gone — it was a second index over the same rows, kept alive only because
- * nobody retired it, and it is now the "All seasons" view of /tournaments
- * (`?view=seasons`) with the bare path redirecting there. What survives at
- * /seasons/{slug} is the season WORKSPACE, which is where organizers do the
- * bulk of their work, so the rail's active key still claims that whole prefix.
+ * Slot 2 is "Tournaments": the recurring tournament is how organizers name
+ * their calendar ("BPL", then "BPL 1", "BPL 2"). The /seasons INDEX is gone —
+ * it is the "All seasons" view of /tournaments (`?view=seasons`) — but the
+ * season WORKSPACE at /seasons/{slug} still lights this item.
+ *
+ * A phone's bottom bar holds five: Organizations and Reports are desk surfaces
+ * (a laptop job) and ride the drawer instead (`mobile: false`).
  */
 export const RAIL: RailTarget[] = [
   { key: "home", label: "Home", href: "/home" },
   { key: "tournaments", label: "Tournaments", href: "/tournaments" },
-  { key: "orgs", label: "Organizations", href: "/orgs" },
-  // DA-18: /money is a placeholder that tells the user so ("being built during
-  // the beta"). A primary navigation item is a promise; this one led to an
-  // apology. It comes back when the surface behind it does — the season's own
-  // Money tab, which IS built, is unaffected.
+  { key: "orgs", label: "Organizations", href: "/orgs", mobile: false },
+  { key: "players", label: "Players", href: "/players" },
+  { key: "auctions", label: "Auctions", href: "/auctions" },
+  { key: "reports", label: "Reports", href: "/reports", mobile: false },
   { key: "help", label: "Help", href: "/help" },
 ];
 
@@ -136,6 +137,13 @@ export function activeRailKey(pathname: string): string | null {
   }
   if (pathname.startsWith("/money")) {
     return "money";
+  }
+  // The three cross-season indexes. Exact segment, so a future /playersfoo (or
+  // the public /c/…/players) never lights them.
+  for (const key of ["players", "auctions", "reports"] as const) {
+    if (pathname === `/${key}` || pathname.startsWith(`/${key}/`)) {
+      return key;
+    }
   }
   if (pathname.startsWith("/help")) {
     return "help";
@@ -228,9 +236,8 @@ export const PUBLIC_DESTINATIONS: readonly {
 
 /**
  * PX-9: Platform Administration's own tab row. Administration is NOT a rail
- * item — the rail is short and fixed (see RAIL above, which is FOUR; the
- * "five, forever" this comment used to assert was retracted there and the
- * retraction had not reached here) — so it navigates itself, reached from the
+ * item — the rail is short and fixed (see RAIL above; its count is a product
+ * ruling, not a constant to quote here) — so it navigates itself, reached from the
  * avatar menu by the few who hold the grant.
  *
  * Messaging was missing from this array while being linked from the admin
@@ -502,10 +509,13 @@ const RAIL_TITLES: Record<string, string> = {
   tournaments: "Tournaments",
   orgs: "Organizations",
   money: "Money",
+  players: "Players",
+  auctions: "Auctions",
+  reports: "Reports",
   help: "Help",
 };
 
-/** The console surfaces that sit outside the five-item rail. */
+/** The console surfaces that sit outside the rail. */
 const OUTSIDE_RAIL: [string, string][] = [
   ["/inbox", "Notifications"],
   ["/account", "Account"],
@@ -531,6 +541,9 @@ const SURFACE_SUBTITLES: [string, string][] = [
     "Your recurring competitions, and every edition that runs under them — grouped, or all at once.",
   ],
   ["/orgs", "The clubs and academies you run tournaments under."],
+  ["/players", "Every player across the seasons you run — search, filter, open their sheet."],
+  ["/auctions", "Every auction night you run, conduct, bid in or can watch."],
+  ["/reports", "Registrations, fees and auction spend for each season you run."],
   // What the page ships, not more: /money renders receipts (it computes no
   // balance and no due), and /inbox already carries approvals, auction results
   // and receipts — the old line undersold a launch product as unfinished.
@@ -742,7 +755,7 @@ export interface RoleNavGroup {
 /**
  * The primary rail for this person. Someone who only plays has no use for the
  * organizer's index pages; everyone else — including a brand-new account, who
- * may be an organizer about to start — keeps the four.
+ * may be an organizer about to start — keeps the full rail.
  */
 export function railFor(roles: ShellRoles | null): RailTarget[] {
   if (roles?.onlyPlays === true) {

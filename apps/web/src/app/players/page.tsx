@@ -1,0 +1,321 @@
+import {
+  IconCheckCircle,
+  IconGavel,
+  IconGlobe,
+  IconStar,
+  IconUser,
+  IconUsers,
+  Pill,
+  PlayerImage,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  TeamChip,
+  type KitTone,
+} from "@desiauction/ui";
+import Link from "next/link";
+
+import { playersIndexView } from "../../server/console/views";
+import type { PlayerIndexRow } from "../../server/console/players-index";
+import { FEE_LABEL, STATUS_LABEL } from "../seasons/[slug]/_players/labels";
+import { NavButton } from "./nav-button";
+import { PlayersFilters } from "./players-filters";
+import "./players.css";
+
+export const metadata = { title: "Players · DesiAuction" };
+
+const STATUS_TONE: Record<PlayerIndexRow["status"], KitTone> = {
+  submitted: "blue",
+  approved: "green",
+  waitlisted: "amber",
+  rejected: "red",
+  withdrawn: "neutral",
+};
+
+const FEE_TONE: Record<PlayerIndexRow["feeStatus"], KitTone> = {
+  pending: "amber",
+  paid: "green",
+  waived: "blue",
+  refunded: "neutral",
+};
+
+const ROUTE_LABEL: Record<NonNullable<PlayerIndexRow["squadRoute"]>, string> = {
+  auction: "Bought at auction",
+  icon: "Icon",
+  captain: "Captain",
+  retained: "Retained",
+};
+
+function count(value: number): string {
+  return value.toLocaleString("en-IN");
+}
+
+/** The page's own query string, with `patch` applied — for the stat cards and pager. */
+function hrefWith(
+  current: Readonly<Record<string, string>>,
+  patch: Readonly<Record<string, string>>,
+): string {
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries({ ...current, ...patch })) {
+    if (value !== "") next.set(key, value);
+  }
+  const qs = next.toString();
+  return qs === "" ? "/players" : `/players?${qs}`;
+}
+
+/**
+ * /players — every player across the seasons this person reviews.
+ *
+ * Gated per season on `registration.review` (the registrations desk's own
+ * gate) before any row is read; see `server/console/views.ts`. A row opens the
+ * player's sheet on that season's desk — the same deep link the desk uses.
+ */
+export default async function PlayersPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const raw = await searchParams;
+  const one = (key: string): string | undefined => {
+    const value = raw[key];
+    return typeof value === "string" ? value : undefined;
+  };
+  const view = await playersIndexView({
+    q: one("q"),
+    season: one("season"),
+    status: one("status"),
+    team: one("team"),
+    mark: one("mark"),
+    page: one("page"),
+  });
+
+  if (view.seasons.length === 0) {
+    return (
+      <main className="px-players">
+        <section className="px-empty" data-testid="players-empty">
+          <span className="px-empty-glyph" aria-hidden>
+            <IconUsers size={30} />
+          </span>
+          <h2>No players to manage yet</h2>
+          <p>
+            This page lists every player in the seasons you run — as a club owner or staff. You
+            don&rsquo;t review registrations for any season yet.
+          </p>
+          <div className="px-empty-actions">
+            {view.ownsTeam !== null ? (
+              <NavButton
+                href={`/seasons/${view.ownsTeam.seasonSlug}/teams`}
+                variant="primary"
+                size="touch"
+              >
+                Your squad · {view.ownsTeam.name}
+              </NavButton>
+            ) : null}
+            <NavButton
+              href="/c"
+              variant={view.ownsTeam === null ? "primary" : "secondary"}
+              size="touch"
+            >
+              <IconGlobe size={18} aria-hidden /> Find tournaments
+            </NavButton>
+            {view.plays ? (
+              <NavButton href="/me" variant="secondary" size="touch">
+                <IconStar size={18} aria-hidden /> My sports
+              </NavButton>
+            ) : null}
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  const { filters, result } = view;
+  const current = { ...filters, page: view.page > 1 ? String(view.page) : "" };
+  const isAll = filters.status === "" && filters.mark === "";
+  const multiSeason = view.seasons.length > 1;
+
+  return (
+    <main className="px-players">
+      <StatGrid testId="players-stats">
+        <StatCard
+          icon={<IconUsers />}
+          tone="gold"
+          value={count(result.stats.total)}
+          label="Players"
+          hint={filters.season === "" ? "Across your seasons" : "In this season"}
+          href={hrefWith(current, { status: "", mark: "", page: "" })}
+          active={isAll}
+          linkComponent={Link}
+          testId="players-stat-all"
+        />
+        <StatCard
+          icon={<IconCheckCircle />}
+          tone="green"
+          value={count(result.stats.approved)}
+          label="Approved"
+          hint="In the pool or signed"
+          href={hrefWith(current, { status: "approved", mark: "", page: "" })}
+          active={filters.status === "approved" && filters.mark === ""}
+          linkComponent={Link}
+          testId="players-stat-approved"
+        />
+        <StatCard
+          icon={<IconGavel />}
+          tone="blue"
+          value={count(result.stats.sold)}
+          label="Sold at auction"
+          hint="Bought in the room"
+          href={hrefWith(current, { mark: "sold", status: "", page: "" })}
+          active={filters.mark === "sold"}
+          linkComponent={Link}
+          testId="players-stat-sold"
+        />
+        <StatCard
+          icon={<IconStar />}
+          tone="purple"
+          value={count(result.stats.preSigned)}
+          label="Pre-signed"
+          hint="Icons, captains, retained"
+          href={hrefWith(current, { mark: "presigned", status: "", page: "" })}
+          active={filters.mark === "presigned"}
+          linkComponent={Link}
+          testId="players-stat-presigned"
+        />
+      </StatGrid>
+
+      <SectionCard
+        icon={<IconUser />}
+        title="All players"
+        description={
+          result.total === 1 ? "1 player matches" : `${count(result.total)} players match`
+        }
+        flush
+        data-testid="players-card"
+      >
+        <PlayersFilters
+          current={filters}
+          seasons={view.seasons}
+          teams={view.teams.map((team) => ({
+            id: team.id,
+            label: multiSeason ? `${team.name} · ${team.seasonName}` : team.name,
+          }))}
+        />
+        {result.rows.length === 0 ? (
+          <p className="px-none" role="status">
+            No players match these filters.
+          </p>
+        ) : (
+          <div className="px-table-wrap">
+            <table className="px-table" data-testid="players-table">
+              <caption className="px-visually-hidden">
+                Players across your seasons. Select a name to open their sheet.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  {multiSeason ? <th scope="col">Season</th> : null}
+                  <th scope="col">Role</th>
+                  <th scope="col">Team</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Fee</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.rows.map((row) => (
+                  <tr key={row.registrationId} data-testid={`players-row-${row.registrationId}`}>
+                    <td className="px-cell-player">
+                      <div className="px-player">
+                        <PlayerImage
+                          name={row.name ?? "Player"}
+                          seed={row.registrationId}
+                          src={row.photoUrl}
+                          size="sm"
+                          shape="round"
+                          decorative
+                          {...(row.teamColor !== null ? { teamColor: row.teamColor } : {})}
+                        />
+                        <span className="px-player-text">
+                          <Link
+                            href={`/seasons/${row.seasonSlug}/registrations?player=${row.registrationId}`}
+                            className="px-row-link"
+                          >
+                            {row.name ?? "Unnamed player"}
+                          </Link>
+                          <span className="px-sub">{row.number}</span>
+                        </span>
+                      </div>
+                    </td>
+                    {multiSeason ? (
+                      <td className="px-cell-season" data-label="Season">
+                        {row.seasonName}
+                      </td>
+                    ) : null}
+                    <td data-label="Role">
+                      {row.role !== null ? (
+                        <Pill tone="neutral">{row.role}</Pill>
+                      ) : (
+                        <span className="px-dash">—</span>
+                      )}
+                    </td>
+                    <td data-label="Team">
+                      {row.teamName !== null ? (
+                        <span className="px-team">
+                          <TeamChip color={row.teamColor}>{row.teamName}</TeamChip>
+                          {row.squadRoute !== null ? (
+                            <span className="px-route">{ROUTE_LABEL[row.squadRoute]}</span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="px-dash">Unassigned</span>
+                      )}
+                    </td>
+                    <td data-label="Status">
+                      <Pill tone={STATUS_TONE[row.status]} dot>
+                        {STATUS_LABEL[row.status]}
+                      </Pill>
+                    </td>
+                    <td data-label="Fee">
+                      <Pill tone={FEE_TONE[row.feeStatus]}>{FEE_LABEL[row.feeStatus]}</Pill>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {view.pageCount > 1 ? (
+          <nav className="px-pager" aria-label="Pages">
+            {view.page > 1 ? (
+              <Link
+                href={hrefWith(current, { page: view.page - 1 === 1 ? "" : String(view.page - 1) })}
+                className="px-page"
+              >
+                Previous
+              </Link>
+            ) : null}
+            {Array.from({ length: view.pageCount }, (_, index) => index + 1)
+              .filter(
+                (number) =>
+                  number === 1 || number === view.pageCount || Math.abs(number - view.page) <= 1,
+              )
+              .map((number) => (
+                <Link
+                  key={number}
+                  href={hrefWith(current, { page: number === 1 ? "" : String(number) })}
+                  className="px-page"
+                  aria-current={number === view.page ? "page" : undefined}
+                >
+                  {number}
+                </Link>
+              ))}
+            {view.page < view.pageCount ? (
+              <Link href={hrefWith(current, { page: String(view.page + 1) })} className="px-page">
+                Next
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
+      </SectionCard>
+    </main>
+  );
+}

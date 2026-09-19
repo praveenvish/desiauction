@@ -95,13 +95,11 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: "DesiAuction runs the player auction for a tournament: registration, the live auction night, and the money afterwards — with one shared truth on every screen. This tour explains how the product is laid out so you can find the rest.",
       },
-      // There are FOUR rail items, not five (components/shell/nav.ts RAIL). The
-      // fifth — Money — was withdrawn under DA-18 because the surface behind it
-      // was a placeholder, and this list went on naming it as a place to work,
-      // with a description ("what you owe") that the /money page never had a
-      // query for. Its receipts half is true and now lives under Home, which is
-      // where a signed-in reader actually starts.
-      { kind: "heading", level: 2, text: "The four places you'll work" },
+      // This list IS the rail (components/shell/nav.ts RAIL) — seven items since
+      // the 2026-09-19 ruling added Players, Auctions and Reports. Money is not
+      // one: it was withdrawn under DA-18 because the surface behind it was a
+      // placeholder, and this list once went on naming it as a place to work.
+      { kind: "heading", level: 2, text: "The seven places you'll work" },
       {
         kind: "list",
         items: [
@@ -116,6 +114,18 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
           {
             text: "{0} — the organizations you belong to, their members and grants.",
             links: [{ text: "Organizations", href: "/orgs" }],
+          },
+          {
+            text: "{0} — every player across the seasons you run, with search and filters; one click opens their sheet.",
+            links: [{ text: "Players", href: "/players" }],
+          },
+          {
+            text: "{0} — every auction night you run, conduct, own a team in or can watch, with the right door for your role.",
+            links: [{ text: "Auctions", href: "/auctions" }],
+          },
+          {
+            text: "{0} — registrations, fees and auction spend for each season you run. Money figures appear only for the people who hold the books.",
+            links: [{ text: "Reports", href: "/reports" }],
           },
           {
             text: "{0} — this help centre, always one click away.",
