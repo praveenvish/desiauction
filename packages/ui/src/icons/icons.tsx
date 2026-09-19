@@ -691,3 +691,39 @@ export function IconEyeOff(props: IconProps) {
     </svg>
   );
 }
+
+export function IconKey(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="8" cy="15" r="4.5" />
+      <path d="M11.2 11.8l8.3-8.3M16.5 6.5l2.5 2.5M14 9l2 2" />
+    </svg>
+  );
+}
+
+export function IconDevice(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4.5" width="18" height="12" rx="1.5" />
+      <path d="M8.5 20h7M12 16.5V20" />
+    </svg>
+  );
+}
+
+export function IconTrash(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 6.5h16M9.5 6.5V4.5h5v2M6.5 6.5l.8 12.6a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12.6" />
+      <path d="M10 10.5v6M14 10.5v6" />
+    </svg>
+  );
+}
+
+export function IconInbox(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 13.5l2.6-7.8A1.5 1.5 0 0 1 7.5 4.7h9a1.5 1.5 0 0 1 1.4 1l2.6 7.8" />
+      <path d="M3.5 13.5V18A1.5 1.5 0 0 0 5 19.5h14a1.5 1.5 0 0 0 1.5-1.5v-4.5h-5l-1.5 2.5h-4L8.5 13.5z" />
+    </svg>
+  );
+}
