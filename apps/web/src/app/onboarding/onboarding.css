@@ -41,8 +41,8 @@
   border-radius: var(--radius-sm);
 }
 
-.onboarding-mark:hover {
-  color: var(--text-accent);
+.onboarding-mark:hover .da-wordmark {
+  opacity: 0.85;
 }
 
 .onboarding-mark:focus-visible {
@@ -53,10 +53,10 @@
 .onboarding-mark-glyph {
   flex: none;
   display: block;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   /* The mark carries its own gold tile and corners. */
-  border-radius: 9px;
+  border-radius: 28%;
   overflow: hidden;
 }
 

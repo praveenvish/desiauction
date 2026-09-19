@@ -2,7 +2,7 @@ import { IconGavel, IconReceipt, IconTile, IconUser } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { BrandMark } from "../../components/shell/brand";
+import { BrandMark, BrandWordmark } from "../../components/shell/brand";
 import { currentSession } from "../../server/auth/actions";
 import { safeNext } from "../../server/auth/redirect";
 import { OnboardingPanel } from "./onboarding-steps";
@@ -48,9 +48,9 @@ export default async function OnboardingPage({
             still drawing the old bar-chart glyph, on a new person's first
             signed-in screen. */}
         <span className="onboarding-mark-glyph" aria-hidden="true">
-          <BrandMark size={34} />
+          <BrandMark size={36} />
         </span>
-        DesiAuction
+        <BrandWordmark tone="page" />
       </Link>
       <div className="onboarding-grid">
         {/* Desktop-only orientation column. The first mark is the ANSWER to the

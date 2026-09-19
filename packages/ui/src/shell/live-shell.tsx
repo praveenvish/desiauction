@@ -17,6 +17,13 @@ export interface LiveShellProps {
    */
   brand?: ReactNode;
   /**
+   * The words beside the mark. The app passes its one brand lockup (name +
+   * tagline) so the live room carries the same identity as the public header;
+   * the plain name is the fallback. Hidden under 640px like before — the link
+   * keeps its `aria-label` there.
+   */
+  wordmark?: ReactNode;
+  /**
    * Where the mark leads. Optional: a conductor's cockpit wants no extra door,
    * but the public stage is the product's most-forwarded screen and its only
    * visitor arrives without an account — there, the mark is the way in.
@@ -32,6 +39,7 @@ export function LiveShell({
   exitLabel = "Leave auction",
   statusSlot,
   brand,
+  wordmark = "DesiAuction",
   brandHref,
   linkComponent: Link = "a",
   children,
@@ -67,7 +75,7 @@ export function LiveShell({
             <span className={styles["live-brand-mark"]} aria-hidden>
               {brand}
             </span>
-            <span className={styles["live-brand-text"]}>DesiAuction</span>
+            <span className={styles["live-brand-text"]}>{wordmark}</span>
           </BrandBlock>
         ) : null}
         {statusSlot !== undefined ? <div className={styles["status"]}>{statusSlot}</div> : null}
