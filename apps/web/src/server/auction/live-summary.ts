@@ -72,7 +72,14 @@ export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedL
     .leftJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
     .leftJoin(teams, eq(teams.id, paddles.teamId))
     .where(
-      and(eq(lots.auctionId, auctionId), inArray(lots.status, ["sold", "unsold", "withdrawn"])),
+      and(
+        eq(lots.auctionId, auctionId),
+        inArray(lots.status, ["sold", "unsold", "withdrawn"]),
+        // A pre-signed player's waiting lot is withdrawn when the auction opens
+        // (settlePool). They are squad, shown through `preSignedPlayers` — not a
+        // lot the night resolved, and not a "withdrawn" line under their name.
+        sql`not (${lots.status} = 'withdrawn' and ${preSignedSql})`,
+      ),
     )
     .orderBy(asc(lots.seq));
   return rows.map((row) => ({
