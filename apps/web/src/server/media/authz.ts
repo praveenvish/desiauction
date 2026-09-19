@@ -19,6 +19,13 @@ export interface ResolvedMediaSubject {
   storageSubjectId: string;
   /** For a player, the owning person (enables the self-upload branch). */
   ownerPersonId: string | null;
+  /**
+   * For a player: the photo belongs on the ENTRY, not the person (0077). The
+   * organizer typed this entry's name (0075), so the account behind the phone
+   * may be somebody the club has never met, and the club is the one acting.
+   * `storageSubjectId` is then the registration id.
+   */
+  entryPhoto?: { registrationId: string };
 }
 
 export async function resolveMediaSubject(
@@ -26,6 +33,7 @@ export async function resolveMediaSubject(
   competition: CompetitionSummary,
   subject: MediaSubject,
   subjectId: string,
+  actorId: string,
 ): Promise<ResolvedMediaSubject | null> {
   if (subject === "competition") {
     return subjectId === competition.id
@@ -42,11 +50,27 @@ export async function resolveMediaSubject(
   }
   // player: subjectId is a registration id; the photo lands person-level (D7).
   const [row] = await db
-    .select({ personId: registrations.personId })
+    .select({ personId: registrations.personId, enteredName: registrations.enteredName })
     .from(registrations)
     .where(and(eq(registrations.id, subjectId), eq(registrations.competitionId, competition.id)))
     .limit(1);
-  return row === undefined ? null : { storageSubjectId: row.personId, ownerPersonId: row.personId };
+  if (row === undefined) {
+    return null;
+  }
+  // A player photo lands on the PERSON, platform-wide (D7) — except when the
+  // club typed this entry's name and someone other than that person is
+  // uploading. Writing to `people` then replaced (or deleted) a stranger's
+  // picture and consent everywhere; refusing would tell the club the phone has
+  // an account. So the club's photo lives on the entry and only this season
+  // shows it (security review, launch Phase 5).
+  if (row.enteredName !== null && row.personId !== actorId) {
+    return {
+      storageSubjectId: subjectId,
+      ownerPersonId: row.personId,
+      entryPhoto: { registrationId: subjectId },
+    };
+  }
+  return { storageSubjectId: row.personId, ownerPersonId: row.personId };
 }
 
 /** Throws ForbiddenError unless the caller may write media for this subject. */
@@ -95,6 +119,13 @@ export async function persistMediaKey(
       .where(eq(competitions.id, resolved.storageSubjectId));
     return;
   }
+  if (resolved.entryPhoto !== undefined) {
+    await db
+      .update(registrations)
+      .set({ enteredPhotoKey: key, enteredPhotoConsentAt: now, enteredPhotoConsentVia: consentVia })
+      .where(eq(registrations.id, resolved.entryPhoto.registrationId));
+    return;
+  }
   // player photo: set the key + upload time, and capture consent if not already
   // present (C-25 × DPDP §5 — render is gated on photo_consent_at downstream).
   await db
@@ -106,6 +137,35 @@ export async function persistMediaKey(
       photoConsentVia: consentVia,
     })
     .where(eq(people.id, resolved.storageSubjectId));
+}
+
+/** The photo key currently attached to this player subject, for deletion. */
+export async function currentPlayerPhotoKey(
+  db: Db,
+  resolved: ResolvedMediaSubject,
+): Promise<string | null> {
+  if (resolved.entryPhoto !== undefined) {
+    const [row] = await db
+      .select({ key: registrations.enteredPhotoKey })
+      .from(registrations)
+      .where(eq(registrations.id, resolved.entryPhoto.registrationId))
+      .limit(1);
+    return row?.key ?? null;
+  }
+  const [row] = await db
+    .select({ key: people.photoUrl })
+    .from(people)
+    .where(eq(people.id, resolved.storageSubjectId))
+    .limit(1);
+  return row?.key ?? null;
+}
+
+/** Withdraw the club's photo from a typed-name entry (0077). */
+export async function clearEntryPhoto(db: Db, registrationId: string): Promise<void> {
+  await db
+    .update(registrations)
+    .set({ enteredPhotoKey: null, enteredPhotoConsentAt: null, enteredPhotoConsentVia: null })
+    .where(eq(registrations.id, registrationId));
 }
 
 /** Consent withdrawal (PR1, DPDP §5): null the photo key + all consent fields.

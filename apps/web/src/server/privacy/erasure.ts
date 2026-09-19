@@ -245,6 +245,14 @@ export async function executeErasure(input: {
           bowlingStyle: null,
           attributes: {},
           note: null,
+          // The name an organizer typed (0075). `shownName` prefers it over the
+          // anonymized account name, so leaving it would keep the person's name
+          // on the showcase, posters, lineups and share cards after erasure.
+          enteredName: null,
+          // ...and the photo the club attached to that entry (0077): a face.
+          enteredPhotoKey: null,
+          enteredPhotoConsentAt: null,
+          enteredPhotoConsentVia: null,
         })
         .where(and(eq(registrations.personId, personId), eq(registrations.orgId, orgId)));
       await tx

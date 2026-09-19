@@ -35,7 +35,7 @@ import { dbHandle, systemDb } from "../db";
 import { storage } from "../media";
 import { canCompetition } from "./authz";
 import { competitionForRegistration, resolveCompetition } from "./competitions";
-import { shownName, shownPhotoKey } from "./shown-name";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
  * THE POSTER'S SERVER SIDE — the gate, the join, and the evidence.
@@ -427,7 +427,7 @@ async function playerPosterFrom(
         .select({
           playerName: shownName,
           photoKey: shownPhotoKey,
-          photoConsentAt: people.photoConsentAt,
+          photoConsentAt: shownPhotoConsentAt,
           role: registrations.role,
           number: registrations.registrationNumber,
           status: registrations.status,
@@ -938,7 +938,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
           : db
               .select({
                 registrationId: registrations.id,
-                name: people.name,
+                name: shownName,
                 number: registrations.registrationNumber,
                 soldPrice: lots.soldPrice,
                 teamName: teams.name,

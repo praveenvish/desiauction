@@ -494,6 +494,14 @@ export const grants = pgTable(
   (table) => [
     index("grants_person_idx").on(table.personId),
     index("grants_scope_idx").on(table.scopeType, table.scopeId),
+    // 0077: a season scope carries the auctioneer and nothing else, once.
+    check(
+      "grants_tournament_scope_is_conductor",
+      sql`${table.scopeType} <> 'tournament' or ${table.capabilitySet} = 'auction:conductor'`,
+    ),
+    uniqueIndex("grants_tournament_active_uq")
+      .on(table.personId, table.scopeId, table.capabilitySet)
+      .where(sql`scope_type = 'tournament' and revoked_at is null`),
   ],
 );
 
@@ -771,6 +779,15 @@ export const registrations = pgTable(
      * phone numbers cannot turn into a lookup of who they belong to.
      */
     enteredName: text("entered_name"),
+    /**
+     * The club's photo for a typed-name entry, and the club's attestation
+     * (0077). A player photo otherwise lives on `people`, platform-wide — for
+     * a typed-name entry that account may be a stranger to the club, so the
+     * club's picture stays here and never touches theirs.
+     */
+    enteredPhotoKey: text("entered_photo_key"),
+    enteredPhotoConsentAt: ts("entered_photo_consent_at"),
+    enteredPhotoConsentVia: text("entered_photo_consent_via"),
     role: text("role"),
     status: text("status", {
       enum: ["draft", "submitted", "approved", "rejected", "waitlisted", "withdrawn"],

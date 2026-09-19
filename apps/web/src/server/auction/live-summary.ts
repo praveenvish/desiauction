@@ -7,7 +7,7 @@ import {
 } from "@desiauction/core";
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, inArray, or } from "drizzle-orm";
-import { shownName, shownPhotoKey } from "../competition/shown-name";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "../competition/shown-name";
 
 // PX-6 live-experience reads (thin, additive, spectator-safe). The snapshot
 // stream carries live state but only the LAST lot outcome — late joiners need
@@ -116,7 +116,7 @@ export async function lotMediaOf(
       lotId: lots.id,
       number: registrations.registrationNumber,
       photoKey: shownPhotoKey,
-      photoConsentAt: people.photoConsentAt,
+      photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
     })
     .from(lots)

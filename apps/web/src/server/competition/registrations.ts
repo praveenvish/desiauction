@@ -29,7 +29,7 @@ import {
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
-import { shownName, shownPhotoKey } from "./shown-name";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 // Registration reads + creation (IP-3 §4, doc 42). TRIAGE TRANSITIONS live only
 // in registration-aggregate.ts; this module owns ENTRY into the competition —
@@ -810,7 +810,7 @@ export async function queryRegistrations(
       rejectionReason: registrations.rejectionReason,
       rejectionNote: registrations.rejectionNote,
       photoKey: shownPhotoKey,
-      photoConsentAt: people.photoConsentAt,
+      photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
@@ -868,7 +868,7 @@ export async function photoTargetsOf(db: Db, competitionId: string): Promise<Pho
       // A typed-name row (0075) never reports the account's photo — "already
       // has a photo" would itself say something about who the number is.
       photoUrl: shownPhotoKey,
-      photoConsentAt: people.photoConsentAt,
+      photoConsentAt: shownPhotoConsentAt,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))

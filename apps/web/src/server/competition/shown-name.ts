@@ -15,8 +15,15 @@ export const shownName = sql<string | null>`coalesce(${registrations.enteredName
 
 /**
  * The account's photo, unless the season only knows this player by a typed
- * name: a face would unmask exactly what the typed name protects.
+ * name: a face would unmask exactly what the typed name protects. A typed-name
+ * entry shows the photo the CLUB attached to it instead (0077), if any.
  */
 export const shownPhotoKey = sql<
   string | null
->`case when ${registrations.enteredName} is null then ${people.photoUrl} end`;
+>`case when ${registrations.enteredName} is null then ${people.photoUrl} else ${registrations.enteredPhotoKey} end`;
+
+/**
+ * The consent that makes `shownPhotoKey` renderable (DPDP §5) — read from the
+ * same place the photo came from. Always select the two together.
+ */
+export const shownPhotoConsentAt = sql<Date | null>`case when ${registrations.enteredName} is null then ${people.photoConsentAt} else ${registrations.enteredPhotoConsentAt} end`;
