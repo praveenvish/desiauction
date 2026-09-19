@@ -115,7 +115,12 @@ test("the competition journey: create, open, team, register, approve", async ({
   // phone is shown to a human; the shell spec asserts the same way.
   await expect(triage).toContainText(formatPhone(`+91${PHONE_PLAYER}`));
   await expect(triage).toContainText("submitted");
-  await triage.getByRole("button", { name: "Approve" }).first().click();
+  // Approve lives in the row's ⋯ menu.
+  await triage
+    .getByTestId(/^row-menu-/)
+    .first()
+    .click();
+  await page.getByRole("menuitem", { name: "Approve" }).click();
   await expect(triage).toContainText("approved");
 });
 

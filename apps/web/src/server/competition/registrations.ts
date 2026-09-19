@@ -515,6 +515,8 @@ export interface RegistrationRow {
    */
   rejectionNote: string | null;
   duplicateName: boolean;
+  /** When they registered (or were added / imported) — ISO, for "Registered on". */
+  createdAt: string;
   // Parity §3.2 profile. photoUrl is DPDP-gated: null unless photo_consent_at is
   // set (render gate, DPDP §5). age is derived from DOB, never stored.
   photoUrl: string | null;
@@ -740,6 +742,8 @@ export interface RegistrationQuery {
   /** Narrow to one fee state — the desk's own question, "who has not paid?". */
   fee?: FeeStatus;
   teamId?: string;
+  /** Narrow to one playing role (the pack's key). */
+  role?: string;
   /** Exactly one registration — the player sheet opened from a team roster. */
   registrationId?: string;
   sort?: RegistrationSort;
@@ -780,6 +784,9 @@ function registrationFilters(
   }
   if (query.teamId !== undefined && query.teamId !== "") {
     filters.push(eq(registrations.teamId, query.teamId));
+  }
+  if (query.role !== undefined && query.role !== "") {
+    filters.push(eq(registrations.role, query.role));
   }
   if (query.registrationId !== undefined) {
     filters.push(eq(registrations.id, query.registrationId));
@@ -858,6 +865,7 @@ export async function queryRegistrations(
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
+      createdAt: registrations.createdAt,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -878,19 +886,22 @@ export async function queryRegistrations(
     .limit(1);
   const sport = season?.sport ?? DEFAULT_SPORT_KEY;
   const now = new Date();
-  const rows: RegistrationRow[] = raw.map(({ photoKey, photoConsentAt, attributes, ...r }) => ({
-    ...r,
-    dateOfBirth: r.dateOfBirth,
-    duplicateName: dupKeys.has(nameKey(r.name)),
-    // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
-    photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
-    age: deriveAge(r.dateOfBirth, now),
-    // Labelled HERE, by the season's pack, so no client has to know what a
-    // football attribute key means. Values the pack cannot explain are
-    // dropped rather than printed raw — see `describeAttributes`.
-    attributes: describeAttributes(sport, (attributes ?? {}) as Record<string, unknown>),
-    attributeValues: attributeValuesOf(sport, r, (attributes ?? {}) as Record<string, unknown>),
-  }));
+  const rows: RegistrationRow[] = raw.map(
+    ({ photoKey, photoConsentAt, attributes, createdAt, ...r }) => ({
+      ...r,
+      createdAt: createdAt.toISOString(),
+      dateOfBirth: r.dateOfBirth,
+      duplicateName: dupKeys.has(nameKey(r.name)),
+      // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
+      photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
+      age: deriveAge(r.dateOfBirth, now),
+      // Labelled HERE, by the season's pack, so no client has to know what a
+      // football attribute key means. Values the pack cannot explain are
+      // dropped rather than printed raw — see `describeAttributes`.
+      attributes: describeAttributes(sport, (attributes ?? {}) as Record<string, unknown>),
+      attributeValues: attributeValuesOf(sport, r, (attributes ?? {}) as Record<string, unknown>),
+    }),
+  );
   return { rows, total, page, pageSize };
 }
 

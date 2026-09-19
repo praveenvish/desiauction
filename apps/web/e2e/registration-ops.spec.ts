@@ -194,7 +194,11 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await expect(poolValue).toHaveText("8");
   // The marks live in the player sheet's Squad tab now (it opens there for an
   // approved player), one click each and undoable — no confirm dialog.
-  await page.getByTestId("reg-table").getByRole("button", { name: "Details" }).first().click();
+  await page
+    .getByTestId("reg-table")
+    .getByTestId(/^open-/)
+    .first()
+    .click();
   await expect(page.getByTestId("player-sheet")).toBeVisible();
   const retain = page.getByTestId(/^retain-toggle-/);
   await retain.click();
@@ -365,6 +369,12 @@ test("declining for 'other' demands the reason, keeps it from the player, and sh
   await page.getByTestId("add-player-done").click();
   await expect(page.getByTestId("reg-table")).toContainText("Declined Player", { timeout: 20_000 });
 
+  // Decline lives in the row's ⋯ menu.
+  await page
+    .getByTestId("reg-table")
+    .getByRole("row", { name: /Declined Player/ })
+    .getByTestId(/^row-menu-/)
+    .click();
   await page
     .getByTestId(/^decline-/)
     .first()
@@ -393,7 +403,7 @@ test("declining for 'other' demands the reason, keeps it from the player, and sh
   await page
     .getByTestId("reg-table")
     .getByRole("row", { name: /Declined Player/ })
-    .getByRole("button", { name: "Details" })
+    .getByTestId(/^open-/)
     .click();
   await expect(page.getByTestId("details-reason")).toContainText("Declined", { timeout: 20_000 });
   await expect(page.getByTestId("details-reason-note")).toContainText(PRIVATE);

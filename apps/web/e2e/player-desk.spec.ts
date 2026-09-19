@@ -116,7 +116,7 @@ test("the player desk: review in one pass, pre-sign, edit in place, export what 
    * approved one), put them on a team, name them captain — the pool drops.
    */
   const firstRow = page.getByTestId("reg-table").getByRole("row").nth(1);
-  await firstRow.getByRole("button", { name: "Details" }).click();
+  await firstRow.getByTestId(/^open-/).click();
   await expect(sheet).toBeVisible();
   await page.getByTestId("sheet-team").selectOption({ label: "Andheri Arrows" });
   await expect(firstRow).toContainText("Andheri Arrows");
@@ -194,7 +194,11 @@ test("the player desk: review in one pass, pre-sign, edit in place, export what 
   );
   expect(overflow).toBeLessThanOrEqual(0);
   await page.screenshot({ path: test.info().outputPath("phone-list.png"), fullPage: true });
-  await page.getByTestId("reg-table").getByRole("button", { name: "Details" }).first().click();
+  await page
+    .getByTestId("reg-table")
+    .getByTestId(/^open-/)
+    .first()
+    .click();
   const box = await sheet.boundingBox();
   expect(Math.round(box?.width ?? 0)).toBe(390);
   await page.screenshot({ path: test.info().outputPath("phone-sheet.png") });

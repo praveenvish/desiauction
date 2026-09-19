@@ -179,7 +179,11 @@ test("founder demo: org → competition → approve → team roster → venue �
   await expect(page).toHaveURL(/status=approved/);
   // The player sheet opens on Squad for an approved player; the team select
   // saves itself — no Assign button.
-  await page.getByRole("button", { name: "Details" }).first().click();
+  await page
+    .getByTestId("reg-table")
+    .getByTestId(/^open-/)
+    .first()
+    .click();
   await expect(page.getByTestId("assign-team-row")).toBeVisible();
   await page.getByTestId("sheet-team").selectOption({ label: "Malad Mavericks" });
   await expect(page.getByTestId("reg-table")).toContainText("Malad Mavericks");

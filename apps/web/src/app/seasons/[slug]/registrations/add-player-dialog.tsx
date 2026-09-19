@@ -6,7 +6,7 @@ import {
   battingStyleLabel,
   bowlingStyleLabel,
 } from "@desiauction/core";
-import { Button, Dialog, Field, Select, useToast } from "@desiauction/ui";
+import { Button, Dialog, Field, IconPlus, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -120,8 +120,9 @@ export function AddPlayerDialog({
 
   return (
     <>
-      <Button size="sm" data-testid="open-add-player" onClick={openDialog}>
-        + Add player
+      <Button variant="primary" data-testid="open-add-player" onClick={openDialog}>
+        <IconPlus size={18} className="icon-lead" aria-hidden />
+        Add player
       </Button>
       <Dialog
         open={open}

@@ -1,6 +1,14 @@
 "use client";
 
-import { Button, useToast, IconCheck } from "@desiauction/ui";
+import {
+  Button,
+  IconCheck,
+  IconCopy,
+  IconGlobe,
+  IconSend,
+  IconTile,
+  useToast,
+} from "@desiauction/ui";
 import { useState } from "react";
 
 import { useOrigin } from "../../../../lib/use-hydrated";
@@ -48,25 +56,26 @@ export function ShareRegistration({ slug, open }: { slug: string; open: boolean 
   if (!open) {
     return (
       // One line, not a panel: a closed link is a fact to know, not a task.
-      <p className="share-reg-closed" data-testid="share-registration">
+      <p className="share-reg-closed rd-share-closed" data-testid="share-registration">
         <span className="share-reg-dot" aria-hidden />
         <span data-testid="share-closed">
-          <strong>Registration is closed</strong> — the link no longer takes new players. Reopen it
-          from the season Overview; you can still add or import players here.
+          <strong>Registration is closed</strong> — the link no longer takes new players. You can
+          still add or import players here.
         </span>
       </p>
     );
   }
 
   return (
-    <div className="share-reg" data-testid="share-registration">
-      <label className="share-reg-label" htmlFor={`share-${slug}`}>
-        Recruit players — share this registration link
-      </label>
-      <div className="share-reg-row">
+    <div className="rd-share" data-testid="share-registration">
+      <IconTile icon={<IconGlobe />} tone="green" size="md" />
+      <div className="rd-share-text">
+        <label className="share-reg-label" htmlFor={`share-${slug}`}>
+          Registration is open — share this link to recruit players
+        </label>
         <input
           id={`share-${slug}`}
-          className="share-reg-input"
+          className="rd-share-input"
           value={url}
           readOnly
           onFocus={(event) => {
@@ -74,17 +83,23 @@ export function ShareRegistration({ slug, open }: { slug: string; open: boolean 
           }}
           aria-label="Public registration link"
         />
+      </div>
+      <div className="rd-share-actions">
         <Button size="sm" variant="secondary" onClick={() => void copy()} disabled={url === ""}>
           {copied ? (
             <>
+              <IconCheck size={16} className="icon-lead" aria-hidden />
               Copied
-              <IconCheck size={14} className="icon-trail" />
             </>
           ) : (
-            "Copy"
+            <>
+              <IconCopy size={16} className="icon-lead" aria-hidden />
+              Copy
+            </>
           )}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void share()} disabled={url === ""}>
+          <IconSend size={16} className="icon-lead" aria-hidden />
           Share
         </Button>
       </div>

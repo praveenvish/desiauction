@@ -7,11 +7,30 @@ import {
   ButtonLink,
   Dialog,
   IconArrowRight,
+  IconCheckCircle,
+  IconChevronLeft,
   IconChevronRight,
+  IconClock,
+  IconDownload,
+  IconFile,
+  IconGavel,
+  IconKebab,
+  IconMinusCircle,
+  IconRefresh,
   IconSearch,
+  IconUpload,
+  IconUsers,
+  IconWallet,
+  IconXCircle,
+  Pill,
   PlayerImage,
+  PopoverMenu,
+  SectionCard,
+  StatCard,
+  TeamChip,
   useToast,
   VisuallyHidden,
+  type KitTone,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import {
@@ -24,9 +43,11 @@ import {
   type ReactNode,
 } from "react";
 
+import { formatDate } from "../../../../lib/format-date";
 import { personContact, personLabel } from "../../../../lib/person-label";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import {
+  advanceCompetitionAction,
   bulkTriageAction,
   registrationDetailAction,
   selectAllMatchingAction,
@@ -44,15 +65,7 @@ import type {
 } from "../../../../server/competition/registrations";
 import { DeclineDialog } from "../_players/decline-dialog";
 import { ExportDialog } from "../_players/export-dialog";
-import {
-  canTriage,
-  FEE_LABEL,
-  FEE_TONE,
-  PAST_TENSE,
-  REASON_LABEL,
-  STATUS_TONE,
-  type Row,
-} from "../_players/labels";
+import { canTriage, FEE_LABEL, PAST_TENSE, REASON_LABEL, type Row } from "../_players/labels";
 import { decisionToast, PlayerSheet } from "../_players/player-sheet";
 import { useMutate } from "../_players/use-mutate";
 import { useRoster } from "../_players/use-roster";
@@ -136,6 +149,7 @@ interface Filters {
   status: string;
   fee: string;
   team: string;
+  role: string;
   sort: string;
 }
 
@@ -152,6 +166,8 @@ export function RegistrationDashboardPanel({
   categoryFlags = {},
   initialPlayerId,
   startReview = false,
+  share,
+  canReopen = false,
 }: {
   slug: string;
   stats: RegistrationStats;
@@ -169,6 +185,10 @@ export function RegistrationDashboardPanel({
   initialPlayerId?: string;
   /** `?review=1` — "Start reviewing" landed here after filtering. */
   startReview?: boolean;
+  /** The registration link, under the page head. */
+  share?: ReactNode;
+  /** Closed, the viewer may advance the season, and the auction has not begun. */
+  canReopen?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -344,6 +364,7 @@ export function RegistrationDashboardPanel({
         status: filters.status,
         fee: filters.fee,
         team: filters.team,
+        role: filters.role,
         sort: filters.sort === "recent" ? "" : filters.sort,
         ...patch,
       };
@@ -407,6 +428,7 @@ export function RegistrationDashboardPanel({
     filters.status !== "" ||
     filters.fee !== "" ||
     filters.team !== "" ||
+    filters.role !== "" ||
     filters.sort !== "recent";
 
   /* --- Selection & bulk ----------------------------------------------- */
@@ -431,7 +453,9 @@ export function RegistrationDashboardPanel({
     const result = await selectAllMatchingAction(slug, {
       ...(filters.search !== "" ? { search: filters.search } : {}),
       ...(filters.status !== "" ? { status: filters.status } : {}),
+      ...(filters.fee !== "" ? { fee: filters.fee } : {}),
       ...(filters.team !== "" ? { teamId: filters.team } : {}),
+      ...(filters.role !== "" ? { role: filters.role } : {}),
     });
     setBulkBusy(null);
     if (!result.ok) {
@@ -564,9 +588,70 @@ export function RegistrationDashboardPanel({
 
   const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
   const teamOptions = teams.map((team) => ({ id: team.id, name: team.name }));
+  const teamColorOf = useMemo(
+    () => new Map(teams.map((team) => [team.id, team.primaryColor])),
+    [teams],
+  );
+
+  /* --- Reopen: the overview's own advance, offered where intake is run. --- */
+  const [reopening, setReopening] = useState(false);
+  const reopen = async () => {
+    setReopening(true);
+    const result = await advanceCompetitionAction(slug, "registration_open");
+    setReopening(false);
+    if (!result.ok) {
+      toast({ title: result.error ?? "Registration couldn't be reopened.", tone: "danger" });
+      return;
+    }
+    toast({ title: "Registration is open again. The link takes new players.", tone: "success" });
+    router.refresh();
+  };
+
+  const pendingReview = stats.submitted + stats.waitlisted;
+  const firstOnPage = (page.page - 1) * page.pageSize;
 
   return (
     <div className="pd-desk" data-sheet-open={sheetRow !== null ? "true" : undefined}>
+      {/* The page head's lede and actions. The shell draws the trail, the one
+          <h1> and — in the top bar — the season's status pill. */}
+      <div className="rd-head">
+        <p className="rd-lede">
+          {stats.total === 0
+            ? "Share the registration link, add players yourself or import your sheet."
+            : `${String(stats.total)} player${stats.total === 1 ? "" : "s"} registered · ${
+                pendingReview === 0
+                  ? "everyone reviewed"
+                  : `${String(pendingReview)} waiting for a decision`
+              }`}
+        </p>
+        <div className="rd-actions">
+          <Button
+            variant="secondary"
+            data-testid="open-import"
+            onClick={() => {
+              setImportOpen(true);
+            }}
+          >
+            <IconUpload size={18} className="icon-lead" aria-hidden />
+            Import CSV
+          </Button>
+          {canReopen ? (
+            <Button
+              variant="secondary"
+              data-testid="reopen-registration"
+              loading={reopening}
+              onClick={() => void reopen()}
+            >
+              <IconRefresh size={18} className="icon-lead" aria-hidden />
+              Reopen registration
+            </Button>
+          ) : null}
+          <AddPlayerDialog slug={slug} roles={desk.roles} rolesRequired={desk.rolesRequired} />
+        </div>
+      </div>
+
+      {share}
+
       <NextStep
         stats={stats}
         orphans={orphanPreSigned}
@@ -577,43 +662,24 @@ export function RegistrationDashboardPanel({
         onOpenPlayer={openSheet}
       />
 
-      <div className="pd-toolbar">
-        <div className="pd-toolbar-actions">
-          <AddPlayerDialog slug={slug} roles={desk.roles} rolesRequired={desk.rolesRequired} />
-          <Button
-            size="sm"
-            variant="secondary"
-            data-testid="open-import"
-            onClick={() => {
-              setImportOpen(true);
-            }}
-          >
-            Import
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            data-testid="export-csv"
-            onClick={() => {
-              setExportOpen(true);
-            }}
-          >
-            Export
-          </Button>
-        </div>
-      </div>
-
-      <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
+      {/* Eight figures, and seven of them are the list's own filters: the
+          open one is gold. The auction pool is derived, so it explains itself
+          instead of filtering. */}
+      <div className="rd-stats" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
         <StatTile
+          icon={<IconUsers />}
+          tone="neutral"
           label="Total"
           value={stats.total}
           testId="stat-total"
-          active={filters.status === ""}
+          active={filters.status === "" && filters.fee === ""}
           onSelect={() => {
-            changeFilter({ status: "" });
+            changeFilter({ status: "", fee: "" });
           }}
         />
         <StatTile
+          icon={<IconFile />}
+          tone="blue"
           label="Submitted"
           value={stats.submitted}
           testId="stat-submitted"
@@ -623,6 +689,8 @@ export function RegistrationDashboardPanel({
           }}
         />
         <StatTile
+          icon={<IconCheckCircle />}
+          tone="green"
           label="Approved"
           value={stats.approved}
           testId="stat-approved"
@@ -634,12 +702,16 @@ export function RegistrationDashboardPanel({
         {/* DA-35: the figure that decides what auction night contains — the
             same rule the Auction tab filters on, so the two cannot disagree. */}
         <StatTile
+          icon={<IconGavel />}
+          tone="gold"
           label="Auction pool"
           value={stats.auctionPool}
           testId="stat-auction-pool"
           hint={poolHint(stats)}
         />
         <StatTile
+          icon={<IconWallet />}
+          tone="green"
           label="Fees paid"
           value={stats.fees.paid}
           testId="stat-fees-paid"
@@ -649,40 +721,39 @@ export function RegistrationDashboardPanel({
           }}
           hint={feeHint(stats)}
         />
-        {/* Zero-count outcomes stay off the strip unless they are the open filter. */}
-        {stats.waitlisted > 0 || filters.status === "waitlisted" ? (
-          <StatTile
-            label="Waitlisted"
-            value={stats.waitlisted}
-            testId="stat-waitlisted"
-            active={filters.status === "waitlisted"}
-            onSelect={() => {
-              changeFilter({ status: "waitlisted" });
-            }}
-          />
-        ) : null}
-        {stats.rejected > 0 || filters.status === "rejected" ? (
-          <StatTile
-            label="Declined"
-            value={stats.rejected}
-            testId="stat-rejected"
-            active={filters.status === "rejected"}
-            onSelect={() => {
-              changeFilter({ status: "rejected" });
-            }}
-          />
-        ) : null}
-        {stats.withdrawn > 0 || filters.status === "withdrawn" ? (
-          <StatTile
-            label="Withdrawn"
-            value={stats.withdrawn}
-            testId="stat-withdrawn"
-            active={filters.status === "withdrawn"}
-            onSelect={() => {
-              changeFilter({ status: "withdrawn" });
-            }}
-          />
-        ) : null}
+        <StatTile
+          icon={<IconClock />}
+          tone="amber"
+          label="Waitlisted"
+          value={stats.waitlisted}
+          testId="stat-waitlisted"
+          active={filters.status === "waitlisted"}
+          onSelect={() => {
+            changeFilter({ status: "waitlisted" });
+          }}
+        />
+        <StatTile
+          icon={<IconXCircle />}
+          tone="red"
+          label="Declined"
+          value={stats.rejected}
+          testId="stat-rejected"
+          active={filters.status === "rejected"}
+          onSelect={() => {
+            changeFilter({ status: "rejected" });
+          }}
+        />
+        <StatTile
+          icon={<IconMinusCircle />}
+          tone="neutral"
+          label="Withdrawn"
+          value={stats.withdrawn}
+          testId="stat-withdrawn"
+          active={filters.status === "withdrawn"}
+          onSelect={() => {
+            changeFilter({ status: "withdrawn" });
+          }}
+        />
       </div>
 
       {/* DA-35: the orphan. A pre-signed player with no team is in NO auction
@@ -750,251 +821,317 @@ export function RegistrationDashboardPanel({
         </div>
       ) : null}
 
-      <form
-        className="pd-filters"
-        role="search"
-        onSubmit={(event) => {
-          event.preventDefault();
-          changeFilter({ q: search.trim() });
-        }}
-      >
-        <div className="pd-search">
-          {/* The magnifier IS the submit button — Enter works too, and the
-              list also follows typing, a beat after the last key. */}
-          <button
-            type="submit"
-            className="pd-search-icon"
-            data-testid="search-submit"
-            aria-label="Search"
-          >
-            <IconSearch size={16} aria-hidden />
-          </button>
-          <label htmlFor="pd-search" className="pd-visually-hidden">
-            Search
-          </label>
-          <input
-            id="pd-search"
-            type="text"
-            enterKeyHint="search"
-            autoComplete="off"
-            className="pd-input"
-            placeholder="Search name, phone, number or team   /"
-            value={search}
-            onChange={(event) => {
-              onSearchInput(event.target.value);
+      <SectionCard
+        flush
+        className="rd-card"
+        icon={<IconUsers />}
+        title="Players"
+        description={`${String(page.total)} player${page.total === 1 ? "" : "s"}${
+          filtersApplied ? " match these filters" : ""
+        }`}
+        action={
+          <Button
+            size="sm"
+            variant="secondary"
+            data-testid="export-csv"
+            onClick={() => {
+              setExportOpen(true);
             }}
+          >
+            <IconDownload size={16} className="icon-lead" aria-hidden />
+            Export
+          </Button>
+        }
+      >
+        <form
+          className="pd-filters rd-filters"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            changeFilter({ q: search.trim() });
+          }}
+        >
+          <div className="pd-search">
+            {/* The magnifier IS the submit button — Enter works too, and the
+                list also follows typing, a beat after the last key. */}
+            <button
+              type="submit"
+              className="pd-search-icon"
+              data-testid="search-submit"
+              aria-label="Search"
+            >
+              <IconSearch size={16} aria-hidden />
+            </button>
+            <label htmlFor="pd-search" className="pd-visually-hidden">
+              Search
+            </label>
+            <input
+              id="pd-search"
+              type="text"
+              enterKeyHint="search"
+              autoComplete="off"
+              className="pd-input"
+              placeholder="Search name, phone, number or team   /"
+              value={search}
+              onChange={(event) => {
+                onSearchInput(event.target.value);
+              }}
+            />
+          </div>
+          <FilterSelect
+            label="Status"
+            value={filters.status}
+            onChange={(value) => {
+              changeFilter({ status: value });
+            }}
+            options={STATUS_FILTERS.map((status) => ({
+              value: status,
+              label: STATUS_LABEL[status] ?? status,
+            }))}
           />
-        </div>
-        <FilterSelect
-          label="Status"
-          value={filters.status}
-          onChange={(value) => {
-            changeFilter({ status: value });
-          }}
-          options={STATUS_FILTERS.map((status) => ({
-            value: status,
-            label: STATUS_LABEL[status] ?? status,
-          }))}
-        />
-        <FilterSelect
-          label="Fee"
-          value={filters.fee}
-          onChange={(value) => {
-            changeFilter({ fee: value });
-          }}
-          options={[
-            { value: "", label: "Any fee state" },
-            ...FEE_STATUSES.map((state) => ({ value: state, label: FEE_LABEL[state] })),
-          ]}
-        />
-        <FilterSelect
-          label="Team"
-          value={filters.team}
-          onChange={(value) => {
-            changeFilter({ team: value });
-          }}
-          options={[
-            { value: "", label: "All teams" },
-            ...teams.map((team) => ({ value: team.id, label: team.name })),
-          ]}
-        />
-        <FilterSelect
-          label="Sort"
-          value={filters.sort}
-          onChange={(value) => {
-            changeFilter({ sort: value });
-          }}
-          options={SORTS.map((sort) => ({ value: sort, label: SORT_LABEL[sort] ?? sort }))}
-        />
-        {filtersApplied ? (
+          {desk.roles.length > 0 ? (
+            <FilterSelect
+              label="Role"
+              value={filters.role}
+              onChange={(value) => {
+                changeFilter({ role: value });
+              }}
+              options={[
+                { value: "", label: "All roles" },
+                ...desk.roles.map((role) => ({ value: role.key, label: role.label })),
+              ]}
+            />
+          ) : null}
+          <FilterSelect
+            label="Team"
+            value={filters.team}
+            onChange={(value) => {
+              changeFilter({ team: value });
+            }}
+            options={[
+              { value: "", label: "All teams" },
+              ...teams.map((team) => ({ value: team.id, label: team.name })),
+            ]}
+          />
+          <FilterSelect
+            label="Fee"
+            value={filters.fee}
+            onChange={(value) => {
+              changeFilter({ fee: value });
+            }}
+            options={[
+              { value: "", label: "Any fee status" },
+              ...FEE_STATUSES.map((state) => ({ value: state, label: FEE_LABEL[state] })),
+            ]}
+          />
+          <FilterSelect
+            label="Sort"
+            value={filters.sort}
+            onChange={(value) => {
+              changeFilter({ sort: value });
+            }}
+            options={SORTS.map((sort) => ({ value: sort, label: SORT_LABEL[sort] ?? sort }))}
+          />
           <button
             type="button"
-            className="pd-link pd-clear"
+            className="rd-reset"
+            data-testid="filters-reset"
+            disabled={!filtersApplied}
             onClick={() => {
               setSearch("");
-              changeFilter({ q: "", status: "", fee: "", team: "", sort: "" });
+              changeFilter({ q: "", status: "", fee: "", team: "", role: "", sort: "" });
             }}
           >
-            Clear filters
+            <IconRefresh size={16} aria-hidden />
+            Reset
           </button>
-        ) : null}
-      </form>
+        </form>
 
-      <div className="pd-table-wrap" data-busy={navigating ? "true" : undefined}>
-        <div className="pd-table-head">
-          {rows.length > 0 ? (
-            <label className="pd-check">
-              <input
-                type="checkbox"
-                aria-label="Select all on page"
-                checked={allOnPageSelected}
-                onChange={() => {
-                  setSelected((prev) => {
-                    const next = new Map(prev);
-                    if (allOnPageSelected) {
-                      rows.forEach((row) => next.delete(row.id));
-                    } else {
-                      rows.forEach((row) => {
-                        next.set(row.id, { id: row.id, number: row.number, name: row.name });
-                      });
-                    }
-                    return next;
-                  });
-                }}
-              />
-              <span>
-                {page.total} player{page.total === 1 ? "" : "s"}
-                {filtersApplied ? " match" : ""}
-              </span>
-            </label>
-          ) : (
-            <span />
-          )}
-          <span className="pd-quiet pd-shortcuts">
-            <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>x</kbd> select
-          </span>
-        </div>
-
-        <div
-          className="pd-table-scroll"
-          role="region"
-          aria-label="Registrations table"
-          tabIndex={0}
-        >
-          <table className="pd-table" data-testid="reg-table">
-            <caption className="pd-visually-hidden">
-              {page.total} registration{page.total === 1 ? "" : "s"} match this view — page{" "}
-              {page.page} of {totalPages}.
-            </caption>
-            <thead>
-              <tr>
-                <th className="pd-col-check">
-                  <VisuallyHidden>Select</VisuallyHidden>
-                </th>
-                <th>Player</th>
-                <th className="pd-col-role">Role</th>
-                <th>Status</th>
-                <th className="pd-col-team">Team</th>
-                <th className="pd-col-actions">
-                  <VisuallyHidden>Actions</VisuallyHidden>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <PlayerRow
-                  key={row.id}
-                  row={row}
-                  cursor={index === cursor}
-                  open={row.id === sheetId}
-                  checked={selected.has(row.id)}
-                  categoryFlagged={categoryFlags[row.id] !== undefined}
-                  roleLabel={labelOf(desk.roles, row.role)}
-                  onToggle={() => {
-                    toggle(row);
-                  }}
-                  onOpen={() => {
-                    setCursor(index);
-                    openSheet(row.id);
-                  }}
-                  onApprove={() => void decideRow(row, "approve")}
-                  onDecline={() => {
-                    setDeclining(row);
+        <div className="pd-table-wrap" data-busy={navigating ? "true" : undefined}>
+          <div className="pd-table-head">
+            {rows.length > 0 ? (
+              <label className="pd-check">
+                <input
+                  type="checkbox"
+                  aria-label="Select all on page"
+                  checked={allOnPageSelected}
+                  onChange={() => {
+                    setSelected((prev) => {
+                      const next = new Map(prev);
+                      if (allOnPageSelected) {
+                        rows.forEach((row) => next.delete(row.id));
+                      } else {
+                        rows.forEach((row) => {
+                          next.set(row.id, { id: row.id, number: row.number, name: row.name });
+                        });
+                      }
+                      return next;
+                    });
                   }}
                 />
-              ))}
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="pd-empty" data-testid="reg-empty">
-                    {!filtersApplied && stats.total > 0 ? (
-                      <>
-                        <strong>
-                          {stats.total} registration{stats.total === 1 ? "" : "s"} exist
-                          {stats.total === 1 ? "s" : ""} but none can be displayed.
-                        </strong>{" "}
-                        This usually means the underlying player records are incomplete — contact
-                        support with this season&rsquo;s name.
-                      </>
-                    ) : filtersApplied ? (
-                      <>
-                        <strong>No registrations match these filters.</strong>{" "}
-                        <button
-                          type="button"
-                          className="pd-link"
-                          onClick={() => {
-                            setSearch("");
-                            changeFilter({ q: "", status: "", fee: "", team: "", sort: "" });
-                          }}
-                        >
-                          Clear the filters
-                        </button>{" "}
-                        to see all {stats.total} registration{stats.total === 1 ? "" : "s"}.
-                      </>
-                    ) : (
-                      <>
-                        <strong>Nobody has registered yet.</strong> Share the registration link —
-                        that&apos;s how players arrive — or add players yourself, or import a CSV.
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 || page.total > 0 ? (
-          <div className="pd-pager">
-            <span data-testid="page-indicator" className="pd-quiet">
-              Page {page.page} of {totalPages} · {page.total} total
-            </span>
-            <span className="pd-pager-buttons">
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={page.page <= 1}
-                onClick={() => {
-                  pushQuery({ page: String(page.page - 1) });
-                }}
-                data-testid="page-prev"
-              >
-                Previous
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={page.page >= totalPages}
-                onClick={() => {
-                  pushQuery({ page: String(page.page + 1) });
-                }}
-                data-testid="page-next"
-              >
-                Next
-              </Button>
+                <span>Select all on this page</span>
+              </label>
+            ) : (
+              <span />
+            )}
+            <span className="pd-quiet pd-shortcuts">
+              <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>x</kbd> select
             </span>
           </div>
-        ) : null}
-      </div>
+
+          <div className="pd-table-scroll" role="region" aria-label="Registrations table">
+            <table className="pd-table" data-testid="reg-table">
+              <caption className="pd-visually-hidden">
+                {page.total} registration{page.total === 1 ? "" : "s"} match this view — page{" "}
+                {page.page} of {totalPages}.
+              </caption>
+              <thead>
+                <tr>
+                  <th className="pd-col-check">
+                    <VisuallyHidden>Select</VisuallyHidden>
+                  </th>
+                  <th className="pd-col-num">#</th>
+                  <th>Player</th>
+                  <th className="pd-col-role">Role</th>
+                  <th className="pd-col-team">Team</th>
+                  <th className="pd-col-status">Status</th>
+                  <th className="pd-col-fee">Fee status</th>
+                  <th className="pd-col-date">Registered on</th>
+                  <th className="pd-col-actions">
+                    <VisuallyHidden>Actions</VisuallyHidden>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <PlayerRow
+                    key={row.id}
+                    row={row}
+                    number={firstOnPage + index + 1}
+                    cursor={index === cursor}
+                    open={row.id === sheetId}
+                    checked={selected.has(row.id)}
+                    categoryFlagged={categoryFlags[row.id] !== undefined}
+                    roleLabel={labelOf(desk.roles, row.role)}
+                    teamColor={teamColorOf.get(row.teamId ?? "") ?? null}
+                    onToggle={() => {
+                      toggle(row);
+                    }}
+                    onOpen={() => {
+                      setCursor(index);
+                      openSheet(row.id);
+                    }}
+                    onApprove={() => void decideRow(row, "approve")}
+                    onDecline={() => {
+                      setDeclining(row);
+                    }}
+                  />
+                ))}
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="pd-empty" data-testid="reg-empty">
+                      {!filtersApplied && stats.total > 0 ? (
+                        <>
+                          <strong>
+                            {stats.total} registration{stats.total === 1 ? "" : "s"} exist
+                            {stats.total === 1 ? "s" : ""} but none can be displayed.
+                          </strong>{" "}
+                          This usually means the underlying player records are incomplete — contact
+                          support with this season&rsquo;s name.
+                        </>
+                      ) : filtersApplied ? (
+                        <>
+                          <strong>No registrations match these filters.</strong>{" "}
+                          <button
+                            type="button"
+                            className="pd-link"
+                            onClick={() => {
+                              setSearch("");
+                              changeFilter({
+                                q: "",
+                                status: "",
+                                fee: "",
+                                team: "",
+                                role: "",
+                                sort: "",
+                              });
+                            }}
+                          >
+                            Clear the filters
+                          </button>{" "}
+                          to see all {stats.total} registration{stats.total === 1 ? "" : "s"}.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Nobody has registered yet.</strong> Share the registration link —
+                          that&apos;s how players arrive — or add players yourself, or import a CSV.
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          {page.total > 0 ? (
+            <nav className="pd-pager" aria-label="Pages">
+              <span data-testid="page-indicator" className="pd-quiet">
+                {page.total} total · showing {firstOnPage + 1}–
+                {Math.min(page.total, firstOnPage + rows.length)}
+              </span>
+              <span className="pd-pager-buttons">
+                <button
+                  type="button"
+                  className="rd-pagebtn"
+                  disabled={page.page <= 1}
+                  onClick={() => {
+                    pushQuery({ page: String(page.page - 1) });
+                  }}
+                  data-testid="page-prev"
+                  aria-label="Previous page"
+                >
+                  <IconChevronLeft size={16} aria-hidden />
+                </button>
+                {pageList(page.page, totalPages).map((entry, index) =>
+                  entry === null ? (
+                    <span key={`gap-${String(index)}`} className="rd-pagegap" aria-hidden>
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={entry}
+                      type="button"
+                      className="rd-pagebtn"
+                      aria-current={entry === page.page ? "page" : undefined}
+                      aria-label={`Page ${String(entry)}`}
+                      onClick={() => {
+                        if (entry !== page.page) {
+                          pushQuery({ page: String(entry) });
+                        }
+                      }}
+                    >
+                      {entry}
+                    </button>
+                  ),
+                )}
+                <button
+                  type="button"
+                  className="rd-pagebtn"
+                  disabled={page.page >= totalPages}
+                  onClick={() => {
+                    pushQuery({ page: String(page.page + 1) });
+                  }}
+                  data-testid="page-next"
+                  aria-label="Next page"
+                >
+                  <IconChevronRight size={16} aria-hidden />
+                </button>
+              </span>
+            </nav>
+          ) : null}
+        </div>
+      </SectionCard>
 
       {/* The bulk bar floats over the table's foot: the selection and what
           can be done to it stay in view however far down the list you are. */}
@@ -1169,6 +1306,7 @@ export function RegistrationDashboardPanel({
                 ...(filters.status !== "" ? { status: filters.status } : {}),
                 ...(filters.fee !== "" ? { fee: filters.fee } : {}),
                 ...(filters.team !== "" ? { teamId: filters.team } : {}),
+                ...(filters.role !== "" ? { role: filters.role } : {}),
               },
             }
           : {})}
@@ -1321,7 +1459,7 @@ function NextStep({
     title = `${String(pending)} player${pending === 1 ? " is" : "s are"} waiting for a decision`;
     why = "Open each one, approve or decline, and the next opens by itself.";
     action = (
-      <Button onClick={onReview} data-testid="start-review">
+      <Button variant="secondary" onClick={onReview} data-testid="start-review">
         Start reviewing <IconArrowRight size={16} className="icon-trail" />
       </Button>
     );
@@ -1333,6 +1471,7 @@ function NextStep({
     action =
       first === undefined ? null : (
         <Button
+          variant="secondary"
           onClick={() => {
             onOpenPlayer(first.id);
           }}
@@ -1345,7 +1484,7 @@ function NextStep({
     title = "Add the teams that will bid";
     why = "An auction needs at least two teams — then pick each team's captain and icons.";
     action = (
-      <ButtonLink href={`/seasons/${slug}/teams`}>
+      <ButtonLink variant="secondary" href={`/seasons/${slug}/teams`}>
         Go to teams <IconArrowRight size={16} className="icon-trail" />
       </ButtonLink>
     );
@@ -1359,7 +1498,7 @@ function NextStep({
     title = `${String(stats.auctionPool)} player${stats.auctionPool === 1 ? "" : "s"} ready for the auction`;
     why = "Everyone is reviewed. Pick captains and icons on each team, then set up the auction.";
     action = (
-      <ButtonLink href={`/seasons/${slug}/auction`}>
+      <ButtonLink variant="secondary" href={`/seasons/${slug}/auction`}>
         Set up the auction <IconArrowRight size={16} className="icon-trail" />
       </ButtonLink>
     );
@@ -1382,30 +1521,52 @@ function NextStep({
 
 /* --- One row ------------------------------------------------------------- */
 
+const STATUS_PILL: Record<Row["status"], KitTone> = {
+  draft: "neutral",
+  submitted: "blue",
+  approved: "green",
+  rejected: "red",
+  waitlisted: "amber",
+  withdrawn: "neutral",
+};
+
+const FEE_PILL: Record<Row["feeStatus"], KitTone> = {
+  pending: "amber",
+  paid: "green",
+  waived: "blue",
+  refunded: "neutral",
+};
+
 function PlayerRow({
   row,
+  number,
   cursor,
   open,
   checked,
   categoryFlagged,
   roleLabel,
+  teamColor,
   onToggle,
   onOpen,
   onApprove,
   onDecline,
 }: {
   row: Row;
+  /** The row's place in the whole filtered list, not just this page. */
+  number: number;
   cursor: boolean;
   open: boolean;
   checked: boolean;
   categoryFlagged: boolean;
   roleLabel: string;
+  teamColor: string | null;
   onToggle: () => void;
   onOpen: () => void;
   onApprove: () => void;
   onDecline: () => void;
 }) {
   const triage = canTriage(row);
+  const name = row.name ?? "Unnamed";
   return (
     <tr
       className="pd-row"
@@ -1415,7 +1576,11 @@ function PlayerRow({
       data-selected={checked ? "true" : undefined}
       onClick={(event) => {
         // The whole row opens the player; its own controls do their own thing.
-        if ((event.target as HTMLElement).closest("button, a, input, label, select") === null) {
+        if (
+          (event.target as HTMLElement).closest(
+            "button, a, input, label, select, [role='menu']",
+          ) === null
+        ) {
           onOpen();
         }
       }}
@@ -1429,6 +1594,7 @@ function PlayerRow({
           onChange={onToggle}
         />
       </td>
+      <td className="pd-col-num">{number}</td>
       <td className="pd-col-player">
         <div className="pd-player">
           <PlayerImage
@@ -1444,8 +1610,9 @@ function PlayerRow({
               className="pd-player-name"
               onClick={onOpen}
               data-focus-key={`open-${row.id}`}
+              data-testid={`open-${row.personId}`}
             >
-              {row.name ?? "Unnamed"}
+              {name}
             </button>
             <span className="pd-player-meta">
               <span className="pd-mono">{row.number}</span>
@@ -1471,29 +1638,17 @@ function PlayerRow({
         </div>
       </td>
       <td className="pd-col-role">
-        <span>{roleLabel}</span>
+        <span>{roleLabel === "" ? "—" : roleLabel}</span>
         {row.age !== null ? <span className="pd-sub">{row.age} yrs</span> : null}
       </td>
-      <td className="pd-col-status">
-        <span className="pd-status">
-          <Badge tone={STATUS_TONE[row.status]}>
-            {row.status === "rejected" ? "declined" : row.status}
-          </Badge>
-          {/* ONLY WHEN IT IS NOT PAID: the one an organizer acts on shows. */}
-          {row.feeStatus !== "paid" ? (
-            <Badge tone={FEE_TONE[row.feeStatus]} data-testid={`fee-${row.personId}`}>
-              {FEE_LABEL[row.feeStatus]}
-            </Badge>
-          ) : null}
-        </span>
-        {row.status === "rejected" && row.rejectionReason !== null ? (
-          <span className="pd-sub" data-testid={`reason-${row.personId}`}>
-            {REASON_LABEL[row.rejectionReason] ?? row.rejectionReason}
-          </span>
-        ) : null}
-      </td>
       <td className="pd-col-team">
-        <span className="pd-team">{row.teamName ?? <span className="pd-quiet">—</span>}</span>
+        <span className="pd-team">
+          {row.teamName !== null ? (
+            <TeamChip color={teamColor}>{row.teamName}</TeamChip>
+          ) : (
+            <span className="pd-quiet">—</span>
+          )}
+        </span>
         <span className="pd-marks-inline">
           {row.isCaptain ? (
             <span
@@ -1530,40 +1685,78 @@ function PlayerRow({
           <span className="pd-sub pd-sub-danger">No team — in no squad</span>
         ) : null}
       </td>
-      <td className="pd-col-actions">
-        {triage ? (
-          <span className="pd-row-actions">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={onApprove}
-              data-focus-key={`approve-${row.id}`}
-            >
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onDecline}
-              data-focus-key={`decline-${row.id}`}
-              data-testid={`decline-${row.personId}`}
-            >
-              Decline
-            </Button>
+      <td className="pd-col-status">
+        <span className="pd-status">
+          <Pill tone={STATUS_PILL[row.status]} dot>
+            {row.status === "rejected" ? "declined" : row.status}
+          </Pill>
+        </span>
+        {row.status === "rejected" && row.rejectionReason !== null ? (
+          <span className="pd-sub" data-testid={`reason-${row.personId}`}>
+            {REASON_LABEL[row.rejectionReason] ?? row.rejectionReason}
           </span>
         ) : null}
-        <button
-          type="button"
-          className="pd-icon-btn pd-row-open"
-          aria-label="Details"
-          title="Open player"
-          onClick={onOpen}
-        >
-          <IconChevronRight size={18} />
-        </button>
+      </td>
+      <td className="pd-col-fee">
+        <Pill tone={FEE_PILL[row.feeStatus]} testId={`fee-${row.personId}`}>
+          {FEE_LABEL[row.feeStatus]}
+        </Pill>
+      </td>
+      <td className="pd-col-date">
+        <time dateTime={row.createdAt}>{formatDate(row.createdAt)}</time>
+      </td>
+      <td className="pd-col-actions">
+        <PopoverMenu
+          label={`Actions for ${name}`}
+          triggerClassName="rd-kebab"
+          trigger={
+            <span className="rd-kebab-glyph" data-testid={`row-menu-${row.personId}`}>
+              <IconKebab size={18} aria-hidden />
+            </span>
+          }
+          items={[
+            { key: "open", label: "Open details", onSelect: onOpen },
+            ...(triage
+              ? [
+                  {
+                    key: "approve",
+                    label: <span data-testid={`approve-${row.personId}`}>Approve</span>,
+                    onSelect: onApprove,
+                  },
+                  {
+                    key: "decline",
+                    label: <span data-testid={`decline-${row.personId}`}>Decline…</span>,
+                    onSelect: onDecline,
+                    danger: true,
+                  },
+                ]
+              : []),
+          ]}
+        />
       </td>
     </tr>
   );
+}
+
+/** Numbered pages around the current one — 1 … 4 5 6 … 12 — `null` is a gap. */
+function pageList(current: number, total: number): (number | null)[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1);
+  }
+  const shown = new Set([1, total, current - 1, current, current + 1]);
+  const out: (number | null)[] = [];
+  let last = 0;
+  for (let entry = 1; entry <= total; entry += 1) {
+    if (!shown.has(entry)) {
+      continue;
+    }
+    if (entry - last > 1) {
+      out.push(null);
+    }
+    out.push(entry);
+    last = entry;
+  }
+  return out;
 }
 
 function FilterSelect({
@@ -1603,6 +1796,8 @@ function FilterSelect({
 }
 
 function StatTile({
+  icon,
+  tone,
   label,
   value,
   testId,
@@ -1610,6 +1805,8 @@ function StatTile({
   active,
   hint,
 }: {
+  icon: ReactNode;
+  tone: KitTone;
   label: string;
   value: number;
   testId: string;
@@ -1619,26 +1816,16 @@ function StatTile({
   /** A figure that is DERIVED says how, where it is read. */
   hint?: string;
 }) {
-  const tile = (
-    <div className="stat-tile" data-testid={testId}>
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
-      {hint !== undefined ? <span className="stat-hint">{hint}</span> : null}
-    </div>
-  );
-  if (onSelect === undefined) {
-    return tile;
-  }
+  // `.stat-value` / `.stat-hint` are the suites' hooks into the figure.
   return (
-    <button
-      type="button"
-      className="stat-tile-link"
-      data-active={active === true}
-      aria-pressed={active === true}
-      aria-label={`Filter: ${label}`}
-      onClick={onSelect}
-    >
-      {tile}
-    </button>
+    <StatCard
+      icon={icon}
+      tone={tone}
+      value={<span className="stat-value">{value}</span>}
+      label={label}
+      {...(hint !== undefined ? { hint: <span className="stat-hint">{hint}</span> } : {})}
+      testId={testId}
+      {...(onSelect !== undefined ? { onSelect, active: active === true } : {})}
+    />
   );
 }

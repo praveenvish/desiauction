@@ -140,6 +140,7 @@ import {
   type KitSummary,
   type OrphanPreSigned,
   type RegistrationPage,
+  type RegistrationQuery,
   type RegistrationRow,
   type RegistrationSort,
   type RegistrationStats,
@@ -1389,8 +1390,34 @@ export interface DashboardParams {
   /** A fee state — the desk's own filter. */
   fee?: string;
   teamId?: string;
+  /** A playing role — the pack's key. */
+  role?: string;
   sort?: string;
   page?: string;
+}
+
+/**
+ * The dashboard's filter from its URL parameters — ONE parser for the page, its
+ * "select all matching" and its "export this view", so the three cannot answer
+ * "who matches?" three ways. (Select-all used to drop the fee filter, so with
+ * "Not paid" on screen it selected the paid players too.)
+ */
+function dashboardFilter(
+  params: DashboardParams,
+): Omit<RegistrationQuery, "page" | "pageSize" | "sort" | "registrationId"> {
+  return {
+    ...(params.search !== undefined && params.search !== "" ? { search: params.search } : {}),
+    ...(params.status !== undefined && VALID_STATUS.has(params.status as RegistrationStatus)
+      ? { status: params.status as RegistrationStatus }
+      : {}),
+    // Validated against the enum rather than passed through: the value reaches
+    // a `where` clause, and an unknown one should narrow to nothing rather than
+    // quietly widening to everything.
+    ...(isFeeStatus(params.fee ?? "") ? { fee: params.fee as FeeStatus } : {}),
+    ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
+    // Compared for equality in SQL, so an unknown role narrows to nobody.
+    ...(params.role !== undefined && params.role !== "" ? { role: params.role } : {}),
+  };
 }
 
 export interface RegistrationDashboard {
@@ -1415,7 +1442,12 @@ export interface RegistrationDashboard {
   teams?: TeamSummary[];
   /** Drives the closed-intake notice on the share block (DA-35). */
   registrationOpen: boolean;
-  viewer: { canReview: boolean };
+  /**
+   * `canManage` — `competition.manage`, which `advanceCompetitionAction`
+   * enforces: the desk offers "Reopen registration" only to whoever may.
+   * Present only past the review gate.
+   */
+  viewer: { canReview: boolean; canManage?: boolean };
   /**
    * PI-1: rows whose person's own declared gender is directly contrary to the
    * season's entry category — the ORGANIZER-channel advisory from the one
@@ -1451,15 +1483,7 @@ export async function registrationDashboard(
   const scope = { orgId: competition.orgId, competitionId: competition.id };
   const pageNum = Number.parseInt(params.page ?? "1", 10);
   const query = {
-    ...(params.search !== undefined && params.search !== "" ? { search: params.search } : {}),
-    ...(params.status !== undefined && VALID_STATUS.has(params.status as RegistrationStatus)
-      ? { status: params.status as RegistrationStatus }
-      : {}),
-    // Validated against the enum rather than passed through: the value reaches
-    // a `where` clause, and an unknown one should narrow to nothing rather than
-    // quietly widening to everything.
-    ...(isFeeStatus(params.fee ?? "") ? { fee: params.fee as FeeStatus } : {}),
-    ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
+    ...dashboardFilter(params),
     sort: (VALID_SORT.has(params.sort as RegistrationSort)
       ? params.sort
       : "recent") as RegistrationSort,
@@ -1477,13 +1501,14 @@ export async function registrationDashboard(
         viewer: { canReview },
       };
     }
-    const [stats, page, teams, orphans, kit, desk] = await Promise.all([
+    const [stats, page, teams, orphans, kit, desk, canManage] = await Promise.all([
       registrationStats(db, competition.id),
       queryRegistrations(db, competition.id, query),
       teamsOf(db, competition.id),
       orphanPreSigned(db, competition.id),
       kitSummary(db, competition.id),
       playerDeskContext(db, session.personId, competition),
+      canCompetition(db, session.personId, scope, "competition.manage"),
     ]);
     // PI-1: the organizer-channel category advisory, computed by THE evaluator
     // (never by a second SQL copy of its rules) over just this page's people.
@@ -1528,7 +1553,7 @@ export async function registrationDashboard(
       orphanPreSigned: orphans,
       kit,
       registrationOpen: competition.status === "registration_open",
-      viewer: { canReview },
+      viewer: { canReview, canManage },
       categoryFlags,
       desk,
     };
@@ -1565,11 +1590,7 @@ export async function selectAllMatchingAction(
     let page = 1;
     for (;;) {
       const result = await queryRegistrations(db, gate.competition.id, {
-        ...(params.search !== undefined && params.search !== "" ? { search: params.search } : {}),
-        ...(params.status !== undefined && VALID_STATUS.has(params.status as RegistrationStatus)
-          ? { status: params.status as RegistrationStatus }
-          : {}),
-        ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
+        ...dashboardFilter(params),
         sort: "number",
         page,
         pageSize: 100,
@@ -2658,18 +2679,7 @@ export async function exportRegistrationsAction(
       ...(teamId !== undefined ? { teamId } : {}),
       ...(request.columns !== undefined ? { columns: request.columns } : {}),
       ...(request.rows !== undefined ? { rows: request.rows } : {}),
-      ...(request.rows === "view"
-        ? {
-            view: {
-              ...(view.search !== undefined && view.search !== "" ? { search: view.search } : {}),
-              ...(view.status !== undefined && VALID_STATUS.has(view.status as RegistrationStatus)
-                ? { status: view.status as RegistrationStatus }
-                : {}),
-              ...(isFeeStatus(view.fee ?? "") ? { fee: view.fee as FeeStatus } : {}),
-              ...(view.teamId !== undefined && view.teamId !== "" ? { teamId: view.teamId } : {}),
-            },
-          }
-        : {}),
+      ...(request.rows === "view" ? { view: dashboardFilter(view) } : {}),
     });
     const suffix =
       team !== undefined
