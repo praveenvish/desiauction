@@ -152,6 +152,12 @@ sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
    and report retention, it is what ages out spent sign-in codes and stored
    request addresses after a day.
    **Proof:** one run returns `security` counts in its JSON body.
+6. **E** — Schedule the personal-message drain every 5 minutes:
+   `POST /api/jobs/messages` with the same `x-feedback-job-secret` header. The
+   sale and the captain/icon announcement send right away on their own; this is
+   what retries a mail the provider refused, with back-off, up to five tries.
+   **Proof:** one run returns `drained: { sent, suppressed, retrying, failed }` in its
+   JSON body.
 
 ## E · Errors reach somebody
 

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --turbopack --port 3000",
     "dev:webpack": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next dev --port 3000",
+    "dlt:sheet": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/dlt-sheet.ts",
     "preview": "NEXT_DIST_DIR=.next-preview node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next build && ALLOW_INSECURE_LOCAL_PRODUCTION=1 NEXT_DIST_DIR=.next-preview node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next start --port 3100",
     "build": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next build",
     "start": "node --env-file-if-exists=../../.env.local node_modules/next/dist/bin/next start",

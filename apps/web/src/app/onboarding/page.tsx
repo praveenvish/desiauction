@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { BrandGlyph } from "@desiauction/ui";
-
+import { BrandMark } from "../../components/shell/brand";
 import { currentSession } from "../../server/auth/actions";
 import { safeNext } from "../../server/auth/redirect";
 import { OnboardingPanel } from "./onboarding-steps";
@@ -44,8 +43,11 @@ export default async function OnboardingPage({
     // (an ink primary, not the marketing gold) — see data-surface in AppShell.
     <main className="onboarding" data-surface="console">
       <Link className="onboarding-mark" href="/">
+        {/* The DA mark every other screen carries — this was the one place
+            still drawing the old bar-chart glyph, on a new person's first
+            signed-in screen. */}
         <span className="onboarding-mark-glyph" aria-hidden="true">
-          <BrandGlyph size={22} />
+          <BrandMark size={34} />
         </span>
         DesiAuction
       </Link>

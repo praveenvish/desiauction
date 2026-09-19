@@ -1,6 +1,7 @@
 import { newId, otpInbox, type Db } from "@desiauction/db";
 
 import { env } from "../../env";
+import { renderEmail } from "../messaging/email-layout";
 
 /**
  * Sending a verification code to a mailbox.
@@ -35,7 +36,7 @@ export interface CodeMailer {
 export function codeMailCopy(
   code: string,
   purpose: CodeMailPurpose,
-): { subject: string; text: string } {
+): { subject: string; text: string; html: string } {
   if (purpose === "signup") {
     /*
      * A DIFFERENT PERSON IS READING THIS. "Sign-in code" to somebody who has no
@@ -45,21 +46,51 @@ export function codeMailCopy(
      */
     return {
       subject: "Your DesiAuction sign-up code",
-      text: `Welcome to DesiAuction. Your sign-up code is ${code}. It expires in 15 minutes.\n\nEntering it creates your account on this address. If you did not ask for this, ignore this message — nothing is created until the code is used.`,
+      ...renderEmail({
+        preheader: `Your sign-up code is ${code}. It expires in 15 minutes.`,
+        heading: "Welcome to DesiAuction",
+        paragraphs: ["Your sign-up code is:"],
+        code,
+        after: [
+          "It expires in 15 minutes. Entering it creates your account on this address.",
+          "If you did not ask for this, ignore this message — nothing is created until the code is used.",
+        ],
+        footnote: "You received this because this address was entered on our sign-up page.",
+        noLinks: true,
+      }),
     };
   }
   if (purpose === "login") {
     return {
       subject: "Your DesiAuction sign-in code",
-      // Names the action, and tells somebody who did NOT do it what it means:
-      // not "ignore this" — that is advice for spam — but that their address is
-      // known to someone. Their account is not at risk without this code.
-      text: `Your DesiAuction sign-in code is ${code}. It expires in 15 minutes.\n\nIf you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.`,
+      ...renderEmail({
+        preheader: `Your sign-in code is ${code}. It expires in 15 minutes.`,
+        heading: "Your sign-in code",
+        paragraphs: ["Your DesiAuction sign-in code is:"],
+        code,
+        after: [
+          "It expires in 15 minutes.",
+          "If you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.",
+        ],
+        footnote: "You received this because this address was entered on our sign-in page.",
+        noLinks: true,
+      }),
     };
   }
   return {
     subject: "Confirm your email for DesiAuction",
-    text: `Your DesiAuction confirmation code is ${code}. It expires in 15 minutes. If you did not ask for this, ignore this message.`,
+    ...renderEmail({
+      preheader: `Your confirmation code is ${code}.`,
+      heading: "Confirm your email",
+      paragraphs: [`Your DesiAuction confirmation code is ${code}.`],
+      code,
+      after: [
+        "Enter it on your account page to confirm this address. It expires in 15 minutes.",
+        "If you did not ask for this, ignore this message.",
+      ],
+      footnote: "You received this because this address was added to a DesiAuction account.",
+      noLinks: true,
+    }),
   };
 }
 

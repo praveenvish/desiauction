@@ -6,7 +6,14 @@ import { describe, expect, it } from "vitest";
 import { NAME_MAX_LENGTH } from "@desiauction/core";
 
 import { REASON_TO_PLAYER } from "../competition/registration-notify";
-import { SMS_TEMPLATES, renderTemplate, slotsInBody, type TemplateKey } from "./templates";
+import {
+  DLT_VAR_MAX,
+  SMS_TEMPLATES,
+  renderTemplate,
+  slotsInBody,
+  smsSeasonName,
+  type TemplateKey,
+} from "./templates";
 
 /**
  * The registry's contract with the operator. These are not unit tests of a
@@ -45,7 +52,7 @@ describe("SMS template registry", () => {
       const rendered = renderTemplate(template, worst);
       expect(rendered.ok, `${key} failed to render at its declared maxima`).toBe(true);
       if (rendered.ok) {
-        expect(rendered.body.length, `${key} at maximum slot lengths`).toBeLessThanOrEqual(320);
+        expect(rendered.body.length, `${key} at maximum slot lengths`).toBeLessThanOrEqual(160);
       }
     }
   });
@@ -89,155 +96,104 @@ describe("SMS template registry", () => {
 describe("renderTemplate", () => {
   const approved = SMS_TEMPLATES["registration.approved"];
 
-  it("fills the slots", () => {
-    const result = renderTemplate(approved, {
-      competition: "Bandra Premier League 2027",
-      link: "desiauction.in/c/bpl-2027",
-    });
+  it("fills the slots, with the link as fixed text", () => {
+    const result = renderTemplate(approved, { competition: "Bandra Premier League 2027" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.body).toBe(
-        // "Details: " was dropped from all five decision notices. Nine
-        // characters the reader learns nothing from, and it moved the
-        // waitlist, decline and withdrawal notices from two segments to one
-        // for an ordinary season name — half the bill on the messages that
-        // actually get sent.
-        "DesiAuction: You are approved for Bandra Premier League 2027. You are in the player pool for auction day. desiauction.in/c/bpl-2027",
+        "DesiAuction: You are approved for Bandra Premier League 2027. You are in the player pool for auction day. https://desiauction.in/home",
       );
     }
   });
 
   it("refuses a missing slot rather than sending a gap", () => {
-    const result = renderTemplate(approved, { competition: "BPL 2027" });
+    const result = renderTemplate(approved, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("competition");
+    }
+  });
+
+  it("refuses an unknown slot, because it means the caller has drifted", () => {
+    // `link` was a slot in v1; a caller still passing it has not moved to v2.
+    const result = renderTemplate(approved, { competition: "BPL 2027", link: "x" });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toContain("link");
     }
   });
 
-  it("refuses an unknown slot, because it means the caller has drifted", () => {
-    const result = renderTemplate(approved, {
-      competition: "BPL 2027",
-      link: "x",
-      reason: "not a slot here",
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason).toContain("reason");
-    }
-  });
-
   it("refuses an over-long slot rather than truncating it", () => {
-    const result = renderTemplate(approved, { competition: "x".repeat(61), link: "x" });
+    const result = renderTemplate(approved, { competition: "x".repeat(DLT_VAR_MAX + 1) });
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.reason).toContain("61 characters");
+      expect(result.reason).toContain(`${String(DLT_VAR_MAX + 1)} characters`);
     }
   });
 });
 
 /**
- * THE SEGMENT BUDGET, held to measured numbers.
+ * DLT'S LIMITS, held as tests (v2).
  *
- * An SMS is 160 GSM-7 characters before it splits into 153-character parts,
- * each billed and each more likely to be scrubbed. The registry's comment used
- * to claim the slot budgets were "deliberately tight" while the numbers said
- * otherwise: `link` was capped at 60 when the longest link this product can
- * build is 27, and at their declared maxima five of six templates ran past 160
- * — `registration.rejected` reached 246. Nobody knew, because nothing measured
- * it.
- *
- * Every number below is therefore tied to the thing that actually produces it,
- * not to a constant somebody remembered. A cap that drifts away from its
- * producer fails here rather than at a gateway.
+ * The operator portals cap each `{#var#}` at 30 characters, and a URL must be
+ * fixed text on a whitelisted domain. Every number below is tied to what
+ * produces it, so a cap that drifts from its producer fails here rather than at
+ * a gateway — where it would show up as a notice nobody received.
  */
-describe("slot budgets are tied to what can actually arrive", () => {
-  const capOf = (key: TemplateKey, slot: string): number => {
-    const spec = SMS_TEMPLATES[key].slots.find((s) => s.name === slot);
-    if (spec === undefined) throw new Error(`${key} has no ${slot} slot`);
-    return spec.maxLength;
-  };
+describe("DLT limits (v2)", () => {
+  const keys = Object.keys(SMS_TEMPLATES) as TemplateKey[];
 
-  it("the competition cap is the longest season name validateName accepts", () => {
-    // Not "60 because 60 looks right" — if NAME_MAX_LENGTH moves, a season the
-    // product accepts would produce a notice the operator's template refuses,
-    // and the player would simply never be told.
-    for (const key of Object.keys(SMS_TEMPLATES) as TemplateKey[]) {
-      const spec = SMS_TEMPLATES[key].slots.find((s) => s.name === "competition");
-      if (spec !== undefined) {
-        expect(spec.maxLength, key).toBeGreaterThanOrEqual(NAME_MAX_LENGTH);
+  it("holds every variable to one DLT variable", () => {
+    for (const key of keys) {
+      for (const slot of SMS_TEMPLATES[key].slots) {
+        expect(slot.maxLength, `${key}.${slot.name}`).toBeLessThanOrEqual(DLT_VAR_MAX);
       }
     }
   });
 
-  it("the reason cap fits every sentence REASON_TO_PLAYER can send", () => {
-    // These are the only values that ever fill the slot, so the cap is either
-    // big enough for all of them or the rejection notice is undeliverable for
-    // whichever reason is longest — and a decline nobody receives is the
-    // failure this whole path exists to avoid.
-    const longest = Math.max(...Object.values(REASON_TO_PLAYER).map((r) => r.length));
-    expect(capOf("registration.rejected", "reason")).toBeGreaterThanOrEqual(longest);
+  it("fits every season name the product accepts into the variable", () => {
+    // The shortened name, not a refusal: a long season name must never cost a
+    // player their notice.
+    const longest = "Mumbai Corporate Premier League Season Twenty Twenty Seven Cup";
+    for (const name of [longest.slice(0, NAME_MAX_LENGTH), "x".repeat(NAME_MAX_LENGTH), "BPL"]) {
+      const short = smsSeasonName(name);
+      expect(short.length, name).toBeLessThanOrEqual(DLT_VAR_MAX);
+      expect(
+        Array.from(short).every((ch) => (ch.codePointAt(0) ?? 0) < 128),
+        short,
+      ).toBe(true);
+    }
+    expect(smsSeasonName("Malad Premier League 2026")).toBe("Malad Premier League 2026");
+    expect(smsSeasonName(longest)).toBe("Mumbai Corporate Premier");
+    // No trailing punctuation to collide with the template's own full stop.
+    expect(smsSeasonName("Bandra Gymkhana Cricket, Invitational 2027")).toBe(
+      "Bandra Gymkhana Cricket",
+    );
   });
 
-  it("the link cap fits the link the notifier builds, with room for a longer host", () => {
-    /*
-     * The link carries no variable part since the season came out of it, so
-     * this is only ever `<base>/home`. Production is 27 characters; the cap
-     * allows 40 so a staging host does not silently break the one path that
-     * cannot report its own failure to a player.
-     */
-    const cap = capOf("registration.approved", "link");
-    for (const base of ["https://desiauction.in", "https://staging.desiauction.in"]) {
-      expect(`${base}/home`.length, base).toBeLessThanOrEqual(cap);
+  it("fits every sentence REASON_TO_PLAYER can send into the variable", () => {
+    for (const [reason, text] of Object.entries(REASON_TO_PLAYER)) {
+      expect(text.length, reason).toBeLessThanOrEqual(DLT_VAR_MAX);
     }
   });
 
-  it("every template is ONE segment for a season named the way seasons are named", () => {
-    // The case that actually happens, and the one worth paying for.
-    const typical = {
-      competition: "Malad Premier League 2026",
-      link: "https://desiauction.in/home",
-      reason: REASON_TO_PLAYER.ineligible,
-      last4: "4321",
-    };
-    for (const key of Object.keys(SMS_TEMPLATES) as TemplateKey[]) {
-      const t = SMS_TEMPLATES[key];
-      const slots = Object.fromEntries(
-        t.slots.map((s) => [s.name, typical[s.name as keyof typeof typical]]),
-      );
-      const result = renderTemplate(t, slots);
-      expect(result.ok, `${key}: ${result.ok ? "" : result.reason}`).toBe(true);
-      if (result.ok) {
-        expect(result.body.length, `${key} is longer than one segment`).toBeLessThanOrEqual(160);
+  it("carries links only as fixed text on the production domain", () => {
+    // TRAI (2024): a URL must be on a domain whitelisted under the entity.
+    for (const key of keys) {
+      const urls = SMS_TEMPLATES[key].body.match(/https?:\/\/[^\s]+/g) ?? [];
+      for (const url of urls) {
+        expect(url, key).toMatch(/^https:\/\/desiauction\.in\//);
       }
+      expect(slotsInBody(SMS_TEMPLATES[key].body), key).not.toContain("link");
     }
   });
 
-  it("holds the WORST case to the segment count each template was signed off at", () => {
-    /*
-     * At the longest season name the product accepts, four of these become two
-     * segments. That is a decision, not an oversight: cutting it would mean
-     * cutting the sentences that say what a status MEANS, and a player told
-     * only "you are on the waitlist" reasonably reads that as a rejection.
-     *
-     * The point of pinning it is that the next person to add a sentence has to
-     * come back here and change a number, rather than doubling the bill for
-     * every notice and finding out from an invoice.
-     */
-    const WORST_CASE_SEGMENTS: Record<TemplateKey, number> = {
-      "registration.approved": 2,
-      "registration.waitlisted": 2,
-      "registration.rejected": 2,
-      "registration.withdrawn": 2,
-      "registration.restored": 1,
-      "security.phone_changed": 1,
-    };
-    for (const key of Object.keys(SMS_TEMPLATES) as TemplateKey[]) {
+  it("is ONE segment for every template, even at every variable's maximum", () => {
+    for (const key of keys) {
       const t = SMS_TEMPLATES[key];
       const worst =
         t.body.replace(/\{[a-z0-9_]+\}/g, "").length + t.slots.reduce((n, s) => n + s.maxLength, 0);
-      const segments = worst <= 160 ? 1 : Math.ceil(worst / 153);
-      expect(segments, `${key} is ${String(worst)} chars`).toBe(WORST_CASE_SEGMENTS[key]);
+      expect(worst, `${key} is ${String(worst)} chars`).toBeLessThanOrEqual(160);
     }
   });
 });

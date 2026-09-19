@@ -49,6 +49,8 @@ const PERSON_EVENT_LABELS = {
   // a person who put their name in and waited — and by the time this is written
   // the requeue rounds are spent, so it is final rather than a running score.
   "auction.unsold": "The auction finished without a bid for you",
+  // Captain, vice-captain, icon or retained — the role and team are in meta.
+  "team.appointed": "Your team named you to a role",
   "profile.name.updated": "Name updated",
   // The first name is not an update — see `profile.name.set`.
   "profile.name.set": "Name added to your profile",
