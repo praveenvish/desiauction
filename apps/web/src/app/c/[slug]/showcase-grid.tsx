@@ -14,6 +14,7 @@ import {
   serializeShowcaseParams,
   type ShowcaseView,
 } from "../../../components/showcase/showcase-params";
+import { preSignedWord } from "../../../lib/pre-signed";
 import { track } from "../../../lib/telemetry";
 import type { ShowcasePlayer, ShowcasePool } from "../../../server/competition/public";
 import { SquadsView } from "./squads-view";
@@ -180,17 +181,17 @@ export function ShowcaseGrid({
                 }}
               >
                 {/* The status key is "retained" for history's sake, but what it
-                    holds is ICONS — `public.ts` sets it from `isIcon`, and the
-                    schema's separate `is_retained` flag means something else.
-                    Every organiser surface says Icon; so does the card below.
-                    Only this filter said Retained. */}
+                    holds is every PRE-SIGNED player — icons, captains picked
+                    before the night and players retained from last season —
+                    so the filter names the category, and each card names the
+                    reason. */}
                 {key === "all"
                   ? "All"
                   : key === "available"
                     ? "Available"
                     : key === "sold"
                       ? "Sold"
-                      : "Icons"}
+                      : "Pre-signed"}
                 <span className="showcase-filter-count">{counts[key]}</span>
               </button>
             ))}
@@ -308,8 +309,8 @@ export function ShowcaseGrid({
                 {selected.status === "available"
                   ? "Available"
                   : selected.teamName === null
-                    ? "Icon player — not in the auction"
-                    : `${selected.teamName}${selected.status === "retained" ? " · icon" : ""}`}
+                    ? `${preSignedWord(selected.preSignedAs)} — not in the auction`
+                    : `${selected.teamName}${selected.status === "retained" ? ` · ${preSignedWord(selected.preSignedAs).toLowerCase()}` : ""}`}
               </dd>
             </dl>
             <ButtonLink

@@ -451,15 +451,9 @@ export function parseRegistrationRecords(
         rowErrors.push(`unreadable ${column} "${read.raw}" (yes or no)`);
       }
     }
-    /*
-     * The invariant the dashboard refuses one row at a time, refused here in
-     * bulk. An Icon is pre-signed and never goes under the hammer; a Captain
-     * leads a squad that plays. A file asserting both about one person has not
-     * expressed a preference the import could honour — it has a mistake in it.
-     */
-    if (iconFlag.value === true && captainFlag.value === true) {
-      rowErrors.push("a player cannot be both an Icon and a Captain");
-    }
+    // Icon AND Captain is a legal pair: both pre-sign the player to their team,
+    // and the marquee name is very often the one wearing the armband. The file
+    // says what the dashboard can say.
     if (teamRaw !== "" && knownTeams !== undefined && !knownTeams.has(normalizeTeamName(teamRaw))) {
       rowErrors.push(`unknown team "${teamRaw}"`);
     }

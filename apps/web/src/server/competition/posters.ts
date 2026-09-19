@@ -28,13 +28,15 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
 import { storage } from "../media";
 import { canCompetition } from "./authz";
 import { competitionForRegistration, resolveCompetition } from "./competitions";
+import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
+import { preSignedSql } from "./pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
@@ -432,6 +434,7 @@ async function playerPosterFrom(
           number: registrations.registrationNumber,
           status: registrations.status,
           isIcon: registrations.isIcon,
+          isCaptain: registrations.isCaptain,
           isRetained: registrations.isRetained,
           preSignedTeamId: registrations.teamId,
         })
@@ -469,7 +472,9 @@ async function playerPosterFrom(
         )
         .limit(1);
 
-      const preSigned = row.isIcon || row.isRetained;
+      // A lot the room SOLD outranks every mark: a captain named after the
+      // night was bought, and the poster is about the sale.
+      const preSigned = lot?.status !== "sold" && isPreSigned(row);
       const teamId = preSigned ? row.preSignedTeamId : (lot?.buyerTeamId ?? null);
       const team =
         teamId === null
@@ -482,7 +487,7 @@ async function playerPosterFrom(
                 .limit(1)
             )[0];
 
-      const outcome = outcomeOf(row.isIcon, row.isRetained, lot?.status);
+      const outcome = outcomeOf(preSigned ? preSignedKind(row) : null, lot?.status);
       if (outcome === null || row.playerName === null) {
         return null;
       }
@@ -561,15 +566,11 @@ async function playerPosterFrom(
  * default to fall back on — it is a claim about a night that has not finished.
  */
 function outcomeOf(
-  isIcon: boolean,
-  isRetained: boolean,
+  preSigned: PreSignedKind | null,
   lotStatus: string | undefined,
 ): PosterOutcome | null {
-  if (isIcon) {
-    return "icon";
-  }
-  if (isRetained) {
-    return "retained";
+  if (preSigned !== null) {
+    return preSigned;
   }
   if (lotStatus === "sold") {
     return "sold";
@@ -661,8 +662,9 @@ async function teamPosterFrom(
           name: shownName,
           role: registrations.role,
           isIcon: registrations.isIcon,
-          // No captain flag here on purpose: a marker slot holds one label, and
-          // on a squad sheet "ICON" is the one people are looking for.
+          // A marker slot holds one label; `preSignedKind` picks it, and on a
+          // squad sheet "ICON" is the one people are looking for.
+          isCaptain: registrations.isCaptain,
           isRetained: registrations.isRetained,
         })
         .from(registrations)
@@ -672,7 +674,10 @@ async function teamPosterFrom(
             eq(registrations.competitionId, gated.competition.id),
             eq(registrations.teamId, teamId),
             eq(registrations.status, "approved"),
-            or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
+            preSignedSql,
+            // A captain named after the night was bought — the `bought` list
+            // below carries them with their price.
+            sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
           ),
         )
         .orderBy(asc(shownName));
@@ -699,7 +704,7 @@ async function teamPosterFrom(
           name: row.name ?? UNNAMED,
           role: row.role ?? "",
           pricePaise: null,
-          marker: row.isIcon ? "icon" : "retained",
+          marker: preSignedKind(row) ?? "icon",
         })),
         ...bought
           // A pre-signed player is excluded from the pool, so this should never

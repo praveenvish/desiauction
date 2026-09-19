@@ -848,6 +848,13 @@ export async function placeBid(
   // squadMax like anyone else. Counting only auction wins let a team with an
   // icon finish on squadMax + 1 and every board render "16/15" — a fraction
   // above its own denominator, which is how you know the cap was not real.
+  //
+  // ALL THREE pre-signing marks, and never a lot of this auction. The count read
+  // `isIcon` alone, so a team with a retained player (and, once captains were
+  // picked before the night, a captain) could still buy up to squadMax at the
+  // hammer and finish one over. Excluding this auction's lots is what keeps the
+  // sum honest the other way: a captain named AFTER being bought is already in
+  // `purseRow.squad` and must not be counted a second time here.
   const [preSignedRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(registrations)
@@ -855,7 +862,8 @@ export async function placeBid(
       and(
         eq(registrations.competitionId, auction.competitionId),
         eq(registrations.teamId, paddle.teamId),
-        eq(registrations.isIcon, true),
+        sql`(${registrations.isIcon} or ${registrations.isCaptain} or ${registrations.isRetained})`,
+        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id})`,
       ),
     );
   const squadSize = (purseRow?.squad ?? 0) + (preSignedRow?.count ?? 0);
