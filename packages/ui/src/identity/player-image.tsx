@@ -21,12 +21,29 @@ export interface PlayerImageProps {
   name: string;
   /** Stable player id; identity derives from it (name as fallback seed). */
   seed?: string;
-  /** Photo URL. Absent, still-loading or failed → the branded mark (C-25). */
-  src?: string;
+  /**
+   * Photo URL. Absent, null (no photo, or consent withheld), still-loading or
+   * failed → the branded mark (C-25). Null is accepted so a consent-gated view
+   * model's `photoUrl: string | null` passes straight through.
+   */
+  src?: string | null | undefined;
   size?: PlayerImageSize;
   shape?: "square" | "round";
   /** Team color hex once the player belongs to a squad; volt until then. */
-  teamColor?: string;
+  teamColor?: string | undefined;
+  /**
+   * The player's name is already printed beside the image (a roster row, a
+   * ribbon, a card title). The image then hides from assistive tech — empty
+   * alt, no role — so a screen reader reads the name once, not twice.
+   */
+  decorative?: boolean;
+  /**
+   * Fill a square box the CALLER sizes (a responsive hero whose edge is a
+   * `clamp()`), instead of the fixed `size` box. `size` then only picks the
+   * intrinsic resolution. The caller owns the box, so the zero-layout-shift
+   * guarantee holds exactly when that box has a definite size.
+   */
+  fluid?: boolean;
 }
 
 function Pattern({ identity, px }: { identity: PlaceholderIdentity; px: number }) {
@@ -84,11 +101,13 @@ function Mark({
   seed,
   px,
   teamColor,
+  decorative,
 }: {
   name: string;
   seed: string;
   px: number;
   teamColor?: string | undefined;
+  decorative: boolean;
 }) {
   const identity = placeholderIdentity(seed, name);
   const edge =
@@ -102,8 +121,9 @@ function Mark({
       viewBox={`0 0 ${String(px)} ${String(px)}`}
       width={px}
       height={px}
-      role="img"
-      aria-label={name.trim() === "" ? "Player" : name}
+      {...(decorative
+        ? { "aria-hidden": true, focusable: "false" }
+        : { role: "img", "aria-label": name.trim() === "" ? "Player" : name })}
       data-pattern={identity.pattern}
     >
       <rect width={px} height={px} fill="var(--identity-field)" />
@@ -149,22 +169,31 @@ export function PlayerImage({
   size = "md",
   shape = "square",
   teamColor,
+  decorative = false,
+  fluid = false,
 }: PlayerImageProps) {
   const px = SIZES[size];
-  const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const showPhoto = src !== undefined && !failed;
+  // Remembered per URL, not as bare booleans: a live surface re-renders the
+  // same frame for the next player, and a failure (or a finished load) for the
+  // last player's photo must not decide what the next one shows.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const photo = src === undefined || src === null || src === "" ? null : src;
+  const failed = photo !== null && failedSrc === photo;
+  const loaded = photo !== null && loadedSrc === photo;
+  const showPhoto = photo !== null && !failed;
 
   return (
     <span
       className={[
         styles["frame"],
         shape === "round" ? styles["round"] : undefined,
+        fluid ? styles["fluid"] : undefined,
         showPhoto && !loaded ? styles["loading"] : undefined,
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ width: px, height: px }}
+      style={fluid ? undefined : { width: px, height: px }}
       data-testid="player-image"
       data-state={showPhoto ? (loaded ? "photo" : "loading") : "mark"}
     >
@@ -173,21 +202,21 @@ export function PlayerImage({
           {!loaded ? <span className={styles["shimmer"]} aria-hidden /> : null}
           <img
             className={styles["photo"]}
-            src={src}
-            alt={name}
+            src={photo}
+            alt={decorative ? "" : name}
             width={px}
             height={px}
             loading="lazy"
             onLoad={() => {
-              setLoaded(true);
+              setLoadedSrc(photo);
             }}
             onError={() => {
-              setFailed(true);
+              setFailedSrc(photo);
             }}
           />
         </>
       ) : (
-        <Mark name={name} seed={seed} px={px} teamColor={teamColor} />
+        <Mark name={name} seed={seed} px={px} teamColor={teamColor} decorative={decorative} />
       )}
     </span>
   );
