@@ -1,5 +1,6 @@
 import { competitions } from "@desiauction/db";
-import { Card, EmptyState } from "@desiauction/ui";
+import { EmptyState, IconBell, IconCog, SectionCard } from "@desiauction/ui";
+import Link from "next/link";
 import { inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
@@ -78,13 +79,27 @@ export default async function InboxPage() {
     events.map((event) => competitionIdOf(event.meta) ?? "").filter((id) => id !== ""),
   );
   return (
-    <main>
-      <Card>
+    <main className="inbox">
+      <SectionCard
+        icon={<IconBell />}
+        title="All notifications"
+        description={
+          events.length === 0
+            ? "Registration decisions, auction results and account activity land here."
+            : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first · marked read as you open this page`
+        }
+        action={
+          <Link href="/account#notifications" className="inbox-settings">
+            <IconCog size={16} aria-hidden /> Notification settings
+          </Link>
+        }
+        flush={events.length > 0}
+      >
         {events.length === 0 ? (
           <EmptyState
-            headingLevel={2}
+            headingLevel={3}
             title="Nothing yet"
-            description="Registration decisions and account activity land here."
+            description="New notices appear here the moment they happen."
           />
         ) : (
           <InboxList
@@ -109,7 +124,7 @@ export default async function InboxPage() {
             })}
           />
         )}
-      </Card>
+      </SectionCard>
     </main>
   );
 }

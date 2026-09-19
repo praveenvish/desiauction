@@ -1,4 +1,4 @@
-import { Badge, LoadingState } from "@desiauction/ui";
+import { IconBall, LoadingState, Pill, SectionCard } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -14,6 +14,7 @@ import type { SportCatalogueRow } from "../../server/admin/views";
 import { OverviewPanel } from "./overview-panel";
 import "../seasons/seasons.css";
 import "./admin.css";
+import "./overview.css";
 
 export const metadata = { title: "Platform admin · DesiAuction" };
 
@@ -38,12 +39,6 @@ export default async function AdminPage() {
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Everything the platform is doing right now. Administration observes — every fix happens
-            in the console that owns it.
-          </p>
-        </header>
         <Suspense fallback={<LoadingState variant="page" />}>
           <Board />
         </Suspense>
@@ -87,23 +82,27 @@ async function Board() {
  * provable "cannot act" property on a two-row list. Migration 0046 seeds it.
  */
 function SportCatalogue({ rows }: { rows: SportCatalogueRow[] }) {
+  const live = rows.filter((row) => row.enabled).length;
   return (
-    <section className="admin-card" aria-labelledby="admin-sports">
-      <h2 id="admin-sports">Sports</h2>
-      <p className="dash-hint">
-        Which shipped packs are switched on. Seeded by migration — administration observes.
-      </p>
-      <ul className="admin-sport-list">
+    <SectionCard
+      icon={<IconBall />}
+      tone="green"
+      title="Sports"
+      description={`${String(live)} of ${String(rows.length)} shipped packs switched on. Seeded by migration — administration observes.`}
+    >
+      <ul className="adm-sports">
         {rows.map((row) => (
           <li key={row.key}>
-            <span className="admin-sport-name">{row.label}</span>
-            <Badge tone={row.enabled ? "success" : "neutral"}>{row.enabled ? "live" : "off"}</Badge>
-            <span className="admin-sport-count">
+            <span className="adm-sport-name">{row.label}</span>
+            <span className="adm-sport-count">
               {row.competitions} {row.competitions === 1 ? "season" : "seasons"}
             </span>
+            <Pill tone={row.enabled ? "green" : "neutral"} dot>
+              {row.enabled ? "Live" : "Off"}
+            </Pill>
           </li>
         ))}
       </ul>
-    </section>
+    </SectionCard>
   );
 }

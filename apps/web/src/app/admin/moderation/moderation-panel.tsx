@@ -1,13 +1,16 @@
 "use client";
 
 import {
-  Badge,
   Button,
-  Card,
   Dialog,
   EmptyState,
   Field,
   IconExternal,
+  IconEyeOff,
+  IconGlobe,
+  IconSearch,
+  Pill,
+  SectionCard,
   useToast,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -39,56 +42,92 @@ const REASON_MAX = 500;
 export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
   return (
     <>
-      <Card data-testid="moderation-held">
-        <h2>Taken down</h2>
+      <SectionCard
+        icon={<IconEyeOff />}
+        tone="red"
+        title="Taken down"
+        description={
+          desk.held.length === 0
+            ? "Held off the public web by DesiAuction"
+            : `${String(desk.held.length)} held off the public web by DesiAuction`
+        }
+        flush
+        data-testid="moderation-held"
+      >
         {desk.held.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="Nothing is taken down"
-            description="Every season DesiAuction takes off the public web is listed here, with who did it and why."
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="Nothing is taken down"
+              description="Every season DesiAuction takes off the public web is listed here, with who did it and why."
+            />
+          </div>
         ) : (
-          <ul className="pass-queue">
+          <ul className="admin-rows is-stacked">
             {desk.held.map((row) => (
               <HeldRow key={row.id} row={row} />
             ))}
           </ul>
         )}
-      </Card>
-      <Card data-testid="moderation-public">
-        <h2>
-          On the public web{" "}
+      </SectionCard>
+      <SectionCard
+        icon={<IconGlobe />}
+        tone="blue"
+        title="On the public web"
+        description={
           <span className="admin-count">
             {desk.query === ""
-              ? `· ${String(desk.publishedTotal)}`
-              : `· ${String(desk.publishedTotal)} matching`}
+              ? `${String(desk.publishedTotal)} public`
+              : `${String(desk.publishedTotal)} matching`}
           </span>
-        </h2>
+        }
+        flush
+        data-testid="moderation-public"
+      >
+        <form className="admin-filters" method="get" role="search" data-testid="moderation-search">
+          <label className="admin-search" htmlFor="moderation-q">
+            <span className="admin-sr-only">Find a public season</span>
+            <IconSearch size={18} aria-hidden />
+            <input
+              id="moderation-q"
+              name="q"
+              type="search"
+              defaultValue={desk.query}
+              placeholder="Season, slug or club"
+              className="admin-search-input"
+            />
+          </label>
+          <button type="submit" className="admin-search-submit">
+            Search
+          </button>
+        </form>
         {desk.published.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title={desk.query === "" ? "No season is public" : "No public season matches"}
-            description={
-              desk.query === ""
-                ? "When an organizer publishes a season, it appears here."
-                : "Try the club's name, or part of the season's."
-            }
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title={desk.query === "" ? "No season is public" : "No public season matches"}
+              description={
+                desk.query === ""
+                  ? "When an organizer publishes a season, it appears here."
+                  : "Try the club's name, or part of the season's."
+              }
+            />
+          </div>
         ) : (
           <>
-            <ul className="pass-queue">
+            <ul className="admin-rows">
               {desk.published.map((row) => (
                 <PublicRow key={row.id} row={row} />
               ))}
             </ul>
             {desk.publishedTotal > desk.published.length ? (
-              <p className="competitions-hint">
+              <p className="admin-pagination admin-meta">
                 Showing the newest {String(desk.published.length)}. Search to reach the rest.
               </p>
             ) : null}
           </>
         )}
-      </Card>
+      </SectionCard>
     </>
   );
 }
@@ -120,17 +159,18 @@ function PublicRow({ row }: { row: PublicSeasonRow }) {
   const valid = length >= REASON_MIN && length <= REASON_MAX;
   return (
     <li className="pass-row" data-testid={`moderation-public-${row.slug}`}>
-      <div className="pass-row-head">
+      <span className="admin-cell-main">
         <span className="pass-row-season">{row.name}</span>
-        <Badge tone="success">Public</Badge>
-      </div>
-      <p className="competitions-hint">
-        <Link href={`/admin/orgs/${row.orgSlug}`}>{row.orgName}</Link> · {row.sport} · created{" "}
-        {row.createdAt.toISOString().slice(0, 10)}
-      </p>
+        <span className="admin-meta">
+          <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-inline-link">
+            {row.orgName}
+          </Link>{" "}
+          · {row.sport} · created {row.createdAt.toISOString().slice(0, 10)}
+        </span>
+      </span>
       <div className="pass-row-actions">
         <a
-          className="admin-meta"
+          className="admin-card-link"
           href={`/c/${row.slug}`}
           target="_blank"
           rel="noopener noreferrer"
@@ -141,6 +181,7 @@ function PublicRow({ row }: { row: PublicSeasonRow }) {
         </a>
         <Button
           variant="danger"
+          size="sm"
           onClick={() => {
             setReason("");
             setOpen(true);
@@ -215,11 +256,15 @@ function HeldRow({ row }: { row: HeldSeasonRow }) {
     <li className="pass-row" data-testid={`moderation-held-${row.slug}`}>
       <div className="pass-row-head">
         <span className="pass-row-season">{row.name}</span>
-        <Badge tone="danger">Taken down</Badge>
+        <Pill tone="red" dot>
+          Taken down
+        </Pill>
       </div>
-      <p className="competitions-hint">
-        <Link href={`/admin/orgs/${row.orgSlug}`}>{row.orgName}</Link> ·{" "}
-        {row.heldAt.toISOString().slice(0, 10)}
+      <p className="pass-row-sub">
+        <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-inline-link">
+          {row.orgName}
+        </Link>{" "}
+        · {row.heldAt.toISOString().slice(0, 10)}
         {row.heldByName === null ? "" : ` · by ${row.heldByName}`}
       </p>
       <blockquote className="pass-row-note">{row.reason}</blockquote>

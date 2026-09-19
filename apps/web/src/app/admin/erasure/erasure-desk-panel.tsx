@@ -1,6 +1,15 @@
 "use client";
 
-import { Badge, Button, Card, Dialog, Field, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Dialog,
+  Field,
+  IconCheckCircle,
+  IconTrash,
+  Pill,
+  SectionCard,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -21,47 +30,59 @@ export function ErasureDeskPanel({ desk }: { desk: ErasureDesk }) {
   return (
     <>
       {desk.open.length > 0 ? (
-        <Card data-testid="erasure-open">
-          <h2>Open requests</h2>
-          <ul className="pass-queue">
+        <SectionCard
+          icon={<IconTrash />}
+          tone="red"
+          title="Open requests"
+          description={`${String(desk.open.length)} waiting, oldest first · the account page promises a reply within seven days`}
+          flush
+          data-testid="erasure-open"
+        >
+          <ul className="admin-rows is-stacked">
             {desk.open.map((row) => (
               <ErasureRow key={row.id} row={row} />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
       {desk.decided.length > 0 ? (
-        <Card data-testid="erasure-decided">
-          <h2>Recently decided</h2>
-          <ul className="pass-recent">
+        <SectionCard
+          icon={<IconCheckCircle />}
+          tone="neutral"
+          title="Recently decided"
+          flush
+          data-testid="erasure-decided"
+        >
+          <ul className="admin-rows">
             {desk.decided.map((row) => (
               <li key={row.id}>
-                <Badge
-                  tone={
-                    row.status === "completed"
-                      ? "success"
-                      : row.status === "declined"
-                        ? "warning"
-                        : "neutral"
-                  }
-                >
-                  {row.status === "completed"
-                    ? "Erased"
-                    : row.status === "declined"
-                      ? "Declined"
-                      : "Withdrawn by the person"}
-                </Badge>
-                <span className="competitions-hint">
+                <span className="admin-meta">
                   asked {row.requestedAt.toISOString().slice(0, 10)}
                   {row.decidedAt === null
                     ? ""
                     : ` · decided ${row.decidedAt.toISOString().slice(0, 10)}`}
                   {row.decisionNote === null ? "" : ` · ${row.decisionNote}`}
                 </span>
+                <Pill
+                  tone={
+                    row.status === "completed"
+                      ? "green"
+                      : row.status === "declined"
+                        ? "amber"
+                        : "neutral"
+                  }
+                  dot
+                >
+                  {row.status === "completed"
+                    ? "Erased"
+                    : row.status === "declined"
+                      ? "Declined"
+                      : "Withdrawn by the person"}
+                </Pill>
               </li>
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
     </>
   );
@@ -94,38 +115,55 @@ function ErasureRow({ row }: { row: DeskRow }) {
   return (
     <li className="pass-row" data-testid={`erasure-request-${row.personId}`}>
       <div className="pass-row-head">
-        <span className="pass-row-season">{who}</span>
+        {/* With no name on file, `who` IS the number or the address. */}
+        <span className="pass-row-season" {...(row.name === null ? { "data-private": "" } : {})}>
+          {who}
+        </span>
         {row.blocked === null ? (
-          <Badge tone="info">
+          <Pill tone="blue">
             {row.clubs === 0
               ? "No clubs"
               : `${String(row.clubs)} club${row.clubs === 1 ? "" : "s"}`}
-          </Badge>
+          </Pill>
         ) : (
-          <Badge tone="warning">Cannot erase yet</Badge>
+          <Pill tone="amber" dot>
+            Cannot erase yet
+          </Pill>
         )}
       </div>
-      <p className="competitions-hint">
+      <p className="pass-row-sub">
         asked {row.requestedAt.toISOString().slice(0, 10)}
-        {row.phone !== null ? ` · ${formatPhone(row.phone)}` : ""}
-        {row.email !== null ? ` · ${row.email}` : ""}
+        {row.phone !== null ? (
+          <>
+            {" · "}
+            <span data-private>{formatPhone(row.phone)}</span>
+          </>
+        ) : null}
+        {row.email !== null ? (
+          <>
+            {" · "}
+            <span data-private>{row.email}</span>
+          </>
+        ) : null}
       </p>
       {row.reason !== null ? <blockquote className="pass-row-note">{row.reason}</blockquote> : null}
       {row.blocked !== null ? (
-        <p className="competitions-hint" role="note" data-testid="erasure-blocked">
+        <p className="pass-row-sub admin-warning" role="note" data-testid="erasure-blocked">
           {row.blocked}
         </p>
       ) : null}
-      <Field
-        label="Note"
-        name={`note-${row.id}`}
-        value={note}
-        onChange={(event) => {
-          setNote(event.target.value);
-        }}
-        help="Required to decline — the person reads it on their account page. Optional when erasing."
-      />
-      <div className="pass-row-actions">
+      <div className="pass-row-field">
+        <Field
+          label="Note"
+          name={`note-${row.id}`}
+          value={note}
+          onChange={(event) => {
+            setNote(event.target.value);
+          }}
+          help="Required to decline — the person reads it on their account page. Optional when erasing."
+        />
+      </div>
+      <div className="pass-row-actions is-pair">
         <Button
           variant="danger"
           disabled={row.blocked !== null}

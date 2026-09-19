@@ -1,6 +1,14 @@
 "use client";
 
-import { Badge, Button, Card, Field, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Field,
+  IconCheckCircle,
+  IconWallet,
+  Pill,
+  SectionCard,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -19,30 +27,46 @@ export function PassQueuePanel({ queue }: { queue: PassQueue }) {
   return (
     <>
       {queue.open.length > 0 ? (
-        <Card data-testid="pass-queue-open">
-          <h2>Open requests</h2>
-          <ul className="pass-queue">
+        <SectionCard
+          icon={<IconWallet />}
+          tone="amber"
+          title="Open requests"
+          description={`${String(queue.open.length)} waiting for an answer`}
+          flush
+          data-testid="pass-queue-open"
+        >
+          <ul className="admin-rows is-stacked">
             {queue.open.map((request) => (
               <PassRow key={request.id} request={request} />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
       {queue.recent.length > 0 ? (
-        <Card data-testid="pass-queue-recent">
-          <h2>Recently granted</h2>
-          <ul className="pass-recent">
+        <SectionCard
+          icon={<IconCheckCircle />}
+          tone="green"
+          title="Recently granted"
+          flush
+          data-testid="pass-queue-recent"
+        >
+          <ul className="admin-rows">
             {queue.recent.map((row) => (
               <li key={`${row.slug}-${row.resolvedAt}`}>
-                <span className="pass-recent-season">{row.seasonName}</span>
-                <span className="competitions-hint">
-                  {row.fromTier} → {row.requestedTier} · {row.resolvedAt.slice(0, 10)}
-                  {row.resolvedByName === null ? "" : ` · by ${row.resolvedByName}`}
+                <span className="admin-cell-main">
+                  <span className="admin-name">{row.seasonName}</span>
+                  <span className="admin-meta">
+                    {row.resolvedAt.slice(0, 10)}
+                    {row.resolvedByName === null ? "" : ` · by ${row.resolvedByName}`}
+                  </span>
                 </span>
+                <Pill tone="green">
+                  {row.fromTier} → {row.requestedTier}
+                </Pill>
               </li>
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
     </>
   );
@@ -70,13 +94,16 @@ function PassRow({ request }: { request: PassQueue["open"][number] }) {
     <li className="pass-row" data-testid={`pass-request-${request.slug}`}>
       <div className="pass-row-head">
         <span className="pass-row-season">{request.seasonName}</span>
-        <Badge tone="info">
+        <Pill tone="blue">
           {request.fromTierName} → {request.requestedTierName}
-        </Badge>
+        </Pill>
       </div>
-      <p className="competitions-hint">
+      <p className="pass-row-sub">
         {request.orgName} · asked {request.requestedAt.slice(0, 10)} by{" "}
-        {request.requestedByName ?? request.requestedByPhone ?? "unknown"}
+        {/* Falls back to a phone number: masked in a Report-a-problem shot. */}
+        <span {...(request.requestedByName === null ? { "data-private": "" } : {})}>
+          {request.requestedByName ?? request.requestedByPhone ?? "unknown"}
+        </span>
       </p>
       {/* The deciding facts, not just the ask. */}
       <p className="pass-row-usage" data-testid={`pass-usage-${request.slug}`}>
@@ -86,16 +113,18 @@ function PassRow({ request }: { request: PassQueue["open"][number] }) {
       {request.note !== null && request.note !== "" ? (
         <blockquote className="pass-row-note">{request.note}</blockquote>
       ) : null}
-      <Field
-        label="Note (optional)"
-        name={`note-${request.slug}`}
-        value={note}
-        onChange={(event) => {
-          setNote(event.target.value);
-        }}
-        help="Recorded on the audit row with your name."
-      />
-      <div className="pass-row-actions">
+      <div className="pass-row-field">
+        <Field
+          label="Note (optional)"
+          name={`note-${request.slug}`}
+          value={note}
+          onChange={(event) => {
+            setNote(event.target.value);
+          }}
+          help="Recorded on the audit row with your name."
+        />
+      </div>
+      <div className="pass-row-actions is-pair">
         <Button
           onClick={() => {
             answer("granted");

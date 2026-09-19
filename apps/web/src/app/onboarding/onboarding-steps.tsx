@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Field } from "@desiauction/ui";
+import { Button, Field, IconTile, IconUser } from "@desiauction/ui";
 import { useActionState, useEffect, useRef } from "react";
 
 import { personContact } from "../../lib/person-label";
@@ -44,6 +44,7 @@ export function OnboardingPanel({
 
   return (
     <>
+      <IconTile icon={<IconUser />} tone="gold" size="lg" />
       <h1>Welcome to DesiAuction</h1>
       <p className="onboarding-sub">One question and you&rsquo;re in.</p>
       <form
@@ -79,7 +80,10 @@ export function OnboardingPanel({
           Continue
         </Button>
         <p className="onboarding-hint">
-          Signed in as <span className="onboarding-contact">{personContact({ phone, email })}</span>{" "}
+          Signed in as{" "}
+          <span className="onboarding-contact" data-private>
+            {personContact({ phone, email })}
+          </span>{" "}
           ·{" "}
           <button
             type="button"

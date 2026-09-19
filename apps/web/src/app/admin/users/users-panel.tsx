@@ -1,4 +1,4 @@
-import { Card, EmptyState, IconArrowRight } from "@desiauction/ui";
+import { EmptyState, IconArrowRight, IconSearch, IconUsers, SectionCard } from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatCount, maskPersonContact } from "../../../server/admin/format";
@@ -20,12 +20,23 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
   return (
     <>
       <ReadOnlyNotice />
-      <Card>
+      <SectionCard
+        icon={<IconUsers />}
+        tone="blue"
+        title="People"
+        description={
+          <span data-testid="admin-user-count">
+            {query === ""
+              ? `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} user${platformTotal === 1 ? "" : "s"} on the platform`
+              : `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`}
+          </span>
+        }
+        flush
+      >
         <form className="admin-filters" method="get" role="search" data-testid="admin-user-search">
-          <div className="admin-filter-grow">
-            <label className="stat-label" htmlFor="admin-user-q">
-              Search users
-            </label>
+          <label className="admin-search" htmlFor="admin-user-q">
+            <span className="admin-sr-only">Search users</span>
+            <IconSearch size={18} aria-hidden />
             <input
               id="admin-user-q"
               name="q"
@@ -34,10 +45,10 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
               placeholder="Name or mobile number"
               className="admin-search-input"
             />
-          </div>
+          </label>
           {/* PI-1 P6: profile-aware facet. URL-driven like every admin filter. */}
-          <div>
-            <label className="stat-label" htmlFor="admin-user-filter">
+          <span className="admin-field">
+            <label className="admin-field-label" htmlFor="admin-user-filter">
               Show
             </label>
             <select
@@ -51,33 +62,27 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
               <option value="players">Players (has a registration)</option>
               <option value="profiled">With a cricket profile</option>
             </select>
-          </div>
+          </span>
           <button type="submit" className="admin-search-submit">
             Search
           </button>
         </form>
-      </Card>
-      <Card>
-        <h2 className="admin-section-title">People</h2>
-        <p className="admin-meta" data-testid="admin-user-count">
-          {query === ""
-            ? `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} user${platformTotal === 1 ? "" : "s"} on the platform`
-            : `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`}
-        </p>
         {rows.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="No user matches"
-            description={
-              query === ""
-                ? "Nobody has signed up yet."
-                : `Nothing matches “${query}”. Try a name or a full mobile number.`
-            }
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No user matches"
+              description={
+                query === ""
+                  ? "Nobody has signed up yet."
+                  : `Nothing matches “${query}”. Try a name or a full mobile number.`
+              }
+            />
+          </div>
         ) : (
           <>
-            <div className="table-scroll">
-              <table className="reg-table" data-testid="admin-user-table">
+            <div className="admin-table-wrap">
+              <table className="admin-table" data-testid="admin-user-table">
                 <thead>
                   <tr>
                     <th scope="col">User</th>
@@ -93,19 +98,22 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="reg-row">
+                    <tr key={row.id}>
                       <td data-label="User">
-                        <Link href={`/admin/users/${row.id}`} className="registration-name">
-                          {row.name ?? "Unnamed"}
-                        </Link>
-                        {/* A fifty-row directory of full E.164 mobile numbers
-                            is a bulk export of the platform's contact list, and
-                            `?q=` put the other 1,098 one page away. The last
-                            four digits answer the directory's actual question —
-                            "which row is this?" — and the whole number is on
-                            the one person's page an operator chose to open. */}
-                        <span className="registration-phone admin-meta">
-                          {maskPersonContact(row)}
+                        <span className="admin-cell-main">
+                          <Link href={`/admin/users/${row.id}`} className="admin-name">
+                            {row.name ?? "Unnamed"}
+                          </Link>
+                          {/* A fifty-row directory of full E.164 mobile numbers
+                              is a bulk export of the platform's contact list,
+                              and `?q=` put the other 1,098 one page away. The
+                              last four digits answer the directory's actual
+                              question — "which row is this?" — and the whole
+                              number is on the one person's page an operator
+                              chose to open. Masked in a screenshot too. */}
+                          <span className="registration-phone admin-meta" data-private>
+                            {maskPersonContact(row)}
+                          </span>
                         </span>
                       </td>
                       <td data-label="Organizations" className="admin-count admin-num">
@@ -141,7 +149,7 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
             </nav>
           </>
         )}
-      </Card>
+      </SectionCard>
     </>
   );
 }

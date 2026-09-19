@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, Dialog, Field, useToast } from "@desiauction/ui";
+import { Button, Dialog, Field, IconTrash, Pill, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
 
@@ -44,9 +44,11 @@ export function ErasurePanel({ request }: { request: MyErasureRequest | null }) 
     return (
       <div className="account-erasure" data-testid="erasure-pending">
         <p className="account-prose">
-          <Badge tone="warning">Deletion requested</Badge> You asked on{" "}
-          {request.requestedAt.toISOString().slice(0, 10)}. We reply within seven days; until then
-          you can take it back.
+          <Pill tone="amber" dot>
+            Deletion requested
+          </Pill>{" "}
+          You asked on {request.requestedAt.toISOString().slice(0, 10)}. We reply within seven days;
+          until then you can take it back.
         </p>
         <Button
           variant="secondary"
@@ -73,7 +75,7 @@ export function ErasurePanel({ request }: { request: MyErasureRequest | null }) 
     <div className="account-erasure">
       {request?.status === "declined" && request.decisionNote !== null ? (
         <p className="account-prose" role="note" data-testid="erasure-declined">
-          <Badge tone="neutral">Not deleted</Badge> Your request from{" "}
+          <Pill tone="neutral">Not deleted</Pill> Your request from{" "}
           {request.requestedAt.toISOString().slice(0, 10)} was declined: {request.decisionNote} You
           can ask again at any time.
         </p>
@@ -86,7 +88,7 @@ export function ErasurePanel({ request }: { request: MyErasureRequest | null }) 
         }}
         data-testid="erasure-open"
       >
-        Delete my account…
+        <IconTrash size={16} aria-hidden /> Delete my account…
       </Button>
       <Dialog
         open={open}

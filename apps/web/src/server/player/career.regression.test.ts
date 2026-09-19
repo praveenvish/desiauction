@@ -2,6 +2,7 @@ import {
   auctions,
   competitions,
   createDb,
+  fixtures,
   lots,
   newId,
   organizations,
@@ -16,7 +17,7 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
-import { personSeasonsInOrg, playerCareer } from "./career";
+import { personSeasonsInOrg, playerCareer, playerUpcomingMatches } from "./career";
 
 /**
  * The career projection, against a real database (PI-1 P5).
@@ -47,6 +48,10 @@ const realAuctionId = newId();
 const abandonedAuctionId = newId();
 
 const SOLD_PRICE = 2_50_000_00; // ₹2,50,000 in paise
+
+// The calendar: one rival and four fixtures, of which exactly one is upcoming.
+const rivalTeamId = newId();
+const fixtureIds = [newId(), newId(), newId(), newId()] as const;
 
 beforeAll(async () => {
   await db.insert(people).values({ id: personId, phone: PHONE, name: "Career Synthetic" });
@@ -87,13 +92,23 @@ beforeAll(async () => {
       createdBy: personId,
     },
   ]);
-  await db.insert(teams).values({
-    id: teamId,
-    orgId,
-    competitionId: soldCompId,
-    name: "Career Strikers",
-    createdBy: personId,
-  });
+  await db.insert(teams).values([
+    {
+      id: teamId,
+      orgId,
+      competitionId: soldCompId,
+      name: "Career Strikers",
+      primaryColor: "#123456",
+      createdBy: personId,
+    },
+    {
+      id: rivalTeamId,
+      orgId,
+      competitionId: soldCompId,
+      name: "Career Rivals",
+      createdBy: personId,
+    },
+  ]);
   await db.insert(registrations).values([
     {
       id: regSold,
@@ -196,14 +211,39 @@ beforeAll(async () => {
       soldPrice: 99_99_999_00, // the phantom price that must never surface
     },
   ]);
+  const fixture = (
+    index: number,
+    status: "draft" | "published" | "completed",
+    kickoffAt: string,
+  ) => ({
+    id: fixtureIds[index] ?? newId(),
+    orgId,
+    competitionId: soldCompId,
+    fixtureNumber: `CRT${RUN}-F00${String(index + 1)}`,
+    seq: index + 1,
+    homeTeamId: index % 2 === 0 ? teamId : rivalTeamId,
+    awayTeamId: index % 2 === 0 ? rivalTeamId : teamId,
+    kickoffAt,
+    status,
+    createdBy: personId,
+  });
+  await db
+    .insert(fixtures)
+    .values([
+      fixture(0, "published", "2099-03-01T16:30"),
+      fixture(1, "published", "2020-03-01T16:30"),
+      fixture(2, "draft", "2099-04-01T16:30"),
+      fixture(3, "completed", "2099-05-01T16:30"),
+    ]);
 });
 
 afterAll(async () => {
+  await db.delete(fixtures).where(inArray(fixtures.id, [...fixtureIds]));
   await db.delete(lots).where(inArray(lots.auctionId, [realAuctionId, abandonedAuctionId]));
   await db.delete(paddles).where(inArray(paddles.auctionId, [realAuctionId, abandonedAuctionId]));
   await db.delete(auctions).where(inArray(auctions.id, [realAuctionId, abandonedAuctionId]));
   await db.delete(registrations).where(inArray(registrations.id, [regSold, regWithdrawn]));
-  await db.delete(teams).where(eq(teams.id, teamId));
+  await db.delete(teams).where(inArray(teams.id, [teamId, rivalTeamId]));
   await db.delete(competitions).where(inArray(competitions.id, [soldCompId, withdrawnCompId]));
   await db.delete(tournaments).where(eq(tournaments.id, tournamentId));
   await db.delete(organizations).where(eq(organizations.id, orgId));
@@ -247,5 +287,23 @@ describe("playerCareer (PI-1)", () => {
     expect(seasons[0]?.competitionName).toBe("Career One-Off");
     // A different org sees nothing — the club's records are the club's.
     expect(await personSeasonsInOrg(personId, newId())).toHaveLength(0);
+  });
+
+  it("lists only published fixtures from today on, from this person's side", async () => {
+    const upcoming = await playerUpcomingMatches(personId, "2026-01-01");
+    expect(upcoming).toHaveLength(1);
+    expect(upcoming[0]).toMatchObject({
+      fixtureId: fixtureIds[0],
+      teamName: "Career Strikers",
+      teamColor: "#123456",
+      opponentName: "Career Rivals",
+      competitionName: "CPL 1",
+    });
+    expect(await playerUpcomingMatches(newId(), "2026-01-01")).toEqual([]);
+  });
+
+  it("carries the team colour on a season for its chip", async () => {
+    const career = await playerCareer(personId);
+    expect(career.seasons.find((s) => s.competitionName === "CPL 1")?.teamColor).toBe("#123456");
   });
 });

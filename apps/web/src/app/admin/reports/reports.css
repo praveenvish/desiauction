@@ -1,23 +1,5 @@
-/* FR-1 — the report desk. Loaded after admin.css, which owns the console frame. */
-
-.report-queue {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.report-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
+/* FR-1 — the report desk. Loaded after admin.css, which owns the rows
+   (`.admin-rows.is-stacked`) each report sits in. */
 
 .report-row-head {
   display: flex;
@@ -33,8 +15,9 @@
 
 .report-row-title {
   margin: 0 0 var(--space-1);
-  color: var(--text-primary);
+  color: var(--text-heading);
   font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
 }
 
 .report-row-tags,
@@ -55,8 +38,10 @@
 
 .report-row-description {
   margin: 0;
-  padding: var(--space-3);
-  border-left: 2px solid var(--border-subtle);
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
   color: var(--text-primary);
   font-size: var(--text-sm-size);
   line-height: 1.6;
@@ -73,18 +58,17 @@
 }
 
 .report-row-context dt {
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .report-row-context dd {
   margin: 0;
   color: var(--text-primary);
   overflow-wrap: anywhere;
-}
-
-/* The row is a column flex box, which stretches a lone button to full width. */
-.report-row > button {
-  align-self: flex-start;
 }
 
 .report-row-shot {

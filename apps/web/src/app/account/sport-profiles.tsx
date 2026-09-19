@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Select } from "@desiauction/ui";
+import { IconBall, SectionCard, Select } from "@desiauction/ui";
 import { useState } from "react";
 
 import { SportProfilePanel, type SportFormSpec } from "./sport-profile-panel";
@@ -43,7 +43,18 @@ export function SportProfiles({ forms }: { forms: readonly SportProfileForm[] })
   const rest = forms.filter((form) => !shows(form));
 
   return (
-    <>
+    <SectionCard
+      id="sports"
+      icon={<IconBall />}
+      tone="green"
+      title="How you play"
+      description={
+        shown.length === 0
+          ? "Tell us how you play and we'll prefill it into every season you enter."
+          : "Per sport, because the answer is different in each. Prefilled into every season you enter."
+      }
+      className="acct-card"
+    >
       {shown.map((form) => (
         <SportProfilePanel
           key={form.spec.key}
@@ -53,17 +64,16 @@ export function SportProfiles({ forms }: { forms: readonly SportProfileForm[] })
         />
       ))}
       {rest.length > 0 ? (
-        <Card data-testid="add-sport">
-          <h2>Play something else?</h2>
-          <p className="dash-hint">
-            {shown.length === 0
-              ? "Tell us how you play and we'll prefill it into every season you enter."
-              : "Add a sport and we'll prefill it the next time you register for one."}
-          </p>
+        <div className="acct-add-sport" data-testid="add-sport">
           <Select
             label="Add a sport"
             name="add-sport"
             value=""
+            help={
+              shown.length === 0
+                ? undefined
+                : "Play something else? Add it and we'll prefill it the next time you register."
+            }
             onChange={(event) => {
               const key = event.target.value;
               if (key !== "") {
@@ -81,8 +91,8 @@ export function SportProfiles({ forms }: { forms: readonly SportProfileForm[] })
               </option>
             ))}
           </Select>
-        </Card>
+        </div>
       ) : null}
-    </>
+    </SectionCard>
   );
 }

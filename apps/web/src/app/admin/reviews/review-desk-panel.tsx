@@ -1,6 +1,19 @@
 "use client";
 
-import { Badge, Button, Card, EmptyState, Field, useToast, VisuallyHidden } from "@desiauction/ui";
+import {
+  Button,
+  EmptyState,
+  Field,
+  IconEyeOff,
+  IconGlobe,
+  IconMail,
+  IconSend,
+  IconStar,
+  Pill,
+  SectionCard,
+  useToast,
+  VisuallyHidden,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -40,41 +53,65 @@ export function ReviewDeskPanel({ desk }: { desk: ReviewDesk }) {
   return (
     <>
       <AskCard />
-      <Card data-testid="review-desk-pending">
-        <h2>Waiting for a decision</h2>
+      <SectionCard
+        icon={<IconStar />}
+        tone="amber"
+        title="Waiting for a decision"
+        description={
+          desk.pending.length === 0
+            ? "Publish the ones worth standing behind; hide the rest"
+            : `${String(desk.pending.length)} to publish or hide`
+        }
+        flush
+        data-testid="review-desk-pending"
+      >
         {desk.pending.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="Nothing waiting"
-            description="New reviews land here. Publish the ones worth standing behind; hide the rest."
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="Nothing waiting"
+              description="New reviews land here as people send them."
+            />
+          </div>
         ) : (
-          <ul className="review-list">
+          <ul className="admin-rows is-stacked">
             {desk.pending.map((review) => (
               <ReviewRow key={review.id} review={review} />
             ))}
           </ul>
         )}
-      </Card>
+      </SectionCard>
       {desk.published.length > 0 ? (
-        <Card data-testid="review-desk-published">
-          <h2>Published</h2>
-          <ul className="review-list">
+        <SectionCard
+          icon={<IconGlobe />}
+          tone="green"
+          title="Published"
+          description={`${String(desk.published.length)} live`}
+          flush
+          data-testid="review-desk-published"
+        >
+          <ul className="admin-rows is-stacked">
             {desk.published.map((review) => (
               <ReviewRow key={review.id} review={review} />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
       {desk.hidden.length > 0 ? (
-        <Card data-testid="review-desk-hidden">
-          <h2>Hidden</h2>
-          <ul className="review-list">
+        <SectionCard
+          icon={<IconEyeOff />}
+          tone="neutral"
+          title="Hidden"
+          description={`${String(desk.hidden.length)} kept off every page`}
+          flush
+          data-testid="review-desk-hidden"
+        >
+          <ul className="admin-rows is-stacked">
             {desk.hidden.map((review) => (
               <ReviewRow key={review.id} review={review} />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
       {desk.asks.length > 0 ? <AsksCard asks={desk.asks} /> : null}
     </>
@@ -89,8 +126,12 @@ function AskCard() {
   const [pending, start] = useTransition();
 
   return (
-    <Card data-testid="review-desk-ask">
-      <h2>Ask for a review</h2>
+    <SectionCard
+      icon={<IconSend />}
+      title="Ask for a review"
+      description="Ask somebody who ran a tournament how it went. You always get a link to send yourself."
+      data-testid="review-desk-ask"
+    >
       <form
         className="review-ask"
         onSubmit={(event) => {
@@ -147,7 +188,7 @@ function AskCard() {
           ) : null}
         </div>
       ) : null}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -187,12 +228,12 @@ function ReviewRow({ review }: { review: DeskReview }) {
               <span className="review-row-rating-rest">{"★".repeat(5 - review.rating)}</span>
             </span>
           </p>
-          <p className="competitions-hint">
+          <p className="pass-row-sub">
             {review.seasonName === null
               ? "About DesiAuction"
               : `About ${review.seasonName} · ${review.role === "owner" ? "team owner" : "player"}`}
           </p>
-          <p className="competitions-hint">
+          <p className="admin-meta">
             {review.personName ?? "No name on file"} · {day(review.createdAt)}
             {review.updatedAt.getTime() - review.createdAt.getTime() > 60_000
               ? ` · edited ${day(review.updatedAt)}`
@@ -201,11 +242,11 @@ function ReviewRow({ review }: { review: DeskReview }) {
         </div>
         <span className="review-row-badges">
           {review.reports.length > 0 ? (
-            <Badge tone="danger">
+            <Pill tone="red" dot>
               {review.reports.length} {review.reports.length === 1 ? "report" : "reports"}
-            </Badge>
+            </Pill>
           ) : null}
-          <Badge tone={review.mayQuote ? "success" : "neutral"}>
+          <Pill tone={review.mayQuote ? "green" : "neutral"}>
             {review.seasonName === null
               ? review.mayQuote
                 ? review.status === "published"
@@ -215,7 +256,7 @@ function ReviewRow({ review }: { review: DeskReview }) {
               : review.mayQuote
                 ? "signed"
                 : "unsigned"}
-          </Badge>
+          </Pill>
         </span>
       </div>
       {review.wentWell !== null ? (
@@ -233,7 +274,7 @@ function ReviewRow({ review }: { review: DeskReview }) {
         </div>
       ) : null}
       {review.mayQuote ? (
-        <p className="competitions-hint">
+        <p className="pass-row-sub">
           Signed: {review.displayName}
           {review.displayOrg === null ? "" : `, ${review.displayOrg}`}
         </p>
@@ -252,7 +293,7 @@ function ReviewRow({ review }: { review: DeskReview }) {
               <li key={index}>
                 <strong>{REASON_WORDS[report.reason] ?? report.reason}</strong>
                 {report.note === null ? null : ` — ${report.note}`}{" "}
-                <span className="competitions-hint">{day(report.createdAt)}</span>
+                <span className="admin-meta">{day(report.createdAt)}</span>
               </li>
             ))}
           </ul>
@@ -316,28 +357,38 @@ const SOURCE_WORDS: Record<string, string> = {
 
 function AsksCard({ asks }: { asks: readonly DeskAsk[] }) {
   return (
-    <Card data-testid="review-desk-asks">
-      <h2>Who we&apos;ve asked</h2>
-      <ul className="review-asks">
+    <SectionCard
+      icon={<IconMail />}
+      tone="neutral"
+      title={"Who we've asked"}
+      description={`${String(asks.length)} asked`}
+      flush
+      data-testid="review-desk-asks"
+    >
+      <ul className="admin-rows">
         {asks.map((ask) => {
           const state = ask.reviewed
-            ? { tone: "success" as const, words: "reviewed" }
+            ? { tone: "green" as const, words: "reviewed" }
             : ask.expired
               ? { tone: "neutral" as const, words: "link expired" }
               : ask.openedAt !== null
-                ? { tone: "info" as const, words: "opened, not reviewed" }
+                ? { tone: "blue" as const, words: "opened, not reviewed" }
                 : ask.sentAt !== null
-                  ? { tone: "warning" as const, words: "emailed, not opened" }
-                  : { tone: "warning" as const, words: "link not emailed" };
+                  ? { tone: "amber" as const, words: "emailed, not opened" }
+                  : { tone: "amber" as const, words: "link not emailed" };
           return (
             <li key={ask.id}>
-              <span className="review-asks-who">
-                {ask.personName ?? "No name"}
-                {ask.personEmail === null ? "" : ` · ${ask.personEmail}`}
+              <span className="admin-cell-main">
+                <span className="admin-name">{ask.personName ?? "No name"}</span>
+                {ask.personEmail === null ? null : (
+                  <span className="admin-meta" data-private>
+                    {ask.personEmail}
+                  </span>
+                )}
               </span>
               <span className="review-asks-state">
-                <Badge tone={state.tone}>{state.words}</Badge>
-                <span className="competitions-hint">
+                <Pill tone={state.tone}>{state.words}</Pill>
+                <span className="admin-meta">
                   {SOURCE_WORDS[ask.source] ?? ask.source} · {day(ask.createdAt)}
                 </span>
               </span>
@@ -345,6 +396,6 @@ function AsksCard({ asks }: { asks: readonly DeskAsk[] }) {
           );
         })}
       </ul>
-    </Card>
+    </SectionCard>
   );
 }

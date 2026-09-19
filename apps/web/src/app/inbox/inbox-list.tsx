@@ -1,8 +1,30 @@
 "use client";
 
-import { VisuallyHidden } from "@desiauction/ui";
+import {
+  IconAlert,
+  IconBell,
+  IconCheckCircle,
+  IconClock,
+  IconClose,
+  IconCrown,
+  IconDevice,
+  IconGavel,
+  IconKey,
+  IconLock,
+  IconLogOut,
+  IconMail,
+  IconMatch,
+  IconPhone,
+  IconReceipt,
+  IconShieldCheck,
+  IconTile,
+  IconUser,
+  IconUsers,
+  VisuallyHidden,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { inboxSeenKey, labelForEvent } from "../../lib/inbox-events";
 import { useHydrated } from "../../lib/use-hydrated";
@@ -58,6 +80,72 @@ function formatWhen(iso: string, now: number | null): string {
 }
 
 /**
+ * One tinted tile per kind of notice, so a list of forty reads at a glance:
+ * gold for the auction, green for good news, red for the ones to look at.
+ * Presentation only — an action this map does not know falls back to a bell.
+ */
+const EVENT_ICON: Record<string, { icon: ReactNode; tone: KitTone }> = {
+  "auth.login.otp": { icon: <IconLock />, tone: "neutral" },
+  "auth.login.email": { icon: <IconLock />, tone: "neutral" },
+  "auth.login.passkey": { icon: <IconKey />, tone: "neutral" },
+  "auth.signup.email": { icon: <IconUser />, tone: "gold" },
+  "auth.otp.requested": { icon: <IconLock />, tone: "neutral" },
+  "auth.otp.lockout": { icon: <IconAlert />, tone: "red" },
+  "auth.passkey.enrolled": { icon: <IconKey />, tone: "purple" },
+  "auth.passkey.renamed": { icon: <IconKey />, tone: "purple" },
+  "auth.passkey.removed": { icon: <IconKey />, tone: "amber" },
+  "auth.passkey.failed": { icon: <IconAlert />, tone: "red" },
+  "auth.session.revoked": { icon: <IconDevice />, tone: "amber" },
+  "auth.logout": { icon: <IconLogOut />, tone: "neutral" },
+  "auth.phone.changed": { icon: <IconPhone />, tone: "amber" },
+  "profile.email.verified": { icon: <IconMail />, tone: "green" },
+  "profile.name.set": { icon: <IconUser />, tone: "blue" },
+  "profile.name.updated": { icon: <IconUser />, tone: "blue" },
+  "profile.player.updated": { icon: <IconUser />, tone: "blue" },
+  "registration.approved": { icon: <IconCheckCircle />, tone: "green" },
+  "registration.rejected": { icon: <IconClose />, tone: "red" },
+  "registration.waitlisted": { icon: <IconClock />, tone: "amber" },
+  "auction.sold": { icon: <IconGavel />, tone: "gold" },
+  "auction.unsold": { icon: <IconGavel />, tone: "neutral" },
+  "team.appointed": { icon: <IconCrown />, tone: "purple" },
+  "team.squad_sheet": { icon: <IconUsers />, tone: "blue" },
+  "fixture.lineup_announced": { icon: <IconMatch />, tone: "green" },
+  "finance.document.issued": { icon: <IconReceipt />, tone: "blue" },
+  "privacy.erasure.requested": { icon: <IconShieldCheck />, tone: "red" },
+  "privacy.erasure.withdrawn": { icon: <IconShieldCheck />, tone: "neutral" },
+};
+
+const FALLBACK_ICON = { icon: <IconBell />, tone: "neutral" as KitTone };
+
+/** The calendar day in IST — the same on the server and in the browser. */
+function dayKey(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+}
+
+/**
+ * "Today" and "Yesterday" need a clock, so they arrive with hydration like the
+ * relative times do; the first paint names the date.
+ */
+function dayLabel(key: string, now: number | null): string {
+  if (now !== null) {
+    const today = dayKey(new Date(now).toISOString());
+    const yesterday = dayKey(new Date(now - 86_400_000).toISOString());
+    if (key === today) return "Today";
+    if (key === yesterday) return "Yesterday";
+  }
+  const date = new Date(`${key}T12:00:00+05:30`);
+  const sameYear =
+    now !== null && key.slice(0, 4) === dayKey(new Date(now).toISOString()).slice(0, 4);
+  return date.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(now === null || sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+/**
  * Unread contract: rows newer than the device's last visit render with the
  * unread dot for THIS render, then the visit timestamp advances. Read-state is
  * presentation-only (localStorage) — no notification storage exists yet — but
@@ -85,41 +173,64 @@ export function InboxList({ personId, events }: { personId: string; events: Inbo
     }
   }, [events, personId]);
 
+  // Consecutive notices on the same IST day share a heading.
+  const groups: { key: string; events: InboxEvent[] }[] = [];
+  for (const event of events) {
+    const key = dayKey(event.at);
+    const last = groups[groups.length - 1];
+    if (last !== undefined && last.key === key) {
+      last.events.push(event);
+    } else {
+      groups.push({ key, events: [event] });
+    }
+  }
+
   return (
-    <ol className="inbox-list" data-testid="inbox-list" data-hydrated={hydrated}>
-      {events.map((event) => {
-        const unread = hydrated && (seenBefore === null || event.at > seenBefore);
-        const label = labelForEvent(event.action);
-        return (
-          <li
-            key={`${event.action}-${event.at}`}
-            className="inbox-row"
-            data-testid="inbox-row"
-            data-unread={unread}
-          >
-            <span className="inbox-dot" aria-hidden data-visible={unread} />
-            <span className="inbox-label">
-              {label}
-              {event.subject !== undefined ? (
-                <span className="inbox-subject">
-                  {event.subject.href !== undefined ? (
-                    <Link href={event.subject.href}>{event.subject.name}</Link>
-                  ) : (
-                    event.subject.name
-                  )}
-                </span>
-              ) : null}
-              {event.detail !== undefined ? (
-                <span className="inbox-detail">{event.detail}</span>
-              ) : null}
-              {unread ? <VisuallyHidden> (new)</VisuallyHidden> : null}
-            </span>
-            <time className="inbox-when" dateTime={event.at}>
-              {formatWhen(event.at, now)}
-            </time>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="inbox-list" data-testid="inbox-list" data-hydrated={hydrated}>
+      {groups.map((group) => (
+        <div key={group.key} className="inbox-day">
+          <h3 className="inbox-day-title">{dayLabel(group.key, now)}</h3>
+          <ol className="inbox-rows">
+            {group.events.map((event) => {
+              const unread = hydrated && (seenBefore === null || event.at > seenBefore);
+              const label = labelForEvent(event.action);
+              const look = EVENT_ICON[event.action] ?? FALLBACK_ICON;
+              return (
+                <li
+                  key={`${event.action}-${event.at}`}
+                  className="inbox-row"
+                  data-testid="inbox-row"
+                  data-unread={unread}
+                >
+                  <IconTile icon={look.icon} tone={look.tone} size="md" />
+                  <span className="inbox-label">
+                    <span className="inbox-headline">{label}</span>
+                    {event.subject !== undefined ? (
+                      <span className="inbox-subject">
+                        {event.subject.href !== undefined ? (
+                          <Link href={event.subject.href}>{event.subject.name}</Link>
+                        ) : (
+                          event.subject.name
+                        )}
+                      </span>
+                    ) : null}
+                    {event.detail !== undefined ? (
+                      <span className="inbox-detail">{event.detail}</span>
+                    ) : null}
+                    {unread ? <VisuallyHidden> (new)</VisuallyHidden> : null}
+                  </span>
+                  <span className="inbox-side">
+                    <time className="inbox-when" dateTime={event.at}>
+                      {formatWhen(event.at, now)}
+                    </time>
+                    <span className="inbox-dot" aria-hidden data-visible={unread} />
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ))}
+    </div>
   );
 }

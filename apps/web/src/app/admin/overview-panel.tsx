@@ -1,5 +1,24 @@
 import type { OutcomeMetrics } from "@desiauction/core";
-import { Badge, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconAlert,
+  IconArrowRight,
+  IconBroadcast,
+  IconChart,
+  IconClock,
+  IconFlag,
+  IconGavel,
+  IconInbox,
+  IconLedger,
+  IconShieldCheck,
+  IconTrophy,
+  IconUser,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
 
 import { ADMIN_ACCESS_ACTION } from "../../server/admin/capabilities";
@@ -13,7 +32,7 @@ import {
 } from "../../server/admin/format";
 import type { LiveBoard } from "../../server/admin/live-views";
 import type { PlatformOverview } from "../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, statusTone } from "./admin-ui";
+import { ReadOnlyNotice, RelativeTime, statusPillTone } from "./admin-ui";
 
 function pct(rate: number): number {
   return Math.round(rate * 100);
@@ -48,207 +67,275 @@ export function OverviewPanel({
     <>
       <ReadOnlyNotice />
 
-      <LiveNow live={live} />
+      <StatGrid testId="admin-totals">
+        <StatCard
+          icon={<IconFlag />}
+          tone="gold"
+          value={formatCount(totals.orgs)}
+          label="Organizations"
+          hint="All clubs"
+          href="/admin/orgs"
+          linkComponent={Link}
+        />
+        <StatCard
+          icon={<IconTrophy />}
+          tone="blue"
+          value={formatCount(totals.competitions)}
+          label="Seasons"
+          hint="Across every club"
+        />
+        <StatCard
+          icon={<IconUser />}
+          tone="green"
+          value={formatCount(totals.people)}
+          label="Users"
+          hint="With an account"
+          href="/admin/users"
+          linkComponent={Link}
+        />
+        <StatCard
+          icon={<IconGavel />}
+          tone="purple"
+          value={formatCount(totals.auctions)}
+          label="Auctions"
+          hint={
+            liveAuctions.total > 0
+              ? `${formatCount(liveAuctions.total - liveAuctions.stale)} live now`
+              : "None live now"
+          }
+          href="/admin/live"
+          linkComponent={Link}
+        />
+      </StatGrid>
 
-      {desks.desks > 0 ? <DeskCard items={desks.items} /> : null}
+      <div className="adm-overview">
+        <div className="adm-col">
+          <LiveNow live={live} />
 
-      <section aria-labelledby="admin-totals">
-        <h2 className="admin-section-title" id="admin-totals">
-          The platform
-        </h2>
-        <div className="stat-row">
-          <Tile label="Organizations" value={totals.orgs} href="/admin/orgs" />
-          <Tile label="Seasons" value={totals.competitions} />
-          <Tile label="Users" value={totals.people} href="/admin/users" />
-          <Tile label="Auctions" value={totals.auctions} />
-          <Tile label="Settlement cases" value={totals.cases} />
-          <Tile label="Finance orgs" value={totals.financeOrgs} href="/admin/health" />
-        </div>
-      </section>
+          <SectionCard
+            icon={<IconAlert />}
+            tone={attention.length === 0 ? "green" : "red"}
+            title="Attention queue"
+            /* Every link here used to read "Open the console →" and point at an
+               org console that `platform:admin` cannot open. The links now go
+               where administration can actually go, and the sentence says who
+               holds the fix. */
+            description="Administration cannot act on these. Each links to what an administrator can open; the repair lives in the owning console, under its own permissions."
+            flush={attention.length > 0}
+          >
+            {attention.length === 0 ? (
+              <EmptyState
+                title="Nothing needs a human"
+                description="No dead jobs, no stalled runner, no stuck auction, no discrepant case, no failed delivery."
+              />
+            ) : (
+              <ul className="adm-rows" data-testid="admin-attention">
+                {attention.map((row, index) => (
+                  <li key={`${row.kind}-${String(index)}`} className="adm-row">
+                    <span className="adm-row-dot" data-tone="red" aria-hidden />
+                    <span className="adm-row-main">
+                      <span className="adm-row-title">{row.subject}</span>
+                      <span className="adm-row-sub adm-mono">
+                        {row.kind}
+                        {row.orgName !== null ? ` · ${row.orgName}` : ""}
+                      </span>
+                    </span>
+                    {row.href !== null ? (
+                      <Link href={row.href} className="adm-link">
+                        Inspect
+                        <IconArrowRight size={14} aria-hidden />
+                      </Link>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
 
-      <section aria-labelledby="admin-outcomes">
-        <h2 className="admin-section-title" id="admin-outcomes">
-          Outcomes · last {outcomes.windowDays} days
-        </h2>
-        <div className="stat-row" data-testid="admin-outcomes">
-          <Tile label="Seasons created" value={outcomes.competitionsCreated} />
-          {/* Was "Cloned (run it again)" — the parenthetical was the internal
-              metric definition, not a label an operator should decode. */}
-          <Tile label="Seasons cloned" value={outcomes.competitionsCloned} />
-          <Tile label="Clone share" value={pct(outcomes.cloneAdoptionRate)} suffix="%" />
-          <Tile label="Repeat orgs" value={outcomes.orgsRepeating} />
-          <Tile label="Repeat org rate" value={pct(outcomes.repeatOrgRate)} suffix="%" />
-          <Tile label="Registrations" value={outcomes.registrationsSubmitted} />
-          <Tile label="Players placed" value={outcomes.playersAssigned} />
-        </div>
-        {Object.keys(outcomes.registrationsBySource).length > 0 ? (
-          <div className="admin-chips" data-testid="admin-outcomes-sources">
-            <span className="admin-meta">Registrations by share source:</span>
-            {Object.entries(outcomes.registrationsBySource)
-              .sort((a, b) => b[1] - a[1])
-              .map(([src, n]) => (
-                <Badge key={src} tone="neutral">
-                  {/* The badge uppercases, so the fold's two bucket keys read
-                      as "OTHER" and "DIRECT" — which name nothing. `other` is a
-                      `?ref` the platform does not recognise; `direct` is no
-                      `?ref` at all (attribution.ts:44). They are different
-                      findings and the chip should say which. */}
-                  {SOURCE_LABELS[src] ?? src} <span className="admin-count">{formatCount(n)}</span>
-                </Badge>
-              ))}
-          </div>
-        ) : null}
-      </section>
-
-      <div className="admin-grid">
-        <Card>
-          <h2 className="admin-section-title">Auctions</h2>
-          <StatusList
-            lines={overview.auctionsByStatus}
-            liveAuctions={liveAuctions}
-            empty="No auction has been created yet."
-          />
-        </Card>
-        <Card>
-          <h2 className="admin-section-title">Settlements</h2>
-          <StatusList lines={overview.casesByStatus} empty="No settlement case has been opened." />
-        </Card>
-        <Card>
-          <h2 className="admin-section-title">System status</h2>
-          <div className="admin-health-org">
-            {/* `runnerVerdict`, NOT `runner.healthy`. The snapshot's rule is
-                `dead === 0`, which a runner that never runs also satisfies:
-                measured at 1,558 queued and 2 done with the oldest job eleven
-                days old, it reported HEALTHY in green — three lines above
-                "Settlement ingest 2 behind", which was behind because of it. */}
-            <div className="admin-health-row">
-              <span>Job runner</span>
-              <Badge
-                tone={runnerVerdict.healthy ? "success" : "danger"}
-                data-testid="admin-overview-runner"
-              >
-                {runnerVerdict.healthy ? "Healthy" : "Not running"}
-              </Badge>
-            </div>
-            {runnerVerdict.detail !== null ? (
-              <p className="admin-meta">{runnerVerdict.detail}</p>
-            ) : null}
-            <div className="admin-chips">
-              <Badge
-                tone={runnerVerdict.queued > 0 && !runnerVerdict.healthy ? "warning" : "neutral"}
-              >
-                queued <span className="admin-count">{formatCount(runnerVerdict.queued)}</span>
-              </Badge>
-              <Badge tone={runnerVerdict.dead > 0 ? "danger" : "neutral"}>
-                dead <span className="admin-count">{formatCount(runnerVerdict.dead)}</span>
-              </Badge>
-              {runnerVerdict.oldestQueuedWaitMs === null ? null : (
-                <Badge tone={runnerVerdict.healthy ? "neutral" : "danger"}>
-                  oldest waited {waitedFor(runnerVerdict.oldestQueuedWaitMs)}
-                </Badge>
-              )}
-            </div>
-            <div className="admin-health-row">
-              <span>Settlement ingest</span>
-              <Badge tone={followers.behind === 0 ? "success" : "warning"}>
-                {followers.behind === 0
-                  ? `${String(followers.orgs)} current`
-                  : `${String(followers.behind)} behind`}
-              </Badge>
-            </div>
-            <Link href="/admin/health" className="admin-meta">
-              Platform health
-              <IconArrowRight size={16} className="icon-trail" />
-            </Link>{" "}
-            {/* The door this console lacked. Whether the deployment holds the
-                registered DLT ids it needs is a health fact like any other —
-                without an id a message shape does not send at all — and it was
-                answerable only by reading a running process's environment. */}
-            <Link href="/admin/messaging" className="admin-meta" data-testid="admin-messaging-link">
-              Messaging
-              <IconArrowRight size={16} className="icon-trail" />
-            </Link>
-          </div>
-        </Card>
-      </div>
-
-      <Card>
-        <h2 className="admin-section-title">Attention queue</h2>
-        {/* Every link here used to read "Open the console →" and point at an
-            org console that `platform:admin` cannot open — the grant confers
-            zero org capability by design, so each one 404'd for its only
-            audience. The links now go where administration can actually go, and
-            the sentence says who holds the fix. */}
-        <p className="admin-meta">
-          Administration cannot act on any of these. Each links to what an administrator can open;
-          the repair itself lives in the owning console, under that console&rsquo;s own permissions.
-        </p>
-        {attention.length === 0 ? (
-          <EmptyState
-            title="Nothing needs a human"
-            description="No dead jobs, no stalled runner, no stuck auction, no discrepant case, no failed delivery."
-          />
-        ) : (
-          <ul className="admin-attention" data-testid="admin-attention">
-            {attention.map((row, index) => (
-              <li key={`${row.kind}-${String(index)}`}>
-                <span className="admin-attention-subject">
-                  <span>{row.subject}</span>
-                  <span className="admin-attention-kind">
-                    {row.kind}
-                    {row.orgName !== null ? ` · ${row.orgName}` : ""}
-                  </span>
-                </span>
-                {row.href !== null ? (
-                  <Link href={row.href} className="admin-meta">
-                    Inspect
-                    <IconArrowRight size={16} className="icon-trail" />
+          <SectionCard
+            icon={<IconClock />}
+            tone="neutral"
+            title="Recent activity"
+            description="The latest audit entries, administration's own page views left out."
+            action={
+              <Link href="/admin/audit" className="adm-link">
+                Audit explorer
+                <IconArrowRight size={14} aria-hidden />
+              </Link>
+            }
+            flush={recent.length > 0}
+          >
+            {recent.length === 0 ? (
+              <EmptyState title="No activity yet" description="The audit log is empty." />
+            ) : (
+              <>
+                <ul className="adm-rows" data-testid="admin-recent">
+                  {recent.map((row) => (
+                    <li key={row.id} className="adm-row">
+                      <span className="adm-row-main">
+                        <span className="adm-row-title adm-mono">{row.action}</span>
+                        <span className="adm-row-sub">
+                          by {actorLabel(row.actor, row.actorName)}
+                        </span>
+                      </span>
+                      <RelativeTime at={row.at} />
+                    </li>
+                  ))}
+                </ul>
+                {/* Administration records its own page views, so this list would
+                    otherwise fill with an admin watching themselves refresh. They
+                    are excluded HERE only, and this link is the disclosure. */}
+                <p className="adm-foot">
+                  <Link
+                    href={`/admin/audit?action=${ADMIN_ACCESS_ACTION}`}
+                    className="adm-link"
+                    data-testid="admin-access-log-link"
+                  >
+                    Administration&rsquo;s own access log
+                    <IconArrowRight size={14} aria-hidden />
                   </Link>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+                </p>
+              </>
+            )}
+          </SectionCard>
+        </div>
 
-      <Card>
-        <h2 className="admin-section-title">Recent activity</h2>
-        {recent.length === 0 ? (
-          <EmptyState title="No activity yet" description="The audit log is empty." />
-        ) : (
-          <>
-            <ul className="admin-timeline" data-testid="admin-recent">
-              {recent.map((row) => (
-                <li key={row.id}>
-                  <span>
-                    <span className="admin-action">{row.action}</span>
-                    <span className="admin-meta"> by {actorLabel(row.actor, row.actorName)}</span>
-                  </span>
-                  <RelativeTime at={row.at} />
-                </li>
-              ))}
+        <div className="adm-col">
+          {desks.desks > 0 ? <DeskCard items={desks.items} /> : null}
+
+          <SectionCard
+            icon={<IconShieldCheck />}
+            tone={runnerVerdict.healthy && followers.behind === 0 ? "green" : "amber"}
+            title="System status"
+            description="The job runner and each club's settlement follower, as they report themselves."
+          >
+            {/* `runnerVerdict`, NOT `runner.healthy`. The snapshot's rule is
+                `dead === 0`, which a runner that never runs also satisfies —
+                measured at 1,558 queued with the oldest eleven days old, it
+                reported HEALTHY in green. */}
+            <ul className="adm-status">
+              <li>
+                <span className="adm-status-name">Job runner</span>
+                <Pill
+                  tone={runnerVerdict.healthy ? "green" : "red"}
+                  dot
+                  testId="admin-overview-runner"
+                >
+                  {runnerVerdict.healthy ? "Healthy" : "Not running"}
+                </Pill>
+              </li>
+              {runnerVerdict.detail !== null ? (
+                <li className="adm-status-note">{runnerVerdict.detail}</li>
+              ) : null}
+              <li className="adm-status-chips">
+                <Pill
+                  tone={runnerVerdict.queued > 0 && !runnerVerdict.healthy ? "amber" : "neutral"}
+                >
+                  Queued {formatCount(runnerVerdict.queued)}
+                </Pill>
+                <Pill tone={runnerVerdict.dead > 0 ? "red" : "neutral"}>
+                  Dead {formatCount(runnerVerdict.dead)}
+                </Pill>
+                {runnerVerdict.oldestQueuedWaitMs === null ? null : (
+                  <Pill tone={runnerVerdict.healthy ? "neutral" : "red"}>
+                    Oldest waited {waitedFor(runnerVerdict.oldestQueuedWaitMs)}
+                  </Pill>
+                )}
+              </li>
+              <li>
+                <span className="adm-status-name">Settlement ingest</span>
+                <Pill tone={followers.behind === 0 ? "green" : "amber"} dot>
+                  {followers.behind === 0
+                    ? `${String(followers.orgs)} current`
+                    : `${String(followers.behind)} behind`}
+                </Pill>
+              </li>
             </ul>
-            <Link href="/admin/audit" className="admin-meta">
-              Open the audit explorer
-              <IconArrowRight size={16} className="icon-trail" />
-            </Link>{" "}
-            {/* Administration records its own page views, so this list would
-                otherwise fill with an admin watching themselves refresh. They
-                are excluded HERE only, and this link is the disclosure. */}
-            <Link
-              href={`/admin/audit?action=${ADMIN_ACCESS_ACTION}`}
-              className="admin-meta"
-              data-testid="admin-access-log-link"
-            >
-              Administration&rsquo;s own access log
-              <IconArrowRight size={16} className="icon-trail" />
-            </Link>
-          </>
-        )}
-      </Card>
+            <p className="adm-foot adm-foot-inline">
+              <Link href="/admin/health" className="adm-link">
+                Platform health
+                <IconArrowRight size={14} aria-hidden />
+              </Link>
+              {/* Whether the deployment holds the registered DLT ids it needs is
+                  a health fact like any other — without an id a message shape
+                  does not send at all. */}
+              <Link href="/admin/messaging" className="adm-link" data-testid="admin-messaging-link">
+                Messaging
+                <IconArrowRight size={14} aria-hidden />
+              </Link>
+            </p>
+          </SectionCard>
+
+          <SectionCard icon={<IconGavel />} tone="purple" title="Auctions by status">
+            <StatusList
+              lines={overview.auctionsByStatus}
+              liveAuctions={liveAuctions}
+              empty="No auction has been created yet."
+            />
+          </SectionCard>
+
+          <SectionCard
+            icon={<IconLedger />}
+            tone="blue"
+            title="Settlements"
+            description={`${countNoun(totals.cases, "settlement case")} · ${countNoun(totals.financeOrgs, "finance org")}`}
+            action={
+              <Link href="/admin/health" className="adm-link">
+                Finance health
+                <IconArrowRight size={14} aria-hidden />
+              </Link>
+            }
+          >
+            <StatusList
+              lines={overview.casesByStatus}
+              empty="No settlement case has been opened."
+            />
+          </SectionCard>
+
+          <SectionCard
+            icon={<IconChart />}
+            tone="green"
+            title={`Outcomes · last ${String(outcomes.windowDays)} days`}
+          >
+            <dl className="adm-figures" data-testid="admin-outcomes">
+              <Figure label="Seasons created" value={outcomes.competitionsCreated} />
+              {/* Was "Cloned (run it again)" — the parenthetical was the internal
+                  metric definition, not a label an operator should decode. */}
+              <Figure label="Seasons cloned" value={outcomes.competitionsCloned} />
+              <Figure label="Clone share" value={pct(outcomes.cloneAdoptionRate)} suffix="%" />
+              <Figure label="Repeat orgs" value={outcomes.orgsRepeating} />
+              <Figure label="Repeat org rate" value={pct(outcomes.repeatOrgRate)} suffix="%" />
+              <Figure label="Registrations" value={outcomes.registrationsSubmitted} />
+              <Figure label="Players placed" value={outcomes.playersAssigned} />
+            </dl>
+            {Object.keys(outcomes.registrationsBySource).length > 0 ? (
+              <div className="adm-chips" data-testid="admin-outcomes-sources">
+                <span className="adm-chips-label">Registrations by share source</span>
+                {Object.entries(outcomes.registrationsBySource)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([src, n]) => (
+                    <Pill key={src} tone="neutral">
+                      {/* `other` is a `?ref` the platform does not recognise;
+                          `direct` is no `?ref` at all (attribution.ts:44). They
+                          are different findings and the chip says which. */}
+                      {SOURCE_LABELS[src] ?? src} · {formatCount(n)}
+                    </Pill>
+                  ))}
+              </div>
+            ) : null}
+          </SectionCard>
+        </div>
+      </div>
     </>
   );
 }
+
+const ROOM_TONE: Record<LiveBoard["running"][number]["state"], KitTone> = {
+  active: "green",
+  quiet: "neutral",
+  paused: "amber",
+  stale: "red",
+};
 
 const ROOM_WORDS: Record<LiveBoard["running"][number]["state"], string> = {
   active: "bidding",
@@ -264,106 +351,119 @@ const ROOM_WORDS: Record<LiveBoard["running"][number]["state"], string> = {
 function LiveNow({ live }: { live: LiveBoard }) {
   const shown = live.running.slice(0, 5);
   return (
-    <Card data-testid="admin-live-now">
-      <div className="admin-live-head">
-        <h2 className="admin-section-title">Live now</h2>
-        <Link href="/admin/live" className="admin-meta" data-testid="admin-live-board-link">
+    <SectionCard
+      icon={<IconBroadcast />}
+      tone={shown.length > 0 ? "red" : "neutral"}
+      title="Live now"
+      description={
+        shown.length === 0
+          ? `No auction is running right now.${
+              live.stale.length > 0
+                ? ` ${countNoun(live.stale.length, "auction")} marked live ${live.stale.length === 1 ? "was" : "were"} never closed.`
+                : ""
+            }`
+          : `${countNoun(live.running.length, "auction")} running`
+      }
+      action={
+        <Link href="/admin/live" className="adm-link" data-testid="admin-live-board-link">
           Open the live board
-          <IconArrowRight size={16} className="icon-trail" />
+          <IconArrowRight size={14} aria-hidden />
         </Link>
-      </div>
-      {shown.length === 0 ? (
-        <p className="admin-meta">
-          No auction is running right now.
-          {live.stale.length > 0
-            ? ` ${countNoun(live.stale.length, "auction")} marked live ${live.stale.length === 1 ? "was" : "were"} never closed.`
-            : ""}
-        </p>
-      ) : (
-        <ul className="admin-live-list is-compact">
-          {shown.map((row) => (
-            <li key={row.auctionId} className="admin-live-row">
-              <span className="admin-live-name">
-                <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
-                <span className="admin-meta">
-                  {row.orgName} · {ROOM_WORDS[row.state]}
+      }
+      flush={shown.length > 0}
+      data-testid="admin-live-now"
+    >
+      {shown.length === 0 ? undefined : (
+        <>
+          <ul className="adm-rows">
+            {shown.map((row) => (
+              <li key={row.auctionId} className="adm-row">
+                <span className="adm-row-dot" data-tone={ROOM_TONE[row.state]} aria-hidden />
+                <span className="adm-row-main">
+                  <Link href={`/admin/auctions/${row.auctionId}`} className="adm-row-title">
+                    {row.seasonName}
+                  </Link>
+                  <span className="adm-row-sub">{row.orgName}</span>
                 </span>
-              </span>
-              <span className="admin-meta">
-                {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in 5 min
-              </span>
-            </li>
-          ))}
-        </ul>
+                <span className="adm-row-side">
+                  <Pill tone={ROOM_TONE[row.state]}>{ROOM_WORDS[row.state]}</Pill>
+                  <span className="adm-row-sub">
+                    {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in 5
+                    min
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {live.running.length > shown.length ? (
+            <p className="adm-foot">
+              And {formatCount(live.running.length - shown.length)} more on the live board.
+            </p>
+          ) : null}
+        </>
       )}
-      {live.running.length > shown.length ? (
-        <p className="admin-meta">
-          And {formatCount(live.running.length - shown.length)} more on the live board.
-        </p>
-      ) : null}
-    </Card>
+    </SectionCard>
   );
 }
 
 /** Work on the desks this operator holds — the one card here they can act on. */
 function DeskCard({ items }: { items: readonly DeskItem[] }) {
   return (
-    <Card data-testid="admin-desks">
-      <h2 className="admin-section-title">Waiting on your desks</h2>
-      {items.length === 0 ? (
-        <p className="admin-meta">Your desks are clear.</p>
-      ) : (
-        <ul className="admin-attention">
+    <SectionCard
+      icon={<IconInbox />}
+      tone={items.length === 0 ? "green" : "gold"}
+      title="Waiting on your desks"
+      description={
+        items.length === 0 ? "Your desks are clear." : "The one card here you can act on."
+      }
+      flush={items.length > 0}
+      data-testid="admin-desks"
+    >
+      {items.length === 0 ? undefined : (
+        <ul className="adm-rows">
           {items.map((item) => (
-            <li key={item.key} data-testid={`admin-desk-${item.key}`}>
-              <span className="admin-attention-subject">
-                <span>{countNoun(item.count, item.label[0], item.label[1])}</span>
+            <li key={item.key} className="adm-row" data-testid={`admin-desk-${item.key}`}>
+              <span className="adm-row-main">
+                <span className="adm-row-title">
+                  {countNoun(item.count, item.label[0], item.label[1])}
+                </span>
                 {item.oldestAt !== null ? (
-                  <span className="admin-attention-kind">
+                  <span className="adm-row-sub">
                     oldest <RelativeTime at={item.oldestAt} />
                   </span>
                 ) : null}
               </span>
-              <Link href={item.href} className="admin-meta">
+              <Link href={item.href} className="adm-link">
                 Open
-                <IconArrowRight size={16} className="icon-trail" />
+                <IconArrowRight size={14} aria-hidden />
               </Link>
             </li>
           ))}
         </ul>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 
-function Tile({
+function Figure({
   label,
   value,
   suffix,
-  href,
 }: {
   label: string;
   value: number;
   /** Rendered with the figure — "3" under "Repeat org rate %" scans as a count. */
   suffix?: string;
-  href?: string;
 }) {
-  const tile = (
-    <div className="stat-tile">
+  return (
+    <div className="adm-figure">
+      <dt>{label}</dt>
       {/* 1539 and 1558 were four unbroken digits the eye has to count. */}
-      <span className="stat-value">
+      <dd>
         {formatCount(value)}
         {suffix ?? ""}
-      </span>
-      <span className="stat-label">{label}</span>
+      </dd>
     </div>
-  );
-  return href === undefined ? (
-    tile
-  ) : (
-    <Link href={href} className="stat-tile-link">
-      {tile}
-    </Link>
   );
 }
 
@@ -386,31 +486,30 @@ function StatusList({
   empty: string;
 }) {
   if (lines.length === 0) {
-    return <EmptyState title="Nothing yet" description={empty} />;
+    return <p className="adm-empty">{empty}</p>;
   }
   return (
-    <div className="admin-chips">
+    <div className="adm-chips">
       {lines.map((line) => {
         if (line.status === "live" && liveAuctions !== undefined && liveAuctions.stale > 0) {
           const running = liveAuctions.total - liveAuctions.stale;
           return (
-            <span key={line.status} className="admin-chips">
+            <span key={line.status} className="adm-chips">
               {running > 0 ? (
-                <Badge tone="live">
-                  live now <span className="admin-count">{formatCount(running)}</span>
-                </Badge>
+                <Pill tone="green" dot>
+                  Live now · {formatCount(running)}
+                </Pill>
               ) : null}
-              <Badge tone="danger" data-testid="admin-stuck-live">
-                stuck in live <span className="admin-count">{formatCount(liveAuctions.stale)}</span>
-              </Badge>
+              <Pill tone="red" dot testId="admin-stuck-live">
+                Stuck in live · {formatCount(liveAuctions.stale)}
+              </Pill>
             </span>
           );
         }
         return (
-          <Badge key={line.status} tone={statusTone(line.status)}>
-            {lifecycleLabel(line.status)}{" "}
-            <span className="admin-count">{formatCount(line.count)}</span>
-          </Badge>
+          <Pill key={line.status} tone={statusPillTone(line.status)} dot>
+            {lifecycleLabel(line.status)} · {formatCount(line.count)}
+          </Pill>
         );
       })}
     </div>

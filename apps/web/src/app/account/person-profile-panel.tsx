@@ -1,7 +1,7 @@
 "use client";
 
 import { GENDERS, genderLabel } from "@desiauction/core";
-import { Button, Card, Field, Select, useToast } from "@desiauction/ui";
+import { Button, Field, IconFile, SectionCard, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
@@ -41,12 +41,15 @@ export function PersonProfilePanel({ profile }: { profile: PlayerProfile }) {
     state.error !== undefined && state.field === field ? { error: state.error } : {};
 
   return (
-    <Card className="account-card" data-testid="cricket-profile-panel">
-      <h2>Player profile</h2>
-      <p className="account-prose">
-        About you, remembered once — the next registration form starts filled in. How you play is
-        below, per sport, because that answer is different in each. Every field is optional.
-      </p>
+    <SectionCard
+      id="player"
+      icon={<IconFile />}
+      tone="blue"
+      title="Player profile"
+      description="About you, remembered once — your next registration form starts filled in. Every field is optional."
+      className="acct-card"
+      data-testid="cricket-profile-panel"
+    >
       <form action={formAction} className="cricket-profile-form">
         <div className="cricket-profile-grid">
           <Field
@@ -108,12 +111,12 @@ export function PersonProfilePanel({ profile }: { profile: PlayerProfile }) {
             {...errorFor("preferred_jersey_number")}
           />
         </div>
-        <div className="profile-save">
+        <div className="acct-form-foot">
           <Button type="submit" loading={pending} variant="secondary">
             Save profile
           </Button>
         </div>
       </form>
-    </Card>
+    </SectionCard>
   );
 }

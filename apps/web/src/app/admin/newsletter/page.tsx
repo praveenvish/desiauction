@@ -1,4 +1,13 @@
-import { ButtonLink, Card, EmptyState, Stat, StatRow } from "@desiauction/ui";
+import {
+  ButtonLink,
+  EmptyState,
+  IconCalendar,
+  IconDownload,
+  IconMail,
+  SectionCard,
+  StatCard,
+  StatGrid,
+} from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { platformAdminPageGate } from "../../../server/admin/authz";
@@ -24,34 +33,51 @@ export default async function AdminNewsletterPage() {
   const summary = await asPerson(admin.personId, (db) => newsletterSummary(db));
   return (
     <main className="registrations-dash">
-      <div className="dash-stack">
+      <div className="dash-stack admin-stack">
         <header className="dash-head">
-          <p className="competitions-hint">
+          <p className="dash-hint">
             Addresses from the footer sign-up. Nothing sends to them yet. Each is deleted
             twenty-four months after it was added, and anyone can remove theirs at
             /newsletter/unsubscribe.
           </p>
         </header>
         {summary.total === 0 ? (
-          <Card>
+          <SectionCard icon={<IconMail />} tone="neutral" title="Newsletter list">
             <EmptyState
-              headingLevel={2}
+              headingLevel={3}
               title="Nobody has signed up"
               description="Addresses given in the site footer appear here."
             />
-          </Card>
+          </SectionCard>
         ) : (
-          <Card data-testid="newsletter-summary">
-            <StatRow label="Newsletter">
-              <Stat label="Addresses" value={String(summary.total)} />
-              <Stat label="Added in the last 30 days" value={String(summary.lastThirtyDays)} />
-            </StatRow>
-            <p>
-              <ButtonLink href="/admin/newsletter/export" variant="secondary">
-                Download addresses (CSV)
-              </ButtonLink>
-            </p>
-          </Card>
+          <>
+            <StatGrid testId="newsletter-summary">
+              <StatCard
+                icon={<IconMail />}
+                tone="gold"
+                value={String(summary.total)}
+                label="Addresses"
+                hint="On the product-news list"
+              />
+              <StatCard
+                icon={<IconCalendar />}
+                tone="green"
+                value={String(summary.lastThirtyDays)}
+                label="Added in the last 30 days"
+              />
+            </StatGrid>
+            <SectionCard
+              icon={<IconDownload />}
+              tone="blue"
+              title="Export"
+              description="Every address at once, as CSV. The download is its own line in the access log."
+              action={
+                <ButtonLink href="/admin/newsletter/export" variant="secondary">
+                  Download addresses (CSV)
+                </ButtonLink>
+              }
+            />
+          </>
         )}
       </div>
     </main>

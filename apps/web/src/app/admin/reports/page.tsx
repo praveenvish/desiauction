@@ -1,4 +1,4 @@
-import { Card, EmptyState, ToastProvider } from "@desiauction/ui";
+import { EmptyState, IconFlag, SectionCard, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
@@ -31,22 +31,22 @@ export default async function AdminReportsPage() {
   return (
     <ToastProvider>
       <main className="registrations-dash">
-        <div className="dash-stack">
+        <div className="dash-stack admin-stack">
           <header className="dash-head">
-            <p className="competitions-hint">
+            <p className="dash-hint">
               Problems people reported from inside the product, newest first. Mark each one when you
               pick it up and again when it&apos;s settled — a status is how &ldquo;somebody told
               us&rdquo; becomes something we can check.
             </p>
           </header>
           {queue.open.length === 0 && queue.closed.length === 0 ? (
-            <Card>
+            <SectionCard icon={<IconFlag />} tone="neutral" title="Reports">
               <EmptyState
-                headingLevel={2}
+                headingLevel={3}
                 title="No reports yet"
                 description="When somebody uses Report a problem, it lands here with the page they were on and, if they kept it, a screenshot."
               />
-            </Card>
+            </SectionCard>
           ) : (
             <ReportQueuePanel queue={queue} />
           )}

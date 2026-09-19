@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, Select, useToast } from "@desiauction/ui";
+import { Button, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef } from "react";
 
@@ -58,12 +58,10 @@ export function SportProfilePanel({
     state.error !== undefined && state.field === field ? { error: state.error } : {};
 
   return (
-    <Card>
-      <h2>{spec.label}</h2>
-      <p className="account-prose">
-        How you play {spec.label.toLowerCase()}, remembered once — a registration form for a{" "}
-        {spec.label.toLowerCase()} season starts filled in. Every field is optional.
-      </p>
+    <div className="acct-sport" aria-labelledby={`sport-${spec.key}-title`}>
+      <h3 className="acct-sport-title" id={`sport-${spec.key}-title`}>
+        {spec.label}
+      </h3>
       <form action={formAction} className="cricket-profile-form">
         {/* The sport this form is about, so one action serves them all. */}
         <input type="hidden" name="sport" value={spec.key} />
@@ -111,10 +109,12 @@ export function SportProfilePanel({
         {state.error !== undefined && state.field === undefined ? (
           <p role="alert">{state.error}</p>
         ) : null}
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : `Save ${spec.label.toLowerCase()} profile`}
-        </Button>
+        <div className="acct-form-foot">
+          <Button type="submit" variant="secondary" disabled={pending}>
+            {pending ? "Saving…" : `Save ${spec.label.toLowerCase()} profile`}
+          </Button>
+        </div>
       </form>
-    </Card>
+    </div>
   );
 }
