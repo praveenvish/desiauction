@@ -26,6 +26,7 @@ import {
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { formatTime } from "../../../../lib/format-date";
 import { compactINR } from "../../../../lib/inr";
+import { lotSeed } from "../../../../lib/player-seed";
 import { AbortDialog } from "./abort-dialog";
 import { AuctionSetupFlow } from "./setup/setup-flow";
 import { ConnectionCheck, RulesCard } from "./live-experience";
@@ -395,9 +396,11 @@ export function AuctionPanel({
                 <span className="auc-lot-number">{lot.lotNumber}</span>
                 <PlayerImage
                   name={lot.playerName ?? "Unnamed"}
-                  seed={lot.id}
+                  seed={lotSeed(lot.id, dashboard.lotMedia)}
+                  src={dashboard.lotMedia[lot.id]?.photoUrl ?? null}
                   size="sm"
                   shape="round"
+                  decorative
                 />
                 <span className="auc-lot-who">
                   <span className="auc-lot-name">{lot.playerName ?? "Unnamed"}</span>
