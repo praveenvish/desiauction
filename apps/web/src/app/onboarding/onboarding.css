@@ -150,15 +150,6 @@
   gap: var(--space-3);
 }
 
-.onboarding-aside-marks li::before {
-  content: "";
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-}
-
 .onboarding-panel {
   box-sizing: border-box;
   /* See --entry-accent-pressed on .onboarding: one gold across the funnel. */
@@ -173,6 +164,10 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-2);
   padding: var(--space-8) var(--space-6);
+}
+
+.onboarding-panel > [data-tone] {
+  margin-bottom: var(--space-4);
 }
 
 .onboarding-panel h1 {

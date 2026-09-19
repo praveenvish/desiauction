@@ -1,3 +1,4 @@
+import { IconGavel, IconReceipt, IconTile, IconUser } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -60,9 +61,18 @@ export default async function OnboardingPage({
             You&rsquo;re one question away from your first auction.
           </p>
           <ul className="onboarding-aside-marks">
-            <li>Your name goes on team sheets and the stage</li>
-            <li aria-hidden="true">Run server-verified live auctions</li>
-            <li aria-hidden="true">Settle every rupee with numbered receipts</li>
+            <li>
+              <IconTile icon={<IconUser />} tone="gold" />
+              Your name goes on team sheets and the stage
+            </li>
+            <li aria-hidden="true">
+              <IconTile icon={<IconGavel />} tone="purple" />
+              Run server-verified live auctions
+            </li>
+            <li aria-hidden="true">
+              <IconTile icon={<IconReceipt />} tone="green" />
+              Settle every rupee with numbered receipts
+            </li>
           </ul>
         </aside>
         <div className="onboarding-panel">
