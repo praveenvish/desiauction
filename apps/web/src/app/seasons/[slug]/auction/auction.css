@@ -2489,6 +2489,19 @@
   gap: var(--space-2);
 }
 
+/* Two labels in one cell: the box is as wide as the longer, whichever shows. */
+.cockpit-gavel-texts {
+  display: inline-grid;
+}
+
+.cockpit-gavel-texts > * {
+  grid-area: 1 / 1;
+}
+
+.cockpit-gavel-texts > [data-shown="false"] {
+  visibility: hidden;
+}
+
 /* Shortcut legend */
 .cockpit-keys {
   display: flex;

@@ -93,8 +93,14 @@ export function FormDialog({
           {triggerLabel}
         </Button>
       )}
+      {/* The form mounts only while open. A closed <dialog> kept its whole
+          form in the DOM, so a page with two create triggers (the page action
+          and an in-page "New season" card) held two hidden copies of every
+          field — `getByLabel("Location")` went ambiguous, and so did ids. */}
       <Dialog open={open} onClose={close} title={title}>
-        <FormDialogClose.Provider value={close}>{children}</FormDialogClose.Provider>
+        {open ? (
+          <FormDialogClose.Provider value={close}>{children}</FormDialogClose.Provider>
+        ) : null}
       </Dialog>
     </>
   );
