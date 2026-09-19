@@ -940,10 +940,11 @@ export function ProductShell({
             },
           ]}
           linkComponent={Link}
+          // ONE tagline in the sidebar (founder, 2026-09-19): the brand line
+          // "Bid · Build · Win" below; the wordmark carries just the name.
           wordmark={
             <span className="public-brand-name">
               Desi<span>Auction</span>
-              <small aria-hidden="true">THE GAME STARTS HERE</small>
             </span>
           }
           wordmarkHref="/home"
