@@ -93,6 +93,8 @@ export interface TeamCard {
   usedPct?: number | null;
   /** Money-gated: naming the dearest buy names a hammer outcome. */
   topBuyName?: string | null;
+  /** Paise the dearest buy went for. Money-gated with its name. */
+  topBuyPrice?: number | null;
   /** Sorted by buy price, dearest first; pre-signed (null price) last. Roster-gated. */
   roster?: TeamRosterRow[];
 }
@@ -287,6 +289,7 @@ export async function teamsWorkspace(
             purseTotal,
             usedPct: purseTotal > 0 ? Math.round((spent / purseTotal) * 100) : null,
             topBuyName: topBuy?.name ?? null,
+            topBuyPrice: topBuy === null ? null : (priceByReg.get(topBuy.registrationId) ?? null),
           }
         : {}),
       ...(options.roster ? { roster } : {}),

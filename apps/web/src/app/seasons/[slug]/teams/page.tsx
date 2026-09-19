@@ -10,6 +10,7 @@ import { AppointmentsPanel } from "./appointments-panel";
 import { SquadSheetsPanel } from "./squad-sheets-panel";
 import { TeamsPanel } from "./teams-panel";
 import "../../seasons.css";
+import "./teams.css";
 
 export const metadata = { title: "Teams · DesiAuction" };
 
@@ -35,8 +36,8 @@ export default async function TeamsPage({
   const selectedTeam = view.teams.find((team) => team.id === sp.team) ?? null;
   return (
     <ToastProvider>
-      <main className="registrations-dash">
-        <div className="dash-stack">
+      <main className="registrations-dash tm-page">
+        <div className="dash-stack tm-stack">
           <TeamsPanel view={view} slug={slug} selected={selectedTeam} />
           {/* Only for whoever may set the roles (team.manage); null otherwise. */}
           {appointments !== null && selectedTeam === null ? (

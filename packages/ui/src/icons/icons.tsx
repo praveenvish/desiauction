@@ -691,3 +691,21 @@ export function IconEyeOff(props: IconProps) {
     </svg>
   );
 }
+
+export function IconXCircle(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9.2 9.2 5.6 5.6M14.8 9.2l-5.6 5.6" />
+    </svg>
+  );
+}
+
+export function IconMinusCircle(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 12h7" />
+    </svg>
+  );
+}

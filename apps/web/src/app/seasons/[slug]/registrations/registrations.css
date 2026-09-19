@@ -1,0 +1,442 @@
+/* REGISTRATIONS — the desk's frame (founder brief, 2026-09-19): the page
+   head's lede and actions, the share row, eight figure cards that filter, and
+   ONE card holding the filters, the table and its pages. The rows, the sheet
+   and the bulk bar keep their own rules in _players/players-desk.css. Tokens
+   only. */
+
+.registrations-dash.rd-page {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.dash-stack.rd-stack {
+  max-width: none;
+}
+
+.rd-page .pd-desk {
+  gap: var(--space-5);
+}
+
+/* ---- Page head: lede left, actions right ---- */
+
+.rd-head {
+  /* Pulled up under the shell's <h1>, where a lede belongs. */
+  margin-top: calc(-1 * var(--space-5));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+}
+
+.rd-lede {
+  flex: 1 1 20rem;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
+  color: var(--text-secondary);
+}
+
+.rd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .rd-head {
+    margin-top: calc(-1 * var(--space-3));
+  }
+
+  .rd-actions {
+    width: 100%;
+  }
+
+  .rd-actions > * {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- Share row ---- */
+
+.rd-share {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.rd-share-text {
+  flex: 1 1 18rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rd-share .share-reg-label {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.rd-share-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.rd-share-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+}
+
+.rd-share-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rd-share-closed {
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+@media (max-width: 719px) {
+  .rd-share {
+    padding: var(--space-4);
+  }
+
+  /* The globe is decoration; on a phone the row is better spent on the link. */
+  .rd-share > [aria-hidden]:first-child {
+    display: none;
+  }
+
+  .rd-share-actions {
+    width: 100%;
+  }
+
+  .rd-share-actions > * {
+    flex: 1;
+  }
+}
+
+/* The next step sits with the other cards; the page keeps ONE gold button. */
+.rd-page .pd-next {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+/* ---- Figures ---- */
+
+.rd-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* Four across once the content column can hold four figure cards. */
+@media (min-width: 1100px) {
+  .rd-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+}
+
+/* The suites read the figure through `.stat-value` / `.stat-hint`; the kit's
+   StatCard styles it, so the legacy season tile rules are neutralised. */
+.rd-stats .stat-value,
+.rd-stats .stat-hint {
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+@media (max-width: 719px) {
+  /* Eight figures on a phone: icon beside the figure, not above it, so the
+     strip is four short rows rather than a screen and a half. */
+  .rd-stats > [data-tone] {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  .rd-stats > [data-tone] > [aria-hidden]:first-child {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+  }
+}
+
+/* ---- The card: filters, table, pages ---- */
+
+/* The row menu opens below its row; a flush card clips to its corners, which
+   would cut the menu of the last rows off. */
+section.rd-card[data-flush="true"] {
+  overflow: visible;
+}
+
+.rd-card .rd-filters {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.rd-card .pd-select {
+  min-width: 0;
+}
+
+.rd-card .rd-filters .pd-search {
+  flex: 1 1 200px;
+  min-width: 180px;
+}
+
+.rd-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.rd-reset:hover:not(:disabled) {
+  background: var(--accent-subtle);
+}
+
+.rd-reset:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.rd-reset:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rd-card .pd-table-head {
+  padding: var(--space-2) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* No sideways scroll: the table is sized to fit and sheds columns as the
+   screen narrows; under 761px it becomes a list of stacked rows. */
+.rd-card .pd-table-scroll {
+  overflow: visible;
+}
+
+.rd-card .pd-table th {
+  position: static;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rd-card .pd-table th:first-child,
+.rd-card .pd-table td:first-child {
+  padding-inline-start: var(--space-5);
+}
+
+.rd-card .pd-table th:last-child,
+.rd-card .pd-table td:last-child {
+  padding-inline-end: var(--space-4);
+}
+
+.rd-card .pd-table {
+  font-size: var(--text-sm-size);
+}
+
+.rd-card .pd-col-num {
+  width: 2.5rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rd-card .pd-col-date {
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.rd-card .pd-status > :first-child {
+  text-transform: capitalize;
+}
+
+.rd-card .pd-marks-inline {
+  margin-inline-start: var(--space-1);
+}
+
+.rd-kebab {
+  width: 36px;
+  height: 36px;
+  justify-content: center;
+  padding: 0;
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.rd-kebab-glyph {
+  display: inline-flex;
+}
+
+/* Pages. */
+.rd-card .pd-pager {
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rd-pagebtn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.rd-pagebtn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.rd-pagebtn:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+.rd-pagebtn[aria-current="page"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.rd-pagebtn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rd-pagegap {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  color: var(--text-muted);
+}
+
+/* Shed the columns the sheet repeats, widest screens keep all nine. */
+@media (max-width: 1279px) {
+  .rd-card .pd-col-date {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .rd-card .pd-col-num,
+  .rd-card .pd-col-role {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .rd-card .rd-filters {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  .rd-card .pd-table-head {
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .rd-card .pd-table th {
+    border-top: 0;
+  }
+
+  /* The list rows (players-desk.css) get the card's gutter. */
+  .rd-card .pd-row {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check player open"
+      ". status fee"
+      ". team team";
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 0;
+  }
+
+  .rd-card .pd-table .pd-row td:first-child,
+  .rd-card .pd-table .pd-row td:last-child {
+    padding: 0;
+  }
+
+  .rd-card .pd-row td.pd-col-num,
+  .rd-card .pd-row td.pd-col-date {
+    display: none;
+  }
+
+  /* Status, then the fee at the row's right edge. */
+  .rd-card .pd-row td.pd-col-status {
+    grid-area: status;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .rd-card .pd-row td.pd-col-fee {
+    grid-area: fee;
+    justify-self: end;
+  }
+
+  .rd-card .pd-row td.pd-col-actions {
+    display: block;
+    width: auto;
+    grid-area: open;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .rd-kebab {
+    width: 44px;
+    height: 44px;
+  }
+
+  .rd-card .pd-pager {
+    justify-content: center;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+
+  .rd-card .pd-pager > [data-testid="page-indicator"] {
+    flex-basis: 100%;
+    text-align: center;
+  }
+}

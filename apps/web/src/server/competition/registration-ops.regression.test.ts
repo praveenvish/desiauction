@@ -811,6 +811,23 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     });
     expect(page.rows.map((r) => r.id)).toContain(result.registrationId);
     expect(page.rows.find((r) => r.id === result.registrationId)?.status).toBe("submitted");
+    // "Registered on" — when the row was made, as an ISO instant.
+    const createdAt = page.rows.find((r) => r.id === result.registrationId)?.createdAt ?? "";
+    expect(Number.isNaN(Date.parse(createdAt))).toBe(false);
+    // The desk's role filter: a bowler is found under bowlers and not batters.
+    const bowlers = await queryRegistrations(db, compId, {
+      role: "bowler",
+      page: 1,
+      pageSize: 100,
+    });
+    expect(bowlers.rows.map((r) => r.id)).toContain(result.registrationId);
+    expect(bowlers.rows.every((r) => r.role === "bowler")).toBe(true);
+    const batters = await queryRegistrations(db, compId, {
+      role: "batter",
+      page: 1,
+      pageSize: 100,
+    });
+    expect(batters.rows.map((r) => r.id)).not.toContain(result.registrationId);
     // The DA-27 lesson: the timeline starts where the player entered.
     const actions = (await timelineOf(db, result.registrationId, compId)).map((t) => t.action);
     expect(actions).toContain("registration.added");

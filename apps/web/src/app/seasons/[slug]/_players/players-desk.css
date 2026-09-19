@@ -1442,6 +1442,42 @@
     display: none;
   }
 
+  .pd-sheet {
+    width: 100vw;
+    border-inline-start: 0;
+  }
+
+  .pd-sheet-scroll {
+    padding: var(--space-4) var(--space-4) var(--space-12);
+  }
+
+  .pd-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pd-tabs {
+    overflow-x: auto;
+  }
+
+  .pd-bulk {
+    bottom: var(--space-2);
+    width: 100%;
+    border-radius: var(--radius-lg);
+  }
+
+  .pd-bulk-actions {
+    width: 100%;
+  }
+
+  .pd-bulk-actions > * {
+    flex: 1;
+  }
+}
+
+/* The table becomes a list of stacked rows below a laptop's width — with the
+   rail beside it, a 1000px screen leaves the table ~750px, too narrow for its
+   columns and never worth a sideways scroll. */
+@media (max-width: 1023px) {
   /* The table becomes a list of two-line rows: who and what state, then the
      actions. Role and team live in the sheet, one tap away. */
   .pd-table thead {
@@ -1531,37 +1567,6 @@
   .pd-row[data-open="true"] td:first-child,
   .pd-row[data-cursor="true"] td:first-child {
     box-shadow: none;
-  }
-
-  .pd-sheet {
-    width: 100vw;
-    border-inline-start: 0;
-  }
-
-  .pd-sheet-scroll {
-    padding: var(--space-4) var(--space-4) var(--space-12);
-  }
-
-  .pd-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .pd-tabs {
-    overflow-x: auto;
-  }
-
-  .pd-bulk {
-    bottom: var(--space-2);
-    width: 100%;
-    border-radius: var(--radius-lg);
-  }
-
-  .pd-bulk-actions {
-    width: 100%;
-  }
-
-  .pd-bulk-actions > * {
-    flex: 1;
   }
 }
 
