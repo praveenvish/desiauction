@@ -62,6 +62,7 @@ function inCompetitionOrg<T>(
 
 async function conductGate(
   slug: string,
+  alsoManage = false,
 ): Promise<
   { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
 > {
@@ -70,17 +71,20 @@ async function conductGate(
   if (competition === null) {
     return { ok: false, error: "Not available." };
   }
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  let manages = true;
   try {
-    await inCompetitionOrg(session.personId, competition, (db) =>
-      requireCompetitionCapability(
-        db,
-        session.personId,
-        { orgId: competition.orgId, competitionId: competition.id },
-        "auction.conduct",
-      ),
-    );
+    // One tenant transaction for both questions: a second round trip made the
+    // owner-plans switch slow enough to lose a reload race.
+    manages = await inCompetitionOrg(session.personId, competition, async (db) => {
+      await requireCompetitionCapability(db, session.personId, scope, "auction.conduct");
+      return alsoManage ? canCompetition(db, session.personId, scope, "competition.manage") : true;
+    });
   } catch {
     return { ok: false, error: "You can't conduct auctions here." };
+  }
+  if (!manages) {
+    return { ok: false, error: "Only the club's owners can do that." };
   }
   return { ok: true, personId: session.personId, competition };
 }
@@ -96,19 +100,7 @@ async function manageGate(
 ): Promise<
   { ok: true; personId: string; competition: CompetitionSummary } | { ok: false; error: string }
 > {
-  const gate = await conductGate(slug);
-  if (!gate.ok) {
-    return gate;
-  }
-  const manages = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
-    canCompetition(
-      db,
-      gate.personId,
-      { orgId: gate.competition.orgId, competitionId: gate.competition.id },
-      "competition.manage",
-    ),
-  );
-  return manages ? gate : { ok: false, error: "Only the club's owners can do that." };
+  return conductGate(slug, true);
 }
 
 async function requireAuction(db: Db, competitionId: string): Promise<AuctionRecord | null> {
