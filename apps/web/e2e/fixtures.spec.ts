@@ -87,7 +87,7 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   await page.getByLabel("Start date").fill("2026-08-01");
   // Fixed kickoffs, so the schedule below is the one the assertions expect.
   await page.getByRole("radio", { name: "My own kickoff times" }).check();
-  await page.getByLabel("Kickoff times").fill("18:00,20:00");
+  await page.getByLabel("Kickoff times", { exact: true }).fill("18:00,20:00");
   await page.getByRole("checkbox", { name: /Main Oval/ }).check();
   await page.getByRole("checkbox", { name: /Side Strip/ }).check();
   await page.getByTestId("generate-fixtures").click();
