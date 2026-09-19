@@ -6,6 +6,7 @@ import { Fragment, useState, useTransition } from "react";
 
 import { formatPhone } from "../../../../lib/format-phone";
 import { useHydrated } from "../../../../lib/use-hydrated";
+import { WHATSAPP_CONSENT_LABEL } from "../../../../lib/whatsapp-consent";
 import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
@@ -194,6 +195,9 @@ export function RegisterFlow({
   // moment of submission, not a preference restored from localStorage on a
   // machine the person may not be sitting at.
   const [consented, setConsented] = useState(false);
+  // WhatsApp opt-in: unticked, and like consent never restored from a draft —
+  // Meta and DPDP both need it to be a choice made now (Phase 3).
+  const [whatsapp, setWhatsapp] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const [restored, setRestored] = useState(false);
@@ -315,6 +319,10 @@ export function RegisterFlow({
       // PI-1: "remember for next time" — the server writes these answers back
       // to the person-level profile so the NEXT season starts filled in.
       formData.set("rememberProfile", remember ? "true" : "false");
+      if (whatsapp) {
+        formData.set("whatsappOptIn", "true");
+        formData.set("whatsappConsentText", WHATSAPP_CONSENT_LABEL);
+      }
       const result = await submitRegistrationAction(slug, {}, formData);
       if (result.done === true) {
         window.localStorage.removeItem(draftKey(slug));
@@ -660,6 +668,20 @@ export function RegisterFlow({
               }}
             />
             <span>Remember these answers on my profile, so the next form starts filled in.</span>
+          </label>
+          {/* Phase 3: WhatsApp instead of SMS for auction and team news.
+              Unticked; leaving it unticked changes nothing already chosen. */}
+          <label className="register-consent-check" htmlFor="register-whatsapp-box">
+            <input
+              id="register-whatsapp-box"
+              type="checkbox"
+              checked={whatsapp}
+              data-testid="register-whatsapp"
+              onChange={(event) => {
+                setWhatsapp(event.target.checked);
+              }}
+            />
+            <span>{WHATSAPP_CONSENT_LABEL}</span>
           </label>
           {error !== null ? (
             <p role="alert" className="register-error">

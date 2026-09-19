@@ -52,6 +52,7 @@ const PERSON_EVENT_LABELS = {
   // Captain, vice-captain, icon or retained — the role and team are in meta.
   "team.appointed": "Your team named you to a role",
   "team.squad_sheet": "Your squad is set",
+  "fixture.lineup_announced": "You're in the lineup",
   "profile.name.updated": "Name updated",
   // The first name is not an update — see `profile.name.set`.
   "profile.name.set": "Name added to your profile",

@@ -1,10 +1,18 @@
 "use client";
 
-import { Button } from "@desiauction/ui";
+import { Button, Dialog } from "@desiauction/ui";
 import { useState, useTransition } from "react";
 
-import { saveLineupAction } from "../../../../server/competition/lineup-actions";
+import {
+  announceLineupAction,
+  saveLineupAction,
+} from "../../../../server/competition/lineup-actions";
+import type { LineupAnnounceState } from "../../../../server/competition/lineup-announce";
 import type { LineupSide } from "../../../../server/competition/lineups";
+
+function players(count: number): string {
+  return count === 1 ? "1 player" : `${String(count)} players`;
+}
 
 /**
  * One team's lineup for one match: a checklist of the squad, a count, and one
@@ -14,10 +22,13 @@ export function LineupSideEditor({
   slug,
   fixtureId,
   side,
+  announce,
 }: {
   slug: string;
   fixtureId: string;
   side: LineupSide;
+  /** Absent for a match that has no announce state (none selected). */
+  announce: LineupAnnounceState | undefined;
 }) {
   const [picked, setPicked] = useState<ReadonlySet<string>>(
     () => new Set(side.players.filter((player) => player.played).map((p) => p.registrationId)),
@@ -26,6 +37,12 @@ export function LineupSideEditor({
     side.recorded ? { tone: "ok", text: "Saved" } : null,
   );
   const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [announcing, startAnnouncing] = useTransition();
+  // Announce tells the SAVED lineup, so ticks not yet saved must be saved
+  // first — otherwise the message and the record would disagree.
+  const saved = new Set(side.players.filter((p) => p.played).map((p) => p.registrationId));
+  const unsaved = saved.size !== picked.size || [...picked].some((id) => !saved.has(id));
 
   function toggle(id: string): void {
     setPicked((current) => {
@@ -43,6 +60,24 @@ export function LineupSideEditor({
       setStatus(
         result.ok
           ? { tone: "ok", text: `Saved — ${String(result.played)} played` }
+          : { tone: "error", text: result.error },
+      );
+    });
+  }
+
+  function announceNow(): void {
+    startAnnouncing(async () => {
+      const result = await announceLineupAction(slug, fixtureId, side.teamId);
+      setConfirming(false);
+      setStatus(
+        result.ok
+          ? {
+              tone: "ok",
+              text:
+                result.told === 0
+                  ? "Everyone in this lineup was already told"
+                  : `Told ${players(result.told)}`,
+            }
           : { tone: "error", text: result.error },
       );
     });
@@ -106,7 +141,56 @@ export function LineupSideEditor({
         >
           Save {side.teamName} lineup
         </Button>
+        {/* Only before the match, only once something is saved, and only for
+            players not told yet. A lineup recorded afterwards tells nobody. */}
+        {announce?.upcoming === true && announce.pending > 0 ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setConfirming(true);
+            }}
+            disabled={unsaved || pending}
+            title={unsaved ? "Save the lineup first" : undefined}
+            data-testid="lineup-announce"
+          >
+            Announce to {players(announce.pending)}
+          </Button>
+        ) : null}
       </footer>
+      {announce !== undefined ? (
+        <Dialog
+          open={confirming}
+          onClose={() => {
+            setConfirming(false);
+          }}
+          title={`Announce the ${side.teamName} lineup?`}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setConfirming(false);
+                }}
+              >
+                Not yet
+              </Button>
+              <Button
+                onClick={announceNow}
+                loading={announcing}
+                data-testid="lineup-announce-confirm"
+              >
+                Announce
+              </Button>
+            </>
+          }
+        >
+          <p className="lineups-note">
+            {players(announce.pending)} in the saved lineup will be told they are playing — in their
+            inbox, by email and by text. Anyone you take out later is not messaged.
+          </p>
+        </Dialog>
+      ) : null}
     </section>
   );
 }

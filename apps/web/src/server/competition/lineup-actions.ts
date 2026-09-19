@@ -15,6 +15,7 @@ import {
   type LineupFixture,
   type LineupSide,
 } from "./lineups";
+import { announceLineup, lineupAnnounceStates, type LineupAnnounceState } from "./lineup-announce";
 import { resolveMemberCompetition } from "./resolve";
 
 /**
@@ -28,6 +29,8 @@ export interface LineupPageView {
   fixtures: LineupFixture[];
   selected: LineupFixture | null;
   sides: LineupSide[];
+  /** Per side of the selected match: can it be announced, and to how many. */
+  announce: Record<string, LineupAnnounceState>;
 }
 
 async function gate(slug: string) {
@@ -78,11 +81,13 @@ export async function lineupPageView(
               role: player.role === null ? null : roleLabelIn(pack, player.role),
             })),
           }));
+    const announce = selected === null ? {} : await lineupAnnounceStates(selected, sides);
     return {
       competition: { name: competition.name, slug: competition.slug },
       fixtures: list,
       selected,
       sides,
+      announce,
     };
   });
 }
@@ -126,4 +131,34 @@ export async function saveLineupAction(
   }
   revalidatePath(`/seasons/${slug}/lineups`);
   return { ok: true, played: result.played };
+}
+
+/**
+ * Tell the players in one side's SAVED lineup that they are in it — only for a
+ * match still to come, only those not told before. Same key as recording it
+ * (`fixture.manage`): whoever picks the lineup announces it.
+ */
+export async function announceLineupAction(
+  slug: string,
+  fixtureId: string,
+  teamId: string,
+): Promise<{ ok: true; told: number } | { ok: false; error: string }> {
+  const gated = await gate(slug);
+  if (gated === null) {
+    return { ok: false, error: "You can't announce lineups for this season." };
+  }
+  const { personId, competition } = gated;
+  const result = await withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
+    announceLineup(db, { competitionId: competition.id, fixtureId, teamId, actorId: personId }),
+  );
+  if (!result.ok) {
+    const message: Record<typeof result.reason, string> = {
+      not_found: "That match isn't in this season any more.",
+      not_a_side: "That team isn't playing in this match.",
+      not_upcoming: "This match has started or finished — lineups are only announced before it.",
+    };
+    return { ok: false, error: message[result.reason] };
+  }
+  revalidatePath(`/seasons/${slug}/lineups`);
+  return { ok: true, told: result.told };
 }

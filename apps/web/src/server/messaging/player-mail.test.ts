@@ -4,6 +4,7 @@ import { DLT_VAR_MAX, smsPrice } from "./templates";
 
 import {
   appointmentMail,
+  lineupMail,
   bidStory,
   ownerSummaryMail,
   rolesTitle,
@@ -191,5 +192,35 @@ describe("the SMS words", () => {
   it("writes a price without the rupee sign, which is not GSM-7", () => {
     expect(smsPrice("₹75,000")).toBe("Rs 75,000");
     expect(smsPrice("₹1,99,00,000")).toBe("Rs 1,99,00,000");
+  });
+});
+
+describe("the lineup", () => {
+  const facts = {
+    name: "Arjun",
+    season: "MPL 2026",
+    teamName: "Cup Kings",
+    opponent: "Tigers",
+    when: "Sun, 4 Oct 2026, 7:30 am",
+    where: "Malad Ground",
+    lineup: [
+      { name: "Vikram Patel", note: "Captain" },
+      { name: "Arjun Sharma (you)", note: "Player" },
+    ],
+  };
+
+  it("names the team, the opponent, when and where, and the whole lineup", () => {
+    const mail = lineupMail(facts);
+    expect(mail.subject).toBe("You're in the Cup Kings lineup vs Tigers");
+    expect(mail.text).toContain("Sun, 4 Oct 2026, 7:30 am at Malad Ground");
+    expect(mail.text).toContain("Arjun Sharma (you)");
+  });
+
+  it("says lineup, never XI — a kabaddi side is seven", () => {
+    expect(lineupMail(facts).text).not.toMatch(/\bXI\b/);
+  });
+
+  it("leaves the ground out when the fixture has none", () => {
+    expect(lineupMail({ ...facts, where: null }).text).not.toContain(" at ");
   });
 });

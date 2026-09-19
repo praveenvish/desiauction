@@ -2,6 +2,7 @@
 // moment, the address and the consent decided at send time, retries that back
 // off and then give up.
 import {
+  consentRecords,
   createDb,
   messageOutbox,
   newId,
@@ -27,6 +28,12 @@ import {
   type QueuedSms,
 } from "./outbox";
 import type { MailOutcome, OutgoingMail, TransactionalMailer } from "./transactional-mail";
+import {
+  setWhatsappOptIn,
+  WhatsAppSendError,
+  type PersonalWhatsAppSender,
+  type WhatsAppMessage,
+} from "./whatsapp";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -37,6 +44,8 @@ let noEmail = "";
 let optedOut = "";
 let flaky = "";
 let noPhone = "";
+let waFan = "";
+let waChanged = "";
 
 function mail(personId: string, key: string): QueuedMail {
   return {
@@ -67,6 +76,8 @@ beforeAll(async () => {
   optedOut = newId();
   flaky = newId();
   noPhone = newId();
+  waFan = newId();
+  waChanged = newId();
   const verified = new Date();
   await db.insert(people).values([
     {
@@ -99,6 +110,14 @@ beforeAll(async () => {
       emailVerifiedAt: verified,
     },
   ]);
+  await db.insert(people).values([
+    { id: waFan, phone: `+9194${RUN}6`, name: "Wa Fan" },
+    { id: waChanged, phone: `+9194${RUN}7`, name: "Wa Changed" },
+  ]);
+  await setWhatsappOptIn(db, { personId: waFan, granted: true, source: "registration" });
+  await setWhatsappOptIn(db, { personId: waChanged, granted: true, source: "registration" });
+  await new Promise((done) => setTimeout(done, 5));
+  await setWhatsappOptIn(db, { personId: waChanged, granted: false, source: "account" });
   await db.insert(notificationPreferences).values([
     { id: newId(), personId: optedOut, topic: "auction", channel: "email", allowed: false },
     { id: newId(), personId: optedOut, topic: "auction", channel: "sms", allowed: false },
@@ -106,8 +125,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const ids = [withEmail, noEmail, optedOut, flaky, noPhone];
+  const ids = [withEmail, noEmail, optedOut, flaky, noPhone, waFan, waChanged];
   await db.delete(messageOutbox).where(inArray(messageOutbox.personId, ids));
+  await db.delete(consentRecords).where(inArray(consentRecords.personId, ids));
   await db.delete(notificationPreferences).where(inArray(notificationPreferences.personId, ids));
   await db.delete(people).where(inArray(people.id, ids));
   await handle.sql.end();
@@ -303,5 +323,119 @@ describe("the text window (IST)", () => {
     expect(textWindowOpensAt(new Date("2026-09-19T21:30:00Z")).toISOString()).toBe(
       "2026-09-20T02:30:00.000Z",
     );
+  });
+});
+
+function whatsapp(fail = false): PersonalWhatsAppSender & { sent: [string, WhatsAppMessage][] } {
+  const sent: [string, WhatsAppMessage][] = [];
+  return {
+    sent,
+    send: vi.fn((to: string, message: WhatsAppMessage) => {
+      if (fail) return Promise.reject(new WhatsAppSendError("WhatsApp refused the send"));
+      sent.push([to, message]);
+      return Promise.resolve();
+    }),
+  };
+}
+
+const APPROVED = (key: string) => (key === "auction.sold" ? "da_auction_sold" : undefined);
+const CARD = "https://desiauction.in/c/mpl/p/R1/opengraph-image";
+
+async function lastText(personId: string) {
+  const rows = await db
+    .select()
+    .from(messageOutbox)
+    .where(eq(messageOutbox.personId, personId))
+    .orderBy(messageOutbox.createdAt);
+  return rows[rows.length - 1];
+}
+
+describe("WHATSAPP — instead of SMS, for a player who opted in", () => {
+  it("sends the approved template with the card and the player's name, and records the channel", async () => {
+    await enqueueSms([{ ...text(waFan, "wa-1"), mediaUrl: CARD }], db);
+    const wa = whatsapp();
+    const sms = phone();
+    const result = await drainOutbox({
+      db,
+      sms,
+      whatsapp: wa,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [waFan],
+    });
+    expect(result.sent).toBe(1);
+    expect(sms.sent).toHaveLength(0);
+    expect(wa.sent[0]?.[1]).toMatchObject({
+      name: "da_auction_sold",
+      params: ["Wa Fan", "Cup Kings", "₹75,000", "MPL 2026"],
+      imageUrl: CARD,
+    });
+    expect((await lastText(waFan))?.channel).toBe("whatsapp");
+  });
+
+  it("falls back to SMS in the same pass when WhatsApp fails, and keeps the reason", async () => {
+    await enqueueSms([text(waFan, "wa-fail")], db);
+    const sms = phone();
+    const result = await drainOutbox({
+      db,
+      sms,
+      whatsapp: whatsapp(true),
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [waFan],
+    });
+    expect(result.sent).toBe(1);
+    expect(sms.sent).toHaveLength(1);
+    const row = await lastText(waFan);
+    expect(row?.channel).toBe("sms");
+    expect(row?.lastError).toContain("WhatsApp:");
+  });
+
+  it("uses SMS while Meta has not approved the template (no name configured)", async () => {
+    await enqueueSms([text(waFan, "wa-unapproved")], db);
+    const wa = whatsapp();
+    const sms = phone();
+    await drainOutbox({
+      db,
+      sms,
+      whatsapp: wa,
+      whatsappTemplate: () => undefined,
+      now: NOON_IST,
+      personIds: [waFan],
+    });
+    expect(wa.sent).toHaveLength(0);
+    expect(sms.sent).toHaveLength(1);
+  });
+
+  it("uses SMS for someone who never opted in, and for someone whose latest answer is no", async () => {
+    await enqueueSms([text(withEmail, "wa-never"), text(waChanged, "wa-withdrew")], db);
+    const wa = whatsapp();
+    const sms = phone();
+    await drainOutbox({
+      db,
+      sms,
+      whatsapp: wa,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [withEmail, waChanged],
+    });
+    expect(wa.sent).toHaveLength(0);
+    expect(sms.sent).toHaveLength(2);
+  });
+
+  it("still honours the Auction updates switch — being messaged at all comes first", async () => {
+    await setWhatsappOptIn(db, { personId: optedOut, granted: true, source: "account" });
+    await enqueueSms([text(optedOut, "wa-opted-out")], db);
+    const wa = whatsapp();
+    const result = await drainOutbox({
+      db,
+      sms: phone(),
+      whatsapp: wa,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [optedOut],
+    });
+    expect(result.suppressed).toBe(1);
+    expect(wa.sent).toHaveLength(0);
   });
 });

@@ -42,7 +42,7 @@ export default async function LineupsPage({
   if (view === null) {
     notFound();
   }
-  const { fixtures, selected, sides } = view;
+  const { fixtures, selected, sides, announce } = view;
   return (
     <main className="lineups">
       <PageIntro subtitle="Tick who took the field. Each player's profile counts it as a match played." />
@@ -104,6 +104,7 @@ export default async function LineupsPage({
                     slug={slug}
                     fixtureId={selected.id}
                     side={side}
+                    announce={announce[side.teamId]}
                   />
                 ))}
               </div>

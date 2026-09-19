@@ -282,7 +282,7 @@ export const messageOutbox = pgTable(
       .references(() => people.id, { onDelete: "cascade" }),
     orgId: char("org_id", { length: 26 }),
     kind: text("kind").notNull(),
-    channel: text("channel", { enum: ["email", "sms"] }).notNull(),
+    channel: text("channel", { enum: ["email", "sms", "whatsapp"] }).notNull(),
     dedupeKey: text("dedupe_key").notNull(),
     subject: text("subject").notNull(),
     bodyText: text("body_text").notNull(),
@@ -300,6 +300,8 @@ export const messageOutbox = pgTable(
      */
     templateKey: text("template_key"),
     slots: jsonb("slots").$type<Record<string, string>>(),
+    /** WhatsApp only (0081): the image a template's header shows. */
+    mediaUrl: text("media_url"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (table) => [

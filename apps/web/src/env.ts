@@ -105,6 +105,13 @@ const envSchema = z.object({
   // text fails with the variable named; the inbox and email still carry it.
   MSG91_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
   MSG91_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
+  MSG91_TEMPLATE_LINEUP_ANNOUNCED: z.string().min(1).optional(),
+  // Phase 3: the names Meta approved the personal WhatsApp templates under
+  // (docs/messaging/WHATSAPP_TEMPLATES.md). Unset = that moment goes by SMS,
+  // even for a player who opted in to WhatsApp.
+  WHATSAPP_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED: z.string().min(1).optional(),
   /**
    * Shared secret on the inbound-SMS webhook, which is where a STOP lands.
    *

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import {
   setNotificationPreferenceAction,
+  setWhatsappPreferenceAction,
   type NotificationSettings,
 } from "../../server/messaging/actions";
 
@@ -69,6 +70,58 @@ export function NotificationSwitches({ settings }: { settings: NotificationSetti
           </label>
         );
       })}
+      {error !== null ? (
+        <p role="alert" className="notify-error">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * WhatsApp instead of SMS (Phase 3): the one switch that is a CONSENT rather
+ * than a preference — so it starts off, and turning it on is recorded with the
+ * words shown. Stopping a topic above still stops it here too.
+ */
+export function WhatsAppSwitch({ optedIn, label }: { optedIn: boolean; label: string }) {
+  const announce = useAnnouncer();
+  const [pending, startTransition] = useTransition();
+  const [on, setOn] = useState(optedIn);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = (next: boolean) => {
+    setOn(next);
+    setError(null);
+    startTransition(async () => {
+      const result = await setWhatsappPreferenceAction(next);
+      if (result.ok) {
+        announce(next ? "WhatsApp updates turned on" : "WhatsApp updates turned off", "polite");
+        return;
+      }
+      setOn(!next);
+      setError(result.error ?? "That did not save. Try again.");
+    });
+  };
+
+  return (
+    <div className="notify-switches" data-testid="whatsapp-switch">
+      <label className="notify-switch" htmlFor="notify-whatsapp">
+        <input
+          id="notify-whatsapp"
+          type="checkbox"
+          checked={on}
+          disabled={pending}
+          data-testid="notify-whatsapp"
+          onChange={(event) => {
+            toggle(event.target.checked);
+          }}
+        />
+        <span className="notify-switch-text">
+          <span className="notify-switch-label">Updates on WhatsApp</span>
+          <span className="notify-switch-detail">{label}</span>
+        </span>
+      </label>
       {error !== null ? (
         <p role="alert" className="notify-error">
           {error}

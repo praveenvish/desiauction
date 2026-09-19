@@ -266,6 +266,41 @@ export function squadSheetMail(facts: SquadSheetFacts): ComposedMail {
   };
 }
 
+// --- The lineup ------------------------------------------------------------------
+
+export interface LineupFacts {
+  readonly name: string;
+  readonly season: string;
+  readonly teamName: string;
+  readonly opponent: string;
+  /** "Sun, 4 Oct 2026, 7:30 pm" */
+  readonly when: string;
+  /** The ground, when the fixture has one. */
+  readonly where: string | null;
+  /** The whole lineup, the reader marked "(you)". */
+  readonly lineup: readonly SquadLine[];
+}
+
+/** "You're in the Cup Kings lineup vs Tigers" — sent on the organizer's Announce. */
+export function lineupMail(facts: LineupFacts): ComposedMail {
+  const place = facts.where === null ? "" : ` at ${facts.where}`;
+  return {
+    subject: `You're in the ${facts.teamName} lineup vs ${facts.opponent}`,
+    ...renderEmail({
+      preheader: `${facts.when}${place} — ${facts.season}.`,
+      heading: `You're in the ${facts.teamName} lineup`,
+      paragraphs: [
+        `Hi ${facts.name},`,
+        `You're playing for ${facts.teamName} against ${facts.opponent} on ${facts.when}${place}. Here's the lineup.`,
+      ],
+      details: facts.lineup.map((line) => [line.name, line.note] as const),
+      after: ["Good luck!"],
+      action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
+      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+    }),
+  };
+}
+
 // --- The owner's night ---------------------------------------------------------
 
 export interface OwnerSummaryFacts {

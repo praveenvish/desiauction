@@ -100,8 +100,8 @@ sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
    in [DLT_REGISTRATION](../messaging/DLT_REGISTRATION.md), generated from the
    code. The OTP template needs a code slot. Registration decision notices are
    separate templates (the regime registers one template per message shape),
-   the old number's phone-change notice is one more, and so are the two auction
-   texts (a sale, a named role).
+   the old number's phone-change notice is one more, and so are the three
+   personal texts (a sale, a named role, a lineup).
 2. **E** — Set in `web.env`:
    ```sh
    OTP_PROVIDER=msg91
@@ -115,6 +115,7 @@ sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
    MSG91_TEMPLATE_SECURITY_PHONE_CHANGED=…          # the old number is told
    MSG91_TEMPLATE_AUCTION_SOLD=…                    # "Cup Kings bought you for Rs 75,000"
    MSG91_TEMPLATE_TEAM_APPOINTED=…                  # "You are named captain of Cup Kings"
+   MSG91_TEMPLATE_LINEUP_ANNOUNCED=…                # "You are in the Cup Kings lineup vs Tigers"
    SMS_INBOUND_SECRET=…                             # ≥16 chars; STOP replies land here
    ```
    A missing decision template makes that one notice refuse with the variable
@@ -130,6 +131,25 @@ sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
    network that is not the office's. Time it: the code should arrive within
    seconds. Then reply STOP and confirm the number appears on the suppression
    list.
+4. **F** — _Optional, not a launch blocker._ WhatsApp for the personal
+   messages. A player who ticks "Send my auction and team updates on WhatsApp
+   instead of SMS" gets the sale (with their player card), a named role and a
+   lineup on WhatsApp instead of by text. Needs a verified Meta Business
+   account with a WhatsApp number on the Cloud API, and the three templates in
+   [WHATSAPP_TEMPLATES](../messaging/WHATSAPP_TEMPLATES.md) approved (Utility,
+   English). **E** — set in `web.env`:
+   ```sh
+   WHATSAPP_PHONE_NUMBER_ID=…                       # shared with WhatsApp sign-in codes
+   WHATSAPP_ACCESS_TOKEN=…
+   WHATSAPP_TEMPLATE_AUCTION_SOLD=…                 # the APPROVED template names
+   WHATSAPP_TEMPLATE_TEAM_APPOINTED=…
+   WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED=…
+   ```
+   Until a template's name is set, that moment goes by SMS even to players who
+   opted in, and any WhatsApp failure falls back to SMS in the same send.
+   **Proof:** opt in on /account with a test number, announce a lineup for a
+   test match, and see it arrive on WhatsApp; the queue row's `channel` reads
+   `whatsapp`.
 
 ## D · Environment and preflight (P0-3, second half)
 

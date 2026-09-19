@@ -16,7 +16,8 @@ import {
   sportsPlayedBy,
   profileCompletenessFor,
 } from "../../server/player/profile";
-import { NotificationSwitches } from "./notification-switches";
+import { WHATSAPP_CONSENT_LABEL } from "../../lib/whatsapp-consent";
+import { NotificationSwitches, WhatsAppSwitch } from "./notification-switches";
 import { PersonProfilePanel } from "./person-profile-panel";
 import { SportProfiles } from "./sport-profiles";
 import { EmailVerify } from "./email-verify";
@@ -181,8 +182,8 @@ export default async function AccountPage() {
               <Card className="account-card" data-testid="notifications-panel">
                 <h2>Notifications</h2>
                 <p className="account-prose">
-                  We use your mobile number for two things, and nothing else. We never sell it, and
-                  we never use it for marketing.
+                  We use your mobile number for sign-in codes and for the updates you choose below,
+                  and nothing else. We never sell it, and we never use it for marketing.
                 </p>
                 <dl className="account-facts">
                   <dt>Sign-in codes</dt>
@@ -190,9 +191,11 @@ export default async function AccountPage() {
                     By SMS, only when you ask for one. These cannot be turned off — they are how you
                     get into your account.
                   </dd>
-                  <dt>Everything else</dt>
+                  <dt>Your season</dt>
                   <dd>
-                    Stays in <Link href="/inbox">your notifications</Link> here in the app.
+                    The big moments — a team buys you, you are named captain, you are in a lineup —
+                    by text (or WhatsApp, if you choose), by email if you have added one, and always
+                    in <Link href="/inbox">your notifications</Link> here in the app.
                   </dd>
                 </dl>
                 <h3 className="account-subhead">What we may send you</h3>
@@ -202,6 +205,9 @@ export default async function AccountPage() {
                   account.
                 </p>
                 {settings === null ? null : <NotificationSwitches settings={settings} />}
+                {settings === null ? null : (
+                  <WhatsAppSwitch optedIn={settings.whatsapp} label={WHATSAPP_CONSENT_LABEL} />
+                )}
                 <p className="account-prose">
                   You can also reply <strong>STOP</strong> to any text to stop all of them at once,
                   and <strong>START</strong> to turn them back on.
