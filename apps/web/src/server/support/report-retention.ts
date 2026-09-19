@@ -1,11 +1,12 @@
 import {
   emailVerifications,
+  messageOutbox,
   otpCodes,
   problemReportScreenshots,
   problemReports,
   reviewReports,
 } from "@desiauction/db";
-import { and, isNotNull, lt } from "drizzle-orm";
+import { and, inArray, isNotNull, lt } from "drizzle-orm";
 
 import { db } from "../db";
 
@@ -82,6 +83,7 @@ export async function purgeExpiredProblemReports(
 export const SECURITY_RECORD_RETENTION_MS = DAY_MS;
 
 export interface SecurityPurgeResult {
+  readonly deliveredMailDeleted: number;
   readonly phoneCodesDeleted: number;
   readonly emailCodesDeleted: number;
   readonly reviewAddressesCleared: number;
@@ -99,12 +101,25 @@ export async function purgeSpentSecurityRecords(
     .delete(emailVerifications)
     .where(lt(emailVerifications.createdAt, before))
     .returning({ id: emailVerifications.id });
+  // Personal mail (0079) once it is settled — sent, suppressed or given up on
+  // — is a copy of a name and a price the product holds elsewhere. Thirty days
+  // covers "I never got it" questions; pending rows are never touched.
+  const deliveredMail = await db
+    .delete(messageOutbox)
+    .where(
+      and(
+        inArray(messageOutbox.status, ["sent", "suppressed", "failed"]),
+        lt(messageOutbox.createdAt, new Date(now.getTime() - 30 * DAY_MS)),
+      ),
+    )
+    .returning({ id: messageOutbox.id });
   const reviewAddresses = await db
     .update(reviewReports)
     .set({ reporterIp: null })
     .where(and(isNotNull(reviewReports.reporterIp), lt(reviewReports.createdAt, before)))
     .returning({ id: reviewReports.id });
   return {
+    deliveredMailDeleted: deliveredMail.length,
     phoneCodesDeleted: phoneCodes.length,
     emailCodesDeleted: emailCodes.length,
     reviewAddressesCleared: reviewAddresses.length,

@@ -1,4 +1,5 @@
 import { env } from "../../env";
+import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
 import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
 import type { ValidDemoRequest } from "./demo-requests";
 
@@ -23,8 +24,6 @@ import type { ValidDemoRequest } from "./demo-requests";
  * Phase 2's reminders may text, because booking is where consent is captured.
  */
 
-const SUPPORT_EMAIL = "support@desiauction.in";
-
 const SIZE_WORDS: Record<string, string> = {
   "under-8": "under 8 teams",
   "8-16": "8–16 teams",
@@ -43,33 +42,32 @@ const WINDOW_WORDS: Record<string, string> = {
 export function requesterAcknowledgement(request: ValidDemoRequest): {
   subject: string;
   text: string;
+  html: string;
 } {
   return {
     subject: "We've got your demo request — DesiAuction",
-    text: [
-      `Hi ${request.name},`,
-      "",
-      `Thanks for asking about a demo for ${request.orgName}. We have your request and`,
-      "we'll get back to you within one working day to fix a time.",
-      "",
-      "What you told us:",
-      `  Tournament: ${request.orgName} (${SIZE_WORDS[request.tournamentSize] ?? request.tournamentSize})`,
-      request.auctionOn === null
-        ? "  Auction date: not fixed yet"
-        : `  Auction date: ${request.auctionOn}`,
-      `  Best time to talk: ${WINDOW_WORDS[request.preferredWindow] ?? request.preferredWindow}`,
-      "",
-      "The demo is a live walkthrough of a real auction — squads, the bidding, the",
-      "gavel, and the money afterwards — on a tournament we've already run, so you",
-      "can see the whole night rather than an empty screen.",
-      "",
-      "In a hurry? You don't have to wait for us. Every tournament gets the full",
-      `platform free during beta: ${env.PUBLIC_BASE_URL}/login`,
-      "",
-      `Reply to this message or write to ${SUPPORT_EMAIL} if anything changes.`,
-      "",
-      "— DesiAuction",
-    ].join("\n"),
+    ...renderEmail({
+      preheader: "We'll get back to you within one working day to fix a time.",
+      heading: "We've got your demo request",
+      paragraphs: [
+        `Hi ${request.name},`,
+        `Thanks for asking about a demo for ${request.orgName}. We'll get back to you within one working day to fix a time.`,
+      ],
+      details: [
+        [
+          "Tournament",
+          `${request.orgName} (${SIZE_WORDS[request.tournamentSize] ?? request.tournamentSize})`,
+        ],
+        ["Auction date", request.auctionOn ?? "not fixed yet"],
+        ["Best time to talk", WINDOW_WORDS[request.preferredWindow] ?? request.preferredWindow],
+      ],
+      after: [
+        "The demo is a live walkthrough of a real auction — squads, the bidding, the gavel, and the money afterwards — on a tournament we've already run, so you see the whole night rather than an empty screen.",
+        "In a hurry? You don't have to wait for us: every tournament gets the full platform free during beta.",
+      ],
+      action: { label: "Start free", url: `${env.PUBLIC_BASE_URL}/login` },
+      footnote: `You received this because you asked for a demo. Reply or write to ${SUPPORT_EMAIL} if anything changes.`,
+    }),
   };
 }
 

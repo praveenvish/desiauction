@@ -268,6 +268,43 @@ export const sessions = pgTable(
   (table) => [index("sessions_person_idx").on(table.personId)],
 );
 
+/**
+ * The personal-message send queue (0079). Rendered once, delivered by a drain,
+ * at most once per `dedupe_key` (a person's sale, an appointment to a role).
+ * Platform table: no org arm, no RLS — see the migration.
+ */
+export const messageOutbox = pgTable(
+  "message_outbox",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    orgId: char("org_id", { length: 26 }),
+    kind: text("kind").notNull(),
+    channel: text("channel", { enum: ["email"] }).notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    subject: text("subject").notNull(),
+    bodyText: text("body_text").notNull(),
+    bodyHtml: text("body_html").notNull(),
+    status: text("status", { enum: ["pending", "sent", "failed", "suppressed"] })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: ts("next_attempt_at").notNull().defaultNow(),
+    sentAt: ts("sent_at"),
+    lastError: text("last_error"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("message_outbox_dedupe_uq").on(table.dedupeKey),
+    index("message_outbox_due_idx")
+      .on(table.nextAttemptAt)
+      .where(sql`status = 'pending'`),
+    index("message_outbox_person_idx").on(table.personId),
+  ],
+);
+
 export const otpCodes = pgTable(
   "otp_codes",
   {

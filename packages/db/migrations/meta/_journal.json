@@ -547,6 +547,13 @@
       "when": 1790438400000,
       "tag": "0078_backfill_entered_name",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1790524800000,
+      "tag": "0079_message_outbox",
+      "breakpoints": true
     }
   ]
 }

@@ -3401,3 +3401,20 @@ p + .date-row {
 [data-surface="console"] .teams-search {
   background: var(--surface-raised);
 }
+
+/* Announce captains & icons: who is named but not told, one line each. */
+.appointments-list {
+  list-style: none;
+  margin: var(--space-3) 0 var(--space-4);
+  padding: 0;
+}
+
+.appointments-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}

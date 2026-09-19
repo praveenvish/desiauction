@@ -52,14 +52,12 @@
 
 .onboarding-mark-glyph {
   flex: none;
-  display: inline-grid;
-  place-items: center;
+  display: block;
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-md);
-  background: var(--identity-field);
-  border: 1px solid var(--identity-line);
-  color: var(--identity-accent);
+  /* The mark carries its own gold tile and corners. */
+  border-radius: 9px;
+  overflow: hidden;
 }
 
 .onboarding-signout {

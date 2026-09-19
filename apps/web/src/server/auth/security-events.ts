@@ -66,6 +66,10 @@ export type SecurityAction =
   // by default, so "unsold" mid-night is a verdict the auction has not reached.
   | "auction.sold"
   | "auction.unsold"
+  // The organizer named this person captain, vice-captain, icon or retained
+  // player (meta: role, team, competition) — announced, not toggled: written
+  // only when the organizer presses Announce (appointments.ts).
+  | "team.appointed"
   // The person asked for their account to be erased, or took the request back.
   // On their own ledger because it is the one request that ends the account;
   // the DECISION is on the request itself, which /account reads.
