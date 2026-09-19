@@ -50,6 +50,7 @@ export function reviewAskMail(
       heading: "How has DesiAuction worked for you?",
       paragraphs: [name === null ? "Hi," : `Hi ${name},`, OPENING[audience].join(" ")],
       action: { label: "Write your review", url: link },
+      actionFirst: true,
       after: [
         `The link is yours and works for ${String(days)} days. Nothing you write is shown to anyone unless you tick the box that says we may quote it.`,
         `Don't want to be asked? Switch off "Feedback requests" in your account settings: ${env.PUBLIC_BASE_URL}/account`,
@@ -120,6 +121,7 @@ export function seasonAskMail(input: {
           : `You played in ${season}, run by ${input.orgName}. How did it go? Other players and owners deciding whether to join next time would like to know.`,
       ],
       action: { label: "Review the season", url: input.link },
+      actionFirst: true,
       after: [
         `Once our team has read it, your review may appear on the season's public page. It carries your name only if you tick the box that says so; otherwise it says ${input.role === "owner" ? '"A team owner"' : '"A player"'}.`,
         `The link is yours and works for ${String(days)} days. Don't want to be asked? Switch off "Feedback requests" at ${env.PUBLIC_BASE_URL}/account`,
