@@ -8,6 +8,7 @@ import {
   EmptyState,
   Field,
   paintOnFill,
+  PlayerImage,
   useToast,
   initialsFor,
   IconArrowRight,
@@ -577,6 +578,7 @@ function RosterDetail({
           slug={slug}
           teamId={team.id}
           teamName={team.name}
+          teamColor={team.color}
           roster={roster}
           locked={view.rulesSource?.locked ?? false}
           settlesAtOpen={view.rulesSource !== null && !view.rulesSource.locked}
@@ -631,11 +633,17 @@ function RosterDetail({
                       <td className="roster-num">{String(index + 1).padStart(2, "0")}</td>
                       <td>
                         <span className="roster-player">
-                          <span className="roster-avatar" aria-hidden>
-                            {/* DA-23: the roster took the first TWO LETTERS of the first word,
-                                so Arjun Sharma read "AR" here and "AS" on Registrations. */}
-                            {initialsFor(row.name ?? row.phone ?? "?").initials ?? "?"}
-                          </span>
+                          {/* The player's photo (consent-gated upstream), else the same
+                              branded initials mark every other surface draws for them. */}
+                          <PlayerImage
+                            name={row.name ?? "Unnamed"}
+                            seed={row.registrationId}
+                            src={row.photoUrl}
+                            size="sm"
+                            shape="round"
+                            teamColor={team.color ?? undefined}
+                            decorative
+                          />
                           <span className="roster-person">
                             <span className="roster-name">
                               <button

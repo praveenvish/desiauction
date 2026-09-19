@@ -22,11 +22,13 @@ import { env } from "../../env";
 import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
+import { storage } from "../media";
 import { playerMatches } from "../player/career";
 import { purgeOrg } from "../test-support/purge-org";
 import { createCompetition, createTeam, type CompetitionSummary } from "./competitions";
 import { createFixture } from "./fixture-aggregate";
 import { lineupFixtures, lineupSides, saveLineup } from "./lineups";
+import { teamsWorkspace } from "./team-workspace";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -198,5 +200,34 @@ describe("LINEUPS — who played", () => {
       .update(fixturesTable)
       .set({ status: "completed" })
       .where(eq(fixturesTable.id, fixtureId));
+  });
+});
+
+describe("PHOTOS on the organizer's desks — consent decides", () => {
+  it("lineups and the team roster sign a player's photo only with recorded consent", async () => {
+    const p1 = must(players[0]);
+    const key = `people/${p1.personId}/photo.jpg`;
+    const sideOf = async () =>
+      (await lineupSides(db, comp.id, must((await lineupFixtures(db, comp.id))[0])))
+        .find((s) => s.teamId === teamA)
+        ?.players.find((p) => p.registrationId === p1.registrationId);
+    const rosterOf = async () =>
+      (await teamsWorkspace(db, comp, { money: false, roster: true })).teams
+        .find((team) => team.id === teamA)
+        ?.roster?.find((row) => row.registrationId === p1.registrationId);
+
+    // A stored photo without consent never gets a URL.
+    await db.update(people).set({ photoUrl: key }).where(eq(people.id, p1.personId));
+    expect((await sideOf())?.photoUrl).toBeNull();
+    expect((await rosterOf())?.photoUrl).toBeNull();
+
+    await db.update(people).set({ photoConsentAt: new Date() }).where(eq(people.id, p1.personId));
+    expect((await sideOf())?.photoUrl).toBe(storage.readUrl(key));
+    expect((await rosterOf())?.photoUrl).toBe(storage.readUrl(key));
+
+    await db
+      .update(people)
+      .set({ photoUrl: null, photoConsentAt: null })
+      .where(eq(people.id, p1.personId));
   });
 });

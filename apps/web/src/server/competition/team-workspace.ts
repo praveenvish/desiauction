@@ -11,9 +11,10 @@ import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { personLabel } from "../../lib/person-label";
 import { resolvedLots, rulesOf } from "../auction/live-summary";
+import { storage } from "../media";
 import { registrationStats } from "./registrations";
 import { teamsOf, type CompetitionSummary } from "./competitions";
-import { shownName } from "./shown-name";
+import { consentedPhotoUrl, shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
  * The Team Workspace (PX "Season Workspace" → Teams): the rich grid of franchise
@@ -61,6 +62,8 @@ export interface TeamRosterRow {
   name: string | null;
   /** Nullable since 0062 — an email-anchored account has no phone. */
   phone: string | null;
+  /** The shown photo, signed only with recorded consent (DPDP §5); null → initials mark. */
+  photoUrl: string | null;
   role: string | null;
   /** Paise paid at auction; null for a pre-signed/icon slot with no hammer price. ABSENT without money sight. */
   buyPrice?: number | null;
@@ -155,6 +158,8 @@ export async function teamsWorkspace(
         isRetained: registrations.isRetained,
         name: shownName,
         phone: people.phone,
+        photoKey: shownPhotoKey,
+        photoConsentAt: shownPhotoConsentAt,
       })
       .from(registrations)
       .innerJoin(people, eq(people.id, registrations.personId))
@@ -248,6 +253,7 @@ export async function teamsWorkspace(
       registrationId: row.registrationId,
       name: row.name,
       phone: row.phone,
+      photoUrl: consentedPhotoUrl(row, (key) => storage.readUrl(key)),
       role: row.role,
       ...(options.money ? { buyPrice: priceByReg.get(row.registrationId) ?? null } : {}),
       isIcon: row.isIcon,

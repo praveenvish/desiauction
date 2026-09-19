@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Dialog } from "@desiauction/ui";
+import { Button, Dialog, PlayerImage } from "@desiauction/ui";
 import { useState, useTransition } from "react";
 
 import {
@@ -111,6 +111,14 @@ export function LineupSideEditor({
                   }}
                 />
                 <label htmlFor={id}>
+                  <PlayerImage
+                    name={player.name}
+                    seed={player.registrationId}
+                    src={player.photoUrl}
+                    size="sm"
+                    shape="round"
+                    decorative
+                  />
                   <span className="lineups-player-name">{player.name}</span>
                   {player.isCaptain ? <span className="lineups-captain">Captain</span> : null}
                   {player.role !== null ? (
