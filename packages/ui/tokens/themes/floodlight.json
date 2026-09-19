@@ -54,6 +54,27 @@
     "base": { "$value": "{color.blue.dark}", "$type": "color" },
     "strong": { "$value": "{color.blue.dark}", "$type": "color" }
   },
+  "//violet": "The fourth tint for icon tiles and stat cards (console kit); strong clears 4.5:1 on its own subtle bed.",
+  "violet": {
+    "subtle": { "$value": "#A78BFA26", "$type": "color" },
+    "base": { "$value": "#A78BFA", "$type": "color" },
+    "strong": { "$value": "#C4B5FD", "$type": "color" }
+  },
+  "//hero": "The hero banner is a night scene in both themes: its text is always light, and the shade keeps contrast over an organizer photo.",
+  "hero": {
+    "night": { "$value": "#0B1120", "$type": "color" },
+    "night-mid": { "$value": "#111A2E", "$type": "color" },
+    "night-deep": { "$value": "#1A1406", "$type": "color" },
+    "glow": { "$value": "#D4A01761", "$type": "color" },
+    "sky": { "$value": "#FFFFFF1A", "$type": "color" },
+    "ink": { "$value": "#FFFFFF", "$type": "color" },
+    "ink-soft": { "$value": "#F8FAFCDB", "$type": "color" },
+    "shade": { "$value": "#05080FE0", "$type": "color" },
+    "shade-mid": { "$value": "#05080F8C", "$type": "color" },
+    "shade-soft": { "$value": "#05080F33", "$type": "color" },
+    "crest-bed": { "$value": "#FFFFFF1A", "$type": "color" },
+    "crest-line": { "$value": "#FFFFFF2E", "$type": "color" }
+  },
   "money": {
     "value": { "$value": "{color.ink.50}", "$type": "color" },
     "spent": { "$value": "{color.ink.400}", "$type": "color" },

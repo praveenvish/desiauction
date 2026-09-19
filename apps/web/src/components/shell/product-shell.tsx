@@ -15,6 +15,12 @@ import {
   IconChevronDown,
   IconHelp,
   IconHome,
+  IconLock,
+  IconLogOut,
+  IconCheckCircle,
+  IconCalendar,
+  Pill,
+  type KitTone,
   IconMenu,
   IconRupee,
   IconTrophy,
@@ -92,6 +98,11 @@ export interface ShellOrg {
 export interface ShellCompetition {
   slug: string;
   name: string;
+  /** The season's lifecycle status — the top bar's status pill. */
+  status?: string;
+  /** Where and when — the top bar's second line ("Season 2026 · Kolkata"). */
+  location?: string | null;
+  startsOn?: string | null;
   orgName: string;
   orgSlug: string;
   /** PX-7: holder of `settlement.view` on this competition's org — gates Money. */
@@ -291,6 +302,29 @@ function IconSettings() {
  * chrome from the pathname via the shared nav model. No page opts in or out —
  * chrome is decided in exactly one place.
  */
+/**
+ * The season's status pill in the top bar — the words an organizer uses, and a
+ * tone that means the same thing everywhere (neutral draft, blue open, amber
+ * closed-and-waiting, green done).
+ */
+const SEASON_STATUS: Record<string, { label: string; tone: KitTone; icon: ReactNode }> = {
+  draft: { label: "Draft", tone: "neutral", icon: <IconCalendar /> },
+  setup: { label: "Setting up", tone: "neutral", icon: <IconCalendar /> },
+  registration_open: {
+    label: "Registration open",
+    tone: "green",
+    icon: <IconCheckCircle />,
+  },
+  registration_closed: { label: "Registration closed", tone: "amber", icon: <IconLock /> },
+};
+
+function crestInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const first = words[0]?.[0] ?? "";
+  const last = words.length > 1 ? (words[words.length - 1]?.[0] ?? "") : (words[0]?.[1] ?? "");
+  return `${first}${last}`.toUpperCase();
+}
+
 export function ProductShell({
   session,
   orgs,
@@ -815,6 +849,7 @@ export function ProductShell({
   const competitionMatch = /^\/seasons\/([^/]+)/.exec(pathname);
   const orgMatch = /^\/org\/([^/]+)/.exec(pathname);
   let seasonSwitcherFor: string | null = null;
+  let contextNode: ReactNode = undefined;
   if (pathname.startsWith("/admin")) {
     // Rendered on `isAdmin` alone: for anyone else the page underneath is a
     // 404, so chrome would frame nothing.
@@ -833,6 +868,50 @@ export function ProductShell({
     const competition = competitions.find((entry) => entry.slug === slug);
     if (competition !== undefined) {
       seasonSwitcherFor = slug;
+      const year = competition.startsOn?.slice(0, 4);
+      const second = [
+        year !== undefined ? `Season ${year}` : null,
+        competition.location ?? competition.orgName,
+      ]
+        .filter((part): part is string => part !== null && part !== "")
+        .join(" · ");
+      const pill = SEASON_STATUS[competition.status ?? ""];
+      const others = competitions.filter((entry) => entry.slug !== slug);
+      // WHERE YOU ARE: the season (its crest, name, year and place) with the
+      // switch to your other seasons, and its status — the top bar's left.
+      contextNode = (
+        <>
+          <Link href={`/seasons/${slug}`} className="shell-season" data-testid="shell-season">
+            <span className="shell-season-crest" aria-hidden>
+              {crestInitials(competition.name)}
+            </span>
+            <span className="shell-season-text">
+              <strong>{competition.name}</strong>
+              <span>{second}</span>
+            </span>
+          </Link>
+          {others.length > 0 ? (
+            <PopoverMenu
+              label="Switch season"
+              trigger={<IconChevronDown width={16} height={16} />}
+              items={others.map((entry) => ({
+                key: entry.slug,
+                label: `${entry.name} — ${entry.orgName}`,
+                onSelect: () => {
+                  router.push(`/seasons/${entry.slug}`);
+                },
+              }))}
+            />
+          ) : null}
+          {pill !== undefined ? (
+            <span className="shell-season-status">
+              <Pill tone={pill.tone} icon={pill.icon} testId="shell-season-status">
+                {pill.label}
+              </Pill>
+            </span>
+          ) : null}
+        </>
+      );
       const activeTab = activeCompetitionTab(pathname, slug);
       tabsNode = (
         <SubNavTabs
@@ -960,25 +1039,42 @@ export function ProductShell({
               ? { subtitle }
               : {})}
           {...(tabsNode !== null ? { tabs: tabsNode } : {})}
+          {...(contextNode !== undefined ? { context: contextNode } : {})}
           {...(pageAction !== null ? { pageAction } : {})}
           railFooter={
-            <Link className="shell-railuser" href="/account">
-              <span className="shell-railuser-avatar">{initials}</span>
-              <span className="shell-railuser-text">
-                <strong>{personLabel(session)}</strong>
-                {/* The second line used to hardcode "Organizer" — a role claim
-                    the shell cannot know and stamped on every member, viewer
-                    and player alike. The CONTACT is the identity fact that is
-                    always true — phone or email, one of the two is guaranteed
-                    by `people_reachable_check` — and on the shared handsets
-                    this product targets it says WHICH account is signed in. */}
-                {session.name !== null ? <span data-private>{personContact(session)}</span> : null}
-              </span>
-            </Link>
+            // The mockups' footer card: who is signed in, and the way out,
+            // one tap each — sign-out used to be two menus deep.
+            <div className="shell-railcard">
+              <Link className="shell-railuser" href="/account">
+                <span className="shell-railuser-avatar">{initials}</span>
+                <span className="shell-railuser-text">
+                  <strong>{personLabel(session)}</strong>
+                  {/* The CONTACT is the identity fact that is always true —
+                      phone or email, one of the two is guaranteed by
+                      `people_reachable_check` — and on shared handsets it says
+                      WHICH account is signed in. */}
+                  {session.name !== null ? (
+                    <span data-private>{personContact(session)}</span>
+                  ) : null}
+                </span>
+              </Link>
+              <button
+                type="button"
+                className="shell-raillogout"
+                onClick={() => {
+                  track("auth.logout");
+                  void logout();
+                }}
+              >
+                <IconLogOut />
+                Log out
+              </button>
+            </div>
           }
           topActions={
             <>
               <InlineSearch
+                variant="bar"
                 handleRef={searchRef}
                 groups={paletteGroups}
                 onNavigate={(href) => {
@@ -995,28 +1091,6 @@ export function ProductShell({
               />
               {/* Switchers live with the other controls now — one cluster, in the
                 same place, whether you are switching season or organization. */}
-              {seasonSwitcherFor !== null && competitions.length > 1 ? (
-                <span className="shell-desktop-only">
-                  <PopoverMenu
-                    label="Switch season"
-                    trigger={
-                      <>
-                        <span className="shell-org-name">Switch</span>
-                        <IconChevronDown width={16} height={16} />
-                      </>
-                    }
-                    items={competitions
-                      .filter((entry) => entry.slug !== seasonSwitcherFor)
-                      .map((entry) => ({
-                        key: entry.slug,
-                        label: `${entry.name} — ${entry.orgName}`,
-                        onSelect: () => {
-                          router.push(`/seasons/${entry.slug}`);
-                        },
-                      }))}
-                  />
-                </span>
-              ) : null}
               {seasonSwitcherFor === null && orgs.length > 1 ? (
                 <span className="shell-desktop-only">
                   <PopoverMenu

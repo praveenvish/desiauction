@@ -18,6 +18,28 @@ export { Stat, StatRow } from "./primitives/stat";
 export type { StatProps, StatRowProps } from "./primitives/stat";
 export { Field, Select } from "./primitives/field";
 export type { FieldProps, SelectProps } from "./primitives/field";
+export {
+  CardGrid,
+  HeroBanner,
+  IconTile,
+  JourneyStepper,
+  Notice,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  TeamChip,
+} from "./primitives/console-kit";
+export type {
+  HeroBannerProps,
+  IconTileProps,
+  JourneyStep,
+  KitTone,
+  NoticeProps,
+  PillProps,
+  SectionCardProps,
+  StatCardProps,
+} from "./primitives/console-kit";
 export { Tabs } from "./primitives/tabs";
 export type { TabsProps, TabItem } from "./primitives/tabs";
 export { Dialog } from "./primitives/dialog";
