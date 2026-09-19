@@ -87,6 +87,8 @@ export async function lineupPageView(
   });
 }
 
+const MAX_LINEUP = 60;
+
 export async function saveLineupAction(
   slug: string,
   fixtureId: string,
@@ -96,6 +98,12 @@ export async function saveLineupAction(
   const gated = await gate(slug);
   if (gated === null) {
     return { ok: false, error: "You can't record lineups for this season." };
+  }
+  // A squad is tens of players, never hundreds. The list comes from the client,
+  // and each id is checked in one IN (...) query — an unbounded array made that
+  // query as large as the request body allowed (security review, Phase 5).
+  if (!Array.isArray(registrationIds) || registrationIds.length > MAX_LINEUP) {
+    return { ok: false, error: "That's more players than a squad holds." };
   }
   const { personId, competition } = gated;
   const result = await withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>

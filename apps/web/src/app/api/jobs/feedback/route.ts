@@ -5,7 +5,10 @@ import { NextResponse } from "next/server";
 import { env } from "../../../../env";
 import { withRequestId } from "../../../../server/logger";
 import { sweepReviewAsks } from "../../../../server/reviews/review-sweep";
-import { purgeExpiredProblemReports } from "../../../../server/support/report-retention";
+import {
+  purgeExpiredProblemReports,
+  purgeSpentSecurityRecords,
+} from "../../../../server/support/report-retention";
 
 /**
  * THE FEEDBACK SWEEP (FR-1) — an endpoint a scheduler calls, like
@@ -41,8 +44,9 @@ async function handle(request: Request): Promise<NextResponse> {
   // In sequence, not in parallel: the purge is cheap and the sweep sends mail,
   // and a failure in one should be attributable from the response alone.
   const purged = await purgeExpiredProblemReports();
+  const security = await purgeSpentSecurityRecords();
   const reviewAsks = await sweepReviewAsks();
-  return NextResponse.json({ purged, reviewAsks });
+  return NextResponse.json({ purged, security, reviewAsks });
 }
 
 export function POST(request: Request): Promise<NextResponse> {

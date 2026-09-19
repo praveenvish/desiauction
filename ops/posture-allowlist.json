@@ -172,7 +172,7 @@
     },
     "apps/web/src/server/support/report-retention.ts": {
       "class": "by-design",
-      "reason": "FR-1. Scheduled retention purge over problem_reports / problem_report_screenshots \u2014 no org_id, no RLS; behind FEEDBACK_JOB_SECRET."
+      "reason": "FR-1. Scheduled retention purge over problem_reports / problem_report_screenshots \u2014 no org_id, no RLS; behind FEEDBACK_JOB_SECRET. Launch Phase 5 adds the age purge of otp_codes / email_verifications rows and review_reports.reporter_ip (global, no org_id, no RLS) in the same job."
     },
     "apps/web/src/server/admin/report-views.ts": {
       "class": "by-design",
