@@ -80,7 +80,7 @@ export default async function CalendarPage({
 
         <Card>
           <nav className="calendar-nav" aria-label="Calendar view">
-            <span className="date-row">
+            <span className="calendar-views">
               {(["day", "week", "timeline"] as const).map((name) => (
                 <Link
                   key={name}
@@ -94,9 +94,10 @@ export default async function CalendarPage({
               ))}
             </span>
             {view.view !== "timeline" ? (
-              <span className="date-row">
+              <span className="calendar-pager">
                 <Link href={href({ date: addDays(view.date, -step) })} className="calendar-tab">
-                  <IconArrowLeft size={16} className="icon-lead" /> previous
+                  <IconArrowLeft size={16} className="icon-lead" />{" "}
+                  <span className="calendar-pager-word">previous</span>
                 </Link>
                 <strong data-testid="calendar-date">{formatWallDate(view.date)}</strong>
                 <Link
@@ -104,7 +105,7 @@ export default async function CalendarPage({
                   className="calendar-tab"
                   data-testid="calendar-next"
                 >
-                  next
+                  <span className="calendar-pager-word">next</span>
                   <IconArrowRight size={16} className="icon-trail" />
                 </Link>
               </span>

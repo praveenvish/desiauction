@@ -72,88 +72,93 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               the title says what is happening on it, which is not always
               "live". */}
           {title !== null ? <PageTitle title={title} /> : null}
-          <header className="dash-head">
-            <div className="competition-title-row title-row-actions">
-              <span className="date-row">
-                {pill !== null ? (
-                  <span className={pill.className} data-testid="auction-header-status">
-                    {pill.label}
-                  </span>
-                ) : null}
-                {inProgress ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/auction/live`}
-                    size="touch"
-                    data-testid="open-live"
-                  >
-                    Go live
-                  </ButtonLink>
-                ) : null}
-                {status !== null &&
-                status !== "completed" &&
-                status !== "reconciled" &&
-                status !== "abandoned" &&
-                dashboard.viewer.canConduct ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/auction/cockpit`}
-                    variant="secondary"
-                    size="touch"
-                    data-testid="open-cockpit"
-                  >
-                    Cockpit
-                  </ButtonLink>
-                ) : null}
-                {/* WR-1: the owner's private plan. Shown only to someone who holds a
+          {/* Before an auction exists every control here is absent, and the
+              empty header drew a stray rule and a blank band at the top. */}
+          {status !== null ? (
+            <header className="dash-head">
+              <div className="competition-title-row title-row-actions">
+                <span className="date-row">
+                  {pill !== null ? (
+                    <span className={pill.className} data-testid="auction-header-status">
+                      {pill.label}
+                    </span>
+                  ) : null}
+                  {inProgress ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/auction/live`}
+                      size="touch"
+                      data-testid="open-live"
+                    >
+                      Go live
+                    </ButtonLink>
+                  ) : null}
+                  {status !== "completed" &&
+                  status !== "reconciled" &&
+                  status !== "abandoned" &&
+                  dashboard.viewer.canConduct ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/auction/cockpit`}
+                      variant="secondary"
+                      size="touch"
+                      data-testid="open-cockpit"
+                    >
+                      Cockpit
+                    </ButtonLink>
+                  ) : null}
+                  {/* WR-1: the owner's private plan. Shown only to someone who holds a
                     team in this auction, and only while planning is switched on —
                     `planView` 404s for everyone else, so the door must not exist for
                     them either. */}
-                {status !== null && dashboard.viewer.planAvailable ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/auction/plan`}
-                    variant="secondary"
-                    size="touch"
-                    data-testid="open-plan"
-                  >
-                    My plan
-                  </ButtonLink>
-                ) : null}
-                {status === "completed" || status === "reconciled" ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/auction/replay`}
-                    variant="secondary"
-                    size="touch"
-                    data-testid="open-replay"
-                  >
-                    Review the night
-                  </ButtonLink>
-                ) : null}
-                {/* The poster studio had the same problem the board and the
+                  {dashboard.viewer.planAvailable ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/auction/plan`}
+                      variant="secondary"
+                      size="touch"
+                      data-testid="open-plan"
+                    >
+                      My plan
+                    </ButtonLink>
+                  ) : null}
+                  {status === "completed" || status === "reconciled" ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/auction/replay`}
+                      variant="secondary"
+                      size="touch"
+                      data-testid="open-replay"
+                    >
+                      Review the night
+                    </ButtonLink>
+                  ) : null}
+                  {/* The poster studio had the same problem the board and the
                     overlay had: a finished surface with no door. It belongs
                     here, beside "Review the night" — the squads are final, and
                     the hour after the hammer is the only hour anyone wants to
                     post them. Gated on `registration.review`, which is what the
                     studio itself checks. */}
-                {(status === "completed" || status === "reconciled") &&
-                dashboard.viewer.canPoster ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/posters`}
-                    variant="secondary"
-                    size="touch"
-                    data-testid="open-posters"
-                  >
-                    Share the squads
-                  </ButtonLink>
-                ) : null}
-              </span>
-            </div>
-          </header>
+                  {(status === "completed" || status === "reconciled") &&
+                  dashboard.viewer.canPoster ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/posters`}
+                      variant="secondary"
+                      size="touch"
+                      data-testid="open-posters"
+                    >
+                      Share the squads
+                    </ButtonLink>
+                  ) : null}
+                </span>
+              </div>
+            </header>
+          ) : null}
           {dashboard.overview !== null ? (
             <AuctionOverviewPanel overview={dashboard.overview} />
           ) : null}
           {/* The board and the overlay were unreachable from anywhere in the
               product. The dashboard is where an organizer sets the night up, so
               it is where they collect the two URLs they will open elsewhere. */}
-          {dashboard.viewer.canConduct ? <BroadcastLinks slug={slug} /> : null}
+          {/* Only once there is a room: before the auction exists both screens
+              show nothing, and the section sat above the setup it waits on. */}
+          {dashboard.viewer.canConduct && status !== null ? <BroadcastLinks slug={slug} /> : null}
           <AuctionPanel slug={slug} dashboard={dashboard} />
           {auctioneers !== null ? <AuctioneerPanel slug={slug} view={auctioneers} /> : null}
         </div>

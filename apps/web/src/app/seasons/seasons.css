@@ -3333,3 +3333,71 @@ p + .date-row {
     flex-basis: auto;
   }
 }
+
+/* CALENDAR CONTROLS (design review leftovers). The views are one pill group,
+   and the pager is ← date → in three columns: on a phone the date used to
+   wrap under "previous" and "next" and sit off-centre. */
+.calendar-views {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.calendar-views .calendar-tab {
+  /* Height stays at the 44px one-handed rung above; the width makes it a pill. */
+  padding-inline: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  text-transform: capitalize;
+  color: var(--text-secondary);
+}
+
+.calendar-views .calendar-tab.active {
+  border-color: var(--text-heading);
+  background: transparent;
+  color: var(--text-heading);
+}
+
+.calendar-pager {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: min(100%, 360px);
+}
+
+.calendar-pager > strong {
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 599px) {
+  .calendar-nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .calendar-pager {
+    width: 100%;
+  }
+
+  /* The arrows carry it; the words stay for screen readers. */
+  .calendar-pager-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .calendar-pager .calendar-tab {
+    min-width: 44px;
+    justify-content: center;
+  }
+}
+
+/* Teams search: an input like every other, not a grey slab. */
+[data-surface="console"] .teams-search {
+  background: var(--surface-raised);
+}

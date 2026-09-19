@@ -94,8 +94,11 @@ export function LineupSideEditor({
         >
           {status?.text ?? (side.recorded ? "" : "Not recorded yet")}
         </span>
+        {/* Secondary: two sides means two of these on one screen, and one ink
+            button per screen is the console's rule. */}
         <Button
           size="sm"
+          variant="secondary"
           onClick={save}
           loading={pending}
           disabled={side.players.length === 0}
