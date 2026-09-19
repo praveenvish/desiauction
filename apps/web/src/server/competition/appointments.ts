@@ -1,6 +1,8 @@
 import {
+  auctions,
   auditLog,
   competitions,
+  lots,
   messageOutbox,
   newId,
   organizations,
@@ -9,7 +11,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
+import { and, asc, eq, isNotNull, like, or, sql } from "drizzle-orm";
 
 import { logSecurityEvent } from "../auth/security-events";
 import { db as appDb } from "../db";
@@ -26,9 +28,12 @@ import { shownName } from "./shown-name";
  * (founder decision) and everyone named but not yet told hears once — by email
  * where they have a verified address, and always in their inbox.
  *
- * "Not yet told" is the outbox's dedupe key: one per registration, role and
- * team. A second press tells only the new names; moving a captain to another
- * team is a new appointment and is told again.
+ * ONE message per person per team, however many roles: a captain who is also
+ * the icon hears "You're the captain and icon player", not two emails. What
+ * was told is kept per role, in the outbox's dedupe key
+ * (`team.appointed:{registration}:{team}:{roles}`), so a role added later is
+ * announced on its own and nothing is said twice. Moving to another team is a
+ * new appointment and is told again.
  */
 
 export interface Appointment {
@@ -40,7 +45,10 @@ export interface Appointment {
   readonly greetingName: string;
   readonly teamId: string;
   readonly teamName: string;
-  readonly role: AppointedRole;
+  /** The roles held now (in the view: the roles not yet announced). */
+  readonly roles: readonly AppointedRole[];
+  /** A sale in this season's auction put them on the team (see appointmentMail). */
+  readonly bought: boolean;
 }
 
 const ROLE_LABEL: Record<AppointedRole, string> = {
@@ -54,8 +62,17 @@ export function roleLabel(role: AppointedRole): string {
   return ROLE_LABEL[role];
 }
 
-function dedupeKey(item: Pick<Appointment, "registrationId" | "role" | "teamId">): string {
-  return `team.appointed:${item.registrationId}:${item.role}:${item.teamId}`;
+/** "Captain & Icon" — the organizer's list and the inbox line. */
+export function rolesLabel(roles: readonly AppointedRole[]): string {
+  return roles.map(roleLabel).join(" & ");
+}
+
+function keyPrefix(item: Pick<Appointment, "registrationId" | "teamId">): string {
+  return `team.appointed:${item.registrationId}:${item.teamId}:`;
+}
+
+function dedupeKey(item: Pick<Appointment, "registrationId" | "teamId" | "roles">): string {
+  return `${keyPrefix(item)}${[...item.roles].sort().join("+")}`;
 }
 
 /** Everyone currently named to a role on a team in this season. */
@@ -72,6 +89,10 @@ export async function appointmentsOf(db: Db, competitionId: string): Promise<App
       isViceCaptain: registrations.isViceCaptain,
       isIcon: registrations.isIcon,
       isRetained: registrations.isRetained,
+      bought: sql<boolean>`exists (
+        select 1 from ${lots} join ${auctions} on ${auctions.id} = ${lots.auctionId}
+        where ${lots.registrationId} = ${registrations.id}
+          and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned')`,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -90,48 +111,63 @@ export async function appointmentsOf(db: Db, competitionId: string): Promise<App
       ),
     )
     .orderBy(asc(teams.name), asc(shownName));
-  return rows.flatMap((row) => {
-    const roles: AppointedRole[] = [
+  return rows.map((row) => ({
+    registrationId: row.registrationId,
+    personId: row.personId,
+    listedName: row.listedName ?? "Player",
+    greetingName: row.greetingName?.trim() || "there",
+    teamId: row.teamId ?? "",
+    teamName: row.teamName,
+    roles: [
       ...(row.isCaptain ? (["captain"] as const) : []),
       ...(row.isViceCaptain ? (["vice_captain"] as const) : []),
       ...(row.isIcon ? (["icon"] as const) : []),
       ...(row.isRetained ? (["retained"] as const) : []),
-    ];
-    return roles.map((role) => ({
-      registrationId: row.registrationId,
-      personId: row.personId,
-      listedName: row.listedName ?? "Player",
-      greetingName: row.greetingName?.trim() || "there",
-      teamId: row.teamId ?? "",
-      teamName: row.teamName,
-      role,
-    }));
-  });
+    ],
+    bought: row.bought,
+  }));
 }
 
-/** The appointments already announced, by dedupe key (the queue, no RLS). */
-async function announcedKeys(keys: readonly string[]): Promise<Set<string>> {
-  if (keys.length === 0) return new Set();
+/**
+ * The roles already announced to each person on each team, keyed by
+ * `keyPrefix` — read from the queue (no RLS), where every announcement left its
+ * dedupe key.
+ */
+async function toldRoles(all: readonly Appointment[]): Promise<Map<string, Set<string>>> {
+  const told = new Map<string, Set<string>>();
+  if (all.length === 0) return told;
   const rows = await appDb
     .select({ key: messageOutbox.dedupeKey })
     .from(messageOutbox)
-    .where(inArray(messageOutbox.dedupeKey, [...keys]));
-  return new Set(rows.map((row) => row.key));
+    .where(or(...all.map((item) => like(messageOutbox.dedupeKey, `${keyPrefix(item)}%`))));
+  for (const { key } of rows) {
+    const cut = key.lastIndexOf(":") + 1;
+    const prefix = key.slice(0, cut);
+    const roles = told.get(prefix) ?? new Set<string>();
+    for (const role of key.slice(cut).split("+")) roles.add(role);
+    told.set(prefix, roles);
+  }
+  return told;
 }
 
 export interface AppointmentsView {
+  /** One entry per person and team, carrying only the roles not yet told. */
   readonly pending: readonly Appointment[];
+  /** People whose every current role has been announced. */
   readonly told: number;
 }
 
 /** Who is named but not yet told, and how many already were. */
 export async function appointmentsView(db: Db, competitionId: string): Promise<AppointmentsView> {
   const all = await appointmentsOf(db, competitionId);
-  const told = await announcedKeys(all.map(dedupeKey));
-  return {
-    pending: all.filter((item) => !told.has(dedupeKey(item))),
-    told: all.length - all.filter((item) => !told.has(dedupeKey(item))).length,
-  };
+  const told = await toldRoles(all);
+  const pending = all
+    .map((item) => {
+      const already = told.get(keyPrefix(item));
+      return { ...item, roles: item.roles.filter((role) => already?.has(role) !== true) };
+    })
+    .filter((item) => item.roles.length > 0);
+  return { pending, told: all.length - pending.length };
 }
 
 /**
@@ -152,8 +188,8 @@ export async function announceAppointments(
   if (context === undefined) {
     return 0;
   }
-  const all = await appointmentsOf(db, input.competitionId);
-  const mails: QueuedMail[] = all.map((item) => ({
+  const { pending } = await appointmentsView(db, input.competitionId);
+  const mails: QueuedMail[] = pending.map((item) => ({
     personId: item.personId,
     orgId: context.orgId,
     kind: "team.appointed",
@@ -163,18 +199,19 @@ export async function announceAppointments(
       season: context.season,
       orgName: context.orgName,
       teamName: item.teamName,
-      role: item.role,
+      roles: item.roles,
+      bought: item.bought,
     }),
   }));
   const fresh = new Set(await enqueueMail(mails));
-  const told = all.filter((item) => fresh.has(dedupeKey(item)));
+  const told = pending.filter((item) => fresh.has(dedupeKey(item)));
   for (const item of told) {
     try {
       await logSecurityEvent(item.personId, "team.appointed", {
         competitionId: input.competitionId,
         competition: context.season,
         team: item.teamName,
-        role: ROLE_LABEL[item.role],
+        role: rolesLabel(item.roles),
       });
     } catch {
       // The email is queued; one unwritable inbox row must not stop the rest.

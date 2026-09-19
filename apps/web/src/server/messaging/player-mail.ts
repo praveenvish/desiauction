@@ -124,6 +124,9 @@ export function unsoldMail(facts: {
 
 export type AppointedRole = "captain" | "vice_captain" | "icon" | "retained";
 
+/** Captain first: the order a person would say their own roles in. */
+const ROLE_ORDER: readonly AppointedRole[] = ["captain", "vice_captain", "icon", "retained"];
+
 const ROLE_WORDS: Record<AppointedRole, { title: string; line: string }> = {
   captain: {
     title: "captain",
@@ -135,31 +138,57 @@ const ROLE_WORDS: Record<AppointedRole, { title: string; line: string }> = {
   },
   icon: {
     title: "icon player",
-    line: "Icon players are the marquee names a team is built around. You're signed to the team before the auction — you won't go under the hammer.",
+    line: "Icon players are the marquee names a team is built around.",
   },
   retained: {
     title: "retained player",
-    line: "Your team kept you from last season. You're signed before the auction — you won't go under the hammer.",
+    line: "Your team kept you from last season.",
   },
 };
 
-export function appointmentMail(facts: {
+/** The three marks that sign a player to a team without the auction. */
+const PRE_SIGNING: ReadonlySet<AppointedRole> = new Set(["captain", "icon", "retained"]);
+
+/** "captain", "captain and icon player", "captain, icon player and retained player". */
+export function rolesTitle(roles: readonly AppointedRole[]): string {
+  const titles = ROLE_ORDER.filter((role) => roles.includes(role)).map(
+    (role) => ROLE_WORDS[role].title,
+  );
+  if (titles.length <= 1) return titles[0] ?? "";
+  return `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1] ?? ""}`;
+}
+
+export interface AppointmentFacts {
   readonly name: string;
   readonly season: string;
   readonly orgName: string;
   readonly teamName: string;
-  readonly role: AppointedRole;
-}): ComposedMail {
-  const words = ROLE_WORDS[facts.role];
+  /** Every role being announced now — one email, however many roles. */
+  readonly roles: readonly AppointedRole[];
+  /**
+   * True when a sale in this season's auction put them on the team. Captain,
+   * icon and retained sign a player DIRECTLY — but a captain named after being
+   * bought went through the auction, and must not be told they skipped it.
+   */
+  readonly bought: boolean;
+}
+
+export function appointmentMail(facts: AppointmentFacts): ComposedMail {
+  const roles = ROLE_ORDER.filter((role) => facts.roles.includes(role));
+  const title = rolesTitle(roles);
+  const signedDirect = !facts.bought && roles.some((role) => PRE_SIGNING.has(role));
   return {
-    subject: `You're the ${words.title} of ${facts.teamName}`,
+    subject: `You're the ${title} of ${facts.teamName}`,
     ...renderEmail({
-      preheader: `${facts.orgName} named you ${words.title} of ${facts.teamName} for ${facts.season}.`,
-      heading: `You're the ${words.title} of ${facts.teamName}`,
+      preheader: `${facts.orgName} named you ${title} of ${facts.teamName} for ${facts.season}.`,
+      heading: `You're the ${title} of ${facts.teamName}`,
       paragraphs: [
         `Congratulations, ${facts.name}!`,
-        `${facts.orgName} has named you ${words.title} of ${facts.teamName} for ${facts.season}.`,
-        words.line,
+        `${facts.orgName} has named you ${title} of ${facts.teamName} for ${facts.season}.`,
+        ...roles.map((role) => ROLE_WORDS[role].line),
+        ...(signedDirect
+          ? [`You join ${facts.teamName} directly, without going through the auction.`]
+          : []),
       ],
       action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
       footnote: `You received this because ${facts.orgName} named you in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,

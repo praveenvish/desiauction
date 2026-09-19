@@ -64,23 +64,36 @@ export default function EmailGalleryPage() {
       }),
     },
     {
-      name: "Named captain",
+      name: "Named captain — signed before the auction",
       mail: appointmentMail({
         name: "Vikram",
         season: "Malad Premier League 2026",
         orgName: "Malad Cricket Club",
         teamName: "Cup Kings",
-        role: "captain",
+        roles: ["captain"],
+        bought: false,
       }),
     },
     {
-      name: "Named icon player",
+      name: "Named captain and icon — one email",
       mail: appointmentMail({
         name: "Rahul",
         season: "Malad Premier League 2026",
         orgName: "Malad Cricket Club",
         teamName: "Cup Kings",
-        role: "icon",
+        roles: ["icon", "captain"],
+        bought: false,
+      }),
+    },
+    {
+      name: "Named captain after the auction bought them",
+      mail: appointmentMail({
+        name: "Arjun",
+        season: "Malad Premier League 2026",
+        orgName: "Malad Cricket Club",
+        teamName: "Cup Kings",
+        roles: ["captain"],
+        bought: true,
       }),
     },
     {

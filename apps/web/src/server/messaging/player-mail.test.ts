@@ -4,6 +4,7 @@ import {
   appointmentMail,
   bidStory,
   ownerSummaryMail,
+  rolesTitle,
   soldMail,
   unsoldMail,
   type SoldFacts,
@@ -63,6 +64,14 @@ describe("not picked", () => {
 });
 
 describe("appointments", () => {
+  const base = {
+    name: "Arjun",
+    season: "MPL 2026",
+    orgName: "Malad CC",
+    teamName: "Cup Kings",
+    bought: false,
+  };
+
   it("names the role and the team for each of the four roles", () => {
     for (const [role, title] of [
       ["captain", "captain"],
@@ -70,26 +79,44 @@ describe("appointments", () => {
       ["icon", "icon player"],
       ["retained", "retained player"],
     ] as const) {
-      const mail = appointmentMail({
-        name: "Arjun",
-        season: "MPL 2026",
-        orgName: "Malad CC",
-        teamName: "Cup Kings",
-        role,
-      });
-      expect(mail.subject).toBe(`You're the ${title} of Cup Kings`);
+      expect(appointmentMail({ ...base, roles: [role] }).subject).toBe(
+        `You're the ${title} of Cup Kings`,
+      );
     }
   });
 
-  it("tells an icon they will not go under the hammer", () => {
-    const mail = appointmentMail({
-      name: "Arjun",
-      season: "MPL 2026",
-      orgName: "Malad CC",
-      teamName: "Cup Kings",
-      role: "icon",
-    });
-    expect(mail.text).toContain("won't go under the hammer");
+  it("tells a captain, an icon and a retained player they skip the auction", () => {
+    for (const role of ["captain", "icon", "retained"] as const) {
+      expect(appointmentMail({ ...base, roles: [role] }).text).toContain(
+        "without going through the auction",
+      );
+    }
+  });
+
+  it("never says so to a vice-captain, who still goes under the hammer", () => {
+    expect(appointmentMail({ ...base, roles: ["vice_captain"] }).text).not.toContain(
+      "without going through the auction",
+    );
+  });
+
+  it("never says so to a captain the auction bought", () => {
+    const mail = appointmentMail({ ...base, roles: ["captain"], bought: true });
+    expect(mail.subject).toBe("You're the captain of Cup Kings");
+    expect(mail.text).not.toContain("without going through the auction");
+  });
+
+  it("one email for a captain who is also the icon, captain first", () => {
+    const mail = appointmentMail({ ...base, roles: ["icon", "captain"] });
+    expect(mail.subject).toBe("You're the captain and icon player of Cup Kings");
+    expect(mail.text).toContain("You'll lead the side");
+    expect(mail.text).toContain("marquee names");
+    expect(mail.text.match(/without going through the auction/g)).toHaveLength(1);
+  });
+
+  it("joins three roles the way a person would say them", () => {
+    expect(rolesTitle(["retained", "icon", "captain"])).toBe(
+      "captain, icon player and retained player",
+    );
   });
 });
 

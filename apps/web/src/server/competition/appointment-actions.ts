@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
 import { canCompetition } from "./authz";
-import { announceAppointments, appointmentsView, roleLabel } from "./appointments";
+import { announceAppointments, appointmentsView, rolesLabel } from "./appointments";
 import { resolveMemberCompetition } from "./resolve";
 
 /**
@@ -47,7 +47,7 @@ export async function appointmentsPanelView(slug: string): Promise<AppointmentsP
   return {
     pending: view.pending.map((item) => ({
       name: item.listedName,
-      role: roleLabel(item.role),
+      role: rolesLabel(item.roles),
       team: item.teamName,
     })),
     told: view.told,
