@@ -9,11 +9,17 @@
 }
 
 /* --- hero ----------------------------------------------------------------- */
+/* The club's identity strip: one white card, like every other surface. */
 .od-hero {
   display: flex;
   align-items: center;
   gap: var(--space-4);
   flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
 }
 
 .od-monogram {
@@ -164,32 +170,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.od-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: start;
-}
-
-@media (max-width: 860px) {
-  .od-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.od-panel-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-
-.od-panel-head h2,
-.od-panel > h2 {
-  margin: 0;
-}
-
 .od-live-list,
 .od-activity-list {
   list-style: none;
@@ -211,8 +191,12 @@
   border-top: none;
 }
 
-.od-live-row:hover {
-  background: var(--surface-sunken);
+.od-live-row:hover .od-live-name {
+  color: var(--text-accent);
+}
+
+.od-live-list li:first-child .od-live-row {
+  padding-top: 0;
 }
 
 .od-live-name {
@@ -237,53 +221,72 @@
 /* --- recent activity ------------------------------------------------------ */
 .od-activity-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
+  padding: var(--space-3) 0;
 }
 
-.od-dot {
+.od-activity-row + .od-activity-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.od-activity-row:first-child {
+  padding-top: 0;
+}
+
+.od-activity-time {
   flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  margin-top: 6px;
+  margin-inline-start: auto;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
-.od-dot--green {
-  background: var(--success-base);
+.od-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 24px;
+  padding: var(--space-1);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+  white-space: nowrap;
 }
-.od-dot--accent {
-  background: var(--accent);
+
+.od-more:hover {
+  text-decoration: underline;
 }
-.od-dot--info {
-  background: var(--info-base);
+
+.od-more:focus-visible,
+.od-live-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
-/* Was #b48cff: the last untokenised hue in the product, in a list where every
-   other dot resolves from the system. Activity of this kind is informational,
-   which is the token that already exists for it. */
-.od-dot--violet {
-  background: var(--info-base);
-}
-.od-dot--muted {
-  background: var(--text-muted);
+
+.od-empty {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
 }
 
 .od-activity-text {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
 .od-activity-text strong {
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
 }
 
 .od-activity-text span {
   font-size: var(--text-xs-size);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .od-money {
