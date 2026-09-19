@@ -26,6 +26,10 @@ describe("scrub", () => {
     expect(out).not.toContain("9876543210");
     expect(out).toContain("template_id=abc");
     expect(scrubText("mobile=919876543210&otp=482913")).not.toContain("482913");
+    // The engine's WebSocket admission ticket rides the query string too.
+    expect(scrubText("wss://engine.example/ws?auction=A1&ticket=eyJhbGciOi.xyz")).not.toContain(
+      "eyJhbGciOi",
+    );
   });
 
   it("redacts a bare 91-prefixed mobile but not ordinary long numbers", () => {

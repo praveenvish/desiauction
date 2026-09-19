@@ -127,18 +127,19 @@ afterAll(async () => {
 
 describe("MEDIA REGRESSION — write authorization contract", () => {
   it("resolves a subject only when it belongs to the competition", async () => {
-    expect(await resolveMediaSubject(db, comp, "team", teamId)).toEqual({
+    expect(await resolveMediaSubject(db, comp, "team", teamId, owner)).toEqual({
       storageSubjectId: teamId,
       ownerPersonId: null,
     });
-    expect(await resolveMediaSubject(db, comp, "team", newId())).toBeNull();
-    expect(await resolveMediaSubject(db, comp, "competition", comp.id)).toEqual({
+    expect(await resolveMediaSubject(db, comp, "team", newId(), owner)).toBeNull();
+    expect(await resolveMediaSubject(db, comp, "competition", comp.id, owner)).toEqual({
       storageSubjectId: comp.id,
       ownerPersonId: null,
     });
-    expect(await resolveMediaSubject(db, comp, "competition", newId())).toBeNull();
-    // Player subject resolves to the PERSON (person-level photo, D7).
-    expect(await resolveMediaSubject(db, comp, "player", registrationId)).toEqual({
+    expect(await resolveMediaSubject(db, comp, "competition", newId(), owner)).toBeNull();
+    // Player subject resolves to the PERSON (person-level photo, D7) when the
+    // entry carries no typed name (0075).
+    expect(await resolveMediaSubject(db, comp, "player", registrationId, owner)).toEqual({
       storageSubjectId: player,
       ownerPersonId: player,
     });
@@ -214,5 +215,68 @@ describe("MEDIA REGRESSION — write authorization contract", () => {
     expect(row?.photoUrl).toBe("k/photo");
     expect(row?.consentAt).not.toBeNull();
     expect(row?.via).toBe("self_upload");
+  });
+
+  it("keeps the club's photo for a typed-name entry on the ENTRY, never the account (0077)", async () => {
+    // The club added this phone under a name it typed, so the account behind it
+    // may be a stranger to the club. The club's photo must not replace theirs —
+    // and must not be refused either, which would say the phone has an account.
+    await db
+      .update(registrationsTable)
+      .set({ enteredName: "Typed By Club" })
+      .where(eq(registrationsTable.id, registrationId));
+    const [before] = await db
+      .select({ photoUrl: people.photoUrl })
+      .from(people)
+      .where(eq(people.id, player))
+      .limit(1);
+
+    const byClub = await resolveMediaSubject(db, comp, "player", registrationId, owner);
+    expect(byClub).toEqual({
+      storageSubjectId: registrationId,
+      ownerPersonId: player,
+      entryPhoto: { registrationId },
+    });
+    if (byClub === null) throw new Error("unreachable");
+    await requireMediaWrite(db, owner, comp, "player", byClub);
+    await persistMediaKey(
+      db,
+      "player",
+      byClub,
+      "k/entry",
+      new Date(),
+      "organizer_upload_attestation",
+    );
+    const [entry] = await db
+      .select({
+        key: registrationsTable.enteredPhotoKey,
+        via: registrationsTable.enteredPhotoConsentVia,
+      })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, registrationId))
+      .limit(1);
+    expect(entry).toEqual({ key: "k/entry", via: "organizer_upload_attestation" });
+    const [after] = await db
+      .select({ photoUrl: people.photoUrl })
+      .from(people)
+      .where(eq(people.id, player))
+      .limit(1);
+    expect(after?.photoUrl).toBe(before?.photoUrl);
+
+    // The person themselves still sets their OWN account photo.
+    expect(await resolveMediaSubject(db, comp, "player", registrationId, player)).toEqual({
+      storageSubjectId: player,
+      ownerPersonId: player,
+    });
+
+    await db
+      .update(registrationsTable)
+      .set({
+        enteredName: null,
+        enteredPhotoKey: null,
+        enteredPhotoConsentVia: null,
+        enteredPhotoConsentAt: null,
+      })
+      .where(eq(registrationsTable.id, registrationId));
   });
 });

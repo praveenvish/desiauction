@@ -177,7 +177,7 @@ export interface CockpitView {
    */
   ownerAcceptances: OwnerAcceptance[];
   teams: { id: string; name: string; shortName: string | null; primaryColor: string | null }[];
-  viewer: { personId: string; canConduct: boolean; canOverride: boolean };
+  viewer: { personId: string; canConduct: boolean; canOverride: boolean; canManage: boolean };
   /** Icons and retained players: on a squad, never in the pool. */
   preSigned: PreSignedPlayer[];
   resolved: ResolvedLot[];
@@ -221,6 +221,7 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
       personId: gate.personId,
       canConduct: gate.canConduct,
       canOverride: gate.canOverride,
+      canManage: gate.canManage,
     },
     preSigned,
     resolved,

@@ -106,9 +106,7 @@ export function AddPlayerDialog({
     }
     setFieldErrors(undefined);
     toast({
-      title: result.personExisted
-        ? `Added existing member as ${result.number}`
-        : `Player added · ${result.number}`,
+      title: `Player added · ${result.number}`,
       tone: "success",
     });
     setCreated({ registrationId: result.registrationId, number: result.number });

@@ -189,3 +189,12 @@ button:hover .icon-trail {
     transform: none;
   }
 }
+
+/* Native form controls (date pickers, selects, scrollbars) follow the theme. */
+[data-theme="daylight"] {
+  color-scheme: light;
+}
+
+[data-theme="floodlight"] {
+  color-scheme: dark;
+}

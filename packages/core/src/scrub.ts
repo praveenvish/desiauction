@@ -47,9 +47,10 @@ const PATTERNS: readonly { readonly re: RegExp; readonly label: string }[] = [
   { re: /\b(?:sk|rzp)_[A-Za-z0-9_]{8,}/g, label: "[key]" },
   // A URL's sensitive query values. The SMS provider's API takes the one-time
   // code and the number IN THE QUERY STRING, and Sentry's fetch spans record
-  // `url.full`/`url.query` — a live login code leaving the process.
+  // `url.full`/`url.query` — a live login code leaving the process. `ticket`
+  // is the auction engine's WebSocket admission (engine-client.ts).
   {
-    re: /([?&](?:otp|code|token|mobile|phone|email|secret|signature|sig|key|authkey)=)[^&#\s"']*/gi,
+    re: /([?&](?:otp|code|token|ticket|mobile|phone|email|secret|signature|sig|key|authkey)=)[^&#\s"']*/gi,
     label: "$1[redacted]",
   },
   // The same Indian mobile WITHOUT the plus, as providers write it (91XXXXXXXXXX).

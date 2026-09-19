@@ -13,6 +13,7 @@ import { personLabel } from "../../lib/person-label";
 import { resolvedLots, rulesOf } from "../auction/live-summary";
 import { registrationStats } from "./registrations";
 import { teamsOf, type CompetitionSummary } from "./competitions";
+import { shownName } from "./shown-name";
 
 /**
  * The Team Workspace (PX "Season Workspace" → Teams): the rich grid of franchise
@@ -148,7 +149,7 @@ export async function teamsWorkspace(
         role: registrations.role,
         isIcon: registrations.isIcon,
         isCaptain: registrations.isCaptain,
-        name: people.name,
+        name: shownName,
         phone: people.phone,
       })
       .from(registrations)

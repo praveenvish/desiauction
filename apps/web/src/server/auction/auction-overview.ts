@@ -12,6 +12,7 @@ import {
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { rulesOf } from "./live-summary";
+import { shownName } from "../competition/shown-name";
 
 /**
  * The Auction tab's operational dashboard (PX "Season Workspace" → Auction):
@@ -123,7 +124,7 @@ export async function auctionOverview(
         status: lots.status,
         soldPrice: lots.soldPrice,
         soldToPaddleId: lots.soldToPaddleId,
-        playerName: people.name,
+        playerName: shownName,
         role: registrations.role,
       })
       .from(lots)

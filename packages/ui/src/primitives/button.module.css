@@ -248,3 +248,26 @@
     opacity: 0.5;
   }
 }
+
+/* ==========================================================================
+   CONSOLE PRIMARY (launch polish, Phase 4): ink, not gold.
+   Inside the console the primary button is the ONE thing to do next on the
+   screen; a gold gradient with a glow read as marketing, and next to gold
+   selection states it stopped standing out. Solid ink, white label, no glow.
+   Public and live surfaces keep the gold (they never carry data-surface).
+   ========================================================================== */
+:global([data-surface="console"]) .primary,
+:global([data-surface="console"]) .primary:active:not(:disabled) {
+  background-color: var(--text-heading);
+  background-image: none;
+  border-color: var(--text-heading);
+  color: var(--surface-raised);
+  box-shadow: none;
+}
+
+:global([data-surface="console"]) .primary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--text-heading) 86%, var(--surface-raised));
+  background-image: none;
+  border-color: color-mix(in srgb, var(--text-heading) 86%, var(--surface-raised));
+  box-shadow: none;
+}

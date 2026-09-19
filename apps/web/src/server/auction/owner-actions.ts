@@ -19,6 +19,8 @@ import { personLabel } from "../../lib/person-label";
 
 import { currentSession } from "../auth/actions";
 import { systemDb } from "../db";
+import { grantsOfPerson } from "../request-cache";
+import { AUCTIONEER_SET } from "./auctioneers";
 import { sendEngineCommand } from "./engine-client";
 import { liveGate } from "./live-actions";
 import { rulesOf } from "./live-summary";
@@ -47,8 +49,10 @@ export async function inviteOwnerAction(
   teamId: string,
 ): Promise<InviteOwnerActionResult> {
   const gate = await liveGate(slug);
-  if (gate === null || !gate.canConduct) {
-    return { ok: false, error: "You can't conduct auctions here." };
+  // Accepting an owner link makes the person a member of the club, so minting
+  // one is the season manager's act — not an appointed auctioneer's.
+  if (gate === null || !gate.canConduct || !gate.canManage) {
+    return { ok: false, error: "Only the club's owners can invite team owners." };
   }
   const token = randomBytes(24).toString("base64url");
   const ack = await sendEngineCommand({
@@ -92,8 +96,8 @@ export async function revokeOwnerInviteAction(
   inviteId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const gate = await liveGate(slug);
-  if (gate === null || !gate.canConduct) {
-    return { ok: false, error: "You can't conduct auctions here." };
+  if (gate === null || !gate.canConduct || !gate.canManage) {
+    return { ok: false, error: "Only the club's owners can withdraw owner links." };
   }
   const ack = await sendEngineCommand({
     auctionId: gate.auction.id,
@@ -318,6 +322,7 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
       auctionId: auctionOwnerInvites.auctionId,
       teamId: auctionOwnerInvites.teamId,
       teamName: teams.name,
+      competitionId: competitions.id,
       competitionSlug: competitions.slug,
       expiresAt: auctionOwnerInvites.expiresAt,
       acceptedAt: auctionOwnerInvites.acceptedAt,
@@ -365,6 +370,19 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
     )
     .limit(1);
   if (existingOwner !== undefined) {
+    return { ok: false };
+  }
+  // THE AUCTIONEER CANNOT OWN A TEAM in the season they run (security review,
+  // launch Phase 5): conducting shows every rival's purse. Appointment already
+  // refuses a team owner; this is the same rule from the other side.
+  const conducting = (await grantsOfPerson(session.personId)).some(
+    (grant) =>
+      grant.revokedAt === null &&
+      grant.scopeType === "tournament" &&
+      grant.scopeId === row.competitionId &&
+      grant.capabilitySet === AUCTIONEER_SET,
+  );
+  if (conducting) {
     return { ok: false };
   }
   // Auction side FIRST: the acceptance travels the command path, and the engine

@@ -265,7 +265,7 @@ export function ResultsCard({
           ? "A lobby is scored by where each squad finished — 1 is the win, and squads may share a place. The table is derived from these, so a correction here moves it immediately."
           : "Overs are written the way a scorer writes them — 18.3 is eighteen overs and three balls. The table is derived from these, so a correction here moves it immediately."}
       </p>
-      <ul className="cockpit-queue" data-testid="results-list">
+      <ul className="cockpit-queue results-list" data-testid="results-list">
         {/* Outstanding first: this list is a worklist, and the matches that
             still need something are the reason anybody opened it. */}
         {[...outstanding, ...played.filter((f) => isScored(f, results))].map((fixture) => {

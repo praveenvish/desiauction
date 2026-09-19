@@ -152,10 +152,11 @@ function clearedRungs(view: SeasonOverviewView): boolean[] {
   ];
 }
 
+// The console's one colour grammar (see STATUS_TONE in tournaments/season-card).
 const STATUS_TONE = {
   draft: "neutral",
-  setup: "info",
-  registration_open: "success",
+  setup: "neutral",
+  registration_open: "info",
   registration_closed: "warning",
 } as const;
 
@@ -325,7 +326,10 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
       <header className="season-hero">
         <div className="season-hero-main">
           <div className="season-hero-title">
-            <Badge tone={STATUS_TONE[status]} data-testid="competition-status">
+            <Badge
+              tone={finished ? "success" : STATUS_TONE[status]}
+              data-testid="competition-status"
+            >
               {finished ? "completed" : status.replace(/_/g, " ")}
             </Badge>
             {view.auctionLive ? <span className="season-live-pill">AUCTION LIVE</span> : null}
@@ -486,10 +490,14 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
             </span>
           </Link>
         ) : null}
-        <div className="season-tile">
-          <span className="season-tile-value">{view.teamCount}</span>
-          <span className="season-tile-label">Teams</span>
-        </div>
+        {/* A finished season's summary above already states teams and lots;
+            the tiles saying them again read as a second, disagreeing report. */}
+        {!finished ? (
+          <div className="season-tile">
+            <span className="season-tile-value">{view.teamCount}</span>
+            <span className="season-tile-label">Teams</span>
+          </div>
+        ) : null}
         {/* Before an auction exists there is no purse and there are no lots —
             two tiles reporting zeroes about a thing that has not been created. */}
         {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
@@ -502,7 +510,7 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
             <span className="season-tile-label">Purse committed</span>
           </div>
         ) : null}
-        {view.auctionStatus !== null ? (
+        {view.auctionStatus !== null && !finished ? (
           <div className="season-tile">
             <span className="season-tile-value season-tile-accent">
               {view.lotsSold}
@@ -698,7 +706,15 @@ export function OverviewPanel({ view, slug }: { view: SeasonOverviewView; slug: 
             <Button
               ref={publishRef}
               size="touch"
-              variant={view.competition.visibility === "public" ? "ghost" : "primary"}
+              // A finished season's one primary is "Run it again": publishing
+              // its record is worth doing, but it is not the next step.
+              variant={
+                view.competition.visibility === "public"
+                  ? "ghost"
+                  : finished
+                    ? "secondary"
+                    : "primary"
+              }
               loading={busy}
               disabled={!canPublish && view.competition.visibility !== "public"}
               data-testid="toggle-visibility"
@@ -896,11 +912,7 @@ function Retrospective({
         >
           Replay the auction
         </Link>
-        {view.viewer.canSeeMoney ? (
-          <ButtonLink href={`/seasons/${slug}/money`} variant="secondary">
-            View results
-          </ButtonLink>
-        ) : null}
+        {/* "View results" lives in the hero above, once. */}
         {view.viewer.canManage ? (
           <Button
             size="touch"

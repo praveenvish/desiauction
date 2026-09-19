@@ -20,10 +20,16 @@ import type { CompetitionSummary } from "../../server/competition/competitions";
  * season card is drawn; if a third surface needs them they should move to a
  * module of their own rather than being copied a second time.
  */
+/*
+ * One colour grammar across the console (launch polish, Phase 4): grey is not
+ * started, blue is open for people to act, amber is waiting on the next step,
+ * green is done, red is live or overdue. "Registration open" used to be green,
+ * which read as "finished" beside a settled season's green.
+ */
 export const STATUS_TONE = {
   draft: "neutral",
-  setup: "info",
-  registration_open: "success",
+  setup: "neutral",
+  registration_open: "info",
   registration_closed: "warning",
 } as const;
 
@@ -67,7 +73,7 @@ export function seasonStatusBadge(
     return { label: "Settled", tone: "success" };
   }
   if (settlement === "settling") {
-    return { label: "Settling", tone: "info" };
+    return { label: "Settling", tone: "warning" };
   }
   return { label: statusLabel(status), tone: statusTone(status) };
 }

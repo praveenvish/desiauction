@@ -59,6 +59,13 @@ interface LiveGate {
   canConduct: boolean;
   canOverride: boolean;
   /**
+   * Runs the SEASON, not only the night (`competition.manage`). An appointed
+   * auctioneer conducts without it: they call lots, pause and close, but the
+   * acts that set the room up or end it for good — abort, issuing a paddle,
+   * minting owner links (which add people to the club) — stay with the owners.
+   */
+  canManage: boolean;
+  /**
    * The teams this person is actually IN this auction for — an accepted owner
    * invitation, a live paddle grant, or a paddle already in hand. Empty for a
    * plain org member, which is now the difference between being in the room and
@@ -192,9 +199,10 @@ export async function auctionMemberGate(slug: string): Promise<LiveGate | null> 
         return null;
       }
       const scope = { orgId: competition.orgId, competitionId: competition.id };
-      const [canConduct, canOverride, teamsOf] = await Promise.all([
+      const [canConduct, canOverride, canManage, teamsOf] = await Promise.all([
         canCompetition(db, session.personId, scope, "auction.conduct"),
         canCompetition(db, session.personId, scope, "auction.override"),
+        canCompetition(db, session.personId, scope, "competition.manage"),
         participantTeamIds(db, auction.id, session.personId),
       ]);
       return {
@@ -203,6 +211,7 @@ export async function auctionMemberGate(slug: string): Promise<LiveGate | null> 
         auction,
         canConduct,
         canOverride,
+        canManage,
         myTeamIds: teamsOf.all,
         planTeamIds: teamsOf.plan,
       };
@@ -495,6 +504,14 @@ const CONDUCT_ONLY = new Set([
   "UndoLastAction",
 ]);
 
+// Conduct commands an appointed auctioneer may NOT send (security review,
+// launch Phase 5): aborting is terminal for the season's auction, and
+// IssuePaddle takes a person id from the client — an auctioneer could hand
+// themselves an ownerless team's paddle and spend its purse. Both need the
+// season's manager. (GrantPaddle stays conduct: the engine only grants to a
+// person who accepted an owner invitation for that team.)
+const MANAGE_ONLY = new Set(["AbortAuction", "IssuePaddle"]);
+
 // Token-flow commands never travel the generic gateway: invitations mint
 // secrets (dedicated action returns the URL) and acceptance must present the
 // TOKEN, not an invite id (owner-actions.ts owns both).
@@ -526,6 +543,9 @@ export async function submitAuctionCommand(
     return { commandId, accepted: false, reason: "unknown_command", version: 0 };
   }
   if (CONDUCT_ONLY.has(type) && !gate.canConduct) {
+    return { commandId, accepted: false, reason: "not_authorized", version: 0 };
+  }
+  if (MANAGE_ONLY.has(type) && !gate.canManage) {
     return { commandId, accepted: false, reason: "not_authorized", version: 0 };
   }
   // The highest-friction action: undo demands the override capability too.

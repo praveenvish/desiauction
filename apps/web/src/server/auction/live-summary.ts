@@ -7,6 +7,7 @@ import {
 } from "@desiauction/core";
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "../competition/shown-name";
 
 // PX-6 live-experience reads (thin, additive, spectator-safe). The snapshot
 // stream carries live state but only the LAST lot outcome — late joiners need
@@ -55,7 +56,7 @@ export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedL
       registrationId: lots.registrationId,
       lotNumber: lots.lotNumber,
       seq: lots.seq,
-      playerName: people.name,
+      playerName: shownName,
       role: registrations.role,
       status: lots.status,
       soldPrice: lots.soldPrice,
@@ -114,8 +115,8 @@ export async function lotMediaOf(
     .select({
       lotId: lots.id,
       number: registrations.registrationNumber,
-      photoKey: people.photoUrl,
-      photoConsentAt: people.photoConsentAt,
+      photoKey: shownPhotoKey,
+      photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
     })
     .from(lots)
@@ -168,7 +169,7 @@ export async function preSignedPlayers(db: Db, competitionId: string): Promise<P
   const rows = await db
     .select({
       registrationId: registrations.id,
-      playerName: people.name,
+      playerName: shownName,
       role: registrations.role,
       teamId: registrations.teamId,
       isIcon: registrations.isIcon,
@@ -186,7 +187,7 @@ export async function preSignedPlayers(db: Db, competitionId: string): Promise<P
         or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
       ),
     )
-    .orderBy(asc(people.name));
+    .orderBy(asc(shownName));
   return rows.flatMap((row) =>
     // A pre-signed marker without a team is an organizer mid-edit, not a squad
     // member: drop it rather than invent a franchise for them.

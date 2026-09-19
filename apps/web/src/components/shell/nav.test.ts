@@ -72,13 +72,15 @@ describe("rail", () => {
 });
 
 describe("competition tabs", () => {
-  it("builds the seven organizer tabs and resolves the active one", () => {
+  it("builds the eight organizer tabs and resolves the active one", () => {
     const tabs = competitionTabs("mpl");
     expect(tabs.map((tab) => tab.key)).toEqual([
       "overview",
       "teams",
       "registrations",
       "fixtures",
+      // Who played each match, beside the matches.
+      "lineups",
       // The table sits beside the fixtures it is derived from.
       "standings",
       "auction",
@@ -89,6 +91,7 @@ describe("competition tabs", () => {
     expect(activeCompetitionTab("/seasons/mpl/teams", "mpl")).toBe("teams");
     expect(activeCompetitionTab("/seasons/mpl/registrations", "mpl")).toBe("registrations");
     expect(activeCompetitionTab("/seasons/mpl/fixtures/calendar", "mpl")).toBe("fixtures");
+    expect(activeCompetitionTab("/seasons/mpl/lineups", "mpl")).toBe("lineups");
     expect(activeCompetitionTab("/seasons/mpl/standings", "mpl")).toBe("standings");
     expect(activeCompetitionTab("/seasons/mpl/reviews", "mpl")).toBe("reviews");
     expect(activeCompetitionTab("/seasons/mpl/auction/ledger", "mpl")).toBe("auction");
@@ -99,6 +102,14 @@ describe("competition tabs", () => {
     // underlined Overview over a page that was not the overview.
     expect(activeCompetitionTab("/seasons/mpl/posters", "mpl")).toBe("");
     expect(activeCompetitionTab("/seasons/mpl/register", "mpl")).toBe("");
+  });
+
+  it("a member who does not manage the club is not offered the roster tabs", () => {
+    const keys = competitionTabs("mpl", false, false).map((tab) => tab.key);
+    expect(keys).not.toContain("registrations");
+    expect(keys).not.toContain("lineups");
+    expect(keys).toContain("fixtures");
+    expect(keys).toContain("standings");
   });
 
   // PX-7: Money is absent without settlement.view — never rendered-then-disabled.
@@ -114,6 +125,7 @@ describe("competition tabs", () => {
       "teams",
       "registrations",
       "fixtures",
+      "lineups",
       "standings",
       "auction",
       "reviews",
@@ -351,7 +363,11 @@ describe("careerTitle", () => {
   it("refuses a sport this platform has no pack for", () => {
     // Rather than confidently titling a page for a sport that cannot exist.
     expect(careerTitle("/me/quidditch")).toBeNull();
-    expect(careerTitle("/me")).toBeNull();
+  });
+
+  it("titles the all-sports hub", () => {
+    // /me used to be a 404 with no index; it is the "My sports" hub now.
+    expect(careerTitle("/me")).toBe("My sports");
   });
 
   it("ignores paths that are not a career page", () => {

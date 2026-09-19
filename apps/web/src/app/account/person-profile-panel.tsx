@@ -44,7 +44,7 @@ export function PersonProfilePanel({ profile }: { profile: PlayerProfile }) {
     <Card className="account-card" data-testid="cricket-profile-panel">
       <h2>Player profile</h2>
       <p className="account-prose">
-        About you, remembered once — the next registration form starts filled in. How you PLAY is
+        About you, remembered once — the next registration form starts filled in. How you play is
         below, per sport, because that answer is different in each. Every field is optional.
       </p>
       <form action={formAction} className="cricket-profile-form">

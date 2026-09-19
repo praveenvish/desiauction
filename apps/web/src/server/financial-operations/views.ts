@@ -337,7 +337,9 @@ export async function deliveriesView(
   const requestedRows = await db
     .select({
       dispatchId: finopsEvents.streamId,
-      atMs: sql<number>`min(${finopsEvents.atMs})`,
+      // bigint arrives from postgres.js as a STRING; unconverted it rendered
+      // "Invalid Date" on the deliveries desk (design review, 2026-09-19).
+      atMs: sql<number>`min(${finopsEvents.atMs})`.mapWith(Number),
     })
     .from(finopsEvents)
     .where(and(eq(finopsEvents.orgId, orgId), eq(finopsEvents.streamType, "dispatch")))
@@ -601,7 +603,9 @@ export async function documentDetailView(
   const requestedRows = await db
     .select({
       dispatchId: finopsEvents.streamId,
-      atMs: sql<number>`min(${finopsEvents.atMs})`,
+      // bigint arrives from postgres.js as a STRING; unconverted it rendered
+      // "Invalid Date" on the deliveries desk (design review, 2026-09-19).
+      atMs: sql<number>`min(${finopsEvents.atMs})`.mapWith(Number),
     })
     .from(finopsEvents)
     .where(and(eq(finopsEvents.orgId, orgId), eq(finopsEvents.streamType, "dispatch")))

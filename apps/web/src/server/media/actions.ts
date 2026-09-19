@@ -7,8 +7,7 @@ import {
   type AllowedImageType,
   type MediaSubject,
 } from "@desiauction/core";
-import { auditLog, newId, people, withTenantDb } from "@desiauction/db";
-import { eq } from "drizzle-orm";
+import { auditLog, newId, withTenantDb } from "@desiauction/db";
 import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
@@ -16,7 +15,9 @@ import { publicCompetitionBySlug, resolveMemberCompetition } from "../competitio
 import { dbHandle } from "../db";
 import {
   ForbiddenError,
+  clearEntryPhoto,
   clearPlayerPhoto,
+  currentPlayerPhotoKey,
   persistMediaKey,
   requireMediaWrite,
   resolveMediaSubject,
@@ -60,7 +61,13 @@ export async function requestMediaUpload(input: UploadRequestInput): Promise<Upl
       dbHandle,
       { personId: session.personId, orgId: competition.orgId },
       async (db) => {
-        const resolved = await resolveMediaSubject(db, competition, input.subject, input.subjectId);
+        const resolved = await resolveMediaSubject(
+          db,
+          competition,
+          input.subject,
+          input.subjectId,
+          session.personId,
+        );
         if (resolved === null) {
           throw new ForbiddenError();
         }
@@ -107,7 +114,13 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
       dbHandle,
       { personId: session.personId, orgId: competition.orgId },
       async (db) => {
-        const resolved = await resolveMediaSubject(db, competition, input.subject, input.subjectId);
+        const resolved = await resolveMediaSubject(
+          db,
+          competition,
+          input.subject,
+          input.subjectId,
+          session.personId,
+        );
         if (resolved === null) {
           throw new ForbiddenError();
         }
@@ -183,17 +196,23 @@ export async function removePlayerPhoto(
       dbHandle,
       { personId: session.personId, orgId: competition.orgId },
       async (db) => {
-        const resolved = await resolveMediaSubject(db, competition, "player", input.registrationId);
+        const resolved = await resolveMediaSubject(
+          db,
+          competition,
+          "player",
+          input.registrationId,
+          session.personId,
+        );
         if (resolved === null) {
           throw new ForbiddenError();
         }
         await requireMediaWrite(db, session.personId, competition, "player", resolved);
-        const [row] = await db
-          .select({ photoUrl: people.photoUrl })
-          .from(people)
-          .where(eq(people.id, resolved.storageSubjectId))
-          .limit(1);
-        await clearPlayerPhoto(db, resolved.storageSubjectId);
+        const removed = await currentPlayerPhotoKey(db, resolved);
+        if (resolved.entryPhoto !== undefined) {
+          await clearEntryPhoto(db, resolved.entryPhoto.registrationId);
+        } else {
+          await clearPlayerPhoto(db, resolved.storageSubjectId);
+        }
         await db.insert(auditLog).values({
           id: newId(),
           actor: session.personId,
@@ -203,7 +222,7 @@ export async function removePlayerPhoto(
           subject: resolved.storageSubjectId,
           meta: { subject: "player", competitionId: competition.id },
         });
-        return row?.photoUrl ?? null;
+        return removed;
       },
     );
     // Consent is already withdrawn (DB committed). Object deletion is best-effort

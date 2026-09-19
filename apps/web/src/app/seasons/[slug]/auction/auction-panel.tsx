@@ -21,6 +21,7 @@ import {
   type AuctionSetupFieldErrors,
 } from "../../../../server/auction/auction-setup";
 import { formatTime } from "../../../../lib/format-date";
+import { compactINR, exactINR } from "../../../../lib/inr";
 import { AbortDialog } from "./abort-dialog";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 import { useHydrated } from "../../../../lib/use-hydrated";
@@ -61,6 +62,23 @@ const AUCTION_NEXT: Partial<Record<string, { command: string; label: string }[]>
     { command: "complete", label: "Close auction" },
   ],
 };
+
+/**
+ * The figure a rupee field holds, read back in grouped rupees ("₹2,00,00,000 ·
+ * ₹2 Cr"). A purse typed as 20000000 is one missing zero from a tenth of the
+ * league it meant; the read-back is how an organizer sees that before it
+ * locks. Nothing for a value the server would refuse anyway.
+ */
+function rupeeReadBack(value: string): { help: string } | Record<string, never> {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return {};
+  const inPaise = Number(trimmed) * 100;
+  if (!Number.isSafeInteger(inPaise)) return {};
+  return {
+    help:
+      inPaise >= 10_000_000 ? `${exactINR(inPaise)} · ${compactINR(inPaise)}` : exactINR(inPaise),
+  };
+}
 
 export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: AuctionDashboard }) {
   const router = useRouter();
@@ -228,7 +246,9 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
             THIS auction can never go live again; it is not a promise that the
             season is over.
         */}
-        {(view === null || view.auction.status === "abandoned") && viewer.canConduct ? (
+        {/* Setting the room up is the season manager's act; an appointed
+            auctioneer runs the night it produces. */}
+        {(view === null || view.auction.status === "abandoned") && viewer.canManage ? (
           <div className="auction-setup" data-testid="auction-setup">
             {/* DA-05: these are the numbers a league negotiates, and until now
                 every auction took ₹2 Cr purses, 8–15 squads and three fixed
@@ -245,6 +265,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="pursePerTeam"
                 inputMode="numeric"
                 value={purse}
+                {...rupeeReadBack(purse)}
                 error={fieldErrors["pursePerTeam"]}
                 onChange={(event) => {
                   setPurse(event.target.value);
@@ -297,6 +318,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 name="basePriceDefault"
                 inputMode="numeric"
                 value={baseDefault}
+                {...rupeeReadBack(baseDefault)}
                 error={fieldErrors["basePriceDefault"]}
                 onChange={(event) => {
                   setBaseDefault(event.target.value);
@@ -395,7 +417,7 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 config on purpose — a switch flipped mid-season is not a rule of
                 the night. Layers above (platform, club, deploy) can only be
                 read here, so the row says when one of them has decided. */}
-            {viewer.canConduct && dashboard.ownerPlans !== undefined ? (
+            {viewer.canManage && dashboard.ownerPlans !== undefined ? (
               <label className="plan-switch" htmlFor="owner-plans-switch">
                 <input
                   id="owner-plans-switch"
@@ -494,7 +516,8 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                     </Button>
                   ),
                 )}
-                {view.auction.status !== "completed" &&
+                {viewer.canManage &&
+                view.auction.status !== "completed" &&
                 view.auction.status !== "reconciled" &&
                 view.auction.status !== "abandoned" ? (
                   /* Behind a confirmation now. This is the catastrophic exit —
@@ -607,7 +630,9 @@ export function AuctionPanel({ slug, dashboard }: { slug: string; dashboard: Auc
                 })}
               </ul>
             )}
-            {viewer.canConduct ? (
+            {/* Issuing a paddle hands its purse to whoever clicks — the
+                season manager's act, never the appointed auctioneer's. */}
+            {viewer.canManage ? (
               <div className="date-row">
                 <Select
                   label="Team"

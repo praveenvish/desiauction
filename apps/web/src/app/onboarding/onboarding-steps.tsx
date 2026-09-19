@@ -61,17 +61,6 @@ export function OnboardingPanel({
         {/* Where the name gate interrupted this person. Re-validated on the
             server (`safeNext`) — a hidden field is user-controlled. */}
         <input type="hidden" name="next" value={next} />
-        <p className="onboarding-hint">
-          Signed in as <strong>{personContact({ phone, email })}</strong> — verified. ·{" "}
-          <button
-            type="button"
-            className="onboarding-signout"
-            data-testid="onboarding-signout"
-            onClick={() => void logoutAction()}
-          >
-            Not you? Sign out
-          </button>
-        </p>
         <Field
           ref={inputRef}
           label="What should we call you?"
@@ -79,7 +68,7 @@ export function OnboardingPanel({
           required
           autoFocus
           autoComplete="name"
-          placeholder="Rohan Kulkarni"
+          placeholder="e.g. Rohan Kulkarni"
           // Login has always preserved the phone across a rejected submit; this
           // field threw the typed name away and made the person start again.
           defaultValue={state.name ?? ""}
@@ -89,6 +78,18 @@ export function OnboardingPanel({
         <Button type="submit" size="touch" loading={pending}>
           Continue
         </Button>
+        <p className="onboarding-hint">
+          Signed in as <span className="onboarding-contact">{personContact({ phone, email })}</span>{" "}
+          ·{" "}
+          <button
+            type="button"
+            className="onboarding-signout"
+            data-testid="onboarding-signout"
+            onClick={() => void logoutAction()}
+          >
+            Not you? Sign out
+          </button>
+        </p>
       </form>
     </>
   );

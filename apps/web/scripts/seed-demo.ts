@@ -92,6 +92,9 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capabilities.js";
 import { auctionReady } from "../src/server/auction/auction-ready.js";
 import { FINOPS_STORAGE_DIR } from "../src/server/financial-operations/deps.js";
+import { createFixture } from "../src/server/competition/fixture-aggregate.js";
+import { saveLineup } from "../src/server/competition/lineups.js";
+import { recordFixtureResult } from "../src/server/competition/results.js";
 import { settlementDeps } from "../src/server/settlement/deps.js";
 import {
   attestManualCapture,
@@ -215,6 +218,21 @@ async function resetDemoOrg(): Promise<void> {
   await db.delete(teams).where(eq(teams.orgId, orgId));
   await db.delete(competitions).where(eq(competitions.orgId, orgId));
   await db.delete(invites).where(eq(invites.orgId, orgId));
+  // Season-scoped grants (0076, the auctioneer) are keyed on the season.
+  await db
+    .delete(grants)
+    .where(
+      and(
+        eq(grants.scopeType, "tournament"),
+        inArray(
+          grants.scopeId,
+          db
+            .select({ id: competitions.id })
+            .from(competitions)
+            .where(eq(competitions.orgId, orgId)),
+        ),
+      ),
+    );
   await db.delete(grants).where(and(eq(grants.scopeType, "org"), eq(grants.scopeId, orgId)));
   await db.delete(orgMembers).where(eq(orgMembers.orgId, orgId));
   await db.delete(auditLog).where(eq(auditLog.scopeId, orgId));
@@ -325,6 +343,16 @@ async function main(): Promise<void> {
     endsOn: "2026-10-31",
     createdBy: founder,
   });
+  // Bidder C runs the Premier League's auction night without owning the club
+  // (0076): the appointed-auctioneer role, signable-into from a fresh setup.
+  await db.insert(grants).values({
+    id: newId(),
+    personId: ids["bidderC"] as string,
+    scopeType: "tournament",
+    scopeId: leagueId,
+    capabilitySet: "auction:conductor",
+    grantedBy: founder,
+  });
   const leagueTeams = ["Demo Tigers", "Demo Falcons", "Demo Panthers", "Demo Wolves"].map(
     (name) => ({ id: newId(), orgId, competitionId: leagueId, name, createdBy: founder }),
   );
@@ -408,6 +436,27 @@ async function main(): Promise<void> {
   const created = await createAuction(db, cup, ready, founder, DEFAULT_AUCTION_CONFIG);
   if (!created.ok) throw new Error(`createAuction: ${created.reason}`);
   let auction = (await auctionOf(db, cupId)) as AuctionRecord;
+  // Two TEAM OWNERS, as an accepted owner invite leaves them (acceptOwnerJoin
+  // writes exactly these fields), so every role the console distinguishes can
+  // be signed into from a fresh setup: Bidder A owns Cup Kings, Bidder B owns
+  // Cup Chargers. The founder still holds both paddles below — the
+  // conductor-on-a-laptop case — which is precisely what the plan-privacy rule
+  // (planTeamIds) has to keep from turning into a view of the owners' plans.
+  for (const [index, key] of (["bidderA", "bidderB"] as const).entries()) {
+    const team = cupTeams[index];
+    if (team === undefined) continue;
+    await db.insert(auctionOwnerInvites).values({
+      id: newId(),
+      orgId,
+      auctionId: auction.id,
+      teamId: team.id,
+      tokenHash: `seed-demo-${auction.id}-${team.id}`,
+      createdBy: founder,
+      expiresAt: new Date(Date.now() + 30 * 86_400_000),
+      acceptedBy: ids[key] as string,
+      acceptedAt: new Date(),
+    });
+  }
   const cupPaddles: string[] = [];
   for (const team of cupTeams) {
     const issued = await issuePaddle(db, auction, founder, team.id, founder);
@@ -444,6 +493,57 @@ async function main(): Promise<void> {
     true,
   );
   if (!completed.ok) throw new Error(`complete: ${completed.reason}`);
+
+  // --- Two played matches with lineups (launch polish, Phase 3) ---------------
+  // So a player's profile has matches to show from a fresh setup. Fixtures are
+  // created by the real aggregate and results/lineups recorded by the real
+  // writers; the ONE shortcut is the status jump to `completed`, because the
+  // lifecycle's guards (ground, kickoff window) are fixture-desk concerns this
+  // exemplar does not need to stage.
+  const [kings, chargers] = cupTeams;
+  if (kings !== undefined && chargers !== undefined) {
+    const squadRows = await db
+      .select({ id: registrations.id, teamId: registrations.teamId })
+      .from(registrations)
+      .where(and(eq(registrations.competitionId, cupId), eq(registrations.status, "approved")));
+    for (const [round, [home, away, outcome]] of (
+      [
+        [kings, chargers, "home_win"],
+        [chargers, kings, "away_win"],
+      ] as const
+    ).entries()) {
+      const made = await createFixture(db, cup, founder, {
+        homeTeamId: home.id,
+        awayTeamId: away.id,
+        kickoffAt: `2026-02-${String(7 + round * 7).padStart(2, "0")}T09:30`,
+        round: round + 1,
+      });
+      if (!made.ok) throw new Error(`createFixture: ${made.reason}`);
+      await db.update(fixtures).set({ status: "completed" }).where(eq(fixtures.id, made.fixtureId));
+      const recorded = await recordFixtureResult(db, {
+        orgId,
+        fixtureId: made.fixtureId,
+        actorId: founder,
+        result: {
+          outcome,
+          homeScore: { runs: 142, wickets: 6, balls: 120 },
+          awayScore: { runs: outcome === "home_win" ? 128 : 146, wickets: 8, balls: 120 },
+        },
+      });
+      if (!recorded.ok) throw new Error(`recordFixtureResult: ${recorded.reason}`);
+      for (const team of [home, away]) {
+        const saved = await saveLineup(db, {
+          competitionId: cupId,
+          orgId,
+          fixtureId: made.fixtureId,
+          teamId: team.id,
+          registrationIds: squadRows.filter((row) => row.teamId === team.id).map((row) => row.id),
+          actorId: founder,
+        });
+        if (!saved.ok) throw new Error(`saveLineup: ${saved.reason}`);
+      }
+    }
+  }
 
   // --- Settlement: case → obligations → manual payments → journal -------------
   const sDeps = settlementDeps(db, { gateways: {} });
@@ -645,9 +745,9 @@ DEMO DATA READY (repeatable — rerun any time)
     founder: "org:owner + settlement:controller + finops:controller + platform:admin",
     admin: "org:owner (NOT a platform admin — /admin 404s for them)",
     organizer: "org:staff",
-    bidderA: "viewer (claims a paddle via owner invite)",
-    bidderB: "viewer (claims a paddle via owner invite)",
-    bidderC: "viewer (claims a paddle via owner invite)",
+    bidderA: "viewer · owner of Cup Kings (demo-cup-settled)",
+    bidderB: "viewer · owner of Cup Chargers (demo-cup-settled)",
+    bidderC: "viewer · auctioneer for demo-premier-league",
     viewer: "viewer",
   };
   for (const user of USERS) {

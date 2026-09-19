@@ -36,13 +36,13 @@ export interface ProfilePanelProps {
  */
 const ITEM_LABELS: Record<ProfileItem, { label: string; hint?: string }> = {
   name: { label: "Name set" },
-  photo: { label: "Profile photo", hint: "— added when you register for a season" },
-  role: { label: "Playing role", hint: "— in Cricket profile below" },
-  date_of_birth: { label: "Date of birth", hint: "— in Cricket profile below" },
-  style: { label: "Batting or bowling style", hint: "— in Cricket profile below" },
-  location: { label: "City", hint: "— in Cricket profile below" },
-  email: { label: "Verified email", hint: "— for receipts and documents" },
-  passkey: { label: "Passkey added", hint: "— fastest sign-in, below" },
+  photo: { label: "Profile photo", hint: "added when you register for a season" },
+  role: { label: "Playing role", hint: "under Sports" },
+  date_of_birth: { label: "Date of birth", hint: "under Player profile" },
+  style: { label: "Batting or bowling style", hint: "under Sports" },
+  location: { label: "City", hint: "under Player profile" },
+  email: { label: "Verified email", hint: "for receipts and documents" },
+  passkey: { label: "Passkey", hint: "the fastest way to sign in" },
 };
 
 /**
@@ -87,12 +87,11 @@ export function ProfilePanel({
   return (
     <Card className="profile-card" data-testid="profile-panel">
       <div className="profile-head">
-        <PlayerImage name={hasName ? name : "New member"} seed={personId} size="md" shape="round" />
+        <PlayerImage name={hasName ? name : "New member"} seed={personId} size="lg" shape="round" />
         <div className="profile-id">
-          <h2>Profile</h2>
-          <p className="profile-name" data-testid="account-name">
-            {hasName ? name : "—"}
-          </p>
+          <h2 className="profile-name" data-testid="account-name">
+            {hasName ? name : "Your profile"}
+          </h2>
           <p className="profile-phone">
             {/*
               The one screen whose entire job is "is this YOUR number?" printed
@@ -109,10 +108,44 @@ export function ProfilePanel({
         </div>
         <div className="profile-signout">{signOut}</div>
       </div>
-      {/* Beside the number it changes, and behind a disclosure. This is the one
-          change that can take an account away from somebody — it does not
-          belong in the same open form as the display name. */}
-      <PhoneChange current={phone} />
+      {/* PI-1: the real checklist — everything the product actually uses,
+          derived per read by core's profileCompleteness. Up top, as a meter:
+          it is the one thing on this page that says what to do next. */}
+      <div className="profile-completion" data-testid="profile-completion">
+        <div className="profile-completion-head">
+          <span className="profile-completion-label">
+            Profile {completeness.done}/{completeness.total} complete
+          </span>
+          <span className="profile-meter" aria-hidden>
+            <i
+              style={{
+                width: `${String(Math.round((completeness.done / Math.max(1, completeness.total)) * 100))}%`,
+              }}
+            />
+          </span>
+        </div>
+        <ul>
+          {PROFILE_ITEMS.map((item) => {
+            const itemDone = !missing.has(item);
+            const { label, hint } = ITEM_LABELS[item];
+            return (
+              <li key={item} data-done={itemDone}>
+                {itemDone ? (
+                  <IconCheckCircle size={16} className="icon-lead" />
+                ) : (
+                  <IconCircle size={16} className="icon-lead" />
+                )}
+                <span>
+                  {label}
+                  {!itemDone && hint !== undefined ? (
+                    <span className="profile-hint"> · {hint}</span>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
       <form action={formAction} className="profile-form">
         <Field
           label="Display name"
@@ -129,32 +162,10 @@ export function ProfilePanel({
           </Button>
         </div>
       </form>
-      {/* PI-1: the real checklist — everything the product actually uses,
-          derived per read by core's profileCompleteness. */}
-      <div className="profile-completion" data-testid="profile-completion">
-        <span className="profile-completion-label">
-          Profile {completeness.done}/{completeness.total} complete
-        </span>
-        <ul>
-          {PROFILE_ITEMS.map((item) => {
-            const itemDone = !missing.has(item);
-            const { label, hint } = ITEM_LABELS[item];
-            return (
-              <li key={item} data-done={itemDone}>
-                {itemDone ? (
-                  <IconCheckCircle size={16} className="icon-lead" />
-                ) : (
-                  <IconCircle size={16} className="icon-lead" />
-                )}
-                {label}{" "}
-                {!itemDone && hint !== undefined ? (
-                  <span className="profile-hint">{hint}</span>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      {/* Behind a disclosure, under the name. This is the one change that can
+          take an account away from somebody — it does not belong in the same
+          open form as the display name. */}
+      <PhoneChange current={phone} />
     </Card>
   );
 }

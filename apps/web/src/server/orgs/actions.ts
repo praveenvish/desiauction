@@ -1,6 +1,6 @@
 "use server";
 
-import { isCapabilitySet } from "@desiauction/core";
+import { isOrgCapabilitySet } from "@desiauction/core";
 import {
   auctions,
   auditLog,
@@ -555,7 +555,8 @@ export async function issueGrantAction(
   // org, settlement or finops — or the grant is a row that expands to nothing
   // and slips past each engine's own set validation and audit tagging.
   if (
-    !isCapabilitySet(capabilitySet) &&
+    // Org sets only: the auctioneer set is per-season (auctioneer-actions.ts).
+    !isOrgCapabilitySet(capabilitySet) &&
     !isSettlementCapabilitySet(capabilitySet) &&
     !isFinopsCapabilitySet(capabilitySet)
   ) {

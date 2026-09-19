@@ -3,23 +3,23 @@
  */
 
 [data-theme="daylight"] {
-  --text-primary: #2B3145;
-  --text-secondary: #545B74;
-  --text-muted: #545B74;
-  --text-disabled: #A9AEC2;
+  --text-primary: #2B2822;
+  --text-secondary: #58534A;
+  --text-muted: #58534A;
+  --text-disabled: #A9A396;
   --text-inverse: #E8EEF9;
   --text-on-accent: #070A0F;
   --text-on-dark: #F6F9FF;
   --text-on-danger: #FFFFFF;
   --text-accent: #865D12;
-  --text-heading: #171C2E;
-  --surface: #F3F5FB;
+  --text-heading: #1A1814;
+  --surface: #F7F6F2;
   --surface-raised: #FFFFFF;
   --surface-overlay: #FFFFFF;
-  --surface-sunken: #EDEFF6;
+  --surface-sunken: #F0EEE8;
   --surface-inverse: #0B1018;
-  --border-subtle: #E6E8F1;
-  --border-strong: #DBDEEA;
+  --border-subtle: #E7E4DC;
+  --border-strong: #D9D5CA;
   --border-interactive: #B57F14;
   --focus-ring: #865D12;
   --scrim: #070A0F99;
@@ -42,8 +42,8 @@
   --info-subtle: #2673D61A;
   --info-base: #2673D6;
   --info-strong: #1E5AAC;
-  --money-value: #0E1220;
-  --money-spent: #545B74;
+  --money-value: #0F0E0B;
+  --money-spent: #58534A;
   --money-remaining: #15794A;
   --money-frozen: #8F6106;
   --ceremony-gold: #E6B24A;

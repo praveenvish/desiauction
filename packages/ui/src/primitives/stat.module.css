@@ -139,3 +139,26 @@
   color: var(--info-strong);
   border-color: color-mix(in srgb, var(--info-strong) 22%, transparent);
 }
+
+/* Console (launch polish, Phase 4): the figure row is a ruled strip, not a
+   row of shadowed tiles that lift on hover. */
+:global([data-surface="console"]) .row {
+  gap: 0;
+  border-block: 1px solid var(--border-subtle);
+}
+
+:global([data-surface="console"]) .stat,
+:global([data-surface="console"]) .stat:hover {
+  padding: var(--space-4) var(--space-5) var(--space-4) 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+:global([data-surface="console"]) .row > li + li .stat,
+:global([data-surface="console"]) .row > .stat + .stat {
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border-subtle);
+}

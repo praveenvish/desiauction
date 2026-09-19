@@ -631,6 +631,27 @@ a.wordmark:hover .wordmark-glyph {
     0 10px 22px -10px color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
+/* An auction in progress: the rail says so where the room is, in words, with
+   the product's live colour on the dot only (the word carries the meaning). */
+.rail-live {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: auto;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rail-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--live);
+}
+
 .rail-badge {
   flex: none;
   min-width: 20px;
@@ -659,4 +680,105 @@ a.wordmark:hover .wordmark-glyph {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+/* ==========================================================================
+   DAYLIGHT CONSOLE (launch polish, Phase 4): a quiet, light rail.
+   The navy slab with a struck-gold active pill read as a template; the
+   console now sits on a white page with a warm-white rail and a hairline.
+   The rail's own rules keep reading the --identity-* variables — they are
+   simply re-pointed inside the rail, in daylight only. Floodlight (the dark
+   console) keeps the navy rail.
+   ========================================================================== */
+@media (min-width: 720px) {
+  :global([data-theme="daylight"]) .shell {
+    /* The rail column paints the full page height, so a long page never shows
+       the rail stopping halfway down (it is sticky at 100dvh inside). */
+    background: linear-gradient(
+      to right,
+      var(--surface) 247px,
+      var(--border-subtle) 247px,
+      var(--border-subtle) 248px,
+      var(--surface-raised) 248px
+    );
+  }
+
+  /* Floodlight: the same full-height column, in the navy rail's own colour. */
+  :global([data-theme="floodlight"]) .shell {
+    background: linear-gradient(
+      to right,
+      var(--identity-field-deep) 247px,
+      var(--identity-line-soft) 247px,
+      var(--identity-line-soft) 248px,
+      var(--surface) 248px
+    );
+  }
+
+  :global([data-theme="daylight"]) .rail {
+    --identity-field: var(--surface);
+    --identity-field-deep: var(--surface);
+    --identity-glyph: var(--text-heading);
+    --identity-line-soft: var(--border-subtle);
+    --identity-accent: var(--accent);
+    --identity-accent-soft: var(--text-accent);
+
+    background: var(--surface);
+    border-right-color: var(--border-subtle);
+  }
+
+  :global([data-theme="daylight"]) .rail-item {
+    color: var(--text-secondary);
+  }
+
+  :global([data-theme="daylight"]) .rail-item:hover {
+    background: var(--surface-sunken);
+    color: var(--text-heading);
+  }
+
+  :global([data-theme="daylight"]) .rail-item-active,
+  :global([data-theme="daylight"]) .rail-item-active:hover {
+    background: var(--surface-sunken);
+    background-image: none;
+    color: var(--text-heading);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+  }
+
+  /* The one touch of gold in the rail: where you are. */
+  :global([data-theme="daylight"]) .rail-item-active .rail-icon {
+    color: var(--accent);
+  }
+
+  :global([data-theme="daylight"]) .rail-group-label {
+    color: var(--text-secondary);
+  }
+
+  :global([data-theme="daylight"]) .rail-badge,
+  :global([data-theme="daylight"]) .rail-item-active .rail-badge {
+    background: var(--accent-subtle);
+    color: var(--text-accent);
+  }
+}
+
+/* The content area IS the page (all widths): every page wrapper that painted
+   var(--surface) — the old grey slab behind boxed cards — resolves to white
+   here, while the rail outside keeps the warm surface. */
+:global([data-theme="daylight"]) .body {
+  --surface: var(--surface-raised);
+  background: var(--surface-raised);
+}
+
+/* Floodlight rail (launch polish, Phase 4): the navy stays, the struck-gold
+   glowing pill goes — a quiet fill with the gold on the icon, as in daylight. */
+@media (min-width: 720px) {
+  :global([data-theme="floodlight"]) .rail-item-active,
+  :global([data-theme="floodlight"]) .rail-item-active:hover {
+    background: color-mix(in srgb, var(--identity-glyph) 10%, transparent);
+    background-image: none;
+    color: var(--identity-glyph);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--identity-glyph) 12%, transparent);
+  }
+
+  :global([data-theme="floodlight"]) .rail-item-active .rail-icon {
+    color: var(--identity-accent);
+  }
 }

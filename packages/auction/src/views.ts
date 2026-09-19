@@ -21,7 +21,7 @@ import {
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { loadEvents, type AuctionRecord } from "./aggregate";
-import { snapshotRefs } from "./live";
+import { lotPlayerName, snapshotRefs } from "./live";
 
 // Auction read models (M-IP4-1). Read-only, plain frozen shapes — the same
 // discipline as the Competition snapshots. Mutations live ONLY in the
@@ -113,7 +113,7 @@ export async function auctionView(db: Db, auction: AuctionRecord): Promise<Aucti
         id: lots.id,
         lotNumber: lots.lotNumber,
         seq: lots.seq,
-        playerName: people.name,
+        playerName: lotPlayerName,
         role: registrations.role,
         basePrice: lots.basePrice,
         status: lots.status,

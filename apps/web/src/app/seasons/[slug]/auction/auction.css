@@ -2638,3 +2638,73 @@
   height: 32px;
   min-width: 32px;
 }
+
+/* Auctioneer appointment (launch polish, Phase 3) — flat section. */
+.auctioneers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.auctioneers-head h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.auctioneers-head p,
+.auctioneers-none {
+  margin: var(--space-1) 0 0;
+  max-width: 64ch;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.auctioneers-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.auctioneers-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.auctioneers-assign {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.auctioneers-assign label {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.auctioneers-assign select {
+  min-height: 40px;
+  min-width: 220px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.auctioneers-error {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--danger-strong);
+}

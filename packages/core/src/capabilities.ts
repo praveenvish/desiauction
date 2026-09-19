@@ -28,7 +28,7 @@ export type Capability =
   | "venue.manage"
   | "fixture.manage";
 
-export type CapabilitySet = "org:owner" | "org:staff" | "viewer";
+export type CapabilitySet = "org:owner" | "org:staff" | "viewer" | "auction:conductor";
 
 const SETS: Record<CapabilitySet, readonly Capability[]> = {
   "org:owner": [
@@ -58,9 +58,44 @@ const SETS: Record<CapabilitySet, readonly Capability[]> = {
     "fixture.manage",
   ],
   viewer: [],
+  /**
+   * THE AUCTIONEER (launch polish, Phase 3). Issued on a SEASON (scope
+   * "tournament", scope id = the competition), never on the org: the person
+   * runs that one night's room. `auction.conduct` alone: compensating undo
+   * (`auction.override`) stays with the club's owners.
+   *
+   * Conduct is wider than calling lots, so the web tier fences the rest behind
+   * `competition.manage`, which only owners hold (security review, launch
+   * Phase 5): creating the auction (purse, bands), the My plan switch, owner
+   * links (accepting one adds a club member), issuing a paddle, and abort.
+   * A team owner in the season can never be appointed, and an appointee
+   * cannot accept an owner link there — conducting shows every rival's purse.
+   */
+  "auction:conductor": ["auction.conduct"],
 };
 
-export const CAPABILITY_SETS: readonly CapabilitySet[] = ["org:owner", "org:staff", "viewer"];
+export const CAPABILITY_SETS: readonly CapabilitySet[] = [
+  "org:owner",
+  "org:staff",
+  "viewer",
+  "auction:conductor",
+];
+
+/**
+ * The sets that may be granted on an ORG — what the members panel offers and
+ * what an invite may carry. `auction:conductor` is deliberately absent: it is a
+ * per-season grant, and issued on the org it would conduct every season.
+ */
+export type OrgCapabilitySet = "org:owner" | "org:staff" | "viewer";
+export const ORG_CAPABILITY_SETS: readonly OrgCapabilitySet[] = [
+  "org:owner",
+  "org:staff",
+  "viewer",
+];
+
+export function isOrgCapabilitySet(value: string): value is OrgCapabilitySet {
+  return (ORG_CAPABILITY_SETS as readonly string[]).includes(value);
+}
 
 export function isCapabilitySet(value: string): value is CapabilitySet {
   return (CAPABILITY_SETS as readonly string[]).includes(value);
