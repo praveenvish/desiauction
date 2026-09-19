@@ -903,6 +903,16 @@ export async function confirmPhoneChangeAction(
   if (session === null) {
     redirect("/login?next=/account");
   }
+  // STEP-UP AT CONFIRM TOO. Checking only at the request let a stale session
+  // finish a change a fresh session had started — and `previous.phone` is the
+  // client's own state (security review, launch Phase 5).
+  if (!signedInRecently(session)) {
+    return {
+      step: previous.step,
+      ...(previous.phone === undefined ? {} : { phone: previous.phone }),
+      error: SIGN_IN_AGAIN,
+    };
+  }
   const target = previous.phone ?? "";
   const result = await confirmPhoneChange(db, {
     personId: session.personId,

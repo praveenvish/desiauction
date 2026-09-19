@@ -1,9 +1,10 @@
-import { createHash, randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
 
 import { newId, otpCodes, people, type Db } from "@desiauction/db";
 import { normalizePhone } from "@desiauction/core";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
+import { boundSubject, codeDigest } from "./code-digest";
 import type { OtpSender } from "./otp-sender";
 import { logSecurityEvent } from "./security-events";
 
@@ -22,8 +23,21 @@ const MAX_ATTEMPTS = 5;
  */
 export const DEFAULT_GLOBAL_PER_HOUR = 2_000;
 
-export function hashCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
+/**
+ * The stored form of a phone code: keyed, and bound to what it proves — the
+ * purpose, the phone, and for a change the account that asked (code-digest.ts).
+ */
+export function phoneCodeDigest(
+  purpose: OtpPurpose,
+  phone: string,
+  code: string,
+  boundTo?: string,
+): string {
+  return codeDigest(
+    purpose === "login" ? "otp:login" : "otp:phone_change",
+    boundTo === undefined ? phone : boundSubject(boundTo, phone),
+    code,
+  );
 }
 
 /**
@@ -51,6 +65,8 @@ export async function requestOtp(
   requestIp: string | null = null,
   purpose: OtpPurpose = "login",
   globalPerHour: number = DEFAULT_GLOBAL_PER_HOUR,
+  /** The account asking, for a code that proves a CHANGE to that account. */
+  boundTo?: string,
 ): Promise<RequestOtpResult> {
   const normalized = normalizePhone(rawPhone);
   if (!normalized.ok) {
@@ -109,7 +125,7 @@ export async function requestOtp(
   await db.insert(otpCodes).values({
     id: newId(),
     phone,
-    codeHash: hashCode(code),
+    codeHash: phoneCodeDigest(purpose, phone, code, boundTo),
     purpose,
     expiresAt: new Date(now + CODE_TTL_MS),
     requestIp,
@@ -145,6 +161,8 @@ export async function consumeCode(
   phone: string,
   code: string,
   purpose: OtpPurpose = "login",
+  /** Must match the `boundTo` the code was requested with (a change code). */
+  boundTo?: string,
 ): Promise<ConsumeResult> {
   const [candidate] = await db
     .select()
@@ -190,7 +208,7 @@ export async function consumeCode(
     return { ok: false, reason: "locked" };
   }
 
-  if (candidate.codeHash !== hashCode(code)) {
+  if (candidate.codeHash !== phoneCodeDigest(purpose, phone, code, boundTo)) {
     if (reserved.attempts >= MAX_ATTEMPTS) {
       return { ok: false, reason: "locked", lockedOut: true };
     }

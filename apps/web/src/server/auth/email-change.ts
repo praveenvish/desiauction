@@ -1,7 +1,9 @@
-import { createHash, randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
 
 import { emailVerifications, newId, people, type Db } from "@desiauction/db";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
+
+import { boundSubject, codeDigest } from "./code-digest";
 
 /**
  * ADDING AN ADDRESS THE PLATFORM MAY ACTUALLY SEND TO.
@@ -52,10 +54,6 @@ export function normalizeEmail(raw: string): string | null {
     return null;
   }
   return trimmed;
-}
-
-function hashCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
 }
 
 export type EmailVerificationRequest =
@@ -109,7 +107,7 @@ export async function requestEmailVerification(
     id: newId(),
     personId: input.personId,
     email,
-    codeHash: hashCode(code),
+    codeHash: codeDigest("email:email_change", boundSubject(input.personId, email), code),
     // Explicit, though it matches the column default: this flow's codes must
     // never be consumable by sign-in, and saying so here means a future change
     // to the default cannot silently widen what they prove.
@@ -172,7 +170,10 @@ export async function confirmEmailVerification(
   if (reserved === undefined) {
     return { ok: false, reason: "locked" };
   }
-  if (candidate.codeHash !== hashCode(input.code)) {
+  if (
+    candidate.codeHash !==
+    codeDigest("email:email_change", boundSubject(input.personId, candidate.email), input.code)
+  ) {
     if (reserved.attempts >= MAX_ATTEMPTS) {
       return { ok: false, reason: "locked" };
     }

@@ -1,4 +1,4 @@
-import { createHash, randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
 
 import {
   emailVerifications,
@@ -9,6 +9,7 @@ import {
 } from "@desiauction/db";
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
+import { codeDigest } from "./code-digest";
 import { normalizeEmail } from "./email-change";
 import { DEFAULT_GLOBAL_PER_HOUR } from "./otp";
 
@@ -57,10 +58,6 @@ const MAX_PER_HOUR = 5;
 /** Per IP, so one host cannot enumerate or spray across many addresses. */
 const MAX_PER_HOUR_PER_IP = 20;
 const MAX_ATTEMPTS = 5;
-
-function hashCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
-}
 
 /**
  * `{ ok: true }` carries NO signal about whether an account exists.
@@ -188,7 +185,7 @@ export async function requestEmailLogin(
     // form, and would take an address on behalf of somebody who never replies.
     personId: person?.id ?? null,
     email,
-    codeHash: hashCode(code),
+    codeHash: codeDigest("email:login", email, code),
     purpose: "login",
     expiresAt: new Date(Date.now() + CODE_TTL_MS),
     ...(input.requestIp !== undefined && input.requestIp !== null
@@ -267,7 +264,7 @@ export async function verifyEmailLogin(
   if (reserved === undefined) {
     return { ok: false, reason: "locked" };
   }
-  if (candidate.codeHash !== hashCode(input.code)) {
+  if (candidate.codeHash !== codeDigest("email:login", email, input.code)) {
     if (reserved.attempts >= MAX_ATTEMPTS) {
       return { ok: false, reason: "locked" };
     }
