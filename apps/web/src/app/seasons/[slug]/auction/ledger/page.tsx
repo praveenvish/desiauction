@@ -1,5 +1,5 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { ButtonLink } from "@desiauction/ui";
+import { ButtonLink, PlayerImage } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { ledgerView } from "../../../../../server/auction/conduct-actions";
@@ -89,7 +89,21 @@ export default async function LedgerPage({
                   <td data-label="Paddle">{row.paddleNumber ?? "—"}</td>
                   <td data-label="Team">{row.teamName ?? "—"}</td>
                   <td data-label="Lot">
-                    {row.lotNumber !== null ? `${row.lotNumber} ${row.playerName ?? ""}` : "—"}
+                    {row.lotNumber !== null ? (
+                      <span className="ledger-lot">
+                        <PlayerImage
+                          name={row.playerName ?? row.lotNumber}
+                          seed={view.faces[row.lotNumber]?.registrationId ?? row.lotNumber}
+                          src={view.faces[row.lotNumber]?.photoUrl}
+                          size="xs"
+                          shape="round"
+                          decorative
+                        />
+                        {`${row.lotNumber} ${row.playerName ?? ""}`}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td data-label="Bid">
                     {row.amount !== null ? formatPaiseINR(paise(row.amount)) : "—"}

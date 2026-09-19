@@ -332,6 +332,12 @@
   border-radius: var(--radius-md, 12px);
   background: color-mix(in srgb, var(--surface-raised) 40%, transparent);
 }
+.board-recent-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
 .board-recent-name {
   font-size: var(--text-2xl-size);
   font-weight: 700;

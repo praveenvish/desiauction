@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast, Dialog, Field } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast, Dialog, Field, PlayerImage } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -11,6 +11,7 @@ import {
   resolveKeyUp,
 } from "../../../../../components/auction/cockpit-keys";
 import { formatDateTime } from "../../../../../lib/format-date";
+import { lotSeed } from "../../../../../lib/player-seed";
 import { personContact } from "../../../../../lib/person-label";
 import { GavelButton, type GavelHandle } from "./gavel-button";
 import type { CockpitView, OwnerAcceptance } from "../../../../../server/auction/conduct-actions";
@@ -409,6 +410,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
           remainingMs={remainingMs}
           variant="shell"
           offline={offline}
+          lotMedia={view.lotMedia}
         />
       </PageStatus>
 
@@ -436,6 +438,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               snapshot={snapshot}
               ceremony={ceremony}
               remainingMs={remainingMs}
+              lotMedia={view.lotMedia}
             />
 
             {/* THE CONDUCT CARD, in three tiers.
@@ -653,6 +656,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                 {queue.map((entry) => (
                   <li key={entry.lotId} data-testid={`queue-${entry.lotNumber}`}>
                     <Badge tone="info">{entry.lotNumber}</Badge>
+                    <PlayerImage
+                      name={entry.playerName ?? "Unnamed"}
+                      seed={lotSeed(entry.lotId, view.lotMedia)}
+                      src={view.lotMedia[entry.lotId]?.photoUrl}
+                      size="sm"
+                      shape="round"
+                      decorative
+                    />
                     <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
                     <span className="competitions-hint">
                       base {formatPaiseINR(paise(entry.basePrice))}
@@ -730,6 +741,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     .map((entry) => (
                       <li key={entry.id} data-testid={`resolve-${entry.lotNumber}`}>
                         <Badge tone="warning">{entry.lotNumber}</Badge>
+                        <PlayerImage
+                          name={entry.playerName ?? "Unnamed"}
+                          seed={lotSeed(entry.id, view.lotMedia)}
+                          src={view.lotMedia[entry.id]?.photoUrl}
+                          size="sm"
+                          shape="round"
+                          decorative
+                        />
                         <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
                         <span className="competitions-hint">{entry.status}</span>
                         <span className="queue-actions">
@@ -1012,6 +1031,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       <SquadBoard
         roles={view.roles}
         teams={view.teams}
+        lotMedia={view.lotMedia}
         preSigned={view.preSigned}
         resolved={feed.resolved}
         snapshot={snapshot}

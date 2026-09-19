@@ -35,6 +35,7 @@ import {
   type PreSignedPlayer,
   type ResolvedLot,
   lotMediaOf,
+  type LotMedia,
 } from "./live-summary";
 import { planLots, planRulesOf, targetsOf, toLivePlanLot, type LivePlan } from "./owner-plan";
 
@@ -249,7 +250,7 @@ export interface LiveAuctionView {
    * player already sees on their own public page — not the queue position the
    * snapshot calls `lotNumber`.
    */
-  lotMedia: Record<string, { photoUrl: string | null; number: string | null }>;
+  lotMedia: Record<string, LotMedia>;
   /** The default paddle (first issued); the room may switch within myPaddles. */
   myPaddle: { paddleId: string; paddleNumber: string; teamId: string; teamName: string } | null;
   /** Every paddle this person holds — one per team they were issued for. */
@@ -400,7 +401,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
             ),
           ),
         resolvedLots(db, gate.auction.id),
-        preSignedPlayers(db, gate.competition.id),
+        preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
         lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
         livePlanFor(db, gate),
       ]),

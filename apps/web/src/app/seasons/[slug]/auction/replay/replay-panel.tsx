@@ -9,11 +9,12 @@ import {
   type AuctionSnapshot,
   type CurrentLotBids,
 } from "@desiauction/core";
-import { Badge, Card } from "@desiauction/ui";
+import { Badge, Card, PlayerImage } from "@desiauction/ui";
 import { useMemo, useState } from "react";
 
 import type { ReplayViewerData } from "../../../../../server/auction/conduct-actions";
 import { formatTime } from "../../../../../lib/format-date";
+import { lotSeed } from "../../../../../lib/player-seed";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 
 // THE REPLAY VIEWER (M-IP4-3). The founder scrubs through the immutable event
@@ -136,7 +137,7 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
       </Card>
 
       {frame.ok ? (
-        <ReplayFrame snapshot={frame.snapshot} />
+        <ReplayFrame snapshot={frame.snapshot} lotMedia={data.lotMedia} />
       ) : (
         <Card>
           <p data-testid="replay-failed">
@@ -158,7 +159,13 @@ const STATUS_TONE = {
   abandoned: "danger",
 } as const;
 
-function ReplayFrame({ snapshot }: { snapshot: AuctionSnapshot }) {
+function ReplayFrame({
+  snapshot,
+  lotMedia,
+}: {
+  snapshot: AuctionSnapshot;
+  lotMedia: ReplayViewerData["lotMedia"];
+}) {
   return (
     <div className="cockpit-grid">
       <Card data-testid="replay-frame">
@@ -173,10 +180,20 @@ function ReplayFrame({ snapshot }: { snapshot: AuctionSnapshot }) {
         </p>
         {snapshot.currentLot !== null ? (
           <>
-            <p className="registration-name" data-testid="replay-lot">
-              {snapshot.currentLot.lotNumber} · {snapshot.currentLot.playerName ?? "Unnamed"} ·{" "}
-              {snapshot.currentLot.status.replace(/_/g, " ")}
-            </p>
+            <div className="replay-subject">
+              <PlayerImage
+                name={snapshot.currentLot.playerName ?? "Unnamed"}
+                seed={lotSeed(snapshot.currentLot.lotId, lotMedia)}
+                src={lotMedia[snapshot.currentLot.lotId]?.photoUrl}
+                size="md"
+                shape="round"
+                decorative
+              />
+              <p className="registration-name" data-testid="replay-lot">
+                {snapshot.currentLot.lotNumber} · {snapshot.currentLot.playerName ?? "Unnamed"} ·{" "}
+                {snapshot.currentLot.status.replace(/_/g, " ")}
+              </p>
+            </div>
             <p data-testid="replay-leading">
               {snapshot.currentLot.currentBid !== null
                 ? `Leading: ${formatPaiseINR(paise(snapshot.currentLot.currentBid.amount))} — ${snapshot.currentLot.currentBid.teamName}`
@@ -193,13 +210,23 @@ function ReplayFrame({ snapshot }: { snapshot: AuctionSnapshot }) {
             </ol>
           </>
         ) : snapshot.lastOutcome !== null ? (
-          <p data-testid="replay-outcome">
-            {snapshot.lastOutcome.kind.toUpperCase()} — {snapshot.lastOutcome.lotNumber}{" "}
-            {snapshot.lastOutcome.playerName ?? ""}
-            {snapshot.lastOutcome.amount !== null
-              ? ` at ${formatPaiseINR(paise(snapshot.lastOutcome.amount))}`
-              : ""}
-          </p>
+          <div className="replay-subject">
+            <PlayerImage
+              name={snapshot.lastOutcome.playerName ?? snapshot.lastOutcome.lotNumber}
+              seed={lotSeed(snapshot.lastOutcome.lotId, lotMedia)}
+              src={lotMedia[snapshot.lastOutcome.lotId]?.photoUrl}
+              size="md"
+              shape="round"
+              decorative
+            />
+            <p data-testid="replay-outcome">
+              {snapshot.lastOutcome.kind.toUpperCase()} — {snapshot.lastOutcome.lotNumber}{" "}
+              {snapshot.lastOutcome.playerName ?? ""}
+              {snapshot.lastOutcome.amount !== null
+                ? ` at ${formatPaiseINR(paise(snapshot.lastOutcome.amount))}`
+                : ""}
+            </p>
+          </div>
         ) : (
           <p className="competitions-hint">No lot on the block.</p>
         )}

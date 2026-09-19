@@ -1,5 +1,6 @@
 "use client";
 
+import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
 import { formatPaiseINR, paise, type AuctionStatus } from "@desiauction/core";
 import { PlayerImage, paintOnFill } from "@desiauction/ui";
@@ -373,13 +374,12 @@ export function BoardPanel({
           <figure className="board-block-face" data-testid="board-block-face">
             <PlayerImage
               name={lot.playerName ?? "Unnamed"}
-              /* The registration number is the player's identity across the
-                 whole product, so seeding the mark with it gives the same
-                 person the same monogram here, on /c and on their share card.
-                 The lot id is only the fallback for a lot with no number. */
-              seed={faceNumber ?? lot.lotId}
+              /* The registration behind the lot — the one seed rule
+                 (lib/player-seed) — so the same person wears the same monogram
+                 here, on every roster and on /c. */
+              seed={lotSeed(lot.lotId, lotMedia)}
               size="hero"
-              {...(facePhoto !== null ? { src: facePhoto } : {})}
+              src={facePhoto}
             />
             {/* The REGISTRATION number, not `lot.lotNumber` — that one is the
                 queue position and it stays in the kicker above. This is the
@@ -563,7 +563,17 @@ export function BoardPanel({
           <ul className="board-recent-list">
             {recent.map((lotRow) => (
               <li key={lotRow.lotId}>
-                <span className="board-recent-name">{lotRow.playerName ?? lotRow.lotNumber}</span>
+                <span className="board-recent-who">
+                  <PlayerImage
+                    name={lotRow.playerName ?? lotRow.lotNumber}
+                    seed={lotRow.registrationId ?? lotSeed(lotRow.lotId, lotMedia)}
+                    src={lotMedia[lotRow.lotId]?.photoUrl}
+                    size="md"
+                    shape="round"
+                    decorative
+                  />
+                  <span className="board-recent-name">{lotRow.playerName ?? lotRow.lotNumber}</span>
+                </span>
                 <span className="board-recent-team">{lotRow.teamName ?? "—"}</span>
                 <span className="board-recent-price">
                   {lotRow.soldPrice !== null ? money(lotRow.soldPrice) : "—"}

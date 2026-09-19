@@ -348,6 +348,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
           remainingMs={remainingMs}
           variant="shell"
           offline={offline}
+          lotMedia={view.lotMedia}
         />
       </PageStatus>
 
@@ -436,7 +437,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
             )}
           </Card>
 
-          <AuctionTimeline feed={feed} />
+          <AuctionTimeline feed={feed} lotMedia={view.lotMedia} />
         </div>
 
         <div className="live-col">
@@ -453,6 +454,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
               feed={feed}
               squadSize={squadSizes[myPaddle.teamId] ?? 0}
               plan={planState}
+              lotMedia={view.lotMedia}
             />
           ) : null}
           {/* Unconditional now: AuctionProgress renders its own connecting state,
@@ -485,6 +487,7 @@ export function LivePanel({ slug, view }: { slug: string; view: LiveAuctionView 
       <SquadBoard
         roles={view.roles}
         teams={boardTeams}
+        lotMedia={view.lotMedia}
         preSigned={view.preSigned}
         resolved={feed.resolved}
         snapshot={snapshot}

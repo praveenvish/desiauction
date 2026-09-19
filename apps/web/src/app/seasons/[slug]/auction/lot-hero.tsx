@@ -167,10 +167,12 @@ export function LotHero({
           <span className="lot-hero-figure">
             <PlayerImage
               name={name}
-              // The lot id, not the name: two players called Rohit Sharma must
-              // not be handed the same monogram pattern, and a player renamed
-              // mid-auction must not have theirs change under them.
-              seed={lot.lotId}
+              // The registration, not the name: two players called Rohit Sharma
+              // must not be handed the same monogram pattern, and a player
+              // renamed mid-auction must not have theirs change under them. The
+              // lot id only for a lot the page's media has not seen
+              // (lib/player-seed).
+              seed={media?.registrationId ?? lot.lotId}
               size="xl"
               {...(photo === null ? {} : { src: photo })}
             />

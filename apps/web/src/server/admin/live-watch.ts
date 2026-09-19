@@ -5,6 +5,7 @@ import { engineDiagnosticsSchema } from "@desiauction/contracts";
 import { auctionOverview, type AuctionOverview } from "../auction/auction-overview";
 import { fetchEngineDiagnostics } from "../auction/engine-reads";
 import { systemDb } from "../db";
+import { storage } from "../media";
 import { platformAdminGate } from "./authz";
 import {
   auctionExists,
@@ -148,7 +149,10 @@ export async function adminAuctionWatch(auctionId: string): Promise<AuctionWatch
   const [overview, pulse, engine] = await Promise.all([
     // The organizer's own read of this auction — the same numbers they see,
     // with purses shown: platform:admin already reads every club's money.
-    auctionOverview(systemDb, auctionId, header.config, header.sport, { money: true }),
+    auctionOverview(systemDb, auctionId, header.config, header.sport, {
+      money: true,
+      readUrl: (key) => storage.readUrl(key),
+    }),
     auctionPulse(systemDb, auctionId, nowMs),
     running ? engineRoom(auctionId) : Promise.resolve(null),
   ]);

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { GoldDrift, PlayerImage } from "@desiauction/ui";
@@ -117,6 +118,14 @@ export function OverlayPanel({
               ? [...sold, ...sold].map((entry, index) => (
                   <span className="obs-ticker-item" key={`${entry.lotId}-${String(index)}`}>
                     <span className="obs-ticker-tag">Sold</span>
+                    <PlayerImage
+                      name={entry.playerName ?? entry.lotNumber}
+                      seed={entry.registrationId ?? lotSeed(entry.lotId, lotMedia)}
+                      src={lotMedia[entry.lotId]?.photoUrl}
+                      size="xs"
+                      shape="round"
+                      decorative
+                    />
                     <b>{entry.playerName ?? entry.lotNumber}</b>
                     {entry.teamName !== null ? <span>→ {entry.teamName}</span> : null}
                     {entry.soldPrice !== null ? (
@@ -161,9 +170,9 @@ export function OverlayPanel({
               <figure className="obs-lt-face" data-testid="obs-lt-face">
                 <PlayerImage
                   name={facing.playerName ?? facing.lotNumber}
-                  seed={faceNumber ?? facing.lotId}
+                  seed={lotSeed(facing.lotId, lotMedia)}
                   size="xl"
-                  {...(facePhoto !== null ? { src: facePhoto } : {})}
+                  src={facePhoto}
                 />
                 {/* The REGISTRATION number — the identity the player already
                     carries on their public page. The eyebrow above keeps
