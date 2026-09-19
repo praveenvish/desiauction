@@ -8,6 +8,24 @@ import type { CompetitionShareCard, PlayerShareCard, ShareCardTone } from "@desi
 
 export const SHARE_IMAGE_SIZE = { width: 1200, height: 630 } as const;
 
+/**
+ * THE REAL MARK, not a typed "DA".
+ *
+ * Every share card that stood for DesiAuction itself drew the letters "DA" in
+ * the rasterizer's default font on a gold square — near the mark, never the
+ * mark — on the image WhatsApp shows for every link anyone forwards. This is
+ * `public/brand/mark.svg`, inlined because this layer does no IO; a test holds
+ * the two identical, so a redrawn mark cannot leave the cards behind.
+ */
+export const BRAND_MARK_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">\n  <rect x="1" y="1" width="62" height="62" rx="17" fill="#E6B24A"/>\n  <path d="M13 16h10c9 0 16 7 16 16s-7 16-16 16H13V16Zm7 7v18h3a9 9 0 0 0 0-18h-3Z" fill="#0B1018"/>\n  <path d="m30 48 13-32h7L37 48h-7Z" fill="#E6B24A" stroke="#E6B24A" stroke-width="5" stroke-linejoin="round"/>\n  <path d="m30 48 13-32h7l-13 32h-7Z" fill="#0B1018"/>\n  <path d="m46.5 24 9 24h-7l-2-6h-8l3-7h3l-1.5-4 3.5-7Z" fill="#0B1018"/>\n</svg>\n';
+
+const BRAND_MARK_URI = `data:image/svg+xml;base64,${Buffer.from(BRAND_MARK_SVG).toString("base64")}`;
+
+function BrandTile({ size }: { size: number }) {
+  return <img src={BRAND_MARK_URI} width={size} height={size} alt="" />;
+}
+
 const C = {
   surface: "#0B1018",
   surfaceRaised: "#101623",
@@ -53,6 +71,11 @@ function StatusChip({ label, tone }: { label: string; tone: ShareCardTone }) {
 }
 
 function MonogramTile({ text }: { text: string }) {
+  // "DA" is the platform standing in for a season with no monogram of its own:
+  // that is the brand, so it is the brand's mark.
+  if (text === "DA") {
+    return <BrandTile size={104} />;
+  }
   return (
     <div
       style={{
@@ -254,22 +277,7 @@ export function renderShareFallback() {
         fontFamily: "sans-serif",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 120,
-          height: 120,
-          borderRadius: 28,
-          background: C.accent,
-          color: C.onAccent,
-          fontSize: 56,
-          fontWeight: 700,
-        }}
-      >
-        DA
-      </div>
+      <BrandTile size={120} />
       <div style={{ display: "flex", fontSize: 52, color: C.heading }}>DesiAuction</div>
       <div style={{ display: "flex", fontSize: 30, color: C.muted }}>
         Run your player auction live

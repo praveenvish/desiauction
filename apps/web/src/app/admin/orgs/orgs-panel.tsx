@@ -152,7 +152,9 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                       <td data-label="Auctions" className="admin-count admin-num">
                         {formatCount(row.auctions)}
                       </td>
-                      <td data-label="Cases">
+                      {/* Right-aligned like its header — without it the count
+                          sat under "Auctions", far from its own column. */}
+                      <td data-label="Cases" className="admin-num">
                         <span className="admin-count">{formatCount(row.cases)}</span>
                         {/* `settled` is counted as unfinished — it can still be
                             closed — but it is not "open", and an amber badge on
