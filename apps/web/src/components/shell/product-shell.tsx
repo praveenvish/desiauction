@@ -23,6 +23,7 @@ import {
   type KitTone,
   IconMenu,
   IconRupee,
+  IconSearch,
   IconTrophy,
   IconUser,
   IconUsers,
@@ -716,20 +717,37 @@ export function ProductShell({
             }
           : {})}
         headerAction={
-          session !== null ? (
-            <Link className="shell-header-cta" href="/home">
-              Open console
-            </Link>
-          ) : atGate ? null : (
-            <>
-              <Link className="shell-header-link" href="/login">
-                Sign in
+          <>
+            {/* Search and the theme switch are the two controls a visitor
+                looks for in a header and had to go to the footer to find.
+                They are hidden at the gates, where the page holds a single
+                decision and every other control is a way to not make it.
+                The search label is "Search", not "Search the site" — the
+                footer already owns that name, and two links with one name
+                break the strict-mode locators that name it. */}
+            {atGate ? null : (
+              <>
+                <Link className="shell-icon-button" href="/search" aria-label="Search" title="Search">
+                  <IconSearch width={18} height={18} />
+                </Link>
+                <ThemeToggle />
+              </>
+            )}
+            {session !== null ? (
+              <Link className="shell-header-cta" href="/home">
+                Open console
               </Link>
-              <Link className="shell-header-cta shell-desktop-only" href="/login">
-                Start free <IconArrowRight width={16} height={16} />
-              </Link>
-            </>
-          )
+            ) : atGate ? null : (
+              <>
+                <Link className="shell-header-link" href="/login">
+                  Sign in
+                </Link>
+                <Link className="shell-header-cta shell-desktop-only" href="/login">
+                  Start free <IconArrowRight width={16} height={16} />
+                </Link>
+              </>
+            )}
+          </>
         }
         footerCompact={atGate}
         contentFill={atLoginGate}

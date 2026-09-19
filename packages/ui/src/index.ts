@@ -122,3 +122,5 @@ export type { ErrorStateProps } from "./primitives/error-state";
 export { BrandGlyph } from "./shell/icons";
 // The one icon set. Every glyph the product draws — shell, marketing, content.
 export * from "./icons/icons";
+// The sport glyphs live in their own module (see the note at its head).
+export * from "./icons/sports";

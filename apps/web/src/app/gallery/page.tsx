@@ -9,6 +9,7 @@ import { DepthDemo } from "./depth-demo";
 import { IdentityDemo } from "./identity-demo";
 import { MotionDemo } from "./motion-demo";
 import { PrimitivesDemo } from "./primitives-demo";
+import { PublicKitDemo } from "./public-kit-demo";
 import { TheatreDemo } from "./theatre-demo";
 
 // M-IP1-1 gallery: token sheet + type ramp + theme flip (IP-1_DESIGN §13).
@@ -229,6 +230,7 @@ export default function GalleryPage() {
           <PrimitivesDemo />
           <DepthDemo />
           <TheatreDemo />
+          <PublicKitDemo />
         </main>
       </ToastProvider>
     </AnnouncerProvider>

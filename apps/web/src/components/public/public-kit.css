@@ -1,0 +1,520 @@
+/* THE PUBLIC KIT — styles for the parts in `public-kit.tsx`.
+ *
+ * Tokens only: every colour is a semantic token or a `color-mix` over one, so
+ * a page renders in daylight or floodlight without a second palette, and the
+ * contrast the gallery sweep certified still holds.
+ *
+ * Display type is always a `clamp()` with a viewport term. That is not only
+ * fluid sizing — `type-scale.test.ts` reads this file and fails any
+ * `--font-display` rule it can resolve to under 30px.
+ */
+
+/* ------------------------------------------------------------------ hero -- */
+
+.pk-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-primary);
+  padding-block: clamp(var(--space-8), 6vw, var(--space-16));
+  padding-inline: clamp(var(--space-4), 5vw, var(--space-12));
+}
+
+/* The band is lit from the top-left, which is where the header's glass sits —
+   without this the header floats on a flat rectangle. */
+.pk-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(
+      120% 90% at 12% -10%,
+      color-mix(in srgb, var(--accent) 16%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--surface-raised), var(--surface));
+}
+
+.pk-hero[data-size="compact"] {
+  padding-block: clamp(var(--space-6), 4vw, var(--space-10));
+}
+
+/* A cover photograph sits under the copy, dimmed enough that white text on it
+   keeps its certified contrast whatever the organizer uploaded. */
+.pk-hero-cover {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.pk-hero-cover img {
+  object-fit: cover;
+}
+
+.pk-hero-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    var(--surface) 12%,
+    color-mix(in srgb, var(--surface) 72%, transparent) 55%,
+    color-mix(in srgb, var(--surface) 38%, transparent)
+  );
+}
+
+.pk-hero-inner {
+  display: grid;
+  gap: clamp(var(--space-5), 4vw, var(--space-10));
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+@media (min-width: 900px) {
+  .pk-hero-inner:has(.pk-hero-art) {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  }
+}
+
+.pk-hero-copy {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  min-width: 0;
+}
+
+.pk-hero-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pk-eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.pk-hero-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5.2vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  color: var(--text-heading);
+}
+
+/* The gold half of a title. A season's name takes it on everything after the
+   first word, so "Vishnoi Cricket Sports Club" reads the way the mockup drew
+   it without the page having to guess at a break point. */
+.pk-hero-title em {
+  font-style: normal;
+  color: var(--text-accent);
+}
+
+.pk-hero-lede {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--text-secondary);
+  font-size: clamp(0.95rem, 1.2vw, 1.0625rem);
+}
+
+.pk-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+.pk-hero-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+}
+
+.pk-hero-fact svg {
+  color: var(--text-accent);
+}
+
+.pk-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  width: 100%;
+}
+
+.pk-hero-art {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------- script tag -- */
+
+.pk-script {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.4vw, 2.25rem);
+  line-height: 1.1;
+  font-style: italic;
+  color: var(--text-accent);
+  text-align: center;
+  transform: rotate(-4deg);
+}
+
+.pk-hero-art .pk-script {
+  position: absolute;
+  right: 0;
+  bottom: var(--space-2);
+}
+
+.pk-hero-script-alone {
+  justify-self: end;
+  align-self: end;
+}
+
+/* ------------------------------------------------------------------- art -- */
+
+.pk-sport-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    var(--pk-art-angle, 135deg),
+    color-mix(in srgb, var(--accent) 22%, var(--surface-raised)),
+    var(--surface-sunken) 65%
+  );
+  border: 1px solid var(--border-subtle);
+}
+
+.pk-sport-glyph {
+  width: 62%;
+  height: auto;
+  max-width: 240px;
+  color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.pk-sport-photo {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-xl);
+}
+
+/* ------------------------------------------------------------------ body -- */
+
+.pk-body {
+  display: grid;
+  gap: clamp(var(--space-6), 3vw, var(--space-10));
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-block: clamp(var(--space-8), 4vw, var(--space-12));
+  padding-inline: clamp(var(--space-4), 5vw, var(--space-8));
+}
+
+.pk-section {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+
+.pk-section[data-flush] {
+  gap: var(--space-4);
+}
+
+.pk-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  align-items: end;
+  justify-content: space-between;
+}
+
+.pk-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.8vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.pk-section-lede {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+.pk-section-action {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+/* ------------------------------------------------------------ stat strip -- */
+
+.pk-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4) var(--space-6);
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.pk-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The trailing cell (who runs this) is a caption, not a figure: it sits apart
+   so the numbers still read as one row of counts. */
+.pk-stat[data-aside] {
+  border-left: 1px solid var(--border-subtle);
+  padding-left: var(--space-5);
+}
+
+@media (max-width: 720px) {
+  .pk-stat[data-aside] {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: var(--space-4);
+  }
+}
+
+.pk-stat-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+/* The figure reads first and the label explains it — the order the eye wants
+   in a row of counts, and the reverse of the source order, which keeps the
+   <dt>/<dd> pairing a definition list for anything not reading visually. */
+.pk-stat-text {
+  display: flex;
+  flex-direction: column-reverse;
+  min-width: 0;
+}
+
+.pk-stat-label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.pk-stat-value {
+  margin: 0;
+  font-weight: 650;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ topic card -- */
+
+.pk-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-4);
+}
+
+.pk-topic {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow-1);
+}
+
+.pk-topic[data-tone="green"] {
+  --pk-tile-bg: var(--success-subtle);
+  --pk-tile-fg: var(--success-strong);
+}
+
+.pk-topic[data-tone="blue"] {
+  --pk-tile-bg: var(--info-subtle);
+  --pk-tile-fg: var(--info-strong);
+}
+
+.pk-topic[data-tone="amber"] {
+  --pk-tile-bg: var(--warning-subtle);
+  --pk-tile-fg: var(--warning-strong);
+}
+
+.pk-topic[data-tone="purple"] {
+  --pk-tile-bg: var(--violet-subtle);
+  --pk-tile-fg: var(--violet-strong);
+}
+
+.pk-topic[data-tone="neutral"] {
+  --pk-tile-bg: var(--surface-sunken);
+  --pk-tile-fg: var(--text-secondary);
+}
+
+.pk-topic-tile {
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  margin-bottom: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--pk-tile-bg, var(--accent-subtle));
+  color: var(--pk-tile-fg, var(--text-accent));
+}
+
+.pk-topic-title {
+  font-weight: 650;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+
+.pk-topic-desc {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+.pk-topic-foot {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.pk-topic:hover {
+  border-color: var(--border-interactive);
+}
+
+.pk-topic:focus-visible,
+.pk-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pk-topic {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      border-color 160ms ease;
+  }
+
+  .pk-topic:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-2);
+  }
+}
+
+/* ----------------------------------------------------------- count chips -- */
+
+.pk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* 24px is the WCAG 2.2 target floor; the padding keeps every chip above it
+     including the shortest label ("All"). */
+  min-height: 36px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pk-chip[data-active] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
+}
+
+.pk-chip-count {
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.pk-chip-dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+}
+
+.pk-chip[data-tone="live"] .pk-chip-dot {
+  background: var(--live);
+}
+
+.pk-chip[data-tone="open"] .pk-chip-dot {
+  background: var(--success-base);
+}
+
+.pk-chip[data-tone="soon"] .pk-chip-dot {
+  background: var(--info-base);
+}
+
+.pk-chip[data-active] .pk-chip-dot {
+  background: var(--text-on-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pk-chip {
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+}
+
+.pk-chip:hover {
+  border-color: var(--border-interactive);
+  color: var(--text-primary);
+}
+
+.pk-chip[data-active]:hover {
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
+}

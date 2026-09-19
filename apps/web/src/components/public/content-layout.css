@@ -1,0 +1,195 @@
+/* THE CONTENT LAYOUT — see `content-layout.tsx`.
+ *
+ * `.cl-prose` styles unstyled markup (an article's own headings, lists and
+ * links), so the selectors here are element selectors scoped to that one
+ * container. That is deliberate: the documents are content, not components,
+ * and asking every legal paragraph to carry a class would be a worse rule.
+ */
+
+.cl {
+  display: grid;
+  gap: clamp(var(--space-6), 4vw, var(--space-10));
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 1000px) {
+  .cl:has(.cl-aside) {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+
+  .cl-related {
+    grid-column: 1 / -1;
+  }
+}
+
+.cl-main {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.cl-meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ---- the reading column ---- */
+
+.cl-prose {
+  max-width: 70ch;
+  color: var(--text-primary);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+
+.cl-prose > * + * {
+  margin-top: var(--space-4);
+}
+
+.cl-prose h2,
+.cl-prose h3 {
+  font-family: var(--font-display);
+  color: var(--text-heading);
+  line-height: 1.2;
+  text-wrap: balance;
+  scroll-margin-top: var(--space-16);
+}
+
+.cl-prose h2 {
+  margin-top: var(--space-8);
+  font-size: clamp(1.375rem, 2.4vw, 1.75rem);
+}
+
+.cl-prose h3 {
+  margin-top: var(--space-6);
+  font-size: clamp(1.125rem, 1.8vw, 1.3125rem);
+}
+
+.cl-prose p,
+.cl-prose li {
+  overflow-wrap: break-word;
+}
+
+.cl-prose ul,
+.cl-prose ol {
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.cl-prose li::marker {
+  color: var(--text-accent);
+}
+
+.cl-prose a {
+  color: var(--text-accent);
+  text-underline-offset: 3px;
+}
+
+.cl-prose blockquote {
+  margin: 0;
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--accent);
+  color: var(--text-secondary);
+}
+
+.cl-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+/* A table in a document is the one thing allowed to be wider than the measure,
+   and it scrolls inside its own box so the page never does. */
+.cl-prose table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.cl-prose th,
+.cl-prose td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cl-foot {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ---- on this page ---- */
+
+.cl-aside {
+  position: sticky;
+  top: var(--space-16);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.cl-aside-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cl-aside-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: cl-anchor;
+  font-size: 0.875rem;
+}
+
+.cl-aside-list a {
+  display: block;
+  min-height: 24px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.cl-aside-list a:hover {
+  color: var(--text-accent);
+}
+
+.cl-aside-list a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- related ---- */
+
+.cl-related {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cl-related-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+  color: var(--text-heading);
+}
