@@ -101,6 +101,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                   {inProgress ? (
                     <ButtonLink
                       href={`/seasons/${slug}/auction/live`}
+                      variant="secondary"
                       size="sm"
                       data-testid="open-live"
                     >

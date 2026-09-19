@@ -32,7 +32,7 @@ import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
-import { AuctionProgress, useLiveFeed } from "../live-experience";
+import { AuctionProgress, BidFeedList, useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
@@ -635,15 +635,11 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   : "Awaiting the first paddle…"}
               </p>
             ) : (
-              <ol className="timeline">
-                {[...lot.bidHistory].reverse().map((entry) => (
-                  <li key={entry.bidId}>
-                    <Badge tone="neutral">{entry.paddleNumber}</Badge>
-                    <span>{entry.teamName}</span>
-                    <span className="timeline-at">{formatPaiseINR(paise(entry.amount))}</span>
-                  </li>
-                ))}
-              </ol>
+              <BidFeedList
+                bids={lot.bidHistory}
+                playerName={lot.playerName}
+                teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
+              />
             )}
           </Card>
 

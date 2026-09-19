@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import { roleLabeller } from "../../../../lib/role-label";
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Card, PlayerImage } from "@desiauction/ui";
+import { Card, IconPlus, PlayerImage } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
 import { TeamChip, type TeamIdentity } from "./purse-board";
@@ -206,7 +206,7 @@ export function SquadBoard({
     (snapshot?.paddles ?? []).map((paddle) => [paddle.teamId, paddle.purseRemaining]),
   );
   return (
-    <Card data-testid="squad-board">
+    <Card data-testid="squad-board" className="live-card">
       <div className="competition-head">
         <h2>Squads</h2>
         {/* The shorthand was a note to ourselves: "pre-signed" is a schema word
@@ -272,6 +272,14 @@ export function SquadBoard({
                       </span>
                     </li>
                   ))}
+                  {members.length < squadMax ? (
+                    <li className="squad-row squad-row--open">
+                      <IconPlus size={14} />
+                      {squadMax - members.length === 1
+                        ? "1 spot open"
+                        : `${String(squadMax - members.length)} spots open`}
+                    </li>
+                  ) : null}
                 </ul>
               )}
             </section>

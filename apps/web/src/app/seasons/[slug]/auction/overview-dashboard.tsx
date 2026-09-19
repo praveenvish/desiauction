@@ -465,7 +465,9 @@ export function OverviewDashboard({
         <table className="dash-table">
           <thead>
             <tr>
-              <th scope="col">#</th>
+              <th scope="col" className="dash-hide-xs">
+                #
+              </th>
               <th scope="col">Player</th>
               <th scope="col" className="dash-hide-sm">
                 Role
@@ -480,7 +482,7 @@ export function OverviewDashboard({
           <tbody>
             {lots.map((lot) => (
               <tr key={lot.id}>
-                <td className="dash-muted dash-mono">{lot.lotNumber}</td>
+                <td className="dash-muted dash-mono dash-hide-xs">{lot.lotNumber}</td>
                 <td>
                   <span className="dash-player">
                     <PlayerImage

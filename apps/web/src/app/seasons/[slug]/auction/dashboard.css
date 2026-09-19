@@ -593,6 +593,19 @@
     display: none;
   }
 
+  /* A header action (a button, a "View all" link) drops under the title on a
+     phone instead of squeezing it into a one-word column. The kit's card is
+     shared, so this is scoped to the auction desk. */
+  .auc-hub [class*="card-head"] {
+    flex-wrap: wrap;
+  }
+
+  .auc-hub [class*="card-action"] {
+    box-sizing: border-box;
+    flex-basis: 100%;
+    padding-inline-start: calc(32px + var(--space-3));
+  }
+
   /* The legend under the bar already says every count. */
   [data-testid="auction-progress-summary"] .auc-card-meta {
     display: none;
@@ -637,5 +650,16 @@
   .bc-url-row {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (max-width: 420px) {
+  .dash-hide-xs {
+    display: none;
+  }
+
+  .dash-table th,
+  .dash-table td {
+    padding-inline: var(--space-2);
   }
 }

@@ -32,31 +32,39 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
       <main className="registrations-dash live-page">
         <div className="dash-stack">
           <h1 className="auction-sr-only">{view.competition.name} — live auction</h1>
-          <LivePanel slug={slug} view={view} />
-          <nav className="live-exits" aria-label="Other auction views">
-            {view.viewer.canConduct ? (
-              <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="open-cockpit">
-                Cockpit
-              </ButtonLink>
-            ) : null}
-            {/* WR-1: the owner's plan — a door only for someone who holds a team
-                here while planning is on; /auction/plan 404s for everyone else. */}
-            {view.planAvailable ? (
-              <ButtonLink
-                href={`/seasons/${slug}/auction/plan`}
-                variant="secondary"
-                data-testid="open-plan"
-              >
-                My plan
-              </ButtonLink>
-            ) : null}
-            <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="ghost">
-              Spectate
-            </ButtonLink>
-            <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-              Auction setup
-            </ButtonLink>
-          </nav>
+          <LivePanel
+            slug={slug}
+            view={view}
+            exits={
+              // Keyed: an element handed across to a client component is
+              // checked as a list child when it renders there.
+              <nav key="exits" className="live-exits" aria-label="Other auction views">
+                {view.viewer.canConduct ? (
+                  <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="open-cockpit">
+                    Cockpit
+                  </ButtonLink>
+                ) : null}
+                {/* WR-1: the owner's plan — a door only for someone who holds a
+                    team here while planning is on; /auction/plan 404s for
+                    everyone else. */}
+                {view.planAvailable ? (
+                  <ButtonLink
+                    href={`/seasons/${slug}/auction/plan`}
+                    variant="secondary"
+                    data-testid="open-plan"
+                  >
+                    My plan
+                  </ButtonLink>
+                ) : null}
+                <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
+                  Spectate
+                </ButtonLink>
+                <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
+                  Auction setup
+                </ButtonLink>
+              </nav>
+            }
+          />
         </div>
       </main>
     </ToastProvider>
