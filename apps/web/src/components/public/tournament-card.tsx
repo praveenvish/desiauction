@@ -100,10 +100,10 @@ export function TournamentCard({
     [
       teamCount === undefined || teamCount === 0
         ? null
-        : `${teamCount} ${teamCount === 1 ? "team" : "teams"}`,
+        : `${String(teamCount)} ${teamCount === 1 ? "team" : "teams"}`,
       playerCount === undefined || playerCount === 0
         ? null
-        : `${playerCount} ${playerCount === 1 ? "player" : "players"}`,
+        : `${String(playerCount)} ${playerCount === 1 ? "player" : "players"}`,
     ]
       .filter((part): part is string => part !== null)
       .join(" • ") || null;

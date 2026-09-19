@@ -727,10 +727,23 @@ export function ProductShell({
                 break the strict-mode locators that name it. */}
             {atGate ? null : (
               <>
-                <Link className="shell-icon-button" href="/search" aria-label="Search" title="Search">
+                {/* Desktop only, for now: at 320px the header action row was
+                    4 controls wide and pushed the page 4px past the viewport
+                    (responsive.spec). The phone reaches search through the
+                    footer's "Search the site"; giving the mobile menu both
+                    controls is a change to the shared shell, not to this
+                    header, and belongs in its own pass. */}
+                <Link
+                  className="shell-icon-button shell-desktop-only"
+                  href="/search"
+                  aria-label="Search"
+                  title="Search"
+                >
                   <IconSearch width={18} height={18} />
                 </Link>
-                <ThemeToggle />
+                <span className="shell-desktop-only">
+                  <ThemeToggle />
+                </span>
               </>
             )}
             {session !== null ? (

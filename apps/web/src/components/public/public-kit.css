@@ -329,9 +329,9 @@
 }
 
 .pk-stat {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: grid;
+  gap: 2px;
+  align-content: center;
   min-width: 0;
 }
 
@@ -353,25 +353,17 @@
 
 .pk-stat-icon {
   flex: none;
-  display: grid;
+  display: inline-grid;
   place-items: center;
-  inline-size: 40px;
-  block-size: 40px;
-  border-radius: var(--radius-lg);
-  background: var(--accent-subtle);
   color: var(--text-accent);
 }
 
-/* The figure reads first and the label explains it — the order the eye wants
-   in a row of counts, and the reverse of the source order, which keeps the
-   <dt>/<dd> pairing a definition list for anything not reading visually. */
-.pk-stat-text {
-  display: flex;
-  flex-direction: column-reverse;
-  min-width: 0;
-}
+
 
 .pk-stat-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: 0.8125rem;
   color: var(--text-muted);
 }
@@ -491,6 +483,23 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* On a phone a wrapped row of chips is a ragged set of different-width taps.
+   Below 640 they become a grid of equal, thumb-sized cells — the same rule the
+   console's action groups follow, asserted in responsive.spec.ts. */
+@media (max-width: 640px) {
+  .pk-chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pk-chip {
+    min-height: 44px;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 .pk-chip {

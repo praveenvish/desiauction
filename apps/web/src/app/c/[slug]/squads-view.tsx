@@ -75,9 +75,8 @@ export function SquadsView({
             coachName: team.coachName,
             crest:
               team.logoUrl === null ? undefined : (
-                // eslint-disable-next-line @next/next/no-img-element -- a signed
-                // storage URL, already sized by the card; next/image would add a
-                // proxy hop for a 40px crest.
+                // A signed storage URL, already sized by the card; next/image
+                // would add a proxy hop for a 40px crest.
                 <img src={team.logoUrl} alt="" width={40} height={40} loading="lazy" />
               ),
             players: squad.map((player) => ({

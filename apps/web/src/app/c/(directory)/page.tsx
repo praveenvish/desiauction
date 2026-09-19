@@ -1,14 +1,11 @@
-import { Badge, Button, ButtonLink, Card, EmptyState, Field } from "@desiauction/ui";
-import { entryCategoryLabel } from "@desiauction/core";
+import { Button, ButtonLink, Card, EmptyState, Field } from "@desiauction/ui";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { env } from "../../../env";
 import {
   parseDirectoryFilter,
   parseDirectorySort,
   publicCompetitionsDirectory,
-  type DirectoryEntry,
   type DirectoryFilter,
   type DirectorySort,
 } from "../../../server/competition/public";
@@ -74,16 +71,6 @@ export async function generateMetadata({
   };
 }
 
-/** Monogram for the crest fallback: first letters of the first two words. */
-function monogram(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 /** Every directory link is one URL builder, so `q`, the facet, the sort and the
  *  page survive each other. Defaults are omitted rather than spelled out — a
  *  shared link should be the shortest URL that reproduces the view. */
@@ -108,31 +95,6 @@ function directoryHref(params: {
   }
   const query = search.toString();
   return query === "" ? "/c" : `/c?${query}`;
-}
-
-/**
- * What one click on this card does, said on the card. The whole card is a
- * single link — exactly one tab stop per result — so the destination and the
- * label are chosen together rather than nesting a second link inside the first
- * (invalid HTML, and a keyboard user paying twice per row).
- *
- * A live auction is the exception that earns the direct route: watching needs
- * no account, so the card goes straight to the spectate stage instead of via
- * the competition page that carries the same door one click further down.
- */
-function cardAction(entry: DirectoryEntry): { href: string; label: string; note: string | null } {
-  if (entry.live) {
-    return {
-      href: `/seasons/${entry.slug}/auction/spectate`,
-      label: "Watch live",
-      note: "No account needed",
-    };
-  }
-  return {
-    href: `/c/${entry.slug}`,
-    label: entry.open ? "Register" : "View tournament",
-    note: null,
-  };
 }
 
 // PX-5 public discovery: only tournaments their organizers PUBLISHED

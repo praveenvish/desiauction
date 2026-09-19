@@ -3,7 +3,6 @@ import { Badge, ButtonLink, PlayerImage, IconArrowLeft } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Fragment } from "react";
 
 import { env } from "../../../../../env";
 import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed";

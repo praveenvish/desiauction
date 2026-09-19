@@ -138,7 +138,7 @@ export function SportWatermark({ sport, seed = "" }: { sport: string; seed?: str
       // it reads as a missing image rather than as the designed fallback.
       data-theme="floodlight"
       data-sport={sport}
-      style={{ "--pk-art-angle": `${sportGradientAngle(sport, seed)}deg` } as CSSProperties}
+      style={{ "--pk-art-angle": `${String(sportGradientAngle(sport, seed))}deg` } as CSSProperties}
     >
       <SportIcon sport={sport} size={220} className="pk-sport-glyph" />
     </span>
@@ -213,21 +213,25 @@ export interface Stat {
 export function StatStrip({ stats, label }: { stats: Stat[]; label: string }) {
   return (
     <dl className="pk-stats" aria-label={label}>
+      {/* A <dl>'s <div> may hold ONLY <dt>/<dd> — an icon span beside them, or
+          a wrapper div around them, and every row stops being a description
+          list (axe: definition-list, dlitem). So the icon lives inside the
+          term, and the figure reads first through order, not through markup. */}
       {stats.map((stat, index) => (
         <div
           className="pk-stat"
           data-aside={stat.aside === true ? "" : undefined}
-          key={`${String(stat.label)}-${index}`}
+          key={`stat-${String(index)}`}
         >
-          {stat.icon === undefined ? null : (
-            <span className="pk-stat-icon" aria-hidden>
-              {stat.icon}
-            </span>
-          )}
-          <div className="pk-stat-text">
-            <dt className="pk-stat-label">{stat.label}</dt>
-            <dd className="pk-stat-value">{stat.value}</dd>
-          </div>
+          <dd className="pk-stat-value">{stat.value}</dd>
+          <dt className="pk-stat-label">
+            {stat.icon === undefined ? null : (
+              <span className="pk-stat-icon" aria-hidden>
+                {stat.icon}
+              </span>
+            )}
+            {stat.label}
+          </dt>
         </div>
       ))}
     </dl>
