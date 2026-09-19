@@ -29,6 +29,9 @@ import {
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
+import { resolveExportColumns, type ExportRows } from "../../lib/export-columns";
+import { preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
+import { preSignedSql } from "./pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 // Registration reads + creation (IP-3 §4, doc 42). TRIAGE TRANSITIONS live only
@@ -516,6 +519,8 @@ export interface RegistrationRow {
   // set (render gate, DPDP §5). age is derived from DOB, never stored.
   photoUrl: string | null;
   age: number | null;
+  /** ISO `yyyy-mm-dd` as stored — the sheet's date field edits it. Review-gated. */
+  dateOfBirth: string | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
   /**
@@ -527,6 +532,13 @@ export interface RegistrationRow {
    * pack declares none.
    */
   attributes: { key: string; label: string; value: string }[];
+  /**
+   * The same answers UNLABELLED, keyed by the pack's attribute key — what an
+   * editor needs to pre-select a value. Cricket's two live in real columns and
+   * every other sport's in `registrations.attributes`; this folds both, so the
+   * player sheet edits any sport without knowing where each one is stored.
+   */
+  attributeValues: Record<string, string>;
 }
 
 /** Legacy triage list for the M-IP3-1 competition page (latest first, unpaged). */
@@ -593,6 +605,8 @@ export interface RegistrationStats {
   auctionPool: number;
   /** Approved icons — pre-signed, never on the block. */
   icons: number;
+  /** Approved captains who are not also icons — picked before the night, never on the block. */
+  captains: number;
   /** Approved retained players — pre-signed from a prior season, never on the block. */
   retained: number;
   /**
@@ -602,7 +616,8 @@ export interface RegistrationStats {
    * screen warns; the aggregate constraint itself is not ours to change.
    */
   iconsWithoutTeam: number;
-  /** The same disappearance, reached by the other mark. */
+  /** The same disappearance, reached by the other marks. */
+  captainsWithoutTeam: number;
   retainedWithoutTeam: number;
   /**
    * THE DESK'S OWN ARITHMETIC, over every registration that is not withdrawn.
@@ -630,6 +645,7 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     .select({
       status: registrations.status,
       isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
       hasTeam: sql<boolean>`${registrations.teamId} is not null`,
       feeStatus: registrations.feeStatus,
@@ -651,6 +667,7 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     .groupBy(
       registrations.status,
       registrations.isIcon,
+      registrations.isCaptain,
       registrations.isRetained,
       registrations.feeStatus,
       sql`${registrations.teamId} is not null`,
@@ -664,8 +681,10 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     withdrawn: 0,
     auctionPool: 0,
     icons: 0,
+    captains: 0,
     retained: 0,
     iconsWithoutTeam: 0,
+    captainsWithoutTeam: 0,
     retainedWithoutTeam: 0,
     fees: { pending: 0, paid: 0, waived: 0, refunded: 0 },
     feeCollectedPaise: 0,
@@ -686,13 +705,19 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
       }
     }
     if (row.status === "approved") {
-      // Icon first where a player is both, the precedence `outcomeOf` and the
+      // Icon, then Captain, then Retained where a player carries more than one
+      // (`preSignedKind`) — the precedence `outcomeOf` and the
       // orphan warning already use — one row must not be counted twice, and
       // `auctionPool` is the figure that has to match the auction exactly.
       if (row.isIcon) {
         stats.icons += row.count;
         if (!row.hasTeam) {
           stats.iconsWithoutTeam += row.count;
+        }
+      } else if (row.isCaptain) {
+        stats.captains += row.count;
+        if (!row.hasTeam) {
+          stats.captainsWithoutTeam += row.count;
         }
       } else if (row.isRetained) {
         stats.retained += row.count;
@@ -715,6 +740,8 @@ export interface RegistrationQuery {
   /** Narrow to one fee state — the desk's own question, "who has not paid?". */
   fee?: FeeStatus;
   teamId?: string;
+  /** Exactly one registration — the player sheet opened from a team roster. */
+  registrationId?: string;
   sort?: RegistrationSort;
   page: number;
   pageSize: number;
@@ -736,15 +763,14 @@ const SORTS: Record<RegistrationSort, SQL[]> = {
 };
 
 /**
- * Deterministic server-driven query. Search matches name / phone / registration
- * number / team name (exact-ish `ILIKE`, no fuzzy). Every sort has a stable
- * tiebreak on id so pagination never drops or repeats a row.
+ * The dashboard's filter as SQL — shared by the page query and by an export of
+ * "what's on screen now", so the file and the table cannot disagree about who
+ * matched. Every clause assumes `people` and `teams` are joined.
  */
-export async function queryRegistrations(
-  db: Db,
+function registrationFilters(
   competitionId: string,
-  query: RegistrationQuery,
-): Promise<RegistrationPage> {
+  query: Omit<RegistrationQuery, "page" | "pageSize" | "sort">,
+): SQL[] {
   const filters: SQL[] = [eq(registrations.competitionId, competitionId)];
   if (query.status !== undefined) {
     filters.push(eq(registrations.status, query.status));
@@ -754,6 +780,9 @@ export async function queryRegistrations(
   }
   if (query.teamId !== undefined && query.teamId !== "") {
     filters.push(eq(registrations.teamId, query.teamId));
+  }
+  if (query.registrationId !== undefined) {
+    filters.push(eq(registrations.id, query.registrationId));
   }
   const term = query.search?.trim();
   if (term !== undefined && term !== "") {
@@ -768,6 +797,20 @@ export async function queryRegistrations(
       filters.push(clause);
     }
   }
+  return filters;
+}
+
+/**
+ * Deterministic server-driven query. Search matches name / phone / registration
+ * number / team name (exact-ish `ILIKE`, no fuzzy). Every sort has a stable
+ * tiebreak on id so pagination never drops or repeats a row.
+ */
+export async function queryRegistrations(
+  db: Db,
+  competitionId: string,
+  query: RegistrationQuery,
+): Promise<RegistrationPage> {
+  const filters = registrationFilters(competitionId, query);
   const where = and(...filters);
 
   const pageSize = Math.min(Math.max(query.pageSize, 1), 100);
@@ -835,20 +878,57 @@ export async function queryRegistrations(
     .limit(1);
   const sport = season?.sport ?? DEFAULT_SPORT_KEY;
   const now = new Date();
-  const rows: RegistrationRow[] = raw.map(
-    ({ photoKey, photoConsentAt, dateOfBirth, attributes, ...r }) => ({
-      ...r,
-      duplicateName: dupKeys.has(nameKey(r.name)),
-      // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
-      photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
-      age: deriveAge(dateOfBirth, now),
-      // Labelled HERE, by the season's pack, so no client has to know what a
-      // football attribute key means. Values the pack cannot explain are
-      // dropped rather than printed raw — see `describeAttributes`.
-      attributes: describeAttributes(sport, (attributes ?? {}) as Record<string, unknown>),
-    }),
-  );
+  const rows: RegistrationRow[] = raw.map(({ photoKey, photoConsentAt, attributes, ...r }) => ({
+    ...r,
+    dateOfBirth: r.dateOfBirth,
+    duplicateName: dupKeys.has(nameKey(r.name)),
+    // DPDP §5 render gate: a stored photo only surfaces with recorded consent.
+    photoUrl: photoConsentAt !== null && photoKey !== null ? storage.readUrl(photoKey) : null,
+    age: deriveAge(r.dateOfBirth, now),
+    // Labelled HERE, by the season's pack, so no client has to know what a
+    // football attribute key means. Values the pack cannot explain are
+    // dropped rather than printed raw — see `describeAttributes`.
+    attributes: describeAttributes(sport, (attributes ?? {}) as Record<string, unknown>),
+    attributeValues: attributeValuesOf(sport, r, (attributes ?? {}) as Record<string, unknown>),
+  }));
   return { rows, total, page, pageSize };
+}
+
+/** See `RegistrationRow.attributeValues`. */
+function attributeValuesOf(
+  sport: string,
+  columns: { battingStyle: string | null; bowlingStyle: string | null },
+  stored: Record<string, unknown>,
+): Record<string, string> {
+  const byColumn: Record<string, string | null> = {
+    batting_style: columns.battingStyle,
+    bowling_style: columns.bowlingStyle,
+  };
+  const out: Record<string, string> = {};
+  for (const attribute of sportPackFor(sport).attributes) {
+    const value =
+      attribute.storage.kind === "column"
+        ? byColumn[attribute.storage.column]
+        : stored[attribute.key];
+    if (typeof value === "string" && value !== "") {
+      out[attribute.key] = value;
+    }
+  }
+  return out;
+}
+
+/** One registration as the dashboard reads it, or null if it is not in this season. */
+export async function registrationRowById(
+  db: Db,
+  competitionId: string,
+  registrationId: string,
+): Promise<RegistrationRow | null> {
+  const { rows } = await queryRegistrations(db, competitionId, {
+    registrationId,
+    page: 1,
+    pageSize: 1,
+  });
+  return rows[0] ?? null;
 }
 
 /**
@@ -993,7 +1073,7 @@ export interface OrphanPreSigned {
   number: string;
   name: string | null;
   /** Which mark took them out of the pool — the warning has to say which. */
-  kind: "icon" | "retained";
+  kind: PreSignedKind;
 }
 
 /**
@@ -1016,8 +1096,12 @@ export async function orphanPreSigned(db: Db, competitionId: string): Promise<Or
     .select({
       id: registrations.id,
       number: registrations.registrationNumber,
-      name: people.name,
+      // The season's shown name (0075): an organizer who typed a name for an
+      // existing account must not be shown the account's own name here.
+      name: shownName,
       isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      isRetained: registrations.isRetained,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -1025,15 +1109,17 @@ export async function orphanPreSigned(db: Db, competitionId: string): Promise<Or
       and(
         eq(registrations.competitionId, competitionId),
         eq(registrations.status, "approved"),
-        or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
+        preSignedSql,
         sql`${registrations.teamId} is null`,
       ),
     )
     .orderBy(asc(registrations.registrationNumber));
-  // Icon wins where a player is both, the same precedence `outcomeOf` uses on
-  // the poster — one player must not be described two different ways by two
-  // surfaces reading one row.
-  return rows.map(({ isIcon, ...rest }) => ({ ...rest, kind: isIcon ? "icon" : "retained" }));
+  // One word per player, by the precedence every surface shares — one player
+  // must not be described two different ways by two surfaces reading one row.
+  return rows.map(({ isIcon, isCaptain, isRetained, ...rest }) => ({
+    ...rest,
+    kind: preSignedKind({ isIcon, isCaptain, isRetained }) ?? "icon",
+  }));
 }
 
 /** Name keys that appear on >1 registration in this competition (dup/conflict flag). */
@@ -1104,18 +1190,59 @@ export async function timelineOf(
  * Deterministic CSV export — stable order (by registration number), competition-
  * scoped by the caller's capability + tenant resolution (no cross-tenant leakage).
  */
+export interface RegistrationExportOptions {
+  /** Narrow to one squad — the Teams tab's per-team export (DA-34). */
+  teamId?: string;
+  /** Column keys from `lib/export-columns.ts`; omitted = the historical file. */
+  columns?: readonly string[];
+  /** Which people — see `ExportRows`. Omitted = everyone. */
+  rows?: ExportRows;
+  /** The dashboard's filter, for `rows: "view"`. */
+  view?: Omit<RegistrationQuery, "page" | "pageSize" | "sort" | "registrationId">;
+}
+
 export async function exportRegistrationsCsv(
   db: Db,
   competitionId: string,
-  /** Narrow to one squad — the Teams tab's per-team export (DA-34). */
-  teamId?: string,
-): Promise<string> {
+  options: RegistrationExportOptions = {},
+): Promise<{ csv: string; rowCount: number }> {
+  const [season] = await db
+    .select({ sport: competitions.sport })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  const pack = sportPackFor(season?.sport ?? DEFAULT_SPORT_KEY);
+  const columns = resolveExportColumns(options.columns, pack.attributes);
+
+  const filters: SQL[] =
+    options.rows === "view"
+      ? registrationFilters(competitionId, options.view ?? {})
+      : [eq(registrations.competitionId, competitionId)];
+  if (options.teamId !== undefined) {
+    filters.push(eq(registrations.teamId, options.teamId));
+  }
+  if (options.rows === "approved" || options.rows === "pool") {
+    filters.push(eq(registrations.status, "approved"));
+  }
+  if (options.rows === "pool") {
+    // The same rule `auctionReady` applies: approved and not pre-signed.
+    filters.push(sql`not ${preSignedSql}`);
+  }
+
   const rows = await db
     .select({
       number: registrations.registrationNumber,
-      name: people.name,
+      // The season's shown name (0075). This read `people.name`, so an export
+      // named the ACCOUNT behind a phone number the organizer had typed a
+      // different name for — the one read the entered-name fix missed.
+      name: shownName,
       phone: people.phone,
       role: registrations.role,
+      band: registrations.basePriceBand,
+      dateOfBirth: registrations.dateOfBirth,
+      battingStyle: registrations.battingStyle,
+      bowlingStyle: registrations.bowlingStyle,
+      attributes: registrations.attributes,
       status: registrations.status,
       team: teams.name,
       isIcon: registrations.isIcon,
@@ -1128,15 +1255,12 @@ export async function exportRegistrationsCsv(
       jerseyNumber: registrations.jerseyNumber,
       tshirtSize: registrations.tshirtSize,
       trouserSize: registrations.trouserSize,
+      note: registrations.note,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
     .leftJoin(teams, eq(teams.id, registrations.teamId))
-    .where(
-      teamId === undefined
-        ? eq(registrations.competitionId, competitionId)
-        : and(eq(registrations.competitionId, competitionId), eq(registrations.teamId, teamId)),
-    )
+    .where(and(...filters))
     .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
   /*
    * THE EXPORT ROUND-TRIPS THROUGH THE IMPORT, which it did not.
@@ -1144,68 +1268,85 @@ export async function exportRegistrationsCsv(
    * `team` was already here and the import could not read it, so an organizer
    * who exported a roster, corrected a phone number in Excel and imported it
    * back lost every squad affiliation in the file they had just been given. The
-   * import understands all four of these columns now, and the header names it
-   * writes are the canonical ones, so a re-import needs no mapping step at all.
+   * import understands all of these columns now, and the header names it
+   * writes are the canonical ones, so a re-import needs no mapping step at all
+   * — whichever subset the organizer chose.
    *
    * Yes/no rather than true/false because a person reads this in Excel, and
    * `parseCsvFlag` takes either.
+   *
+   * `father_name` is deliberately NOT a column. It is an identity check on an
+   * entry form, not kit, and this file is handed to suppliers; a list of
+   * players' fathers has no business on it. It renders on the record instead,
+   * where the organizer already sees the phone number.
    */
   const yesNo = (value: boolean): string => (value ? "yes" : "no");
-  return toCsv(
-    [
-      "registration_number",
-      "name",
-      "phone",
-      "role",
-      "status",
-      "team",
-      "is_icon",
-      "is_captain",
-      "is_retained",
-      // The desk, which this export could not answer for either. Canonical
-      // header names, so a club can fix a payment in Excel and import it back.
-      "fee_status",
-      "fee_amount",
-      "fee_reference",
-      /*
-       * THE KIT, which is the whole reason this block is collected. A jersey
-       * order IS a spreadsheet a club sends a vendor, so the export matters
-       * more here than any screen does — and it wrote none of it.
-       *
-       * `father_name` is deliberately NOT here. It is an identity check on an
-       * entry form, not kit, and this file is handed to a supplier; a list of
-       * players' fathers has no business on it. It renders on the record
-       * instead, where the organizer already sees the phone number.
-       */
-      "jersey_name",
-      "jersey_number",
-      "tshirt_size",
-      "trouser_size",
-    ],
-    rows.map((r) => [
-      r.number,
-      r.name ?? "",
-      // Blank rather than "null" in a spreadsheet cell: an export is read by a
-      // person, and an email-anchored player (0062) simply has no number.
-      r.phone ?? "",
-      r.role ?? "",
-      r.status,
-      r.team ?? "",
-      yesNo(r.isIcon),
-      yesNo(r.isCaptain),
-      yesNo(r.isRetained),
-      r.feeStatus,
-      // RUPEES, because the import reads rupees and a round-trip has to close.
-      // Blank rather than 0 for an unrecorded amount: they are different facts
-      // and writing zero would tell the next reader the fee was free.
-      r.feeAmountPaise === null ? "" : String(r.feeAmountPaise / 100),
-      r.feeReference ?? "",
-      r.jerseyName ?? "",
-      r.jerseyNumber ?? "",
-      r.tshirtSize ?? "",
-      r.trouserSize ?? "",
-    ]),
-  );
+  const now = new Date();
+  type ExportRow = (typeof rows)[number];
+  const cell = (row: ExportRow, key: string): string => {
+    switch (key) {
+      case "registration_number":
+        return row.number;
+      case "name":
+        return row.name ?? "";
+      case "phone":
+        // Blank rather than "null" in a spreadsheet cell: an export is read by
+        // a person, and an email-anchored player (0062) simply has no number.
+        return row.phone ?? "";
+      case "role":
+        return row.role ?? "";
+      case "base_price_band":
+        return row.band ?? "";
+      case "age": {
+        const age = deriveAge(row.dateOfBirth, now);
+        return age === null ? "" : String(age);
+      }
+      case "date_of_birth":
+        return row.dateOfBirth ?? "";
+      case "status":
+        return row.status;
+      case "team":
+        return row.team ?? "";
+      case "is_icon":
+        return yesNo(row.isIcon);
+      case "is_captain":
+        return yesNo(row.isCaptain);
+      case "is_retained":
+        return yesNo(row.isRetained);
+      case "fee_status":
+        return row.feeStatus;
+      case "fee_amount":
+        // RUPEES, because the import reads rupees and a round-trip has to
+        // close. Blank rather than 0 for an unrecorded amount: they are
+        // different facts and writing zero would say the fee was free.
+        return row.feeAmountPaise === null ? "" : String(row.feeAmountPaise / 100);
+      case "fee_reference":
+        return row.feeReference ?? "";
+      case "jersey_name":
+        return row.jerseyName ?? "";
+      case "jersey_number":
+        return row.jerseyNumber ?? "";
+      case "tshirt_size":
+        return row.tshirtSize ?? "";
+      case "trouser_size":
+        return row.trouserSize ?? "";
+      case "note":
+        return row.note ?? "";
+      default:
+        return (
+          attributeValuesOf(pack.key, row, (row.attributes ?? {}) as Record<string, unknown>)[
+            key
+          ] ?? ""
+        );
+    }
+  };
+  return {
+    csv: toCsv(
+      columns.map((column) => column.key),
+      rows.map((row) => columns.map((column) => cell(row, column.key))),
+    ),
+    rowCount: rows.length,
+  };
 }
 
 /**

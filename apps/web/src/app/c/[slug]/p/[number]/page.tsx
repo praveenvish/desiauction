@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 
 import { env } from "../../../../../env";
+import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed";
 import { publicPlayer } from "../../../../../server/competition/public";
 import { SharePlayer } from "./share-player";
 import "../../../../marketing.css";
@@ -27,6 +28,7 @@ import "../../../directory.css";
  */
 function statusText(player: {
   status: "available" | "sold" | "retained";
+  preSignedAs: PreSignedKind | null;
   teamName: string | null;
 }): string {
   if (player.status === "available") {
@@ -37,9 +39,10 @@ function statusText(player: {
     // available — `auctionReady` filters icons out of the pool, so no team can
     // bid for them — and "Retained" on its own implies a retaining team there
     // is no record of. Say the thing that is actually true of them.
+    const word = preSignedWord(player.preSignedAs);
     return player.teamName !== null
-      ? `Icon player for ${player.teamName}`
-      : "Icon player — not in the auction";
+      ? `${word} for ${player.teamName}`
+      : `${word} — not in the auction`;
   }
   return player.teamName !== null ? `Sold to ${player.teamName}` : "Sold";
 }

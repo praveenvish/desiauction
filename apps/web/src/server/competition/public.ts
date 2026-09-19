@@ -15,6 +15,8 @@ import { storage } from "../media";
 import { systemDb } from "../db";
 import { teamsOf, type TeamSummary } from "./competitions";
 import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
+import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
+import { preSignedSql } from "./pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 // PX-5 public reads (PX-1 02 §I thin-wiring class): anonymous, system-pool
@@ -185,6 +187,8 @@ export interface ShowcasePlayer {
    * announced "4 sold" on a competition whose auction had not started.
    */
   status: "available" | "sold" | "retained";
+  /** Why a `retained`-status player skipped the auction — the word to print. */
+  preSignedAs: PreSignedKind | null;
   teamName: string | null;
 }
 
@@ -200,8 +204,18 @@ interface ShowcaseRow {
   photoConsentAt: Date | null;
   teamId: string | null;
   teamName: string | null;
+  preSigned: boolean;
   isIcon: boolean;
+  isCaptain: boolean;
+  isRetained: boolean;
 }
+
+/**
+ * Pre-signed and NOT sold: any of the three marks (`preSignedSql`), minus a
+ * captain the room bought and the organizer named afterwards — that player's
+ * public outcome is the sale.
+ */
+const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold'))`;
 
 /**
  * Row → public player: consent-gates the photo, derives age, maps squad→status.
@@ -209,11 +223,11 @@ interface ShowcaseRow {
  * Status was derived from `team_id` alone, so an APPROVED ICON with no team yet
  * was published as "Available" — on the page, in the <title>, in the meta
  * description and on the share card someone forwards to a WhatsApp group. It is
- * not available: `auctionReady` filters icons out of the pool
- * (`server/auction/auction-ready.ts`, `.filter((row) => !row.isIcon)`), so no
- * team can bid for them in any auction this platform will ever run. The icon
- * flag is checked FIRST because it is the fact that decides biddability; the
- * team assignment only decides which name to print.
+ * not available: `auctionReady` filters pre-signed players out of the pool
+ * (`server/auction/auction-ready.ts`, `isPreSigned`), so no team can bid for
+ * them in any auction this platform will ever run. The pre-signed flag is
+ * checked FIRST because it is the fact that decides biddability; the team
+ * assignment only decides which name to print.
  */
 function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePlayer {
   // PRR P0-2 (DPDP Act 2023 §9): a minor's personal data may not be published on
@@ -241,7 +255,8 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
       !minor && r.photoConsentAt !== null && r.photoKey !== null
         ? storage.readUrl(r.photoKey)
         : null,
-    status: r.isIcon ? "retained" : r.teamId === null ? "available" : "sold",
+    status: r.preSigned ? "retained" : r.teamId === null ? "available" : "sold",
+    preSignedAs: r.preSigned ? preSignedKind(r) : null,
     teamName: r.teamName,
   };
 }
@@ -316,7 +331,10 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
       photoConsentAt: shownPhotoConsentAt,
       teamId: registrations.teamId,
       teamName: teams.name,
+      preSigned: showcasePreSigned,
       isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      isRetained: registrations.isRetained,
       // The pool size, carried on every row. `count(*) over ()` is evaluated
       // before LIMIT, so it counts the whole approved set — one query rather
       // than a second round trip, and there is no window in which the rows and
@@ -403,7 +421,10 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
       photoConsentAt: shownPhotoConsentAt,
       teamId: registrations.teamId,
       teamName: teams.name,
+      preSigned: showcasePreSigned,
       isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      isRetained: registrations.isRetained,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -748,6 +769,7 @@ export async function myRegistrations(personId: string): Promise<MyRegistration[
       number: registrations.registrationNumber,
       competitionStatus: competitions.status,
       isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
       lotStatus: lots.status,
     })
@@ -786,7 +808,7 @@ export async function myRegistrations(personId: string): Promise<MyRegistration[
     open: row.competitionStatus === "registration_open",
     posterReady:
       row.status === "approved" &&
-      (row.isIcon || row.isRetained || row.lotStatus === "sold" || row.lotStatus === "unsold"),
+      (isPreSigned(row) || row.lotStatus === "sold" || row.lotStatus === "unsold"),
   }));
 }
 

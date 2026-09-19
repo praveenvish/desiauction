@@ -59,6 +59,9 @@ function auctionBadge(
   if (outcome.kind === "retained") {
     return { tone: "info", text: "Retained" };
   }
+  if (outcome.kind === "captain") {
+    return { tone: "info", text: "Captain · picked before the auction" };
+  }
   return { tone: "neutral", text: "Unsold" };
 }
 

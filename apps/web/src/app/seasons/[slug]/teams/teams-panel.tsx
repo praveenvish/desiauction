@@ -3,7 +3,6 @@
 import {
   Badge,
   Button,
-  ButtonLink,
   Card,
   Dialog,
   EmptyState,
@@ -16,18 +15,20 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 
 import { PageTitle } from "../../../../components/shell/page-title";
+import { formatPhone } from "../../../../lib/format-phone";
 import {
   createTeamAction,
-  exportRegistrationsAction,
   setTeamCoachAction,
   updateTeamAction,
 } from "../../../../server/competition/actions";
 import type { TeamsWorkspaceView } from "../../../../server/competition/actions";
 import type { TeamCard } from "../../../../server/competition/team-workspace";
 import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
+import { ExportDialog } from "../_players/export-dialog";
+import { RosterSheetHost, SquadPreSign } from "./squad-desk";
 import { TeamLogoUploader } from "./team-logo-uploader";
 
 /** "₹74,31,250" — exact rupees, Indian grouping. */
@@ -100,17 +101,6 @@ function nextTeamColor(teams: readonly { color: string | null }[]): string {
     }
   }
   return best;
-}
-
-function downloadCsv(csv: string, filename: string): void {
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
 }
 
 export function TeamsPanel({
@@ -463,8 +453,11 @@ function RosterDetail({
   team: TeamCard;
   view: TeamsWorkspaceView;
 }) {
-  const toast = useToast();
-  const [exporting, startExport] = useTransition();
+  const [exportOpen, setExportOpen] = useState(false);
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const closeSheet = useCallback(() => {
+    setSheetId(null);
+  }, []);
   const canManage = view.viewer.canManageTeams;
   /**
    * The SEASON's role labels. `roleLabel` asks cricket and falls back to the
@@ -541,29 +534,13 @@ function RosterDetail({
             <Button
               variant="secondary"
               size="sm"
-              loading={exporting}
               data-testid="export-squad"
               onClick={() => {
-                startExport(async () => {
-                  // DA-34: "Export" used to NAVIGATE to a filtered list. This
-                  // downloads the squad, which is what the word means.
-                  const result = await exportRegistrationsAction(slug, team.id);
-                  if (!result.ok) {
-                    toast({ tone: "danger", title: result.error });
-                    return;
-                  }
-                  downloadCsv(result.csv, result.filename);
-                  toast({ tone: "success", title: "Squad exported" });
-                });
+                setExportOpen(true);
               }}
             >
-              Export squad CSV
+              Export squad
             </Button>
-          ) : null}
-          {canManage ? (
-            <ButtonLink href={`/seasons/${slug}/registrations?status=approved`} size="sm">
-              + Add to roster
-            </ButtonLink>
           ) : null}
         </div>
       </header>
@@ -595,6 +572,17 @@ function RosterDetail({
         </div>
       ) : null}
 
+      {canManage && view.viewer.canSeeRoster ? (
+        <SquadPreSign
+          slug={slug}
+          teamId={team.id}
+          teamName={team.name}
+          roster={roster}
+          locked={view.rulesSource?.locked ?? false}
+          settlesAtOpen={view.rulesSource !== null && !view.rulesSource.locked}
+        />
+      ) : null}
+
       {tally.length > 0 ? (
         <div className="team-tally">
           {tally.map(([role, count]) => (
@@ -611,11 +599,10 @@ function RosterDetail({
             <EmptyState
               headingLevel={2}
               title="No players on this squad yet"
-              description="Players land here when they're won at auction or assigned from Registrations."
-              action={
-                <ButtonLink href={`/seasons/${slug}/registrations?status=approved`}>
-                  Open registrations
-                </ButtonLink>
+              description={
+                canManage
+                  ? "Pick the captain and any icons above — everyone else joins at the auction."
+                  : "Players land here when they're won at auction or pre-signed by the organizer."
               }
             />
           ) : (
@@ -631,7 +618,16 @@ function RosterDetail({
                 </thead>
                 <tbody>
                   {roster.map((row, index) => (
-                    <tr key={row.registrationId}>
+                    <tr
+                      key={row.registrationId}
+                      className="pd-roster-row"
+                      data-open={sheetId === row.registrationId ? "true" : undefined}
+                      onClick={(event) => {
+                        if ((event.target as HTMLElement).closest("button, a") === null) {
+                          setSheetId(row.registrationId);
+                        }
+                      }}
+                    >
                       <td className="roster-num">{String(index + 1).padStart(2, "0")}</td>
                       <td>
                         <span className="roster-player">
@@ -642,15 +638,26 @@ function RosterDetail({
                           </span>
                           <span className="roster-person">
                             <span className="roster-name">
-                              {row.name ?? "Unnamed"}
+                              <button
+                                type="button"
+                                className="pd-player-name"
+                                onClick={() => {
+                                  setSheetId(row.registrationId);
+                                }}
+                              >
+                                {row.name ?? "Unnamed"}
+                              </button>
                               {row.isCaptain ? <Badge tone="info">Captain</Badge> : null}
                               {row.isIcon ? <Badge tone="success">Icon</Badge> : null}
+                              {row.isRetained ? <Badge tone="info">Retained</Badge> : null}
                             </span>
                             {/* A player always has one — `submitRegistration` refuses an
                                 account with no number, because SMS is the only way a
                                 season reaches them. The fallback is for the rows that
                                 predate that rule, not a state the product creates. */}
-                            <span className="roster-phone">{row.phone ?? "—"}</span>
+                            <span className="roster-phone">
+                              {row.phone !== null ? formatPhone(row.phone) : "—"}
+                            </span>
                           </span>
                         </span>
                       </td>
@@ -707,6 +714,28 @@ function RosterDetail({
             </div>
           </div>
         </Card>
+      ) : null}
+
+      <ExportDialog
+        slug={slug}
+        open={exportOpen}
+        onClose={() => {
+          setExportOpen(false);
+        }}
+        sportAttributes={view.sportAttributes}
+        teams={view.teams.map((entry) => ({ id: entry.id, name: entry.name }))}
+        fixedTeam={{ id: team.id, name: team.name }}
+      />
+
+      {sheetId !== null ? (
+        <RosterSheetHost
+          slug={slug}
+          registrationId={sheetId}
+          teams={view.teams.map((entry) => ({ id: entry.id, name: entry.name }))}
+          order={roster.map((row) => row.registrationId)}
+          onNavigate={setSheetId}
+          onClose={closeSheet}
+        />
       ) : null}
     </>
   );
