@@ -2,7 +2,8 @@ import { buildPlayerShareCard } from "@desiauction/core";
 import { initialsFor } from "@desiauction/ui";
 import { ImageResponse } from "next/og";
 
-import { publicPlayer } from "../../../../../server/competition/public";
+import { inlineStoredImage } from "../../../../../server/competition/posters";
+import { publicPlayerCard } from "../../../../../server/competition/public";
 import {
   SHARE_IMAGE_SIZE,
   renderPlayerShareCard,
@@ -12,7 +13,11 @@ import {
 // Shareable single-player card (parity §Phase 2). The viral unit of a grassroots
 // auction: a player posts their own card — "I'm in the pool, bid for me". Reuses
 // the SAME consent + visibility gates as the showcase (`publicPlayer` → null →
-// neutral fallback, never leaked data), and the pure share-card view.
+// neutral fallback, never leaked data), and the pure share-card view. The face
+// rides the card when the PUBLIC gate passes (consent recorded, not a minor):
+// `publicPlayerCard` hands over the stored key only then, and the bytes are
+// inlined because the rasterizer cannot fetch a relative path. No key, a WebP
+// or a missing object → the initials tile, as before.
 
 export const runtime = "nodejs"; // publicPlayer reads Postgres — not edge-safe.
 // A withdrawn player 404s on their page immediately, and a season pulled
@@ -31,10 +36,11 @@ export default async function OpengraphImage({
   params: Promise<{ slug: string; number: string }>;
 }) {
   const { slug, number } = await params;
-  const player = await publicPlayer(slug, number);
-  if (player === null) {
+  const card = await publicPlayerCard(slug, number);
+  if (card === null) {
     return new ImageResponse(renderShareFallback(), { ...size });
   }
+  const { player } = card;
   const model = buildPlayerShareCard({
     name: player.name,
     number: player.number,
@@ -47,5 +53,6 @@ export default async function OpengraphImage({
     competitionName: player.competitionName,
   });
   const { initials } = initialsFor(player.name);
-  return new ImageResponse(renderPlayerShareCard(model, initials ?? "DA"), { ...size });
+  const photo = await inlineStoredImage(card.photoKey);
+  return new ImageResponse(renderPlayerShareCard(model, initials ?? "DA", photo), { ...size });
 }

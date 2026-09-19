@@ -226,9 +226,10 @@ export function PlayerSheet({
         <header className="pd-sheet-head">
           <PlayerImage
             name={row.name ?? "Player"}
-            seed={row.personId}
+            seed={row.id}
             size="lg"
-            {...(row.photoUrl !== null ? { src: row.photoUrl } : {})}
+            src={row.photoUrl}
+            decorative
           />
           <div className="pd-sheet-id">
             <h2 id={titleId} ref={headingRef} tabIndex={-1} data-testid="details-subject">

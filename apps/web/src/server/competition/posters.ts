@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import {
   DEFAULT_AUCTION_CONFIG,
+  isMinor,
   isTier,
   isValidMediaKey,
   slugifyName,
@@ -430,6 +431,7 @@ async function playerPosterFrom(
           playerName: shownName,
           photoKey: shownPhotoKey,
           photoConsentAt: shownPhotoConsentAt,
+          dateOfBirth: registrations.dateOfBirth,
           role: registrations.role,
           number: registrations.registrationNumber,
           status: registrations.status,
@@ -498,8 +500,15 @@ async function playerPosterFrom(
        * photo without a timestamp beside it never reaches the renderer — the
        * model already draws a monogram for exactly this case, so the withheld
        * answer is a designed one rather than a hole.
+       *
+       * PRR P0-2 (DPDP §9): and never a minor's face, whatever consent was
+       * recorded — a poster is a public surface the moment it is forwarded,
+       * so it takes the same age gate as /c and the live rooms
+       * (`publicPhotoUrl`). Decided HERE, before `inlineStoredImage` reads a
+       * single byte, so a withheld photo is never fetched at all.
        */
-      const photoKey = row.photoConsentAt === null ? null : row.photoKey;
+      const photoKey =
+        row.photoConsentAt === null || isMinor(row.dateOfBirth, new Date()) ? null : row.photoKey;
 
       await recordPosterGenerated(db, gated, {
         action: "registration.poster_generated",
@@ -794,7 +803,7 @@ function pursePerTeamOf(config: unknown): number {
  * poster through the monogram the model already designs for, which is a poster
  * that looks intentional rather than a 500.
  */
-async function inlineStoredImage(key: string | null): Promise<string | null> {
+export async function inlineStoredImage(key: string | null): Promise<string | null> {
   if (key === null || !isValidMediaKey(key)) {
     return null;
   }

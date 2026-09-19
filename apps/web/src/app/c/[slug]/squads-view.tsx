@@ -38,10 +38,11 @@ export function SquadsView({ players }: { players: ShowcasePlayer[] }) {
                 <li key={p.number} className="squad-player">
                   <PlayerImage
                     name={p.name}
-                    seed={p.number}
+                    seed={p.registrationId}
                     size="sm"
                     shape="round"
-                    {...(p.photoUrl !== null ? { src: p.photoUrl } : {})}
+                    src={p.photoUrl}
+                    decorative
                   />
                   <span className="squad-player-name">{p.name}</span>
                   <span className="squad-player-num">#{p.number}</span>

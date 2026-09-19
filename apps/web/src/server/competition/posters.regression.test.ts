@@ -464,3 +464,60 @@ describe("POSTER ACCESS — everyone else", () => {
     await db.delete(competitionsTable).where(eq(competitionsTable.id, second.id));
   });
 });
+
+describe("POSTER PHOTO — consent AND age, decided before a byte is read", () => {
+  /** The `photo` fact on the newest poster row the organizer made for `sold`. */
+  async function lastPhotoFact(): Promise<string | undefined> {
+    const [row] = await db
+      .select({ meta: auditLog.meta })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.action, "registration.poster_generated"),
+          eq(auditLog.subject, sold.registrationId),
+          eq(auditLog.actor, organizer),
+        ),
+      )
+      .orderBy(desc(auditLog.at), desc(auditLog.id))
+      .limit(1);
+    return (row?.meta as { photo?: string } | undefined)?.photo;
+  }
+
+  it("withholds a MINOR's consented photo — a poster is public once forwarded", async () => {
+    const tenYearsAgo = new Date();
+    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+    await db
+      .update(people)
+      .set({ photoUrl: `players/${sold.personId}/poster-test.png`, photoConsentAt: new Date() })
+      .where(eq(people.id, sold.personId));
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: tenYearsAgo.toISOString().slice(0, 10) })
+      .where(eq(registrationsTable.id, sold.registrationId));
+
+    const minor = await playerPosterFor(organizer, slug, sold.registrationId, REQUEST);
+    expect(minor.ok).toBe(true);
+    if (minor.ok) {
+      expect(minor.input.photoUrl).toBeNull();
+    }
+    expect(await lastPhotoFact()).toBe("withheld");
+
+    // The same consented photo on an ADULT is included — proving the refusal
+    // above was the age gate and not the fixture.
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: "1990-01-01" })
+      .where(eq(registrationsTable.id, sold.registrationId));
+    expect((await playerPosterFor(organizer, slug, sold.registrationId, REQUEST)).ok).toBe(true);
+    expect(await lastPhotoFact()).toBe("included");
+
+    await db
+      .update(people)
+      .set({ photoUrl: null, photoConsentAt: null })
+      .where(eq(people.id, sold.personId));
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: null })
+      .where(eq(registrationsTable.id, sold.registrationId));
+  });
+});

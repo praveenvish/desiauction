@@ -7,6 +7,7 @@ import {
   Card,
   LoadingState,
   Money,
+  PlayerImage,
   SectionHeader,
   VisuallyHidden,
   IconArrowRight,
@@ -918,11 +919,23 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
                 {liveBoard?.onBlock !== null && liveBoard?.onBlock !== undefined ? (
                   <div>
                     <dt>On the block</dt>
-                    <dd>
-                      {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
-                      <span className="home-live-role">
-                        {" · "}
-                        {roleLabeller(liveBoard.roles)(liveBoard.onBlock.role)}
+                    <dd className="home-live-player">
+                      {/* The face under the hammer (broadcast rule, gated in
+                          the read); the registration's initials mark without one. */}
+                      <PlayerImage
+                        name={liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
+                        seed={liveBoard.onBlock.registrationId}
+                        src={liveBoard.onBlock.photoUrl}
+                        size="xs"
+                        shape="round"
+                        decorative
+                      />
+                      <span>
+                        {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
+                        <span className="home-live-role">
+                          {" · "}
+                          {roleLabeller(liveBoard.roles)(liveBoard.onBlock.role)}
+                        </span>
                       </span>
                     </dd>
                   </div>

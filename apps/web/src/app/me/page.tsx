@@ -1,11 +1,12 @@
 import { SPORTS, sportPackFor } from "@desiauction/core";
+import { PlayerImage } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { compactINR } from "../../lib/inr";
 import { currentSession } from "../../server/auth/actions";
 import { playerCareer, playerMatches, type CareerMatch } from "../../server/player/career";
-import { playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
+import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
 import "./me.css";
 
 export const metadata = { title: "My sports · DesiAuction" };
@@ -67,12 +68,13 @@ export default async function MySportsPage({
   if (session.name === null || session.name.trim() === "") {
     redirect("/onboarding");
   }
-  const [query, career, matches, profile, completeness] = await Promise.all([
+  const [query, career, matches, profile, completeness, photoUrl] = await Promise.all([
     searchParams,
     playerCareer(session.personId),
     playerMatches(session.personId),
     playerProfileFor(session.personId),
     profileCompletenessFor(session.personId),
+    ownPhotoUrl(session.personId),
   ]);
 
   // Sports this person actually played, in the platform's own order.
@@ -102,19 +104,19 @@ export default async function MySportsPage({
   );
   const upcoming = waiting ?? inPool;
 
-  const initials = session.name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-
   return (
     <main className="me">
       <section className="me-profile" aria-label="Profile">
-        <span className="me-avatar" aria-hidden>
-          {initials}
-        </span>
+        {/* Their own face when they have uploaded one; the branded initials
+            mark (C-25) until then — the same mark every season surface shows. */}
+        <PlayerImage
+          name={session.name}
+          seed={session.personId}
+          src={photoUrl}
+          size="lg"
+          shape="round"
+          decorative
+        />
         <div className="me-who">
           <h2 className="me-name">{session.name}</h2>
           <p className="me-meta">

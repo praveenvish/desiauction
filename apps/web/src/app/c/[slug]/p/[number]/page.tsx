@@ -131,9 +131,10 @@ export default async function PlayerProfilePage({
           <div className="showcase-detail">
             <PlayerImage
               name={player.name}
-              seed={player.number}
+              seed={player.registrationId}
               size="hero"
-              {...(player.photoUrl !== null ? { src: player.photoUrl } : {})}
+              src={player.photoUrl}
+              decorative
             />
             <dl className="showcase-detail-meta">
               <dt>Number</dt>

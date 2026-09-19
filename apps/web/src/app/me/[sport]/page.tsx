@@ -6,6 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import { currentSession } from "../../../server/auth/actions";
 import { playerCareer, type CareerSeason } from "../../../server/player/career";
 import {
+  ownPhotoUrl,
   playerProfileFor,
   profileCompletenessFor,
   sportProfileFor,
@@ -75,11 +76,12 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
   if (session === null) {
     redirect(`/login?next=/me/${pack.key}`);
   }
-  const [career, sportProfile, profile, completeness] = await Promise.all([
+  const [career, sportProfile, profile, completeness, photoUrl] = await Promise.all([
     playerCareer(session.personId, pack.key),
     sportProfileFor(session.personId, pack.key),
     playerProfileFor(session.personId),
     profileCompletenessFor(session.personId),
+    ownPhotoUrl(session.personId),
   ]);
 
   return (
@@ -90,8 +92,10 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
           <PlayerImage
             name={session.name ?? "Player"}
             seed={session.personId}
+            src={photoUrl}
             size="md"
             shape="round"
+            decorative
           />
           <div className="me-cricket-id">
             <h2>{session.name ?? "—"}</h2>

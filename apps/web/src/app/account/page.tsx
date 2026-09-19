@@ -11,6 +11,7 @@ import {
 } from "../../server/auth/actions";
 import { notificationSettings } from "../../server/messaging/actions";
 import {
+  ownPhotoUrl,
   playerProfileFor,
   sportProfilesFor,
   sportsPlayedBy,
@@ -49,7 +50,7 @@ export default async function AccountPage() {
   // Independent reads, together: they were eight awaits in a row, so the page
   // cost the SUM of eight round trips. Completeness needs the passkey count,
   // so it follows.
-  const [security, settings, email, erasure, cricketProfile, sportProfiles, played] =
+  const [security, settings, email, erasure, cricketProfile, sportProfiles, played, photoUrl] =
     await Promise.all([
       accountSecurity(),
       notificationSettings(),
@@ -66,6 +67,8 @@ export default async function AccountPage() {
       // a season they entered. Every pack is still built; `SportProfiles`
       // decides which to show and offers the rest one at a time.
       sportsPlayedBy(session.personId),
+      // Their own photo, signed here rather than in the client panel.
+      ownPhotoUrl(session.personId),
     ]);
   const sportForms = SPORTS.map((pack) => {
     const held = sportProfiles.find((profile) => profile.sport === pack.key);
@@ -131,6 +134,7 @@ export default async function AccountPage() {
                 phone={session.phone}
                 email={session.email}
                 name={session.name}
+                photoUrl={photoUrl}
                 completeness={completeness}
                 signOut={<SignOutButton logout={logoutAction} />}
               />

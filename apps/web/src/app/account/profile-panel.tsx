@@ -24,6 +24,8 @@ export interface ProfilePanelProps {
   phone: string | null;
   email: string | null;
   name: string | null;
+  /** Their own photo, consent-gated and signed server-side; null → initials mark. */
+  photoUrl: string | null;
   /** PI-1: computed server-side by core's profileCompleteness — never stored. */
   completeness: ProfileCompleteness;
   /** The sign-out form, which must be a client component to sweep localStorage. */
@@ -47,8 +49,9 @@ const ITEM_LABELS: Record<ProfileItem, { label: string; hint?: string }> = {
 
 /**
  * PX-3 profile: the existing identity, made visible and editable.
- * Avatar is the branded generated identity (C-25) — photo upload arrives with
- * player registration consent (photoConsent columns), not here. Timezone and
+ * Avatar is the person's own photo once they have uploaded one (upload
+ * arrives with player registration consent — photoConsent columns — not
+ * here), and the branded generated identity (C-25) until then. Timezone and
  * language are product rulings (IST, English) — not settings, so not shown.
  *
  * This is now the ONE identity card on the page: the headless <dl> that used to
@@ -59,6 +62,7 @@ export function ProfilePanel({
   phone,
   email,
   name,
+  photoUrl,
   completeness,
   signOut,
 }: ProfilePanelProps) {
@@ -87,7 +91,14 @@ export function ProfilePanel({
   return (
     <Card className="profile-card" data-testid="profile-panel">
       <div className="profile-head">
-        <PlayerImage name={hasName ? name : "New member"} seed={personId} size="lg" shape="round" />
+        <PlayerImage
+          name={hasName ? name : "New member"}
+          seed={personId}
+          src={photoUrl}
+          size="lg"
+          shape="round"
+          decorative
+        />
         <div className="profile-id">
           <h2 className="profile-name" data-testid="account-name">
             {hasName ? name : "Your profile"}
