@@ -4,6 +4,7 @@ import {
   auditLog,
   consentRecords,
   emailVerifications,
+  messageOutbox,
   erasureRequests,
   grants,
   newId,
@@ -309,6 +310,9 @@ export async function executeErasure(input: {
     await tx.delete(playerProfiles).where(eq(playerProfiles.personId, personId));
     await tx.delete(playerSportProfiles).where(eq(playerSportProfiles.personId, personId));
     await tx.delete(emailVerifications).where(eq(emailVerifications.personId, personId));
+    // Queued personal mail carries a name and a price (0079): nothing of it is
+    // kept, sent or not.
+    await tx.delete(messageOutbox).where(eq(messageOutbox.personId, personId));
     if (before?.phone !== null && before?.phone !== undefined) {
       await tx.delete(otpCodes).where(eq(otpCodes.phone, before.phone));
       await tx.delete(otpInbox).where(eq(otpInbox.phone, before.phone));

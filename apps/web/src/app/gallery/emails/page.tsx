@@ -5,6 +5,12 @@ import {
   bookingReminderMail,
 } from "../../../server/marketing/demo-booking-mail";
 import { requesterAcknowledgement } from "../../../server/marketing/demo-mail";
+import {
+  appointmentMail,
+  ownerSummaryMail,
+  soldMail,
+  unsoldMail,
+} from "../../../server/messaging/player-mail";
 import { reviewAskMail, seasonAskMail } from "../../../server/reviews/review-mail";
 import "./emails.css";
 
@@ -26,7 +32,85 @@ export default function EmailGalleryPage() {
     slotEnd: new Date("2026-10-02T13:00:00Z"),
     sequence: 0,
   };
+  const squad = [
+    { name: "Arjun Sharma", note: "₹75,000" },
+    { name: "Vikram Patel", note: "Captain · ₹25,000" },
+    { name: "Rahul Desai", note: "Icon" },
+  ];
   const samples: { name: string; mail: { subject: string; text: string; html: string } }[] = [
+    {
+      name: "Sold — with the bidding story",
+      mail: soldMail({
+        name: "Arjun",
+        season: "Malad Premier League 2026",
+        orgName: "Malad Cricket Club",
+        teamName: "Cup Kings",
+        price: "₹75,000",
+        basePrice: "₹25,000",
+        multiple: 3,
+        bidders: ["Tigers", "Cup Kings", "Falcons"],
+        bidCount: 7,
+        highlight: "You were the most expensive buy of the night",
+        squad,
+        cardUrl: "https://desiauction.in/c/malad-premier-league/p/R8KQ2X1",
+      }),
+    },
+    {
+      name: "Not picked",
+      mail: unsoldMail({
+        name: "Rohit",
+        season: "Malad Premier League 2026",
+        orgName: "Malad Cricket Club",
+      }),
+    },
+    {
+      name: "Named captain — signed before the auction",
+      mail: appointmentMail({
+        name: "Vikram",
+        season: "Malad Premier League 2026",
+        orgName: "Malad Cricket Club",
+        teamName: "Cup Kings",
+        roles: ["captain"],
+        bought: false,
+      }),
+    },
+    {
+      name: "Named captain and icon — one email",
+      mail: appointmentMail({
+        name: "Rahul",
+        season: "Malad Premier League 2026",
+        orgName: "Malad Cricket Club",
+        teamName: "Cup Kings",
+        roles: ["icon", "captain"],
+        bought: false,
+      }),
+    },
+    {
+      name: "Named captain after the auction bought them",
+      mail: appointmentMail({
+        name: "Arjun",
+        season: "Malad Premier League 2026",
+        orgName: "Malad Cricket Club",
+        teamName: "Cup Kings",
+        roles: ["captain"],
+        bought: true,
+      }),
+    },
+    {
+      name: "Owner — the squad after the auction",
+      mail: ownerSummaryMail({
+        name: "Priya",
+        season: "Malad Premier League 2026",
+        teamName: "Cup Kings",
+        squad,
+        spent: "₹1,00,000",
+        purseLeft: "₹1,99,00,000",
+        squadSize: 3,
+        squadMin: 8,
+        squadMax: 15,
+        teamUrl: "https://desiauction.in/seasons/malad-premier-league/teams",
+      }),
+    },
     { name: "Sign-in code", mail: codeMailCopy("482913", "login") },
     { name: "Sign-up code", mail: codeMailCopy("482913", "signup") },
     { name: "Confirm email", mail: codeMailCopy("482913", "email_change") },

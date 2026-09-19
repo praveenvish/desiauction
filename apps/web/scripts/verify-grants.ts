@@ -142,6 +142,10 @@ const APP_WRITES_UNPROTECTED = [
   "reviews",
   // FR-1 Phase 4 (0070): a reader's report on a public review, no tenant.
   "review_reports",
+  // Personal messages (0079): the queue is keyed by person, not org. The sale
+  // and the announce enqueue, the drain updates, erasure and the retention
+  // sweep delete — all on the app pool.
+  "message_outbox",
 ];
 
 /**

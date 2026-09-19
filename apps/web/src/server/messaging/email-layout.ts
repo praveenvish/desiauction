@@ -28,8 +28,13 @@ export interface EmailContent {
   readonly paragraphs: readonly string[];
   /** A one-time code, shown large and on its own. */
   readonly code?: string;
-  /** The ONE thing to do. */
+  /** The ONE thing to do. Placed last — after the facts it acts on. */
   readonly action?: { readonly label: string; readonly url: string };
+  /**
+   * The button right after the opening paragraphs instead: for a mail whose
+   * whole point is the click (a review ask), where what follows is fine print.
+   */
+  readonly actionFirst?: boolean;
   /** A few labelled facts, e.g. the details of a booking. */
   readonly details?: readonly (readonly [string, string])[];
   /** Paragraphs after the code, button or details. */
@@ -99,14 +104,17 @@ function detailsTable(details: readonly (readonly [string, string])[]): string {
 }
 
 export function renderEmail(content: EmailContent): RenderedEmail {
+  const action = content.action === undefined ? "" : button(content.action);
+  const first = content.actionFirst === true;
   const body = [
     ...content.paragraphs.map(paragraph),
     content.code === undefined ? "" : codeBlock(content.code),
-    content.action === undefined ? "" : button(content.action),
+    first ? action : "",
     content.details === undefined || content.details.length === 0
       ? ""
       : detailsTable(content.details),
     ...(content.after ?? []).map(paragraph),
+    first ? "" : action,
   ].join("");
 
   const html = `<!doctype html>
@@ -143,16 +151,19 @@ ${content.noLinks === true ? `<p style="margin:0;">DesiAuction &middot; Help: ${
 </body>
 </html>`;
 
+  const actionLine =
+    content.action === undefined ? [] : [`${content.action.label}: ${content.action.url}`, ""];
   const text = [
     content.heading,
     "",
     ...content.paragraphs.flatMap((p) => [p, ""]),
     ...(content.code === undefined ? [] : [`    ${content.code}`, ""]),
-    ...(content.action === undefined ? [] : [`${content.action.label}: ${content.action.url}`, ""]),
+    ...(first ? actionLine : []),
     ...(content.details === undefined
       ? []
       : [...content.details.map(([label, value]) => `  ${label}: ${value}`), ""]),
     ...(content.after ?? []).flatMap((p) => [p, ""]),
+    ...(first ? [] : actionLine),
     "—",
     content.footnote,
     content.noLinks === true
