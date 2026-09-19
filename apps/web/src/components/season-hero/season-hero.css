@@ -215,3 +215,23 @@ li:has(> .sh-figures) {
     flex-wrap: nowrap;
   }
 }
+
+/* A banner with no side column: the main column takes the full width, and the
+   eyebrow row carries the status on the left and the controls on the right. */
+.sh-full-main [class*="hero-main"] {
+  flex: 1;
+}
+
+.sh-eyebrow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sh-eyebrow-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}

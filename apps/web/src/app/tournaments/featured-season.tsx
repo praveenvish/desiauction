@@ -159,11 +159,26 @@ export function FeaturedSeason({
 
   return (
     <section className="tg-feature" aria-label="Featured season" data-testid="tg-featured">
-      <div className="tg-feature-top sh-top-actions">
+      <div className="tg-feature-top sh-full-main">
         <HeroBanner
           image={coverOf(season)}
           crest={<SeasonCrest name={season.name} logoUrl={overview?.logoUrl ?? null} />}
-          eyebrow={<HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>}
+          // The chip and the menu ride the eyebrow row, right-aligned, so the
+          // banner's main column keeps its full width for the four figures.
+          eyebrow={
+            <div className="sh-eyebrow-row">
+              <HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>
+              <span className="sh-eyebrow-actions">
+                {season.orgName !== "" ? <HeroChip>{season.orgName}</HeroChip> : null}
+                <PopoverMenu
+                  label={`${season.name} actions`}
+                  trigger={<IconKebab width={18} height={18} />}
+                  triggerClassName="sh-ghost-trigger"
+                  items={menu}
+                />
+              </span>
+            </div>
+          }
           title={season.name}
           meta={[
             ...(when !== null
@@ -184,17 +199,6 @@ export function FeaturedSeason({
               : []),
             <HeroFigures key="figures" figures={figures} label={`${season.name} at a glance`} />,
           ]}
-          actions={
-            <>
-              {season.orgName !== "" ? <HeroChip>{season.orgName}</HeroChip> : null}
-              <PopoverMenu
-                label={`${season.name} actions`}
-                trigger={<IconKebab width={18} height={18} />}
-                triggerClassName="sh-ghost-trigger"
-                items={menu}
-              />
-            </>
-          }
         />
 
         <div className="tg-feature-side">

@@ -1074,3 +1074,12 @@
 .tg-feature-steps li > * {
   box-sizing: border-box;
 }
+
+/* Stacked under the banner, the side panel would restate the banner's name and
+   dates a second time; it keeps only its status, tournament and the way in. */
+@media (max-width: 1099px) {
+  .tg-feature-name,
+  .tg-feature-when {
+    display: none;
+  }
+}
