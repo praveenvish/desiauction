@@ -341,6 +341,11 @@ export interface HeroBannerProps {
   /** Right side: a quote, figures, a switcher. */
   aside?: ReactNode;
   headingLevel?: 1 | 2;
+  /**
+   * Where the side column (actions + aside) sits: "end" (bottom, for a quote
+   * or figures) or "start" (top right, for a club chip and a menu).
+   */
+  sideAlign?: "start" | "end";
   testId?: string;
 }
 
@@ -353,6 +358,7 @@ export function HeroBanner({
   actions,
   aside,
   headingLevel = 2,
+  sideAlign = "end",
   testId,
 }: HeroBannerProps) {
   const Heading: ElementType = headingLevel === 1 ? "h1" : "h2";
@@ -360,6 +366,7 @@ export function HeroBanner({
     <section
       className={styles["hero"]}
       data-has-image={image !== undefined && image !== null ? "true" : undefined}
+      data-side-align={sideAlign}
       data-testid={testId}
     >
       {image !== undefined && image !== null ? (

@@ -407,6 +407,7 @@ button.stat:focus-visible {
 }
 
 .journey-link {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -550,6 +551,7 @@ a.journey-link:focus-visible {
 }
 
 .hero-main {
+  flex: 1 1 20rem;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -614,7 +616,22 @@ a.journey-link:focus-visible {
   height: 16px;
 }
 
+.hero[data-side-align="start"] .hero-inner {
+  align-items: flex-start;
+}
+
+@media (min-width: 720px) {
+  .hero[data-side-align="start"] .hero-inner {
+    flex-wrap: nowrap;
+  }
+
+  .hero[data-side-align="start"] .hero-actions {
+    flex-wrap: nowrap;
+  }
+}
+
 .hero-side {
+  flex: none;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

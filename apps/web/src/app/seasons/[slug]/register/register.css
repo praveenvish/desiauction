@@ -302,7 +302,7 @@
 
 .reg-step-title {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: var(--text-xl-size);
   line-height: var(--text-xl-line);
   font-weight: 600;
@@ -634,7 +634,7 @@
   align-items: baseline;
   gap: var(--space-2);
   flex-wrap: wrap;
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: var(--text-lg-size);
   line-height: var(--text-lg-line);
   font-weight: 600;
@@ -825,7 +825,7 @@
 
 .reg-status-title h2 {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: var(--text-xl-size);
   line-height: var(--text-xl-line);
   font-weight: 600;

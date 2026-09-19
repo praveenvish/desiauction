@@ -266,6 +266,8 @@ a.wordmark:hover .wordmark-glyph {
     line-height: var(--text-xl-line);
   }
 
+  /* The action gets its own full-width row — in the page head, and in the
+     top bar, where it goes LAST so the icons keep the first row. */
   .page-action {
     flex-basis: 100%;
   }
@@ -274,6 +276,25 @@ a.wordmark:hover .wordmark-glyph {
   .page-action > a {
     flex: 1;
     justify-content: center;
+  }
+
+  .topbar:has(.page-action:not(:empty)) {
+    height: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  .topbar-inner {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--shell-topbar-h);
+  }
+
+  .topbar .page-action {
+    order: 10;
+  }
+
+  .topbar .identity-lede {
+    display: none;
   }
 }
 

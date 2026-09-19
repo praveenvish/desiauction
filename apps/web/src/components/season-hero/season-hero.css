@@ -195,33 +195,6 @@ li:has(> .sh-figures) {
   background: var(--text-on-accent);
 }
 
-/* HeroBanner bottom-aligns its side column, which is right for a quote and
-   wrong for a chip + menu: the mockup pins those to the top right. The kit has
-   no prop for it; this is the one override, scoped to heroes that ask. */
-.sh-top-actions [class*="hero-inner"] {
-  align-items: flex-start;
-}
-
-@media (min-width: 720px) {
-  .sh-top-actions [class*="hero-inner"] {
-    flex-wrap: nowrap;
-  }
-
-  .sh-top-actions [class*="hero-side"] {
-    flex: none;
-  }
-
-  .sh-top-actions [class*="hero-actions"] {
-    flex-wrap: nowrap;
-  }
-}
-
-/* A banner with no side column: the main column takes the full width, and the
-   eyebrow row carries the status on the left and the controls on the right. */
-.sh-full-main [class*="hero-main"] {
-  flex: 1;
-}
-
 .sh-eyebrow-row {
   display: flex;
   flex-wrap: wrap;

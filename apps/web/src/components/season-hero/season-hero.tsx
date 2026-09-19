@@ -11,33 +11,8 @@ import "./season-hero.css";
  * figures, the chip and the ghost buttons that sit on a dark bed.
  */
 
-/** "Vishnoi Cricket Club" → "VC". First code point of up to two words. */
-export function monogram(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((word) => {
-        const first = word.codePointAt(0);
-        return first === undefined ? "" : String.fromCodePoint(first);
-      })
-      .join("")
-      .toUpperCase() || "—"
-  );
-}
-
-/** The season's crest where the organizer set one; its initials where not. */
-export function SeasonCrest({ name, logoUrl }: { name: string; logoUrl: string | null }) {
-  return logoUrl !== null ? (
-    <img src={logoUrl} alt="" className="sh-crest-img" />
-  ) : (
-    <span className="sh-crest-mono" aria-hidden>
-      {monogram(name)}
-    </span>
-  );
-}
+export { monogram } from "./monogram";
+export { SeasonCrest } from "./season-crest";
 
 export interface HeroFigure {
   key: string;

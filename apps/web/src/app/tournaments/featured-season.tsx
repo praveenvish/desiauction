@@ -159,7 +159,7 @@ export function FeaturedSeason({
 
   return (
     <section className="tg-feature" aria-label="Featured season" data-testid="tg-featured">
-      <div className="tg-feature-top sh-full-main">
+      <div className="tg-feature-top">
         <HeroBanner
           image={coverOf(season)}
           crest={<SeasonCrest name={season.name} logoUrl={overview?.logoUrl ?? null} />}

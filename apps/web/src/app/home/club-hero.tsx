@@ -61,8 +61,9 @@ export function ClubHero({
   );
   const live = overview.auctionLive;
   return (
-    <div className="home-hero sh-top-actions">
+    <div className="home-hero">
       <HeroBanner
+        sideAlign="start"
         testId="home-club-hero"
         image={coverOf(season)}
         crest={<SeasonCrest name={season.name} logoUrl={overview.logoUrl} />}
