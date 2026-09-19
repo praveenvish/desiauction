@@ -102,6 +102,7 @@ export function LotHero({
   frozen = false,
   clock,
   media,
+  face = "md",
   testId = "current-lot",
 }: {
   /** The season's roles, so a football night is not named in cricket. */
@@ -134,6 +135,12 @@ export function LotHero({
    */
   media?: LotMedia | undefined;
   /**
+   * How much of the hero the player's face takes. `lg` is the spectator's
+   * stage — a guest came to watch a PERSON be sold, and a 96px thumbnail is
+   * what the owner's console needs, not what the room does.
+   */
+  face?: "md" | "lg";
+  /**
    * `current-lot` is the long-standing handle for "the lot on the block", kept
    * as the default so the live-auction suites keep pointing at the thing they
    * were written against. Spectate overrides it: a suite there matches
@@ -164,7 +171,7 @@ export function LotHero({
             `lot-hero-top` justifies its children apart, and dropping the photo
             in as a third sibling would have pushed the ring into the middle. */}
         <div className="lot-hero-identity">
-          <span className="lot-hero-figure">
+          <span className={`lot-hero-figure${face === "lg" ? " lot-hero-figure--lg" : ""}`}>
             <PlayerImage
               name={name}
               // The registration, not the name: two players called Rohit Sharma
@@ -173,7 +180,11 @@ export function LotHero({
               // lot id only for a lot the page's media has not seen
               // (lib/player-seed).
               seed={media?.registrationId ?? lot.lotId}
-              size="xl"
+              size={face === "lg" ? "hero" : "xl"}
+              fluid={face === "lg"}
+              /* Ringed in the colours of whoever is leading: the room sees who
+                 is winning him before it reads a word. */
+              {...(leadColor === null ? {} : { teamColor: leadColor, ring: true })}
               {...(photo === null ? {} : { src: photo })}
             />
             {/* THE PLAYER'S OWN NUMBER, which the room shouts and the kicker

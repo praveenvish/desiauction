@@ -255,9 +255,10 @@ export function SquadBoard({
                         name={member.name}
                         seed={member.seed}
                         src={member.photoUrl}
-                        size="xs"
+                        size="sm"
                         shape="round"
                         teamColor={team.primaryColor ?? undefined}
+                        ring
                         decorative
                       />
                       <span className="squad-name">{member.name}</span>

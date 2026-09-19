@@ -11,6 +11,7 @@ import { useLiveFeed } from "../live-experience";
 import { purseRowKey, teamPurseRows, type TeamIdentity } from "../purse-board";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
+import { BrandLockup } from "../../../../../components/shell/brand";
 import { SoundToggle } from "../../../../../components/shell/sound-toggle";
 
 import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
@@ -21,6 +22,9 @@ import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-s
 // Squad counts are matched by TEAM NAME, not id: a live sale arrives via the
 // snapshot's lastOutcome with only the team's name (no id), so name is the one
 // key present for both the server-seeded history and live deltas.
+
+/** Faces shown per franchise card before the rest collapse into "+N". */
+const SQUAD_FACES = 6;
 
 function money(amount: number): string {
   return formatPaiseINR(paise(amount));
@@ -231,6 +235,15 @@ export function BoardPanel({
   // block, not the history — so recent sales stand down for the duration of a
   // lot and come back between lots, which is exactly when they are read.
   const recent = [...soldLots].reverse().slice(0, 6);
+  // A sale is matched to its franchise by NAME (see the note at the top), so the
+  // team's colour is too — it rings the faces of the players it bought.
+  const colorOf = (teamName: string | null | undefined): string | undefined =>
+    teamIdentities.find((team) => team.name === teamName)?.primaryColor ?? undefined;
+  const faceOf = (entry: ResolvedLot) => ({
+    name: entry.playerName ?? entry.lotNumber,
+    seed: entry.registrationId ?? lotSeed(entry.lotId, lotMedia),
+    src: lotMedia[entry.lotId]?.photoUrl ?? null,
+  });
 
   const status = snapshot?.auctionStatus ?? null;
   const lot = snapshot?.currentLot ?? null;
@@ -286,7 +299,6 @@ export function BoardPanel({
       {/* The projector's one control besides the browser: sound, off by
           default, switched on by whoever set the laptop up. Floated so it
           takes no row of the frame. */}
-      <SoundToggle className="board-sound" />
       <header className="board-head">
         <div className="board-head-main">
           {/* DA-15: this said "Live auction" whatever the auction was doing —
@@ -309,32 +321,43 @@ export function BoardPanel({
             </p>
           ) : null}
         </div>
-        {/* Rendered while connecting too, with em dashes for the counts. It is
+        <div className="board-head-side">
+          {/* THE BRAND, in the corner of the wall — the same lockup as the
+              public header, sized for the back of a hall and set in the header's
+              quiet column so it never competes with the lot. It shares the row
+              with the projector's one control (sound), which used to float over
+              this corner on its own. */}
+          <div className="board-head-brand">
+            <BrandLockup tone="board" />
+            <SoundToggle className="board-sound" />
+          </div>
+          {/* Rendered while connecting too, with em dashes for the counts. It is
             the right-hand half of the header: absent, the title block had the
             whole width and re-flowed when the socket answered. */}
-        <div className="board-progress" data-testid="board-progress" data-connecting={connecting}>
-          {connecting ? (
-            <span className="board-progress-count">
-              &mdash;<span className="board-progress-total">/&mdash;</span>
+          <div className="board-progress" data-testid="board-progress" data-connecting={connecting}>
+            {connecting ? (
+              <span className="board-progress-count">
+                &mdash;<span className="board-progress-total">/&mdash;</span>
+              </span>
+            ) : (
+              <span className="board-progress-count">
+                {snapshot.lotsResolved}
+                <span className="board-progress-total">/{snapshot.lotsTotal}</span>
+              </span>
+            )}
+            <span className="board-progress-label">lots settled</span>
+            <span className="board-progress-bar" aria-hidden="true">
+              <i
+                style={{
+                  width: `${String(
+                    snapshot !== null && snapshot.lotsTotal > 0
+                      ? Math.round((snapshot.lotsResolved / snapshot.lotsTotal) * 100)
+                      : 0,
+                  )}%`,
+                }}
+              />
             </span>
-          ) : (
-            <span className="board-progress-count">
-              {snapshot.lotsResolved}
-              <span className="board-progress-total">/{snapshot.lotsTotal}</span>
-            </span>
-          )}
-          <span className="board-progress-label">lots settled</span>
-          <span className="board-progress-bar" aria-hidden="true">
-            <i
-              style={{
-                width: `${String(
-                  snapshot !== null && snapshot.lotsTotal > 0
-                    ? Math.round((snapshot.lotsResolved / snapshot.lotsTotal) * 100)
-                    : 0,
-                )}%`,
-              }}
-            />
-          </span>
+          </div>
         </div>
       </header>
 
@@ -380,6 +403,10 @@ export function BoardPanel({
               seed={lotSeed(lot.lotId, lotMedia)}
               size="hero"
               src={facePhoto}
+              /* The leading franchise's colour rings the face while it leads,
+                 so the wall says WHO is winning him before anyone reads it. */
+              teamColor={colorOf(lot.currentBid?.teamName)}
+              ring
             />
             {/* The REGISTRATION number, not `lot.lotNumber` — that one is the
                 queue position and it stays in the kicker above. This is the
@@ -492,11 +519,25 @@ export function BoardPanel({
           <div className="board-tile">
             <span className="board-tile-label">Most expensive</span>
             {topBuy !== null && topBuy.soldPrice !== null ? (
-              <span className="board-tile-value board-tile-top">
-                {money(topBuy.soldPrice)}
-                <span className="board-tile-note">
-                  {topBuy.playerName ?? topBuy.lotNumber}
-                  {topBuy.teamName !== null ? ` · ${topBuy.teamName}` : ""}
+              <span className="board-tile-topbuy" data-testid="board-top-buy">
+                {/* The night's headline is a PERSON: the face beside the price. */}
+                <span className="board-tile-face">
+                  <PlayerImage
+                    {...faceOf(topBuy)}
+                    size="xl"
+                    shape="round"
+                    teamColor={colorOf(topBuy.teamName)}
+                    ring
+                    fluid
+                    decorative
+                  />
+                </span>
+                <span className="board-tile-value board-tile-top">
+                  {money(topBuy.soldPrice)}
+                  <span className="board-tile-note">
+                    {topBuy.playerName ?? topBuy.lotNumber}
+                    {topBuy.teamName !== null ? ` · ${topBuy.teamName}` : ""}
+                  </span>
                 </span>
               </span>
             ) : (
@@ -526,19 +567,47 @@ export function BoardPanel({
                   {team.activePaddles.length > 0 ? team.activePaddles.join(" · ") : "—"}
                 </span>
               </div>
-              <div className="board-team-purse">
-                <span className="board-purse-value">
-                  {/* "sealed" means the engine withheld this team's money from
+              <div className="board-team-mid">
+                <div className="board-team-purse">
+                  <span className="board-purse-value">
+                    {/* "sealed" means the engine withheld this team's money from
                       this viewer. Before the socket answers, nothing has been
                       withheld — it simply is not known yet, and saying "sealed"
                       there would state a permission fact that is not true. */}
-                  {connecting
-                    ? "—"
-                    : team.purseRemaining === null
-                      ? "sealed"
-                      : money(team.purseRemaining)}
-                </span>
-                <span className="board-purse-label">purse remaining</span>
+                    {connecting
+                      ? "—"
+                      : team.purseRemaining === null
+                        ? "sealed"
+                        : money(team.purseRemaining)}
+                  </span>
+                  <span className="board-purse-label">purse remaining</span>
+                </div>
+                {/* THE SQUAD, BY FACE. Who each franchise has bought tonight, as
+                  a row of faces ringed in its colours — the part of the
+                  standings a room actually talks about. It shares the purse's
+                  row, so it costs the one-frame projector no height. */}
+                {!connecting && team.squad > 0 ? (
+                  <ul className="board-team-faces" aria-label={`${team.teamName} squad`}>
+                    {soldLots
+                      .filter((entry) => entry.teamName === team.teamName)
+                      .slice(0, SQUAD_FACES)
+                      .map((entry) => (
+                        <li key={entry.lotId}>
+                          <PlayerImage
+                            {...faceOf(entry)}
+                            size="md"
+                            shape="round"
+                            teamColor={team.team?.primaryColor ?? undefined}
+                            ring
+                            fluid
+                          />
+                        </li>
+                      ))}
+                    {team.squad > SQUAD_FACES ? (
+                      <li className="board-team-faces-more">+{team.squad - SQUAD_FACES}</li>
+                    ) : null}
+                  </ul>
+                ) : null}
               </div>
               <dl className="board-team-stats">
                 <div>
@@ -564,17 +633,28 @@ export function BoardPanel({
             {recent.map((lotRow) => (
               <li key={lotRow.lotId}>
                 <span className="board-recent-who">
-                  <PlayerImage
-                    name={lotRow.playerName ?? lotRow.lotNumber}
-                    seed={lotRow.registrationId ?? lotSeed(lotRow.lotId, lotMedia)}
-                    src={lotMedia[lotRow.lotId]?.photoUrl}
-                    size="md"
-                    shape="round"
-                    decorative
-                  />
+                  <span className="board-recent-face">
+                    <PlayerImage
+                      {...faceOf(lotRow)}
+                      size="lg"
+                      shape="round"
+                      teamColor={colorOf(lotRow.teamName)}
+                      ring
+                      fluid
+                      decorative
+                    />
+                  </span>
                   <span className="board-recent-name">{lotRow.playerName ?? lotRow.lotNumber}</span>
                 </span>
-                <span className="board-recent-team">{lotRow.teamName ?? "—"}</span>
+                <span className="board-recent-team">
+                  {/* The buyer in its own colours, not grey text. */}
+                  <i
+                    className="board-recent-swatch"
+                    style={paintOnFill(colorOf(lotRow.teamName))}
+                    aria-hidden="true"
+                  />
+                  {lotRow.teamName ?? "—"}
+                </span>
                 <span className="board-recent-price">
                   {lotRow.soldPrice !== null ? money(lotRow.soldPrice) : "—"}
                 </span>

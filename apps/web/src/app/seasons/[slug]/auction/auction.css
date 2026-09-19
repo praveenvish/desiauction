@@ -434,6 +434,64 @@
   color: var(--text-heading);
 }
 
+/* --- the results showcase (the finished stage) -----------------------------
+   The last frame of the night used to be 552px of black with "3/3 LOTS
+   RESOLVED" floating in the middle of it — on the screen the product is most
+   often shared from. The height was already paid for (see `.ceremony`): the
+   finished phase simply never spent it. It spends it on the people. */
+.ceremony-showcase {
+  display: grid;
+  /* Always one ROW: a podium that wraps to 2 + 1 reads as an accident. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-5);
+  width: min(100%, 640px);
+  margin: var(--space-2) auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ceremony-showcase-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ceremony-showcase-face {
+  display: block;
+  width: clamp(72px, 16vw, 112px);
+  height: clamp(72px, 16vw, 112px);
+  margin-bottom: var(--space-2);
+}
+
+.ceremony-showcase-rank {
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ceremony-showcase-name {
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.ceremony-showcase-price {
+  font-family: var(--font-display);
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-accent);
+}
+
+.ceremony-showcase-team {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
 .ceremony-waiting-hint {
   max-width: 42ch;
   color: var(--text-muted);
@@ -879,6 +937,14 @@
   position: relative;
   flex: none;
   display: flex;
+}
+
+/* THE SPECTATOR'S STAGE. A guest came to watch a PERSON be sold; 96px is the
+   thumbnail an owner's console wants. The box is definite at every width (the
+   primitive fills it), so the zero-layout-shift contract is unchanged. */
+.lot-hero-figure--lg {
+  width: clamp(104px, 13vw, 168px);
+  height: clamp(104px, 13vw, 168px);
 }
 
 /* THE PLAYER'S OWN NUMBER — the one on the shirt and on their public page, not
@@ -2165,6 +2231,31 @@
 
 .stage-mode .ceremony-timer {
   font-size: clamp(1.5rem, min(4vw, 5vh), 3rem);
+}
+
+/* On the wall the showcase grows with everything else — bounded by the short
+   edge, like every other figure on the projected stage. */
+.stage-mode .ceremony-showcase {
+  width: min(100%, 72vw);
+  gap: clamp(var(--space-3), 2vh, var(--space-8));
+}
+
+.stage-mode .ceremony-showcase-face {
+  width: clamp(5rem, min(13vw, 16vh), 11rem);
+  height: clamp(5rem, min(13vw, 16vh), 11rem);
+}
+
+.stage-mode .ceremony-showcase-name {
+  font-size: clamp(1rem, min(2.4vw, 2.8vh), 2rem);
+}
+
+.stage-mode .ceremony-showcase-price {
+  font-size: clamp(1.25rem, min(3.4vw, 4vh), 3rem);
+}
+
+.stage-mode .ceremony-showcase-rank,
+.stage-mode .ceremony-showcase-team {
+  font-size: clamp(0.8rem, min(1.4vw, 1.8vh), 1.25rem);
 }
 
 .stage-mode .ceremony-waiting-title {

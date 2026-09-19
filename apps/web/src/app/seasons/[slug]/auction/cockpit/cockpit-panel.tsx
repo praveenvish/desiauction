@@ -444,6 +444,8 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               ceremony={ceremony}
               remainingMs={remainingMs}
               lotMedia={view.lotMedia}
+              resolved={feed.resolved}
+              teams={view.teams}
             />
 
             {/* THE CONDUCT CARD, in three tiers.

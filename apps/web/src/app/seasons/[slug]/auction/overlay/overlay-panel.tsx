@@ -7,6 +7,7 @@ import { roleLabeller } from "../../../../../lib/role-label";
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { GoldDrift, PlayerImage } from "@desiauction/ui";
 
+import { BrandLockup } from "../../../../../components/shell/brand";
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
 import { useAuctionSocket } from "../use-auction-socket";
@@ -267,6 +268,15 @@ export function OverlayPanel({
             below ~800px the lower third and the brand cluster overlapped by
             73px. They share one flex footer now and can never collide. */}
         <div className="obs-brand">
+          {/* THE BUG. A stream frame carried the player, the price and the watch
+              URL and nothing that said whose product this is — the one surface
+              that reaches an audience with no account at all. Plated, because a
+              transparent overlay is composited over somebody else's video and
+              the lockup has to survive whatever is behind it. */}
+          <div className="obs-bug" data-testid="obs-bug">
+            <span className="obs-bug-kicker">Powered by</span>
+            <BrandLockup tone="bug" />
+          </div>
           {sponsor !== null ? (
             <div className="obs-sponsor">
               <span>Presented by</span>
