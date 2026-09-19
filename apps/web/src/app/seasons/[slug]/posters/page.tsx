@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 
+import { PageTitle } from "../../../../components/shell/page-title";
 import { posterPicker } from "../../../../server/competition/posters";
 import { PosterStudio } from "./poster-studio";
 import "../../seasons.css";
+import "../_tabs/tabs.css";
+import "./posters.css";
 
 export const metadata = { title: "Posters · DesiAuction" };
 
@@ -28,6 +31,8 @@ export default async function PostersPage({ params }: { params: Promise<{ slug: 
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
+        {/* The shell derives no name for this surface; it said the season's. */}
+        <PageTitle title={view.scope === "mine" ? "Your poster" : "Posters"} />
         <PosterStudio slug={slug} view={view} />
       </div>
     </main>

@@ -1,7 +1,14 @@
 "use client";
 
 import { POSTER_THEMES, type PosterSize, type PosterTheme } from "@desiauction/core";
-import { ButtonLink, Card, Select } from "@desiauction/ui";
+import {
+  ButtonLink,
+  IconDownload,
+  IconImage,
+  IconPencil,
+  SectionCard,
+  Select,
+} from "@desiauction/ui";
 import { useState } from "react";
 
 import { withViewTransition } from "../../../../lib/view-transition";
@@ -62,19 +69,19 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   const downloadHref = subjectId === "" ? null : `${base}?${query}&download=1`;
 
   return (
-    <>
-      <Card>
-        <h1 className="dash-title">{own ? "Your poster" : "Posters"}</h1>
-        <p className="section-note">
-          {own
+    <div className="ps-layout">
+      <SectionCard
+        icon={<IconPencil />}
+        title={own ? "Style it" : "Design a poster"}
+        description={`${
+          own
             ? onlyKind === "team"
               ? "Your squad, ready to post."
               : "Your card, ready to post."
-            : "A card for a player or a whole squad, ready to post."}{" "}
-          {view.competitionName}.
-        </p>
-
-        <div className="poster-controls">
+            : "A card for a player or a whole squad, ready to post."
+        } ${view.competitionName}.`}
+      >
+        <div className="ps-controls">
           {onlyKind !== null ? null : (
             <Select
               label="What"
@@ -159,15 +166,28 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
         </div>
 
         {!view.showBranding ? null : (
-          <p className="section-note poster-brand-note">
+          <p className="st-note ps-brand-note">
             Posters on the free pass carry a small DesiAuction strip. A paid pass removes it.
           </p>
         )}
-      </Card>
+      </SectionCard>
 
-      <Card>
+      <SectionCard
+        icon={<IconImage />}
+        tone="purple"
+        title="Preview"
+        description={size === "story" ? "Status · 1080 × 1920" : "Feed · 1080 × 1080"}
+        action={
+          downloadHref !== null ? (
+            <ButtonLink href={downloadHref} download size="sm" data-testid="poster-download">
+              <IconDownload size={16} aria-hidden />
+              Download PNG
+            </ButtonLink>
+          ) : undefined
+        }
+      >
         {previewSrc === null || downloadHref === null ? (
-          <p className="section-note">
+          <p className="st-note">
             {own
               ? "There is no card here for you yet — one appears once the auction reaches a verdict on your lot."
               : kind === "player"
@@ -185,17 +205,12 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
               alt="Poster preview"
               className="poster-preview-image"
             />
-            <div className="poster-actions">
-              {/* A plain anchor, not next/link: the href is our own image
-                  route and `download` must reach the DOM for the browser to
-                  save rather than navigate. */}
-              <ButtonLink href={downloadHref} download size="lg" data-testid="poster-download">
-                Download PNG
-              </ButtonLink>
-            </div>
           </div>
         )}
-      </Card>
-    </>
+        {/* The download is a plain anchor, not next/link: the href is our own
+            image route and `download` must reach the DOM for the browser to
+            save rather than navigate. */}
+      </SectionCard>
+    </div>
   );
 }
