@@ -579,6 +579,7 @@ function RosterDetail({
           teamName={team.name}
           roster={roster}
           locked={view.rulesSource?.locked ?? false}
+          settlesAtOpen={view.rulesSource !== null && !view.rulesSource.locked}
         />
       ) : null}
 

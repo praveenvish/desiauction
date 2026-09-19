@@ -818,10 +818,8 @@ function SquadTab({
         <p className="pd-setting-hint">
           {marksDisabledReason ??
             (locked
-              ? "Icon and Retained are locked with the auction; the armband can still move."
-              : onTeam
-                ? "Any of these keeps them out of the auction — they join their team directly."
-                : "Any of these keeps them out of the auction — pick their team above.")}
+              ? "Icon and Retained are locked with the auction. The armband can still move between players a team has bought."
+              : `Any of these keeps them out of the auction — ${onTeam ? "they join their team directly" : "pick their team above"}.${desk.auctionExists ? " The auction is set up, and these still count: its lots follow them when it opens." : ""}`)}
         </p>
       </section>
     </div>

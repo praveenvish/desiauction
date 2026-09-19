@@ -1305,6 +1305,12 @@
   border-block: 1px solid var(--border-subtle);
 }
 
+/* Spans the row under the three slots rather than taking a fourth column. */
+.pd-presign-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .pd-presign-slot {
   display: flex;
   flex-direction: column;

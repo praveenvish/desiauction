@@ -106,8 +106,13 @@ import {
 } from "./registration-edit";
 import { playerDeskContext, type PlayerDeskContext } from "./player-desk";
 import type { ExportRows } from "../../lib/export-columns";
-import { marksFreezeWithRoster, squadMarksIn } from "./roster-lock";
-import { commitRegistrationImport, existingForImport } from "./registration-import";
+import { captainLockRefusal } from "./captain-lock";
+import { captainRefusalMessage, marksFreezeWithRoster, squadMarksIn } from "./roster-lock";
+import {
+  CaptainImportRefused,
+  commitRegistrationImport,
+  existingForImport,
+} from "./registration-import";
 import {
   forgetImportMapping,
   saveImportMapping,
@@ -1714,9 +1719,19 @@ export async function markRegistrationAction(
   marks: { isIcon?: boolean; isRetained?: boolean; isCaptain?: boolean; teamId?: string | null },
 ): Promise<{ ok: boolean; error?: string }> {
   const result = await inSeasonAs(slug, "team.manage", async ({ db, personId, competition }) => {
-    // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
-    if (marksFreezeWithRoster(marks) && (await rosterLockedIn(db, competition.id))) {
-      return { ok: false as const, reason: "locked" as const };
+    const auction = await auctionOf(db, competition.id);
+    if (auction !== null && auction.status !== "scheduled") {
+      // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
+      if (marksFreezeWithRoster(marks)) {
+        return { ok: false as const, reason: "locked" as const };
+      }
+      // The armband is judged per player — see `captainChangeRefusal`.
+      if (marks.isCaptain !== undefined) {
+        const refusal = await captainLockRefusal(db, auction.id, registrationId, marks.isCaptain);
+        if (refusal !== null) {
+          return { ok: false as const, reason: "captain" as const, refusal };
+        }
+      }
     }
     return setRegistrationMarks(
       db,
@@ -1739,7 +1754,9 @@ export async function markRegistrationAction(
       error:
         result.value.reason === "locked"
           ? ROSTER_LOCKED
-          : "That registration is not in this season.",
+          : result.value.reason === "captain"
+            ? captainRefusalMessage(result.value.refusal)
+            : "That registration is not in this season.",
     };
   }
   return { ok: true };
@@ -2534,7 +2551,9 @@ export async function importCommitAction(
    * ONLY THOSE COLUMNS. A file with no squad columns still imports mid-auction
    * — new registrations land in `submitted` and reach the pool through the same
    * approval gate — and the captain badge is deliberately not frozen, because
-   * a drafted player's team is decided ON auction night.
+   * a drafted player's team is decided ON auction night. It is judged per
+   * player instead, by the dashboard's rule, inside the commit
+   * (`captainChangeRefusal`); one refusal leaves the whole file unimported.
    */
   if (marksFreezeWithRoster(squadMarksIn(parsed.rows))) {
     if (await auctionLocksRoster(gate.personId, gate.competition)) {
@@ -2545,16 +2564,29 @@ export async function importCommitAction(
       };
     }
   }
-  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
-    commitRegistrationImport(
-      db,
-      gate.competition.id,
-      gate.competition.orgId,
-      gate.personId,
-      parsed.rows,
-      options?.shape?.policy ?? options?.policy ?? "fill-blanks",
-    ),
-  );
+  let result: Awaited<ReturnType<typeof commitRegistrationImport>>;
+  try {
+    result = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+      const auction = await auctionOf(db, gate.competition.id);
+      return commitRegistrationImport(
+        db,
+        gate.competition.id,
+        gate.competition.orgId,
+        gate.personId,
+        parsed.rows,
+        options?.shape?.policy ?? options?.policy ?? "fill-blanks",
+        auction !== null && auction.status !== "scheduled" ? auction.id : null,
+      );
+    });
+  } catch (error) {
+    if (error instanceof CaptainImportRefused) {
+      return {
+        ok: false,
+        error: `${captainRefusalMessage(error.refusal)} Nothing was imported — remove that captain from the file to import the rest.`,
+      };
+    }
+    throw error;
+  }
   return {
     ok: true,
     imported: result.imported,

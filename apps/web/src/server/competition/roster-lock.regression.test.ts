@@ -15,7 +15,13 @@ import { describe, expect, it } from "vitest";
 
 import { parseRegistrationCsv } from "@desiauction/core";
 
-import { marksFreezeWithRoster, squadMarksIn } from "./roster-lock";
+import {
+  captainChangeRefusal,
+  captainRefusalMessage,
+  marksFreezeWithRoster,
+  squadMarksIn,
+  type CaptainFacts,
+} from "./roster-lock";
 
 describe("ROSTER LOCK — what the auction freezes, and what it must not", () => {
   it("freezes the marks that move the auction pool", () => {
@@ -101,9 +107,10 @@ describe("what a file carries, and what the lock makes of it", () => {
   });
 
   it("does NOT freeze a file that only names captains", () => {
-    // The captain badge decides nothing the engine priced a bid against, and a
-    // drafted player's team is settled ON auction night — freezing it would
-    // close the one window in which the answer is knowable.
+    // A drafted player's team is settled ON auction night — freezing the column
+    // would close the one window in which the answer is knowable. Each captain
+    // the file changes is judged inside the commit instead, by the dashboard's
+    // per-player rule (`captainChangeRefusal`, below).
     const rows = parse("name,phone,role,is_captain", "Rohit,9876543210,batter,yes");
     expect(squadMarksIn(rows)).toEqual({});
     expect(marksFreezeWithRoster(squadMarksIn(rows))).toBe(false);
@@ -133,5 +140,75 @@ describe("what a file carries, and what the lock makes of it", () => {
       "Jasprit,9876543211,bowler,yes",
     );
     expect(marksFreezeWithRoster(squadMarksIn(rows))).toBe(true);
+  });
+});
+
+/**
+ * THE ARMBAND AFTER THE POOL SETTLED.
+ *
+ * Captaincy pre-signs a player now, and the pool is settled once, when the
+ * auction opens. After that the mark may still move — a team's leader is often
+ * one of the players it just bought — but never where it would take a player
+ * out of the pool or out of a squad count the engine is pricing bids against.
+ */
+describe("the captain mark once the auction has opened", () => {
+  const player = (over: Partial<CaptainFacts> = {}): CaptainFacts => ({
+    name: "Rohit",
+    isIcon: false,
+    isRetained: false,
+    isCaptain: false,
+    bought: false,
+    ...over,
+  });
+
+  it("lets a bought player take the armband, and give it up", () => {
+    expect(captainChangeRefusal(player({ bought: true }), true, null)).toBeNull();
+    expect(captainChangeRefusal(player({ bought: true, isCaptain: true }), false, null)).toBeNull();
+  });
+
+  it("lets an Icon or a retained player take it: the armband pre-signs nothing new", () => {
+    expect(captainChangeRefusal(player({ isIcon: true }), true, null)).toBeNull();
+    expect(
+      captainChangeRefusal(player({ isRetained: true, isCaptain: true }), false, null),
+    ).toBeNull();
+  });
+
+  it("refuses a player who is not on a squad — they are still in the pool", () => {
+    // Named captain while waiting for the block, they would be sold as another
+    // team's captain and collide with the buyer's own on the unique index.
+    expect(captainChangeRefusal(player(), true, null)).toEqual({
+      kind: "not_in_squad",
+      name: "Rohit",
+    });
+  });
+
+  it("refuses to clear a captain who joined without the auction", () => {
+    expect(captainChangeRefusal(player({ isCaptain: true }), false, null)).toEqual({
+      kind: "joined_as_captain",
+      name: "Rohit",
+    });
+  });
+
+  it("refuses to take the armband from a captain who joined that way", () => {
+    // DA-04 demotes the incumbent, which clears their mark just the same.
+    const incumbent = player({ name: "Virat", isCaptain: true });
+    expect(captainChangeRefusal(player({ bought: true }), true, incumbent)).toEqual({
+      kind: "armband_holder",
+      name: "Virat",
+    });
+    expect(
+      captainChangeRefusal(player({ bought: true }), true, { ...incumbent, bought: true }),
+    ).toBeNull();
+  });
+
+  it("has nothing to refuse when the mark does not change", () => {
+    expect(captainChangeRefusal(player(), false, null)).toBeNull();
+    expect(captainChangeRefusal(player({ isCaptain: true }), true, null)).toBeNull();
+  });
+
+  it("names the player in every refusal", () => {
+    for (const kind of ["not_in_squad", "joined_as_captain", "armband_holder"] as const) {
+      expect(captainRefusalMessage({ kind, name: "Rohit" })).toContain("Rohit");
+    }
   });
 });
