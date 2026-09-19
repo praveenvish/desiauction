@@ -41,6 +41,8 @@ export default async function FixturesPage({
               slug={slug}
               orgSlug={dashboard.orgSlug}
               isPublic={dashboard.competition.visibility === "public"}
+              seasonStartsOn={dashboard.competition.startsOn}
+              seasonEndsOn={dashboard.competition.endsOn}
               stats={dashboard.stats}
               next={dashboard.next}
               page={dashboard.page}

@@ -297,13 +297,61 @@ export interface GenerateInput {
   durationMinutes: number;
 }
 
+/**
+ * The plan runs past the season's own dates. Refused BEFORE the conflict pass,
+ * which would otherwise report every candidate as "(Unknown fixture) — date is
+ * outside the competition window": true, unreadable, and no hint what to change.
+ */
+export interface OutsideWindow {
+  ok: false;
+  reason: "outside_window";
+  startsOn: string | null;
+  endsOn: string | null;
+  firstDate: string;
+  lastDate: string;
+  /** Match days the plan needs at the chosen kickoffs × grounds. */
+  daysNeeded: number;
+  /** Fixtures one match day can hold (kickoff times × grounds). */
+  perDay: number;
+}
+
 export type GenerateResult =
   | { ok: true; created: number }
   | ConflictRefusal
+  | OutsideWindow
   | {
       ok: false;
       reason: "fixtures_exist" | "unknown_ground" | GeneratePlanResultError;
     };
+
+/** The first plan date before the season starts, or the last after it ends. */
+function outsideWindow(
+  competition: CompetitionSummary,
+  planned: readonly { kickoffAt: string }[],
+  input: GenerateInput,
+): OutsideWindow | null {
+  const dates = planned.map((f) => f.kickoffAt.slice(0, 10)).sort();
+  const firstDate = dates[0];
+  const lastDate = dates[dates.length - 1];
+  if (firstDate === undefined || lastDate === undefined) {
+    return null;
+  }
+  const early = competition.startsOn !== null && firstDate < competition.startsOn;
+  const late = competition.endsOn !== null && lastDate > competition.endsOn;
+  if (!early && !late) {
+    return null;
+  }
+  return {
+    ok: false,
+    reason: "outside_window",
+    startsOn: competition.startsOn,
+    endsOn: competition.endsOn,
+    firstDate,
+    lastDate,
+    daysNeeded: new Set(dates).size,
+    perDay: Math.max(1, input.kickoffTimes.length) * Math.max(1, input.groundIds.length),
+  };
+}
 
 type GeneratePlanResultError =
   | "too_few_teams"
@@ -364,6 +412,10 @@ export async function generateFixtures(
   const plan = planRoundRobin(planInput);
   if (!plan.ok) {
     return { ok: false, reason: plan.reason };
+  }
+  const miss = outsideWindow(competition, plan.fixtures, input);
+  if (miss !== null) {
+    return miss;
   }
 
   const baseSeq = await nextSeq(db, competition.id);
@@ -434,6 +486,7 @@ export interface GeneratePreview {
 
 export type GeneratePreviewResult =
   | { ok: true; preview: GeneratePreview }
+  | OutsideWindow
   | { ok: false; reason: "fixtures_exist" | GeneratePlanResultError };
 
 /**
@@ -470,6 +523,12 @@ export async function previewGeneration(
   });
   if (!plan.ok) {
     return { ok: false, reason: plan.reason };
+  }
+  // The preview says what the confirm would refuse, so the organizer fixes it
+  // here rather than after pressing "Generate".
+  const miss = outsideWindow(competition, plan.fixtures, input);
+  if (miss !== null) {
+    return miss;
   }
   const dates = plan.fixtures.map((f) => f.kickoffAt.slice(0, 10)).sort();
   return {

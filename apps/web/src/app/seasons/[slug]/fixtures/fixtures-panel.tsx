@@ -129,8 +129,13 @@ export function FixturesPanel({
   scoreFields,
   fixtureShape,
   next,
+  seasonStartsOn = null,
+  seasonEndsOn = null,
 }: {
   next: FixtureDashboard["next"];
+  /** The season's own dates — the generator's default start and its limits. */
+  seasonStartsOn?: string | null;
+  seasonEndsOn?: string | null;
   slug: string;
   orgSlug: string;
   isPublic: boolean;
@@ -175,10 +180,15 @@ export function FixturesPanel({
   // Generate wizard state. `plan` holds the dry run awaiting confirmation.
   const [plan, setPlan] = useState<Extract<GeneratePreview, { ok: true }> | null>(null);
   const [genRounds, setGenRounds] = useState("1");
-  const [genStart, setGenStart] = useState("");
+  // Starts on the season's first day: an empty date disabled "Generate" with
+  // nothing on screen saying why.
+  const [genStart, setGenStart] = useState(seasonStartsOn ?? "");
   const [genTimes, setGenTimes] = useState("18:00");
   const [genDuration, setGenDuration] = useState("180");
-  const [genGrounds, setGenGrounds] = useState<Set<string>>(new Set());
+  // One ground is the only answer, so it starts ticked.
+  const [genGrounds, setGenGrounds] = useState<Set<string>>(
+    () => new Set(grounds.length === 1 && grounds[0] !== undefined ? [grounds[0].id] : []),
+  );
 
   // Manual fixture state.
   const [manHome, setManHome] = useState("");
@@ -501,6 +511,8 @@ export function FixturesPanel({
           name="startDate"
           type="date"
           value={genStart}
+          {...(seasonStartsOn !== null ? { min: seasonStartsOn } : {})}
+          {...(seasonEndsOn !== null ? { max: seasonEndsOn } : {})}
           onChange={(event) => {
             setGenStart(event.target.value);
           }}
@@ -563,13 +575,24 @@ export function FixturesPanel({
           onClick={() => void askToGenerate()}
           loading={busy}
           disabled={genStart === "" || genGrounds.size === 0}
+          aria-describedby="generate-why"
           data-testid="generate-fixtures"
         >
           <IconSpark size={16} aria-hidden />
           Generate
         </Button>
-        <p className="st-note">
-          Generated fixtures land as drafts, so nothing is public until you publish.
+        {/* A disabled button always says why — this one used to sit greyed
+            out with nothing on screen explaining it. */}
+        <p className="st-note" id="generate-why" data-testid="generate-why">
+          {genStart === "" && genGrounds.size === 0
+            ? `Pick a start date and tick at least one ${terms.ground.toLowerCase()} to generate.`
+            : genStart === ""
+              ? "Pick a start date to generate."
+              : genGrounds.size === 0
+                ? `Tick at least one ${terms.ground.toLowerCase()} to generate.`
+                : seasonStartsOn !== null && seasonEndsOn !== null
+                  ? `The season runs ${formatWallDate(seasonStartsOn)} – ${formatWallDate(seasonEndsOn)}. Fixtures land as drafts, so nothing is public until you publish.`
+                  : "Generated fixtures land as drafts, so nothing is public until you publish."}
         </p>
       </div>
     </div>

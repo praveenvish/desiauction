@@ -1,5 +1,6 @@
 "use server";
 
+import { outsideWindowMessage } from "../../lib/fixture-window";
 import {
   parseFixtureCsv,
   parseScoreField,
@@ -476,6 +477,9 @@ export async function generateFixturesAction(
     if (result.reason === "conflicts") {
       return { ok: false, error: conflictMessages(result.conflicts) };
     }
+    if (result.reason === "outside_window") {
+      return { ok: false, error: outsideWindowMessage(result) };
+    }
     return { ok: false, error: GENERATE_ERROR[result.reason] ?? "Could not generate." };
   }
   return { ok: true, created: result.created };
@@ -649,9 +653,16 @@ export async function previewGenerationAction(
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     previewGeneration(db, gate.competition, input),
   );
-  return result.ok
-    ? { ok: true, preview: result.preview }
-    : { ok: false, error: GENERATE_ERROR[result.reason] ?? "Could not plan a schedule." };
+  if (result.ok) {
+    return { ok: true, preview: result.preview };
+  }
+  return {
+    ok: false,
+    error:
+      result.reason === "outside_window"
+        ? outsideWindowMessage(result)
+        : (GENERATE_ERROR[result.reason] ?? "Could not plan a schedule."),
+  };
 }
 
 export async function fixtureTimelineAction(
