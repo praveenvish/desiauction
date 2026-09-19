@@ -1,208 +1,263 @@
-/* Lineups (launch polish, Phase 3): flat — headings, hairline rows, space. */
-.lineups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
+/* LINEUPS (page.tsx, lineup-side-editor.tsx): the match list beside the match,
+   each side a panel of players with a played/bench mark. Tokens only. */
 
-.lineups-layout {
+.lu-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-  gap: var(--space-10);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
   align-items: start;
 }
 
-@media (max-width: 899px) {
-  .lineups-layout {
-    grid-template-columns: minmax(0, 1fr);
+@media (min-width: 1024px) {
+  .lu-layout {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
   }
 }
 
-.lineups-matches ul,
-.lineups-players {
+/* ---- Match list ---- */
+
+.lu-match-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.lu-match-list li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.lu-match {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) ease;
+}
+
+.lu-match:hover {
+  background: var(--surface-sunken);
+}
+
+.lu-match[aria-current="page"] {
+  background: var(--accent-subtle);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.lu-match:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.lu-match-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.lu-match-teams {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.lu-vs {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.lu-status {
+  display: inline-flex;
+  text-transform: capitalize;
+}
+
+/* ---- The two sides ---- */
+
+.lu-sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: var(--space-4);
+}
+
+.lu-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.lu-side-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lu-side-title {
+  margin: 0;
+  font-size: var(--text-sm-size);
+}
+
+.lu-count {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.lu-count strong {
+  color: var(--text-heading);
+}
+
+.lu-side-empty {
+  padding: var(--space-4);
+}
+
+.lu-players {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.lineups-matches li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.lineups-match {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3);
-  margin-inline: calc(var(--space-3) * -1);
-  border-radius: var(--radius-md);
-  color: inherit;
-  text-decoration: none;
-}
-
-.lineups-match:hover {
-  background: var(--surface-sunken);
-}
-
-.lineups-match[aria-current="page"] {
-  background: var(--accent-subtle);
-}
-
-.lineups-match strong {
-  font-size: var(--text-base-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.lineups-match-when,
-.lineups-match-state {
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-.lineups-match-state--done {
-  color: var(--success-strong);
-}
-
-.lineups-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.lineups-editor-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-}
-
-.lineups-editor-head h2 {
-  margin: 0;
-  font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.lineups-editor-head span,
-.lineups-note {
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-.lineups-note {
-  margin: 0;
-}
-
-.lineups-sides {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--space-10);
-}
-
-.lineups-side-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.lineups-side-head h3 {
-  margin: 0;
-  flex: 1 1 auto;
-  font-size: var(--text-md-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.lineups-count {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-.lineups-players li {
+.lu-players li {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 44px;
+  padding: 0 var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.lineups-players input {
+.lu-players li:last-child {
+  border-bottom: 0;
+}
+
+.lu-players input {
+  flex: none;
   width: 18px;
   height: 18px;
-  flex: none;
+  margin: 0;
   accent-color: var(--accent);
 }
 
-.lineups-players label {
+.lu-players label {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  flex: 1 1 auto;
-  min-height: 44px;
+  gap: var(--space-3);
+  min-height: 52px;
   cursor: pointer;
 }
 
-.lineups-player-name {
-  flex: 1 1 auto;
-  font-size: var(--text-base-size);
-  color: var(--text-primary);
+/* The whole row picks the player, not just the box. */
+.lu-players label::after {
+  content: "";
+  position: absolute;
+  inset: 0;
 }
 
-.lineups-player-role {
-  font-size: var(--text-sm-size);
+.lu-players li:hover {
+  background: color-mix(in srgb, var(--surface-sunken) 55%, transparent);
+}
+
+.lu-players li:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.lu-players li[data-played="false"] .lu-player-name {
   color: var(--text-secondary);
 }
 
-.lineups-captain {
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  background: var(--info-subtle);
-  color: var(--info-strong);
+.lu-player-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.lineups-side-foot {
+.lu-player-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.lu-captain {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.lu-side-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-top: auto;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
 }
 
-/* Save and Announce side by side, each on one line; the row wraps instead. */
-.lineups-side-foot > button {
-  white-space: nowrap;
-}
-
-.lineups-status {
-  flex: 1 1 auto;
+.lu-status-text {
   font-size: var(--text-sm-size);
   color: var(--success-strong);
 }
 
-.lineups-status--error {
+.lu-status-text:empty {
+  display: none;
+}
+
+.lu-status-text[data-tone="error"] {
   color: var(--danger-strong);
 }
 
-.lineups-side-empty {
-  margin: var(--space-3) 0;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
+.lu-side-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-inline-start: auto;
 }
 
-.lineups-empty h2 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-md-size);
+.lu-note {
+  margin-top: var(--space-4);
 }
 
-.lineups-empty p {
-  margin: 0 0 var(--space-3);
-  color: var(--text-secondary);
+@media (max-width: 719px) {
+  .lu-match {
+    padding-inline: var(--space-4);
+  }
+
+  .lu-side-actions {
+    width: 100%;
+  }
+
+  .lu-side-actions > * {
+    flex: 1 1 auto;
+  }
 }
