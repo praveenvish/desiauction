@@ -350,6 +350,7 @@ export function SpectatePanel({
             canConduct={false}
             viewerTeamName={null}
             canReplay={false}
+            teamColors={Object.fromEntries(teams.map((team) => [team.id, team.primaryColor]))}
           />
         </div>
       ) : null}

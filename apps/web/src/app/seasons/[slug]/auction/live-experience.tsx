@@ -1,12 +1,34 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot, type PlanState } from "@desiauction/core";
-import { Badge, ButtonLink, Card, IconTrophy, PlayerImage } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  IconBroadcast,
+  IconCheck,
+  IconCrown,
+  IconFile,
+  IconLedger,
+  IconPlay,
+  IconTrophy,
+  IconUsers,
+  IconWallet,
+  Pill,
+  PlayerImage,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  TeamChip,
+  type KitTone,
+} from "@desiauction/ui";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { lotSeed } from "../../../../lib/player-seed";
 import type { AuctionRules, LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
 import { fitBadge } from "./plan/plan-model";
+import "./dashboard.css";
+import "./live/live.css";
 
 // PX-6 live-experience kit: presentation over the broadcast AuctionSnapshot
 // and the resolved-lot history. NOTHING here decides — money math comes from
@@ -219,18 +241,17 @@ export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | 
   return { resolved: feed.resolved, events: feed.events };
 }
 
-const FEED_TONE: Record<FeedEvent["kind"], "success" | "neutral" | "warning" | "info" | "danger"> =
-  {
-    sold: "success",
-    unsold: "neutral",
-    withdrawn: "danger",
-    held: "info",
-    reopened: "warning",
-    paused: "warning",
-    resumed: "success",
-    recovered: "info",
-    completed: "success",
-  };
+const FEED_TONE: Record<FeedEvent["kind"], KitTone> = {
+  sold: "blue",
+  unsold: "neutral",
+  withdrawn: "red",
+  held: "purple",
+  reopened: "amber",
+  paused: "amber",
+  resumed: "green",
+  recovered: "neutral",
+  completed: "green",
+};
 
 /** The auction timeline: outcomes and conduct events, newest first. */
 export function AuctionTimeline({
@@ -246,12 +267,15 @@ export function AuctionTimeline({
     return null;
   }
   return (
-    <Card data-testid="auction-timeline">
+    <Card data-testid="auction-timeline" className="live-card">
       <h2>Auction timeline</h2>
-      <ol className="timeline timeline--faces">
+      <ol className="live-rail-list">
         {feed.events.slice(0, limit).map((event) => (
-          <li key={event.key} data-testid={`timeline-${event.kind}`}>
-            <Badge tone={FEED_TONE[event.kind]}>{event.kind}</Badge>
+          <li key={event.key} data-testid={`timeline-${event.kind}`} data-kind={event.kind}>
+            <span className="live-rail-dot" aria-hidden />
+            <span className="live-rail-pill">
+              <Pill tone={FEED_TONE[event.kind]}>{event.kind}</Pill>
+            </span>
             {event.subject === undefined ? null : (
               <LotFace
                 lotId={event.subject.lotId}
@@ -259,12 +283,52 @@ export function AuctionTimeline({
                 lotMedia={lotMedia}
               />
             )}
-            <span>{event.label}</span>
+            <span className="live-rail-label">{event.label}</span>
             {event.detail !== null ? <span className="timeline-at">{event.detail}</span> : null}
           </li>
         ))}
       </ol>
     </Card>
+  );
+}
+
+/**
+ * The bidding on the lot, newest first, as the founder mockup reads it: the
+ * paddle on its team's colour, the team, what they did, and the amount. The
+ * snapshot carries no bid times, so there is no time column to fake.
+ */
+export function BidFeedList({
+  bids,
+  playerName,
+  teamColors,
+  testId,
+}: {
+  bids: readonly { bidId: string; paddleNumber: string; teamName: string; amount: number }[];
+  playerName: string | null;
+  /** Team NAME → colour: the bid entries carry the name, not the id. */
+  teamColors: ReadonlyMap<string, string | null>;
+  testId?: string;
+}) {
+  const newestFirst = [...bids].reverse();
+  return (
+    <ol className="bid-feed-list" data-testid={testId}>
+      {newestFirst.map((entry, index) => (
+        <li key={entry.bidId} data-leading={index === 0 ? "true" : undefined}>
+          <TeamChip color={teamColors.get(entry.teamName) ?? null}>{entry.paddleNumber}</TeamChip>
+          <span className="bid-feed-team">{entry.teamName}</span>
+          <span className="bid-feed-action">
+            {index === newestFirst.length - 1 ? "opened the bidding" : "raised"}
+            {playerName !== null ? (
+              <>
+                {" "}
+                for <strong>{playerName}</strong>
+              </>
+            ) : null}
+          </span>
+          <span className="bid-feed-amount">{formatPaiseINR(paise(entry.amount))}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -364,47 +428,52 @@ export function MyTeamCard({
   const leading =
     snapshot?.currentLot?.currentBid !== null &&
     snapshot?.currentLot?.currentBid.paddleNumber === myPaddleNumber;
+  const complete = squadSize >= rules.squadMax;
   return (
-    <Card data-testid="my-team-card">
+    <Card data-testid="my-team-card" className="live-card my-team">
       <div className="competition-head">
         <h2>{myTeamName}</h2>
         {leading ? (
           <Badge tone="success" data-testid="my-team-leading">
             Leading this lot
           </Badge>
-        ) : null}
+        ) : (
+          <a className="live-card-link" href="#live-squads">
+            View squad
+          </a>
+        )}
       </div>
       {paddle !== null ? (
-        <div className="stat-row live-team-stats">
+        <div className="my-team-stats">
           {/* This is the viewer's OWN paddle, so the engine always sends its
               money; the fallback exists because the type is honest about
               redaction, not because a bidder is ever denied their own purse. */}
-          <div className="stat-tile" data-testid="my-purse">
-            <span className="stat-value">
+          <div className="my-team-stat" data-testid="my-purse">
+            <span className="my-team-value">
               {paddle.purseRemaining === null ? "—" : formatPaiseINR(paise(paddle.purseRemaining))}
             </span>
-            <span className="stat-label">Purse remaining</span>
+            <span className="my-team-label">Purse remaining</span>
           </div>
-          <div className="stat-tile" data-testid="my-spent">
-            <span className="stat-value">
+          <div className="my-team-stat" data-testid="my-spent">
+            <span className="my-team-value">
               {paddle.committed === null ? "—" : formatPaiseINR(paise(paddle.committed))}
             </span>
-            <span className="stat-label">Committed</span>
+            <span className="my-team-label">Committed</span>
           </div>
-          <div className="stat-tile" data-testid="my-slots">
-            <span className="stat-value">
+          <div className="my-team-stat" data-testid="my-slots">
+            <span className="my-team-value">
               {squadSize}/{rules.squadMax}
             </span>
-            <span className="stat-label">Squad (min {rules.squadMin})</span>
+            <span className="my-team-label">Squad (min {rules.squadMin})</span>
           </div>
           {plan !== null && fit !== null ? (
-            <div className="stat-tile" data-testid="my-plan-headroom" data-fit={plan.budget.fit}>
-              <span className="stat-value">
+            <div className="my-team-stat" data-testid="my-plan-headroom" data-fit={plan.budget.fit}>
+              <span className="my-team-value">
                 {plan.budget.headroom < 0
                   ? `−${formatPaiseINR(paise(-plan.budget.headroom))}`
                   : formatPaiseINR(paise(plan.budget.headroom))}
               </span>
-              <span className="stat-label">Plan headroom</span>
+              <span className="my-team-label">Plan headroom</span>
               <Badge tone={fit.tone} className="plan-tile-badge">
                 {plan.budget.fit === "fits"
                   ? "Fits"
@@ -413,7 +482,20 @@ export function MyTeamCard({
                     : "Over purse"}
               </Badge>
             </div>
-          ) : null}
+          ) : (
+            <div className="my-team-stat my-team-stat--pill">
+              <Pill
+                tone={complete ? "green" : squadSize >= rules.squadMin ? "blue" : "amber"}
+                icon={complete ? <IconCheck /> : undefined}
+              >
+                {complete
+                  ? "Squad complete"
+                  : squadSize >= rules.squadMin
+                    ? `${String(rules.squadMax - squadSize)} spots open`
+                    : `${String(rules.squadMin - squadSize)} short of minimum`}
+              </Pill>
+            </div>
+          )}
         </div>
       ) : null}
       {squad.length > 0 ? (
@@ -456,6 +538,7 @@ export function AuctionSummaryCard({
    * own).
    */
   canReplay = true,
+  teamColors = {},
 }: {
   snapshot: AuctionSnapshot;
   feed: LiveFeed;
@@ -463,6 +546,8 @@ export function AuctionSummaryCard({
   canConduct: boolean;
   viewerTeamName: string | null;
   canReplay?: boolean;
+  /** Team id → the team's own colour, for the spend bars. */
+  teamColors?: Readonly<Record<string, string | null>>;
 }) {
   const sold = feed.resolved.filter((lot) => lot.status === "sold");
   const unsold = feed.resolved.filter((lot) => lot.status === "unsold");
@@ -472,80 +557,141 @@ export function AuctionSummaryCard({
   );
   // Redacted money sorts and sums as zero rather than throwing: the ceremony
   // shows what this viewer was sent, and a sealed rival simply has no figure.
-  const totalSpent = snapshot.paddles.reduce((sum, paddle) => sum + (paddle.committed ?? 0), 0);
+  // A sealed purse is not a zero: when any team's money was withheld, the
+  // total comes from the hammer prices, which the whole room saw called.
+  const totalSpent = snapshot.paddles.some((paddle) => paddle.committed === null)
+    ? sold.reduce((sum, lot) => sum + (lot.soldPrice ?? 0), 0)
+    : snapshot.paddles.reduce((sum, paddle) => sum + (paddle.committed ?? 0), 0);
   const teams = [...snapshot.paddles].sort((a, b) => (b.committed ?? 0) - (a.committed ?? 0));
   return (
-    <Card data-testid="auction-summary">
-      <h2>
-        <IconTrophy size={20} className="icon-lead" /> That&apos;s a wrap
-      </h2>
-      <p className="competitions-hint">
-        {viewerTeamName !== null
-          ? `Congratulations, ${viewerTeamName} — your squad is set.`
-          : "The auction is complete — every rupee accounted for."}
-      </p>
-      <div className="stat-row live-team-stats">
-        <div className="stat-tile" data-testid="summary-sold">
-          <span className="stat-value">{sold.length}</span>
-          <span className="stat-label">Players sold</span>
+    <section className="wrap" data-testid="auction-summary" aria-labelledby="wrap-title">
+      <div className="wrap-hero">
+        <span className="wrap-trophy" aria-hidden>
+          <IconTrophy size={40} />
+        </span>
+        <div className="wrap-hero-text">
+          <h2 id="wrap-title">That&apos;s a wrap!</h2>
+          <p>
+            {viewerTeamName !== null
+              ? `Congratulations, ${viewerTeamName} — your squad is set.`
+              : "The auction is complete — every rupee accounted for."}
+          </p>
         </div>
-        <div className="stat-tile" data-testid="summary-unsold">
-          <span className="stat-value">{unsold.length}</span>
-          <span className="stat-label">Passed</span>
-        </div>
-        <div className="stat-tile" data-testid="summary-spent">
-          <span className="stat-value">{formatPaiseINR(paise(totalSpent))}</span>
-          <span className="stat-label">Total spent</span>
-        </div>
+        <p className="wrap-tag" aria-hidden>
+          Teams built. Stories ahead.
+        </p>
+      </div>
+      <StatGrid>
+        <StatCard
+          icon={<IconUsers />}
+          tone="blue"
+          value={sold.length}
+          label="Players sold"
+          testId="summary-sold"
+        />
+        <StatCard
+          icon={<IconFile />}
+          tone="purple"
+          value={unsold.length}
+          label="Passed / unsold"
+          testId="summary-unsold"
+        />
+        <StatCard
+          icon={<IconWallet />}
+          tone="green"
+          value={formatPaiseINR(paise(totalSpent))}
+          label="Total spent"
+          testId="summary-spent"
+        />
         {topSale !== null ? (
-          <div className="stat-tile" data-testid="summary-top">
-            <span className="stat-value">
-              {topSale.soldPrice !== null ? formatPaiseINR(paise(topSale.soldPrice)) : "—"}
-            </span>
-            <span className="stat-label">Top sale — {topSale.playerName ?? topSale.lotNumber}</span>
+          <StatCard
+            icon={<IconCrown />}
+            tone="gold"
+            value={topSale.soldPrice !== null ? formatPaiseINR(paise(topSale.soldPrice)) : "—"}
+            label={`Top sale — ${topSale.playerName ?? topSale.lotNumber}`}
+            testId="summary-top"
+          />
+        ) : null}
+      </StatGrid>
+      <div className="wrap-body">
+        <div className="wrap-spend">
+          <h3 className="live-summary-heading">Squads by spend</h3>
+          <ul className="wrap-spend-list" data-testid="summary-teams">
+            {teams.map((paddle) => {
+              const total =
+                paddle.committed === null || paddle.purseRemaining === null
+                  ? null
+                  : paddle.committed + paddle.purseRemaining;
+              const pct =
+                total === null || total === 0 ? 0 : ((paddle.committed ?? 0) / total) * 100;
+              const color = teamColors[paddle.teamId] ?? null;
+              return (
+                <li key={paddle.paddleId}>
+                  <TeamChip color={color}>{paddle.paddleNumber}</TeamChip>
+                  <span className="wrap-spend-team">{paddle.teamName}</span>
+                  {total === null ? (
+                    <span />
+                  ) : (
+                    <span
+                      className="wrap-spend-bar"
+                      style={color !== null ? { ["--team" as string]: color } : {}}
+                      aria-hidden
+                    >
+                      <span style={{ width: `${String(Math.min(100, pct))}%` }} />
+                    </span>
+                  )}
+                  <span className="wrap-spend-figures">
+                    {paddle.committed === null || paddle.purseRemaining === null ? (
+                      "purse sealed"
+                    ) : (
+                      <>
+                        <strong>{formatPaiseINR(paise(paddle.committed))}</strong>
+                        <span> · left {formatPaiseINR(paise(paddle.purseRemaining))}</span>
+                      </>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        {slug !== null ? (
+          <div className="wrap-actions live-summary-actions">
+            {canReplay ? (
+              <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary" size="touch">
+                <IconPlay size={18} />
+                Watch the replay
+              </ButtonLink>
+            ) : (
+              <ButtonLink
+                href={`/c/${slug}`}
+                variant="secondary"
+                size="touch"
+                data-testid="summary-tournament"
+              >
+                See the full tournament
+              </ButtonLink>
+            )}
+            {canConduct ? (
+              <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="primary" size="touch">
+                <IconLedger size={18} />
+                Open the ledger
+              </ButtonLink>
+            ) : null}
+            {!canReplay ? (
+              <ButtonLink
+                href="/"
+                variant="primary"
+                size="touch"
+                data-testid="summary-run-your-own"
+              >
+                Run your own auction
+              </ButtonLink>
+            ) : null}
           </div>
         ) : null}
       </div>
-      <h3 className="live-summary-heading">Squads by spend</h3>
-      <ul className="conflict-list" data-testid="summary-teams">
-        {teams.map((paddle) => (
-          <li key={paddle.paddleId}>
-            <Badge tone="info">{paddle.paddleNumber}</Badge>
-            <span className="registration-name">{paddle.teamName}</span>
-            <span className="registration-phone">
-              {paddle.committed === null || paddle.purseRemaining === null
-                ? "purse sealed"
-                : `spent ${formatPaiseINR(paise(paddle.committed))} · left ${formatPaiseINR(
-                    paise(paddle.purseRemaining),
-                  )}`}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {slug !== null ? (
-        <div className="date-row live-summary-actions">
-          {canReplay ? (
-            <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary">
-              Watch the replay
-            </ButtonLink>
-          ) : (
-            <ButtonLink href={`/c/${slug}`} variant="secondary" data-testid="summary-tournament">
-              See the full tournament
-            </ButtonLink>
-          )}
-          {canConduct ? (
-            <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="ghost">
-              Open the ledger
-            </ButtonLink>
-          ) : null}
-          {!canReplay ? (
-            <ButtonLink href="/" variant="primary" data-testid="summary-run-your-own">
-              Run your own auction
-            </ButtonLink>
-          ) : null}
-        </div>
-      ) : null}
-    </Card>
+    </section>
   );
 }
 
@@ -613,44 +759,52 @@ export function UpNext({
  */
 export function RulesCard({
   rules,
+  action,
 }: {
   rules: Omit<AuctionRules, "pursePerTeam"> & { pursePerTeam?: number };
+  /** A header link ("Room & settings →") where the card sits on a dashboard. */
+  action?: ReactNode;
 }) {
   return (
-    <Card data-testid="auction-rules">
-      <h2>Rules of the night</h2>
-      <ul className="conflict-list">
+    <SectionCard
+      icon={<IconFile />}
+      tone="amber"
+      title="Rules of the night"
+      action={action}
+      data-testid="auction-rules"
+    >
+      <dl className="rules-list">
         {rules.pursePerTeam !== undefined ? (
-          <li>
-            <span className="registration-name">Purse per team</span>
-            <span className="registration-phone">{formatPaiseINR(paise(rules.pursePerTeam))}</span>
-          </li>
+          <div>
+            <dt>Purse per team</dt>
+            <dd>{formatPaiseINR(paise(rules.pursePerTeam))}</dd>
+          </div>
         ) : null}
-        <li>
-          <span className="registration-name">Squad size</span>
-          <span className="registration-phone">
+        <div>
+          <dt>Squad size</dt>
+          <dd>
             {rules.squadMin}–{rules.squadMax} players
-          </span>
-        </li>
-        <li>
-          <span className="registration-name">Timer</span>
-          <span className="registration-phone">
+          </dd>
+        </div>
+        <div>
+          <dt>Timer</dt>
+          <dd>
             {rules.initialSeconds}s per lot · +{rules.extensionSeconds}s anti-snipe extension
-          </span>
-        </li>
-        <li>
-          <span className="registration-name">Bid increments</span>
-          <span className="registration-phone">
-            {rules.slabs
-              .map(
-                (slab) =>
-                  `${formatPaiseINR(paise(slab.step))}${slab.upTo !== null ? ` up to ${formatPaiseINR(paise(slab.upTo))}` : " beyond"}`,
-              )
-              .join(" · ")}
-          </span>
-        </li>
-      </ul>
-    </Card>
+          </dd>
+        </div>
+        <div>
+          <dt>Bid increments</dt>
+          <dd>
+            {rules.slabs.map((slab) => (
+              <span key={`${String(slab.step)}-${String(slab.upTo)}`} className="rules-slab">
+                {formatPaiseINR(paise(slab.step))}
+                {slab.upTo !== null ? ` up to ${formatPaiseINR(paise(slab.upTo))}` : " beyond"}
+              </span>
+            ))}
+          </dd>
+        </div>
+      </dl>
+    </SectionCard>
   );
 }
 
@@ -691,24 +845,38 @@ export function ConnectionCheck({ wsUrl }: { wsUrl: string }) {
     };
   }, [wsUrl]);
   return (
-    <Card data-testid="connection-check">
-      <h2>Your connection</h2>
-      <p className="competitions-hint">
+    <SectionCard
+      icon={<IconBroadcast />}
+      tone={state === "unreachable" ? "red" : "green"}
+      title="Your connection"
+      data-testid="connection-check"
+    >
+      <div className="conn-check" data-state={state}>
         {state === "checking" ? (
-          "Checking the auction room…"
+          <p className="conn-check-text">Checking the auction room…</p>
         ) : state === "ok" ? (
           <>
-            <Badge tone="success">Ready</Badge> Engine reachable in {rttMs ?? 0}ms — this device can
-            join the room.
+            <Pill tone="green" dot>
+              Ready
+            </Pill>
+            <p className="conn-check-text">
+              <strong>Engine reachable in {rttMs ?? 0}ms</strong>
+              <span>This device can join the room.</span>
+            </p>
           </>
         ) : (
           <>
-            <Badge tone="danger">Unreachable</Badge> Couldn&apos;t reach the auction room from this
-            device — check your network and reload.
+            <Pill tone="red" dot>
+              Unreachable
+            </Pill>
+            <p className="conn-check-text">
+              <strong>Couldn&apos;t reach the auction room</strong>
+              <span>Check this device&apos;s network and reload.</span>
+            </p>
           </>
         )}
-      </p>
-    </Card>
+      </div>
+    </SectionCard>
   );
 }
 

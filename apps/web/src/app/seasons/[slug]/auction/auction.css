@@ -143,6 +143,21 @@
   gap: var(--space-2);
 }
 
+/* At 320px the shell ribbon was 20px wider than the screen: the version and
+   the name refused to give way. The status row may wrap, and the version —
+   an operator's figure, repeated in the room's diagnostics — steps aside. */
+@media (max-width: 400px) {
+  .status-ribbon--shell {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .status-ribbon--shell .ribbon-version {
+    display: none;
+  }
+}
+
 /* The Live shell's header carries the status now, so it has to behave like a
    status bar: it stays put while the page scrolls, and it wraps to a second
    row rather than shoving the ribbon off a 320px screen. Scoped to the Live
@@ -2692,13 +2707,11 @@
   min-width: 32px;
 }
 
-/* Auctioneer appointment (launch polish, Phase 3) — flat section. */
-.auctioneers {
+/* Auctioneer appointment (launch polish, Phase 3) — a console-kit card. */
+.auctioneers-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--border-subtle);
 }
 
 .auctioneers-head h2 {
