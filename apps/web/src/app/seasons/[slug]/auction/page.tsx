@@ -150,7 +150,9 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               </div>
             </header>
           ) : null}
-          {dashboard.overview !== null ? (
+          {/* Progress, burndown and the block mean nothing before the room
+              opens — the setup steps say what is left instead. */}
+          {dashboard.overview !== null && status !== "scheduled" ? (
             <AuctionOverviewPanel overview={dashboard.overview} />
           ) : null}
           {/* The board and the overlay were unreachable from anywhere in the
@@ -158,7 +160,13 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               it is where they collect the two URLs they will open elsewhere. */}
           {/* Only once there is a room: before the auction exists both screens
               show nothing, and the section sat above the setup it waits on. */}
-          {dashboard.viewer.canConduct && status !== null ? <BroadcastLinks slug={slug} /> : null}
+          {/* During setup the links live in the "Go live" step. */}
+          {dashboard.viewer.canConduct &&
+          status !== null &&
+          status !== "scheduled" &&
+          status !== "abandoned" ? (
+            <BroadcastLinks slug={slug} />
+          ) : null}
           <AuctionPanel slug={slug} dashboard={dashboard} />
           {auctioneers !== null ? <AuctioneerPanel slug={slug} view={auctioneers} /> : null}
         </div>
