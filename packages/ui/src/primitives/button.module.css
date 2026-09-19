@@ -250,37 +250,29 @@
 }
 
 /* ==========================================================================
-   CONSOLE PRIMARY (founder mockups, 2026-09-19): deep gold, white label.
-   The mockups put one gold button on every screen — "+ Add team", "Announce".
-   Daylight uses the DEEP end of the gold ramp: white on --accent-pressed is
-   5.9:1, where white on --accent would be 3.5:1 and fail AA. Floodlight keeps
-   the bright gold with its ink label. No glow — it is a console, not a stage.
+   CONSOLE PRIMARY (founder mockups, 2026-09-19): gold, one per screen.
+   Fill is --accent-pressed and the label is --surface-raised, a pair that
+   flips WITH the theme instead of beside it: deep gold + white in daylight
+   (5.9:1), bright gold + near-black in floodlight (7:1). A theme-keyed
+   override missed pages that carry their own theme scope (onboarding) and
+   painted white on bright gold — 2.4:1, caught by axe. No glow.
    ========================================================================== */
 :global([data-surface="console"]) .primary,
 :global([data-surface="console"]) .primary:active:not(:disabled) {
   background-color: var(--accent-pressed);
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 35%, var(--accent-pressed)),
-    var(--accent-pressed)
-  );
+  background-image: none;
   border-color: var(--accent-pressed);
-  color: var(--text-on-dark);
+  color: var(--surface-raised);
   box-shadow: var(--shadow-1);
 }
 
 :global([data-surface="console"]) .primary:hover:not(:disabled) {
   background-color: var(--accent-pressed);
-  background-image: none;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-raised) 8%, transparent),
+    transparent
+  );
   border-color: var(--accent-pressed);
   box-shadow: var(--shadow-2);
-}
-
-:global([data-theme="floodlight"] [data-surface="console"]) .primary,
-:global([data-theme="floodlight"] [data-surface="console"]) .primary:active:not(:disabled),
-:global([data-theme="floodlight"] [data-surface="console"]) .primary:hover:not(:disabled) {
-  background-color: var(--accent);
-  background-image: none;
-  border-color: var(--accent);
-  color: var(--text-on-accent);
 }

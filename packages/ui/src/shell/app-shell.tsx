@@ -224,18 +224,21 @@ export function AppShell({
           {/* THE PAGE HEAD. Trail, then the page's one <h1> with its status,
               then what the surface is for — and the page's primary action on
               the right. It opens the page instead of hiding in the top bar,
-              so every console surface starts the same way. */}
+              so every console surface starts the same way. A named region, not
+              a bare div: pages own their <main> and the head sits above it —
+              content outside every landmark fails axe `region` (a <header>
+              here would be a second banner). */}
           {!titleInBar &&
           (pageTitle !== undefined || breadcrumb !== undefined || pageAction !== undefined) ? (
-            <div className={styles["page-head"]} data-page-head>
+            <section className={styles["page-head"]} data-page-head aria-label="Page heading">
               {breadcrumb !== undefined ? (
                 <div className={styles["identity-trail"]}>{breadcrumb}</div>
               ) : null}
-              <div className={styles["page-head-row"]}>
+              <div className={styles["page-head-row"]} data-page-head-row>
                 {identityBlock}
                 {actionBlock}
               </div>
-            </div>
+            </section>
           ) : null}
           {children}
         </div>

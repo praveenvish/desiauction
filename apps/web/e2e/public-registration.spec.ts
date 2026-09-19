@@ -185,7 +185,9 @@ test("player journey: discover → multi-step register with draft recovery → t
     // DA-35: the share link is no longer a login wall that never names the
     // tournament. A public season shows what it is and what will be asked;
     // the OTP moves to the point of submission.
-    await expect(player.getByTestId("register-preview")).toContainText(`Monsoon Cup ${STAMP}`);
+    // The name heads the page (the frame's h1); the card below says what is asked.
+    await expect(player.getByRole("heading", { level: 1 })).toHaveText(`Monsoon Cup ${STAMP}`);
+    await expect(player.getByTestId("register-preview")).toBeVisible();
     await player.getByTestId("register-verify-cta").click();
     await expect(player).toHaveURL(/\/login\?next=/);
     await otpLogin(player, PLAYER);
