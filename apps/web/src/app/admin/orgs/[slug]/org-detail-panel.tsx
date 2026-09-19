@@ -1,10 +1,24 @@
-import { Badge, ButtonLink, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
+import {
+  ButtonLink,
+  CardGrid,
+  EmptyState,
+  IconArrowRight,
+  IconClock,
+  IconKey,
+  IconLedger,
+  IconTrophy,
+  IconUsers,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+} from "@desiauction/ui";
 import Link from "next/link";
 
 import { PageTitle } from "../../../../components/shell/page-title";
 import { formatCount, lifecycleLabel, maskPersonContact } from "../../../../server/admin/format";
 import type { OrgDetail } from "../../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, absoluteIst, statusTone } from "../../admin-ui";
+import { ReadOnlyNotice, RelativeTime, absoluteIst, statusPillTone } from "../../admin-ui";
 
 /**
  * PX-9 §2 — the organization inspector.
@@ -22,64 +36,79 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
   return (
     <>
       <PageTitle title={org.name} />
-      <header className="dash-head">
-        <div className="competition-title-row title-row-actions">
-          <span className="date-row">
-            {/* Opens only for someone who also holds org capability HERE —
-                `platform:admin` confers none. Named beside the door rather
-                than discovered as a 404 behind it. */}
-            <ButtonLink href={`/org/${org.slug}`} variant="secondary" data-testid="admin-open-org">
-              Open console
-            </ButtonLink>
-            <ButtonLink href="/admin/orgs" variant="secondary">
-              All organizations
-            </ButtonLink>
-          </span>
+      <header className="dash-head admin-head">
+        <div className="admin-head-text">
+          <p className="dash-hint">
+            <span className="admin-id">{org.slug}</span> · created {absoluteIst(org.createdAt)}
+          </p>
+          <p className="admin-meta">
+            The console link needs organizer permissions on this organization; a platform grant
+            confers none.
+          </p>
         </div>
-        <p className="dash-hint">
-          <span className="admin-id">{org.slug}</span> · created {absoluteIst(org.createdAt)}
-        </p>
-        <p className="admin-meta">
-          The console link needs organizer permissions on this organization; a platform grant
-          confers none.
-        </p>
+        <div className="admin-head-actions">
+          {/* Opens only for someone who also holds org capability HERE —
+              `platform:admin` confers none. Named beside the door rather than
+              discovered as a 404 behind it. */}
+          <ButtonLink href={`/org/${org.slug}`} variant="secondary" data-testid="admin-open-org">
+            Open console
+          </ButtonLink>
+          <ButtonLink href="/admin/orgs" variant="secondary">
+            All organizations
+          </ButtonLink>
+        </div>
       </header>
       <ReadOnlyNotice />
 
-      <div className="stat-row">
-        <div className="stat-tile">
-          <span className="stat-value">{formatCount(competitions.length)}</span>
-          <span className="stat-label">Seasons</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{formatCount(members.length)}</span>
-          <span className="stat-label">Members</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{formatCount(active.length)}</span>
-          <span className="stat-label">Active grants</span>
-        </div>
-        {/* "Yes" set in 24px tabular-nums read as a number that had lost its
-            digits. A fact is a badge, not a figure. */}
-        <div className="stat-tile admin-fact">
-          <span className="stat-label">Finance</span>
-          {finance.declared ? (
-            <Badge tone="info">
-              Declared{finance.posture === null ? "" : ` · ${finance.posture}`}
-            </Badge>
-          ) : (
-            <Badge tone="neutral">Not declared</Badge>
-          )}
-        </div>
-      </div>
+      <StatGrid>
+        <StatCard
+          icon={<IconTrophy />}
+          tone="gold"
+          value={formatCount(competitions.length)}
+          label="Seasons"
+        />
+        <StatCard
+          icon={<IconUsers />}
+          tone="blue"
+          value={formatCount(members.length)}
+          label="Members"
+        />
+        <StatCard
+          icon={<IconKey />}
+          tone="purple"
+          value={formatCount(active.length)}
+          label="Active grants"
+        />
+        {/* A fact, not a figure: "Yes" in tabular digits read as a number that
+            had lost them. */}
+        <StatCard
+          icon={<IconLedger />}
+          tone={finance.declared ? "green" : "neutral"}
+          value={finance.declared ? "Declared" : "Not declared"}
+          label="Finance"
+          {...(finance.declared && finance.posture !== null
+            ? { hint: `Posture: ${finance.posture}` }
+            : {})}
+        />
+      </StatGrid>
 
-      <Card>
-        <h2 className="admin-section-title">Seasons</h2>
+      <SectionCard
+        icon={<IconTrophy />}
+        title="Seasons"
+        description={`${formatCount(competitions.length)} season${competitions.length === 1 ? "" : "s"} · status, visibility, auction and settlement`}
+        flush
+      >
         {competitions.length === 0 ? (
-          <EmptyState title="No seasons" description="This organization has not created one yet." />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No seasons"
+              description="This organization has not created one yet."
+            />
+          </div>
         ) : (
-          <div className="table-scroll">
-            <table className="reg-table" data-testid="admin-org-competitions">
+          <div className="admin-table-wrap">
+            <table className="admin-table" data-testid="admin-org-competitions">
               <thead>
                 <tr>
                   <th scope="col">Season</th>
@@ -91,9 +120,9 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               </thead>
               <tbody>
                 {competitions.map((competition) => (
-                  <tr key={competition.id} className="reg-row">
+                  <tr key={competition.id}>
                     <td data-label="Season">
-                      <Link href={`/seasons/${competition.slug}`} className="registration-name">
+                      <Link href={`/seasons/${competition.slug}`} className="admin-name">
                         {competition.name}
                       </Link>
                     </td>
@@ -102,41 +131,41 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                         an un-translated database value, not a name anyone
                         needs to type back. */}
                     <td data-label="Status">
-                      <Badge tone={statusTone(competition.status)}>
+                      <Pill tone={statusPillTone(competition.status)} dot>
                         {lifecycleLabel(competition.status)}
-                      </Badge>
+                      </Pill>
                     </td>
                     <td data-label="Visibility">
                       {competition.held ? (
-                        <Badge tone="danger">Taken down</Badge>
+                        <Pill tone="red">Taken down</Pill>
                       ) : (
-                        <Badge tone={competition.visibility === "public" ? "info" : "neutral"}>
+                        <Pill tone={competition.visibility === "public" ? "blue" : "neutral"}>
                           {lifecycleLabel(competition.visibility)}
-                        </Badge>
+                        </Pill>
                       )}
                     </td>
                     <td data-label="Auction">
                       {competition.auctionStatus === null || competition.auctionId === null ? (
-                        <span className="admin-meta">No auction</span>
+                        <span className="admin-dash">No auction</span>
                       ) : (
                         <Link
                           href={`/admin/auctions/${competition.auctionId}`}
                           className="admin-badge-link"
                           aria-label={`Watch this auction (${lifecycleLabel(competition.auctionStatus)})`}
                         >
-                          <Badge tone={statusTone(competition.auctionStatus)}>
+                          <Pill tone={statusPillTone(competition.auctionStatus)} dot>
                             {lifecycleLabel(competition.auctionStatus)}
-                          </Badge>
+                          </Pill>
                         </Link>
                       )}
                     </td>
                     <td data-label="Settlement">
                       {competition.caseStatus === null ? (
-                        <span className="admin-meta">No case</span>
+                        <span className="admin-dash">No case</span>
                       ) : (
-                        <Badge tone={statusTone(competition.caseStatus)}>
+                        <Pill tone={statusPillTone(competition.caseStatus)} dot>
                           {lifecycleLabel(competition.caseStatus)}
-                        </Badge>
+                        </Pill>
                       )}
                     </td>
                   </tr>
@@ -145,18 +174,26 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
             </table>
           </div>
         )}
-      </Card>
+      </SectionCard>
 
-      <Card>
-        <h2 className="admin-section-title">Grants</h2>
+      <SectionCard
+        icon={<IconKey />}
+        tone="purple"
+        title="Grants"
+        description="Who can do what here — each capability set exactly as it is held."
+        flush
+      >
         {grants.length === 0 ? (
-          <EmptyState
-            title="No grants"
-            description="Nobody holds authority on this organization."
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No grants"
+              description="Nobody holds authority on this organization."
+            />
+          </div>
         ) : (
-          <div className="table-scroll">
-            <table className="reg-table" data-testid="admin-org-grants">
+          <div className="admin-table-wrap">
+            <table className="admin-table" data-testid="admin-org-grants">
               <thead>
                 <tr>
                   <th scope="col">Person</th>
@@ -166,9 +203,9 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               </thead>
               <tbody>
                 {grants.map((grant) => (
-                  <tr key={grant.id} className="reg-row">
+                  <tr key={grant.id}>
                     <td data-label="Person">
-                      <Link href={`/admin/users/${grant.personId}`} className="registration-name">
+                      <Link href={`/admin/users/${grant.personId}`} className="admin-name">
                         {grant.name ?? grant.personId.slice(-6)}
                       </Link>
                     </td>
@@ -177,9 +214,11 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                     </td>
                     <td data-label="State">
                       {grant.revokedAt === null ? (
-                        <Badge tone="success">Active</Badge>
+                        <Pill tone="green" dot>
+                          Active
+                        </Pill>
                       ) : (
-                        <Badge tone="neutral">Revoked {absoluteIst(grant.revokedAt)}</Badge>
+                        <Pill tone="neutral">Revoked {absoluteIst(grant.revokedAt)}</Pill>
                       )}
                     </td>
                   </tr>
@@ -188,56 +227,79 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
             </table>
           </div>
         )}
-      </Card>
+      </SectionCard>
 
-      <div className="admin-grid">
-        <Card>
-          <h2 className="admin-section-title">Members</h2>
+      <CardGrid>
+        <SectionCard icon={<IconUsers />} tone="blue" title="Members" flush>
           {members.length === 0 ? (
-            <EmptyState title="No members" description="Nobody has joined." />
+            <div className="admin-card-empty">
+              <EmptyState headingLevel={3} title="No members" description="Nobody has joined." />
+            </div>
           ) : (
-            <ul className="admin-timeline" data-testid="admin-org-members">
+            <ul className="admin-rows" data-testid="admin-org-members">
               {members.map((member) => (
                 <li key={member.personId}>
-                  <span>
-                    <Link href={`/admin/users/${member.personId}`} className="registration-name">
+                  <span className="admin-cell-main">
+                    {/* The name falls back to the masked contact, so the link
+                        itself can carry one — masked in a screenshot too. */}
+                    <Link
+                      href={`/admin/users/${member.personId}`}
+                      className="admin-name"
+                      {...(member.name === null ? { "data-private": "" } : {})}
+                    >
                       {member.name ?? maskPersonContact(member)}
                     </Link>
-                    {/* A membership list is a directory; the whole number lives on the
-                        one person's page. */}
-                    <span className="admin-meta">{maskPersonContact(member)}</span>
+                    {/* A membership list is a directory; the whole number lives
+                        on the one person's page. */}
+                    <span className="admin-meta" data-private>
+                      {maskPersonContact(member)}
+                    </span>
                   </span>
                   <RelativeTime at={member.joinedAt} />
                 </li>
               ))}
             </ul>
           )}
-        </Card>
-        <Card>
-          <h2 className="admin-section-title">Recent activity</h2>
+        </SectionCard>
+        <SectionCard
+          icon={<IconClock />}
+          tone="neutral"
+          title="Recent activity"
+          flush
+          {...(activity.length > 0
+            ? {
+                action: (
+                  <Link href={`/admin/audit?scopeId=${org.id}`} className="admin-card-link">
+                    All audit for this organization
+                    <IconArrowRight size={16} className="icon-trail" />
+                  </Link>
+                ),
+              }
+            : {})}
+        >
           {activity.length === 0 ? (
-            <EmptyState title="Nothing yet" description="No audited action on this organization." />
+            <div className="admin-card-empty">
+              <EmptyState
+                headingLevel={3}
+                title="Nothing yet"
+                description="No audited action on this organization."
+              />
+            </div>
           ) : (
-            <>
-              <ul className="admin-timeline">
-                {activity.map((row) => (
-                  <li key={row.id}>
-                    <span>
-                      <span className="admin-action">{row.action}</span>
-                      <span className="admin-meta"> by {row.actorName ?? row.actor.slice(-6)}</span>
-                    </span>
-                    <RelativeTime at={row.at} />
-                  </li>
-                ))}
-              </ul>
-              <Link href={`/admin/audit?scopeId=${org.id}`} className="admin-meta">
-                All audit for this organization
-                <IconArrowRight size={16} className="icon-trail" />
-              </Link>
-            </>
+            <ul className="admin-rows">
+              {activity.map((row) => (
+                <li key={row.id}>
+                  <span>
+                    <span className="admin-action">{row.action}</span>
+                    <span className="admin-meta"> by {row.actorName ?? row.actor.slice(-6)}</span>
+                  </span>
+                  <RelativeTime at={row.at} />
+                </li>
+              ))}
+            </ul>
           )}
-        </Card>
-      </div>
+        </SectionCard>
+      </CardGrid>
     </>
   );
 }

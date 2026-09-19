@@ -1,6 +1,14 @@
 "use client";
 
-import { Badge, Button, Card, useToast } from "@desiauction/ui";
+import {
+  Button,
+  IconCheckCircle,
+  IconFlag,
+  Pill,
+  SectionCard,
+  useToast,
+  type KitTone,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -34,6 +42,14 @@ const STATUS_WORDS: Record<string, string> = {
   duplicate: "duplicate",
 };
 
+const STATUS_TONE: Record<string, KitTone> = {
+  new: "amber",
+  triaged: "blue",
+  fixed: "green",
+  wont_fix: "neutral",
+  duplicate: "neutral",
+};
+
 const MOVES: readonly { value: string; label: string }[] = [
   { value: "triaged", label: "Looking into it" },
   { value: "fixed", label: "Fixed" },
@@ -49,24 +65,36 @@ export function ReportQueuePanel({ queue }: { queue: ReportQueue }) {
   return (
     <>
       {queue.open.length > 0 ? (
-        <Card data-testid="report-queue-open">
-          <h2>Open</h2>
-          <ul className="report-queue">
+        <SectionCard
+          icon={<IconFlag />}
+          tone="amber"
+          title="Open"
+          description={`${String(queue.open.length)} to pick up or settle, newest first`}
+          flush
+          data-testid="report-queue-open"
+        >
+          <ul className="admin-rows is-stacked report-queue">
             {queue.open.map((row) => (
               <ReportRow key={row.id} row={row} />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
       {queue.closed.length > 0 ? (
-        <Card data-testid="report-queue-closed">
-          <h2>Closed</h2>
-          <ul className="report-queue">
+        <SectionCard
+          icon={<IconCheckCircle />}
+          tone="neutral"
+          title="Closed"
+          description={`${String(queue.closed.length)} settled`}
+          flush
+          data-testid="report-queue-closed"
+        >
+          <ul className="admin-rows is-stacked report-queue">
             {queue.closed.map((row) => (
               <ReportRow key={row.id} row={row} />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
     </>
   );
@@ -97,25 +125,27 @@ function ReportRow({ row }: { row: ReportQueueRow }) {
       <div className="report-row-head">
         <div className="report-row-who">
           <p className="report-row-title">{who}</p>
-          <p className="competitions-hint">
+          <p className="pass-row-sub">
             {when(row.createdAt)}
             {row.replyEmail === null ? (
               " · no reply address"
             ) : (
               <>
                 {" · "}
-                <a href={`mailto:${row.replyEmail}`}>{row.replyEmail}</a>
+                <a href={`mailto:${row.replyEmail}`} data-private>
+                  {row.replyEmail}
+                </a>
               </>
             )}
           </p>
         </div>
         <div className="report-row-tags">
-          <Badge tone={row.category === "bug" ? "danger" : "neutral"}>
+          <Pill tone={row.category === "bug" ? "red" : "neutral"}>
             {CATEGORY_WORDS[row.category] ?? row.category}
-          </Badge>
-          <Badge tone={row.status === "new" ? "warning" : "neutral"}>
+          </Pill>
+          <Pill tone={STATUS_TONE[row.status] ?? "neutral"} dot>
             {STATUS_WORDS[row.status] ?? row.status}
-          </Badge>
+          </Pill>
         </div>
       </div>
 
@@ -158,7 +188,7 @@ function ReportRow({ row }: { row: ReportQueueRow }) {
           </Button>
         )
       ) : (
-        <p className="competitions-hint">No screenshot.</p>
+        <p className="pass-row-sub">No screenshot.</p>
       )}
 
       <div className="report-row-actions">

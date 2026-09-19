@@ -1,6 +1,20 @@
 "use client";
 
-import { Badge, Card, EmptyState } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconBolt,
+  IconClock,
+  IconGavel,
+  IconLayers,
+  IconList,
+  IconRupee,
+  IconUsers,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { useCallback } from "react";
 
@@ -13,13 +27,25 @@ import { ageLabel, istClock, istTime, istWhen, usePolled } from "../../use-polle
 
 const REFRESH_MS = 5_000;
 
-const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral" | "danger"> = {
-  live: "success",
-  paused: "warning",
-  scheduled: "info",
+const STATUS_TONE: Record<string, KitTone> = {
+  live: "green",
+  paused: "amber",
+  scheduled: "blue",
   completed: "neutral",
   reconciled: "neutral",
-  abandoned: "danger",
+  abandoned: "red",
+};
+
+/** A lot's state, toned: what is settled, what is still moving. */
+const LOT_STATUS_TONE: Record<string, KitTone> = {
+  sold: "green",
+  unsold: "neutral",
+  withdrawn: "neutral",
+  queued: "neutral",
+  prepared: "neutral",
+  on_block: "gold",
+  closing_soon: "amber",
+  frozen: "red",
 };
 
 const LOT_STATUS_LABEL: Record<string, string> = {
@@ -80,206 +106,278 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
 
   return (
     <>
-      <Card data-testid="auction-watch-head">
-        <div className="admin-live-head">
-          <span className="admin-live-name">
-            <span className="admin-watch-title">{header.seasonName}</span>
-            <span className="admin-meta">
-              <Link href={`/admin/orgs/${header.orgSlug}`}>{header.orgName}</Link> · {header.sport}{" "}
-              · {header.auctionName}
-            </span>
-          </span>
-          <Badge tone={STATUS_TONE[header.status] ?? "neutral"} data-testid="auction-watch-status">
+      <SectionCard
+        icon={<IconGavel />}
+        tone={stillRunning ? "green" : "gold"}
+        title={header.seasonName}
+        description={
+          <>
+            <Link href={`/admin/orgs/${header.orgSlug}`} className="admin-inline-link">
+              {header.orgName}
+            </Link>{" "}
+            · {header.sport} · {header.auctionName}
+          </>
+        }
+        action={
+          <Pill tone={STATUS_TONE[header.status] ?? "neutral"} dot testId="auction-watch-status">
             {header.status}
-          </Badge>
+          </Pill>
+        }
+        data-testid="auction-watch-head"
+      >
+        <div className="admin-watch-body">
+          <LiveFreshness
+            generatedAtMs={data.generatedAtMs}
+            polling={stillRunning && !revoked}
+            failed={failed}
+            revoked={revoked}
+          />
+          <p className="admin-meta">
+            You are watching, not conducting. Pausing, closing or recovering this auction happens in
+            the organizer&rsquo;s cockpit.
+          </p>
         </div>
-        <LiveFreshness
-          generatedAtMs={data.generatedAtMs}
-          polling={stillRunning && !revoked}
-          failed={failed}
-          revoked={revoked}
-        />
-        <p className="admin-meta">
-          You are watching, not conducting. Pausing, closing or recovering this auction happens in
-          the organizer&rsquo;s cockpit.
-        </p>
-      </Card>
+      </SectionCard>
 
-      <div className="stat-row" data-testid="auction-watch-vitals">
-        <Vital
-          label={pulse.closedAtMs !== null ? "Ran" : "Opened"}
-          value={
-            pulse.openedAtMs === null
-              ? "Not yet"
-              : pulse.closedAtMs !== null
-                ? `${istClock(pulse.openedAtMs)}–${istWhen(pulse.closedAtMs, data.generatedAtMs)}`
-                : istWhen(pulse.openedAtMs, data.generatedAtMs)
-          }
-        />
-        <Vital label="Duration" value={durationMs === null ? "—" : ageLabel(durationMs)} />
-        <Vital
-          label={stillRunning ? "Bids · last 5 min" : "Bids"}
-          value={
-            stillRunning
-              ? `${String(pulse.bidsLastFiveMinutes)} / ${String(pulse.bidsTotal)}`
-              : String(pulse.bidsTotal)
-          }
-        />
-        <Vital label="Teams that bid" value={String(pulse.activeBidders)} />
-        <Vital label="Average sale" value={averageSale === null ? "—" : compactINR(averageSale)} />
+      <div className="admin-vitals">
+        <StatGrid testId="auction-watch-vitals">
+          <StatCard
+            icon={<IconClock />}
+            tone="blue"
+            label={pulse.closedAtMs !== null ? "Ran" : "Opened"}
+            value={
+              pulse.openedAtMs === null
+                ? "Not yet"
+                : pulse.closedAtMs !== null
+                  ? `${istClock(pulse.openedAtMs)}–${istWhen(pulse.closedAtMs, data.generatedAtMs)}`
+                  : istWhen(pulse.openedAtMs, data.generatedAtMs)
+            }
+          />
+          <StatCard
+            icon={<IconClock />}
+            tone="neutral"
+            label="Duration"
+            value={durationMs === null ? "—" : ageLabel(durationMs)}
+          />
+          <StatCard
+            icon={<IconBolt />}
+            tone="gold"
+            label={stillRunning ? "Bids · last 5 min" : "Bids"}
+            value={
+              stillRunning
+                ? `${String(pulse.bidsLastFiveMinutes)} / ${String(pulse.bidsTotal)}`
+                : String(pulse.bidsTotal)
+            }
+          />
+          <StatCard
+            icon={<IconUsers />}
+            tone="purple"
+            label="Teams that bid"
+            value={String(pulse.activeBidders)}
+          />
+          <StatCard
+            icon={<IconRupee />}
+            tone="green"
+            label="Average sale"
+            value={averageSale === null ? "—" : compactINR(averageSale)}
+          />
+        </StatGrid>
       </div>
 
       <AuctionOverviewPanel overview={overview} idleHint="No lot is under the hammer right now." />
 
       {engine !== null ? <EngineCard engine={engine} /> : null}
 
-      <Card data-testid="auction-watch-tape">
-        <h2 className="admin-section-title">Bid tape</h2>
+      <SectionCard
+        icon={<IconBolt />}
+        tone="gold"
+        title="Bid tape"
+        description="The latest bids, newest first."
+        flush
+        data-testid="auction-watch-tape"
+      >
         {pulse.tape.length === 0 ? (
-          <p className="admin-meta">No bids yet.</p>
+          <p className="admin-card-empty">No bids yet.</p>
         ) : (
-          <table className="reg-table">
-            <thead>
-              <tr>
-                <th scope="col">Time</th>
-                <th scope="col">Lot</th>
-                <th scope="col">Team</th>
-                <th scope="col" className="admin-num">
-                  Bid
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {pulse.tape.map((bid, index) => (
-                <tr key={`${String(bid.placedAtMs)}-${String(index)}`} className="reg-row">
-                  <td data-label="Time">{istTime(bid.placedAtMs)}</td>
-                  <td data-label="Lot">{bid.lotNumber}</td>
-                  <td data-label="Team">
-                    {bid.teamName}{" "}
-                    <span className="admin-meta">
-                      {bid.paddleNumber}
-                      {bid.status === "outbid" ? " · outbid" : ""}
-                    </span>
-                  </td>
-                  <td data-label="Bid" className="admin-num">
-                    {exactINR(bid.amount)}
-                  </td>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Time</th>
+                  <th scope="col">Lot</th>
+                  <th scope="col">Team</th>
+                  <th scope="col" className="admin-num">
+                    Bid
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pulse.tape.map((bid, index) => (
+                  <tr key={`${String(bid.placedAtMs)}-${String(index)}`}>
+                    <td data-label="Time" className="admin-count">
+                      {istTime(bid.placedAtMs)}
+                    </td>
+                    <td data-label="Lot" className="admin-count">
+                      {bid.lotNumber}
+                    </td>
+                    <td data-label="Team">
+                      <span className="admin-cell-main">
+                        <span className="admin-name">{bid.teamName}</span>
+                        <span className="admin-meta">
+                          {bid.paddleNumber}
+                          {bid.status === "outbid" ? " · outbid" : ""}
+                        </span>
+                      </span>
+                    </td>
+                    <td data-label="Bid" className="admin-num admin-count">
+                      {exactINR(bid.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+      </SectionCard>
 
-      <Card data-testid="auction-watch-teams">
-        <h2 className="admin-section-title">Teams</h2>
+      <SectionCard
+        icon={<IconUsers />}
+        tone="purple"
+        title="Teams"
+        description="Players bought, purse spent and left, and each team's top buy."
+        flush
+        data-testid="auction-watch-teams"
+      >
         {teams.length === 0 ? (
-          <p className="admin-meta">No paddles issued yet.</p>
+          <p className="admin-card-empty">No paddles issued yet.</p>
         ) : (
-          <table className="reg-table">
-            <thead>
-              <tr>
-                <th scope="col">Team</th>
-                <th scope="col" className="admin-num">
-                  Players
-                </th>
-                <th scope="col" className="admin-num">
-                  Spent
-                </th>
-                <th scope="col" className="admin-num">
-                  Left
-                </th>
-                <th scope="col" className="admin-num">
-                  Top buy
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {teams.map((team) => (
-                <tr key={team.paddleNumber} className="reg-row">
-                  <td data-label="Team">
-                    {team.teamName} <span className="admin-meta">{team.paddleNumber}</span>
-                  </td>
-                  <td data-label="Players" className="admin-num">
-                    {team.players}
-                  </td>
-                  <td data-label="Spent" className="admin-num">
-                    {team.spent === undefined ? "—" : compactINR(team.spent)}
-                  </td>
-                  <td data-label="Left" className="admin-num">
-                    {team.remaining === undefined ? "—" : compactINR(team.remaining)}
-                  </td>
-                  <td data-label="Top buy" className="admin-num">
-                    {team.highest === null ? "—" : compactINR(team.highest)}
-                  </td>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Team</th>
+                  <th scope="col" className="admin-num">
+                    Players
+                  </th>
+                  <th scope="col" className="admin-num">
+                    Spent
+                  </th>
+                  <th scope="col" className="admin-num">
+                    Left
+                  </th>
+                  <th scope="col" className="admin-num">
+                    Top buy
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {teams.map((team) => (
+                  <tr key={team.paddleNumber}>
+                    <td data-label="Team">
+                      <span className="admin-cell-main">
+                        <span className="admin-name">{team.teamName}</span>
+                        <span className="admin-meta">{team.paddleNumber}</span>
+                      </span>
+                    </td>
+                    <td data-label="Players" className="admin-num admin-count">
+                      {team.players}
+                    </td>
+                    <td data-label="Spent" className="admin-num admin-count">
+                      {team.spent === undefined ? "—" : compactINR(team.spent)}
+                    </td>
+                    <td data-label="Left" className="admin-num admin-count">
+                      {team.remaining === undefined ? "—" : compactINR(team.remaining)}
+                    </td>
+                    <td data-label="Top buy" className="admin-num admin-count">
+                      {team.highest === null ? "—" : compactINR(team.highest)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+      </SectionCard>
 
-      <Card data-testid="auction-watch-lots">
-        <h2 className="admin-section-title">
-          Lots <span className="admin-count">· {String(overview.totalLots)}</span>
-        </h2>
+      <SectionCard
+        icon={<IconList />}
+        tone="blue"
+        title="Lots"
+        description={`${String(overview.totalLots)} lot${overview.totalLots === 1 ? "" : "s"} · base and final price, and the paddle that bought`}
+        flush
+        data-testid="auction-watch-lots"
+      >
         {overview.lots.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="No lots yet"
-            description="The organizer has not put any players into this auction."
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No lots yet"
+              description="The organizer has not put any players into this auction."
+            />
+          </div>
         ) : (
-          <table className="reg-table">
-            <thead>
-              <tr>
-                <th scope="col">Lot</th>
-                <th scope="col">Player</th>
-                <th scope="col">Status</th>
-                <th scope="col" className="admin-num">
-                  Base
-                </th>
-                <th scope="col" className="admin-num">
-                  Final
-                </th>
-                <th scope="col">Paddle</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.lots.map((lot) => (
-                <tr key={lot.lotId} className="reg-row">
-                  <td data-label="Lot">{lot.lotNumber}</td>
-                  <td data-label="Player">
-                    {lot.playerName ?? "Unnamed"}
-                    {lot.role !== null ? (
-                      <span className="admin-meta"> · {labelOf(lot.role)}</span>
-                    ) : null}
-                  </td>
-                  <td data-label="Status">{LOT_STATUS_LABEL[lot.status] ?? lot.status}</td>
-                  <td data-label="Base" className="admin-num">
-                    {compactINR(lot.basePrice)}
-                  </td>
-                  <td data-label="Final" className="admin-num">
-                    {lot.soldPrice === null ? "—" : compactINR(lot.soldPrice)}
-                  </td>
-                  <td data-label="Paddle">{lot.paddleNumber ?? "—"}</td>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th scope="col">Lot</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" className="admin-num">
+                    Base
+                  </th>
+                  <th scope="col" className="admin-num">
+                    Final
+                  </th>
+                  <th scope="col">Paddle</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {overview.lots.map((lot) => (
+                  <tr key={lot.lotId}>
+                    <td data-label="Player">
+                      <span className="admin-cell-main">
+                        <span className="admin-name">{lot.playerName ?? "Unnamed"}</span>
+                        {lot.role !== null ? (
+                          <span className="admin-meta">{labelOf(lot.role)}</span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td data-label="Lot" className="admin-count">
+                      {lot.lotNumber}
+                    </td>
+                    <td data-label="Status">
+                      <Pill tone={LOT_STATUS_TONE[lot.status] ?? "neutral"}>
+                        {LOT_STATUS_LABEL[lot.status] ?? lot.status}
+                      </Pill>
+                    </td>
+                    <td data-label="Base" className="admin-num admin-count">
+                      {compactINR(lot.basePrice)}
+                    </td>
+                    <td data-label="Final" className="admin-num admin-count">
+                      {lot.soldPrice === null ? "—" : compactINR(lot.soldPrice)}
+                    </td>
+                    <td data-label="Paddle">{lot.paddleNumber ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+      </SectionCard>
 
-      <Card data-testid="auction-watch-events">
-        <h2 className="admin-section-title">Latest events</h2>
-        <p className="admin-meta">
-          The tail of the auction&rsquo;s append-only log — {String(pulse.eventCount)} events in
-          all.
-        </p>
+      <SectionCard
+        icon={<IconLayers />}
+        tone="neutral"
+        title="Latest events"
+        description={`The tail of the auction’s append-only log — ${String(pulse.eventCount)} events in all.`}
+        flush
+        data-testid="auction-watch-events"
+      >
         {overview.events.length === 0 ? (
-          <p className="admin-meta">Nothing has happened yet.</p>
+          <p className="admin-card-empty">Nothing has happened yet.</p>
         ) : (
-          <ul className="admin-timeline">
+          <ul className="admin-rows">
             {overview.events.map((event) => (
               <li key={event.seq}>
                 <span>
@@ -291,41 +389,35 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             ))}
           </ul>
         )}
-      </Card>
+      </SectionCard>
     </>
-  );
-}
-
-function Vital({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="stat-tile">
-      <span className="stat-value admin-vital">{value}</span>
-      <span className="stat-label">{label}</span>
-    </div>
   );
 }
 
 function EngineCard({ engine }: { engine: NonNullable<AuctionWatch["engine"]> }) {
   if (engine.state === "unreachable" || engine.state === "not_checked") {
     return (
-      <Card data-testid="auction-watch-engine">
-        <h2 className="admin-section-title">Engine</h2>
+      <SectionCard icon={<IconBolt />} tone="red" title="Engine" data-testid="auction-watch-engine">
         <p className="admin-live-trouble" role="note">
           The engine did not answer within two seconds. If this persists, check /admin/health and
           the engine&rsquo;s readiness probe.
         </p>
-      </Card>
+      </SectionCard>
     );
   }
   if (engine.state === "idle") {
     return (
-      <Card data-testid="auction-watch-engine">
-        <h2 className="admin-section-title">Engine</h2>
+      <SectionCard
+        icon={<IconBolt />}
+        tone="neutral"
+        title="Engine"
+        data-testid="auction-watch-engine"
+      >
         <p className="admin-meta">
           The engine is up but holds nothing in memory for this auction — nobody has connected since
           it last started. It loads the room the moment someone does.
         </p>
-      </Card>
+      </SectionCard>
     );
   }
   const trouble =
@@ -335,8 +427,13 @@ function EngineCard({ engine }: { engine: NonNullable<AuctionWatch["engine"]> })
         ? "The engine's timer watchdog has stalled — lot clocks may not be advancing."
         : null;
   return (
-    <Card data-testid="auction-watch-engine">
-      <h2 className="admin-section-title">Engine</h2>
+    <SectionCard
+      icon={<IconBolt />}
+      tone={trouble !== null ? "red" : "green"}
+      title="Engine"
+      description="The engine's own view of the room."
+      data-testid="auction-watch-engine"
+    >
       {trouble !== null ? (
         <p className="admin-live-trouble" role="note">
           {trouble}
@@ -370,6 +467,6 @@ function EngineCard({ engine }: { engine: NonNullable<AuctionWatch["engine"]> })
           <dd>{engine.recoveries}</dd>
         </div>
       </dl>
-    </Card>
+    </SectionCard>
   );
 }

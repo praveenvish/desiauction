@@ -1,4 +1,4 @@
-import { IconEye, type BadgeTone } from "@desiauction/ui";
+import { IconEye, Notice, type BadgeTone, type KitTone } from "@desiauction/ui";
 
 /**
  * PX-9 shared admin rendering. Presentation only — no reads, no rules. The
@@ -34,6 +34,20 @@ export function statusTone(status: string): BadgeTone {
   return TONES[status] ?? "neutral";
 }
 
+/** The same look-up for the console kit's `Pill` tones. Unknown → neutral. */
+const PILL_TONES: Record<BadgeTone, KitTone> = {
+  neutral: "neutral",
+  live: "green",
+  warning: "amber",
+  success: "green",
+  danger: "red",
+  info: "blue",
+};
+
+export function statusPillTone(status: string): KitTone {
+  return PILL_TONES[statusTone(status)];
+}
+
 /**
  * Administration says what it is, at the top of every surface. Not decoration:
  * an operator arriving at a platform-wide console during an incident needs to
@@ -41,16 +55,11 @@ export function statusTone(status: string): BadgeTone {
  */
 export function ReadOnlyNotice() {
   return (
-    <p className="admin-readonly" data-testid="admin-readonly">
-      <span aria-hidden>
-        <IconEye size={18} />
-      </span>
-      <span>
-        Read-only. Administration observes the platform; every operational fix happens in the
-        console that owns it, under that console&rsquo;s own permissions — which a platform grant
-        alone does not confer. Page views here are recorded in the audit log.
-      </span>
-    </p>
+    <Notice tone="info" icon={<IconEye size={20} />} testId="admin-readonly">
+      Read-only. Administration observes the platform; every operational fix happens in the console
+      that owns it, under that console&rsquo;s own permissions — which a platform grant alone does
+      not confer. Page views here are recorded in the audit log.
+    </Notice>
   );
 }
 

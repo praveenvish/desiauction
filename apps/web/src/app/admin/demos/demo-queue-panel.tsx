@@ -1,6 +1,14 @@
 "use client";
 
-import { Badge, Button, Card, useToast } from "@desiauction/ui";
+import {
+  Button,
+  IconCalendar,
+  IconCheckCircle,
+  IconClock,
+  Pill,
+  SectionCard,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -23,44 +31,61 @@ export function DemoQueuePanel({ queue }: { queue: DemoQueue }) {
   return (
     <>
       {queue.upcoming.length > 0 ? (
-        <Card data-testid="demo-queue-upcoming">
-          <h2>Booked in</h2>
-          <ul className="demo-queue">
+        <SectionCard
+          icon={<IconCalendar />}
+          tone="green"
+          title="Booked in"
+          description={`${String(queue.upcoming.length)} call${queue.upcoming.length === 1 ? "" : "s"} on the calendar`}
+          flush
+          data-testid="demo-queue-upcoming"
+        >
+          <ul className="admin-rows is-stacked">
             {queue.upcoming.map((row) => (
               <DemoRow key={`upcoming-${row.id}`} row={row} showCancel />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
 
       {queue.open.length > 0 ? (
-        <Card data-testid="demo-queue-open">
-          <h2>Waiting for an answer</h2>
-          <ul className="demo-queue">
+        <SectionCard
+          icon={<IconClock />}
+          tone="amber"
+          title="Waiting for an answer"
+          description={`${String(queue.open.length)} request${queue.open.length === 1 ? "" : "s"}, oldest first`}
+          flush
+          data-testid="demo-queue-open"
+        >
+          <ul className="admin-rows is-stacked">
             {queue.open.map((row) => (
               <DemoRow key={`open-${row.id}`} row={row} />
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
 
       {queue.answered.length > 0 ? (
-        <Card data-testid="demo-queue-answered">
-          <h2>Answered</h2>
-          <ul className="demo-answered">
+        <SectionCard
+          icon={<IconCheckCircle />}
+          tone="neutral"
+          title="Answered"
+          flush
+          data-testid="demo-queue-answered"
+        >
+          <ul className="admin-rows">
             {queue.answered.map((row) => (
               <li key={`answered-${row.id}`}>
-                <span className="demo-answered-org">{row.orgName}</span>
-                <span className="competitions-hint">
-                  {(row.outcome ?? "").replace("_", " ")}
-                  {row.contactedAt === null
-                    ? ""
-                    : ` · ${row.contactedAt.toISOString().slice(0, 10)}`}
+                <span className="admin-name">{row.orgName}</span>
+                <span className="admin-pills">
+                  <Pill tone="neutral">{(row.outcome ?? "").replace("_", " ")}</Pill>
+                  {row.contactedAt === null ? null : (
+                    <span className="admin-when">{row.contactedAt.toISOString().slice(0, 10)}</span>
+                  )}
                 </span>
               </li>
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
     </>
   );
@@ -140,12 +165,19 @@ function DemoRow({ row, showCancel = false }: { row: DemoQueueRow; showCancel?: 
       <div className="demo-row-head">
         <div>
           <p className="demo-row-org">{row.orgName}</p>
-          <p className="competitions-hint">
-            {row.name} · <a href={`tel:${row.phone}`}>{row.phone}</a>
+          {/* A stranger's number and address: masked in a Report-a-problem
+              screenshot (the tel:/mailto: links are, and so is the line). */}
+          <p className="pass-row-sub">
+            {row.name} ·{" "}
+            <a href={`tel:${row.phone}`} data-private>
+              {row.phone}
+            </a>
             {row.email === null ? null : (
               <>
                 {" · "}
-                <a href={`mailto:${row.email}`}>{row.email}</a>
+                <a href={`mailto:${row.email}`} data-private>
+                  {row.email}
+                </a>
               </>
             )}
           </p>
@@ -154,18 +186,18 @@ function DemoRow({ row, showCancel = false }: { row: DemoQueueRow; showCancel?: 
           {/* First, because which sport they run changes how the rest reads. A
               request taken before migration 0045 has no answer, and says so
               rather than being quietly counted as cricket. */}
-          <Badge tone={row.sport === null ? "neutral" : "info"}>
+          <Pill tone={row.sport === null ? "neutral" : "blue"}>
             {row.sport === null ? "sport not asked" : (SPORT_WORDS[row.sport] ?? row.sport)}
-          </Badge>
-          <Badge tone="neutral">{SIZE_WORDS[row.tournamentSize] ?? row.tournamentSize}</Badge>
+          </Pill>
+          <Pill tone="neutral">{SIZE_WORDS[row.tournamentSize] ?? row.tournamentSize}</Pill>
           {urgency !== null ? (
-            <Badge tone={urgency <= 14 ? "danger" : urgency <= 30 ? "warning" : "neutral"}>
+            <Pill tone={urgency <= 14 ? "red" : urgency <= 30 ? "amber" : "neutral"} dot>
               auction in {urgency} {urgency === 1 ? "day" : "days"}
-            </Badge>
+            </Pill>
           ) : (
-            <Badge tone="neutral">no auction date</Badge>
+            <Pill tone="neutral">no auction date</Pill>
           )}
-          <Badge tone="neutral">{WINDOW_WORDS[row.preferredWindow] ?? row.preferredWindow}</Badge>
+          <Pill tone="neutral">{WINDOW_WORDS[row.preferredWindow] ?? row.preferredWindow}</Pill>
         </div>
       </div>
 

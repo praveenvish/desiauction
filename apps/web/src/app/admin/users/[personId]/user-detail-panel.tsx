@@ -1,4 +1,18 @@
-import { Badge, ButtonLink, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
+import {
+  ButtonLink,
+  CardGrid,
+  EmptyState,
+  IconArrowRight,
+  IconClock,
+  IconKey,
+  IconLayers,
+  IconLock,
+  IconTrophy,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+} from "@desiauction/ui";
 import { roleLabelIn, sportPackFor } from "@desiauction/core";
 import Link from "next/link";
 
@@ -24,48 +38,63 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
   return (
     <>
       <PageTitle title={person.name ?? "Unnamed"} />
-      <header className="dash-head">
-        <div className="competition-title-row title-row-actions">
-          <span className="date-row">
-            <ButtonLink href="/admin/users" variant="secondary">
-              All users
-            </ButtonLink>
-          </span>
+      <header className="dash-head admin-head">
+        <div className="admin-head-text">
+          {/* The ONE surface that shows the whole number — an operator arrived
+              here on purpose, for one person. The directory shows four digits.
+              `data-private` paints it over in a Report-a-problem screenshot. */}
+          <p className="dash-hint">
+            <span data-private>{personContact(person)}</span> ·{" "}
+            <span className="admin-id">{person.id}</span> · joined {absoluteIst(person.createdAt)}
+          </p>
         </div>
-        {/* The ONE surface that shows the whole number — an operator arrived
-            here on purpose, for one person. The directory shows four digits. */}
-        <p className="dash-hint">
-          {personContact(person)} · <span className="admin-id">{person.id}</span> · joined{" "}
-          {absoluteIst(person.createdAt)}
-        </p>
+        <div className="admin-head-actions">
+          <ButtonLink href="/admin/users" variant="secondary">
+            All users
+          </ButtonLink>
+        </div>
       </header>
       <ReadOnlyNotice />
 
-      <div className="stat-row">
-        <div className="stat-tile">
-          <span className="stat-value">{formatCount(orgs.length)}</span>
-          <span className="stat-label">Organizations</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{formatCount(active.length)}</span>
-          <span className="stat-label">Active grants</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{formatCount(grants.length - active.length)}</span>
-          <span className="stat-label">Revoked grants</span>
-        </div>
-      </div>
+      <StatGrid>
+        <StatCard
+          icon={<IconLayers />}
+          tone="blue"
+          value={formatCount(orgs.length)}
+          label="Organizations"
+        />
+        <StatCard
+          icon={<IconKey />}
+          tone="green"
+          value={formatCount(active.length)}
+          label="Active grants"
+        />
+        <StatCard
+          icon={<IconLock />}
+          tone="neutral"
+          value={formatCount(grants.length - active.length)}
+          label="Revoked grants"
+        />
+      </StatGrid>
 
-      <Card>
-        <h2 className="admin-section-title">Grants</h2>
+      <SectionCard
+        icon={<IconKey />}
+        tone="purple"
+        title="Grants"
+        description="Every grant this person holds, in every scope, as the capability set it is."
+        flush
+      >
         {grants.length === 0 ? (
-          <EmptyState
-            title="No grants"
-            description="This person holds no authority anywhere on the platform."
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No grants"
+              description="This person holds no authority anywhere on the platform."
+            />
+          </div>
         ) : (
-          <div className="table-scroll">
-            <table className="reg-table" data-testid="admin-user-grants">
+          <div className="admin-table-wrap">
+            <table className="admin-table" data-testid="admin-user-grants">
               <thead>
                 <tr>
                   <th scope="col">Scope</th>
@@ -76,10 +105,12 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
               </thead>
               <tbody>
                 {grants.map((grant) => (
-                  <tr key={grant.id} className="reg-row">
+                  <tr key={grant.id}>
                     <td data-label="Scope">
-                      <span className="registration-name">{grant.scopeLabel}</span>
-                      <span className="admin-meta">{grant.scopeType}</span>
+                      <span className="admin-cell-main">
+                        <span className="admin-name">{grant.scopeLabel}</span>
+                        <span className="admin-meta">{grant.scopeType}</span>
+                      </span>
                     </td>
                     <td data-label="Capability set">
                       <span className="admin-action">{grant.capabilitySet}</span>
@@ -92,18 +123,22 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                         self-reference, so it is named as one rather than
                         dressed up as a decision somebody made. */}
                     <td data-label="Granted">
-                      <span className="admin-meta">{absoluteIst(grant.createdAt)}</span>{" "}
-                      <span className="admin-meta">
-                        {grant.grantedBy === person.id
-                          ? "· installed out-of-band (self-referencing grantor)"
-                          : `· by ${grant.grantedByName ?? grant.grantedBy.slice(-6)}`}
+                      <span className="admin-cell-main">
+                        <span className="admin-meta">{absoluteIst(grant.createdAt)}</span>
+                        <span className="admin-meta">
+                          {grant.grantedBy === person.id
+                            ? "installed out-of-band (self-referencing grantor)"
+                            : `by ${grant.grantedByName ?? grant.grantedBy.slice(-6)}`}
+                        </span>
                       </span>
                     </td>
                     <td data-label="State">
                       {grant.revokedAt === null ? (
-                        <Badge tone="success">Active</Badge>
+                        <Pill tone="green" dot>
+                          Active
+                        </Pill>
                       ) : (
-                        <Badge tone="neutral">Revoked {absoluteIst(grant.revokedAt)}</Badge>
+                        <Pill tone="neutral">Revoked {absoluteIst(grant.revokedAt)}</Pill>
                       )}
                     </td>
                   </tr>
@@ -112,76 +147,99 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
             </table>
           </div>
         )}
-      </Card>
+      </SectionCard>
 
       {/* PI-1 P6: the person's participations — read-only, no prices (money
           surfaces stay with the money capabilities). */}
-      <Card>
-        <h2 className="admin-section-title">Seasons played</h2>
+      <SectionCard icon={<IconTrophy />} title="Seasons played" flush>
         {detail.seasons.length === 0 ? (
-          <EmptyState title="No registrations" description="This person has joined no season." />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No registrations"
+              description="This person has joined no season."
+            />
+          </div>
         ) : (
-          <ul className="admin-timeline" data-testid="admin-user-seasons">
+          <ul className="admin-rows" data-testid="admin-user-seasons">
             {detail.seasons.map((season, index) => (
               <li key={index}>
-                <span className="registration-name">{season.competitionName}</span>{" "}
-                <span className="admin-meta">
-                  {season.orgName}
-                  {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
-                  {roleLabelIn(sportPackFor(season.sport), season.role)} · {season.status}
+                <span className="admin-cell-main">
+                  <span className="admin-name">{season.competitionName}</span>
+                  <span className="admin-meta">
+                    {season.orgName}
+                    {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
+                    {roleLabelIn(sportPackFor(season.sport), season.role)}
+                  </span>
                 </span>
+                <Pill tone="neutral">{season.status}</Pill>
               </li>
             ))}
           </ul>
         )}
-      </Card>
+      </SectionCard>
 
-      <div className="admin-grid">
-        <Card>
-          <h2 className="admin-section-title">Organizations</h2>
+      <CardGrid>
+        <SectionCard icon={<IconLayers />} tone="blue" title="Organizations" flush>
           {orgs.length === 0 ? (
-            <EmptyState
-              title="No memberships"
-              description="This person belongs to no organization."
-            />
+            <div className="admin-card-empty">
+              <EmptyState
+                headingLevel={3}
+                title="No memberships"
+                description="This person belongs to no organization."
+              />
+            </div>
           ) : (
-            <ul className="admin-timeline" data-testid="admin-user-orgs">
+            <ul className="admin-rows" data-testid="admin-user-orgs">
               {orgs.map((org) => (
                 <li key={org.slug}>
-                  <Link href={`/admin/orgs/${org.slug}`} className="registration-name">
-                    {org.name}
-                  </Link>
+                  <span>
+                    <Link href={`/admin/orgs/${org.slug}`} className="admin-name">
+                      {org.name}
+                    </Link>
+                  </span>
                   <RelativeTime at={org.joinedAt} />
                 </li>
               ))}
             </ul>
           )}
-        </Card>
-        <Card>
-          <h2 className="admin-section-title">Recent activity</h2>
+        </SectionCard>
+        <SectionCard
+          icon={<IconClock />}
+          tone="neutral"
+          title="Recent activity"
+          flush
+          {...(activity.length > 0
+            ? {
+                action: (
+                  <Link href={`/admin/audit?actor=${person.id}`} className="admin-card-link">
+                    Everything this person did
+                    <IconArrowRight size={16} className="icon-trail" />
+                  </Link>
+                ),
+              }
+            : {})}
+        >
           {activity.length === 0 ? (
-            <EmptyState
-              title="Nothing yet"
-              description="This person has taken no audited action."
-            />
+            <div className="admin-card-empty">
+              <EmptyState
+                headingLevel={3}
+                title="Nothing yet"
+                description="This person has taken no audited action."
+              />
+            </div>
           ) : (
-            <>
-              <ul className="admin-timeline">
-                {activity.map((row) => (
-                  <li key={row.id}>
-                    <span className="admin-action">{row.action}</span>
-                    <RelativeTime at={row.at} />
-                  </li>
-                ))}
-              </ul>
-              <Link href={`/admin/audit?actor=${person.id}`} className="admin-meta">
-                Everything this person did
-                <IconArrowRight size={16} className="icon-trail" />
-              </Link>
-            </>
+            <ul className="admin-rows">
+              {activity.map((row) => (
+                <li key={row.id}>
+                  <span className="admin-action">{row.action}</span>
+                  <RelativeTime at={row.at} />
+                </li>
+              ))}
+            </ul>
           )}
-        </Card>
-      </div>
+        </SectionCard>
+      </CardGrid>
     </>
   );
 }

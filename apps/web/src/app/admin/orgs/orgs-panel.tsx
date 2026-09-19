@@ -1,4 +1,11 @@
-import { Badge, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconArrowRight,
+  IconLayers,
+  IconSearch,
+  Pill,
+  SectionCard,
+} from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatCount } from "../../../server/admin/format";
@@ -37,12 +44,27 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
   return (
     <>
       <ReadOnlyNotice />
-      <Card>
+      <SectionCard
+        icon={<IconLayers />}
+        title="Organizations"
+        // One sentence, one meaning. It used to read "1 shown · 1 organization
+        // on the platform" for a search that matched one of 349, because
+        // `total` was the match count with a query and the UNFILTERED count
+        // with a filter. Match count and platform count are now separate
+        // numbers and are never spelled the same way.
+        description={
+          <span data-testid="admin-org-count">
+            {narrowed
+              ? `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`
+              : `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} organization${platformTotal === 1 ? "" : "s"} on the platform`}
+          </span>
+        }
+        flush
+      >
         <form className="admin-filters" method="get" role="search" data-testid="admin-org-search">
-          <div className="admin-filter-grow">
-            <label className="stat-label" htmlFor="admin-org-q">
-              Search organizations, seasons and tournaments
-            </label>
+          <label className="admin-search" htmlFor="admin-org-q">
+            <span className="admin-sr-only">Search organizations, seasons and tournaments</span>
+            <IconSearch size={18} aria-hidden />
             <input
               id="admin-org-q"
               name="q"
@@ -51,9 +73,9 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
               placeholder="Club, season or tournament"
               className="admin-search-input"
             />
-          </div>
-          <div>
-            <label className="stat-label" htmlFor="admin-org-filter">
+          </label>
+          <span className="admin-field">
+            <label className="admin-field-label" htmlFor="admin-org-filter">
               Filter
             </label>
             <select
@@ -68,42 +90,30 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                 </option>
               ))}
             </select>
-          </div>
+          </span>
           <button type="submit" className="admin-search-submit">
             Search
           </button>
         </form>
-      </Card>
-
-      <Card>
-        <h2 className="admin-section-title">Organizations</h2>
-        {/* One sentence, one meaning. It used to read "1 shown · 1 organization
-            on the platform" for a search that matched one of 349, because
-            `total` was the match count with a query and the UNFILTERED count
-            with a filter. Match count and platform count are now separate
-            numbers and are never spelled the same way. */}
-        <p className="admin-meta" data-testid="admin-org-count">
-          {narrowed
-            ? `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`
-            : `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} organization${platformTotal === 1 ? "" : "s"} on the platform`}
-        </p>
         {rows.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="No organization matches"
-            description={
-              // The old copy asserted "This filter has no organizations yet."
-              // on a filter that had only ever looked at the newest fifty rows.
-              // These sentences are now the database's answer over everything.
-              query === ""
-                ? `No organization matches “${filterLabel(filter)}”. ${formatCount(platformTotal)} exist on the platform.`
-                : `Nothing matches “${query}”. Try a different name or slug.`
-            }
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No organization matches"
+              description={
+                // The old copy asserted "This filter has no organizations yet."
+                // on a filter that had only ever looked at the newest fifty rows.
+                // These sentences are now the database's answer over everything.
+                query === ""
+                  ? `No organization matches “${filterLabel(filter)}”. ${formatCount(platformTotal)} exist on the platform.`
+                  : `Nothing matches “${query}”. Try a different name or slug.`
+              }
+            />
+          </div>
         ) : (
           <>
-            <div className="table-scroll">
-              <table className="reg-table" data-testid="admin-org-table">
+            <div className="admin-table-wrap">
+              <table className="admin-table" data-testid="admin-org-table">
                 <thead>
                   <tr>
                     <th scope="col">Organization</th>
@@ -116,32 +126,30 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                     <th scope="col" className="admin-num">
                       Auctions
                     </th>
-                    <th scope="col" className="admin-num">
-                      Cases
-                    </th>
+                    <th scope="col">Cases</th>
                     <th scope="col">Finance</th>
                     <th scope="col">Last activity</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="reg-row">
-                      {/* Below 1100px `.reg-table` becomes one card per row and
-                          hides the header strip, replacing it with
-                          `td::before { content: attr(data-label) }`. No admin
-                          table set `data-label` on any cell, so an operator saw
-                          a name and then six unlabelled numbers with no way to
-                          tell Seasons from Members from Cases. */}
+                    <tr key={row.id}>
+                      {/* On a phone each row is a card and the header strip is
+                          hidden; `data-label` names every figure in its place,
+                          so Seasons, Members and Cases never read as three
+                          unlabelled numbers. */}
                       <td data-label="Organization">
-                        <Link href={`/admin/orgs/${row.slug}`} className="registration-name">
-                          {row.name}
-                        </Link>
-                        <span className="admin-id">{row.slug}</span>
-                        {row.matchedSeason !== null ? (
-                          <span className="admin-match" data-testid="admin-org-matched-season">
-                            Matched: {row.matchedSeason}
-                          </span>
-                        ) : null}
+                        <span className="admin-cell-main">
+                          <Link href={`/admin/orgs/${row.slug}`} className="admin-name">
+                            {row.name}
+                          </Link>
+                          <span className="admin-id">{row.slug}</span>
+                          {row.matchedSeason !== null ? (
+                            <span className="admin-match" data-testid="admin-org-matched-season">
+                              Matched: {row.matchedSeason}
+                            </span>
+                          ) : null}
+                        </span>
                       </td>
                       <td data-label="Seasons" className="admin-count admin-num">
                         {formatCount(row.competitions)}
@@ -152,32 +160,28 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                       <td data-label="Auctions" className="admin-count admin-num">
                         {formatCount(row.auctions)}
                       </td>
-                      {/* Right-aligned like its header — without it the count
-                          sat under "Auctions", far from its own column. */}
-                      <td data-label="Cases" className="admin-num">
-                        <span className="admin-count">{formatCount(row.cases)}</span>
+                      <td data-label="Cases">
                         {/* `settled` is counted as unfinished — it can still be
-                            closed — but it is not "open", and an amber badge on
+                            closed — but it is not "open", and an amber pill on
                             a case that settled correctly reads as a problem
                             that is not there. */}
-                        {row.openCases > 0 ? (
-                          <>
-                            {" "}
-                            <Badge tone="warning">{row.openCases} open</Badge>
-                          </>
-                        ) : null}
-                        {row.settledCases > 0 ? (
-                          <>
-                            {" "}
-                            <Badge tone="success">{row.settledCases} settled</Badge>
-                          </>
-                        ) : null}
+                        <span className="admin-pills">
+                          <span className="admin-count">{formatCount(row.cases)}</span>
+                          {row.openCases > 0 ? (
+                            <Pill tone="amber" dot>
+                              {row.openCases} open
+                            </Pill>
+                          ) : null}
+                          {row.settledCases > 0 ? (
+                            <Pill tone="green">{row.settledCases} settled</Pill>
+                          ) : null}
+                        </span>
                       </td>
                       <td data-label="Finance">
                         {row.financeDeclared ? (
-                          <Badge tone="info">Declared</Badge>
+                          <Pill tone="blue">Declared</Pill>
                         ) : (
-                          <span className="admin-meta">Not declared</span>
+                          <span className="admin-dash">Not declared</span>
                         )}
                       </td>
                       <td data-label="Last activity">
@@ -193,9 +197,8 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
               </table>
             </div>
             {/* There was no pagination anywhere: 50 of 349 organizations, and
-                the other 299 — demo-club among them, with 9 seasons, 7 members
-                and an unclosed case — were unreachable by browsing OR by any
-                filter. A LINK, not a button: administration submits nothing. */}
+                the other 299 were unreachable by browsing OR by any filter. A
+                LINK, not a button: administration submits nothing. */}
             <nav className="admin-pagination" aria-label="More organizations">
               {nextHref === null ? (
                 <span className="admin-meta">End of the list.</span>
@@ -208,7 +211,7 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
             </nav>
           </>
         )}
-      </Card>
+      </SectionCard>
     </>
   );
 }

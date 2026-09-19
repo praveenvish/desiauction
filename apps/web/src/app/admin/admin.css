@@ -1,105 +1,447 @@
-/* PX-9 Platform Administration. Reuses the console's dash/stat/table language
-   (seasons.css) — administration is a console, not a new design system.
-   Only what administration genuinely adds lives here. */
+/* Platform administration — the sub-pages. Built on the console kit
+   (SectionCard, StatCard, Pill, Notice from @desiauction/ui) and the /players
+   table language: a flush card, an uppercase label strip on the sunken surface,
+   hairline rows, stacked cards on a phone. Tokens only; both themes. */
 
 .admin-stack {
   max-width: 1120px;
 }
 
-/* The observation banner: administration states its own nature, once, at the
-   top of the console, so an operator never wonders whether a click will DO
-   something. It is the read-only guarantee, said out loud. */
-.admin-readonly {
+/* ---- Page head: the lede on the left, the page's doors on the right ---- */
+
+.admin-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.admin-head-text {
+  flex: 1 1 22rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.admin-head-text p {
+  margin: 0;
+}
+
+.admin-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- A small uppercase label over a group of figures ---- */
+
+.admin-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.admin-group-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ---- Filter row (inside a flush card, above its table) ---- */
+
+.admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.admin-search {
+  box-sizing: border-box;
+  flex: 1 1 260px;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
+  height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
   color: var(--text-muted);
+}
+
+/* A labelled control: the label sits inside the box, before the value. */
+.admin-field {
+  box-sizing: border-box;
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 44px;
+  padding: 0 0 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.admin-field-label {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-search:focus-within,
+.admin-field:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.admin-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--space-3) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  outline: none;
+}
+
+.admin-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* The native select/date draws its own chrome; keep it quiet and in the box. */
+select.admin-search-input {
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.admin-search-submit {
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.admin-search-submit:hover {
+  background: var(--surface-sunken);
+}
+
+.admin-search-submit:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- Tables (the /players table, for administration) ---- */
+
+.admin-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+  /* The containing block for any visually-hidden text inside the table, so a
+     1px span cannot stretch the document sideways. */
+  position: relative;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: var(--text-sm-size);
 }
 
-.admin-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.admin-section-title {
-  font-family: var(--font-text);
-  letter-spacing: -0.01em;
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
-  color: var(--text-heading);
-  margin: 0 0 var(--space-3);
-}
-
-/* Attention queue: each row is another platform's verdict, carried across. */
-.admin-attention {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-attention li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  flex-wrap: wrap;
-}
-
-/* `min-width: 0` lets this column SHRINK, but a 26-character ULID has no break
-   opportunity in it, so the column shrank and its content did not — taking the
-   whole page 17px past a 320px viewport. Administration is the one area whose
-   content is machine identifiers by nature (ULIDs, dispatch keys, environment
-   variable names), so the rule belongs here rather than at each call site. */
-.admin-attention-subject {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.admin-attention-kind {
-  font-family: var(--font-mono);
+.admin-table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: start;
   font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
   color: var(--text-muted);
-  word-break: break-all;
-}
-
-/* The activity timeline — audit rows, newest first. */
-.admin-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-timeline li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.admin-timeline li:last-child {
-  border-bottom: none;
+.admin-table th:first-child,
+.admin-table td:first-child {
+  padding-left: var(--space-5);
 }
+
+.admin-table th:last-child,
+.admin-table td:last-child {
+  padding-right: var(--space-5);
+}
+
+.admin-table td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--surface-sunken);
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* A count column is read by comparing digits down it. */
+.admin-table .admin-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The primary cell: a name over its quiet second line. */
+.admin-cell-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-name {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+a.admin-name {
+  display: inline-flex;
+  align-items: center;
+  /* WCAG 2.2 §2.5.8: a row's one way in is a real target, not a 16px strip. */
+  min-height: 28px;
+  text-decoration: none;
+}
+
+a.admin-name:hover {
+  text-decoration: underline;
+}
+
+a.admin-name:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.admin-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-dash {
+  color: var(--text-muted);
+}
+
+/* ---- Rows inside a flush card (timelines, desks, rooms) ---- */
+
+.admin-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-rows > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  min-width: 0;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-rows > li:last-child {
+  border-bottom: 0;
+}
+
+.admin-rows > li > :first-child {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+/* A rich row — a desk request, a live room — reads top to bottom. */
+.admin-rows.is-stacked > li {
+  flex-direction: column;
+  /* A wrapping column box sizes a grid child (the live facts) as if it were
+     one column wide, then lays it out five across — leaving a hole. */
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.admin-rows.is-stacked > li > :first-child {
+  flex: none;
+}
+
+/* A column flex row stretches a lone button to full width; it keeps its own. */
+.admin-rows.is-stacked > li > button {
+  align-self: flex-start;
+}
+
+/* Rows inside a padded (non-flush) card run to the card's own padding. */
+.admin-rows.is-inset {
+  border-top: 0;
+}
+
+.admin-rows.is-inset > li {
+  padding-inline: 0;
+}
+
+/* The empty state / quiet sentence inside a flush card. */
+.admin-card-empty {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+p.admin-card-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+/* A consequence the operator must not miss, said in words. */
+p.admin-warning {
+  color: var(--warning-strong);
+}
+
+/* ---- Paging (a link, never a button: administration submits nothing) ---- */
+
+.admin-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-pagination a {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.admin-pagination a:hover {
+  background: var(--surface-sunken);
+}
+
+.admin-pagination a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A quiet "see everything" link in a card's header. */
+.admin-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-card-link:hover {
+  text-decoration: underline;
+}
+
+.admin-card-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- A label / value line (health, messaging verdicts) ---- */
+
+.admin-kv {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.admin-kv > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-kv > div:first-child {
+  padding-top: 0;
+}
+
+.admin-kv > div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.admin-kv dt {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-kv dd {
+  margin: 0;
+  min-width: 0;
+}
+
+/* A value that is a set of chips rather than one. */
+.admin-kv > div.is-block {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* ---- Text roles ---- */
 
 .admin-action {
   font-family: var(--font-mono);
@@ -108,9 +450,8 @@
   word-break: break-word;
 }
 
-/* Same cause as `.admin-attention-subject` above: this renders environment
-   variable names — MSG91_TEMPLATE_REGISTRATION_WAITLISTED and its siblings —
-   which are single unbreakable tokens 38 characters long. */
+/* Environment variable names (MSG91_TEMPLATE_REGISTRATION_WAITLISTED…) are
+   single unbreakable tokens; they wrap anywhere rather than widen the page. */
 .admin-meta {
   font-size: var(--text-xs-size);
   color: var(--text-muted);
@@ -124,6 +465,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The absolute timestamp is a sentence, not a token — it wraps. */
+.admin-when-wide {
+  white-space: normal;
+}
+
 /* ULIDs and digests: monospace, and never allowed to widen the page. */
 .admin-id {
   font-family: var(--font-mono);
@@ -132,18 +478,9 @@
   word-break: break-all;
 }
 
-/* Its own line in TABLE cells only: rendered inline after a name link, the
-   underline ran straight into the monospace slug ("Form Org 89435571form-
-   org-…") in every row of the org directory's primary scan column. The detail
-   pages keep the inline form — theirs sits mid-sentence between dividers. */
-td .admin-id {
-  display: block;
-}
-
 /* Why a row matched a search it does not literally contain. */
 .admin-match {
   display: block;
-  margin-top: var(--space-1);
   font-size: var(--text-xs-size);
   color: var(--text-secondary);
 }
@@ -158,114 +495,8 @@ td .admin-id {
   max-width: 100%;
 }
 
-.admin-filters {
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.admin-filters .admin-filter-grow {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-
-/* The GET-form controls. The Field/Select primitives are client components
-   bound to onChange; administration's filters are a plain form that submits,
-   so these are styled to match them rather than to reinvent them. */
-.admin-search-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-primary);
-  font-family: var(--font-text);
-  font-size: var(--text-sm-size);
-  min-height: 40px;
-}
-
-.admin-search-input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-.admin-search-submit {
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  color: var(--text-primary);
-  font-family: var(--font-text);
-  font-size: var(--text-sm-size);
-  min-height: 40px;
-  cursor: pointer;
-}
-
-.admin-search-submit:hover {
-  background: var(--surface-sunken);
-}
-
-.admin-search-submit:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-.admin-health-org {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.admin-health-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.admin-chips {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-/*
- * A CHIP IN THIS ROW MAY BE A SENTENCE, NOT A STATUS WORD.
- *
- * `Badge` is `white-space: nowrap`, which is right for the short states it was
- * designed for — "queued 4", "Healthy". Administration also puts a whole
- * clause in one: "oldest queued job has waited three days". At 360px that chip
- * measured 355px wide and could not break, so it pushed the BODY to 416px and
- * scrolled the whole page sideways — 56px of it.
- *
- * Measured, not guessed: the element ending at exactly the document's
- * scrollWidth was that badge.
- *
- * It only appears once the job queue is non-empty, which is why a fresh
- * database never showed it and the responsive test looked intermittent for
- * weeks. Scoped here rather than changed on the primitive: every other surface
- * uses badges as the short labels they are, and PX-1 04 §9 says wide content
- * wraps or scrolls in its OWN container — never the body.
- */
-.admin-chips > * {
-  white-space: normal;
-}
-
 .admin-count {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-}
-
-/* A count column is read by comparing digits down the column, which only works
-   when the digits line up. */
-@media (min-width: 1101px) {
-  .admin-stack .reg-table td.admin-num,
-  .admin-stack .reg-table th.admin-num {
-    text-align: right;
-  }
 }
 
 /* The absolute timestamp is announced on every surface; it is DRAWN only where
@@ -282,200 +513,53 @@ td .admin-id {
   border: 0;
 }
 
-/* Target size (WCAG 2.2 §2.5.8). The row links measured 276×16 at 1440 and
-   98×32 at 390 — fifty of them stacked, each a 16px-tall strip. `target-size`
-   is not in the wcag21aa tag set, so axe passed every one of them; the ruler
-   did not. Padding rather than a bare min-height, so the growth is part of the
-   hit area instead of dead space beneath the text. */
-.admin-stack .reg-table td a,
-.admin-stack .admin-timeline a,
-.admin-stack .admin-attention a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding-block: var(--space-1);
-}
+/* ---- Audit rows ---- */
 
-/* Inline links inside a running line (the audit row's scope id) cannot become
-   44px tall without breaking the sentence they sit in; they get the width and
-   as much height as an inline box allows. */
-.admin-stack .admin-attention-kind a {
-  display: inline-block;
-  min-height: 24px;
-  padding-block: var(--space-1);
-  min-width: 44px;
-}
-
-/* The finance tile is a fact, not a figure: "Yes" in 24px tabular-nums read as
-   a number that had lost its digits. */
-.admin-fact {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  align-items: flex-start;
-}
-
-.admin-pagination {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  align-items: center;
-  margin-top: var(--space-3);
-}
-
-.admin-pagination a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm-size);
-}
-
-/* The absolute timestamp is a sentence, not a token — it wraps. */
-.admin-when-wide {
-  white-space: normal;
-}
-
-/* Below 1100px every `.reg-table` row is a card and every cell a flex line. A
-   cell holding a timestamp AND a badge had nowhere to put the badge, so it went
-   past the card's right edge and took the page with it. */
-@media (max-width: 1100px) {
-  .admin-stack .reg-table td {
-    flex-wrap: wrap;
-  }
-}
-
-/* 360px (PX-1 04 §9): tables scroll inside their own container, never the page. */
-@media (max-width: 640px) {
-  .admin-timeline li {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-attention li {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-/* --- RH-1g · The pass queue ------------------------------------------------ */
-
-.pass-queue,
-.pass-recent {
-  list-style: none;
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.pass-row {
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.pass-row-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.pass-row-season {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-/* The deciding facts, weighted like facts rather than like chrome. */
-.pass-row-usage {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  font-size: var(--text-sm-size);
-}
-
-.pass-row-note {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border-inline-start: 3px solid var(--accent);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-.pass-row-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-top: var(--space-2);
-}
-
-.pass-recent li {
+.admin-attention-subject {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.pass-recent-season {
-  color: var(--text-primary);
-}
-
-/* The console is a phone job when something is wrong at 9pm, like everything
-   else here: a pair of buttons splits the row rather than stacking ragged. */
-@media (max-width: 640px) {
-  .pass-row-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-  }
-
-  .pass-row-actions > button {
-    width: 100%;
-    min-height: 44px;
-  }
-}
-
-/* SP-1 Phase 1 — the sport catalogue, read-only. One row per shipped pack. */
-.admin-sport-list {
-  list-style: none;
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.admin-sport-list li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.admin-sport-name {
-  font-weight: 600;
-}
-
-.admin-sport-count {
+.admin-attention-kind {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
+  word-break: break-all;
 }
 
-/* ---------------------------------------------------------------------------
-   The live board and the auction watch.
-   --------------------------------------------------------------------------- */
+/* Inline links in a running line cannot become 44px tall without breaking the
+   sentence they sit in; they get the width and as much height as fits. */
+.admin-attention-kind a,
+.admin-attention-subject .admin-meta a {
+  display: inline-block;
+  min-height: 24px;
+  padding-block: 2px;
+  color: var(--text-accent);
+}
+
+/* ---- Chips that may be sentences ----
+   A chip here can be a clause ("oldest queued job has waited three days"). At
+   360px an unbreakable one pushed the body 56px past the viewport, so the pills
+   in this row are allowed to wrap. */
+.admin-chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.admin-chips > * {
+  white-space: normal;
+}
+
+/* ---- The live board and the auction watch ---- */
 
 /* How fresh the screen is — the line that tells a quiet auction from a board
    that stopped refreshing. The dot is static on purpose: a pulse on a screen
-   left open all night is noise, and "Refreshing automatically" already says it. */
+   left open all night is noise. */
 .admin-live-fresh {
   display: flex;
   align-items: center;
@@ -501,41 +585,6 @@ td .admin-id {
   background: var(--live);
 }
 
-.admin-live-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-live-list.is-compact {
-  gap: var(--space-2);
-}
-
-.admin-live-room {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-
-.admin-live-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-
 .admin-live-head {
   display: flex;
   align-items: flex-start;
@@ -546,28 +595,28 @@ td .admin-id {
 .admin-live-name {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
   min-width: 0;
-  font-weight: 600;
-  color: var(--text-heading);
   overflow-wrap: anywhere;
 }
 
-.admin-live-name .admin-meta {
-  font-weight: 400;
+.admin-live-name > a {
+  font-size: var(--text-base-size);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
 }
 
-.admin-watch-title {
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
+.admin-live-name > a:hover {
+  text-decoration: underline;
 }
 
 /* Label over value, as many across as fit — five facts on a desktop row,
    two on a phone, never a horizontal scroll. */
 .admin-live-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: var(--space-3) var(--space-4);
   margin: 0;
 }
 
@@ -580,11 +629,15 @@ td .admin-id {
 
 .admin-live-facts dt {
   font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .admin-live-facts dd {
   margin: 0;
+  font-size: var(--text-sm-size);
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   overflow-wrap: anywhere;
@@ -601,25 +654,36 @@ td .admin-id {
   font-size: var(--text-sm-size);
 }
 
-.admin-tile-danger {
-  border-color: var(--danger-base);
+/* The watch's figures are times and ranges — words, sized to fit a phone.
+   (The kit's figure is the first line of the card's text column.) */
+.admin-vitals [data-tone] > span:last-child > span:first-child {
+  font-size: var(--text-md-size);
+  line-height: 1.3;
+  white-space: normal;
 }
 
-.admin-tile-danger .stat-value {
-  color: var(--danger-strong);
+.admin-watch-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-/* Times and ranges are words, not mono figures — they must fit a phone tile. */
-.stat-value.admin-vital {
-  font-family: var(--font-text);
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
+.admin-watch-body p {
+  margin: 0;
 }
 
-/* A status badge that is also the way in (the auction column on an org). */
+/* A link inside a sentence (a card's description, a desk row's facts). */
+.admin-inline-link {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+/* A status pill that is also the way in (the auction column on an org). */
 .admin-badge-link {
   display: inline-flex;
-  border-radius: var(--radius-sm);
+  align-items: center;
+  min-height: 32px;
+  border-radius: var(--radius-full);
   text-decoration: none;
 }
 
@@ -634,133 +698,182 @@ td .admin-id {
 }
 
 /* A folded tail — the "Never closed" backlog beyond its first ten. */
-.admin-more {
-  margin-top: var(--space-3);
-}
-
 .admin-more > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border-top: 1px solid var(--border-subtle);
   cursor: pointer;
   color: var(--text-accent);
   font-size: var(--text-sm-size);
-  margin-bottom: var(--space-2);
+  font-weight: var(--font-weight-semibold);
 }
 
 .admin-more > summary:focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
-/* ==========================================================================
-   MESSAGING ON A PHONE. Each table gets the layout its rows are read in,
-   instead of every cell stacked under a label: a template is its key and
-   its state, then the variable to set; a delivery row is one message and
-   three figures side by side; a suppression is who, since when, and why.
-   ========================================================================== */
-@media (max-width: 1100px) {
-  [data-surface="console"] .msg-template-table tbody tr,
-  [data-surface="console"] .msg-suppression-table tbody tr {
+/* ---- Desks: a request is a stacked row inside a flush card ---- */
+
+.pass-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  flex-wrap: wrap;
+}
+
+.pass-row-season {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.pass-row-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+}
+
+.pass-row-sub a {
+  color: var(--text-accent);
+}
+
+/* The deciding facts, weighted like facts rather than like chrome. */
+.pass-row-usage {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.pass-row-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+}
+
+.pass-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* A desk row's form field should not run the width of a laptop. */
+.pass-row-field {
+  max-width: 32rem;
+}
+
+/* The console is a phone job when something is wrong at 9pm: a pair of
+   buttons splits the row rather than stacking ragged. */
+@media (max-width: 640px) {
+  .pass-row-actions.is-pair {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: var(--space-4);
-    align-items: start;
+    grid-template-columns: 1fr 1fr;
   }
 
-  [data-surface="console"] .msg-template-table tbody tr > td,
-  [data-surface="console"] .msg-delivery-table tbody tr > td,
-  [data-surface="console"] .msg-suppression-table tbody tr > td {
+  .pass-row-actions.is-pair > button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* ---- Phone: every table row becomes a card (as /players does) ---- */
+
+@media (max-width: 719px) {
+  .admin-filters {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .admin-field {
+    flex: 1 1 140px;
+  }
+
+  .admin-field .admin-search-input {
+    width: 100%;
+  }
+
+  .admin-search-submit {
+    flex: 1 1 100%;
+  }
+
+  .admin-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .admin-table,
+  .admin-table tbody {
+    display: block;
+  }
+
+  .admin-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .admin-table[data-stack="3"] tbody tr {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-table td,
+  .admin-table td:first-child,
+  .admin-table td:last-child {
     display: block;
     min-width: 0;
+    padding: 0;
+    border: 0;
   }
 
-  /* Template: key + description | status / variable across. */
-  [data-surface="console"] .msg-template-table td:nth-child(1) {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  [data-surface="console"] .msg-template-table td:nth-child(2) {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  [data-surface="console"] .msg-template-table td:nth-child(3) {
+  .admin-table td:first-child,
+  .admin-table td.is-wide {
     grid-column: 1 / -1;
-    grid-row: 2;
   }
 
-  [data-surface="console"] .msg-template-table td:nth-child(1) > span {
-    display: block;
-  }
-
-  [data-surface="console"] .msg-template-table td:nth-child(3) code {
-    overflow-wrap: anywhere;
-  }
-
-  /* Delivery: the message, then Sent · Failed · Suppressed in a row. */
-  [data-surface="console"] .msg-delivery-table tbody tr {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    column-gap: var(--space-4);
-  }
-
-  [data-surface="console"] .msg-delivery-table td:nth-child(1) {
-    grid-column: 1 / -1;
-    padding-bottom: var(--space-2);
-  }
-
-  [data-surface="console"] .msg-delivery-table td.admin-num {
+  .admin-table .admin-num {
     text-align: start;
   }
 
-  /* Suppression: contact | since / reason · topic. */
-  [data-surface="console"] .msg-suppression-table td:nth-child(1) {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  [data-surface="console"] .msg-suppression-table td:nth-child(4) {
-    grid-column: 2;
-    grid-row: 1;
-    color: var(--text-secondary);
-    font-size: var(--text-sm-size);
-  }
-
-  [data-surface="console"] .msg-suppression-table td:nth-child(2),
-  [data-surface="console"] .msg-suppression-table td:nth-child(3) {
-    grid-row: 2;
-    display: flex;
-    gap: var(--space-2);
-    justify-content: flex-start;
-    align-items: baseline;
-    font-size: var(--text-sm-size);
-  }
-
-  [data-surface="console"] .msg-suppression-table td:nth-child(2) {
-    grid-column: 1;
-  }
-
-  [data-surface="console"] .msg-suppression-table td:nth-child(3) {
-    grid-column: 2;
-  }
-
-  /* Labels that the layout already says. */
-  [data-surface="console"] .msg-template-table td:nth-child(1)::before,
-  [data-surface="console"] .msg-template-table td:nth-child(2)::before,
-  [data-surface="console"] .msg-delivery-table td:nth-child(1)::before,
-  [data-surface="console"] .msg-suppression-table td:nth-child(1)::before,
-  [data-surface="console"] .msg-suppression-table td:nth-child(4)::before {
-    content: none;
-  }
-
-  [data-surface="console"] .msg-template-table td:nth-child(3)::before,
-  [data-surface="console"] .msg-delivery-table td.admin-num::before {
+  .admin-table td[data-label]:not(:first-child)::before {
+    content: attr(data-label);
     display: block;
-    max-width: none;
-    padding: 0 0 2px;
+    margin-bottom: 2px;
+    color: var(--text-muted);
+    font-size: var(--text-xs-size);
   }
 
-  [data-surface="console"] .msg-suppression-table td:nth-child(2)::before,
-  [data-surface="console"] .msg-suppression-table td:nth-child(3)::before {
-    padding: 0;
+  a.admin-name {
+    min-height: 44px;
+  }
+
+  .admin-rows > li,
+  .admin-rows.is-stacked > li {
+    padding-inline: var(--space-4);
+  }
+
+  .admin-rows.is-inset > li {
+    padding-inline: 0;
+  }
+
+  .admin-card-empty,
+  .admin-pagination {
+    padding-inline: var(--space-4);
   }
 }

@@ -29,9 +29,9 @@ export default async function AdminReviewsPage() {
   return (
     <ToastProvider>
       <main className="registrations-dash">
-        <div className="dash-stack">
+        <div className="dash-stack admin-stack">
           <header className="dash-head">
-            <p className="competitions-hint">
+            <p className="dash-hint">
               Ask the people who ran a tournament how it went, then publish the reviews worth
               standing behind. A published review is only ever quoted if its author said we may —
               and a published platform review that may be quoted appears on the home page, newest

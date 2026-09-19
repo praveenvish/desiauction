@@ -1,4 +1,4 @@
-import { Card, EmptyState, ToastProvider } from "@desiauction/ui";
+import { EmptyState, IconTrash, SectionCard, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
@@ -29,22 +29,22 @@ export default async function AdminErasurePage() {
   return (
     <ToastProvider>
       <main className="registrations-dash">
-        <div className="dash-stack">
+        <div className="dash-stack admin-stack">
           <header className="dash-head">
-            <p className="competitions-hint">
+            <p className="dash-hint">
               Account deletion requests, oldest first. The account page promises a reply within
               seven days. Erasing deletes the person&apos;s own profile and anonymizes them in every
               shared record; declining needs a reason they will read.
             </p>
           </header>
           {desk.open.length === 0 && desk.decided.length === 0 ? (
-            <Card>
+            <SectionCard icon={<IconTrash />} tone="neutral" title="Deletion requests">
               <EmptyState
-                headingLevel={2}
+                headingLevel={3}
                 title="Nobody has asked"
                 description="When somebody asks to delete their account from the account page, the request appears here."
               />
-            </Card>
+            </SectionCard>
           ) : (
             <ErasureDeskPanel desk={desk} />
           )}
