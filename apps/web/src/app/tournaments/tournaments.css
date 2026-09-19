@@ -54,20 +54,29 @@
 }
 
 /* --- toolbar -------------------------------------------------------------- */
+/* The filters sit on the page, not in a box of their own (founder mockup):
+   each control is its own white field, in one row with the view switch. */
+.tg-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
 .tg-toolbar {
+  flex: 1 1 36rem;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-3);
   flex-wrap: wrap;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
+  min-width: 0;
 }
 
 .tg-search {
-  flex: 1;
+  flex: 1 1 14rem;
+  max-width: 24rem;
   min-width: 200px;
   display: flex;
   align-items: center;
@@ -75,7 +84,8 @@
   padding: 0 var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
 }
 
 .tg-search:focus-within {
@@ -128,7 +138,8 @@
   padding: 0 var(--space-2) 0 var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
@@ -228,7 +239,7 @@
 
 .tg {
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--surface-raised);
   box-shadow: var(--shadow-1);
   overflow: hidden;
@@ -666,8 +677,14 @@
 /* On a phone the toolbar stops being a row: the search box takes the full
    width and the controls sit under it rather than each collapsing to nothing. */
 @media (max-width: 620px) {
+  .tg-topbar,
+  .tg-toolbar {
+    justify-content: flex-start;
+  }
+
   .tg-search {
     flex-basis: 100%;
+    max-width: none;
   }
 
   /* Grow to share the row, but never below a width that fits the label. Two
@@ -923,4 +940,137 @@
 .tg-season-compact {
   font-size: var(--text-xs-size);
   color: var(--text-secondary);
+}
+
+/* --- featured season (founder mockup 6) ----------------------------------- */
+/* One white card: the floodlit banner and its side panel on top, the season's
+   road underneath. */
+.tg-feature {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.tg-feature-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: center;
+}
+
+@media (min-width: 1100px) {
+  .tg-feature-top {
+    grid-template-columns: minmax(0, 2.4fr) minmax(16rem, 1fr);
+  }
+}
+
+/* `.competitions h2` (seasons.css) is written for the page's own section
+   headings and outranks the kit's single-class hero title; the banner's title
+   gets its own size back here. */
+.competitions .tg-feature h2 {
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  line-height: 1.15;
+  color: var(--hero-ink);
+}
+
+@media (max-width: 719px) {
+  .competitions .tg-feature h2 {
+    font-size: var(--text-xl-size);
+  }
+}
+
+.tg-feature-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+}
+
+.tg-feature-name {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xl-size);
+  line-height: 1.2;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.tg-feature-sub {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.tg-feature-when {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tg-feature-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* The stepper is a card of its own in the kit; inside this card it is a row. */
+.tg-feature-steps > ol {
+  border: 0;
+  box-shadow: none;
+  background: none;
+  padding: 0;
+}
+
+/* --- "Looking to create a new season?" ------------------------------------ */
+.tg-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-5);
+  width: 100%;
+  max-width: 52rem;
+  margin: var(--space-2) auto 0;
+  box-sizing: border-box;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--accent-subtle) 60%, var(--surface-raised));
+}
+
+.tg-cta-text {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.competitions .tg-cta h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: 1.3;
+}
+
+.tg-cta p {
+  margin: 2px 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 620px) {
+  .tg-cta {
+    padding: var(--space-4);
+  }
+}
+
+/* See home.css: the kit's journey link overflows its row without border-box. */
+.tg-feature-steps li > * {
+  box-sizing: border-box;
 }

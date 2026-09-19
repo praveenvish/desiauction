@@ -94,6 +94,13 @@ export interface SeasonOverview {
   purseCommitted?: number;
   /** 0–100, or null when no auction (and so no purse) is configured. Money-gated. */
   pursePct?: number | null;
+  /**
+   * The auction's purse per team and squad cap — the figures a season's hero
+   * card states. Null before an auction exists. Money-gated with the spend: the
+   * squad cap is auction configuration and travels with it (see `squadMax`).
+   */
+  pursePerTeam?: number | null;
+  squadCap?: number | null;
   lotsSold: number;
   lotsTotal: number;
   auctionLive: boolean;
@@ -178,7 +185,9 @@ export async function seasonOverview(
     // No auction yet — the tiles that describe one stay honestly empty.
     return {
       ...base,
-      ...(options.money ? { purseCommitted: 0, pursePct: null } : {}),
+      ...(options.money
+        ? { purseCommitted: 0, pursePct: null, pursePerTeam: null, squadCap: null }
+        : {}),
       lotsSold: 0,
       lotsTotal: 0,
       auctionLive: false,
@@ -232,6 +241,8 @@ export async function seasonOverview(
       ? {
           purseCommitted,
           pursePct: purseTotal > 0 ? Math.round((purseCommitted / purseTotal) * 100) : null,
+          pursePerTeam: rules.pursePerTeam,
+          squadCap: rules.squadMax,
         }
       : {}),
     lotsSold: lots.filter((lot) => lot.status === "sold").length,
