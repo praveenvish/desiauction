@@ -40,7 +40,6 @@ const MAX_WIDTH = 1440;
 export const PRIVATE_SELECTOR = [
   `[${PRIVATE_ATTRIBUTE}]`,
   ".registration-phone",
-  ".roster-phone",
   ".od-member-phone",
   'a[href^="tel:"]',
   'a[href^="mailto:"]',
