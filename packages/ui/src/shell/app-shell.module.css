@@ -915,3 +915,49 @@ a.wordmark:hover .wordmark-glyph {
   white-space: nowrap;
   border: 0;
 }
+
+/* ===========================================================================
+   THE ONE THING THAT PULSES (RN-1 Phase 6 §9)
+
+   An auction you are in is the only state in this product urgent enough to
+   move on its own, and LAW 7 already gives it the top of the menu. The pulse
+   is what makes it findable from the corner of an eye on a night when the
+   reader is looking at the room, not the rail.
+
+   TRANSFORM AND BOX-SHADOW ONLY — never opacity, and never on text. An
+   opacity keyframe over type fails a contrast scan mid-frame, because axe
+   samples a computed colour at a moment the animation chose, not the one the
+   designer looked at. Scaling a dot cannot: its contrast is the same at every
+   frame of the cycle.
+
+   `--duration-pulse` is the token this scale already carries for exactly this.
+   ======================================================================== */
+@keyframes rn1-live-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.35);
+  }
+}
+
+.rail-live-dot,
+.tab-live {
+  /* Plain `ease-in-out`: the scale carries --ease-out and --ease-in, and a
+     symmetric breath wants neither. Referencing a token that does not exist,
+     even with a fallback, invites somebody to "fix" it into one that does. */
+  animation: rn1-live-pulse var(--duration-pulse) ease-in-out infinite;
+}
+
+/*
+   Honoured, not merely respected: the dot keeps its size and its colour, so
+   the fact is unchanged and only the motion is gone. Somebody who asked for
+   less motion is not asking for less information.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .rail-live-dot,
+  .tab-live {
+    animation: none;
+  }
+}

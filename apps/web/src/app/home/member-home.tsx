@@ -24,7 +24,24 @@ import { statusLabel, statusTone } from "./home-parts";
 export async function MemberHome({ clubCount }: { clubCount: number }) {
   const view = await competitionsView();
   if (view.competitions.length === 0) {
-    return null;
+    /*
+     * A club with no seasons yet. This used to return null — and membership is
+     * the ONLY thing this person has, so the whole page below the greeting
+     * became blank. An empty state that explains is the least a home can do;
+     * a blank screen makes somebody wonder whether the product is broken.
+     */
+    return (
+      <section className="home-aside" aria-labelledby="home-member-empty" data-testid="home-member">
+        <h2 id="home-member-empty" className="home-flat-title">
+          Nothing running yet
+        </h2>
+        <p>
+          You&apos;re a member of {clubCount === 1 ? "a club" : `${String(clubCount)} clubs`} that
+          hasn&apos;t started a season. When one opens, it will show up here — and you&apos;ll get a
+          message if they ask you to register.
+        </p>
+      </section>
+    );
   }
   return (
     <section className="home-member" aria-labelledby="home-member-title" data-testid="home-member">

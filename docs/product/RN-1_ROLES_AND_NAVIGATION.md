@@ -413,12 +413,20 @@ Gate first, then stream.
 
 - **Gold is reserved.** The accent marks the active menu item and the one
   primary action. Nothing else earns it.
-- **One motion grammar.** The active indicator *moves* between items
-  (transform-only, ≤180ms); it never cross-fades. Honours
-  `prefers-reduced-motion`.
+- **One motion grammar** — and the sliding active indicator is **dropped**, on
+  contact with the code. The premise was a rail whose items stay put while the
+  highlight travels between them. This rail's item SET changes with the person
+  and the path: the cap swaps in whichever item claims the current page, and
+  the live door appears and disappears with the auction. A shared-layout slide
+  would animate between two positions that are not the same two items, which is
+  worse than an honest repaint. The active state stays a struck-metal pill,
+  unmistakable and instant.
 - **Live is the only thing that pulses**, and it pulses a dot by `transform`,
-  never text by `opacity` — an opacity keyframe on text fails contrast scans
-  mid-frame.
+  never text by `opacity` — an opacity keyframe over type fails a contrast scan
+  mid-frame, because axe samples a computed colour at a moment the animation
+  chose. Under `prefers-reduced-motion` the dot keeps its size and colour: the
+  fact is unchanged, only the motion goes. Somebody asking for less motion is
+  not asking for less information.
 - **Badges are counts you can act on.** Notifications, attention. Never
   decorative.
 - **Icons: one weight, one grid**, every rail item — the icon is the phone
@@ -427,7 +435,8 @@ Gate first, then stream.
   way to start. One per role, per surface.
 - **Skeletons match the final shape**, so nothing jumps. The `@action` slot
   already proved the cost of getting this wrong (CLS 0.123 on /home).
-- **44px everywhere**, and the phone bar respects the safe-area inset.
+- **44px everywhere**, and the phone bar respects the safe-area inset. Both are
+  asserted at 320px against the rendered bar, not against the stylesheet.
 
 ---
 
@@ -443,7 +452,7 @@ Zero migrations in the whole programme.
 | 3 | **Home** — ✅ **DONE** | `/home` → 161-line router over 6 role homes (member is the sixth); the new auctioneer home; the identity line | `home-router.test.ts` pins which sections each role gets; verified in-browser as owner, organizer+player+operator, auctioneer+player | done |
 | 4 | **The season** — ✅ **DONE** | `seasonTabs(slug, role)` wired; `seasonRoleFor` resolved per season in the layout; `activeSeasonTab` replaces the fixed path→key table; Players/Schedule consolidation with `claims` + sibling links | 87 unit tests; **full e2e 130 passed, 0 failed** | done |
 | 5 | **Trust** | Admin grouped into 4; door on held capabilities; the §7 payload matrix | Served-payload assertion per row; one operator per platform set reaches their section in one click | 3–4 d |
-| 6 | **Premium** | §9 in full; palette rebuilt from `NavModel.palette`; per-role empty states | Full precompiled e2e; `pnpm verify`; axe in **both** themes; computed-style contrast; target-size | 3–4 d |
+| 6 | **Premium** — ✅ **DONE** (one item dropped, §9) | Live pulse (transform-only, reduced-motion honoured); axe in **both themes**; 320px clipping + 44px thumb targets asserted against the real render; member empty state; palette rebuilt in Phase 2 | full e2e 131 passed, 0 failed | done |
 
 **≈ 4 weeks, one person, sequential.** Phases 1–3 deliver the whole complaint.
 

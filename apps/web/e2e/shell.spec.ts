@@ -221,6 +221,40 @@ test("mobile chrome: bottom tabs navigate and the drawer opens", async ({ browse
     await tabs.getByRole("link", { name: "Find" }).click();
     await expect(page).toHaveURL(/\/c/);
     await page.goto("/home");
+
+    /*
+     * NOTHING CLIPS AT 320px — the narrowest phone the product supports, and
+     * the check the bar's CSS comment promises. `BAR_LABEL_MAX` in
+     * navigation.test.ts bounds the label at eleven characters by arithmetic;
+     * only this can fail for the right reason, because only this renders the
+     * real font into the real cell. The five-tab case steps down to 10px via
+     * `.bottom-tabs:has(> :nth-child(5))`.
+     */
+    await page.setViewportSize({ width: 320, height: 640 });
+    const clipped = await tabs.evaluate((bar) =>
+      [...bar.querySelectorAll<HTMLElement>('[class*="tab-label"]')]
+        .filter((label) => label.scrollWidth > label.clientWidth + 0.5)
+        .map((label) => label.textContent ?? ""),
+    );
+    expect(clipped, "a bottom-tab label is cut off at 320px").toEqual([]);
+
+    /*
+     * THUMB-SIZED, at the narrowest width. The bar is the whole menu on a
+     * phone, and this product is used one-handed on a shared handset in a
+     * noisy hall on auction night. 44px is the rung the product standardised
+     * on; the bar also carries `env(safe-area-inset-bottom)` so the last row
+     * is not under the home indicator.
+     */
+    const tabLinks = await tabs.getByRole("link").all();
+    expect(tabLinks.length).toBeGreaterThan(0);
+    for (const link of tabLinks) {
+      const box = await link.boundingBox();
+      expect(box, "a bottom tab has no box").not.toBeNull();
+      expect(
+        box?.height ?? 0,
+        `"${await link.textContent()}" is under the 44px rung`,
+      ).toBeGreaterThanOrEqual(44);
+    }
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
     await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Account" }).click();
@@ -248,14 +282,35 @@ test("public shell wraps anonymous pages; console routes stay gated", async ({ p
   }
 });
 
-test("shell accessibility: /home and /help scan clean", async ({ page }) => {
-  await otpLogin(page, `83${STAMP}`);
-  // Let the route content replace the loading skeleton before scanning.
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const homeScan = await new AxeBuilder({ page }).analyze();
-  expect(homeScan.violations, JSON.stringify(homeScan.violations, null, 2)).toEqual([]);
-  await page.goto("/help");
-  await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeVisible();
-  const helpScan = await new AxeBuilder({ page }).analyze();
-  expect(helpScan.violations, JSON.stringify(helpScan.violations, null, 2)).toEqual([]);
-});
+/**
+ * BOTH THEMES (RN-1 Phase 6).
+ *
+ * This scanned the default theme only, so the console's floodlight surface —
+ * a different set of colours on every token — had never been scanned at all.
+ * Contrast is the whole category axe is best at and the one that a theme swap
+ * is most likely to break, which makes "we scan for a11y" and "we scan the
+ * product" two different claims.
+ *
+ * The theme is replayed from localStorage before first paint (THEME_BOOTSTRAP
+ * in the root layout), so setting the key and reloading is how a returning
+ * visitor actually arrives in it.
+ */
+for (const theme of ["daylight", "floodlight"] as const) {
+  test(`shell accessibility: /home and /help scan clean · ${theme}`, async ({ page }) => {
+    await otpLogin(page, `8${theme === "daylight" ? "3" : "1"}${STAMP}`);
+    await page.evaluate((value) => {
+      window.localStorage.setItem("da-theme", value);
+    }, theme);
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+
+    // Let the route content replace the loading skeleton before scanning.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const homeScan = await new AxeBuilder({ page }).analyze();
+    expect(homeScan.violations, JSON.stringify(homeScan.violations, null, 2)).toEqual([]);
+    await page.goto("/help");
+    await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeVisible();
+    const helpScan = await new AxeBuilder({ page }).analyze();
+    expect(helpScan.violations, JSON.stringify(helpScan.violations, null, 2)).toEqual([]);
+  });
+}
