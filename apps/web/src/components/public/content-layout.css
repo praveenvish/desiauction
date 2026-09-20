@@ -52,9 +52,12 @@
   margin-top: var(--space-4);
 }
 
+/* The reading column's own headings take the TEXT face, like `.prose-h2` in
+   content.css: the display face is for ≥30px (type-scale.test.ts), and a
+   sub-heading inside a document is never that big. */
 .cl-prose h2,
 .cl-prose h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   color: var(--text-heading);
   line-height: 1.2;
   text-wrap: balance;
@@ -189,7 +192,7 @@
 
 .cl-related-title {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-size: clamp(1.25rem, 2.2vw, 1.5rem);
   color: var(--text-heading);
 }

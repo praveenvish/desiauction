@@ -15,7 +15,6 @@ import {
   IconGavel,
   IconPlay,
   IconReceipt,
-  IconShieldCheck,
   IconTrophy,
   IconTv,
   IconUsers,
@@ -41,18 +40,6 @@ const sports = SPORTS.map((sport) => ({
   label: sport.label,
   role: sport.roles.values[0]?.label ?? "Player",
 }));
-const questions = [
-  {
-    question: "Is DesiAuction only for cricket?",
-    answer: `No. Choose from ${SPORTS.map((sport) => sport.label.toLowerCase()).join(", ")}. Your tournament uses the roles and vocabulary of the sport you select.`,
-  },
-  {
-    question: "What does it cost to get started?",
-    answer:
-      "Everything is free during public beta, with no card required and no team or player limits enforced. Tournaments you start during beta stay free. See the pricing page for planned passes.",
-  },
-  ...LANDING.faq.items.slice(0, 2),
-];
 
 export default function LandingPage() {
   return (
@@ -360,83 +347,15 @@ export default function LandingPage() {
           <LandingVoices />
         </Suspense>
 
-        <section className={styles.betaSection} aria-labelledby="beta-title">
-          <div className={styles.betaCard} data-reveal>
-            <div className={styles.betaCopy}>
-              <p className={styles.eyebrow}>
-                <IconSparkle /> AN OPEN INVITATION
-              </p>
-              <h2 id="beta-title">
-                Your next tournament.
-                <br />
-                On us.
-              </h2>
-              <p>
-                We’re in public beta. Explore the full platform, bring your teams and run the real
-                thing.
-              </p>
-              <Link className={styles.primary} href="/login">
-                Start free today <IconArrowRight size={18} />
-              </Link>
-            </div>
-            <div className={styles.price}>
-              <span>FREE DURING BETA</span>
-              <strong>
-                ₹0<span>/ tournament</span>
-              </strong>
-              <ul>
-                <li>
-                  <IconCheck size={16} /> Every feature included during beta
-                </li>
-                <li>
-                  <IconCheck size={16} /> No card required
-                </li>
-                <li>
-                  <IconCheck size={16} /> Tournaments started now stay free
-                </li>
-              </ul>
-              <Link href="/pricing">
-                View pricing & future passes <IconArrowRight size={16} />
-              </Link>
-            </div>
-          </div>
-          <div className={styles.trustLine}>
-            <span>
-              <IconShieldCheck size={17} /> Server-verified bidding
-            </span>
-            <span>
-              <IconReceipt size={17} /> A clear auction record
-            </span>
-            <span>
-              <IconTv size={17} /> Browser to big screen
-            </span>
-          </div>
-        </section>
-
-        <section className={styles.faqSection} aria-labelledby="faq-title">
-          <div>
-            <p className={styles.eyebrow}>BEFORE THE FIRST WHISTLE</p>
-            <h2 id="faq-title">
-              Good questions.
-              <br />
-              <span>Straight answers.</span>
-            </h2>
-            <Link className={styles.textLink} href="/help">
-              Explore the help centre <IconArrowRight size={17} />
-            </Link>
-          </div>
-          <div className={styles.faqList}>
-            {questions.map((item) => (
-              <details key={item.question}>
-                <summary>
-                  {item.question}
-                  <span aria-hidden="true">+</span>
-                </summary>
-                <p>{item.answer}</p>
-              </details>
-            ))}
-          </div>
-        </section>
+        {/* TWO BANDS LEFT THIS PAGE (founder, 2026-09-19).
+            The "₹0 / tournament" band restated the hero's own promise — the
+            hero already says "Free during beta · No card required", which the
+            content test pins — and then sent the reader to /pricing, which is
+            the page that exists to say it properly. The FAQ band answered two
+            questions out of a help centre holding sixteen articles and its own
+            FAQ page. Both are one click away, from the header and from the
+            footer, and the page a visitor lands on is shorter for it: on a
+            phone it was eleven screens tall. */}
         <section className={styles.finalCta} aria-labelledby="final-title">
           <p className={styles.eyebrow}>YOUR SPORT. YOUR PEOPLE. YOUR MOMENT.</p>
           <h2 id="final-title">
@@ -466,20 +385,5 @@ export default function LandingPage() {
         </section>
       </main>
     </HomeMotion>
-  );
-}
-function IconSparkle() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" />
-    </svg>
   );
 }
