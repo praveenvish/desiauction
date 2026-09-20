@@ -15,12 +15,13 @@ import { ReportProblemProvider } from "../components/report-problem/report-probl
 import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
-import { adminNavVisible } from "../server/admin/actions";
+import { platformDoorCapabilities } from "../server/admin/actions";
 import { currentSession, logoutAction } from "../server/auth/actions";
 import { latestSecurityEventAt } from "../server/auth/security-events";
 import { competitionsView } from "../server/competition/actions";
 import { myOrgs } from "../server/orgs/actions";
-import { currentTeam, rolesOf } from "../server/roles/roles";
+import { rolesOf } from "../server/roles/roles";
+import type { NavRoles } from "../components/shell/nav";
 import { finopsOrgIds } from "../server/financial-operations/actions";
 import { settlementOrgIds } from "../server/settlement/actions";
 
@@ -111,7 +112,7 @@ export default async function RootLayout({
   // PX-9 adds `isAdmin` to the same one-shot fan-out: the avatar menu's Platform
   // admin door is revealed by the SAME evaluation the surface gates on, so the
   // nav and the console can never disagree about who is staff.
-  const [orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, isAdmin, roles] =
+  const [orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, platform, roles] =
     session !== null
       ? await Promise.all([
           myOrgs(),
@@ -119,45 +120,48 @@ export default async function RootLayout({
           settlementOrgIds().then((ids) => new Set(ids)),
           finopsOrgIds().then((ids) => new Set(ids)),
           latestSecurityEventAt(session.personId).then((at) => at?.toISOString() ?? null),
-          adminNavVisible(),
+          platformDoorCapabilities(),
           rolesOf(session.personId),
         ])
-      : [[], null, new Set<string>(), new Set<string>(), null, false, null];
-  // What the rail OFFERS this person (server/roles) — never what it allows.
-  const team = roles !== null ? currentTeam(roles) : null;
-  const shellRoles =
+      : [[], null, new Set<string>(), new Set<string>(), null, [], null];
+  /*
+   * WHAT THE MENU OFFERS THIS PERSON (RN-1). Facts in, menu out — `nav.ts`
+   * decides the shape, this only translates `server/roles` into its vocabulary.
+   *
+   * Note what is NOT passed: `memberOf`. Membership is not a role. It confers
+   * read access and never a menu item, which is what stops `acceptOwnerJoin` —
+   * it makes every team owner a viewer-level member of the host club — from
+   * handing a player who accepted a team the whole organizer product.
+   *
+   * Nothing here is ordered or truncated: `navigationFor` owns the precedence
+   * and the cap, so the two can never drift apart across a server boundary.
+   */
+  const isLive = (status: string | null): boolean => status === "live" || status === "paused";
+  const navRoles: NavRoles | null =
     roles === null
       ? null
       : {
-          team:
-            team === null
-              ? null
-              : {
-                  name: team.teamName,
-                  seasonSlug: team.competitionSlug,
-                  live: team.auctionStatus === "live" || team.auctionStatus === "paused",
-                },
+          organizes: roles.organizes.length > 0,
+          // EVERY team, not `currentTeam()`'s one: an owner with teams in two
+          // seasons used to lose one of them to that reduction without a trace.
+          teams: roles.owns.map((team) => ({
+            label: team.teamName,
+            seasonSlug: team.competitionSlug,
+            seasonName: team.competitionName,
+            live: isLive(team.auctionStatus),
+          })),
+          conducts: roles.conducts.map((season) => ({
+            label: season.competitionName,
+            seasonSlug: season.competitionSlug,
+            seasonName: season.competitionName,
+            live: isLive(season.auctionStatus),
+          })),
           plays: roles.plays,
-          onlyPlays:
-            roles.plays &&
-            roles.organizes.length === 0 &&
-            roles.memberOf.length === 0 &&
-            roles.owns.length === 0 &&
-            roles.conducts.length === 0,
-          conducting: (() => {
-            // The night to lead with: one still to run, else the newest.
-            const season =
-              roles.conducts.find(
-                (row) => row.auctionStatus !== "completed" && row.auctionStatus !== "reconciled",
-              ) ?? roles.conducts[0];
-            return season === undefined
-              ? null
-              : {
-                  name: season.competitionName,
-                  seasonSlug: season.competitionSlug,
-                  live: season.auctionStatus === "live" || season.auctionStatus === "paused",
-                };
-          })(),
+          // Money earned its rail slot back for the people who have books, and
+          // stays absent for everyone else (LAW 3). Both partitions count: the
+          // settlement desk and the finance desk are separate keys.
+          hasBooks: settlementOrgs.size > 0 || financeOrgs.size > 0,
+          platform,
         };
 
   const orgSlugById = new Map(orgs.map((org) => [org.id, org.slug]));
@@ -215,8 +219,7 @@ export default async function RootLayout({
             }))}
             competitions={competitions}
             serverAction={action}
-            isAdmin={isAdmin}
-            roles={shellRoles}
+            navRoles={navRoles}
             latestEventAt={latestEventAt}
             logout={logoutAction}
           >

@@ -6,6 +6,7 @@ import {
   operatorDoorHref,
   seasonRoleFor,
   seasonTabs,
+  shellKind,
   RAIL_CAP,
   type NavRoles,
   type NavScope,
@@ -394,5 +395,73 @@ describe("the season's tabs, by role", () => {
         expect(privileged).not.toContain(label);
       }
     }
+  });
+});
+
+describe("the phone's bar can read every label (LAW 4)", () => {
+  /**
+   * Five columns at 320px is ~64px each, and the bar's label is pinned to 11px
+   * (`.tab-label`, app-shell.module.css) rather than the 12px xs token for
+   * exactly this reason. Eleven characters is what fits in that cell.
+   *
+   * MEASURED, not guessed: at 11px Geist Sans "Tournaments" is 66.6px against
+   * a 64px cell, so `.bottom-tabs:has(> :nth-child(5)) .tab-label` steps the
+   * five-tab case down to 10px, where it is 60.5px. Eleven characters is
+   * therefore the real bound, and the CSS moved rather than the product's word.
+   * A twelfth character would clip even at 10px.
+   */
+  const BAR_LABEL_MAX = 11;
+
+  const everyone: NavRoles[] = [
+    NOBODY,
+    { ...NOBODY, plays: true },
+    { ...NOBODY, teams: [scope("Demo Panthers Reloaded", "demo-pl", true)] },
+    { ...NOBODY, conducts: [scope("Bandra Premier League", "bpl-3")] },
+    { ...NOBODY, organizes: true, hasBooks: true },
+    { ...NOBODY, organizes: true, plays: true, teams: [scope("City Kings", "city-cup")] },
+  ];
+
+  it("no short label overflows the bar", () => {
+    for (const roles of everyone) {
+      for (const item of navigationFor({ roles, pathname: "/home" }).rail) {
+        expect(item.shortLabel.length).toBeLessThanOrEqual(BAR_LABEL_MAX);
+      }
+    }
+  });
+
+  it("a team's NAME rides the rail; the bar says what kind of thing it is", () => {
+    const owner = { ...NOBODY, teams: [scope("Demo Panthers Reloaded", "demo-pl")] };
+    const item = navigationFor({ roles: owner, pathname: "/home" }).rail[1];
+    expect(item?.label).toBe("Demo Panthers Reloaded");
+    expect(item?.shortLabel).toBe("My team");
+  });
+
+  it("product vocabulary is not abbreviated — only shortened to a word we already say", () => {
+    const organizer = navigationFor({ roles: { ...NOBODY, organizes: true }, pathname: "/home" });
+    const byKey = new Map(organizer.rail.map((item) => [item.key, item]));
+    // "Tournaments" survives intact: it is the word the whole product uses.
+    expect(byKey.get("tournaments")?.shortLabel).toBe("Tournaments");
+    // "Clubs" is /home's own setup-ladder word for an organization.
+    expect(byKey.get("orgs")?.shortLabel).toBe("Clubs");
+  });
+});
+
+describe("the directory stays public, and the rail item that leads there stays", () => {
+  /**
+   * The obvious fix — `shellKind(pathname, hasSession)` — was built and
+   * reverted: `/c` and `/c/{slug}` each render their own `<h1>`, so console
+   * framing puts two on every page (LAW 5). This pins the decision so the next
+   * person does not rediscover it by shipping it.
+   */
+  it("is public whoever is reading", () => {
+    expect(shellKind("/c")).toBe("public");
+    expect(shellKind("/c/malad-premier-league")).toBe("public");
+  });
+
+  it("but every player is still offered it", () => {
+    const player: NavRoles = { ...NOBODY, plays: true };
+    expect(
+      navigationFor({ roles: player, pathname: "/home" }).rail.map((item) => item.key),
+    ).toContain("find");
   });
 });

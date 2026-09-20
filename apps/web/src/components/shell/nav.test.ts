@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   ADMIN_TABS,
-  RAIL,
   activeAdminTab,
   activeCompetitionTab,
   activeOrgMoneyTab,
@@ -48,15 +47,14 @@ describe("shellKind", () => {
   });
 });
 
-describe("rail", () => {
-  it("has exactly four items, forever", () => {
-    // Four since DA-18 retired the /money placeholder from the rail. A primary
-    // nav item is a promise; that one led to "being built during the beta".
-    expect(RAIL).toHaveLength(4);
-    expect(RAIL.map((item) => item.key)).toEqual(["home", "tournaments", "orgs", "help"]);
-  });
-
-  it("maps paths to the owning rail item", () => {
+/**
+ * The fixed `RAIL` array is gone (RN-1): the menu is composed per person by
+ * `navigationFor`, and navigation.test.ts is the ruling on what it contains.
+ * `activeRailKey` survives for a DIFFERENT job — it tells the identity bar
+ * which surface a path belongs to, which is "where am I" (LAW 2), not a menu.
+ */
+describe("path ownership, for the identity bar's title", () => {
+  it("maps paths to the owning surface", () => {
     expect(activeRailKey("/home")).toBe("home");
     expect(activeRailKey("/tournaments")).toBe("tournaments");
     // A season is an edition OF a tournament: working inside one must not leave

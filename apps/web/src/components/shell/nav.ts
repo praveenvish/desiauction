@@ -115,40 +115,6 @@ export interface RailTarget {
   href: string;
 }
 
-/**
- * FOUR items. The canon (docs/16; PX-1 01 §1) said "exactly five, forever", and
- * this comment went on asserting it two lines above a four-item array — while
- * the help centre, reading the same canon, told customers about "the five
- * places you'll work" and named a Money page that is not in the rail.
- *
- * The count stopped being five under DA-18 (see the note on the removed slot
- * below), and a comment that contradicts the array under it is how a false
- * claim survives a rewrite of the array. The canon here is the RULE — a short,
- * fixed, primary rail, every item a place a signed-in person actually works —
- * not the number. Adding a fifth needs a product ruling; so does the sixth.
- *
- * Slot 2 was "Seasons". It is now "Tournaments", by an explicit product ruling:
- * the recurring tournament is how organizers name their calendar ("BPL", then
- * "BPL 1", "BPL 2"), the schema has modelled it since IP-3, and the layer was
- * unreachable — no route, no create flow, every UI-made season a one-off.
- * Seasons have not moved: they live under their tournament. The /seasons INDEX
- * is gone — it was a second index over the same rows, kept alive only because
- * nobody retired it, and it is now the "All seasons" view of /tournaments
- * (`?view=seasons`) with the bare path redirecting there. What survives at
- * /seasons/{slug} is the season WORKSPACE, which is where organizers do the
- * bulk of their work, so the rail's active key still claims that whole prefix.
- */
-export const RAIL: RailTarget[] = [
-  { key: "home", label: "Home", href: "/home" },
-  { key: "tournaments", label: "Tournaments", href: "/tournaments" },
-  { key: "orgs", label: "Organizations", href: "/orgs" },
-  // DA-18: /money is a placeholder that tells the user so ("being built during
-  // the beta"). A primary navigation item is a promise; this one led to an
-  // apology. It comes back when the surface behind it does — the season's own
-  // Money tab, which IS built, is unaffected.
-  { key: "help", label: "Help", href: "/help" },
-];
-
 /** Rail active state: longest matching prefix wins; /org/* belongs to Organizations. */
 export function activeRailKey(pathname: string): string | null {
   if (pathname.startsWith("/org/") || pathname.startsWith("/orgs")) {
@@ -732,114 +698,6 @@ export function liveExit(pathname: string, hasSession: boolean): { href: string;
   return { href: `/seasons/${match.slug}/auction`, label: "Leave auction" };
 }
 
-/**
- * WHAT THE RAIL OFFERS, BY ROLE (launch polish, Phase 2).
- *
- * The facts come from `server/roles/roles.ts`; this only decides what to show.
- * Offering is not allowing — every surface still gates itself — but a rail that
- * offers a player "Tournaments" and "Organizations" (both empty for them) and
- * nothing about the season they are actually in reads as "not for you".
- */
-export interface ShellRoles {
-  /** The team this person owns and should see first, if any. */
-  team: { name: string; seasonSlug: string; live: boolean } | null;
-  /** Plays anywhere: a registration or a player profile. */
-  plays: boolean;
-  /** Plays and does NOTHING else — no club membership, no team. */
-  onlyPlays: boolean;
-  /** A season whose auction this person was appointed to run, if any. */
-  conducting?: { name: string; seasonSlug: string; live: boolean } | null;
-}
-
-export interface RoleNavItem {
-  key: string;
-  label: string;
-  href: string;
-  icon: "team" | "plan" | "room" | "sports" | "find" | "cockpit";
-  live?: boolean;
-  active?: boolean;
-}
-
-export interface RoleNavGroup {
-  key: string;
-  label: string;
-  items: RoleNavItem[];
-}
-
-/**
- * The primary rail for this person. Someone who only plays has no use for the
- * organizer's index pages; everyone else — including a brand-new account, who
- * may be an organizer about to start — keeps the four.
- */
-export function railFor(roles: ShellRoles | null): RailTarget[] {
-  if (roles?.onlyPlays === true) {
-    return RAIL.filter((item) => item.key === "home" || item.key === "help");
-  }
-  return RAIL;
-}
-
-export function roleNavGroups(roles: ShellRoles | null, pathname: string): RoleNavGroup[] {
-  if (roles === null) return [];
-  const groups: RoleNavGroup[] = [];
-  if (roles.team !== null) {
-    const base = `/seasons/${roles.team.seasonSlug}`;
-    groups.push({
-      key: "team",
-      label: "My team",
-      items: [
-        { key: "team", label: roles.team.name, href: `${base}/teams`, icon: "team" },
-        { key: "plan", label: "My plan", href: `${base}/auction/plan`, icon: "plan" },
-        {
-          key: "room",
-          label: "Auction room",
-          href: `${base}/auction/live`,
-          icon: "room",
-          live: roles.team.live,
-        },
-      ],
-    });
-  }
-  if (roles.conducting !== undefined && roles.conducting !== null) {
-    const base = `/seasons/${roles.conducting.seasonSlug}/auction`;
-    groups.push({
-      key: "auction",
-      label: "Auction night",
-      items: [
-        { key: "season-auction", label: roles.conducting.name, href: base, icon: "room" },
-        {
-          key: "cockpit",
-          label: "Cockpit",
-          href: `${base}/cockpit`,
-          icon: "cockpit",
-          live: roles.conducting.live,
-        },
-      ],
-    });
-  }
-  if (roles.plays) {
-    groups.push({
-      key: "play",
-      label: "Play",
-      items: [
-        { key: "sports", label: "My sports", href: "/me", icon: "sports" },
-        { key: "find", label: "Find tournaments", href: "/c", icon: "find" },
-      ],
-    });
-  }
-  // Active state by exact section: the team items are all under /seasons/{slug},
-  // so a prefix match would light all three at once.
-  return groups.map((group) => ({
-    ...group,
-    items: group.items.map((item) => ({
-      ...item,
-      active:
-        item.key === "sports"
-          ? pathname === "/me" || pathname.startsWith("/me/")
-          : pathname === item.href || pathname.startsWith(`${item.href}/`),
-    })),
-  }));
-}
-
 /* ===========================================================================
  * RN-1 — THE ONE NAVIGATION MODEL
  *
@@ -899,6 +757,17 @@ export interface NavChoice {
 export interface NavItem {
   key: string;
   label: string;
+  /**
+   * What the phone's bottom bar calls this.
+   *
+   * LAW 4 wants the same word on every device, so this differs from `label`
+   * only where it must: five columns at 320px is ~64px each, and a team's name
+   * or "Find tournaments" cannot be read in that. Where a short form is needed
+   * it is a synonym the product already uses out loud ("Clubs" is the word
+   * /home's own setup ladder uses for an organization), never an abbreviation
+   * invented for the bar — "tourns" is not a word in any register.
+   */
+  shortLabel: string;
   href: string;
   icon: NavIcon;
   /** An auction under this item is running right now (LAW 7). */
@@ -1007,6 +876,7 @@ function liveDoor(roles: NavRoles): NavItem | null {
     return {
       key: "cockpit",
       label: "Cockpit",
+      shortLabel: "Cockpit",
       href: `/seasons/${night.seasonSlug}/auction/cockpit`,
       icon: "cockpit",
       live: true,
@@ -1017,6 +887,7 @@ function liveDoor(roles: NavRoles): NavItem | null {
     return {
       key: "room",
       label: "Auction room",
+      shortLabel: "Room",
       href: `/seasons/${team.seasonSlug}/auction/live`,
       icon: "room",
       live: true,
@@ -1036,6 +907,8 @@ function scopeItem(
   key: string,
   scopes: NavScope[],
   plural: string,
+  /** The bar's word for this, whether there is one scope or five. */
+  shortLabel: string,
   icon: NavIcon,
   href: (scope: NavScope) => string,
 ): NavItem | null {
@@ -1047,6 +920,7 @@ function scopeItem(
     return {
       key,
       label: first.label,
+      shortLabel,
       href: href(first),
       icon,
       ...(first.live ? { live: true } : {}),
@@ -1055,6 +929,7 @@ function scopeItem(
   return {
     key,
     label: plural,
+    shortLabel,
     href: href(first),
     icon,
     ...(scopes.some((scope) => scope.live) ? { live: true } : {}),
@@ -1122,12 +997,13 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
   }
 
   const candidates: (NavItem | null)[] = [
-    { key: "home", label: "Home", href: "/home", icon: "home" },
+    { key: "home", label: "Home", shortLabel: "Home", href: "/home", icon: "home" },
     liveDoor(roles),
     scopeItem(
       "team",
       roles.teams,
       "My teams",
+      "My team",
       "team",
       (scope) => `/seasons/${scope.seasonSlug}/teams`,
     ),
@@ -1135,30 +1011,52 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
       "nights",
       roles.conducts,
       "Auction nights",
+      "Nights",
       "nights",
       (scope) => `/seasons/${scope.seasonSlug}/auction`,
     ),
     roles.organizes
-      ? { key: "tournaments", label: "Tournaments", href: "/tournaments", icon: "trophy" }
+      ? {
+          key: "tournaments",
+          label: "Tournaments",
+          shortLabel: "Tournaments",
+          href: "/tournaments",
+          icon: "trophy",
+        }
       : null,
-    roles.organizes ? { key: "orgs", label: "Organizations", href: "/orgs", icon: "org" } : null,
+    roles.organizes
+      ? { key: "orgs", label: "Organizations", shortLabel: "Clubs", href: "/orgs", icon: "org" }
+      : null,
     // DA-18 removed Money because it led to an apology. It comes back for the
     // people who have books — and stays absent for everyone else (LAW 3).
-    roles.hasBooks ? { key: "money", label: "Money", href: "/money", icon: "money" } : null,
-    roles.plays ? { key: "sports", label: "My sports", href: "/me", icon: "sports" } : null,
+    roles.hasBooks
+      ? { key: "money", label: "Money", shortLabel: "Money", href: "/money", icon: "money" }
+      : null,
+    roles.plays
+      ? { key: "sports", label: "My sports", shortLabel: "My sports", href: "/me", icon: "sports" }
+      : null,
     /*
      * An organizer already has three doors into competitions; the public
      * directory is for people who need to FIND one.
      *
-     * KNOWN, AND FIXED IN PHASE 2: `/c` is a PUBLIC surface by `shellKind`, so
-     * this — a player's most-used rail item — currently navigates them out of
-     * the shell that drew it, and the whole chrome changes under them. Phase 2
-     * makes `shellKind` session-aware for `/c` and `/c/{slug}`, the way
-     * `liveExit` is already session-aware, so a signed-in visitor keeps their
-     * menu while browsing. Until then the rail simply never renders there,
-     * which is why no test asserts an active item on that path.
+     * A RAIL ITEM THAT LEAVES THE SHELL, AND WHY IT STAYS THAT WAY.
+     *
+     * `/c` is PUBLIC by `shellKind`, so this item hands a player from the
+     * console to the public shell and the chrome changes under them. Phase 2
+     * tried the obvious fix — make `shellKind` session-aware, the way
+     * `liveExit` already is — and reverted it: `/c` and `/c/{slug}` each render
+     * their OWN `<h1>`, so console framing puts two of them on every page and
+     * breaks LAW 5, and converting two SEO surfaces off the public kit to
+     * repair a chrome discontinuity is a bad trade.
+     *
+     * It is also a smaller problem than it looked: `PublicShell` already gives
+     * a signed-in visitor a "Home" door back into the console. The item stays,
+     * the directory stays public, and no test asserts an active item there
+     * because the rail is not rendered on that path at all.
      */
-    roles.organizes ? null : { key: "find", label: "Find tournaments", href: "/c", icon: "find" },
+    roles.organizes
+      ? null
+      : { key: "find", label: "Find tournaments", shortLabel: "Find", href: "/c", icon: "find" },
   ];
 
   const offered = candidates.filter((item): item is NavItem => item !== null);
@@ -1182,13 +1080,21 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
 
   const doorHref = operatorDoorHref(roles.platform);
   const utility: NavItem[] = [
-    { key: "bell", label: "Notifications", href: "/inbox", icon: "bell" },
-    { key: "account", label: "Account", href: "/account", icon: "account" },
+    { key: "bell", label: "Notifications", shortLabel: "Alerts", href: "/inbox", icon: "bell" },
+    { key: "account", label: "Account", shortLabel: "Account", href: "/account", icon: "account" },
     // Help left the rail under RN-1: the rail is WORK, utility is SERVICES.
     // That is what frees the four slots beside Home.
-    { key: "help", label: "Help", href: "/help", icon: "help" },
+    { key: "help", label: "Help", shortLabel: "Help", href: "/help", icon: "help" },
     ...(doorHref !== null
-      ? [{ key: "admin", label: "Platform admin", href: doorHref, icon: "admin" as const }]
+      ? [
+          {
+            key: "admin",
+            label: "Platform admin",
+            shortLabel: "Admin",
+            href: doorHref,
+            icon: "admin" as const,
+          },
+        ]
       : []),
   ];
 

@@ -782,3 +782,136 @@ a.wordmark:hover .wordmark-glyph {
     color: var(--identity-accent);
   }
 }
+
+/* ===========================================================================
+   RN-1 — the phone's bar carries the same menu, and the rail carries scopes
+   ======================================================================== */
+
+/*
+   The bar's label is pinned at 11px rather than inheriting the 12px xs token:
+   five columns at 320px is ~64px each, and the product's own longest rail word
+   ("Tournaments", 11 characters) does not fit that cell at 12. Paired with
+   `BAR_LABEL_MAX` in navigation.test.ts — if one moves, the other has to.
+
+   nowrap, not wrap: a label that wraps makes ONE tab two lines tall and drags
+   the whole fixed bar up over the content, so a clipped word is the cheaper
+   failure. Phase 6 asserts nothing clips at 320px against the real render.
+*/
+.tab-label {
+  font-size: 11px;
+  line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+   FIVE TABS AT 320px, MEASURED.
+
+   The cell is 320/5 = 64px, and the longest label the menu can produce —
+   "Tournaments", which stays unabbreviated because it is the product's own word
+   — measures 66.6px at 11px Geist Sans. It clipped to "Tournament…" by 2.6px.
+
+   The step-down is scoped to the crowded case rather than applied to the whole
+   bar: five tabs needs an organizer who ALSO owns a team during a live auction,
+   and making every phone read 10px labels to serve that would be paying for the
+   edge with the common case. At 10px the same word is 60.5px.
+*/
+.bottom-tabs:has(> :nth-child(5)) .tab-label {
+  font-size: 10px;
+}
+
+/* The icon is the anchor, so the live dot rides its corner. A "Live" pill like
+   the rail's is as wide as the entire column. */
+.tab-icon {
+  position: relative;
+}
+
+.tab-live {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--live);
+  /* Reads against both the resting bar and the active tab's tinted ground. */
+  box-shadow: 0 0 0 2px var(--surface-raised);
+}
+
+/*
+   The scopes under one rail item — the two teams behind "My teams".
+   Indented under their parent, quieter than it, and never more than a handful:
+   an owner with five teams has five rows here, which is still one LIST (LAW 1).
+*/
+.rail-sublist {
+  list-style: none;
+  margin: var(--space-05) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+}
+
+.rail-subitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* Aligned to the parent's LABEL, not its icon, so the nesting reads as
+     "these belong to that" rather than as a second top-level list. */
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-10);
+  min-height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+}
+
+/*
+   Borrowed from `.rail-item` above rather than invented: the rail is themed
+   twice (daylight overrides it wholesale further down) and `--identity-glyph`
+   is the one colour proven correct in BOTH. `--surface-hover` was the first
+   draft and does not exist anywhere in the package — an undefined custom
+   property voids the whole declaration silently, which is how a hover state
+   ships looking like no hover state at all.
+*/
+.rail-subitem:hover {
+  background: color-mix(in srgb, var(--identity-glyph) 10%, transparent);
+  color: var(--identity-glyph);
+}
+
+.rail-subitem:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Deliberately NOT the parent's struck-metal gold: two gold pills stacked read
+   as two primary items, and a child is not one. Lit, not plated. */
+.rail-subitem-active,
+.rail-subitem-active:hover {
+  background: color-mix(in srgb, var(--identity-glyph) 18%, transparent);
+  color: var(--identity-glyph);
+  font-weight: 600;
+}
+
+.rail-sublabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The live fact, for anyone who cannot see the dot. Not `display: none`, which
+   takes it out of the accessibility tree along with the pixels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
