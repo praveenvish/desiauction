@@ -43,7 +43,7 @@ import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
-import { BrandMark } from "./brand";
+import { BrandMark, BrandWordmark } from "./brand";
 import {
   adminSectionsFor,
   PUBLIC_DESTINATIONS,
@@ -732,7 +732,8 @@ export function ProductShell({
           exitHref={exit.href}
           exitLabel={exit.label}
           linkComponent={Link}
-          brand={<BrandMark size={26} />}
+          brand={<BrandMark size={32} />}
+          wordmark={<BrandWordmark tone="live" />}
           // A spectator arrives with no account and the mark was dead text on
           // the one screen the product is most often shared from.
           brandHref="/"
@@ -762,12 +763,11 @@ export function ProductShell({
     const atLoginGate = pathname === "/login";
     return (
       <PublicShell
-        wordmark={
-          <span className="public-brand-name">
-            Desi<span>Auction</span>
-            <small aria-hidden="true">THE GAME STARTS HERE</small>
-          </span>
-        }
+        // The brand lockup is ONE component with a tone (brand.tsx), not markup
+        // repeated per shell — which is how the header came to render the
+        // wordmark and the tagline jammed on a single line: the inline copy
+        // kept a <small> the stacking CSS no longer had a rule for.
+        wordmark={<BrandWordmark tone="header" />}
         wordmarkHref="/"
         glyph={<BrandMark size={42} />}
         nav={publicNav(pathname)}
@@ -1049,16 +1049,9 @@ export function ProductShell({
             },
           ]}
           linkComponent={Link}
-          // ONE tagline in the sidebar (founder, 2026-09-19): the brand line
-          // "Bid · Build · Win" below; the wordmark carries just the name.
-          wordmark={
-            <span className="public-brand-name">
-              Desi<span>Auction</span>
-            </span>
-          }
+          wordmark={<BrandWordmark tone="rail" />}
           wordmarkHref="/home"
           glyph={<BrandMark size={32} />}
-          tagline="Bid · Build · Win"
           {...(title !== null ? { pageTitle: title } : {})}
           {...(titleTestId !== undefined ? { pageTitleAttrs: { "data-testid": titleTestId } } : {})}
           {...(identity.crumbs.length > 0
