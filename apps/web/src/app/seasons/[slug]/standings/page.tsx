@@ -1,4 +1,6 @@
-import { IconTrophy, IconUsers, Pill, SectionCard } from "@desiauction/ui";
+import { IconTrophy, IconUsers, PageIntro, Pill, SectionCard } from "@desiauction/ui";
+
+import { SiblingLink } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { standingsView } from "../../../../server/competition/fixture-actions";
@@ -34,6 +36,9 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
+        {/* The table shares the Schedule tab with the fixtures it is derived
+            from (RN-1), so this is how an organizer reaches them. */}
+        <PageIntro actions={<SiblingLink href={`/seasons/${slug}/fixtures`} label="Fixtures" />} />
         <SectionCard
           icon={<IconTrophy />}
           title={lobby ? "Points table" : "League table"}

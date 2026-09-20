@@ -1,14 +1,4 @@
-import {
-  ButtonLink,
-  IconChart,
-  IconShieldCheck,
-  IconUsers,
-  IconWallet,
-  Pill,
-  SectionCard,
-  StatCard,
-  StatGrid,
-} from "@desiauction/ui";
+import Link from "next/link";
 
 import { compactFloorINR, compactINR } from "../../lib/inr";
 import { planView } from "../../server/auction/owner-plan-actions";
@@ -68,60 +58,40 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
                 sub: "only you can see it",
               },
         ];
-  const looks = [
-    { icon: <IconWallet />, tone: "gold" },
-    { icon: <IconUsers />, tone: "green" },
-    { icon: <IconChart />, tone: "purple" },
-  ] as const;
   return (
-    <SectionCard
-      className="home-owner"
-      data-testid="home-owner"
-      icon={<IconShieldCheck />}
-      tone="gold"
-      title={team.teamName}
-      description={`${team.competitionName} · ${STATUS_LABEL[team.auctionStatus] ?? "Auction"}`}
-      action={
-        live ? (
-          <Pill tone="red" dot>
-            Live
-          </Pill>
-        ) : undefined
-      }
-    >
+    <section className="home-owner" aria-labelledby="home-owner-title" data-testid="home-owner">
+      <header className="home-flat-head">
+        <h2 id="home-owner-title" className="home-flat-title">
+          {team.teamName}
+        </h2>
+        <span className="home-flat-meta">
+          {team.competitionName} · {STATUS_LABEL[team.auctionStatus] ?? "Auction"}
+        </span>
+      </header>
       {figures !== null ? (
-        <StatGrid>
-          {figures.map((figure, index) => (
-            <StatCard
-              key={figure.label}
-              icon={looks[index % looks.length]?.icon ?? <IconChart />}
-              tone={looks[index % looks.length]?.tone ?? "gold"}
-              value={figure.value}
-              label={figure.label}
-              hint={figure.sub}
-            />
+        <dl className="home-figures">
+          {figures.map((figure) => (
+            <div key={figure.label} className="home-figure">
+              <dt>{figure.label}</dt>
+              <dd className="home-figure-value">{figure.value}</dd>
+              <dd className="home-figure-sub">{figure.sub}</dd>
+            </div>
           ))}
-        </StatGrid>
+        </dl>
       ) : null}
       <nav className="home-owner-links" aria-label={`${team.teamName} shortcuts`}>
-        <ButtonLink href={`${base}/teams`} variant="secondary" size="touch">
-          Team page
-        </ButtonLink>
+        <Link href={`${base}/teams`}>Team page</Link>
         {over ? (
-          <ButtonLink href={`${base}/fixtures`} variant="secondary" size="touch">
-            Fixtures
-          </ButtonLink>
+          <Link href={`${base}/fixtures`}>Fixtures</Link>
         ) : (
           <>
-            <ButtonLink href={`${base}/auction/plan`} variant="secondary" size="touch">
-              My plan
-            </ButtonLink>
-            <ButtonLink href={`${base}/auction/live`} variant="secondary" size="touch">
+            <Link href={`${base}/auction/plan`}>My plan</Link>
+            <Link href={`${base}/auction/live`}>
               {live ? "Enter the live room" : "Auction room"}
-            </ButtonLink>
+            </Link>
           </>
         )}
       </nav>
-    </SectionCard>
+    </section>
   );
 }

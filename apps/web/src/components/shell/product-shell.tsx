@@ -7,27 +7,22 @@ import {
   IconBell,
   IconArrowRight,
   IconBolt,
+  IconCalendar,
+  IconChart,
   IconGavel,
+  IconGrid,
   IconGlobe,
-  IconList,
   IconShieldCheck,
   IconStar,
   IconChevronDown,
   IconHelp,
   IconHome,
-  IconLock,
-  IconLogOut,
-  IconCheckCircle,
-  IconCalendar,
-  Pill,
-  type KitTone,
   IconMenu,
   IconRupee,
   IconSearch,
   IconTrophy,
   IconUser,
   IconUsers,
-  IconChart,
   InlineSearch,
   LiveShell,
   PopoverMenu,
@@ -48,23 +43,24 @@ import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
-import { BrandMark, BrandWordmark } from "./brand";
+import { BrandMark } from "./brand";
 import {
-  ADMIN_TABS,
+  adminSectionsFor,
   PUBLIC_DESTINATIONS,
-  RAIL,
   activeAdminTab,
-  activeCompetitionTab,
   activeOrgMoneyTab,
-  activeRailKey,
-  competitionTabs,
+  activeSeasonTab,
+  seasonTabs,
   liveExit,
+  navigationFor,
+  phoneBar,
   orgMoneyTabs,
   pageIdentity,
   shellKind,
-  railFor,
-  roleNavGroups,
-  type ShellRoles,
+  type NavIcon,
+  type NavItem,
+  type NavRoles,
+  type SeasonRole,
 } from "./nav";
 import { useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
@@ -101,17 +97,16 @@ export interface ShellOrg {
 export interface ShellCompetition {
   slug: string;
   name: string;
-  /** The season's lifecycle status — the top bar's status pill. */
-  status?: string;
-  /** Where and when — the top bar's second line ("Season 2026 · Kolkata"). */
-  location?: string | null;
-  startsOn?: string | null;
   orgName: string;
   orgSlug: string;
   /** PX-7: holder of `settlement.view` on this competition's org — gates Money. */
   canSettle: boolean;
-  /** Manages this competition's club (org:owner/staff) — gates the roster tabs. */
-  canManage?: boolean;
+  /**
+   * Who this person is IN THIS SEASON (RN-1 Phase 4), resolved by
+   * `seasonRoleFor` in the server layout. Replaces `canManage`, which was one
+   * boolean standing in for seven roles.
+   */
+  seasonRole: SeasonRole;
 }
 
 export interface ProductShellProps {
@@ -125,10 +120,15 @@ export interface ProductShellProps {
    * after hydration, and the bar changing height at that moment was CLS 0.123.
    */
   serverAction?: ReactNode;
-  /** PX-9: holder of `platform.admin` — reveals the one door into administration. */
-  isAdmin?: boolean;
-  /** What this person does here (server/roles) — decides what the rail offers. */
-  roles?: ShellRoles | null;
+  /**
+   * What this person does here (server/roles), in the menu's vocabulary.
+   *
+   * REPLACES `isAdmin` + `roles`. The old pair was the two-authorities defect
+   * in miniature: a boolean that revealed administration only to
+   * `platform.admin`, beside a role object the rail consulted for exactly one
+   * decision. One input, one function, one menu.
+   */
+  navRoles?: NavRoles | null;
   /** Newest person-scoped event timestamp (ISO) — drives the bell's unread dot. */
   latestEventAt?: string | null;
   /** The existing logout server action, passed through from the server layout. */
@@ -196,25 +196,83 @@ function BellLink({
   );
 }
 
-const ROLE_ICONS: Record<"team" | "plan" | "room" | "sports" | "find" | "cockpit", ReactNode> = {
-  team: <IconUsers />,
-  plan: <IconList />,
+/**
+ * The menu's icon vocabulary (nav.ts `NavIcon`), in one map.
+ *
+ * Was TWO maps — `ROLE_ICONS` for the role groups and `RAIL_ICONS` for the rail
+ * — which is the three-lists defect showing up in the iconography: the same
+ * destination could be drawn differently depending on which list it landed in.
+ *
+ * `org` is a grid and `team` is people, deliberately: both were `IconUsers`,
+ * so an organizer who also owned a team saw the same glyph twice in one rail.
+ */
+const NAV_ICONS: Record<NavIcon, ReactNode> = {
+  home: <IconHome />,
   room: <IconGavel />,
-  sports: <IconStar />,
-  find: <IconGlobe />,
   cockpit: <IconBolt />,
+  team: <IconUsers />,
+  nights: <IconCalendar />,
+  trophy: <IconTrophy />,
+  org: <IconGrid />,
+  money: <IconRupee />,
+  sports: <IconStar />,
+  // The founder's mockup icons for the three cross-season indexes
+  // (ui/premium-flow, 2026-09-19): a person, a gavel, a chart.
+  player: <IconUser />,
+  gavel: <IconGavel />,
+  chart: <IconChart />,
+  find: <IconGlobe />,
+  help: <IconHelp />,
+  bell: <IconBell />,
+  account: <IconSettings />,
+  admin: <IconShieldCheck />,
 };
 
-const RAIL_ICONS: Record<string, ReactNode> = {
-  home: <IconHome />,
-  tournaments: <IconTrophy />,
-  orgs: <IconUsers />,
-  players: <IconUser />,
-  auctions: <IconGavel />,
-  reports: <IconChart />,
-  money: <IconRupee />,
-  help: <IconHelp />,
-};
+/**
+ * Reachable by anyone signed in, whether or not it is in their menu.
+ *
+ * Every one of these is a place a person with no roles at all may legitimately
+ * want: `/orgs` is where a club is created, and the directory is where a
+ * tournament is found. They are search answers, not offers — see the note in
+ * the palette below.
+ */
+const UNIVERSAL_DESTINATIONS: { key: string; label: string; href: string; keywords: string }[] = [
+  {
+    key: "go-orgs",
+    label: "Organizations",
+    href: "/orgs",
+    keywords: "organization org club create start academy",
+  },
+  {
+    key: "go-directory",
+    label: "Browse public tournaments",
+    href: "/c",
+    keywords: "directory discover register public tournament find",
+  },
+];
+
+/** nav.ts NavItem → the shell's presentational item. */
+function toShellItem(item: NavItem): ShellNavItem {
+  return {
+    key: item.key,
+    label: item.label,
+    shortLabel: item.shortLabel,
+    href: item.href,
+    icon: NAV_ICONS[item.icon],
+    ...(item.active === true ? { active: true } : {}),
+    ...(item.live === true ? { live: true } : {}),
+    ...(item.choices !== undefined
+      ? {
+          children: item.choices.map((choice) => ({
+            key: choice.key,
+            label: choice.label,
+            href: choice.href,
+            ...(choice.live === true ? { live: true } : {}),
+          })),
+        }
+      : {}),
+  };
+}
 
 /**
  * The public header's five destinations, with the one you are already on marked
@@ -308,36 +366,12 @@ function IconSettings() {
  * chrome from the pathname via the shared nav model. No page opts in or out —
  * chrome is decided in exactly one place.
  */
-/**
- * The season's status pill in the top bar — the words an organizer uses, and a
- * tone that means the same thing everywhere (neutral draft, blue open, amber
- * closed-and-waiting, green done).
- */
-const SEASON_STATUS: Record<string, { label: string; tone: KitTone; icon: ReactNode }> = {
-  draft: { label: "Draft", tone: "neutral", icon: <IconCalendar /> },
-  setup: { label: "Setting up", tone: "neutral", icon: <IconCalendar /> },
-  registration_open: {
-    label: "Registration open",
-    tone: "green",
-    icon: <IconCheckCircle />,
-  },
-  registration_closed: { label: "Registration closed", tone: "amber", icon: <IconLock /> },
-};
-
-function crestInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const first = words[0]?.[0] ?? "";
-  const last = words.length > 1 ? (words[words.length - 1]?.[0] ?? "") : (words[0]?.[1] ?? "");
-  return `${first}${last}`.toUpperCase();
-}
-
 export function ProductShell({
   session,
   orgs,
   competitions,
   serverAction,
-  isAdmin = false,
-  roles = null,
+  navRoles = null,
   latestEventAt = null,
   logout,
   children,
@@ -425,20 +459,45 @@ export function ProductShell({
     }
   }, [pathname, session]);
 
+  /*
+   * THE MENU (RN-1). One call, one model, both devices — `AppShell` maps `nav`
+   * into the desktop rail AND the phone's bottom bar, so LAW 4 holds by
+   * construction rather than by two lists being kept in step by hand.
+   */
+  const menu = useMemo(() => navigationFor({ roles: navRoles, pathname }), [navRoles, pathname]);
+  /** An operator holds a door — any platform capability, not just admin. */
+  const adminDoor = menu.utility.find((item) => item.key === "admin")?.href;
+  const isAdmin = adminDoor !== undefined;
+
   const paletteGroups: PaletteGroup[] = useMemo(() => {
     const groups: PaletteGroup[] = [
       {
         label: "Go to",
+        /*
+         * The person's own menu FIRST, then the handful of places anyone
+         * signed in may legitimately go.
+         *
+         * It used to be the fixed four-item `RAIL` plus Account, Notifications
+         * and the directory, so ⌘K never offered a team owner their own team.
+         * Building it from the menu fixed that and broke something else: a
+         * brand-new account typing "organiz" found nothing at all, though
+         * creating a club is exactly what they are there to do.
+         *
+         * LAW 3 GOVERNS WHAT THE PRODUCT OFFERS UNPROMPTED. A rail item is an
+         * offer and its slots are scarce, so it must be earned. A search result
+         * answers a question somebody asked, and refusing to answer is not
+         * restraint — it is a dead end. The two lists differ on purpose.
+         */
         items: [
-          ...RAIL.map((item) => ({ key: item.key, label: item.label, href: item.href })),
-          { key: "account", label: "Account", href: "/account" },
-          { key: "inbox", label: "Notifications", href: "/inbox" },
-          {
-            key: "directory",
-            label: "Browse public tournaments",
-            href: "/c",
-            keywords: "directory discover register public",
-          },
+          ...[...menu.rail, ...menu.utility].map((item) => ({
+            key: item.key,
+            label: item.label,
+            href: item.href,
+          })),
+          ...UNIVERSAL_DESTINATIONS.filter(
+            (destination) =>
+              ![...menu.rail, ...menu.utility].some((item) => item.href === destination.href),
+          ),
         ],
       },
     ];
@@ -451,11 +510,9 @@ export function ProductShell({
       groups.push({
         label: `In ${currentCompetition.name}`,
         items: [
-          ...competitionTabs(
-            currentCompetition.slug,
-            currentCompetition.canSettle,
-            currentCompetition.canManage ?? true,
-          ).map((tab) => ({
+          ...seasonTabs(currentCompetition.slug, currentCompetition.seasonRole, {
+            canSettle: currentCompetition.canSettle,
+          }).map((tab) => ({
             key: `section-${tab.key}`,
             label: tab.label,
             hint: currentCompetition.name,
@@ -630,13 +687,17 @@ export function ProductShell({
     // where it can query the system pool behind the gate; shipping every org
     // and person into every admin's client bundle to filter them here would
     // leak the platform's directory into the browser to save a click.
-    if (isAdmin) {
+    const adminSections = adminSectionsFor(navRoles?.platform ?? []);
+    if (adminSections.length > 0) {
       groups.push({
         label: "Administration",
-        items: ADMIN_TABS.map((tab) => ({
-          key: `admin-${tab.key}`,
-          label: tab.key === "overview" ? "Platform admin" : `Platform ${tab.label.toLowerCase()}`,
-          href: tab.href,
+        items: adminSections.map((section) => ({
+          key: `admin-${section.key}`,
+          label:
+            section.key === "overview"
+              ? "Platform admin"
+              : `Platform ${section.label.toLowerCase()}`,
+          href: section.href,
           keywords: "admin platform staff governance support observe",
         })),
       });
@@ -653,7 +714,7 @@ export function ProductShell({
       })),
     });
     return groups;
-  }, [competitions, orgs, pathname, isAdmin]);
+  }, [competitions, orgs, pathname, navRoles, menu]);
 
   if (kind === "bare") {
     return <>{children}</>;
@@ -671,8 +732,7 @@ export function ProductShell({
           exitHref={exit.href}
           exitLabel={exit.label}
           linkComponent={Link}
-          brand={<BrandMark size={32} />}
-          wordmark={<BrandWordmark tone="live" />}
+          brand={<BrandMark size={26} />}
           // A spectator arrives with no account and the mark was dead text on
           // the one screen the product is most often shared from.
           brandHref="/"
@@ -702,9 +762,12 @@ export function ProductShell({
     const atLoginGate = pathname === "/login";
     return (
       <PublicShell
-        // THE reference lockup: every other surface renders this same
-        // component (brand.tsx), in its own tone.
-        wordmark={<BrandWordmark tone="header" />}
+        wordmark={
+          <span className="public-brand-name">
+            Desi<span>Auction</span>
+            <small aria-hidden="true">THE GAME STARTS HERE</small>
+          </span>
+        }
         wordmarkHref="/"
         glyph={<BrandMark size={42} />}
         nav={publicNav(pathname)}
@@ -863,16 +926,24 @@ export function ProductShell({
     );
   }
 
-  const activeKey = activeRailKey(pathname);
-  const nav: ShellNavItem[] = railFor(roles).map((item) => ({
-    ...item,
-    icon: RAIL_ICONS[item.key],
-    active: item.key === activeKey,
-  }));
+  const nav: ShellNavItem[] = menu.rail.map(toShellItem);
+  /*
+   * The phone's bar is the same menu minus the desk surfaces (`mobile: false`)
+   * and capped at the five columns it has. The rail above is vertical and keeps
+   * everything, which is what the founder's 2026-09-19 mockups assumed when
+   * they asked for seven items on a laptop.
+   */
+  const bottomNav: ShellNavItem[] = phoneBar(menu.rail).map(toShellItem);
 
   // Identity: one derivation for every console route (nav.ts), overridden only
   // where the name is page data the shell cannot hold.
-  const identity = pageIdentity(pathname, { competitions, orgs, isAdmin });
+  const identity = pageIdentity(pathname, {
+    competitions,
+    orgs,
+    isAdmin,
+    // Their own door, so the trail never points at a page that 404s for them.
+    ...(adminDoor !== undefined ? { adminHome: adminDoor } : {}),
+  });
   const title = titleOverride === null ? identity.title : titleOverride.title;
   const titleTestId = titleOverride?.testId;
   const subtitle = titleOverride?.subtitle ?? identity.subtitle;
@@ -883,80 +954,37 @@ export function ProductShell({
   const competitionMatch = /^\/seasons\/([^/]+)/.exec(pathname);
   const orgMatch = /^\/org\/([^/]+)/.exec(pathname);
   let seasonSwitcherFor: string | null = null;
-  let contextNode: ReactNode = undefined;
   if (pathname.startsWith("/admin")) {
     // Rendered on `isAdmin` alone: for anyone else the page underneath is a
     // 404, so chrome would frame nothing.
-    tabsNode = isAdmin ? (
-      <SubNavTabs
-        label="Administration sections"
-        linkComponent={Link}
-        tabs={ADMIN_TABS.map((tab) => ({
-          ...tab,
-          active: tab.key === activeAdminTab(pathname),
-        }))}
-      />
-    ) : null;
+    // Only the sections this operator holds a key to (RN-1 Phase 5). The pages
+    // still 404 on a direct URL for anyone else — that is the real boundary.
+    const sections = adminSectionsFor(navRoles?.platform ?? []);
+    tabsNode =
+      sections.length > 0 ? (
+        <SubNavTabs
+          label="Administration sections"
+          linkComponent={Link}
+          tabs={sections.map((section) => ({
+            ...section,
+            active: section.key === activeAdminTab(pathname),
+          }))}
+        />
+      ) : null;
   } else if (competitionMatch !== null) {
     const slug = competitionMatch[1] as string;
     const competition = competitions.find((entry) => entry.slug === slug);
     if (competition !== undefined) {
       seasonSwitcherFor = slug;
-      const year = competition.startsOn?.slice(0, 4);
-      const second = [
-        year !== undefined ? `Season ${year}` : null,
-        competition.location ?? competition.orgName,
-      ]
-        .filter((part): part is string => part !== null && part !== "")
-        .join(" · ");
-      const pill = SEASON_STATUS[competition.status ?? ""];
-      const others = competitions.filter((entry) => entry.slug !== slug);
-      // WHERE YOU ARE: the season (its crest, name, year and place) with the
-      // switch to your other seasons, and its status — the top bar's left.
-      contextNode = (
-        <>
-          <Link href={`/seasons/${slug}`} className="shell-season" data-testid="shell-season">
-            <span className="shell-season-crest" aria-hidden>
-              {crestInitials(competition.name)}
-            </span>
-            <span className="shell-season-text">
-              <strong>{competition.name}</strong>
-              <span>{second}</span>
-            </span>
-          </Link>
-          {others.length > 0 ? (
-            <PopoverMenu
-              label="Switch season"
-              trigger={<IconChevronDown width={16} height={16} />}
-              items={others.map((entry) => ({
-                key: entry.slug,
-                label: `${entry.name} — ${entry.orgName}`,
-                onSelect: () => {
-                  router.push(`/seasons/${entry.slug}`);
-                },
-              }))}
-            />
-          ) : null}
-          {pill !== undefined ? (
-            <span className="shell-season-status">
-              <Pill tone={pill.tone} icon={pill.icon} testId="shell-season-status">
-                {pill.label}
-              </Pill>
-            </span>
-          ) : null}
-        </>
-      );
-      const activeTab = activeCompetitionTab(pathname, slug);
+      const tabs = seasonTabs(slug, competition.seasonRole, {
+        canSettle: competition.canSettle,
+      });
+      const activeTab = activeSeasonTab(pathname, slug, tabs);
       tabsNode = (
         <SubNavTabs
           label="Season sections"
           linkComponent={Link}
-          tabs={competitionTabs(slug, competition.canSettle, competition.canManage ?? true).map(
-            (tab) => ({
-              ...tab,
-              active: tab.key === activeTab,
-            }),
-          )}
+          tabs={tabs.map((tab) => ({ ...tab, active: tab.key === activeTab }))}
         />
       );
     }
@@ -1006,60 +1034,31 @@ export function ProductShell({
       <ShellActionContext.Provider value={actionChannel}>
         <AppShell
           nav={nav}
+          bottomNav={bottomNav}
           navGroups={[
-            ...roleNavGroups(roles, pathname).map((group) => ({
-              key: group.key,
-              label: group.label,
-              items: group.items.map((item) => ({
-                key: item.key,
-                label: item.label,
-                href: item.href,
-                icon: ROLE_ICONS[item.icon],
-                active: item.active === true,
-                ...(item.live === true ? { live: true } : {}),
-              })),
-            })),
             {
               key: "utility",
-              items: [
-                {
-                  key: "inbox",
-                  label: "Notifications",
-                  href: "/inbox",
-                  icon: <IconBell />,
-                  active: pathname.startsWith("/inbox"),
-                },
-                {
-                  key: "account",
-                  label: "Account",
-                  href: "/account",
-                  icon: <IconSettings />,
-                  active: pathname.startsWith("/account"),
-                },
-                // The same door the avatar menu offers, where an operator looks
-                // for it first; rendered on the same `isAdmin` evaluation.
-                ...(isAdmin
-                  ? [
-                      {
-                        key: "admin",
-                        label: "Platform admin",
-                        href: "/admin",
-                        icon: <IconShieldCheck />,
-                        active: pathname.startsWith("/admin"),
-                      },
-                    ]
-                  : []),
-              ],
+              // LAW 1: the rail above is the ONE primary list. This is
+              // services — notifications, the account, help, and an operator's
+              // door — divided from it and never competing with it. The role
+              // groups that used to sit between them are gone: their items are
+              // in the rail itself now, which is also what finally puts them on
+              // the phone, since the bottom bar maps `nav` and never mapped
+              // `navGroups`.
+              items: menu.utility.map(toShellItem),
             },
           ]}
           linkComponent={Link}
-          // The guest header's lockup, tagline included (founder, 2026-09-20:
-          // "the guest page one is final"). The rail used to carry its own
-          // line, "Bid · Build · Win", under a display-face wordmark — a second
-          // brand one click away from the first.
-          wordmark={<BrandWordmark tone="rail" />}
+          // ONE tagline in the sidebar (founder, 2026-09-19): the brand line
+          // "Bid · Build · Win" below; the wordmark carries just the name.
+          wordmark={
+            <span className="public-brand-name">
+              Desi<span>Auction</span>
+            </span>
+          }
           wordmarkHref="/home"
-          glyph={<BrandMark size={38} />}
+          glyph={<BrandMark size={32} />}
+          tagline="Bid · Build · Win"
           {...(title !== null ? { pageTitle: title } : {})}
           {...(titleTestId !== undefined ? { pageTitleAttrs: { "data-testid": titleTestId } } : {})}
           {...(identity.crumbs.length > 0
@@ -1070,42 +1069,25 @@ export function ProductShell({
               ? { subtitle }
               : {})}
           {...(tabsNode !== null ? { tabs: tabsNode } : {})}
-          {...(contextNode !== undefined ? { context: contextNode } : {})}
           {...(pageAction !== null ? { pageAction } : {})}
           railFooter={
-            // The mockups' footer card: who is signed in, and the way out,
-            // one tap each — sign-out used to be two menus deep.
-            <div className="shell-railcard">
-              <Link className="shell-railuser" href="/account">
-                <span className="shell-railuser-avatar">{initials}</span>
-                <span className="shell-railuser-text">
-                  <strong>{personLabel(session)}</strong>
-                  {/* The CONTACT is the identity fact that is always true —
-                      phone or email, one of the two is guaranteed by
-                      `people_reachable_check` — and on shared handsets it says
-                      WHICH account is signed in. */}
-                  {session.name !== null ? (
-                    <span data-private>{personContact(session)}</span>
-                  ) : null}
-                </span>
-              </Link>
-              <button
-                type="button"
-                className="shell-raillogout"
-                onClick={() => {
-                  track("auth.logout");
-                  void logout();
-                }}
-              >
-                <IconLogOut />
-                Log out
-              </button>
-            </div>
+            <Link className="shell-railuser" href="/account">
+              <span className="shell-railuser-avatar">{initials}</span>
+              <span className="shell-railuser-text">
+                <strong>{personLabel(session)}</strong>
+                {/* The second line used to hardcode "Organizer" — a role claim
+                    the shell cannot know and stamped on every member, viewer
+                    and player alike. The CONTACT is the identity fact that is
+                    always true — phone or email, one of the two is guaranteed
+                    by `people_reachable_check` — and on the shared handsets
+                    this product targets it says WHICH account is signed in. */}
+                {session.name !== null ? <span data-private>{personContact(session)}</span> : null}
+              </span>
+            </Link>
           }
           topActions={
             <>
               <InlineSearch
-                variant="bar"
                 handleRef={searchRef}
                 groups={paletteGroups}
                 onNavigate={(href) => {
@@ -1122,6 +1104,28 @@ export function ProductShell({
               />
               {/* Switchers live with the other controls now — one cluster, in the
                 same place, whether you are switching season or organization. */}
+              {seasonSwitcherFor !== null && competitions.length > 1 ? (
+                <span className="shell-desktop-only">
+                  <PopoverMenu
+                    label="Switch season"
+                    trigger={
+                      <>
+                        <span className="shell-org-name">Switch</span>
+                        <IconChevronDown width={16} height={16} />
+                      </>
+                    }
+                    items={competitions
+                      .filter((entry) => entry.slug !== seasonSwitcherFor)
+                      .map((entry) => ({
+                        key: entry.slug,
+                        label: `${entry.name} — ${entry.orgName}`,
+                        onSelect: () => {
+                          router.push(`/seasons/${entry.slug}`);
+                        },
+                      }))}
+                  />
+                </span>
+              ) : null}
               {seasonSwitcherFor === null && orgs.length > 1 ? (
                 <span className="shell-desktop-only">
                   <PopoverMenu
@@ -1172,20 +1176,25 @@ export function ProductShell({
                       label: "Report a problem",
                       onSelect: reportProblem,
                     },
-                    // PX-1 01 §3: "(Admin: + Platform admin.)" — absent, not
-                    // disabled, for everyone else. The surface 404s regardless;
-                    // this only spares admins from typing the URL.
-                    ...(isAdmin
-                      ? [
-                          {
-                            key: "admin",
-                            label: "Platform admin",
-                            onSelect: () => {
-                              router.push("/admin");
-                            },
-                          },
-                        ]
-                      : []),
+                    /*
+                     * PX-1 01 §3: "(Admin: + Platform admin.)" — absent, not
+                     * disabled, for everyone else. The surface 404s regardless;
+                     * this only spares an operator from typing the URL.
+                     *
+                     * The destination comes from the MENU, so a support-only
+                     * operator lands on /admin/reports rather than on /admin,
+                     * which 404s for them. It used to be hardcoded to /admin
+                     * for a door that only `platform.admin` could see at all.
+                     */
+                    ...menu.utility
+                      .filter((item) => item.key === "admin")
+                      .map((item) => ({
+                        key: item.key,
+                        label: item.label,
+                        onSelect: () => {
+                          router.push(item.href);
+                        },
+                      })),
                     {
                       key: "logout",
                       label: "Sign out",
@@ -1235,35 +1244,25 @@ export function ProductShell({
             <div className="shell-drawer-session" data-private>
               {personContact(session)}
             </div>
+            {/*
+                UTILITY ONLY (RN-1 §3.3). The primary menu is the bottom tab
+                bar, which maps the same `nav` as the desktop rail; this is the
+                services half, in the same order as the rail's utility group
+                because it is built from the same list.
+
+                It used to open with every club you BELONG to — a membership
+                list standing in for a menu, on the one device where it was the
+                only menu there was. Organizations is a rail item for the people
+                who run clubs, and nothing for the people who do not.
+            */}
             <ul className="shell-drawer-list">
-              {/* What the bottom tab bar leaves out (`mobile: false`) is carried
-                  here, so no rail destination is unreachable on a phone. */}
-              {nav
-                .filter((item) => item.mobile === false)
-                .map((item) => (
-                  <li key={`rail-${item.key}`}>
-                    <Link href={item.href} className="shell-drawer-link">
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              {orgs.map((org) => (
-                <li key={org.slug}>
-                  <Link href={`/org/${org.slug}`} className="shell-drawer-link">
-                    {org.name}
+              {menu.utility.map((item) => (
+                <li key={item.key}>
+                  <Link href={item.href} className="shell-drawer-link">
+                    {item.label}
                   </Link>
                 </li>
               ))}
-              <li>
-                <Link href="/account" className="shell-drawer-link">
-                  Account
-                </Link>
-              </li>
-              <li>
-                <Link href="/help" className="shell-drawer-link">
-                  Help
-                </Link>
-              </li>
               <li>
                 <button
                   type="button"
@@ -1278,13 +1277,7 @@ export function ProductShell({
                   Report a problem
                 </button>
               </li>
-              {isAdmin ? (
-                <li>
-                  <Link href="/admin" className="shell-drawer-link">
-                    Platform admin
-                  </Link>
-                </li>
-              ) : null}
+
               {/* The theme switch rides here under 720px: the bar has room for the
                 title or a fourth icon, and the title is what people navigate by. */}
               <li className="shell-drawer-row">

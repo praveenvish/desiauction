@@ -22,6 +22,15 @@ export interface SubNavTab {
   attention?: boolean | number;
   /** Test hook, for when a tab IS the navigation affordance a suite drives. */
   testId?: string;
+  /**
+   * Starts a new group — the strip draws a rule before it.
+   *
+   * Groups are not LABELLED here: with administration filtered to the sections
+   * an operator holds, most see three or four, and a heading over a pair of
+   * links is chrome explaining chrome. The order carries the meaning; this only
+   * makes the seam visible.
+   */
+  dividerBefore?: boolean;
 }
 
 export interface SubNavTabsProps {
@@ -35,7 +44,7 @@ export function SubNavTabs({ label, tabs, linkComponent: Link = "a" }: SubNavTab
     <nav aria-label={label} className={styles["tabs"]}>
       <ul className={styles["list"]}>
         {tabs.map((tab) => (
-          <li key={tab.key}>
+          <li key={tab.key} {...(tab.dividerBefore === true ? { "data-group-start": "" } : {})}>
             <Link
               href={tab.href}
               className={[styles["tab"], tab.active === true ? styles["active"] : ""]

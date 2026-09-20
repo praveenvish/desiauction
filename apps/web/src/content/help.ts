@@ -95,50 +95,41 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: "DesiAuction runs the player auction for a tournament: registration, the live auction night, and the money afterwards — with one shared truth on every screen. This tour explains how the product is laid out so you can find the rest.",
       },
-      // This list IS the rail (components/shell/nav.ts RAIL) — seven items since
-      // the 2026-09-19 ruling added Players, Auctions and Reports. Money is not
-      // one: it was withdrawn under DA-18 because the surface behind it was a
-      // placeholder, and this list once went on naming it as a place to work.
-      { kind: "heading", level: 2, text: "The seven places you'll work" },
+      /*
+       * DO NOT LIST THE MENU ITEM BY ITEM HERE. This section used to name "the
+       * four places you'll work" — and before that five, naming a Money page
+       * that had been withdrawn — so the help centre was a second, stale copy
+       * of an array in components/shell/nav.ts, wrong every time the array
+       * moved and read by the people least able to tell.
+       *
+       * Under RN-1 it cannot be a list at all: the menu is built per person
+       * from what they do, so there is no single set of names to print. What
+       * generalises is the RULE, which is also the more useful thing to teach.
+       */
+      { kind: "heading", level: 2, text: "Your menu is yours" },
       {
-        kind: "list",
-        items: [
-          {
-            text: "{0} — your starting point once you sign in: what needs attention, your seasons, and your registrations.",
-            links: [{ text: "Home", href: "/home" }],
-          },
-          {
-            text: "{0} — every recurring competition you run or take part in, and every season under them.",
-            links: [{ text: "Tournaments", href: "/tournaments" }],
-          },
-          {
-            text: "{0} — the organizations you belong to, their members and grants.",
-            links: [{ text: "Organizations", href: "/orgs" }],
-          },
-          {
-            text: "{0} — every player across the seasons you run, with search and filters; one click opens their sheet.",
-            links: [{ text: "Players", href: "/players" }],
-          },
-          {
-            text: "{0} — every auction night you run, conduct, own a team in or can watch, with the right door for your role.",
-            links: [{ text: "Auctions", href: "/auctions" }],
-          },
-          {
-            text: "{0} — registrations, fees and auction spend for each season you run. Money figures appear only for the people who hold the books.",
-            links: [{ text: "Reports", href: "/reports" }],
-          },
-          {
-            text: "{0} — this help centre, always one click away.",
-            links: [{ text: "Help", href: "/help" }],
-          },
+        kind: "paragraph",
+        text: "The menu down the left (along the bottom, on a phone) is built from what you actually do here, so no two people see quite the same one. Run a club and you get your tournaments and organizations; own a team and you get your team and, on the night, the auction room; play and you get your record and a way to find tournaments. Nothing you cannot use is ever offered — if a place is not in your menu, it is not a place you have.",
+      },
+      {
+        kind: "paragraph",
+        text: "If you run seasons you also get three cross-season desks: {0} is everyone across every season you run, {1} is every auction night with the right door for your role, and {2} is registrations, fees and spend per season.",
+        links: [
+          { text: "Players", href: "/players" },
+          { text: "Auctions", href: "/auctions" },
+          { text: "Reports", href: "/reports" },
         ],
       },
       {
-        // /money is a real page and is NOT in the rail, so a reader who is owed
-        // a receipt has to be told where it is. What it shows is exactly the
-        // documents issued to your teams — it computes no balance and no due.
         kind: "paragraph",
-        text: "There's one more page worth knowing: {0} lists every receipt a club has issued to a team you bid for. It isn't in the navigation bar during the beta, so bookmark it or come back here.",
+        text: "{0} is always the first item, and it is the one page that shows everything you have at once — so anything your menu is too short to list is one tap away there. Notifications, your account and this help centre sit together underneath, on every screen.",
+        links: [{ text: "Home", href: "/home" }],
+      },
+      {
+        // /money is a real page and reaches the menu only for people who hold
+        // the books, so a team owner owed a receipt still has to be told.
+        kind: "paragraph",
+        text: "One page worth bookmarking either way: {0} lists every receipt a club has issued to a team you bid for. It joins the menu only for people who hold a club's books, so if you do not, come back here for it.",
         links: [{ text: "Money", href: "/money" }],
       },
       { kind: "heading", level: 2, text: "Roles are grants, not titles" },

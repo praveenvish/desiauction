@@ -9,9 +9,11 @@
  * the directory card, the season hero and the sign-in page could not show a
  * sport without copying them. One set, used by every public surface.
  *
- * Contract, same as `icons.tsx`: `currentColor` only (the package's guardrail
- * test rejects hex and `rgb()`), 24×24 viewBox, decorative by default — a
- * caller that needs it announced passes a `title`.
+ * Contract, same as `icons.tsx`: `currentColor` only — the package's guardrail
+ * test rejects hex literals and rgb functions, and it scans comments too, so
+ * this sentence deliberately names neither in a form it would match. 24×24
+ * viewBox, decorative by default; a caller that needs it announced passes a
+ * `title`.
  */
 import type { ReactNode, SVGProps } from "react";
 
@@ -200,6 +202,14 @@ export type SportIconKey = keyof typeof SPORT_ICONS;
  * grid reads as a broken image.
  */
 export function SportIcon({ sport, ...props }: SportIconProps & { sport: string }) {
-  const Glyph = SPORT_ICONS[sport as SportIconKey] ?? IconSportCricket;
+  /*
+   * `sport` is a plain string from the database, so the lookup can miss — but
+   * casting it to `SportIconKey` told the type-checker it never could, which
+   * made the fallback below look like dead code to lint. The cast belongs on
+   * the RECORD, not the key: widened this way the miss is expressible, and the
+   * `??` that keeps an unknown sport from rendering a blank tile survives.
+   */
+  const icons: Partial<Record<string, (typeof SPORT_ICONS)[SportIconKey]>> = SPORT_ICONS;
+  const Glyph = icons[sport] ?? IconSportCricket;
   return <Glyph {...props} />;
 }

@@ -4,6 +4,90 @@
   gap: var(--space-5);
 }
 
+/* ---------- shared: icon chips ---------- */
+.home-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  color: #ffffff;
+  box-shadow: 0 6px 14px -8px rgb(0 0 0 / 0.45);
+}
+
+.home-ic svg {
+  width: 21px;
+  height: 21px;
+}
+
+.home-ic--sm {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.home-ic--sm svg {
+  width: 16px;
+  height: 16px;
+}
+
+.home-ic--accent {
+  background: linear-gradient(140deg, var(--accent), var(--accent-pressed));
+}
+.home-ic--green {
+  background: linear-gradient(140deg, var(--success-base), var(--success-strong));
+}
+.home-ic--gold {
+  background: linear-gradient(140deg, var(--ceremony-gold), var(--ceremony-gold-deep));
+}
+.home-ic--info {
+  background: linear-gradient(140deg, var(--info-base), var(--info-strong));
+}
+.home-ic--warn {
+  background: linear-gradient(140deg, var(--warning-base), var(--warning-strong));
+}
+/* These two were the only colours in the product with no token behind them —
+   #a25cf0/#7b45df and #2bc0b4/#149a8f — sitting in a block where every sibling
+   resolves from the system. They pass contrast; the problem is that they have
+   no second theme value and no meaning, so a chip that reads correctly on the
+   floodlit shell is a different relationship on the daylight one and no token
+   change can reach them.
+
+   Settlement is money reaching its end state, so it takes the ceremony pair —
+   the same gold the SOLD moment uses, one step deeper. The teal chip is spare
+   capacity with no current caller and takes `info`, which is what it was
+   standing in for. */
+.home-ic--violet {
+  background: linear-gradient(140deg, var(--ceremony-gold), var(--ceremony-gold-deep));
+}
+.home-ic--teal {
+  background: linear-gradient(140deg, var(--info-base), var(--info-strong));
+}
+
+/* ---------- shared: crest ---------- */
+.home-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(140deg, var(--accent), var(--accent-pressed));
+  color: var(--text-on-accent);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-sm-size);
+  letter-spacing: 0.01em;
+}
+
+.home-crest--sm {
+  width: 32px;
+  height: 32px;
+  font-size: var(--text-xs-size);
+}
+
 /* ---------- setup ladder: the five rungs to a first auction ---------- */
 .home-ladder {
   display: flex;
@@ -137,6 +221,884 @@
   }
 }
 
+/* ---------- lifecycle strip: the platform in one row ---------- */
+.home-flow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.home-step {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.home-step:hover {
+  background: var(--surface-sunken);
+}
+
+.home-step:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Chevron connector: the stages are a sequence, so say so. */
+.home-step-sep {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border-top: 2px solid var(--text-muted);
+  border-right: 2px solid var(--text-muted);
+}
+
+/* Stages holding no work read as dimmed steps on the path. */
+.home-step:not(.home-step--on) .home-ic {
+  opacity: 0.4;
+}
+
+/*
+ * In the setup state the strip is a MAP, not a report — nothing has reached any
+ * of these stages yet, so it teaches the four steps that come after the ladder
+ * rather than reporting four zeroes. The counts recede; the names do not, so
+ * the text keeps its contrast and the labelling stays legible.
+ */
+.home-flow--map {
+  background: var(--surface-sunken);
+}
+
+.home-flow--map .home-step-count {
+  opacity: 0.55;
+}
+
+.home-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* The count sits beside its own label — right-aligning it puts the number next
+   to the following stage's icon, where it reads as that stage's number. */
+.home-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.home-step-name {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Real figures now, not descriptive filler — worth reading, so not muted. */
+.home-step-blurb {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-step-count {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-step--on .home-step-count {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+@media (max-width: 1024px) {
+  .home-flow {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--space-2) var(--space-4);
+  }
+
+  .home-step-sep {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .home-flow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ---------- designed empty states ---------- */
+.home-blank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+}
+
+.home-blank-ic {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.home-blank-ic svg {
+  width: 19px;
+  height: 19px;
+}
+
+.home-blank p {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* 16px tall as plain inline text. The box is padded out to the 44px touch rung
+   the product standardised on, and the negative inline margin keeps the visual
+   position unchanged — the target grows, the layout does not move. */
+.home-blank-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  margin: 0 calc(var(--space-2) * -1);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.home-blank-cta:hover {
+  text-decoration: underline;
+}
+
+/* ---------- main two-column body ---------- */
+.home-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/* Panels are suppressed when they have nothing to say, so a column can empty
+   out entirely. When one does, the survivor takes the full width instead of
+   sitting in a 1.45fr slot beside a blank one. */
+.home-main--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.home-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .home-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- panels ---------- */
+.home-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.home-panel--alert {
+  border-color: color-mix(in srgb, var(--warning-base) 45%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--warning-base) 7%, transparent),
+    transparent 60%
+  );
+}
+
+.home-panel--flush {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.home-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.home-head--pad {
+  padding: 0 var(--space-5);
+}
+
+.home-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--warning-base);
+  color: var(--text-on-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.home-more {
+  margin-left: auto;
+  margin-right: calc(var(--space-2) * -1);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.home-more:hover {
+  text-decoration: underline;
+}
+
+/* These two were the only interactive classes on the page missing from the
+   focus-visible group below, so they fell back to the UA's 1px auto outline
+   while everything beside them drew a 2px token ring. */
+.home-more:focus-visible,
+.home-blank-cta:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The scan is capped; say so where the cap bites. */
+.home-scan-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* ---------- lists ---------- */
+.home-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-attn,
+.home-auction,
+.home-event {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.home-attn:hover,
+.home-auction:hover,
+.home-event:hover {
+  background: var(--surface-sunken);
+}
+
+.home-attn:focus-visible,
+.home-auction:focus-visible,
+.home-event:focus-visible,
+.home-money-cell:focus-visible,
+.home-tcell:focus-visible,
+.home-card-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * "Get your card" — the player's own poster, under their own registration.
+ *
+ * Aligned to the row's TEXT rather than its edge (32px crest + the flex gap),
+ * so it reads as belonging to the season above it and not as a new item in the
+ * list. `min-height` is not decoration: this is a standalone tap target on the
+ * one screen a player opens on a phone, and WCAG 2.2 SC 2.5.8 wants 24px before
+ * spacing is counted.
+ */
+.home-own-poster {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-left: calc(32px + var(--space-3) + var(--space-2));
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  /* `--text-accent`, not `--accent`: the accent is a FILL, darkened for text
+     so it clears AA on the raised surface (5.85:1 daylight, 10.4:1
+     floodlight). `--accent-text` does not exist — the only other file that
+     reaches for that name guards it with a fallback. */
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.home-own-poster:hover {
+  background: var(--surface-sunken);
+  text-decoration: underline;
+}
+
+.home-own-poster:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.home-attn-text,
+.home-event-text,
+.home-feed-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* The season/club the event belongs to — the answer to "which one?" that a
+   bare verb row withholds. One line, truncated: it is a pointer, not prose. */
+.home-feed-scope {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-attn-text strong,
+.home-event-text strong,
+.home-feed-text strong {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-attn-text span,
+.home-event-text span,
+.home-feed-text span {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-go {
+  flex: none;
+  color: var(--text-accent);
+  font-size: var(--text-md-size);
+  line-height: 1;
+}
+
+.home-time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-feed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  min-width: 0;
+}
+
+/* ---------- money chart ---------- */
+.home-chart-wrap {
+  position: relative;
+}
+
+.home-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.home-chart-peak {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.home-legend {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-3);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.home-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
+
+.home-dot--accent {
+  background: var(--accent);
+}
+.home-dot--muted {
+  background: var(--text-muted);
+}
+
+.home-money {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.home-money-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  text-decoration: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.home-money-cell:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+/* The same cell with nowhere honest to go: no hover, no pointer, no promise. */
+.home-money-cell--flat:hover {
+  border-color: var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.home-money-label {
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+/* ---------- auctions ---------- */
+.home-auction-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.home-auction-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.home-auction-top strong {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-auction-meta {
+  display: flex;
+  gap: var(--space-3);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.home-auction-meta b {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-chip {
+  flex: none;
+  font-family: var(--font-text);
+  font-size: 9.5px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.07em;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.home-chip--live {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.home-chip--soon {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.home-progress {
+  display: block;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.home-progress i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent), var(--accent-pressed));
+}
+
+/* ---------- events ---------- */
+.home-date {
+  flex: none;
+  width: 44px;
+  text-align: center;
+  padding: var(--space-1) 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.home-date b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--text-lg-size);
+  line-height: 1;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-date span {
+  font-family: var(--font-text);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+/* ---------- table ---------- */
+/*
+ * `overflow-x: auto` here was decoration that could never fire: the table below
+ * is `width: 100%` with `table-layout: fixed`, so it is incapable of exceeding
+ * this wrapper. Fixed layout then handed columns 2/3/4 their pinned widths
+ * (62 + 62 + 78 = 202px) plus padding and the crest, and the season NAME —
+ * the only column anyone reads — was left 0px wide on every phone. It is kept
+ * for the tablet band, where the table is real and can want it.
+ */
+.home-table-wrap {
+  overflow-x: auto;
+}
+
+.home-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* The phone rendering: one card per season, name first and full width. */
+.home-season-cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-season-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-season-card:hover {
+  background: var(--surface-sunken);
+}
+
+.home-season-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.home-season-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.home-season-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.home-season-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding-left: calc(32px + var(--space-3));
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 639px) {
+  .home-table {
+    display: none;
+  }
+
+  .home-season-cards {
+    display: block;
+  }
+}
+
+.home-table th:nth-child(2),
+.home-table td:nth-child(2),
+.home-table th:nth-child(3),
+.home-table td:nth-child(3) {
+  width: 62px;
+}
+
+.home-table th:nth-child(4),
+.home-table td:nth-child(4) {
+  width: 78px;
+}
+
+.home-table th {
+  text-align: left;
+  padding: 0 var(--space-2) var(--space-2);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.home-table th:first-child,
+.home-table td:first-child {
+  padding-left: var(--space-5);
+}
+
+.home-table th:last-child,
+.home-table td:last-child {
+  padding-right: var(--space-5);
+}
+
+.home-table td {
+  padding: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+}
+
+.home-table tbody tr {
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.home-table tbody tr:hover {
+  background: var(--surface-sunken);
+}
+
+.home-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-num {
+  text-align: right;
+}
+
+.home-tcell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  /* 33px measured in the tablet band, where the table is still the rendering
+     and the device is still a touchscreen. */
+  min-height: 44px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.home-tcell-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.home-tcell-text strong {
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-tcell-text span {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+/* ---------- shortcut cards (HomeShortcuts) ---------- */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.home-card-link {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding-right: 44px;
+  text-decoration: none;
+  color: var(--text-primary);
+  min-width: 0;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.home-card-link:hover {
+  transform: translateY(-2px);
+}
+
+.home-card-sub {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.home-shortcut-card {
+  position: relative;
+}
+
+/* Measured 22x22 — the smallest target on the page, and the only one that is
+   pure icon. Padded to the 44px rung; it is absolutely positioned, so growing
+   it costs the card no layout. */
+.home-pin-button {
+  position: absolute;
+  top: var(--space-05);
+  right: var(--space-05);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  color: var(--text-accent);
+  font-size: var(--text-lg-size);
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.home-pin-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-step,
+  .home-card-link {
+    transition: none;
+  }
+
+  .home-card-link:hover {
+    transform: none;
+  }
+}
+
 /* ---------- the live hero ----------------------------------------------------
    A night in progress outranks everything else on this page, so it is not a row
    in a right-hand list: it is the first thing under the header, full width, and
@@ -263,13 +1225,6 @@
   font-size: var(--text-base-size);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
-}
-
-/* The on-block player: their mark, then the name — one line, aligned. */
-.home-live-facts dd.home-live-player {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .home-live-role,
@@ -407,812 +1362,224 @@
   }
 }
 
-/* The next step as the first item of the organizer's "Needs attention" card:
-   a warm inset block rather than a card inside a card. */
-.home-next--embedded {
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--warning-strong) 18%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--warning-subtle);
-  box-shadow: none;
-}
-
-.home-next--embedded.home-next--live {
-  border-color: color-mix(in srgb, var(--live) 40%, transparent);
-  background: var(--danger-subtle);
-}
-
-.home-next--embedded .home-next-title {
-  font-size: var(--text-md-size);
-}
-
-.home-next--embedded .home-next-why {
-  font-size: var(--text-sm-size);
-}
-
-@media (max-width: 1279px) {
-  /* In the narrower left column the actions go under the words. */
-  .home-next--embedded {
-    flex-wrap: wrap;
-  }
-
-  .home-next--embedded .home-next-actions {
-    flex: 1 1 100%;
-    align-items: flex-start;
-  }
-}
-
-/* ---------- club hero ---------- */
-.home-hero-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.home-hero-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
-.home-hero-link:focus-visible {
-  outline: 2px solid var(--ceremony-gold);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-.home-hero-switch {
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ---------- journey row ---------- */
-.home-journey-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  margin-inline-start: var(--space-2);
-  padding: 0 6px;
-  box-sizing: border-box;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  vertical-align: 1px;
-}
-
-/* ---------- columns ---------- */
-.home-col {
+/* ==========================================================================
+   FLAT SECTIONS (launch polish): a heading, hairline rows, whitespace — no box.
+   ========================================================================== */
+.home-flat-head {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-/* ---------- shared rows inside cards ---------- */
-.home-list {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.home-list > li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.home-row-link,
-.home-feed,
-.home-clear,
-.home-blank {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3) 0;
-  color: inherit;
-  text-decoration: none;
-}
-
-.home-list > li:first-child > .home-row-link,
-.home-list > li.home-feed:first-child {
-  padding-top: 0;
-}
-
-.home-list > li:last-child > .home-row-link,
-.home-list > li.home-feed:last-child {
-  padding-bottom: 0;
-}
-
-.home-row-link {
-  border-radius: var(--radius-md);
-  transition: background var(--duration-fast) var(--ease-out);
-}
-
-.home-row-link:hover .home-row-text strong {
-  color: var(--text-accent);
-}
-
-.home-row-link:focus-visible,
-.home-card-link:focus-visible,
-.home-money-cell:focus-visible,
-.home-more:focus-visible,
-.home-view:focus-visible,
-.home-tcell-text a:focus-visible,
-.home-season-card:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.home-row-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.home-row-text strong {
-  overflow: hidden;
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.home-row-text > span {
-  overflow: hidden;
-  font-size: var(--text-xs-size);
-  line-height: 1.45;
-  color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-row-go {
-  flex: none;
-  color: var(--text-muted);
-}
-
-.home-time {
-  flex: none;
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-/* "View all →" in a card header. Padded to a 24px target (SC 2.5.8). */
-.home-more {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 24px;
-  padding: var(--space-1) var(--space-1);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-accent);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.home-more:hover {
-  text-decoration: underline;
-}
-
-/* ---------- needs attention ---------- */
-.home-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 var(--space-2);
-  box-sizing: border-box;
-  border-radius: var(--radius-full);
-  background: var(--danger-subtle);
-  color: var(--danger-strong);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-}
-
-.home-attention > div:last-child {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.home-clear {
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--success-subtle);
-}
-
-.home-clear .home-row-text strong,
-.home-clear .home-row-text > span {
-  white-space: normal;
-}
-
-.home-scan-note {
-  margin: 0;
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-}
-
-.home-scan-note a {
-  color: var(--text-accent);
-  font-weight: var(--font-weight-semibold);
-}
-
-/* ---------- designed empty states ---------- */
-.home-blank {
+  align-items: baseline;
   flex-wrap: wrap;
-  padding: 0;
+  gap: var(--space-2) var(--space-3);
+  padding-bottom: var(--space-3);
 }
 
-.home-blank .home-row-text {
-  flex: 1 1 12rem;
-}
-
-.home-blank .home-row-text strong,
-.home-blank .home-row-text > span {
-  white-space: normal;
-}
-
-.home-blank-cta {
-  flex: none;
-}
-
-/* ---------- crest (monogram) ---------- */
-.home-crest {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(145deg, var(--accent), var(--accent-pressed));
-  color: var(--text-on-accent);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.02em;
-}
-
-/* ---------- top seasons ---------- */
-.home-table-wrap {
-  min-width: 0;
-}
-
-.home-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.home-table th {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.06em;
-  text-align: start;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.home-table td {
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: middle;
-}
-
-.home-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.home-table th:first-child,
-.home-table td:first-child {
-  padding-inline-start: var(--space-5);
-}
-
-.home-table th:last-child,
-.home-table td:last-child {
-  padding-inline-end: var(--space-5);
-}
-
-.home-num {
-  text-align: end;
-  width: 5rem;
-}
-
-.home-table th.home-num {
-  text-align: end;
-}
-
-.home-end {
-  text-align: end;
-  width: 1%;
-}
-
-.home-mono {
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-
-.home-tcell {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.home-tcell-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.home-tcell-text a {
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-  text-decoration: none;
-}
-
-.home-tcell-text a:hover {
-  color: var(--text-accent);
-}
-
-.home-tcell-text span {
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-}
-
-.home-view {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-
-.home-view:hover {
-  border-color: var(--text-muted);
-}
-
-/* The phone rendering: one row per season, name first and full width. */
-.home-season-cards {
-  display: none;
+.home-flat-title {
   margin: 0;
-  padding: 0 var(--space-4) var(--space-2);
-  list-style: none;
-}
-
-.home-season-cards > li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.home-season-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  color: inherit;
-  text-decoration: none;
-}
-
-.home-season-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.home-season-name {
-  font-size: var(--text-sm-size);
+  font-size: var(--text-md-size);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
   color: var(--text-heading);
-  overflow-wrap: anywhere;
 }
 
-.home-season-meta {
-  font-size: var(--text-xs-size);
+.home-flat-meta {
+  font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
 
-@media (max-width: 639px) {
-  .home-table {
-    display: none;
-  }
-
-  .home-season-cards {
-    display: block;
-  }
-}
-
-/* ---------- active auctions ---------- */
-.home-progress {
-  display: block;
-  height: 4px;
-  margin-top: var(--space-1);
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  overflow: hidden;
-}
-
-.home-progress i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-}
-
-/* ---------- continue working ---------- */
-.home-shortcuts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.home-block-title {
+/* Figures as one ruled strip, not a row of tiles. */
+.home-figures {
   margin: 0;
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border-block: 1px solid var(--border-subtle);
 }
 
-.home-shortcut-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.home-shortcut-card:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-}
-
-/* The whole card is the link: its box is stretched over the card, and only the
-   pin button sits above it. */
-.home-card-link {
-  flex: 1;
-  min-width: 0;
+.home-figure {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  color: inherit;
-  text-decoration: none;
+  padding: var(--space-4) var(--space-5) var(--space-4) 0;
 }
 
-.home-card-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+.home-figure + .home-figure {
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border-subtle);
 }
 
-.home-card-link strong {
-  overflow: hidden;
+.home-figure dt {
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-card-sub {
-  overflow: hidden;
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-card-go {
-  flex: none;
-  display: inline-flex;
-  color: var(--text-muted);
-}
-
-.home-pin-button {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--text-accent);
-  cursor: pointer;
-}
-
-.home-pin-button:hover {
-  background: var(--accent-subtle);
-}
-
-.home-pin-button:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-/* The dashed "Create a new tournament" card: a FormDialog trigger. */
-.home-create-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  min-height: 100%;
-  box-sizing: border-box;
-  padding: var(--space-4);
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--radius-xl);
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  text-decoration: none;
-  cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-
-.home-create-card:hover {
-  border-color: var(--accent);
-}
-
-.home-create-card:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.home-create-plus {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
   color: var(--text-secondary);
 }
 
-.home-create-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+.home-figure dd {
+  margin: 0;
 }
 
-.home-create-text strong {
-  font-size: var(--text-sm-size);
+.home-figure-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xl-size);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
   color: var(--text-heading);
 }
 
-.home-create-text span {
-  font-size: var(--text-xs-size);
+.home-figure-sub {
+  font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
 
-/* ---------- owner ---------- */
 .home-owner-links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
+  gap: var(--space-2) var(--space-6);
+  padding-top: var(--space-3);
 }
 
-/* ---------- my registrations ---------- */
-.home-reg {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.home-reg > .home-row-link {
-  flex: 1;
-  min-width: 0;
-}
-
-/* On a phone the card link takes its own line under the row, indented to the
-   text, so the season name keeps the width it needs. */
-@media (max-width: 559px) {
-  .home-reg {
-    flex-wrap: wrap;
-    gap: 0;
-  }
-
-  .home-reg > .home-row-link {
-    flex-basis: 100%;
-  }
-
-  .home-reg > .home-own-poster {
-    margin: 0 0 var(--space-3) calc(40px + var(--space-3));
-  }
-}
-
-.home-own-poster {
-  flex: none;
+.home-owner-links a {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
+  min-height: 44px;
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-accent);
-  text-decoration: none;
-  white-space: nowrap;
 }
 
-.home-own-poster:hover {
-  border-color: var(--accent);
+/* Hairline rows: the list IS the structure. */
+.home-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
 }
 
-.home-own-poster:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+.home-rows > li {
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .home-shortcut-card,
-  .home-shortcut-card:hover {
-    transition: none;
-    transform: none;
-  }
-}
-
-/* ---------- money chart ---------- */
-.home-chart-wrap {
-  position: relative;
-}
-
-.home-chart {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.home-chart-peak {
-  position: absolute;
-  top: 0;
-  right: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-size);
-  color: var(--text-muted);
-}
-
-.home-legend {
-  margin-left: auto;
+.home-row {
   display: flex;
+  align-items: center;
   gap: var(--space-3);
-  font-family: var(--font-text);
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
 }
 
-.home-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-sm);
-  margin-right: var(--space-1);
-  vertical-align: middle;
+.home-row:hover {
+  background: var(--surface-sunken);
 }
 
-.home-dot--accent {
-  background: var(--accent);
-}
-.home-dot--muted {
-  background: var(--text-muted);
-}
-
-.home-money {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
-}
-
-.home-money-cell {
+.home-row-main {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  text-decoration: none;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.home-money-cell:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-raised);
+.home-row-main strong {
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
 }
 
-/* The same cell with nowhere honest to go: no hover, no pointer, no promise. */
-.home-money-cell--flat:hover {
-  border-color: var(--border-subtle);
-  background: var(--surface-sunken);
-}
-
-.home-money-label {
-  font-family: var(--font-text);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-medium);
+.home-row-main span {
+  font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
 
-/* ---------- events ---------- */
-.home-date {
-  flex: none;
-  width: 44px;
-  text-align: center;
-  padding: var(--space-1) 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
+/* ==========================================================================
+   QUIET PREMIUM (launch polish, Phase 4) — the organizer dashboard, flat.
+   Overrides kept together here rather than edited into the rules above, so the
+   earlier reasoning in those rules stays readable next to what replaced it.
+   ========================================================================== */
+
+/* Icon chips: a tinted disc with a coloured glyph, not a gradient tile with a
+   white glyph and a drop shadow — six of those in a list read as buttons. */
+.home-ic {
+  box-shadow: none;
+  color: var(--text-accent);
+  background: var(--accent-subtle);
+}
+.home-ic--accent,
+.home-ic--gold,
+.home-ic--violet {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+.home-ic--green {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+.home-ic--info,
+.home-ic--teal {
+  background: var(--info-subtle);
+  color: var(--info-strong);
+}
+.home-ic--warn {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
 }
 
-.home-date b {
-  display: block;
-  font-family: var(--font-display);
-  font-size: var(--text-lg-size);
-  line-height: 1;
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
+/* The lifecycle is a strip between hairlines, not a floating box. */
+.home-flow,
+.home-flow--map {
+  padding: var(--space-2) 0;
+  border: 0;
+  border-block: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.home-date span {
-  font-family: var(--font-text);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
+/* "Needs attention" says so in its heading and count; a tinted, bordered box
+   around it was a second panel competing with the next-step banner. */
+.home-panel--alert {
+  border-color: var(--border-subtle);
+  background: transparent;
 }
 
-/* The kit's journey link is `height: 100%` plus padding in content-box, so the
-   current step's wash hangs past the card's bottom edge; border-box keeps it in. */
-.home-journey li > * {
-  box-sizing: border-box;
+.home-main {
+  gap: var(--space-10);
+}
+
+.home-col {
+  gap: var(--space-8);
+}
+
+/* Empty states are one quiet line, left-aligned with the section — an empty
+   panel used to take half a screen to say "nothing yet". */
+.home-blank {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
+  text-align: left;
+}
+
+.home-blank-ic {
+  width: 28px;
+  height: 28px;
+  border: 0;
+}
+
+.home-blank-ic svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* The one-time "your menu changed" sentence (RN-1 §3.6). Quiet on purpose:
+   it reports a fact the reader will confirm by looking left, and it is gone
+   the next time they load the page. */
+.home-role-change {
+  border-left: 3px solid var(--accent);
+}
+
+.home-role-change p {
+  margin: 0;
 }

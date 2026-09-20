@@ -81,3 +81,15 @@
   padding: 0 var(--space-1);
   font-weight: var(--font-weight-semibold);
 }
+
+/*
+   A group seam in the strip (RN-1 Phase 5). Administration's sections run
+   platform → trust → commercial, and the order is the grouping; this is the
+   only thing that makes the seam visible, so it stays a hairline rather than a
+   labelled heading over two links.
+*/
+.list > li[data-group-start] {
+  margin-inline-start: var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 1px solid var(--border-subtle);
+}

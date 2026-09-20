@@ -1,4 +1,5 @@
-import { ToastProvider } from "@desiauction/ui";
+import { ToastProvider, PageIntro } from "@desiauction/ui";
+import { SiblingLink } from "../sibling-link";
 import { SportTermsProvider } from "../../../../components/sport-terms";
 import { notFound } from "next/navigation";
 
@@ -34,6 +35,9 @@ export default async function FixturesPage({
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
+          {/* The table is derived from these fixtures and shares their tab
+              (RN-1 "Schedule") — so this is how an organizer reaches it. */}
+          <PageIntro actions={<SiblingLink href={`/seasons/${slug}/standings`} label="Table" />} />
           <SportTermsProvider terms={dashboard.terms}>
             <FixturesPanel
               scoreFields={dashboard.scoreFields}
