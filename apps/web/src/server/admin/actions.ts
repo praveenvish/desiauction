@@ -5,6 +5,7 @@ import type { OutcomeMetrics } from "@desiauction/core";
 import { env } from "../../env";
 import { systemDb } from "../db";
 import { webFinopsDeps } from "../financial-operations/deps";
+import type { PlatformCapability } from "./capabilities";
 import { heldPlatformCapabilities, platformAdminGate } from "./authz";
 import { deskQueue, desksHeld, type DeskItem } from "./desk-queue";
 import {
@@ -184,7 +185,20 @@ export async function adminMessaging(): Promise<MessagingOverview | null> {
   return messagingOverview(systemDb, env as unknown as Record<string, string | undefined>);
 }
 
-/** Nav-only: whether to render the Platform admin door in the avatar menu. */
-export async function adminNavVisible(): Promise<boolean> {
-  return (await platformAdminGate()) !== null;
+/**
+ * Nav-only: which platform capabilities this person actually holds.
+ *
+ * WAS `adminNavVisible()`, a boolean over `platformAdminGate()` — so the door
+ * appeared for `platform.admin` and for nobody else. An operator holding only
+ * `platform:support`, `:moderation`, `:privacy`, `:billing` or `:demo` had no
+ * door ANYWHERE and had to know and type the URL, while the pages behind it
+ * worked perfectly. Every set is a real desk; every desk gets a door
+ * (`operatorDoorHref`), and the page each one opens still gates itself.
+ *
+ * Returns an array, not the Set `heldPlatformCapabilities` gives back: this
+ * crosses the server/client boundary into `ProductShell`, and a Set does not
+ * survive that.
+ */
+export async function platformDoorCapabilities(): Promise<PlatformCapability[]> {
+  return [...(await heldPlatformCapabilities())];
 }

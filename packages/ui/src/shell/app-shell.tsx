@@ -19,24 +19,48 @@ import { BrandGlyph } from "./icons";
 export interface ShellNavItem {
   key: string;
   label: string;
+  /**
+   * What the phone's bottom bar calls this, where the rail's label is too long
+   * for a ~64px column (a team's name, "Find tournaments"). Defaults to
+   * `label`, so the same word appears on both devices unless it cannot.
+   */
+  shortLabel?: string;
   href: string;
   icon?: ReactNode;
   active?: boolean;
   /** Optional count chip (e.g. unread notifications). */
   badge?: number;
-  /** A test hook on the link (the season sections carry `open-teams` and co.). */
-  testId?: string;
   /** Happening now (an auction in progress): a LIVE marker instead of a count. */
   live?: boolean;
   /**
-   * `false`: rail only. The phone's bottom tab bar has room for five, so the
-   * rest ride the app's drawer instead of squeezing every label unreadable.
+   * The scopes under this one item — the two teams behind "My teams".
+   *
+   * Rendered as a nested list in the rail, where there is vertical room, and
+   * collapsed into the parent on the bottom bar, where there is not. The parent
+   * is always a working link to the most urgent child, so this never becomes
+   * the only way to reach them.
    */
-  mobile?: boolean;
+  children?: ShellNavItem[];
+  /**
+   * `false`: desktop rail only (premium-flow's ruling, 2026-09-19, kept).
+   * Organizations and Reports are desk surfaces, and the phone's bar has five
+   * columns to spend. The app decides WHICH items this covers — see
+   * `phoneBar()` — and passes the result as `bottomNav`.
+   */
+  mobile?: false;
 }
 
 export interface AppShellProps {
   nav: ShellNavItem[];
+  /**
+   * What the phone's bottom bar carries, when it is not simply `nav`.
+   *
+   * A vertical rail has room and a five-column bar does not, so the app hands
+   * the already-decided five here rather than this component re-deriving them.
+   * LAW 4 still holds: it is the same menu, minus the desk surfaces a phone
+   * cannot usefully show, and every one of those is still in the drawer.
+   */
+  bottomNav?: ShellNavItem[];
   /** Extra groups rendered under the primary rail, each divided from the last. */
   navGroups?: { key: string; label?: string; items: ShellNavItem[] }[];
   /** Injected link renderer (e.g. next/link). Defaults to <a>. */
@@ -69,12 +93,7 @@ export interface AppShellProps {
    * instead of floating somewhere different on each page.
    */
   pageAction?: ReactNode;
-  /**
-   * Left of the top bar: where you are — the club and season switchers and the
-   * season's status. The page's title is no longer up here; it opens the page.
-   */
-  context?: ReactNode;
-  /** Right side of the top bar: search, theme, bell, user menu. */
+  /** Right side of the top bar: search, theme, bell, switchers, user menu. */
   topActions?: ReactNode;
   /** Pinned to the bottom of the sidebar (upgrade card, signed-in user). */
   railFooter?: ReactNode;
@@ -85,6 +104,7 @@ export interface AppShellProps {
 
 export function AppShell({
   nav,
+  bottomNav,
   navGroups,
   linkComponent: Link = "a",
   wordmark,
@@ -97,7 +117,6 @@ export function AppShell({
   breadcrumb,
   subtitle,
   pageAction,
-  context,
   topActions,
   railFooter,
   tabs,
@@ -136,39 +155,6 @@ export function AppShell({
       </span>
     </Link>
   );
-  /*
-   * WHERE THE TITLE LIVES. Inside a season the top bar says where you are (the
-   * season, its status) and the page opens with its own title — "Teams",
-   * "Auction results". On a surface with no such context (Home, the lists
-   * under the rail) the title IS the context, so it stays in the bar, with
-   * the page's main button beside it.
-   */
-  const titleInBar = context === undefined;
-  const identityBlock = (
-    <div className={styles["identity"]}>
-      {pageTitle !== undefined ? (
-        <div className={styles["identity-title"]}>
-          <h1 className={styles["page-title"]} {...pageTitleAttrs}>
-            {pageTitle}
-          </h1>
-          {titleStatus}
-        </div>
-      ) : null}
-      {/* In the bar there is room for one line under the title: the trail
-          where the surface has ancestors, its lede where it does not. */}
-      {titleInBar && breadcrumb !== undefined ? (
-        <div className={styles["identity-trail"]}>{breadcrumb}</div>
-      ) : subtitle !== undefined ? (
-        <p className={styles["identity-lede"]}>{subtitle}</p>
-      ) : null}
-    </div>
-  );
-  const actionBlock =
-    pageAction !== undefined ? (
-      <div className={styles["page-action"]} data-page-action>
-        {pageAction}
-      </div>
-    ) : null;
   return (
     // The console's own surface: quieter primitives (an ink primary instead of
     // the marketing gold) key on this, so public and live shells are untouched.
@@ -203,14 +189,32 @@ export function AppShell({
           <div className={styles["topbar-inner"]}>
             {/* The brand rides the top bar only on mobile, where the rail is hidden. */}
             <div className={styles["topbar-brand"]}>{brand}</div>
-            {titleInBar ? (
-              <>
-                {identityBlock}
-                {actionBlock}
-              </>
-            ) : (
-              <div className={styles["context"]}>{context}</div>
-            )}
+            {/* Title first, trail under it: the name is what you came to read,
+                and the path is the smaller print that qualifies it. */}
+            <div className={styles["identity"]}>
+              {pageTitle !== undefined ? (
+                <div className={styles["identity-title"]}>
+                  <h1 className={styles["page-title"]} {...pageTitleAttrs}>
+                    {pageTitle}
+                  </h1>
+                  {titleStatus}
+                </div>
+              ) : null}
+              {/* One slot, two possible answers: the trail where the surface
+                  has ancestors, its lede where it does not. */}
+              {breadcrumb !== undefined ? (
+                <div className={styles["identity-trail"]}>{breadcrumb}</div>
+              ) : subtitle !== undefined ? (
+                <p className={styles["identity-lede"]}>{subtitle}</p>
+              ) : null}
+            </div>
+            {/* Under 720px it wraps to its own full-width row rather than
+                competing with the title for a 390px bar. */}
+            {pageAction !== undefined ? (
+              <div className={styles["page-action"]} data-page-action>
+                {pageAction}
+              </div>
+            ) : null}
             <div className={styles["top-actions"]}>{topActions}</div>
           </div>
         </header>
@@ -221,25 +225,6 @@ export function AppShell({
         ) : null}
         {/* Pages own their <main> landmark; this is the skip-link target. */}
         <div id="main-content" className={styles["content"]} tabIndex={-1}>
-          {/* THE PAGE HEAD. Trail, then the page's one <h1> with its status,
-              then what the surface is for — and the page's primary action on
-              the right. It opens the page instead of hiding in the top bar,
-              so every console surface starts the same way. A named region, not
-              a bare div: pages own their <main> and the head sits above it —
-              content outside every landmark fails axe `region` (a <header>
-              here would be a second banner). */}
-          {!titleInBar &&
-          (pageTitle !== undefined || breadcrumb !== undefined || pageAction !== undefined) ? (
-            <section className={styles["page-head"]} data-page-head aria-label="Page heading">
-              {breadcrumb !== undefined ? (
-                <div className={styles["identity-trail"]}>{breadcrumb}</div>
-              ) : null}
-              <div className={styles["page-head-row"]} data-page-head-row>
-                {identityBlock}
-                {actionBlock}
-              </div>
-            </section>
-          ) : null}
           {children}
         </div>
       </div>
@@ -254,21 +239,26 @@ export function AppShell({
           "Sections" was also simply wrong — the section tabs are a separate
           strip (the `tabs` prop, rendered above). */}
       <nav className={styles["bottom-tabs"]} aria-label="Primary">
-        {nav
-          .filter((item) => item.mobile !== false)
-          .map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={[styles["tab"], item.active === true ? styles["tab-active"] : ""]
-                .filter(Boolean)
-                .join(" ")}
-              aria-current={item.active === true ? "page" : undefined}
-            >
-              <span className={styles["tab-icon"]}>{item.icon}</span>
-              <span className={styles["tab-label"]}>{item.label}</span>
-            </Link>
-          ))}
+        {(bottomNav ?? nav).map((item) => (
+          <Link
+            key={item.key}
+            href={item.href}
+            className={[styles["tab"], item.active === true ? styles["tab-active"] : ""]
+              .filter(Boolean)
+              .join(" ")}
+            aria-current={item.active === true ? "page" : undefined}
+          >
+            <span className={styles["tab-icon"]}>
+              {item.icon}
+              {/* The live dot rides the ICON here, not a "Live" pill: the pill
+                  is as wide as the whole column. Same fact, same accent, the
+                  width the bar has. */}
+              {item.live === true ? <span className={styles["tab-live"]} aria-hidden /> : null}
+            </span>
+            <span className={styles["tab-label"]}>{item.shortLabel ?? item.label}</span>
+            {item.live === true ? <span className={styles["sr-only"]}>Live</span> : null}
+          </Link>
+        ))}
       </nav>
     </div>
   );
@@ -308,6 +298,7 @@ export interface NavigationItemProps {
 }
 
 export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationItemProps) {
+  const children = item.children ?? [];
   return (
     <li>
       <Link
@@ -316,7 +307,6 @@ export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationIt
           .filter(Boolean)
           .join(" ")}
         aria-current={item.active === true ? "page" : undefined}
-        data-testid={item.testId}
       >
         <span className={styles["rail-icon"]}>{item.icon}</span>
         <span className={styles["rail-label"]}>{item.label}</span>
@@ -329,6 +319,30 @@ export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationIt
           <span className={styles["rail-badge"]}>{item.badge}</span>
         ) : null}
       </Link>
+      {children.length > 0 ? (
+        <ul className={styles["rail-sublist"]}>
+          {children.map((child) => (
+            <li key={child.key}>
+              <Link
+                href={child.href}
+                className={[
+                  styles["rail-subitem"],
+                  child.active === true ? styles["rail-subitem-active"] : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-current={child.active === true ? "page" : undefined}
+              >
+                <span className={styles["rail-sublabel"]}>{child.label}</span>
+                {child.live === true ? (
+                  <span className={styles["rail-live-dot"]} aria-hidden />
+                ) : null}
+                {child.live === true ? <span className={styles["sr-only"]}>Live</span> : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </li>
   );
 }

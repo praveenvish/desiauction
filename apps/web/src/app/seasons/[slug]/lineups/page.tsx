@@ -13,6 +13,8 @@ import {
   TeamChip,
 } from "@desiauction/ui";
 import Link from "next/link";
+
+import { SiblingLink } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { formatWallDate, formatWallTime } from "../../../../lib/format-date";
@@ -71,6 +73,8 @@ export default async function LineupsPage({
             Tick who took the field. Each player&apos;s profile counts it as a match played.
           </p>
           <div className="st-actions">
+            {/* Registrations shares this tab (RN-1 "Players"). */}
+            <SiblingLink href={`/seasons/${slug}/registrations`} label="Registrations" />
             <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary" size="sm">
               <IconList size={16} aria-hidden />
               Fixtures

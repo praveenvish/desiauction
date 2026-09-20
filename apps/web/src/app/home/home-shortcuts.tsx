@@ -1,17 +1,13 @@
 "use client";
 
-import { IconArrowRight, IconStar, IconStarOutline } from "@desiauction/ui";
+import { Card, SectionHeader, IconStar, IconStarOutline } from "@desiauction/ui";
 import Link from "next/link";
-import { useMemo, useSyncExternalStore, type ReactNode } from "react";
-
-import { monogram } from "../../components/season-hero/season-hero";
+import { useMemo, useSyncExternalStore } from "react";
 
 export interface ShortcutCompetition {
   slug: string;
   name: string;
   orgName: string;
-  /** "19 Sept – 21 Sept 2026 · Kolkata" — whatever the season has. */
-  meta?: string;
 }
 
 const RECENT_KEY = "da:recent-competitions";
@@ -88,15 +84,7 @@ export function recordRecentCompetition(slug: string): void {
  * device-local (localStorage), never sent to the server — pins and recents are
  * a personal lens over data the session already holds, not new backend truth.
  */
-export function HomeShortcuts({
-  competitions,
-  createCard,
-}: {
-  competitions: ShortcutCompetition[];
-  /** The dashed "Create a new tournament" card, beside the recents — offered
-      only to someone who may create one. */
-  createCard?: ReactNode;
-}) {
+export function HomeShortcuts({ competitions }: { competitions: ShortcutCompetition[] }) {
   const recent = useList(RECENT_KEY);
   const pins = useList(PIN_KEY);
 
@@ -122,10 +110,8 @@ export function HomeShortcuts({
   return (
     <>
       {pinned.length > 0 ? (
-        <section className="home-shortcuts" aria-labelledby="home-pinned-title">
-          <h2 id="home-pinned-title" className="home-block-title">
-            Pinned
-          </h2>
+        <>
+          <SectionHeader title="Pinned" />
           <div className="home-grid" data-testid="home-pinned">
             {pinned.map((competition) => (
               <ShortcutCard
@@ -136,13 +122,11 @@ export function HomeShortcuts({
               />
             ))}
           </div>
-        </section>
+        </>
       ) : null}
       {continuing.length > 0 ? (
-        <section className="home-shortcuts" aria-labelledby="home-recent-title">
-          <h2 id="home-recent-title" className="home-block-title">
-            Continue working
-          </h2>
+        <>
+          <SectionHeader title="Continue working" />
           <div className="home-grid" data-testid="home-recent">
             {continuing.map((competition) => (
               <ShortcutCard
@@ -152,9 +136,8 @@ export function HomeShortcuts({
                 onTogglePin={togglePin}
               />
             ))}
-            {createCard}
           </div>
-        </section>
+        </>
       ) : null}
     </>
   );
@@ -170,17 +153,11 @@ function ShortcutCard({
   onTogglePin: (slug: string) => void;
 }) {
   return (
-    <div className="home-shortcut-card">
-      <span className="home-crest" aria-hidden>
-        {monogram(competition.name)}
-      </span>
+    <Card className="home-shortcut-card">
       <Link href={`/seasons/${competition.slug}`} className="home-card-link">
         <strong>{competition.name}</strong>
-        <span className="home-card-sub">{competition.meta ?? competition.orgName}</span>
+        <span className="home-card-sub">{competition.orgName}</span>
       </Link>
-      <span className="home-card-go" aria-hidden>
-        <IconArrowRight size={16} />
-      </span>
       <button
         type="button"
         className="home-pin-button"
@@ -192,6 +169,6 @@ function ShortcutCard({
       >
         {pinned ? <IconStar size={18} /> : <IconStarOutline size={18} />}
       </button>
-    </div>
+    </Card>
   );
 }

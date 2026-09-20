@@ -1,9 +1,10 @@
-import { ToastProvider } from "@desiauction/ui";
+import { PageIntro, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { registrationDashboard } from "../../../../server/competition/actions";
 import { RegistrationDashboardPanel } from "./dashboard-panel";
 import { ShareRegistration } from "./share-registration";
+import { SiblingLink } from "../sibling-link";
 import "../../seasons.css";
 import "./registrations.css";
 
@@ -56,6 +57,9 @@ export default async function RegistrationsPage({
     <ToastProvider>
       <main className="registrations-dash rd-page">
         <div className="dash-stack rd-stack">
+          {/* Lineups shares this tab (RN-1 "Players"): who applied, and who
+              actually took the field, are one question with two answers. */}
+          <PageIntro actions={<SiblingLink href={`/seasons/${slug}/lineups`} label="Lineups" />} />
           <RegistrationDashboardPanel
             share={<ShareRegistration slug={slug} open={dashboard.registrationOpen} />}
             canReopen={
