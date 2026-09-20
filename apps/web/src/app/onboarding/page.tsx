@@ -41,16 +41,18 @@ export default async function OnboardingPage({
   }
   return (
     /*
-     * NOT `data-surface="console"` any more.
+     * NOT a console surface, deliberately.
      *
-     * The console primary became "fill with --accent-pressed, label with
-     * --surface-raised" (2026-09-20). This panel deliberately re-points the
-     * accent ramp at the marketing gold so the last click of the entry funnel
-     * matches the first one (login's "Send code"), and those two rules met
-     * here as WHITE ON BRIGHT GOLD — 2.5:1, an AA failure axe catches on this
-     * exact screen. The marketing primary reads the same re-pointed ramp and
-     * pairs it with the ink label the gold was measured against (9.8:1), which
-     * is both legible and the button this journey already showed once.
+     * This panel re-points the accent ramp at the marketing gold so the last
+     * click of the entry journey matches login's "Send code" (see
+     * --entry-accent-pressed in onboarding.css). The console primary pairs
+     * --accent-pressed with a WHITE label, and against the re-pointed ramp that
+     * is white on #CE9A2E — 2.53:1. The marketing primary reads the same ramp
+     * with the ink label the gold was measured against: 7.8:1.
+     *
+     * Two sessions found this independently and fixed it the same way. Worth
+     * keeping the reason it survived a green axe scan: the Continue button is
+     * DISABLED until a name is typed, and axe skips disabled controls.
      */
     <main className="onboarding">
       <Link className="onboarding-mark" href="/">
