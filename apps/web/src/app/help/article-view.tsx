@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { IconArrowLeft } from "@desiauction/ui";
 
+import { PageBody, PageHero } from "../../components/public/public-kit";
 import { Prose, tocOf, type Block } from "../../content/blocks";
 
 /**
@@ -24,16 +25,20 @@ export function ArticleView({
   const toc = tocOf(blocks);
   return (
     <main className="content-page">
-      <p className="article-meta no-print">
-        <Link href={backHref} className="prose-link">
-          {/* The two page files already hide the glyph; this shared component
-              did not, so a screen reader read the arrow character aloud. */}
-          <IconArrowLeft size={16} className="icon-lead" /> {backLabel}
-        </Link>
-      </p>
-      <h1>{title}</h1>
-      {meta !== undefined ? <p className="article-meta">{meta}</p> : null}
-      <div className="article-layout">
+      <PageHero
+        size="compact"
+        eyebrow={
+          <Link href={backHref} className="article-back no-print">
+            {/* The two page files already hide the glyph; this shared component
+                did not, so a screen reader read the arrow character aloud. */}
+            <IconArrowLeft size={16} className="icon-lead" /> {backLabel}
+          </Link>
+        }
+        title={title}
+        {...(meta === undefined ? {} : { lede: meta })}
+      />
+      <PageBody>
+        <div className="article-layout">
         <article>
           <Prose blocks={blocks} />
         </article>
@@ -48,8 +53,9 @@ export function ArticleView({
               ))}
             </ul>
           </nav>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      </PageBody>
     </main>
   );
 }

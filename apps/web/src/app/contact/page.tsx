@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { env } from "../../env";
 import { SUPPORT } from "../../content/support";
+import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -17,9 +18,7 @@ export const metadata: Metadata = {
  */
 export default function ContactPage() {
   return (
-    <main className="content-page content-narrow">
-      <h1>Contact us</h1>
-      <p className="content-lead">{SUPPORT.intro}</p>
+    <ContentPage eyebrow="Talk to us" title="Contact us" lede={SUPPORT.intro}>
 
       <div className="support-channels">
         {SUPPORT.channels.map((channel) => (
@@ -46,6 +45,6 @@ export default function ContactPage() {
         </Link>
         .
       </p>
-    </main>
+    </ContentPage>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { env } from "../../env";
+import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -13,13 +14,15 @@ export const metadata: Metadata = {
  * organizer's own), only the platform's own ground rules. Public, no auth. */
 export default function RulesGuidelinesPage() {
   return (
-    <main className="content-page content-narrow">
-      <h1>Rules &amp; guidelines</h1>
-      <p className="content-lead">
-        DesiAuction doesn't set your tournament's auction rules — purse, base price, team counts and
-        bidding format are yours to decide. These are the platform's own ground rules, the same for
-        every tournament.
-      </p>
+    <ContentPage
+      eyebrow="Ground rules"
+      title={
+        <>
+          Rules &amp; <em>guidelines</em>
+        </>
+      }
+      lede="DesiAuction doesn't set your tournament's auction rules — purse, base price, team counts and bidding format are yours to decide. These are the platform's own ground rules, the same for every tournament."
+    >
       <div className="prose">
         <h2 className="prose-h2">Every bid is final once accepted</h2>
         <p className="prose-p">
@@ -44,6 +47,6 @@ export default function RulesGuidelinesPage() {
           room, for players, families and fans.
         </p>
       </div>
-    </main>
+    </ContentPage>
   );
 }

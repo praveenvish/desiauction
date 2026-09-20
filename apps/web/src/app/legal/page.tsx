@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { env } from "../../env";
 import { LEGAL_DOCUMENTS } from "../../content/legal";
+import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -14,12 +15,15 @@ export const metadata: Metadata = {
 /** PX-10 P-04 — the Legal Centre index. Public, no auth, printable documents. */
 export default function LegalIndexPage() {
   return (
-    <main className="content-page">
-      <h1>Legal centre</h1>
-      <p className="content-lead">
-        The documents that govern using DesiAuction. Each is a beta draft under legal review — the
-        current version and date are on every page.
-      </p>
+    <ContentPage
+      eyebrow="Legal"
+      title={
+        <>
+          Legal <em>centre</em>
+        </>
+      }
+      lede="The documents that govern using DesiAuction. Each is a beta draft under legal review — the current version and date are on every page."
+    >
       {/* The eight card titles were h3 directly under the page h1 — a skipped
           level on the index of the documents a reader reaches when something
           has gone wrong. `heading-order` is best-practice rather than wcag2aa,
@@ -37,6 +41,6 @@ export default function LegalIndexPage() {
           </li>
         ))}
       </ul>
-    </main>
+    </ContentPage>
   );
 }

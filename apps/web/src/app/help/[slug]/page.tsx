@@ -5,6 +5,7 @@ import { IconArrowLeft } from "@desiauction/ui";
 
 import { env } from "../../../env";
 import { FAQS, HELP_ARTICLES, helpArticle, helpCategory } from "../../../content/help";
+import { PageBody, PageHero } from "../../../components/public/public-kit";
 import { ArticleView } from "../article-view";
 import "../../content.css";
 
@@ -42,21 +43,30 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
 
   if (slug === "faq") {
     return (
-      <main className="content-page content-narrow">
-        <p className="article-meta no-print">
-          <Link href="/help" className="prose-link">
-            <IconArrowLeft size={16} className="icon-lead" /> All help
-          </Link>
-        </p>
-        <h1>Frequently asked questions</h1>
-        <div className="content-section">
+      <main className="content-page">
+        <PageHero
+          size="compact"
+          eyebrow={
+            <Link href="/help" className="article-back no-print">
+              <IconArrowLeft size={16} className="icon-lead" /> All help
+            </Link>
+          }
+          title={
+            <>
+              Frequently asked <em>questions</em>
+            </>
+          }
+        />
+        <PageBody>
+          <div className="content-section">
           {FAQS.map((faq) => (
             <details key={faq.question} className="faq-item">
               <summary>{faq.question}</summary>
               <p>{faq.answer}</p>
             </details>
-          ))}
-        </div>
+            ))}
+          </div>
+        </PageBody>
       </main>
     );
   }

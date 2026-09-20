@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { searchContent } from "../../content/search";
+import { PageBody, PageHero, SportMontage } from "../../components/public/public-kit";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -39,10 +40,14 @@ export default async function SearchPage({
   const results = showAll ? matches : matches.slice(0, PAGE_SIZE);
   return (
     <main className="content-page">
-      <h1>Search</h1>
-      <p className="content-lead">Find help articles, legal documents, pricing and support.</p>
-
-      <form className="content-searchbar no-print" action="/search" method="get" role="search">
+      <PageHero
+        size="compact"
+        eyebrow="Find anything"
+        title="Search"
+        lede="Find help articles, legal documents, pricing and support."
+        art={<SportMontage />}
+        actions={
+          <form className="content-searchbar no-print" action="/search" method="get" role="search">
         <label className="visually-hidden-heading" htmlFor="search-q">
           Search
         </label>
@@ -56,10 +61,13 @@ export default async function SearchPage({
           defaultValue={query}
           placeholder="Search the site…"
         />
-        <button type="submit">Search</button>
-      </form>
+            <button type="submit">Search</button>
+          </form>
+        }
+      />
 
-      {query.length < 2 ? (
+      <PageBody>
+        {query.length < 2 ? (
         <p className="article-meta">Type at least two characters to search.</p>
       ) : matches.length === 0 ? (
         <p className="article-meta" data-testid="search-empty">
@@ -100,7 +108,8 @@ export default async function SearchPage({
             </p>
           ) : null}
         </>
-      )}
+        )}
+      </PageBody>
     </main>
   );
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IconArrowLeft } from "@desiauction/ui";
 
+import { PageBody, PageHero } from "../../../components/public/public-kit";
 import { env } from "../../../env";
 import { Prose } from "../../../content/blocks";
 import { LEGAL_DOCUMENTS, legalDocument } from "../../../content/legal";
@@ -40,17 +41,19 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
     notFound();
   }
   return (
-    <main className="content-page content-narrow">
-      <p className="article-meta no-print">
-        <Link href="/legal" className="prose-link">
-          <IconArrowLeft size={16} className="icon-lead" /> All legal documents
-        </Link>
-      </p>
-      <h1>{doc.title}</h1>
-      <p className="article-meta">
-        Effective {doc.effective} · version {doc.versions[0]?.version}
-      </p>
-      <Prose blocks={doc.blocks} />
+    <main className="content-page">
+      <PageHero
+        size="compact"
+        eyebrow={
+          <Link href="/legal" className="article-back no-print">
+            <IconArrowLeft size={16} className="icon-lead" /> All legal documents
+          </Link>
+        }
+        title={doc.title}
+        lede={`Effective ${doc.effective} · version ${doc.versions[0]?.version ?? ""}`}
+      />
+      <PageBody>
+        <Prose blocks={doc.blocks} />
 
       <section className="content-section" aria-labelledby="version-history">
         <h2 id="version-history" className="prose-h2">
@@ -67,6 +70,7 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
           ))}
         </dl>
       </section>
+      </PageBody>
     </main>
   );
 }
