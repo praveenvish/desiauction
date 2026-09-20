@@ -248,8 +248,8 @@
   min-width: 0;
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface-sunken) 70%, transparent);
-  color: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-sunken) 55%, transparent);
+  color: color-mix(in srgb, var(--accent) 88%, transparent);
   transform: skewX(-8deg);
 }
 

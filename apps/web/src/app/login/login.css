@@ -112,18 +112,75 @@
 
 .login-scene-marks li {
   display: flex;
-  align-items: center;
+  align-items: start;
   gap: var(--space-3);
 }
 
-.login-scene-marks li::before {
-  content: "";
+.login-scene-marks li > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.login-scene-marks b {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.login-mark-detail {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* The icon tile, the same one the public kit's cards use. */
+.login-mark-icon {
   flex: none;
-  width: 7px;
-  height: 7px;
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+/* The sports strip and the handwritten tag beside it. */
+.login-scene-art {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.login-scene-art .pk-script {
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+}
+
+/* What is true about the platform, in four words each. Never a count we cannot
+   evidence — the sports figure counts the sport packs themselves. */
+.login-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  border-top: 1px solid var(--border-subtle);
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.login-facts li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.login-facts li::before {
+  content: "";
+  inline-size: 6px;
+  block-size: 6px;
   border-radius: var(--radius-full);
   background: var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 /* The form column. */

@@ -40,9 +40,19 @@ export default async function OnboardingPage({
     redirect(destination);
   }
   return (
-    // The first signed-in screen: it takes the console's quiet primitives
-    // (an ink primary, not the marketing gold) — see data-surface in AppShell.
-    <main className="onboarding" data-surface="console">
+    /*
+     * NOT `data-surface="console"` any more.
+     *
+     * The console primary became "fill with --accent-pressed, label with
+     * --surface-raised" (2026-09-20). This panel deliberately re-points the
+     * accent ramp at the marketing gold so the last click of the entry funnel
+     * matches the first one (login's "Send code"), and those two rules met
+     * here as WHITE ON BRIGHT GOLD — 2.5:1, an AA failure axe catches on this
+     * exact screen. The marketing primary reads the same re-pointed ramp and
+     * pairs it with the ink label the gold was measured against (9.8:1), which
+     * is both legible and the button this journey already showed once.
+     */
+    <main className="onboarding">
       <Link className="onboarding-mark" href="/">
         {/* The DA mark every other screen carries — this was the one place
             still drawing the old bar-chart glyph, on a new person's first
