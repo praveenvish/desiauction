@@ -95,40 +95,32 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: "DesiAuction runs the player auction for a tournament: registration, the live auction night, and the money afterwards — with one shared truth on every screen. This tour explains how the product is laid out so you can find the rest.",
       },
-      // There are FOUR rail items, not five (components/shell/nav.ts RAIL). The
-      // fifth — Money — was withdrawn under DA-18 because the surface behind it
-      // was a placeholder, and this list went on naming it as a place to work,
-      // with a description ("what you owe") that the /money page never had a
-      // query for. Its receipts half is true and now lives under Home, which is
-      // where a signed-in reader actually starts.
-      { kind: "heading", level: 2, text: "The four places you'll work" },
+      /*
+       * DO NOT LIST THE MENU ITEM BY ITEM HERE. This section used to name "the
+       * four places you'll work" — and before that five, naming a Money page
+       * that had been withdrawn — so the help centre was a second, stale copy
+       * of an array in components/shell/nav.ts, wrong every time the array
+       * moved and read by the people least able to tell.
+       *
+       * Under RN-1 it cannot be a list at all: the menu is built per person
+       * from what they do, so there is no single set of names to print. What
+       * generalises is the RULE, which is also the more useful thing to teach.
+       */
+      { kind: "heading", level: 2, text: "Your menu is yours" },
       {
-        kind: "list",
-        items: [
-          {
-            text: "{0} — your starting point once you sign in: what needs attention, your seasons, and your registrations.",
-            links: [{ text: "Home", href: "/home" }],
-          },
-          {
-            text: "{0} — every recurring competition you run or take part in, and every season under them.",
-            links: [{ text: "Tournaments", href: "/tournaments" }],
-          },
-          {
-            text: "{0} — the organizations you belong to, their members and grants.",
-            links: [{ text: "Organizations", href: "/orgs" }],
-          },
-          {
-            text: "{0} — this help centre, always one click away.",
-            links: [{ text: "Help", href: "/help" }],
-          },
-        ],
+        kind: "paragraph",
+        text: "The menu down the left (along the bottom, on a phone) is built from what you actually do here, so no two people see quite the same one. Run a club and you get your tournaments and organizations; own a team and you get your team and, on the night, the auction room; play and you get your record and a way to find tournaments. Nothing you cannot use is ever offered — if a place is not in your menu, it is not a place you have.",
       },
       {
-        // /money is a real page and is NOT in the rail, so a reader who is owed
-        // a receipt has to be told where it is. What it shows is exactly the
-        // documents issued to your teams — it computes no balance and no due.
         kind: "paragraph",
-        text: "There's one more page worth knowing: {0} lists every receipt a club has issued to a team you bid for. It isn't in the navigation bar during the beta, so bookmark it or come back here.",
+        text: "{0} is always the first item, and it is the one page that shows everything you have at once — so anything your menu is too short to list is one tap away there. Notifications, your account and this help centre sit together underneath, on every screen.",
+        links: [{ text: "Home", href: "/home" }],
+      },
+      {
+        // /money is a real page and reaches the menu only for people who hold
+        // the books, so a team owner owed a receipt still has to be told.
+        kind: "paragraph",
+        text: "One page worth bookmarking either way: {0} lists every receipt a club has issued to a team you bid for. It joins the menu only for people who hold a club's books, so if you do not, come back here for it.",
         links: [{ text: "Money", href: "/money" }],
       },
       { kind: "heading", level: 2, text: "Roles are grants, not titles" },

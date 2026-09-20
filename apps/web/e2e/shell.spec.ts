@@ -56,21 +56,44 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   // heading, not /home's.
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Shell Tester");
 
-  // Rail navigation: four items. Money was pulled from the rail (DA-18) — a
-  // primary nav item is a promise, and /money is still a "being built during
-  // the beta" placeholder, so it stays reachable only from the season's own
-  // Money tab, not the top-level rail. Help is last — it lands on the Public
-  // shell (no rail), so the loop ends there and returns via URL.
+  /*
+   * THE MENU IS BUILT FROM WHAT THIS PERSON DOES (RN-1).
+   *
+   * This used to assert a fixed four — Tournaments, Organizations, Home, Help
+   * — for everybody, which is what it was: one rail handed to every account
+   * whatever they held. A brand-new account runs no club and plays in nothing,
+   * so it is offered neither index: both are empty for them, and LAW 3 says a
+   * destination that would come up empty is ABSENT. What they get instead is
+   * the way in — Home, which asks whether they want to run a tournament or
+   * play in one, and the public directory.
+   */
   const nav = rail(page).first();
-  for (const [label, url] of [
-    ["Tournaments", /\/tournaments/],
-    ["Organizations", /\/orgs/],
-    ["Home", /\/home/],
-    ["Help", /\/help/],
-  ] as const) {
-    await nav.getByRole("link", { name: label }).click();
-    await expect(page).toHaveURL(url);
-  }
+  /*
+   * EXACTLY TWO LISTS (LAW 1), scoped by list rather than by landmark: the nav
+   * landmark also holds the brand lockup and the signed-in footer, so asking it
+   * for every link is asking the wrong question.
+   *
+   * List one is the primary menu — WORK. List two is utility — SERVICES. There
+   * used to be a third between them, the role groups, which is how the sidebar
+   * came to show nine links in three idioms with no stated hierarchy.
+   */
+  await expect(nav.getByRole("list")).toHaveCount(2);
+  await expect(nav.getByRole("list").first().getByRole("link")).toHaveText([
+    "Home",
+    "Find tournaments",
+  ]);
+  await expect(nav.getByRole("link", { name: "Tournaments", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Organizations" })).toHaveCount(0);
+
+  // Help left the rail under RN-1 — that is what freed the slots beside Home.
+  await expect(nav.getByRole("list").nth(1).getByRole("link")).toHaveText([
+    "Notifications",
+    "Account",
+    "Help",
+  ]);
+
+  await nav.getByRole("link", { name: "Find tournaments" }).click();
+  await expect(page).toHaveURL(/\/c/);
   await page.goto("/home");
 
   // User menu → Account; signed-in phone is shown in the menu header, grouped
@@ -86,7 +109,15 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
 test("search navigates; the identity bar names every surface consistently", async ({ page }) => {
   await otpLogin(page, PHONE_PALETTE);
 
-  // Search: ⌘K opens the top bar's field — keyboard-first, no modal.
+  /*
+   * Search: ⌘K opens the top bar's field — keyboard-first, no modal.
+   *
+   * This account holds nothing yet, so "Organizations" is NOT in its rail
+   * (see the test above). It is still in the palette, deliberately: LAW 3
+   * governs what the product offers unprompted, and a search result answers a
+   * question somebody asked. Creating a club is precisely what a new account
+   * is here to do, so "organiz" has to find the place that does it.
+   */
   await page.keyboard.press("ControlOrMeta+k");
   await page.getByRole("combobox").fill("organiz");
   await page.keyboard.press("Enter");
@@ -122,15 +153,18 @@ test("search navigates; the identity bar names every surface consistently", asyn
 
   // A section below it: the section becomes the title, the season joins the trail.
   const tabs = page.getByRole("navigation", { name: "Season sections" });
-  await tabs.getByRole("link", { name: "Registrations" }).click();
+  /*
+   * "Players", not "Registrations": RN-1 Phase 4 took the organizer's strip
+   * from nine tabs to seven by joining the surfaces that answer one question —
+   * Players is Registrations AND Lineups — and the page announces the same
+   * name the tab does, rather than contradicting it one line apart.
+   */
+  await tabs.getByRole("link", { name: "Players" }).click();
   await expect(page).toHaveURL(/\/registrations$/);
-  await expect(heading).toHaveText("Registrations");
+  await expect(heading).toHaveText("Players");
   await expect(breadcrumb).toContainText(`Shell Cup ${STAMP}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
-  await expect(tabs.getByRole("link", { name: "Registrations" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(tabs.getByRole("link", { name: "Players" })).toHaveAttribute("aria-current", "page");
 
   // /home now shows the competition and pins work (device-local).
   await page.goto("/home");
@@ -175,9 +209,52 @@ test("mobile chrome: bottom tabs navigate and the drawer opens", async ({ browse
   const page = await context.newPage();
   try {
     await otpLogin(page, `85${STAMP}`);
+    /*
+     * LAW 4: the bar is the SAME menu as the desktop rail — same items, same
+     * order — so a brand-new account gets Home and Find tournaments here too.
+     * It used to map only the fixed four, and never the role items, so a team
+     * owner on a phone could not reach their team, their plan or the auction
+     * room from navigation at all.
+     */
     const tabs = rail(page).last();
-    await tabs.getByRole("link", { name: "Tournaments" }).click();
-    await expect(page).toHaveURL(/\/tournaments/);
+    await expect(tabs.getByRole("link")).toHaveText(["Home", "Find"]);
+    await tabs.getByRole("link", { name: "Find" }).click();
+    await expect(page).toHaveURL(/\/c/);
+    await page.goto("/home");
+
+    /*
+     * NOTHING CLIPS AT 320px — the narrowest phone the product supports, and
+     * the check the bar's CSS comment promises. `BAR_LABEL_MAX` in
+     * navigation.test.ts bounds the label at eleven characters by arithmetic;
+     * only this can fail for the right reason, because only this renders the
+     * real font into the real cell. The five-tab case steps down to 10px via
+     * `.bottom-tabs:has(> :nth-child(5))`.
+     */
+    await page.setViewportSize({ width: 320, height: 640 });
+    const clipped = await tabs.evaluate((bar) =>
+      [...bar.querySelectorAll<HTMLElement>('[class*="tab-label"]')]
+        .filter((label) => label.scrollWidth > label.clientWidth + 0.5)
+        .map((label) => label.textContent ?? ""),
+    );
+    expect(clipped, "a bottom-tab label is cut off at 320px").toEqual([]);
+
+    /*
+     * THUMB-SIZED, at the narrowest width. The bar is the whole menu on a
+     * phone, and this product is used one-handed on a shared handset in a
+     * noisy hall on auction night. 44px is the rung the product standardised
+     * on; the bar also carries `env(safe-area-inset-bottom)` so the last row
+     * is not under the home indicator.
+     */
+    const tabLinks = await tabs.getByRole("link").all();
+    expect(tabLinks.length).toBeGreaterThan(0);
+    for (const link of tabLinks) {
+      const box = await link.boundingBox();
+      expect(box, "a bottom tab has no box").not.toBeNull();
+      expect(
+        box?.height ?? 0,
+        `"${await link.textContent()}" is under the 44px rung`,
+      ).toBeGreaterThanOrEqual(44);
+    }
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
     await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Account" }).click();
@@ -205,14 +282,35 @@ test("public shell wraps anonymous pages; console routes stay gated", async ({ p
   }
 });
 
-test("shell accessibility: /home and /help scan clean", async ({ page }) => {
-  await otpLogin(page, `83${STAMP}`);
-  // Let the route content replace the loading skeleton before scanning.
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const homeScan = await new AxeBuilder({ page }).analyze();
-  expect(homeScan.violations, JSON.stringify(homeScan.violations, null, 2)).toEqual([]);
-  await page.goto("/help");
-  await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeVisible();
-  const helpScan = await new AxeBuilder({ page }).analyze();
-  expect(helpScan.violations, JSON.stringify(helpScan.violations, null, 2)).toEqual([]);
-});
+/**
+ * BOTH THEMES (RN-1 Phase 6).
+ *
+ * This scanned the default theme only, so the console's floodlight surface —
+ * a different set of colours on every token — had never been scanned at all.
+ * Contrast is the whole category axe is best at and the one that a theme swap
+ * is most likely to break, which makes "we scan for a11y" and "we scan the
+ * product" two different claims.
+ *
+ * The theme is replayed from localStorage before first paint (THEME_BOOTSTRAP
+ * in the root layout), so setting the key and reloading is how a returning
+ * visitor actually arrives in it.
+ */
+for (const theme of ["daylight", "floodlight"] as const) {
+  test(`shell accessibility: /home and /help scan clean · ${theme}`, async ({ page }) => {
+    await otpLogin(page, `8${theme === "daylight" ? "3" : "1"}${STAMP}`);
+    await page.evaluate((value) => {
+      window.localStorage.setItem("da-theme", value);
+    }, theme);
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+
+    // Let the route content replace the loading skeleton before scanning.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const homeScan = await new AxeBuilder({ page }).analyze();
+    expect(homeScan.violations, JSON.stringify(homeScan.violations, null, 2)).toEqual([]);
+    await page.goto("/help");
+    await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeVisible();
+    const helpScan = await new AxeBuilder({ page }).analyze();
+    expect(helpScan.violations, JSON.stringify(helpScan.violations, null, 2)).toEqual([]);
+  });
+}

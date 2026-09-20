@@ -70,6 +70,10 @@ export interface ConductedSeason {
   competitionName: string;
   /** The season's auction, if one has been created (null before that). */
   auctionStatus: string | null;
+  /** The season's own lifecycle, so the queue can say what is still missing. */
+  competitionStatus: string;
+  /** Local wall-clock "YYYY-MM-DD…", or null. The queue orders by it. */
+  startsOn: string | null;
 }
 
 const MANAGING_SETS = new Set(["org:owner", "org:staff"]);
@@ -81,6 +85,8 @@ async function conductedSeasons(competitionIds: string[]): Promise<ConductedSeas
       competitionSlug: competitions.slug,
       competitionName: competitions.name,
       auctionStatus: auctions.status,
+      competitionStatus: competitions.status,
+      startsOn: competitions.startsOn,
     })
     .from(competitions)
     .leftJoin(

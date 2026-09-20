@@ -13,7 +13,13 @@ import {
 import { formatDateTime } from "../../../../../lib/format-date";
 import { personContact } from "../../../../../lib/person-label";
 import { GavelButton, type GavelHandle } from "./gavel-button";
-import type { CockpitView, OwnerAcceptance } from "../../../../../server/auction/conduct-actions";
+import type { CockpitView } from "../../../../../server/auction/conduct-actions";
+// From its OWN module, not re-exported through the "use server" file beside it:
+// `export type { X }` in a "use server" module is erased before Turbopack reads
+// the directive's export list, so dev builds fail with "Export X doesn't exist
+// in target module" while `tsc` stays perfectly happy. Dev-only, and it takes
+// the whole server down rather than one page.
+import type { OwnerAcceptance } from "../../../../../server/auction/owner-acceptances";
 import {
   grantPaddleAction,
   inviteOwnerAction,

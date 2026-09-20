@@ -19,6 +19,12 @@ import { BrandGlyph } from "./icons";
 export interface ShellNavItem {
   key: string;
   label: string;
+  /**
+   * What the phone's bottom bar calls this, where the rail's label is too long
+   * for a ~64px column (a team's name, "Find tournaments"). Defaults to
+   * `label`, so the same word appears on both devices unless it cannot.
+   */
+  shortLabel?: string;
   href: string;
   icon?: ReactNode;
   active?: boolean;
@@ -26,6 +32,15 @@ export interface ShellNavItem {
   badge?: number;
   /** Happening now (an auction in progress): a LIVE marker instead of a count. */
   live?: boolean;
+  /**
+   * The scopes under this one item — the two teams behind "My teams".
+   *
+   * Rendered as a nested list in the rail, where there is vertical room, and
+   * collapsed into the parent on the bottom bar, where there is not. The parent
+   * is always a working link to the most urgent child, so this never becomes
+   * the only way to reach them.
+   */
+  children?: ShellNavItem[];
 }
 
 export interface AppShellProps {
@@ -216,8 +231,15 @@ export function AppShell({
               .join(" ")}
             aria-current={item.active === true ? "page" : undefined}
           >
-            <span className={styles["tab-icon"]}>{item.icon}</span>
-            <span className={styles["tab-label"]}>{item.label}</span>
+            <span className={styles["tab-icon"]}>
+              {item.icon}
+              {/* The live dot rides the ICON here, not a "Live" pill: the pill
+                  is as wide as the whole column. Same fact, same accent, the
+                  width the bar has. */}
+              {item.live === true ? <span className={styles["tab-live"]} aria-hidden /> : null}
+            </span>
+            <span className={styles["tab-label"]}>{item.shortLabel ?? item.label}</span>
+            {item.live === true ? <span className={styles["sr-only"]}>Live</span> : null}
           </Link>
         ))}
       </nav>
@@ -259,6 +281,7 @@ export interface NavigationItemProps {
 }
 
 export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationItemProps) {
+  const children = item.children ?? [];
   return (
     <li>
       <Link
@@ -279,6 +302,30 @@ export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationIt
           <span className={styles["rail-badge"]}>{item.badge}</span>
         ) : null}
       </Link>
+      {children.length > 0 ? (
+        <ul className={styles["rail-sublist"]}>
+          {children.map((child) => (
+            <li key={child.key}>
+              <Link
+                href={child.href}
+                className={[
+                  styles["rail-subitem"],
+                  child.active === true ? styles["rail-subitem-active"] : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-current={child.active === true ? "page" : undefined}
+              >
+                <span className={styles["rail-sublabel"]}>{child.label}</span>
+                {child.live === true ? (
+                  <span className={styles["rail-live-dot"]} aria-hidden />
+                ) : null}
+                {child.live === true ? <span className={styles["sr-only"]}>Live</span> : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </li>
   );
 }

@@ -1572,3 +1572,14 @@
   width: 15px;
   height: 15px;
 }
+
+/* The one-time "your menu changed" sentence (RN-1 §3.6). Quiet on purpose:
+   it reports a fact the reader will confirm by looking left, and it is gone
+   the next time they load the page. */
+.home-role-change {
+  border-left: 3px solid var(--accent);
+}
+
+.home-role-change p {
+  margin: 0;
+}

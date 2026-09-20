@@ -321,6 +321,60 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     await expect(page.getByTestId("live-status")).toHaveText("completed", { timeout: 20_000 });
   }
 
+  /* ------------------------------------------------------------------------
+   * RN-1 §7 — GATE THE DATA, NOT THE BUTTON.
+   *
+   * The state this asserts against is the expensive part, and the auction above
+   * has just built it: three accepted team owners, each a viewer-level member
+   * of the host club (that is what `acceptOwnerJoin` does), on a settled season.
+   *
+   * So the victims of a leak here are not passers-by. They are RIVAL BIDDERS,
+   * and a rival's remaining purse is a competitive-integrity failure before it
+   * is a privacy one.
+   *
+   * ASSERTED AGAINST THE SERVED PAYLOAD, NEVER THE DOM. `teamsWorkspace` OMITS
+   * the gated keys rather than nulling them, exactly so nothing can be read
+   * back out of the RSC stream — and `TeamsPanel` is a client component handed
+   * the whole view, so every key it is given is serialized into the HTML and is
+   * greppable here. CSS hiding would prove nothing about either.
+   * `page.request` carries the context's cookies, so this is that owner's own
+   * response.
+   *
+   * MONEY KEYS, NOT PHONE NUMBERS. The first draft of this checked that an
+   * owner is served no squad phone — and passed against a fixture whose two
+   * players are never sold, so there were no squad rows to leak in the first
+   * place. A negative asserted against data that does not exist is theatre.
+   * The purse is on every team card whenever money sight is on, so it is
+   * present for the organizer below and absent for the owners above by the gate
+   * alone. That is the difference this can actually prove.
+   * --------------------------------------------------------------------- */
+  /*
+   * The money-gated keys, spelled exactly as `TeamCard` declares them. Two
+   * earlier drafts of this guessed the names, and both passed the owner side
+   * while failing the control — which is precisely the failure a control is
+   * for: a negative assertion against a string that is never emitted for
+   * ANYBODY proves nothing at all.
+   */
+  const MONEY_KEYS = ["purseTotal", "usedPct", "topBuyName"];
+  for (const [index, { page }] of bidders.entries()) {
+    const served = await page.request.get(`/seasons/${slug}/teams`);
+    expect(served.ok(), `owner ${String(index)} could not load the teams workspace`).toBe(true);
+    const body = await served.text();
+    for (const key of MONEY_KEYS) {
+      expect(body, `owner ${String(index)} was served the money key ${key}`).not.toContain(key);
+    }
+  }
+
+  /*
+   * The control, and it is the whole point: the organizer IS served those keys
+   * from the same route. Without this, every assertion above would pass just as
+   * happily against a page that had stopped rendering entirely.
+   */
+  const organizerBody = await (await organizer.request.get(`/seasons/${slug}/teams`)).text();
+  for (const key of MONEY_KEYS) {
+    expect(organizerBody, `the organizer should be served ${key}`).toContain(key);
+  }
+
   for (const { ctx } of bidders) {
     await ctx.close();
   }

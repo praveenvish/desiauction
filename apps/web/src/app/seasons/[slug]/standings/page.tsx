@@ -1,4 +1,6 @@
 import { Badge, Card, EmptyState, PageIntro } from "@desiauction/ui";
+
+import { SiblingLink } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { standingsView } from "../../../../server/competition/fixture-actions";
@@ -29,7 +31,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <PageIntro />
+        <PageIntro actions={<SiblingLink href={`/seasons/${slug}/fixtures`} label="Fixtures" />} />
         <Card>
           <div className="competition-title-row">
             <h2>Table</h2>

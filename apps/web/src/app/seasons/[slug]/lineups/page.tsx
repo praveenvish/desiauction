@@ -1,4 +1,6 @@
 import { PageIntro } from "@desiauction/ui";
+
+import { SiblingLink } from "../sibling-link";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -45,7 +47,10 @@ export default async function LineupsPage({
   const { fixtures, selected, sides, announce } = view;
   return (
     <main className="lineups">
-      <PageIntro subtitle="Tick who took the field. Each player's profile counts it as a match played." />
+      <PageIntro
+        subtitle="Tick who took the field. Each player's profile counts it as a match played."
+        actions={<SiblingLink href={`/seasons/${slug}/registrations`} label="Registrations" />}
+      />
       {fixtures.length === 0 ? (
         <section className="lineups-empty">
           <h2>No matches yet</h2>

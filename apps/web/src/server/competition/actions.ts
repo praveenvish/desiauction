@@ -122,7 +122,7 @@ import {
 } from "./import-mappings";
 import { notifyDecision } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
-import { teamsWorkspace, type TeamsWorkspace } from "./team-workspace";
+import { teamsWorkspace, workspaceSightFor, type TeamsWorkspace } from "./team-workspace";
 import {
   addPlayerByPhone,
   exportRegistrationsCsv,
@@ -469,12 +469,14 @@ export async function teamsWorkspaceView(slug: string): Promise<TeamsWorkspaceVi
       canCompetition(db, session.personId, scope, "auction.conduct"),
       canSettlement(db, session.personId, competition.orgId, "settlement.view"),
     ]);
-    // The same two answers the season overview gives, so one season cannot
-    // report its money two ways: running it, or keeping its books.
-    const canSeeMoney = canManage || canSettle;
-    // Squad names and phone numbers are registration data wherever they are
-    // rendered; /registrations is gated on `registration.review`, so is this.
-    const canSeeRoster = canManage || canReview;
+    // RN-1 §7: the rule is a pure function so the whole matrix can be asserted
+    // without a browser — see `workspaceSightFor` and its test.
+    const { money: canSeeMoney, roster: canSeeRoster } = workspaceSightFor({
+      canManage,
+      canSettle,
+      canReview,
+      canConduct,
+    });
     const workspace = await teamsWorkspace(db, competition, {
       money: canSeeMoney,
       roster: canSeeRoster,

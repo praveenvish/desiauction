@@ -3,13 +3,10 @@ import { existsSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  ADMIN_TABS,
-  RAIL,
+  adminSectionsFor,
   activeAdminTab,
-  activeCompetitionTab,
   activeOrgMoneyTab,
   activeRailKey,
-  competitionTabs,
   liveExit,
   orgMoneyTabs,
   pageIdentity,
@@ -48,15 +45,14 @@ describe("shellKind", () => {
   });
 });
 
-describe("rail", () => {
-  it("has exactly four items, forever", () => {
-    // Four since DA-18 retired the /money placeholder from the rail. A primary
-    // nav item is a promise; that one led to "being built during the beta".
-    expect(RAIL).toHaveLength(4);
-    expect(RAIL.map((item) => item.key)).toEqual(["home", "tournaments", "orgs", "help"]);
-  });
-
-  it("maps paths to the owning rail item", () => {
+/**
+ * The fixed `RAIL` array is gone (RN-1): the menu is composed per person by
+ * `navigationFor`, and navigation.test.ts is the ruling on what it contains.
+ * `activeRailKey` survives for a DIFFERENT job — it tells the identity bar
+ * which surface a path belongs to, which is "where am I" (LAW 2), not a menu.
+ */
+describe("path ownership, for the identity bar's title", () => {
+  it("maps paths to the owning surface", () => {
     expect(activeRailKey("/home")).toBe("home");
     expect(activeRailKey("/tournaments")).toBe("tournaments");
     // A season is an edition OF a tournament: working inside one must not leave
@@ -68,93 +64,6 @@ describe("rail", () => {
     expect(activeRailKey("/help")).toBe("help");
     expect(activeRailKey("/account")).toBeNull();
     expect(activeRailKey("/inbox")).toBeNull();
-  });
-});
-
-describe("competition tabs", () => {
-  it("builds the eight organizer tabs and resolves the active one", () => {
-    const tabs = competitionTabs("mpl");
-    expect(tabs.map((tab) => tab.key)).toEqual([
-      "overview",
-      "teams",
-      "registrations",
-      "fixtures",
-      // Who played each match, beside the matches.
-      "lineups",
-      // The table sits beside the fixtures it is derived from.
-      "standings",
-      "auction",
-      // FR-1: what players and owners said, at the end of the season's story.
-      "reviews",
-    ]);
-    expect(activeCompetitionTab("/seasons/mpl", "mpl")).toBe("overview");
-    expect(activeCompetitionTab("/seasons/mpl/teams", "mpl")).toBe("teams");
-    expect(activeCompetitionTab("/seasons/mpl/registrations", "mpl")).toBe("registrations");
-    expect(activeCompetitionTab("/seasons/mpl/fixtures/calendar", "mpl")).toBe("fixtures");
-    expect(activeCompetitionTab("/seasons/mpl/lineups", "mpl")).toBe("lineups");
-    expect(activeCompetitionTab("/seasons/mpl/standings", "mpl")).toBe("standings");
-    expect(activeCompetitionTab("/seasons/mpl/reviews", "mpl")).toBe("reviews");
-    expect(activeCompetitionTab("/seasons/mpl/auction/ledger", "mpl")).toBe("auction");
-    // Readiness lives with the auction preparation context.
-    expect(activeCompetitionTab("/seasons/mpl/readiness", "mpl")).toBe("auction");
-    // Posters and the public register form are reached from elsewhere and are
-    // not tabs. They used to fall through to "overview", so the strip
-    // underlined Overview over a page that was not the overview.
-    expect(activeCompetitionTab("/seasons/mpl/posters", "mpl")).toBe("");
-    expect(activeCompetitionTab("/seasons/mpl/register", "mpl")).toBe("");
-  });
-
-  it("a member who does not manage the club is not offered the roster tabs", () => {
-    const keys = competitionTabs("mpl", false, false).map((tab) => tab.key);
-    expect(keys).not.toContain("registrations");
-    expect(keys).not.toContain("lineups");
-    expect(keys).toContain("fixtures");
-    expect(keys).toContain("standings");
-  });
-
-  // PX-7: Money is absent without settlement.view — never rendered-then-disabled.
-  it("hides Money from anyone without a settlement grant", () => {
-    expect(competitionTabs("mpl").map((tab) => tab.key)).not.toContain("money");
-    expect(competitionTabs("mpl", false).map((tab) => tab.key)).not.toContain("money");
-  });
-
-  it("appends Money last for a settlement grant holder", () => {
-    const tabs = competitionTabs("mpl", true);
-    expect(tabs.map((tab) => tab.key)).toEqual([
-      "overview",
-      "teams",
-      "registrations",
-      "fixtures",
-      "lineups",
-      "standings",
-      "auction",
-      "reviews",
-      "money",
-    ]);
-    expect(tabs.at(-1)?.href).toBe("/seasons/mpl/money");
-  });
-
-  it("keeps the money surfaces on the Money tab", () => {
-    expect(activeCompetitionTab("/seasons/mpl/money", "mpl")).toBe("money");
-    expect(activeCompetitionTab("/seasons/mpl/money/case/01ABC", "mpl")).toBe("money");
-  });
-
-  it("labels deep sections for the breadcrumb", () => {
-    expect(sectionLabel("/seasons/mpl")).toBeNull();
-    expect(sectionLabel("/seasons/mpl/teams")).toBe("Teams");
-    expect(sectionLabel("/seasons/mpl/readiness")).toBe("Readiness");
-    expect(sectionLabel("/seasons/mpl/registrations")).toBe("Registrations");
-    expect(sectionLabel("/seasons/mpl/fixtures/match-day")).toBe("Match day");
-    expect(sectionLabel("/seasons/mpl/auction/ledger")).toBe("Ledger");
-    // PX-7: the case review is its own place, never just "Money".
-    expect(sectionLabel("/seasons/mpl/money")).toBe("Money");
-    expect(sectionLabel("/seasons/mpl/money/case/01ABC")).toBe("Case review");
-    expect(sectionLabel("/org/demo-club/settlement")).toBe("Settlement");
-    // PX-8: the finance segments are their own places, never just "Money".
-    expect(sectionLabel("/org/demo-club/money")).toBe("Money");
-    expect(sectionLabel("/org/demo-club/money/deliveries")).toBe("Deliveries");
-    expect(sectionLabel("/org/demo-club/money/reconciliation")).toBe("Reconciliation");
-    expect(sectionLabel("/org/demo-club/money/documents/01ABC")).toBe("Document");
   });
 });
 
@@ -307,19 +216,29 @@ describe("the admin tab strip agrees with the routes on disk", () => {
     expect(routes).toContain("/admin/messaging");
   });
 
-  it("gives every admin route a tab", () => {
+  // Every capability, so the catalogue is complete regardless of who holds what.
+  const ALL = adminSectionsFor([
+    "platform.admin",
+    "platform.pass",
+    "platform.demo",
+    "platform.privacy",
+    "platform.support",
+    "platform.moderate",
+  ]);
+
+  it("gives every admin route a section", () => {
     for (const route of routes) {
       expect(
-        ADMIN_TABS.some((tab) => tab.href === route),
-        `${route} ships but has no tab in ADMIN_TABS`,
+        ALL.some((section) => section.href === route),
+        `${route} ships but has no section in ADMIN_SECTIONS`,
       ).toBe(true);
     }
   });
 
-  it("lights the tab you are actually on", () => {
+  it("lights the section you are actually on", () => {
     for (const route of routes) {
-      const tab = ADMIN_TABS.find((entry) => entry.href === route);
-      expect(activeAdminTab(route), `${route} lights the wrong tab`).toBe(tab?.key);
+      const section = ALL.find((entry) => entry.href === route);
+      expect(activeAdminTab(route), `${route} lights the wrong section`).toBe(section?.key);
     }
   });
 
