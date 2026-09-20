@@ -143,12 +143,20 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
         ) ?? null,
     });
 
-  // Roles that do not reach OrganizerHome still deserve the banner, so it is
-  // rendered here for them — the organizer's own copy sits above its ladder,
-  // where it can defer to the ladder on a brand-new club.
-  const standaloneStep = sections.has("organizer")
-    ? null
-    : nextStepFor({ managedLive: null, attention: [] });
+  /*
+   * Roles that do not reach OrganizerHome still deserve the banner, so it is
+   * rendered here for them — the organizer's own copy sits above its ladder,
+   * where it can defer to the ladder on a brand-new club.
+   *
+   * Except a newcomer: `NewcomerHome` IS their next step, full-bleed. Rendering
+   * both put two identical "Create your club" buttons on one page, carrying the
+   * same test hook — which is how the e2e suite found it, and how a reader
+   * would have met the same question asked twice in a row.
+   */
+  const standaloneStep =
+    sections.has("organizer") || sections.has("newcomer")
+      ? null
+      : nextStepFor({ managedLive: null, attention: [] });
 
   return (
     <>

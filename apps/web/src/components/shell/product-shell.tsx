@@ -214,6 +214,29 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
   admin: <IconShieldCheck />,
 };
 
+/**
+ * Reachable by anyone signed in, whether or not it is in their menu.
+ *
+ * Every one of these is a place a person with no roles at all may legitimately
+ * want: `/orgs` is where a club is created, and the directory is where a
+ * tournament is found. They are search answers, not offers — see the note in
+ * the palette below.
+ */
+const UNIVERSAL_DESTINATIONS: { key: string; label: string; href: string; keywords: string }[] = [
+  {
+    key: "go-orgs",
+    label: "Organizations",
+    href: "/orgs",
+    keywords: "organization org club create start academy",
+  },
+  {
+    key: "go-directory",
+    label: "Browse public tournaments",
+    href: "/c",
+    keywords: "directory discover register public tournament find",
+  },
+];
+
 /** nav.ts NavItem → the shell's presentational item. */
 function toShellItem(item: NavItem): ShellNavItem {
   return {
@@ -436,17 +459,31 @@ export function ProductShell({
       {
         label: "Go to",
         /*
-         * The person's OWN menu, not a static list. It used to be the fixed
-         * four-item `RAIL` plus Account, Notifications and the directory — so
-         * ⌘K offered a player "Tournaments" and "Organizations", both of which
-         * are empty for them, and never offered a team owner their own team
-         * (LAW 3). Rail first, then utility, in the menu's own order.
+         * The person's own menu FIRST, then the handful of places anyone
+         * signed in may legitimately go.
+         *
+         * It used to be the fixed four-item `RAIL` plus Account, Notifications
+         * and the directory, so ⌘K never offered a team owner their own team.
+         * Building it from the menu fixed that and broke something else: a
+         * brand-new account typing "organiz" found nothing at all, though
+         * creating a club is exactly what they are there to do.
+         *
+         * LAW 3 GOVERNS WHAT THE PRODUCT OFFERS UNPROMPTED. A rail item is an
+         * offer and its slots are scarce, so it must be earned. A search result
+         * answers a question somebody asked, and refusing to answer is not
+         * restraint — it is a dead end. The two lists differ on purpose.
          */
-        items: [...menu.rail, ...menu.utility].map((item) => ({
-          key: item.key,
-          label: item.label,
-          href: item.href,
-        })),
+        items: [
+          ...[...menu.rail, ...menu.utility].map((item) => ({
+            key: item.key,
+            label: item.label,
+            href: item.href,
+          })),
+          ...UNIVERSAL_DESTINATIONS.filter(
+            (destination) =>
+              ![...menu.rail, ...menu.utility].some((item) => item.href === destination.href),
+          ),
+        ],
       },
     ];
     // PX-4 organizer search: inside a competition, its sections are first-class

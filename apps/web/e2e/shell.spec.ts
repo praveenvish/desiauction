@@ -56,21 +56,44 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   // heading, not /home's.
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Shell Tester");
 
-  // Rail navigation: four items. Money was pulled from the rail (DA-18) — a
-  // primary nav item is a promise, and /money is still a "being built during
-  // the beta" placeholder, so it stays reachable only from the season's own
-  // Money tab, not the top-level rail. Help is last — it lands on the Public
-  // shell (no rail), so the loop ends there and returns via URL.
+  /*
+   * THE MENU IS BUILT FROM WHAT THIS PERSON DOES (RN-1).
+   *
+   * This used to assert a fixed four — Tournaments, Organizations, Home, Help
+   * — for everybody, which is what it was: one rail handed to every account
+   * whatever they held. A brand-new account runs no club and plays in nothing,
+   * so it is offered neither index: both are empty for them, and LAW 3 says a
+   * destination that would come up empty is ABSENT. What they get instead is
+   * the way in — Home, which asks whether they want to run a tournament or
+   * play in one, and the public directory.
+   */
   const nav = rail(page).first();
-  for (const [label, url] of [
-    ["Tournaments", /\/tournaments/],
-    ["Organizations", /\/orgs/],
-    ["Home", /\/home/],
-    ["Help", /\/help/],
-  ] as const) {
-    await nav.getByRole("link", { name: label }).click();
-    await expect(page).toHaveURL(url);
-  }
+  /*
+   * EXACTLY TWO LISTS (LAW 1), scoped by list rather than by landmark: the nav
+   * landmark also holds the brand lockup and the signed-in footer, so asking it
+   * for every link is asking the wrong question.
+   *
+   * List one is the primary menu — WORK. List two is utility — SERVICES. There
+   * used to be a third between them, the role groups, which is how the sidebar
+   * came to show nine links in three idioms with no stated hierarchy.
+   */
+  await expect(nav.getByRole("list")).toHaveCount(2);
+  await expect(nav.getByRole("list").first().getByRole("link")).toHaveText([
+    "Home",
+    "Find tournaments",
+  ]);
+  await expect(nav.getByRole("link", { name: "Tournaments", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Organizations" })).toHaveCount(0);
+
+  // Help left the rail under RN-1 — that is what freed the slots beside Home.
+  await expect(nav.getByRole("list").nth(1).getByRole("link")).toHaveText([
+    "Notifications",
+    "Account",
+    "Help",
+  ]);
+
+  await nav.getByRole("link", { name: "Find tournaments" }).click();
+  await expect(page).toHaveURL(/\/c/);
   await page.goto("/home");
 
   // User menu → Account; signed-in phone is shown in the menu header, grouped
@@ -86,7 +109,15 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
 test("search navigates; the identity bar names every surface consistently", async ({ page }) => {
   await otpLogin(page, PHONE_PALETTE);
 
-  // Search: ⌘K opens the top bar's field — keyboard-first, no modal.
+  /*
+   * Search: ⌘K opens the top bar's field — keyboard-first, no modal.
+   *
+   * This account holds nothing yet, so "Organizations" is NOT in its rail
+   * (see the test above). It is still in the palette, deliberately: LAW 3
+   * governs what the product offers unprompted, and a search result answers a
+   * question somebody asked. Creating a club is precisely what a new account
+   * is here to do, so "organiz" has to find the place that does it.
+   */
   await page.keyboard.press("ControlOrMeta+k");
   await page.getByRole("combobox").fill("organiz");
   await page.keyboard.press("Enter");
@@ -175,9 +206,18 @@ test("mobile chrome: bottom tabs navigate and the drawer opens", async ({ browse
   const page = await context.newPage();
   try {
     await otpLogin(page, `85${STAMP}`);
+    /*
+     * LAW 4: the bar is the SAME menu as the desktop rail — same items, same
+     * order — so a brand-new account gets Home and Find tournaments here too.
+     * It used to map only the fixed four, and never the role items, so a team
+     * owner on a phone could not reach their team, their plan or the auction
+     * room from navigation at all.
+     */
     const tabs = rail(page).last();
-    await tabs.getByRole("link", { name: "Tournaments" }).click();
-    await expect(page).toHaveURL(/\/tournaments/);
+    await expect(tabs.getByRole("link")).toHaveText(["Home", "Find"]);
+    await tabs.getByRole("link", { name: "Find" }).click();
+    await expect(page).toHaveURL(/\/c/);
+    await page.goto("/home");
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
     await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Account" }).click();
