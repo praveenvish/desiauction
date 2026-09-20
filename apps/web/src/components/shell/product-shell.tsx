@@ -42,7 +42,7 @@ import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
 import { BrandMark } from "./brand";
 import {
-  ADMIN_TABS,
+  adminSectionsFor,
   PUBLIC_DESTINATIONS,
   activeAdminTab,
   activeOrgMoneyTab,
@@ -457,7 +457,8 @@ export function ProductShell({
    */
   const menu = useMemo(() => navigationFor({ roles: navRoles, pathname }), [navRoles, pathname]);
   /** An operator holds a door — any platform capability, not just admin. */
-  const isAdmin = menu.utility.some((item) => item.key === "admin");
+  const adminDoor = menu.utility.find((item) => item.key === "admin")?.href;
+  const isAdmin = adminDoor !== undefined;
 
   const paletteGroups: PaletteGroup[] = useMemo(() => {
     const groups: PaletteGroup[] = [
@@ -677,13 +678,17 @@ export function ProductShell({
     // where it can query the system pool behind the gate; shipping every org
     // and person into every admin's client bundle to filter them here would
     // leak the platform's directory into the browser to save a click.
-    if (isAdmin) {
+    const adminSections = adminSectionsFor(navRoles?.platform ?? []);
+    if (adminSections.length > 0) {
       groups.push({
         label: "Administration",
-        items: ADMIN_TABS.map((tab) => ({
-          key: `admin-${tab.key}`,
-          label: tab.key === "overview" ? "Platform admin" : `Platform ${tab.label.toLowerCase()}`,
-          href: tab.href,
+        items: adminSections.map((section) => ({
+          key: `admin-${section.key}`,
+          label:
+            section.key === "overview"
+              ? "Platform admin"
+              : `Platform ${section.label.toLowerCase()}`,
+          href: section.href,
           keywords: "admin platform staff governance support observe",
         })),
       });
@@ -700,7 +705,7 @@ export function ProductShell({
       })),
     });
     return groups;
-  }, [competitions, orgs, pathname, isAdmin, menu]);
+  }, [competitions, orgs, pathname, navRoles, menu]);
 
   if (kind === "bare") {
     return <>{children}</>;
@@ -886,7 +891,13 @@ export function ProductShell({
 
   // Identity: one derivation for every console route (nav.ts), overridden only
   // where the name is page data the shell cannot hold.
-  const identity = pageIdentity(pathname, { competitions, orgs, isAdmin });
+  const identity = pageIdentity(pathname, {
+    competitions,
+    orgs,
+    isAdmin,
+    // Their own door, so the trail never points at a page that 404s for them.
+    ...(adminDoor !== undefined ? { adminHome: adminDoor } : {}),
+  });
   const title = titleOverride === null ? identity.title : titleOverride.title;
   const titleTestId = titleOverride?.testId;
   const subtitle = titleOverride?.subtitle ?? identity.subtitle;
@@ -900,16 +911,20 @@ export function ProductShell({
   if (pathname.startsWith("/admin")) {
     // Rendered on `isAdmin` alone: for anyone else the page underneath is a
     // 404, so chrome would frame nothing.
-    tabsNode = isAdmin ? (
-      <SubNavTabs
-        label="Administration sections"
-        linkComponent={Link}
-        tabs={ADMIN_TABS.map((tab) => ({
-          ...tab,
-          active: tab.key === activeAdminTab(pathname),
-        }))}
-      />
-    ) : null;
+    // Only the sections this operator holds a key to (RN-1 Phase 5). The pages
+    // still 404 on a direct URL for anyone else — that is the real boundary.
+    const sections = adminSectionsFor(navRoles?.platform ?? []);
+    tabsNode =
+      sections.length > 0 ? (
+        <SubNavTabs
+          label="Administration sections"
+          linkComponent={Link}
+          tabs={sections.map((section) => ({
+            ...section,
+            active: section.key === activeAdminTab(pathname),
+          }))}
+        />
+      ) : null;
   } else if (competitionMatch !== null) {
     const slug = competitionMatch[1] as string;
     const competition = competitions.find((entry) => entry.slug === slug);

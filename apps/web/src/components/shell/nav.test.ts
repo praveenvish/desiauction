@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  ADMIN_TABS,
+  adminSectionsFor,
   activeAdminTab,
   activeOrgMoneyTab,
   activeRailKey,
@@ -216,19 +216,29 @@ describe("the admin tab strip agrees with the routes on disk", () => {
     expect(routes).toContain("/admin/messaging");
   });
 
-  it("gives every admin route a tab", () => {
+  // Every capability, so the catalogue is complete regardless of who holds what.
+  const ALL = adminSectionsFor([
+    "platform.admin",
+    "platform.pass",
+    "platform.demo",
+    "platform.privacy",
+    "platform.support",
+    "platform.moderate",
+  ]);
+
+  it("gives every admin route a section", () => {
     for (const route of routes) {
       expect(
-        ADMIN_TABS.some((tab) => tab.href === route),
-        `${route} ships but has no tab in ADMIN_TABS`,
+        ALL.some((section) => section.href === route),
+        `${route} ships but has no section in ADMIN_SECTIONS`,
       ).toBe(true);
     }
   });
 
-  it("lights the tab you are actually on", () => {
+  it("lights the section you are actually on", () => {
     for (const route of routes) {
-      const tab = ADMIN_TABS.find((entry) => entry.href === route);
-      expect(activeAdminTab(route), `${route} lights the wrong tab`).toBe(tab?.key);
+      const section = ALL.find((entry) => entry.href === route);
+      expect(activeAdminTab(route), `${route} lights the wrong section`).toBe(section?.key);
     }
   });
 

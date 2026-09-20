@@ -229,49 +229,162 @@ export const PUBLIC_DESTINATIONS: readonly {
 ];
 
 /**
- * PX-9: Platform Administration's own tab row. Administration is NOT a rail
- * item — the rail is short and fixed (see RAIL above, which is FOUR; the
- * "five, forever" this comment used to assert was retracted there and the
- * retraction had not reached here) — so it navigates itself, reached from the
- * avatar menu by the few who hold the grant.
+ * PLATFORM ADMINISTRATION'S OWN SECTIONS (PX-9, regrouped by RN-1 Phase 5).
  *
- * Messaging was missing from this array while being linked from the admin
- * overview and shipped. One omission, three symptoms: no tab to click,
- * `activeAdminTab` falling through to "overview" so the strip lit the WRONG
- * tab, and `pageIdentity` finding no section so the title rendered "Platform
- * admin" directly under a breadcrumb reading "Platform admin".
+ * Administration is NOT a rail item — the rail is short and every slot is a
+ * place this person works — so it navigates itself, reached from a door in the
+ * utility group by the few who hold a platform grant.
+ *
+ * THE RULE CHANGED, DELIBERATELY. Every section used to be shown to every
+ * operator, with the PAGE returning not-found without the grant, so that
+ * comparing two screens could never reveal who holds what. That bought
+ * leak-prevention BETWEEN COLLEAGUES WHO ARE ALL STAFF OF THIS COMPANY, and
+ * charged for it in eight dead clicks per visit, forever, levied on exactly the
+ * operators with the fewest grants: somebody holding only `platform:support`
+ * met twelve tabs, ten of which said "This page doesn't exist".
+ *
+ * So a section now appears only for a capability its reader holds. THE 404 IS
+ * UNTOUCHED — every page still gates itself on a direct URL, which is the real
+ * boundary and keeps every property the capability engine proves. What changed
+ * is only what the chrome OFFERS, which is LAW 3 applied to the same surface as
+ * everywhere else.
  */
-export const ADMIN_TABS: CompetitionTab[] = [
-  { key: "overview", label: "Overview", href: "/admin" },
-  // Second, because on an auction night it is the only tab that matters.
-  { key: "live", label: "Live", href: "/admin/live" },
-  { key: "orgs", label: "Organizations", href: "/admin/orgs" },
-  { key: "users", label: "Users", href: "/admin/users" },
-  { key: "audit", label: "Audit", href: "/admin/audit" },
-  { key: "health", label: "Health", href: "/admin/health" },
-  { key: "messaging", label: "Messaging", href: "/admin/messaging" },
-  // Passes is the one admin surface gated on `platform:billing` rather than
-  // `platform:admin`, so the tab is included for everyone and the PAGE returns
-  // not-found to anyone without it — the same posture the console takes to its
-  // own front door. A tab that appears only for some operators would leak who
-  // holds which grant to anyone comparing screens.
-  { key: "passes", label: "Passes", href: "/admin/passes" },
-  // Demos sits behind `platform:demo` and follows the same rule as Passes: the
-  // tab is present for everyone, the page 404s without the grant. Which tabs
-  // you can SEE must not be a map of which grants you hold.
-  { key: "demos", label: "Demos", href: "/admin/demos" },
-  // Erasure sits behind `platform:privacy`, on the same rule as the two above.
-  { key: "erasure", label: "Erasure", href: "/admin/erasure" },
-  // Moderation sits behind `platform:moderation`, on the same rule again.
-  { key: "moderation", label: "Moderation", href: "/admin/moderation" },
-  { key: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
-  // Reports sits behind `platform:support`, same rule again: present for
-  // everyone, 404 without the grant.
-  { key: "reports", label: "Reports", href: "/admin/reports" },
-  // Reviews shares `platform:support` with Reports — both are what people told
-  // us — and follows the same present-for-everyone, 404-without-grant rule.
-  { key: "reviews", label: "Reviews", href: "/admin/reviews" },
+export type AdminGroup = "platform" | "trust" | "commercial";
+
+export interface AdminSection extends CompetitionTab {
+  /** The one capability that reveals this section. */
+  capability: PlatformDoorCapability;
+  group: AdminGroup;
+  /** First of its group — the strip draws a divider before it. */
+  dividerBefore?: boolean;
+}
+
+/**
+ * Ordered by group. The groups are not labelled in the strip: with the
+ * filtering above, most operators see three or four sections, and a heading
+ * over a pair of links is chrome explaining chrome. The order and a divider
+ * carry it.
+ *
+ *   platform    — what the whole platform is doing right now
+ *   trust       — the sections that act on PEOPLE, and can end an account
+ *   commercial  — customers: what they pay, ask for, and tell us
+ */
+const ADMIN_SECTIONS: readonly Omit<AdminSection, "dividerBefore">[] = [
+  {
+    key: "overview",
+    label: "Overview",
+    href: "/admin",
+    capability: "platform.admin",
+    group: "platform",
+  },
+  // Second, because on an auction night it is the only one that matters.
+  {
+    key: "live",
+    label: "Live",
+    href: "/admin/live",
+    capability: "platform.admin",
+    group: "platform",
+  },
+  {
+    key: "health",
+    label: "Health",
+    href: "/admin/health",
+    capability: "platform.admin",
+    group: "platform",
+  },
+  {
+    key: "audit",
+    label: "Audit",
+    href: "/admin/audit",
+    capability: "platform.admin",
+    group: "platform",
+  },
+
+  {
+    key: "orgs",
+    label: "Organizations",
+    href: "/admin/orgs",
+    capability: "platform.admin",
+    group: "trust",
+  },
+  {
+    key: "users",
+    label: "Users",
+    href: "/admin/users",
+    capability: "platform.admin",
+    group: "trust",
+  },
+  // Can take a public page down, overriding an organizer's own decision.
+  {
+    key: "moderation",
+    label: "Moderation",
+    href: "/admin/moderation",
+    capability: "platform.moderate",
+    group: "trust",
+  },
+  // Can END somebody's account, across every club they were ever in.
+  {
+    key: "erasure",
+    label: "Erasure",
+    href: "/admin/erasure",
+    capability: "platform.privacy",
+    group: "trust",
+  },
+
+  {
+    key: "passes",
+    label: "Passes",
+    href: "/admin/passes",
+    capability: "platform.pass",
+    group: "commercial",
+  },
+  {
+    key: "demos",
+    label: "Demos",
+    href: "/admin/demos",
+    capability: "platform.demo",
+    group: "commercial",
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    href: "/admin/reports",
+    capability: "platform.support",
+    group: "commercial",
+  },
+  {
+    key: "reviews",
+    label: "Reviews",
+    href: "/admin/reviews",
+    capability: "platform.support",
+    group: "commercial",
+  },
+  {
+    key: "newsletter",
+    label: "Newsletter",
+    href: "/admin/newsletter",
+    capability: "platform.admin",
+    group: "commercial",
+  },
+  {
+    key: "messaging",
+    label: "Messaging",
+    href: "/admin/messaging",
+    capability: "platform.admin",
+    group: "commercial",
+  },
 ];
+
+/** The sections this operator holds a key to, with group dividers marked. */
+export function adminSectionsFor(held: readonly PlatformDoorCapability[]): AdminSection[] {
+  const visible = ADMIN_SECTIONS.filter((section) => held.includes(section.capability));
+  let previous: AdminGroup | null = null;
+  return visible.map((section) => {
+    const first = previous !== null && previous !== section.group;
+    previous = section.group;
+    return first ? { ...section, dividerBefore: true } : { ...section };
+  });
+}
 
 export function activeAdminTab(pathname: string): string {
   // An auction is reached from the live board, so it lights the board's tab.
@@ -488,6 +601,15 @@ export interface IdentityContext {
   orgs: { slug: string; name: string }[];
   /** Administration exists for its grant holders only — for everyone else /admin 404s. */
   isAdmin?: boolean;
+  /**
+   * Where this operator's administration STARTS.
+   *
+   * The trail used to point at /admin unconditionally, which 404s for an
+   * operator who holds only `platform:support` — so the one breadcrumb on their
+   * only two pages was a dead link. `operatorDoorHref` already computes the
+   * right landing for each set; this carries it in.
+   */
+  adminHome?: string;
 }
 
 /**
@@ -509,10 +631,11 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
     if (ctx.isAdmin !== true) {
       return { crumbs: [], title: null };
     }
-    return pathname === "/admin"
-      ? { crumbs: [], title: "Platform admin" }
+    const home = ctx.adminHome ?? "/admin";
+    return pathname === home
+      ? { crumbs: [], title: section ?? "Platform admin" }
       : {
-          crumbs: [{ label: "Platform admin", href: "/admin" }],
+          crumbs: [{ label: "Platform admin", href: home }],
           title: section ?? "Platform admin",
         };
   }

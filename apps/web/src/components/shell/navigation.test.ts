@@ -6,6 +6,7 @@ import {
   operatorDoorHref,
   seasonRoleFor,
   activeSeasonTab,
+  adminSectionsFor,
   seasonTabs,
   shellKind,
   RAIL_CAP,
@@ -534,5 +535,75 @@ describe("the strip always says where you are, whatever role you hold", () => {
         expect(at(tab.href, role, true)).toBe(tab.key);
       }
     }
+  });
+});
+
+describe("administration shows an operator the desks they hold (RN-1 §6.3)", () => {
+  const keys = (held: PlatformDoorCapability[]): string[] =>
+    adminSectionsFor(held).map((section) => section.key);
+
+  it("a support-only operator sees their two desks, not twelve dead ends", () => {
+    /*
+     * THE RULE THIS REVERSES. Every section used to be shown to everybody, with
+     * the page 404ing without the grant, so comparing two screens could not
+     * reveal who holds what. The leak it prevented is between colleagues who
+     * are all staff of this company; the cost was ten "This page doesn't exist"
+     * clicks per visit, levied on the operators with the fewest grants.
+     */
+    expect(keys(["platform.support"])).toEqual(["reports", "reviews"]);
+  });
+
+  it("each single grant opens exactly its own desk", () => {
+    expect(keys(["platform.moderate"])).toEqual(["moderation"]);
+    expect(keys(["platform.privacy"])).toEqual(["erasure"]);
+    expect(keys(["platform.pass"])).toEqual(["passes"]);
+    expect(keys(["platform.demo"])).toEqual(["demos"]);
+  });
+
+  it("no platform grant, no sections — administration is absent, not locked", () => {
+    expect(keys([])).toEqual([]);
+  });
+
+  it("platform.admin is not a superset: it opens neither the pass desk nor erasure", () => {
+    // The capability engine's whole point — seeing the platform is a different
+    // act of trust from changing what a customer is entitled to, or ending
+    // somebody's account. The chrome must not imply otherwise.
+    const admin = keys(["platform.admin"]);
+    expect(admin).not.toContain("passes");
+    expect(admin).not.toContain("erasure");
+    expect(admin).not.toContain("moderation");
+    expect(admin).not.toContain("demos");
+    expect(admin).not.toContain("reports");
+  });
+
+  it("groups run platform → trust → commercial, and only seams are marked", () => {
+    const sections = adminSectionsFor([
+      "platform.admin",
+      "platform.moderate",
+      "platform.privacy",
+      "platform.support",
+    ]);
+    // 4 platform (overview, live, health, audit), 4 trust (orgs, users,
+    // moderation, erasure), 4 commercial (reports, reviews from support;
+    // newsletter, messaging from admin — passes and demos need their own
+    // grants, which this operator does not hold).
+    expect(sections.map((section) => section.group)).toEqual([
+      ...Array<string>(4).fill("platform"),
+      ...Array<string>(4).fill("trust"),
+      ...Array<string>(4).fill("commercial"),
+    ]);
+    // Exactly two seams for three groups, and never one on the first item.
+    expect(sections.filter((section) => section.dividerBefore === true)).toHaveLength(2);
+    expect(sections[0]?.dividerBefore).toBeUndefined();
+  });
+
+  it("a seam appears only where a group actually changes", () => {
+    // One grant, one group: no seam to draw.
+    const only = adminSectionsFor(["platform.support"]);
+    expect(only.filter((section) => section.dividerBefore === true)).toHaveLength(0);
+    // Two grants in two groups: one seam.
+    const two = adminSectionsFor(["platform.privacy", "platform.pass"]);
+    expect(two.map((section) => section.key)).toEqual(["erasure", "passes"]);
+    expect(two[1]?.dividerBefore).toBe(true);
   });
 });
