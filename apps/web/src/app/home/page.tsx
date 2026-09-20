@@ -40,8 +40,12 @@ export const metadata = { title: "Home · DesiAuction" };
  * what lets the rail cap at five items: Home is the union surface, so anything
  * the cap drops is still exactly one tap away, here.
  */
-export default async function HomePage() {
-  const session = await currentSession();
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [session, params] = await Promise.all([currentSession(), searchParams]);
   if (session === null) {
     redirect("/login?next=/home");
   }
@@ -51,7 +55,12 @@ export default async function HomePage() {
   return (
     <main className="home">
       <Suspense fallback={<LoadingState variant="page" />}>
-        <HomeBody personId={session.personId} name={session.name} />
+        <HomeBody
+          personId={session.personId}
+          name={session.name}
+          // `?season=` — the club hero's switcher writes it (organizer home).
+          focusSlug={typeof params.season === "string" ? params.season : null}
+        />
       </Suspense>
     </main>
   );
@@ -97,7 +106,15 @@ function identityLine(roles: PersonRoles, entries: number): string {
   return parts.join(" · ") || "Welcome";
 }
 
-async function HomeBody({ personId, name }: { personId: string; name: string }) {
+async function HomeBody({
+  personId,
+  name,
+  focusSlug,
+}: {
+  personId: string;
+  name: string;
+  focusSlug: string | null;
+}) {
   const roles = await rolesOf(personId);
   const manages = roles.organizes.length > 0;
   /*
@@ -178,7 +195,7 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
       {sections.has("auctioneer") ? <AuctioneerHome seasons={roles.conducts} /> : null}
       {sections.has("organizer") ? (
         <Suspense fallback={<LoadingState variant="page" />}>
-          <OrganizerHome nextStepFor={nextStepFor} />
+          <OrganizerHome personId={personId} focusSlug={focusSlug} nextStepFor={nextStepFor} />
         </Suspense>
       ) : null}
       {sections.has("player") ? (
