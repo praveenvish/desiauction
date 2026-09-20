@@ -301,6 +301,9 @@
 
   .tc-cover,
   .pk-sport-glyph {
-    transition: transform 240ms ease;
+    /* `base`, not a raw 240ms: a card hover is the same beat as every other
+       hover in the product, and the scale is not encoding a relationship that
+       a rung would break. */
+    transition: transform var(--duration-base) ease;
   }
 }
