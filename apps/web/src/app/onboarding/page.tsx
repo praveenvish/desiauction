@@ -40,9 +40,17 @@ export default async function OnboardingPage({
     redirect(destination);
   }
   return (
-    // The first signed-in screen: it takes the console's quiet primitives
-    // (an ink primary, not the marketing gold) — see data-surface in AppShell.
-    <main className="onboarding" data-surface="console">
+    /*
+     * NOT a console surface, deliberately. This panel re-points the accent ramp
+     * at the marketing gold so the last click of the entry journey matches
+     * login's "Send code" (see --entry-accent-pressed in onboarding.css). The
+     * console primary pairs --accent-pressed with a WHITE label; against the
+     * re-pointed ramp that is white on #CE9A2E — 2.53:1, an AA failure axe only
+     * misses because the button is disabled until a name is typed. The
+     * marketing primary reads the same ramp with the ink label the gold was
+     * measured against: 7.8:1.
+     */
+    <main className="onboarding">
       <Link className="onboarding-mark" href="/">
         {/* The DA mark every other screen carries — this was the one place
             still drawing the old bar-chart glyph, on a new person's first
