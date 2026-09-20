@@ -258,7 +258,14 @@ changes the menu. Silent change is the confusion; the product says it once:
 
 > **You're now a team owner for Demo Panthers.** Your menu has a new item — *My team*.
 
-An inline notice on the next page load, dismissed permanently on first sight.
+An inline notice on the next page load, shown once. Which change earns a
+sentence is a product decision, so it is a pure function (`role-change.ts`)
+with its own test: only ADDITIONS are announced (losing a role is the revoking
+organizer's to explain, and a menu item that quietly disappears is not
+something anybody hunts for), several at once collapse to the most urgent in
+the rail's own order, and a device with no stored signature says nothing at all
+— telling somebody "you're now a team owner" about a team they have owned for a
+month is worse than silence.
 
 ---
 
@@ -367,7 +374,12 @@ Answering "for whom do we show the player list":
 The team-owner row is **competitive integrity**, not only privacy: a rival's
 remaining purse leaking mid-auction decides the auction.
 
-**Pinned, with a control.** `live-auction.spec.ts` already builds the expensive
+**Pinned twice.** `workspaceSightFor` (team-workspace.ts) is the whole rule as
+one pure function, and `data-visibility.test.ts` asserts every row of the table
+above — including that `auction.conduct` buys neither half, and that holding
+nothing is served nothing, because membership is not a capability.
+
+**And proved end-to-end, with a control.** `live-auction.spec.ts` builds the expensive
 state — three accepted owners, each a viewer-level member of the host club, on
 a settled season — so the assertion lives there: each owner's own
 `response.text()` for `/seasons/{slug}/teams` carries none of `TeamCard`'s
@@ -376,11 +388,10 @@ money keys, and the organizer's carries all of them from the same route.
 The control is the load-bearing half. Two earlier drafts guessed key names that
 are never emitted for anybody, and both passed the owner side while failing the
 control. **A negative assertion against a string the page never emits proves
-nothing**, and only an inverted check can tell the two apart. The remaining
-rows (auctioneer, player, member) are gated by the same
-`money`/`roster` options on the same read model and are covered by unit-level
-capability resolution; extending the served-payload proof to each is a
-follow-up, not a gap in the gate.
+nothing**, and only an inverted check can tell the two apart. The remaining rows share that one rule and are asserted against it directly;
+only the team-owner row also has a browser behind it, because it is the only
+one whose fixture already existed and the only one where the cost of being
+wrong is an auction decided by a leak.
 
 ---
 
@@ -463,6 +474,25 @@ themes; assert computed styles, not tokens; scope queries to
 `getByRole("dialog")` because a closed `FormDialog` keeps its form in the DOM.
 
 ---
+
+## 10.1 Delivered — final state
+
+Nine phases-worth of work in nine commits on `rn1/navigation-model`, branched
+from `origin/main`.
+
+| Gate | Result |
+|---|---|
+| Full Playwright suite (precompiled) | **131 passed, 0 failed** |
+| Unit tests (web) | **340 passed** |
+| lint · typecheck · depcruise · format · check:motion | green |
+| axe, **both themes** | clean |
+
+`/home`'s files, after the Phase 3 split and the Phase 6 follow-through:
+`page.tsx` 192 · `organizer-home` 336 · `player-home` 147 · `auctioneer-home`
+135 · `member-home` 68 · `newcomer-home` 45 · `owner-home` 38. The two files
+still above 350 are `organizer-panels` (515) and `organizer-parts` (584) — a
+panel catalogue and a formatting library, which is a different kind of file
+from a page, and each is reviewable on its own terms.
 
 ## 11. Out of scope, deliberately
 

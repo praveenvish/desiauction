@@ -11,6 +11,8 @@ import { greetingFor } from "./home-parts";
 import { homeSections } from "./home-router";
 import { MemberHome } from "./member-home";
 import { NewcomerHome } from "./newcomer-home";
+import type { RoleToken } from "./role-change";
+import { RoleChangeNotice } from "./role-change-notice";
 import { chooseNextStep, type NextStep } from "./next-step";
 import { NextStepBanner } from "./next-step-banner";
 import { OrganizerHome } from "./organizer-home";
@@ -112,6 +114,13 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
     }),
   );
   const newcomer = sections.has("newcomer");
+  // The same facts the rail is built from, in the notice's vocabulary.
+  const heldRoles: RoleToken[] = [
+    ...(manages ? (["organizer"] as const) : []),
+    ...(roles.owns.length > 0 ? (["owner"] as const) : []),
+    ...(roles.conducts.length > 0 ? (["auctioneer"] as const) : []),
+    ...(roles.plays ? (["player"] as const) : []),
+  ];
 
   /*
    * Read only for the line under the greeting, and only when this person plays.
@@ -161,6 +170,8 @@ async function HomeBody({ personId, name }: { personId: string; name: string }) 
   return (
     <>
       <PageTitle title={greetingFor(new Date(), name)} subtitle={identityLine(roles, entries)} />
+      {/* Said once, when the menu actually changed under them (RN-1 §3.6). */}
+      <RoleChangeNotice held={heldRoles} />
       {standaloneStep !== null ? <NextStepBanner step={standaloneStep} /> : null}
       {sections.has("newcomer") ? <NewcomerHome /> : null}
       {sections.has("owner") ? <OwnerHome teams={roles.owns} /> : null}

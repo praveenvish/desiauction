@@ -41,6 +41,50 @@ import { shownName } from "./shown-name";
  * RSC payload, and CSS cannot un-hide what was never serialized.
  */
 
+/**
+ * WHO MAY SEE WHAT, IN ONE PLACE (RN-1 §7).
+ *
+ * This decision used to live inline in `teamsWorkspaceView`, which made it
+ * unreachable by a test: proving the auctioneer row, the player row and the
+ * member row each needed a browser, a live auction and a seeded grant. The
+ * rule is now a pure function and the matrix below is asserted exhaustively;
+ * the SERIALIZATION is proved end-to-end for the row that matters most — a
+ * rival bidder's purse, in e2e/live-auction.spec.ts.
+ *
+ * The rows, from the RN-1 plan:
+ *
+ *   organizer / staff  every registration: name, phone, role, fee, notes
+ *   auctioneer         the pool: name, role, base price. NO phones, no fees
+ *   team owner         own squad in full; never a rival's remaining purse
+ *   player             own entry; the published pool
+ *   member (viewer)    what the public sees
+ *
+ * Note what does NOT appear on the right-hand side: `auction.conduct`, and
+ * membership. Conduct is narrow on purpose (core/capabilities) — running the
+ * night is not a licence to read the club's registrant list or its books — and
+ * membership buys identity and counts and nothing else, which matters because
+ * `acceptOwnerJoin` makes every rival bidder a member.
+ */
+export function workspaceSightFor(caps: {
+  /** `competition.manage` — running the season IS money authority over it. */
+  canManage: boolean;
+  /** `settlement.view` — keeping its books. */
+  canSettle: boolean;
+  /** `registration.review` — the capability /registrations itself is gated on. */
+  canReview: boolean;
+  /** `auction.conduct` — deliberately buys NEITHER. */
+  canConduct: boolean;
+}): TeamsWorkspaceOptions {
+  return {
+    // The same two answers the season overview gives, so one season cannot
+    // report its money two ways: running it, or keeping its books.
+    money: caps.canManage || caps.canSettle,
+    // Squad names and phone numbers are registration data wherever they are
+    // rendered; /registrations is gated on `registration.review`, so is this.
+    roster: caps.canManage || caps.canReview,
+  };
+}
+
 export interface TeamsWorkspaceOptions {
   /**
    * Money sight: `competition.manage` (running the season is money authority
