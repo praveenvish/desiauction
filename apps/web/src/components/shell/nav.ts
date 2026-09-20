@@ -1,5 +1,32 @@
 import { sportPack } from "@desiauction/core";
 
+/* ===========================================================================
+ * THE SEVEN NAVIGATION LAWS (RN-1)
+ *
+ * Everything below is a consequence of these. They are here, in the module
+ * every shell and layout reads, so that the next change has to argue with them
+ * rather than quietly contradict them — which is exactly how this file came to
+ * hold two disagreeing navigation authorities.
+ *
+ *   1. ONE PRIMARY LIST. Exactly one, at most five items. Never three.
+ *   2. RAIL = WHO YOU ARE. TABS = WHERE YOU ARE. ACTION = WHAT YOU CAN DO.
+ *      Nothing appears in two of them.
+ *   3. OFFER ONLY WHAT IS YOURS. A destination that would 404, or come up
+ *      empty, is ABSENT — never disabled, never present-and-apologising.
+ *   4. SAME MENU ON EVERY DEVICE. Same items, same order, same active state.
+ *   5. ONE NAME PER SURFACE, drawn by the shell. No page titles itself.
+ *   6. ONE PRIMARY ACTION PER SCREEN, always in the same place.
+ *   7. LIVE OUTRANKS EVERYTHING. An auction you are in takes the top of the
+ *      rail and the top of home, whatever else is true.
+ *
+ * And the rule that repairs the defect these laws were written for:
+ *
+ *   MEMBERSHIP IS NOT A ROLE. `memberOf` confers READ ACCESS and never a menu
+ *   item. `acceptOwnerJoin` makes every team owner a viewer-level member of the
+ *   host club, so a menu built from membership hands a player who accepted a
+ *   team the whole organizer product. A menu is built from what you DO.
+ * ======================================================================== */
+
 /**
  * The one navigation model (PX-1 01; PX-2 scope §2). Pure data + pure
  * functions — the single source for shell selection, rail items, competition
@@ -811,4 +838,491 @@ export function roleNavGroups(roles: ShellRoles | null, pathname: string): RoleN
           : pathname === item.href || pathname.startsWith(`${item.href}/`),
     })),
   }));
+}
+
+/* ===========================================================================
+ * RN-1 — THE ONE NAVIGATION MODEL
+ *
+ * Everything above this line is the PX-2 model, still wired to the shell. This
+ * section is its replacement: one pure function that answers "what is in this
+ * person's menu", for every device, from role facts alone.
+ *
+ * Phase 1 ships the model and its test matrix and changes no UI. Phase 2 swaps
+ * `ProductShell` onto it and deletes `RAIL`, `railFor`, `roleNavGroups` and
+ * `activeRailKey`, which are the three-lists-in-one-sidebar defect (LAW 1).
+ *
+ * WHY A UNION AND NOT A MODE. The first draft of RN-1 proposed a "lens" — one
+ * role the product assumes you are in, with a switcher and a cookie. A mode is
+ * a power-user concept: hidden state, a control that has to be taught, and a
+ * new question ("why am I seeing this?") added to a product whose whole
+ * complaint is that it is confusing. So the menu is simply the UNION of what is
+ * yours, ordered by urgency, capped at five — deterministic, teachable by
+ * looking at it, and testable as a table.
+ *
+ * THE CAP CAN BE HARD BECAUSE HOME IS THE UNION SURFACE. Every role's summary
+ * lives on /home, so an item dropped by the cap is always exactly one tap away.
+ * That is what lets this refuse a "More…" menu, which is a fourth list wearing
+ * a disguise.
+ * ======================================================================== */
+
+/**
+ * Rail and utility icons. Named, not imported: this module is pure data shared
+ * by a server layout and a client shell, and the moment it imports a component
+ * it stops being either.
+ */
+export type NavIcon =
+  | "home"
+  | "room"
+  | "cockpit"
+  | "team"
+  | "nights"
+  | "trophy"
+  | "org"
+  | "money"
+  | "sports"
+  | "find"
+  | "help"
+  | "bell"
+  | "account"
+  | "admin";
+
+/** One entry of a multi-scope item's popover (two teams, three auction nights). */
+export interface NavChoice {
+  key: string;
+  label: string;
+  /** The season this one belongs to — the popover's second line. */
+  hint: string;
+  href: string;
+  live?: boolean;
+}
+
+export interface NavItem {
+  key: string;
+  label: string;
+  href: string;
+  icon: NavIcon;
+  /** An auction under this item is running right now (LAW 7). */
+  live?: boolean;
+  active?: boolean;
+  /** Present only when the person holds more than one of this thing. */
+  choices?: NavChoice[];
+}
+
+export interface NavModel {
+  /** LAW 1: the one primary list, at most `RAIL_CAP` items. */
+  rail: NavItem[];
+  /** Site-wide services. The rail is WORK; this is everything else. */
+  utility: NavItem[];
+}
+
+/**
+ * The six platform capability sets, as bare strings.
+ *
+ * Declared here rather than imported from `server/admin/capabilities`: this
+ * module is bundled into the client, and a type-only import that someone later
+ * "tidies" into a value import would drag the platform vocabulary — and
+ * whatever it grows to import — into every visitor's browser. The pairing is
+ * pinned by a test instead.
+ */
+export type PlatformDoorCapability =
+  | "platform.admin"
+  | "platform.support"
+  | "platform.moderate"
+  | "platform.privacy"
+  | "platform.pass"
+  | "platform.demo";
+
+/** A team this person owns, or a season they were appointed to run. */
+export interface NavScope {
+  /** The team's name, or the season's. */
+  label: string;
+  seasonSlug: string;
+  /** The season's name — what a popover row says underneath the label. */
+  seasonName: string;
+  /** Its auction is `live` or `paused`. */
+  live: boolean;
+}
+
+/**
+ * WHO THIS PERSON IS, reduced to what a menu needs.
+ *
+ * Every field is a FACT, derived in `server/roles/roles.ts`. There is
+ * deliberately no `memberOf` and no `onlyPlays`: membership is not a role, and
+ * `onlyPlays` was a single fragile branch standing in for a model.
+ */
+export interface NavRoles {
+  /** Holds `org:owner` or `org:staff` anywhere. */
+  organizes: boolean;
+  /** Teams owned — an accepted owner invite or a live paddle grant. */
+  teams: NavScope[];
+  /** Seasons held under an `auction:conductor` grant. */
+  conducts: NavScope[];
+  /** A registration anywhere, or a player profile. */
+  plays: boolean;
+  /** Holds `settlement.view` or finops on at least one org. */
+  hasBooks: boolean;
+  /** Platform capabilities actually held — not "is an admin". */
+  platform: readonly PlatformDoorCapability[];
+}
+
+/** LAW 1. Five is the cap, and §RN-1 3.1 explains why it can be hard. */
+export const RAIL_CAP = 5;
+
+/**
+ * Where an operator's one door leads.
+ *
+ * `platform.admin` opens the overview; every other set opens the ONE section it
+ * licenses. Before RN-1 the door was rendered on `platform.admin` alone, so an
+ * operator holding only support, moderation, privacy, billing or demo had no
+ * door anywhere and had to type the URL — while the pages behind it worked.
+ * Ordered most-general first: an operator holding two sets lands on the wider.
+ */
+const PLATFORM_DOORS: [PlatformDoorCapability, string][] = [
+  ["platform.admin", "/admin"],
+  ["platform.support", "/admin/reports"],
+  ["platform.moderate", "/admin/moderation"],
+  ["platform.privacy", "/admin/erasure"],
+  ["platform.pass", "/admin/passes"],
+  ["platform.demo", "/admin/demos"],
+];
+
+export function operatorDoorHref(held: readonly PlatformDoorCapability[]): string | null {
+  for (const [capability, href] of PLATFORM_DOORS) {
+    if (held.includes(capability)) {
+      return href;
+    }
+  }
+  return null;
+}
+
+/**
+ * LAW 7 — the one item that outranks everything, or null.
+ *
+ * Conducting beats owning when (rarely) both are live: without the auctioneer
+ * the whole room is stopped, whereas an owner's absence costs only that owner.
+ */
+function liveDoor(roles: NavRoles): NavItem | null {
+  const night = roles.conducts.find((scope) => scope.live);
+  if (night !== undefined) {
+    return {
+      key: "cockpit",
+      label: "Cockpit",
+      href: `/seasons/${night.seasonSlug}/auction/cockpit`,
+      icon: "cockpit",
+      live: true,
+    };
+  }
+  const team = roles.teams.find((scope) => scope.live);
+  if (team !== undefined) {
+    return {
+      key: "room",
+      label: "Auction room",
+      href: `/seasons/${team.seasonSlug}/auction/live`,
+      icon: "room",
+      live: true,
+    };
+  }
+  return null;
+}
+
+/**
+ * One scope → a named link. Several → the same link plus a popover.
+ *
+ * `currentTeam()` used to answer this by returning ONE team, so an owner with
+ * teams in two seasons silently lost one. The href still points at the first
+ * scope so the item works as a plain link when the popover cannot open.
+ */
+function scopeItem(
+  key: string,
+  scopes: NavScope[],
+  plural: string,
+  icon: NavIcon,
+  href: (scope: NavScope) => string,
+): NavItem | null {
+  const first = scopes[0];
+  if (first === undefined) {
+    return null;
+  }
+  if (scopes.length === 1) {
+    return {
+      key,
+      label: first.label,
+      href: href(first),
+      icon,
+      ...(first.live ? { live: true } : {}),
+    };
+  }
+  return {
+    key,
+    label: plural,
+    href: href(first),
+    icon,
+    ...(scopes.some((scope) => scope.live) ? { live: true } : {}),
+    choices: scopes.map((scope, index) => ({
+      key: `${key}-${String(index)}`,
+      label: scope.label,
+      hint: scope.seasonName,
+      href: href(scope),
+      ...(scope.live ? { live: true } : {}),
+    })),
+  };
+}
+
+/**
+ * Does this path belong to this rail item?
+ *
+ * Ordered evaluation, not longest-prefix: `navigationFor` marks the FIRST
+ * matching item and no other, so an organizer standing on their own team's page
+ * lights "My team" rather than "Tournaments". Exactly one item is ever active,
+ * which is a property the test matrix asserts for every row.
+ */
+function claims(item: NavItem, pathname: string): boolean {
+  switch (item.key) {
+    case "home":
+      return pathname === "/home" || pathname.startsWith("/home/");
+    case "tournaments":
+      return pathname.startsWith("/tournaments") || pathname.startsWith("/seasons");
+    case "orgs":
+      return pathname.startsWith("/orgs") || pathname.startsWith("/org/");
+    case "money":
+      return pathname.startsWith("/money");
+    case "sports":
+      return pathname === "/me" || pathname.startsWith("/me/");
+    case "find":
+      return pathname === "/c" || pathname.startsWith("/c/");
+    case "help":
+      return pathname.startsWith("/help");
+    case "bell":
+      return pathname.startsWith("/inbox");
+    case "account":
+      return pathname.startsWith("/account");
+    case "admin":
+      return pathname.startsWith("/admin");
+    default:
+      // Scope items (team, nights, room, cockpit) own their own subtree, and a
+      // popover's item owns every one of its choices.
+      return [item.href, ...(item.choices ?? []).map((choice) => choice.href)].some(
+        (href) => pathname === href || pathname.startsWith(`${href}/`),
+      );
+  }
+}
+
+/**
+ * THE MENU. One function, every device, from facts alone.
+ *
+ * The candidate order below IS the product ruling from RN-1 §3.1 — urgency
+ * first, then how much of this product the person has invested in. Read it as
+ * the answer to "if this person may only have five doors, which five?".
+ */
+export function navigationFor(input: { roles: NavRoles | null; pathname: string }): NavModel {
+  const { roles, pathname } = input;
+  if (roles === null) {
+    // Signed out. The public shell draws its own header; there is no rail.
+    return { rail: [], utility: [] };
+  }
+
+  const candidates: (NavItem | null)[] = [
+    { key: "home", label: "Home", href: "/home", icon: "home" },
+    liveDoor(roles),
+    scopeItem(
+      "team",
+      roles.teams,
+      "My teams",
+      "team",
+      (scope) => `/seasons/${scope.seasonSlug}/teams`,
+    ),
+    scopeItem(
+      "nights",
+      roles.conducts,
+      "Auction nights",
+      "nights",
+      (scope) => `/seasons/${scope.seasonSlug}/auction`,
+    ),
+    roles.organizes
+      ? { key: "tournaments", label: "Tournaments", href: "/tournaments", icon: "trophy" }
+      : null,
+    roles.organizes ? { key: "orgs", label: "Organizations", href: "/orgs", icon: "org" } : null,
+    // DA-18 removed Money because it led to an apology. It comes back for the
+    // people who have books — and stays absent for everyone else (LAW 3).
+    roles.hasBooks ? { key: "money", label: "Money", href: "/money", icon: "money" } : null,
+    roles.plays ? { key: "sports", label: "My sports", href: "/me", icon: "sports" } : null,
+    /*
+     * An organizer already has three doors into competitions; the public
+     * directory is for people who need to FIND one.
+     *
+     * KNOWN, AND FIXED IN PHASE 2: `/c` is a PUBLIC surface by `shellKind`, so
+     * this — a player's most-used rail item — currently navigates them out of
+     * the shell that drew it, and the whole chrome changes under them. Phase 2
+     * makes `shellKind` session-aware for `/c` and `/c/{slug}`, the way
+     * `liveExit` is already session-aware, so a signed-in visitor keeps their
+     * menu while browsing. Until then the rail simply never renders there,
+     * which is why no test asserts an active item on that path.
+     */
+    roles.organizes ? null : { key: "find", label: "Find tournaments", href: "/c", icon: "find" },
+  ];
+
+  const offered = candidates.filter((item): item is NavItem => item !== null);
+
+  /*
+   * THE PAGE YOU ARE ON ALWAYS HAS A SEAT.
+   *
+   * The cap is hard (LAW 1), so a busy organizer who also plays loses "My
+   * sports" to it. Without this, walking to /me — reachable from their home,
+   * which is the whole justification for a hard cap — lit NOTHING in the menu,
+   * and a menu that cannot say where you are is worse than a long one.
+   *
+   * So the item claiming the current path displaces the lowest-precedence one
+   * instead of vanishing. Home keeps slot 1 always; the cap still holds.
+   */
+  const claimant = offered.findIndex((item) => claims(item, pathname));
+  const rail =
+    claimant >= RAIL_CAP
+      ? [...offered.slice(0, RAIL_CAP - 1), offered[claimant] as NavItem]
+      : offered.slice(0, RAIL_CAP);
+
+  const doorHref = operatorDoorHref(roles.platform);
+  const utility: NavItem[] = [
+    { key: "bell", label: "Notifications", href: "/inbox", icon: "bell" },
+    { key: "account", label: "Account", href: "/account", icon: "account" },
+    // Help left the rail under RN-1: the rail is WORK, utility is SERVICES.
+    // That is what frees the four slots beside Home.
+    { key: "help", label: "Help", href: "/help", icon: "help" },
+    ...(doorHref !== null
+      ? [{ key: "admin", label: "Platform admin", href: doorHref, icon: "admin" as const }]
+      : []),
+  ];
+
+  // Exactly one active item across BOTH lists, first match wins.
+  let claimed = false;
+  const mark = (item: NavItem): NavItem => {
+    if (claimed || !claims(item, pathname)) {
+      return item;
+    }
+    claimed = true;
+    return { ...item, active: true };
+  };
+  return { rail: rail.map(mark), utility: utility.map(mark) };
+}
+
+/* ---------------------------------------------------------------------------
+ * THE SEASON WORKSPACE
+ *
+ * A person's role is not global — they organize club A, own a team in season B
+ * and play in season C. `competitionTabs` asked one and a half booleans
+ * (`canManage`, `canSettle`), so a team owner got six tabs and not one of them
+ * was "My plan" or "My squad", the only two they came for.
+ * ------------------------------------------------------------------------ */
+
+export type SeasonRole =
+  "organizer" | "staff" | "auctioneer" | "owner" | "player" | "member" | "public";
+
+export interface SeasonRoleFacts {
+  /** `org:owner` / `org:staff` on the club that owns this season. */
+  manages: "owner" | "staff" | null;
+  /** An `auction:conductor` grant on THIS season. */
+  conducts: boolean;
+  /** Owns a team in this season. */
+  ownsTeam: boolean;
+  /** Has a registration in this season. */
+  registered: boolean;
+  /** Belongs to the club with no capability — read access, never a role. */
+  member: boolean;
+}
+
+/**
+ * Highest authority wins. An org owner who also owns a team in their own season
+ * is an ORGANIZER here: they can already see everything, and demoting them to
+ * the owner's four tabs would hide their own workspace from them.
+ */
+export function seasonRoleFor(facts: SeasonRoleFacts): SeasonRole {
+  if (facts.manages === "owner") return "organizer";
+  if (facts.manages === "staff") return "staff";
+  if (facts.conducts) return "auctioneer";
+  if (facts.ownsTeam) return "owner";
+  if (facts.registered) return "player";
+  if (facts.member) return "member";
+  return "public";
+}
+
+/**
+ * The tab strip, by role in THIS season.
+ *
+ * Two consolidations take the organizer from nine tabs to seven, each joining
+ * surfaces that answer one question:
+ *   · PLAYERS  = Registrations + Lineups — "who is in this season"
+ *   · SCHEDULE = Fixtures + Table        — "when, and how it went"
+ *
+ * The `testId`s are carried forward from `competitionTabs` unchanged: these
+ * tabs ARE the navigation the e2e suite drives, and renaming a hook during a
+ * navigation change is how a suite starts failing for the wrong reason.
+ */
+export function seasonTabs(
+  slug: string,
+  role: SeasonRole,
+  options: { canSettle?: boolean } = {},
+): CompetitionTab[] {
+  const base = `/seasons/${slug}`;
+  const overview: CompetitionTab = { key: "overview", label: "Overview", href: base };
+  const table: CompetitionTab = {
+    key: "standings",
+    label: "Table",
+    href: `${base}/standings`,
+    testId: "open-standings",
+  };
+  const auction: CompetitionTab = {
+    key: "auction",
+    label: "Auction",
+    href: `${base}/auction`,
+    testId: "open-auction",
+  };
+  const teams: CompetitionTab = {
+    key: "teams",
+    label: "Teams",
+    href: `${base}/teams`,
+    testId: "open-teams",
+  };
+
+  switch (role) {
+    case "organizer":
+    case "staff":
+      return [
+        overview,
+        {
+          key: "players",
+          label: "Players",
+          href: `${base}/registrations`,
+          testId: "open-dashboard",
+        },
+        teams,
+        { key: "schedule", label: "Schedule", href: `${base}/fixtures`, testId: "open-fixtures" },
+        auction,
+        // Absent without `settlement.view`, never disabled — the surface itself
+        // 404s rather than admit the books exist, and the tab must agree.
+        ...(options.canSettle === true
+          ? [{ key: "money", label: "Money", href: `${base}/money` }]
+          : []),
+        { key: "reviews", label: "Reviews", href: `${base}/reviews`, testId: "open-reviews" },
+      ];
+    case "auctioneer":
+      // Conduct is narrow on purpose (core/capabilities): run the night, see
+      // who is bidding. No registrations, no money, no reviews.
+      return [overview, teams, auction];
+    case "owner":
+      return [
+        { key: "my-team", label: "My team", href: `${base}/teams`, testId: "open-teams" },
+        { key: "my-plan", label: "My plan", href: `${base}/auction/plan` },
+        { key: "room", label: "Auction room", href: `${base}/auction/live` },
+        table,
+      ];
+    case "player":
+      return [
+        overview,
+        { key: "my-entry", label: "My entry", href: `${base}/register` },
+        table,
+        auction,
+      ];
+    case "member":
+    case "public":
+      return [overview, table, auction];
+  }
 }
